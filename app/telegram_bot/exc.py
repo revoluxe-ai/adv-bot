@@ -1,0 +1,4 @@
+
+
+class UnknownInnerError(Exception):
+    pass

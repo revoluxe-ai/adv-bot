@@ -1,0 +1,18 @@
+from python_modules.path_setting_funcs import get_document_by_key_name
+
+setting_path = 'setting.yaml'
+
+
+
+
+
+
+class Settings:
+
+    @property
+    def cv(self):
+        return get_document_by_key_name(setting_path, 'cv')
+
+
+settings = Settings()
+
