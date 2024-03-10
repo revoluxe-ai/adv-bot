@@ -55,19 +55,13 @@ from session_maker import get_async_session_maker
 predictor = Predictor()
 
 
-
-
-
-
-
-
-
-
 logger = logging.getLogger(__name__)
 
 fit_logger = logging.getLogger('fit_logger')
 
 sm = get_async_session_maker()
+
+
 
 
 class Manager(AbcManager):
@@ -78,6 +72,7 @@ class Manager(AbcManager):
     _word2vec = Word2Vec()
     _faiss_manager = FaissManager()
     _lock = asyncio.Lock()
+    _predictor = Predictor()
 
     def __init__(self):
         self._image_master = ImageMaster()
@@ -100,7 +95,6 @@ class Manager(AbcManager):
             async with sm() as session:
                 stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
                 result = (await session.execute(stmt)).unique()
-                # adv_settings = result.scalars()
                 for adv_setting in result.scalars():
                     keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
                     for keyword in keywords:
@@ -155,7 +149,7 @@ class Manager(AbcManager):
 
     async def graph_vector_update(self, saving_data_for_predictor:asyncio.Event) -> None:
         # power = self._shop_manager.power
-        length = 2**3
+        length = 2**4
         if True:
             await self.graph_updater.update_graph_run(length)
         await self.graph_updater.get_nmids_and_keyword_featers_for_ml(saving_data_for_predictor)
@@ -337,7 +331,7 @@ class Manager(AbcManager):
 
 
     async def fit_and_save_model(self, model_saving: asyncio.Lock):
-        model = await self._fitter.getGradientBoostingFullFitModel()
+        await self._fitter.getGradientBoostingFullFitModel()
 
 
     async def update_vectors_exec_mode(self, saving_data_for_predictor: asyncio.Event):
@@ -499,67 +493,8 @@ class Manager(AbcManager):
         except ValueError:
             return False
 
-
-
-
-
-class PredictManager:
-    async def predict_ctr_for_keywords(self):
-        async with sm() as session:
-            stmt = select(AdvSetting).options(joinedload(AdvSetting.adv_keywords),AdvSetting.nmids)
-            result = await session.execute(stmt)
-            all_adv_settings = result.scalars().all()
-            df_for_predict = await self._get_df_for_predict(all_adv_settings, session)
-            predict_df = await asyncio.to_thread(predictor.predict, df_for_predict)
-
-            # for n, row in predict_df.iterrows():
-            #     adv_id = row['adv_id']
-            #     keyword = row['keyword']
-            #     predict_ctr = row['predict_ctr']
-            #     smtp =
-
-
-
-
-
-
-    async def _get_df_for_predict(self, adv_settings: list[AdvSetting], session)->pd.DataFrame:
-       data_rows = []
-       for adv in adv_settings:
-           item_features_list = []
-           for nmid in adv.nmids:
-               item_feature = await session.execute(
-                   select(ItemFeature).where(ItemFeature.nmid == nmid)
-               )
-               item_features = item_feature.scalars().all()
-               for item_feature in item_features:
-                   item_features_list.append(item_feature.vector)
-
-           # Вычисляем средние значения фичей товаров, если они есть
-
-           avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
-           avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
-
-           for keyword in adv.keyword_settings:
-               keyword_feature = await session.execute(
-                   select(KeywordFeature).where(KeywordFeature.keyword == keyword.text)
-               )
-               keyword_feature = keyword_feature.scalars().first()
-               keyword_features = keyword_feature.vector
-
-               row = {
-                   'adv_id': adv.adv_id,
-                   'keyword': keyword.text,
-                   **avg_item_features,
-                   **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
-               }
-               data_rows.append(row)
-
-       df = pd.DataFrame(data_rows)
-       return df
-
-
-
+    async def update_predict_ctr(self, update_featers_block):
+        await self._predictor.predict_ctr_for_keywords(update_featers_block)
 
 
 

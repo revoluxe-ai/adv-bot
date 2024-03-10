@@ -1,5 +1,8 @@
 import datetime
+import os.path
 import typing
+
+import joblib
 import xgboost
 
 import settings
@@ -15,7 +18,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import sessionmaker, joinedload, selectinload
 from xgboost import XGBRegressor
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from app.wildberries.models import AdvSetting, WBCard, WBCategory, KeywordSetting
 from app.keyword_async_ml_updater.models import KeywordFeature, ItemFeature
 import json
@@ -32,17 +35,26 @@ model_folder = 'app/keyword_async_ml_updater/model'
 
 global_model: typing.Union[xgboost.XGBModel, None] = None
 
+path = 'app/keyword_async_ml_updater/model/'
 
-def save_model(model: xgboost.XGBModel, time_stamp, path):
-    model.save_model('app/keyword_async_ml_updater/model')
+def save_model(model: xgboost.XGBModel, time_stamp):
+    model_path = os.path.join(path, 'model.json')
+    joblib.dump(model, model_path)
+
     with open(f'{path}/time_stamp.txt', 'w') as file:
         file.write(time_stamp)
+
+def load_model():
+    model = joblib.load(os.path.join(path, 'model.json'))
+    with open(f'{path}/time_stamp.txt', 'r') as file:
+        time_stamp = file.read()
+    return model, time_stamp
+
 
 
 class Fitter(AbcManager):
 
     data_getter = DataGetter()
-
 
 
     @staticmethod
@@ -95,9 +107,9 @@ class Fitter(AbcManager):
         return df_final
 
     async def getGradientBoostingFullFitModel(self):
-        model = await self._fit_modelGradientBoosting()
+        await self._fit_modelGradientBoosting()
         fit_logger.debug('Модель обучена')
-        return model
+
 
     def _get_enough_views(self, ctr, n):
          return int(1/ctr/n)
@@ -192,7 +204,7 @@ class Fitter(AbcManager):
 
         return df
 
-    async def _get_df_for_fit(self)-> (pd.DataFrame, str):
+    async def _get_df_for_fit(self, timestamp_str)-> pd.DataFrame:
         async with sm() as sess:
             result = await sess.execute(
                 select(AdvSetting)
@@ -206,7 +218,6 @@ class Fitter(AbcManager):
 
             data_rows = []
 
-            time_stamp = None
 
             for adv in adv_settings:
                 item_features_list = []
@@ -218,10 +229,7 @@ class Fitter(AbcManager):
                     if not item_features:
                         continue
                     for item_feature in item_features:
-                        if time_stamp is None:
-                            time_stamp = item_feature.timestamp
-                        else:
-                            assert time_stamp == item_feature.timestamp
+                        item_feature.timestamp = timestamp_str
                         item_features_list.append(item_feature.vector)
 
                 # Вычисляем средние значения фичей товаров, если они есть
@@ -240,8 +248,11 @@ class Fitter(AbcManager):
                     if not keyword_feature:
                         continue
                     keyword_features = keyword_feature.vector
+                    keyword_feature.timestamp = timestamp_str
                     clicks = sum([adv_keyword.clicks for adv_keyword in keyword_setting.adv_keywords])
                     views = sum([adv_keyword.views for adv_keyword in keyword_setting.adv_keywords])
+                    if views < 18:
+                        continue
                     spend = sum([adv_keyword.spend for adv_keyword in keyword_setting.adv_keywords])
                     row = {
                         'adv_id': adv.adv_id,
@@ -254,23 +265,26 @@ class Fitter(AbcManager):
                         **{f'keyword_feature_{i}': keyword_features[i] for i in  range(len(keyword_features))},
                     }
                     data_rows.append(row)
+            await sess.commit()
 
         df = pd.DataFrame(data_rows)
         if len(df) > 0:
             df = df[df.views > 0]
             df['ctr'] = df['clicks'] / df['views']
-        return df, time_stamp
+        return df
 
 
 
     async def _fit_modelGradientBoosting(self):
+        timestamp = datetime.datetime.now()
+        timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
         fit_logger.debug('Поток обучения запущен, получение данных')
-        df, timestamp_str = await self._get_df_for_fit()
+        df = await self._get_df_for_fit(timestamp )
         fit_logger.debug('Данные получены')
         df:pd.DataFrame = await self._bayesian_apply(df)
         await asyncio.to_thread(df.to_csv,'work_folder/df_for_fit.csv', index=False)
         y = df['ctr']
-        X = df.drop([ 'keyword', 'views', 'ctr', 'clicks',  'adv_id'], axis=1)
+        X = df.drop([ 'keyword', 'views', 'ctr', 'clicks',  'adv_id', 'spend', 'nmids'], axis=1)
         fit_logger.debug('Данные подготовлены')
         # Создание модели градиентного бустинга
         model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
@@ -293,18 +307,93 @@ class Fitter(AbcManager):
         model.fit(X, y)
         fit_logger.debug('Модель обучена')
         model = typing.cast(xgboost.XGBModel, model.named_steps['xgbregressor'])
-        global_model = model
-        await asyncio.to_thread(save_model, model, timestamp_str, self.model_path)
+        await asyncio.to_thread(save_model, model, timestamp_str)
 
 
 
 
 class Predictor:
-    def predict(self, df: pd.DataFrame):
+
+    def _predict(self, df: pd.DataFrame)-> typing.Union[pd.DataFrame, None]:
+        model, timestamp_str = load_model()
         X = df.drop(['keyword', 'adv_id'], axis=1)
-        y = global_model.predict(X)
+        y = model.predict(X)
         df['predicted_ctr'] = y
         return df
+
+    async def predict_ctr_for_keywords(self, update_featers_block):
+        async with sm() as session:
+            stmt = select(AdvSetting).options(
+                selectinload(AdvSetting.adv_keywords),
+                selectinload(AdvSetting.keyword_settings)
+            )
+            result = await session.execute(stmt)
+            all_adv_settings = result.scalars().unique().all()
+            await update_featers_block.wait()
+            df_for_predict = await self._get_df_for_predict(all_adv_settings, session)
+            predict_df = await asyncio.to_thread(self._predict, df_for_predict)
+
+            for n, row in predict_df.iterrows():
+                adv_id = row['adv_id']
+                keyword = row['keyword']
+                predict_ctr = row['predict_ctr']
+                query = session.query(KeywordSetting) \
+                    .join(AdvSetting, KeywordSetting.adv_setting) \
+                    .filter(
+                    and_(KeywordSetting.text == keyword, KeywordSetting.adv_id == adv_id, AdvSetting.adv_id == adv_id)) \
+                    .options(joinedload(KeywordSetting.adv_setting))
+                keyword_setting = await session.execute(query)
+                keyword_setting = keyword_setting.scalar()
+                keyword_setting.predict_ctr = predict_ctr
+            await session.commit()
+
+
+
+
+
+    async def _get_df_for_predict(self, adv_settings: list[AdvSetting], session)-> pd.DataFrame:
+       data_rows = []
+       timestamp = None
+       for adv in adv_settings:
+           item_features_list = []
+           for nmid in adv.nmids:
+               item_feature = await session.execute(
+                   select(ItemFeature).where(ItemFeature.nmid == nmid)
+               )
+               item_features = item_feature.scalars().all()
+               for item_feature in item_features:
+                   if timestamp is None:
+                       timestamp = item_feature.timestamp
+                   else:
+                       assert timestamp == item_feature.timestamp
+                   item_features_list.append(item_feature.vector)
+
+           # Вычисляем средние значения фичей товаров, если они есть
+
+           avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
+           avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
+
+           for keyword in adv.keyword_settings:
+               keyword_feature = await session.execute(
+                   select(KeywordFeature).where(KeywordFeature.keyword == keyword.text)
+               )
+               keyword_feature = keyword_feature.scalars().first()
+               if not keyword_feature:
+                   continue
+               keyword_features = keyword_feature.vector
+
+
+
+               row = {
+                   'adv_id': adv.adv_id,
+                   'keyword': keyword.text,
+                   **avg_item_features,
+                   **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
+               }
+               data_rows.append(row)
+
+       df = pd.DataFrame(data_rows)
+       return df
 
 
 

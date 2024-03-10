@@ -42,27 +42,30 @@ class Runner:
                     )
 
     async def _main_loop(self):
-        saving_data_for_predictor = asyncio.Event()
-        saving_data_for_predictor.set()
+        update_featers_block = asyncio.Event()
+        update_featers_block.set()
         need_update_model = asyncio.Event()
         need_update_model.set()
-        file_working = asyncio.Lock()
 
         await asyncio.gather(
             # self.update_cards_in_graph(),
-            self.run_update_keyword_stat(need_update_model),
-            # self.run_update_vectors(saving_data_for_predictor, need_update_model),
-            # self.run_update_model(saving_data_for_predictor, need_update_model),
-            # self.run_update_predict_ctr(),
+            # self.run_update_keyword_stat(need_update_model),
+            # self.run_update_vectors(update_featers_block, need_update_model),
+            # self.run_update_model(update_featers_block, need_update_model),
+            self.run_update_predict_ctr(update_featers_block),
             # self.run_update_keywords_in_cabinets(saving_data_for_predictor, file_working),
 
             return_exceptions=False
             )
 
-    # async def run_update_predict_ctr(self):
-    #
-    #
-    #
+    async def run_update_predict_ctr(self, update_featers_block: asyncio.Event):
+        await self._manager.update_predict_ctr(update_featers_block)
+
+
+
+
+
+
 
 
 
@@ -86,11 +89,11 @@ class Runner:
 
 
 
-    async def run_update_vectors(self, saving_data_for_predictor: asyncio.Event,
+    async def run_update_vectors(self, update_featers_block: asyncio.Event,
                                   need_update_model:asyncio.Event):
         while True:
             await self._manager.update_wb_adv_phrase_in_db()
-            await self._manager.update_vectors_exec_mode(saving_data_for_predictor)
+            await self._manager.update_vectors_exec_mode(update_featers_block)
             need_update_model.set()
             await asyncio.sleep(1)
 
@@ -104,12 +107,12 @@ class Runner:
 
 
 
-    async def run_update_model(self, saving_data_for_predictor, need_update_model:asyncio.Event):
+    async def run_update_model(self, update_featers_block, need_update_model:asyncio.Event):
         while True:
             fit_logger.debug('Старт цикла обновления модели')
             await need_update_model.wait()
             fit_logger.debug('need_update_model.wait пройден')
-            await self._manager.update_model(saving_data_for_predictor)
+            await self._manager.update_model(update_featers_block)
             fit_logger.debug('Цикл обновления модели завершен')
             await asyncio.sleep(1)
             fit_logger.debug('Установка clear для need_update_model')
