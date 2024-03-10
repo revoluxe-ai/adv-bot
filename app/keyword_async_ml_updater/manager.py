@@ -2,6 +2,8 @@ import logging
 import multiprocessing
 import re
 import typing
+from datetime import datetime
+
 from app.wildberries.api import WBApi
 from collections import defaultdict
 from functools import partial
@@ -44,10 +46,10 @@ from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.future import select
 from .ML import Predictor
 from app.db.associations import WBUserCabinet
-from app.keyword_async_ml_updater.models import ItemFeature, KeywordFeature, KeywordSetting
+from app.keyword_async_ml_updater.models import ItemFeature, KeywordFeature
 from app.my_types import WBCabinet
 from app.telegram_bot.models import User
-from app.wildberries.models import AdvSetting, AdvKeyword
+from app.wildberries.models import AdvSetting, AdvKeyword, KeywordSetting
 from session_maker import get_async_session_maker
 
 predictor = Predictor()
@@ -102,7 +104,9 @@ class Manager(AbcManager):
                 for adv_setting in result.scalars():
                     keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
                     for keyword in keywords:
-                        stmt = select(AdvKeyword).where(and_(AdvKeyword.text == keyword.text,
+                        stmt = select(AdvKeyword)\
+                        .options(joinedload(AdvKeyword.keyword_setting))\
+                        .where(and_(AdvKeyword.text == keyword.text,
                                                         AdvKeyword.date == keyword.date,
                                                         AdvKeyword.adv_setting_id == adv_setting.id))
 
@@ -118,7 +122,7 @@ class Manager(AbcManager):
                                  keyword_setting = KeywordSetting()
                                  keyword_setting.text = keyword.text
                                  keyword_setting.adv_setting_id = adv_setting.id
-                            keyword_db.keyword_setting = keyword_setting
+                                 keyword_db.keyword_setting = keyword_setting
                             session.add(keyword_db)
                             keyword_db.adv_setting = adv_setting
                             keyword_db.text = keyword.text
@@ -143,7 +147,7 @@ class Manager(AbcManager):
                         keyword_db.spend = keyword.spend
                         keyword_db.update_timestamp = keyword.update_timestamp
                         await session.merge(keyword_db)
-                        await session.commit()
+                    await session.commit()
                     if update_signal:
                         need_update_model.set()
                         update_signal = False
@@ -508,10 +512,11 @@ class PredictManager:
             df_for_predict = await self._get_df_for_predict(all_adv_settings, session)
             predict_df = await asyncio.to_thread(predictor.predict, df_for_predict)
 
-            for n, row in predict_df.iterrows():
-                adv_id = row['adv_id']
-                keyword = row['keyword']
-                predict_ctr = row['predict_ctr']
+            # for n, row in predict_df.iterrows():
+            #     adv_id = row['adv_id']
+            #     keyword = row['keyword']
+            #     predict_ctr = row['predict_ctr']
+            #     smtp =
 
 
 
@@ -535,7 +540,7 @@ class PredictManager:
            avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
            avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-           for keyword in adv.adv_keywords:
+           for keyword in adv.keyword_settings:
                keyword_feature = await session.execute(
                    select(KeywordFeature).where(KeywordFeature.keyword == keyword.text)
                )
@@ -551,8 +556,6 @@ class PredictManager:
                data_rows.append(row)
 
        df = pd.DataFrame(data_rows)
-       df = df[df.views > 0]
-       df['ctr'] = df['clicks'] / df['views']
        return df
 
 

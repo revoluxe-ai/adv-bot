@@ -49,27 +49,22 @@ class Runner:
         file_working = asyncio.Lock()
 
         await asyncio.gather(
-            self.update_cards_in_graph(),
+            # self.update_cards_in_graph(),
             self.run_update_keyword_stat(need_update_model),
-            self.run_update_vectors(saving_data_for_predictor, need_update_model),
-            self.run_update_model(saving_data_for_predictor, need_update_model),
-            self.run_update_predict_ctr(),
+            # self.run_update_vectors(saving_data_for_predictor, need_update_model),
+            # self.run_update_model(saving_data_for_predictor, need_update_model),
+            # self.run_update_predict_ctr(),
             # self.run_update_keywords_in_cabinets(saving_data_for_predictor, file_working),
 
             return_exceptions=False
             )
-        # for result in results:
-        #     if isinstance(result, Exception):
-        #         logger.error(f"Задача завершилась исключением: {result}")
+
+    # async def run_update_predict_ctr(self):
+    #
+    #
+    #
 
 
-
-    # async def run_updade_cards(self, files_saving:asyncio.Lock):
-    #     while True:
-    #         logger.debug('Старт обновления карточек')
-    #         await self._manager.update_cards(files_saving)
-    #         logger.debug('Инфа о карточках обновлена')
-    #         await asyncio.sleep(1)
 
 
     async def run_update_keyword_stat(self,  need_update_model:asyncio.Event):
@@ -87,9 +82,7 @@ class Runner:
                     if tasks[cabinet_id].done():
                         if tasks[cabinet_id].exception():
                             logger.error(f'Ошибка обновления статистики ключей: {tasks[cabinet_id].exception()}')
-                        tasks[cabinet_id] = asyncio.create_task(
-                            self._manager.update_keyword_stat(super_wb_user_cabinet,
-                          need_update_model))
+
 
 
 

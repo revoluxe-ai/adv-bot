@@ -103,7 +103,9 @@ class AdvKeyword(BaseTable):
     spend = Column(Float, default=0)
     add_to_db = Column(Boolean, default=False)
     update_timestamp = Column(DateTime, nullable=False)
-    __table_args__ = (UniqueConstraint('text', 'date', name='_text_date_uc'),)
+    keyword_setting_id = Column(Integer, ForeignKey('keywordsetting.id'))
+    keyword_setting = relationship('KeywordSetting', back_populates='adv_keywords')
+    __table_args__ = (UniqueConstraint('text', 'date', 'adv_setting_id', name='_text_date_adv_setting_id_uc'),)
 
 
 
@@ -187,12 +189,15 @@ class AdvSetting(BaseTable):
 
 
 class KeywordSetting(BaseTable):
-    text = Column(String, nullable=False, unique=True)
+    text = Column(String, nullable=False)
     adv_setting_id: Mapped[int] = mapped_column(ForeignKey('advsetting.id'))
     adv_setting: Mapped[AdvSetting] = relationship('AdvSetting', back_populates='keyword_settings', uselist=False)
     predict_ctr = Column(Float, nullable=True)
     pass_days = Column(Integer, nullable=False, default=30)
+    adv_keywords = relationship('AdvKeyword', back_populates='keyword_setting', uselist=True)
     __table_args__ = (UniqueConstraint('text', 'adv_setting_id'),)
+
+
 
     @hybrid_property
     def clicks(self):
@@ -256,4 +261,6 @@ class KeywordSetting(BaseTable):
                 .label('spend'))
 
 
-
+    # @hybrid_property
+    # def timestamp(self):
+    #     return (select([func.max(AdvKeyword.date)])

@@ -16,7 +16,7 @@ from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import sessionmaker, joinedload, selectinload
 from xgboost import XGBRegressor
 from sqlalchemy import select
-from app.wildberries.models import AdvSetting, WBCard, WBCategory
+from app.wildberries.models import AdvSetting, WBCard, WBCategory, KeywordSetting
 from app.keyword_async_ml_updater.models import KeywordFeature, ItemFeature
 import json
 
@@ -43,7 +43,7 @@ class Fitter(AbcManager):
 
     data_getter = DataGetter()
 
-    def __init__(self):
+
 
     @staticmethod
     def __get_average_vector(nmids:str, df_vectors):
@@ -141,7 +141,7 @@ class Fitter(AbcManager):
         # Вычисление общего среднего ctr
         global_base_ctr = 5
         all_avg_ctrs = list(shop_avg_min_ctr.values())
-        overall_avg_ctr = sum(all_avg_ctrs) / len(all_avg_ctrs)/100 if all_avg_ctrs else global_base_ctr/100
+        overall_avg_ctr = sum(all_avg_ctrs) / len(all_avg_ctrs)/100 if sum(all_avg_ctrs) else global_base_ctr/100
         async with sm() as session:  # session: AsyncSession
             result = await session.execute(
                 select(WBCard).options(selectinload(WBCard.wb_cabinet))
@@ -194,10 +194,15 @@ class Fitter(AbcManager):
 
     async def _get_df_for_fit(self)-> (pd.DataFrame, str):
         async with sm() as sess:
-            adv_settings = await sess.execute(
-                select(AdvSetting).options(joinedload(AdvSetting.adv_keywords))
+            result = await sess.execute(
+                select(AdvSetting)
+                .options(
+                    selectinload(AdvSetting.adv_keywords),
+                    selectinload(AdvSetting.keyword_settings).selectinload(KeywordSetting.adv_keywords),
+                )
             )
-            adv_settings = adv_settings.scalars().unique().all()
+            # Используйте unique() для удаления дубликатов перед получением списка объектов
+            adv_settings = result.scalars().unique().all()
 
             data_rows = []
 
@@ -210,6 +215,8 @@ class Fitter(AbcManager):
                         select(ItemFeature).where(ItemFeature.nmid == nmid)
                     )
                     item_features = item_feature.scalars().all()
+                    if not item_features:
+                        continue
                     for item_feature in item_features:
                         if time_stamp is None:
                             time_stamp = item_feature.timestamp
@@ -222,22 +229,26 @@ class Fitter(AbcManager):
                 avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
                 avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
+                keyword_settings: list[KeywordSetting] = adv.keyword_settings
 
-                for keyword in adv.adv_keywords:
-                    assert time_stamp == keyword.timestamp
+                for keyword_setting in keyword_settings:
+                    text = keyword_setting.text
                     keyword_feature = await sess.execute(
-                        select(KeywordFeature).where(KeywordFeature.keyword == keyword.text)
+                        select(KeywordFeature).where(KeywordFeature.keyword == text)
                     )
                     keyword_feature = keyword_feature.scalars().first()
+                    if not keyword_feature:
+                        continue
                     keyword_features = keyword_feature.vector
-
+                    clicks = sum([adv_keyword.clicks for adv_keyword in keyword_setting.adv_keywords])
+                    views = sum([adv_keyword.views for adv_keyword in keyword_setting.adv_keywords])
+                    spend = sum([adv_keyword.spend for adv_keyword in keyword_setting.adv_keywords])
                     row = {
                         'adv_id': adv.adv_id,
-                        'keyword': keyword.text,
-                        'views': keyword.views,
-                        'clicks': keyword.clicks,
-                        'spend': keyword.spend,
-                        'real_ctr': keyword.real_ctr,
+                        'keyword': keyword_setting.text,
+                        'views': views,
+                        'clicks': clicks,
+                        'spend': spend,
                         'nmids': adv.nmids,
                         **avg_item_features,
                         **{f'keyword_feature_{i}': keyword_features[i] for i in  range(len(keyword_features))},
@@ -245,8 +256,9 @@ class Fitter(AbcManager):
                     data_rows.append(row)
 
         df = pd.DataFrame(data_rows)
-        df = df[df.views > 0]
-        df['ctr'] = df['clicks'] / df['views']
+        if len(df) > 0:
+            df = df[df.views > 0]
+            df['ctr'] = df['clicks'] / df['views']
         return df, time_stamp
 
 
@@ -258,7 +270,7 @@ class Fitter(AbcManager):
         df:pd.DataFrame = await self._bayesian_apply(df)
         await asyncio.to_thread(df.to_csv,'work_folder/df_for_fit.csv', index=False)
         y = df['ctr']
-        X = df.drop(['nmids', 'keyword', 'views', 'ctr', 'clicks', 'spend', 'adv_id'], axis=1)
+        X = df.drop([ 'keyword', 'views', 'ctr', 'clicks',  'adv_id'], axis=1)
         fit_logger.debug('Данные подготовлены')
         # Создание модели градиентного бустинга
         model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
