@@ -1,6 +1,10 @@
 import asyncio
 import logging
 from collections import defaultdict
+from datetime import datetime, timedelta
+
+from sqlalchemy.orm import selectinload
+
 from app.my_types import WBUserCabinet
 import sqlalchemy.orm
 from sqlalchemy import select
@@ -14,7 +18,7 @@ from app.my_types import AdvSetting
 from app.wildberries.api import WBApi
 
 from app.NeoDataScience.driver import DataScience
-
+from app.wildberries.models import KeywordSetting, AdvKeyword
 
 logger = logging.getLogger(__name__)
 
@@ -107,36 +111,61 @@ class DataGetter(AbcManager):
 
 class DataSetter:
     def __init__(self, shop: WbShop, async_sm: sqlalchemy.orm.sessionmaker):
-        self._wb_api = async_WBApi(shop)
         self._getter = DataGetter()
         self._async_sm = async_sm
 
-    async def update_minus_keywords(self, wb_api, df_predict, df_fact):
-        all_companies = await wb_api.get_all_adv_companies()
-        for n, company in enumerate(all_companies):
-            if company.adv_type == AdvType.KEYWORD_TEST:
-                async with self._async_sm() as session:
-                    stmt = select(AdvSetting).where(AdvSetting.nmid == nmid,
-                                                    AdvSetting.bot_active == True)
-                    result = await session.execute(stmt)
-                    adv_setting = result.scalars().first()
-                    if not adv_setting:
-                        logger.debug(f'Кампания {company.name} не активна')
+    async def update_minus_keywords(self, wb_api):
+        async with self._async_sm() as session:
+            stmt = select(AdvSetting).where(AdvSetting.bot_active == True)\
+            .options(selectinload(AdvSetting.keyword_settings)
+                     .selectinload(KeywordSetting.adv_keywords))
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = result.unique().scalars().all()
+            today = datetime.now().date()
+            for adv_setting in adv_settings:
+                keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
+                for keyword_setting in keyword_settings:
+                    adv_keywords: list[AdvKeyword] = keyword_setting.adv_keywords
+                    pass_days = keyword_setting.pass_days
+                    clicks = sum([adv_keyword.clicks for adv_keyword in adv_keywords if adv_keyword.date.date() >= today - timedelta(days=pass_days)])
+                    views = sum([adv_keyword.views for adv_keyword in adv_keywords if adv_keyword.date.date() >= today - timedelta(days=pass_days)])
+                    if views == 0:
                         continue
-                min_ctr = adv_setting.min_ctr/100
-                logger.info('Минимальный ctr в настройках: %s',min_ctr)
-                shop_df = df_predict[df_predict['nmid'] == nmid]
-                bad_phrases = list(shop_df[(shop_df['predict_ctr'] < min_ctr)]['keyword'].unique())
-                self._print_keywords(shop_df, df_fact, nmid, min_ctr)
+                    fact_ctr = clicks / views
+                    predict_ctr = keyword_setting.predict_ctr
+                    min_ctr = adv_setting.min_ctr
+                    pass
 
-                while True:
-                    try:
-                         await wb_api.set_minus_phrases(company, bad_phrases)
-                         break
-                    except Exception as exc:
-                        logger.error('Ошибка обновления минус-фраз: %s', exc)
-                        await asyncio.sleep(30)
-                await asyncio.sleep(30)
+        #         bad_phrases = list(df[df['predict_ctr'] < adv_setting.min_ctr]['keyword'].unique())
+        #         await wb_api.set_minus_phrases(company, bad_phrases)
+        #         await asyncio.sleep(30)
+        #
+        #
+        # all_companies = await wb_api.get_all_adv_companies()
+        # for n, company in enumerate(all_companies):
+        #     if company.adv_type == AdvType.KEYWORD_TEST:
+        #         async with self._async_sm() as session:
+        #             stmt = select(AdvSetting).where(AdvSetting.nmid == nmid,
+        #                                             AdvSetting.bot_active == True)
+        #             result = await session.execute(stmt)
+        #             adv_setting = result.scalars().first()
+        #             if not adv_setting:
+        #                 logger.debug(f'Кампания {company.name} не активна')
+        #                 continue
+        #         min_ctr = adv_setting.min_ctr/100
+        #         logger.info('Минимальный ctr в настройках: %s',min_ctr)
+        #         shop_df = df_predict[df_predict['nmid'] == nmid]
+        #         bad_phrases = list(shop_df[(shop_df['predict_ctr'] < min_ctr)]['keyword'].unique())
+        #         self._print_keywords(shop_df, df_fact, nmid, min_ctr)
+        #
+        #         while True:
+        #             try:
+        #                  await wb_api.set_minus_phrases(company, bad_phrases)
+        #                  break
+        #             except Exception as exc:
+        #                 logger.error('Ошибка обновления минус-фраз: %s', exc)
+        #                 await asyncio.sleep(30)
+        #         await asyncio.sleep(30)
 
     def _print_keywords(self, df: pd.DataFrame, df_fact: pd.DataFrame, nmid, min_ctr: float):
         full_goods = []

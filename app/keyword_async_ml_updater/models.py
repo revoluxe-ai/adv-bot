@@ -19,7 +19,7 @@ class ItemFeature(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     nmid = Column(Integer, nullable=False, unique=True)
     vector = Column(JSONB, nullable=False)
-    timestamp = Column(DateTime, nullable=True)
+
 
 
 class KeywordFeature(Base):
@@ -27,4 +27,4 @@ class KeywordFeature(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     keyword = Column(String, nullable=False, unique=True)
     vector = Column(JSONB, nullable=False)
-    timestamp = Column(DateTime, nullable=True)
+

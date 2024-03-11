@@ -51,22 +51,15 @@ class Runner:
             # self.update_cards_in_graph(),
             # self.run_update_keyword_stat(need_update_model),
             # self.run_update_vectors(update_featers_block, need_update_model),
-            # self.run_update_model(update_featers_block, need_update_model),
+            self.run_update_model(update_featers_block, need_update_model),
             self.run_update_predict_ctr(update_featers_block),
-            # self.run_update_keywords_in_cabinets(saving_data_for_predictor, file_working),
+            # self.run_update_keywords_status(update_featers_block),
 
             return_exceptions=False
             )
 
     async def run_update_predict_ctr(self, update_featers_block: asyncio.Event):
         await self._manager.update_predict_ctr(update_featers_block)
-
-
-
-
-
-
-
 
 
 
@@ -83,6 +76,7 @@ class Runner:
                      need_update_model))
                 else:
                     if tasks[cabinet_id].done():
+                        logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id.name}')
                         if tasks[cabinet_id].exception():
                             logger.error(f'Ошибка обновления статистики ключей: {tasks[cabinet_id].exception()}')
 
@@ -97,13 +91,10 @@ class Runner:
             need_update_model.set()
             await asyncio.sleep(1)
 
-    async def run_update_keywords_in_cabinets(self, saving_data_for_predictor, file_working: asyncio.Lock):
+    async def run_update_keywords_status(self, update_featers_block):
         while True:
-            tasks: list[typing.Awaitable] = await self._manager\
-                .update_keywords_in_advs(saving_data_for_predictor,
-            file_working)
-            tasks = [asyncio.create_task(task) for task in tasks]
-            await asyncio.gather(*tasks)
+            await self._manager\
+                .update_keywords_in_advs(update_featers_block)
 
 
 

@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import new
 
-class UnknownApiRequestError(Exception):
+class UnknownApiRequestError(BaseException):
    pass
 
 
-class ApiErrorWithCode(Exception):
+class ApiErrorWithCode(BaseException):
     def __init__(self, code, message, rejection):
         self.code = code
         self.message = message
@@ -18,7 +18,7 @@ class ApiErrorWithCode(Exception):
 
 
 
-class NotValidTokenError(Exception):
+class NotValidTokenError(BaseException):
     pass
 
 
@@ -29,7 +29,7 @@ class TokenExpiredError(Exception):
         super().__init__(f'{m} text: {self.text}')
 
 
-class TokensFromDifferentShopsError:
+class TokensFromDifferentShopsError(BaseException):
     def __init__(self):
         m = 'Токены принадлежат разным магазинам'
         super().__init__(f'{m}')

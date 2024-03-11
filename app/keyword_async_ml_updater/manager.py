@@ -34,7 +34,7 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from app.NeoDataScience.driver import DataScience
 from app.wildberries.models import (AdvSetting,
                                     AdvKeyword, WBCard,
-                                    WBCabinet)
+                                    WBCabinet, WBToken)
 
 from app.image_master.image_master2 import ImageMaster
 import pymystem3
@@ -147,12 +147,12 @@ class Manager(AbcManager):
                         update_signal = False
 
 
-    async def graph_vector_update(self, saving_data_for_predictor:asyncio.Event) -> None:
+    async def graph_vector_update(self, update_featers_block:asyncio.Event) -> None:
         # power = self._shop_manager.power
         length = 2**4
         if True:
             await self.graph_updater.update_graph_run(length)
-        await self.graph_updater.get_nmids_and_keyword_featers_for_ml(saving_data_for_predictor)
+        await self.graph_updater.get_nmids_and_keyword_featers_for_ml(update_featers_block)
 
 
     # async def update_cards(self, file_working:asyncio.Lock):
@@ -229,95 +229,41 @@ class Manager(AbcManager):
         return joblib.load(model_path)
 
 
-    async def update_keywords_in_advs(self,
-                                      saving_data_for_predictor:asyncio.Event,
-                                      file_working: asyncio.Lock) -> list[typing.Awaitable]:
-        fitter = Fitter()
+    async def update_keywords_in_advs(self, update_featers_block: asyncio.Event) -> list[typing.Awaitable]:
+        # while True:
+            update_tasks: dict[int, asyncio.Task] = {}
+            async  with sm() as session:
+                subquery = select(AdvSetting.id).where(
+                    AdvSetting.bot_active == True,
+                    AdvSetting.wb_cabinet_id == WBCabinet.id
+                ).exists()
 
-        logger.debug('Ожидание процесса сохранения')
-        await saving_data_for_predictor.wait()
-        logger.debug('Продолжаю обновлять ключи')
-        while True:
-            try:
-                async with file_working:
-                    logger.debug('Попытка загрузки модели')
-                    model = await asyncio.to_thread(self.__load_ml_model,self.model_path)
-                    logger.debug('Модель загружена')
-                    break
-            except (EOFError, FileNotFoundError) as exc:
-                logger.error(exc)
-                logger.error('Ошибка загрузки модели')
-                await asyncio.sleep(30)
-        def read_files(keywords_vectors_path, nmids_vectors_path):
-            keyword_featers = pd.read_csv(keywords_vectors_path)
-            nmids_featers = pd.read_csv(nmids_vectors_path)
+                stmt = select(WBCabinet).options(
+                    joinedload(WBCabinet.wb_user_cabinets).joinedload(WBUserCabinet.user)
+                ).where(subquery)
 
-            return keyword_featers, nmids_featers
+                result = await session.execute(stmt)
+                wb_cabinets: list[WBCabinet] = result.unique().scalars().all()
+                for wb_cabinet in wb_cabinets:
+                    if wb_cabinet.id not in update_tasks:
+                        wb_user_cabinets: list[WBUserCabinet] = wb_cabinet.wb_user_cabinets
+                        users: list[User] = [wb_user_cabinet.user for wb_user_cabinet in wb_user_cabinets]
+                        tokens: list[WBToken] = [token for user in users for token in user.wb_tokens if token.shop_id == wb_cabinet.shop_id]
+                        super_user = User()
+                        super_user.wb_tokens = tokens
+                        super_wb_user_cabinet = WBUserCabinet()
+                        super_wb_user_cabinet.wb_cabinet = wb_cabinet
+                        super_wb_user_cabinet.user = super_user
+                        wb_api = WBApi(super_wb_user_cabinet)
+                        data_setter = DataSetter(super_wb_user_cabinet, self._aiosm)
+                        task = asyncio.create_task(data_setter.update_minus_keywords(wb_api))
+                        update_tasks[wb_cabinet.id] = task
+                    else:
+                        if update_tasks[wb_cabinet.id].done():
+                            if update_tasks[wb_cabinet.id].exception():
+                                logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet.id].exception()}')
+                            del update_tasks[wb_cabinet.id]
 
-        read_files = partial(read_files, keywords_vectors_path = self.keywords_vectors_path,
-                             nmids_vectors_path  = self.nmids_vectors_path)
-        logger.debug('Загружаю фичи')
-        keyword_featers, nmids_featers = await asyncio.to_thread(read_files)
-        logger.debug('Фичи загружены')
-
-        def get_keyword_stat(keyword_stat_df_path):
-            return pd.read_csv(keyword_stat_df_path)
-
-
-        logger.debug('Получаю статистику по ключам')
-        keyword_stat_df = await asyncio.to_thread(get_keyword_stat,self.keyword_stat_df_path)
-        logger.debug('Статистика по ключам получена')
-        keywords_without_featers = set(keyword_stat_df.keyword.unique()) - set(keyword_featers.keyword.to_list())
-
-        logger.debug('Получаю суррогатные ключи')
-        surrogate_keywords: dict = await self.get_nearest_surrogate_phrases(keywords_without_featers)
-        # surrogate_keywords =  {} #временно отключил суррогатные ключи для скорости тестирования
-        stat_surrogate = keyword_stat_df.copy()
-        for index, row in  stat_surrogate.iterrows():
-            keyword = row['keyword']
-            # Проверяем, существует ли ключевое слово в keyword_featers
-            if keyword not in keyword_featers['keyword'].values:
-                # Если ключевого слова нет, проверяем, есть ли оно в словаре суррогатных ключевых слов
-                if keyword in surrogate_keywords:
-                    # Заменяем ключевое слово на его суррогат из словаря
-                    stat_surrogate.at[index, 'keyword'] = surrogate_keywords[keyword]
-        logger.debug('Получаю предсказания')
-        keyword_stat_df =  stat_surrogate.dropna()
-        # stat_df = keyword_stat_df.merge(nmids_featers, how='inner', on= 'nmid')
-        stat_df = fitter.fill_average_vector(stat_surrogate, nmids_featers)
-        stat_df = stat_df.merge(keyword_featers, how='inner', on= 'keyword')
-        X = stat_df.drop(['nmids', 'keyword', 'views', 'clicks', 'spend', 'adv_id'], axis=1)
-        y = model.predict(X)
-        logger.debug('Предсказания получены')
-        y_df = pd.DataFrame(y, columns=['predict_ctr'])
-        predict_df = pd.concat([stat_df, y_df], axis=1)
-        predict_df =  predict_df[['adv_id', 'keyword', 'predict_ctr']]
-
-        original_keywords = {v: k for k, v in surrogate_keywords.items()}
-
-        # Шаг 2: Выполнить обратную замену в predict_df
-        for index, row in predict_df.iterrows():
-            surrogate_keyword = row['keyword']
-            if surrogate_keyword in original_keywords:
-                # Обратная замена суррогатного ключевого слова на оригинальное
-                predict_df.at[index, 'keyword'] = original_keywords[surrogate_keyword]
-        common_df = stat_df.merge(predict_df, on=['adv_id', 'keyword'])
-        common_df['ctr'] = common_df.clicks/common_df.views
-        common_df = common_df[['adv_id', 'nmids',  'keyword', 'views', 'clicks', 'ctr', 'predict_ctr']]
-        await asyncio.to_thread(lambda: common_df.to_csv(f'work_folder/predict_df.csv', index=False))
-        shop_tasks = []
-        logger.debug('Получаю магазины')
-        async with self._aiosm() as session:
-            cabinets = await session.execute(select(Cabinet))
-            cabinets = cabinets.scalars().all()
-        logger.debug('Магазины получены')
-
-        for cabinet in cabinets:
-            wb_api = async_WBApi(cabinet)
-            data_setter = DataSetter(cabinet, self._aiosm)
-            task = data_setter.update_minus_keywords(wb_api, predict_df, stat_df)
-            shop_tasks.append(task)
-        return shop_tasks
 
 
     async def update_model(self, saving_data_for_predictor):
@@ -334,8 +280,8 @@ class Manager(AbcManager):
         await self._fitter.getGradientBoostingFullFitModel()
 
 
-    async def update_vectors_exec_mode(self, saving_data_for_predictor: asyncio.Event):
-        await self.graph_vector_update(saving_data_for_predictor)
+    async def update_vectors_exec_mode(self, update_featers_block: asyncio.Event):
+        await self.graph_vector_update(update_featers_block)
 
 
 

@@ -74,11 +74,12 @@ class ABC_WB_API(WbRequestApiMixin):
 
     def __init__(self, wb_user_cabinet: app.my_types.WBUserCabinet):
         tokens: list[WBToken]= wb_user_cabinet.user.wb_tokens
+        tokens = [token for token in tokens if token.shop_id == wb_user_cabinet.wb_cabinet.shop_id]
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_user_cabinet)
-        if len(set(token.shop_id for token in tokens)) > 1:
-            raise exceptions.TokensFromDifferentShopsError
+        # if len(set(token.shop_id for token in tokens)) > 1:
+        #     raise exceptions.TokensFromDifferentShopsError
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
         for token in tokens:
             if  self._rights.issubset(token.categories) \
