@@ -66,3 +66,7 @@ venv
 *.log
 app/text_master/w2v_cc_300d_ru/*
 *.txt
+app/keword_async_ml_updater/model/*
+*.index
+git ls-tree
+app/text_master/w2v_cc_300d_ru
