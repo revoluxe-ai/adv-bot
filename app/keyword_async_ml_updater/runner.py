@@ -67,17 +67,15 @@ class Runner:
                 if cabinet_id not in tasks:
                     task = asyncio.create_task(
                         self._manager.update_keyword_stat(super_wb_user_cabinet, need_update_model))
-                    def delete_task(cabinet_id=cabinet_id):
-                        logger.warning('Срабатывание колбэка удаления задачи')
-                        tasks.pop(cabinet_id)
-                    task.add_done_callback(delete_task)
                     tasks[cabinet_id] = task
+
                 else:
                     if tasks[cabinet_id].done():
                         logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
                         if tasks[cabinet_id].exception():
                             logger.error(f'Ошибка обновления статистики ключей: {tasks[cabinet_id].exception()}')
 
+                        del tasks[cabinet_id]
 
 
 
