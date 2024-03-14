@@ -48,7 +48,8 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
                     return result
                 except exceptions.ApiForbiddenError:
                     raise exceptions.ApiForbiddenError
-                except exceptions.UnknownApiRequestError as e:
+                except (exceptions.UnknownApiRequestError,
+                        aiohttp.client_exceptions.ClientConnectorError) as e:
                     logger.error(f'Ошибка при запросе к API: {e},'
                                  f' повтор через {current_pause} секунд')
                     await asyncio.sleep(current_pause)
