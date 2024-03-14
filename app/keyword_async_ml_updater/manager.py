@@ -306,7 +306,6 @@ class Manager(AbcManager):
             phrase_data_list = []
             for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
                 for keyword_stat in keyword_stats:
-                    logger.debug(f'Обновление фразы в neo {keyword_stat.text} для кабинета {adv_setting.name}')
                     ctr = keyword_stat.ctr
                     # Расчет нормализованного CTR для каждой фразы
                     n_ctr = ((ctr - total_min_ctr) / (total_max_ctr - total_min_ctr)
