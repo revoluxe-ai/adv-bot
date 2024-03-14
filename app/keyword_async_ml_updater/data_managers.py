@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, NamedTuple
 from dataclasses import dataclass
-
+from cachetools.func import ttl_cache
 
 import numpy as np
 import pydantic
@@ -59,9 +59,8 @@ async def get_keyword_statistic(session, adv_setting: AdvSetting, hard_statuses:
                 KeywordSetting.adv_setting_id == adv_setting.id
             )
         )
-    else:
-        # Если hard_statuses не предоставлены, используем базовый запрос без дополнительного условия where
-        stmt = base_stmt
+    else: stmt = base_stmt.where(KeywordSetting.adv_setting_id == adv_setting.id)
+
 
     # Группировка по тексту ключевых слов и идентификатору настройки рекламной кампании вне зависимости от условия
     stmt = stmt.group_by(AdvKeyword.text, KeywordSetting.adv_setting_id)
@@ -164,6 +163,7 @@ async def get_parent_id_categories_subcategories_list() -> defaultdict[Any, list
     return parent_categories_subcategories_list
 
 
+@ttl_cache(ttl=15*60)
 async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
     parent_categories_to_subcategories_list = await get_parent_id_categories_subcategories_list()
     category_name_to_parent_id = {}
@@ -173,7 +173,8 @@ async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
 
     wb_category_to_keywordstat_list = await get_wb_category_to_keywordstat_list(session)
     parent_category_to_keywordstat_list = {}
-    for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
+    for wb_category, keywordstat_list in wb_category_to_keywordstat_list.items():
+        wb_category_name = wb_category.wb_category_name
         parentId = category_name_to_parent_id[wb_category_name]
         if parentId not in parent_category_to_keywordstat_list:
             parent_category_to_keywordstat_list[parentId] = []
@@ -186,15 +187,16 @@ async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
     final_wb_category_name_to_min_ctr = {}
     for wb_category, keywordstat_list in wb_category_to_keywordstat_list.items():
         ctr_percentil = np.percentile([keywordstat.ctr for keywordstat in  keywordstat_list], 10)
+        wb_category_name = wb_category.wb_category_name
         if ctr_percentil == 0:
-            wb_category_name =wb_category.wb_category_name
             parentId = category_name_to_parent_id[wb_category_name]
             keywordstats = parent_category_to_keywordstat_list[parentId]
             ctr_pencentile = np.percentile([kw.ctr for kw in keywordstats], 10)
             if ctr_percentil == 0:
                 ctr_pencentile = np.percentile([kw.ctr for kw in global_keywordstats_list], 10)
             final_wb_category_name_to_min_ctr[wb_category_name] = ctr_pencentile
-
+        else:
+            final_wb_category_name_to_min_ctr[wb_category_name] = ctr_pencentile
     return final_wb_category_name_to_min_ctr
 
 
@@ -338,34 +340,34 @@ async def get_wb_category(adv_setting: AdvSetting, session)-> WBCategory:
     wb_category = wb_card.wb_category
     return wb_category
 
-
-
-async def get_adv_id_min_ctr(session, super_wb_user_cabinet: WBUserCabinet):
-    wb_api = WBApi(super_wb_user_cabinet)
-    subcategories: list[Subcategories] = await wb_api.content.get_all_subcategories()
-    smtp = select(AdvSetting).options(selectinload(AdvSetting.adv_keywords))
-    result = session.execute(smtp)
-    adv_settings: list[AdvSetting] = result.unique().scalars().all()
-
-    wb_category_advs = defaultdict(list)
-
-    for adv_setting in adv_settings:
-        clicks, views, _ = await get_keyword_statistic(adv_setting)
-        if views:
-            adv_setting.ctr = clicks/ views
-        else:
-            adv_setting.ctr = 0
-        category = get_wb_category(adv_setting)
-        category_name = category.wb_category_name
-        wb_category_advs[category_name].append(adv_setting)
-
-    wb_category_min_ctr = {}
-    parent_category_min_ctr = {}
-    for category, advs in wb_category_advs.items():
-        min_ctr = np.percentile([adv_setting.ctr for adv_setting in advs], 10)
-        wb_category_min_ctr[category] = min_ctr
-        if parent_category_min_ctr.get(category):
-            parent_category_min_ctr[category_name] = min_ctr
+#
+#
+# async def get_adv_id_min_ctr(session, super_wb_user_cabinet: WBUserCabinet):
+#     wb_api = WBApi(super_wb_user_cabinet)
+#     subcategories: list[Subcategories] = await wb_api.content.get_all_subcategories()
+#     smtp = select(AdvSetting).options(selectinload(AdvSetting.adv_keywords))
+#     result = session.execute(smtp)
+#     adv_settings: list[AdvSetting] = result.unique().scalars().all()
+#
+#     wb_category_advs = defaultdict(list)
+#
+#     for adv_setting in adv_settings:
+#         clicks, views, _ = await get_keyword_statistic(adv_setting)
+#         if views:
+#             adv_setting.ctr = clicks/ views
+#         else:
+#             adv_setting.ctr = 0
+#         category = get_wb_category(adv_setting)
+#         category_name = category.wb_category_name
+#         wb_category_advs[category_name].append(adv_setting)
+#
+#     wb_category_min_ctr = {}
+#     parent_category_min_ctr = {}
+#     for category, advs in wb_category_advs.items():
+#         min_ctr = np.percentile([adv_setting.ctr for adv_setting in advs], 10)
+#         wb_category_min_ctr[category] = min_ctr
+#         if parent_category_min_ctr.get(category):
+#             parent_category_min_ctr[category_name] = min_ctr
 
 
 

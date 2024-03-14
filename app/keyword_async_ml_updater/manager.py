@@ -332,8 +332,6 @@ class Manager(AbcManager):
             await asyncio.sleep(1)
 
 
-
-
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):
         if self._phrase_index is None:
             index = await asyncio.to_thread(self._get_phrase_index)

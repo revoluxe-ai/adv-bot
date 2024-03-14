@@ -1,29 +1,25 @@
-import asyncio
 import aiogram
 from aiogram import Router, types, F
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy.orm import selectinload, joinedload
-from app.telegram_bot.models import User
+from sqlalchemy.orm import joinedload
 from app.db.associations import WBUserCabinet
 from app.wildberries.models import WBCabinet, AdvSetting
-import app
 from sqlalchemy.future import select
 from session_maker import get_async_session_maker
 from ..views import messages
 from app.my_types import LastMessage
 from ..views import callbacks
-from ..views.callbacks import Action
 from .. import states
 from ...redis_manager import RedisManager
-router = Router()
+
 from app.telegram_bot.wb_user_cabinet_manager import CabinetManager
 
 
 
 sm = get_async_session_maker()
 
-
+router = Router()
 redis_manager = RedisManager()
 
 

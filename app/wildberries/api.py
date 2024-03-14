@@ -14,7 +14,7 @@ from .models import WBToken, AdvSetting
 from . import exceptions
 from . import api_rights
 import app
-from cachetools import TTLCache
+
 from cachetools.func import ttl_cache
 
 

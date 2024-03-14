@@ -2,7 +2,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from app.db.associations import WBUserCabinet
 from ...user_interface.views.callbacks import BudgetForCreatingAdv
-from app.wildberries.models import  AdvSetting
+from app.wildberries.models import AdvSetting, KeywordSetting
 import app
 from ...user_interface.views import callbacks
 from app.wildberries.data_classes.adv import Adv
@@ -10,7 +10,7 @@ from ...user_interface.views.callbacks import TurnAdv
 from .callbacks import Action
 from sqlalchemy import select
 from session_maker import get_async_session_maker
-
+from ...utils import KeywordForKeyboard
 
 sm = get_async_session_maker()
 
@@ -92,22 +92,24 @@ def get_adv_list_keyboard(advs: list[Adv]):
 
 
 def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting):
+
+    buttons = []
+    buttons.append([InlineKeyboardButton(text='Контроль ключевых слов по кампании',
+                              callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
+                                                                      type='by_adv').pack())])
     if adv_setting.bot_active:
-        buttons = [
+        buttons.append(
+        [InlineKeyboardButton(text='Отключить бота', callback_data=TurnAdv(action='off',
+         adv_original_id=adv_setting.id,
+        wb_user_cabinet_original_id =wb_user_cabinet.id).pack())])
 
 
-
-            [InlineKeyboardButton(text='Отключить бота', callback_data=TurnAdv(action='off',
-             adv_original_id=adv_setting.id,
-            wb_user_cabinet_original_id =wb_user_cabinet.id).pack())],
-
-        ]
     else:
-        buttons = [
-            [InlineKeyboardButton(text='Включить бота', callback_data=TurnAdv(action='on',
-               adv_original_id=adv_setting.id,
-             wb_user_cabinet_original_id = wb_user_cabinet.id).pack())],
-        ]
+        buttons.append(
+            [InlineKeyboardButton(text='Включить бота',
+                                  callback_data=TurnAdv(action='on',
+                                   adv_original_id=adv_setting.id,
+                                   wb_user_cabinet_original_id=wb_user_cabinet.id).pack())])
 
     wb_user_cabinet_original_id = wb_user_cabinet.id
     buttons.append([InlineKeyboardButton(text='Вернуться к списку кампаний',
@@ -167,3 +169,85 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  app.my_types.WBUse
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard
+
+
+def get_keywords_setting_keyboard(keywords: list[KeywordForKeyboard], adv_setting: AdvSetting,
+                                  page=1):
+    on_page = 5
+    start_index = (page - 1) * on_page
+    end_index = start_index + on_page
+
+    bottoms = []
+    for keyword in keywords[start_index:end_index]:
+        clicks = keyword.statistic.clicks
+        views = keyword.statistic.views
+        ctr = keyword.statistic.ctr
+        if keyword.keyword_settings.hard_status == 0:
+            hard_status = 'ЧС'
+        elif keyword.keyword_settings.hard_status == 1:
+            hard_status = 'Авто'
+        else:
+            hard_status = 'БС'
+
+        turn_on = '✅' if keyword.turn_on else '❌'
+        text = f'{turn_on} {keyword.text} Клики: {clicks} Показы: {views} CTR: ({round(ctr, 2)*100} %) ({hard_status})'
+
+
+        inline_keyboard = [InlineKeyboardButton(text= text,
+                                                callback_data=callbacks.SettingKeyword(
+                                                keyword_setting_original_id = keyword.keyword_settings.id,
+                                                ).pack())]
+        bottoms.append(inline_keyboard)
+    if page > 1:
+        prev_page = page - 1
+        bottoms.append([InlineKeyboardButton(text="⬅️",
+                                             callback_data=callbacks.SettingKeywords(
+                                                 adv_original_id=adv_setting.id,
+                                                 type='by_adv',
+                                                 page=prev_page).pack())])
+
+    if len(keywords) > end_index:
+        next_page = page + 1
+        bottoms.append([InlineKeyboardButton(text="➡️",
+                                             callback_data=callbacks.SettingKeywords(
+                                                adv_original_id=adv_setting.id,
+                                                type='by_adv',
+                                                page=next_page).pack())])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=bottoms)
+    return keyboard
+
+
+
+def get_keyword_setting_keyboard(keyword: KeywordSetting, adv_setting: AdvSetting, return_to: str = 'by_adv',):
+    buttoms = []
+    if keyword.hard_status in [0, 1]:
+        buttom = [InlineKeyboardButton(text='В белый список',
+                                       callback_data=callbacks.ChangeKeywordHardStatus(
+                                           new_hard_status=2,
+                                           keyword_setting_original_id=keyword.id).pack())]
+        buttoms.append(buttom)
+
+    if keyword.hard_status in [0, 2]:
+        buttom = [InlineKeyboardButton(text='В авто',
+                                       callback_data=callbacks.ChangeKeywordHardStatus(
+                                           new_hard_status=1,
+                                           keyword_setting_original_id=keyword.id).pack())]
+        buttoms.append(buttom)
+
+    if keyword.hard_status in [1, 2]:
+        buttom = [InlineKeyboardButton(text='В черный список',
+                                       callback_data=callbacks.ChangeKeywordHardStatus(
+                                           new_hard_status=0,
+                                           keyword_setting_original_id=keyword.id).pack())]
+        buttoms.append(buttom)
+
+    buttoms.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
+                                         callback_data=callbacks.SettingKeywords(
+                                             adv_original_id=adv_setting.id,
+                                             type=return_to).pack())])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttoms)
+    return keyboard
+
+
+

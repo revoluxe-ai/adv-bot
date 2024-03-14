@@ -19,5 +19,6 @@ __all__ = ['WBUserCabinet',
            'WBCabinet',
             'AdvKeyword',
            'Subcategory',
-           'KeywordStatFromDB'
+           'KeywordStatFromDB',
+           'KeywordForKeyboard'
            ]

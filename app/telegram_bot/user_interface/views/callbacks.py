@@ -61,3 +61,19 @@ class AddNewToken(CallbackData, prefix="add_new_token"):
 
 class DeleteWbUserCabinet(CallbackData, prefix="delete_wb_user_cabinet"):
     wb_user_cabinet_original_id: int
+
+
+class SettingKeywords(CallbackData, prefix="setting_keywords"):
+    adv_original_id: int
+    type: str
+    page: int = 1
+
+
+class SettingKeyword(CallbackData, prefix="setting_keyword"):
+    keyword_setting_original_id: int
+
+
+class ChangeKeywordHardStatus(CallbackData, prefix="change_keyword_hard_status"):
+    new_hard_status: int
+    keyword_setting_original_id: int
+

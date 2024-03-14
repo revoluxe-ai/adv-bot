@@ -12,7 +12,8 @@ from aiogram.types import Message
 from app.wildberries.data_classes.adv import Adv as WbAdv
 import logging
 import app
-from app.wildberries.models import AdvSetting, WBCabinet
+from app.wildberries.models import AdvSetting, WBCabinet, KeywordSetting
+from ...utils import KeywordForKeyboard
 
 logger = logging.getLogger(__name__)
 
@@ -196,3 +197,37 @@ class MinCTRChanged(Text):
 
 class CabinetNameTooLong(Text):
     text = 'Название кабинета слишком длинное. Попробуйте снова(не более 50 символов):'
+
+
+class AdvKeywordsSetting(TextWithKeyboard):
+    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int,
+                 keywords: list[KeywordForKeyboard], adv_setting: AdvSetting):
+        super().__init__(bot, last_message, chat_id)
+        self._keywords = keywords
+        self._adv_setting = adv_setting
+
+
+    text = 'Статистика и настройка ключевых слов:'
+
+    @property
+    def keyboard(self):
+        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting)
+
+
+class KeywordSettingMessage(TextWithKeyboard):
+    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int,
+                 keyword_setting: KeywordSetting, adv_setting: AdvSetting):
+        super().__init__(bot, last_message, chat_id)
+        self._keyword_setting = keyword_setting
+        self._adv_setting = adv_setting
+
+    @property
+    def text(self):
+        return f'Статистика и настройка ключевого слова: {self._keyword_setting.text}'
+
+    @property
+    def keyboard(self):
+        return keyboards.get_keyword_setting_keyboard(self._keyword_setting, self._adv_setting)
+
+
+
