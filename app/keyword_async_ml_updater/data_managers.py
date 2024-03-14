@@ -49,10 +49,10 @@ async def get_keyword_statistic(session, adv_setting: AdvSetting, hard_statuses:
         )
         .join(KeywordSetting, AdvKeyword.keyword_setting_id == KeywordSetting.id)
         .where(AdvKeyword.date >= today - timedelta(days=pass_days))
-        .group_by(AdvKeyword.text)  # Группировка по тексту ключа
+
     )
     if hard_statuses:
-        # Применяем фильтры по hard_statuses и adv_setting_id внутри условия
+        # Фильтрация по hard_statuses и adv_setting_id и добавление группировки
         stmt = base_stmt.where(
             and_(
                 KeywordSetting.hard_status.in_(hard_statuses),
@@ -60,7 +60,11 @@ async def get_keyword_statistic(session, adv_setting: AdvSetting, hard_statuses:
             )
         )
     else:
+        # Если hard_statuses не предоставлены, используем базовый запрос без дополнительного условия where
         stmt = base_stmt
+
+    # Группировка по тексту ключевых слов и идентификатору настройки рекламной кампании вне зависимости от условия
+    stmt = stmt.group_by(AdvKeyword.text, KeywordSetting.adv_setting_id)
 
     result = await session.execute(stmt)
     rows = result.all()  # Получение всех результатов запроса
