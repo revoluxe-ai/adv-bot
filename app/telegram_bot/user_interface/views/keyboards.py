@@ -94,9 +94,9 @@ def get_adv_list_keyboard(advs: list[Adv]):
 def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting):
     if adv_setting.bot_active:
         buttons = [
-            [InlineKeyboardButton(text=f'Изменить минимальный CTR ({adv_setting.min_ctr})',
-                                  callback_data=callbacks.Min_ctr(action='change',
-                                         adv_original_id=adv_setting.id).pack())],
+
+
+
             [InlineKeyboardButton(text='Отключить бота', callback_data=TurnAdv(action='off',
              adv_original_id=adv_setting.id,
             wb_user_cabinet_original_id =wb_user_cabinet.id).pack())],
@@ -120,19 +120,14 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
     return keyboard
 
 
-def get_advs_keyboard_with_paginator(wb_user_cabinet: WBUserCabinet, page: int, on_page: int):
+def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
+                                     adv_settings: list[AdvSetting],
+                                     page: int, on_page: int):
     keyboard_buttons = []
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
-    wb_cabinet = wb_user_cabinet.wb_cabinet
-    wb_user_cabinet_original_id = wb_user_cabinet.id
-    # Добавляем кнопки для объявлений
-    try:
-         advs =  wb_cabinet.adv_settings
-    except:
-        pass
-    for adv in advs[start_index:end_index]:
-        button_text = adv.name
+    for adv in adv_settings[start_index:end_index]:
+        button_text = adv.name + ' (Бот включен)' if adv.bot_active else adv.name + ' (Бот отключен)'
         callback_data = callbacks.Adv(action='select', adv_original_id=adv.id,
                                       wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack()
         keyboard_buttons.append([InlineKeyboardButton(text=button_text,
@@ -146,7 +141,7 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet: WBUserCabinet, page: int, 
                  .ChoiceAdvPaginator(wb_user_cabinet_original_id = wb_user_cabinet_original_id
                  , page=prev_page).pack())])
 
-    if len(advs) > end_index:
+    if len(adv_settings) > end_index:
         next_page = page + 1
         keyboard_buttons.append([InlineKeyboardButton(text="➡️",
                                                       callback_data= callbacks

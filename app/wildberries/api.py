@@ -9,6 +9,7 @@ from .data_classes.adv import Adv
 import time
 import json
 from .data_classes.keywordstat import KeywordStat
+from .data_classes.subcategories import Subcategory
 from .models import WBToken, AdvSetting
 from . import exceptions
 from . import api_rights
@@ -21,17 +22,17 @@ logger = logging.getLogger(__name__)
 
 
 def _try_except_decorator(requests_per_interval, interval_seconds):
-    min_interval = interval_seconds / requests_per_interval
+    base_interval = interval_seconds / requests_per_interval
     last_query_time = 0
-    sleep_on_error = min_interval
+    current_pause = base_interval
     def decorator(request_func):
         async def wrapper(*args, **kwargs):
-            nonlocal sleep_on_error
+            nonlocal current_pause
             nonlocal last_query_time
             # Рассчитываем время, через которое можно сделать следующий запрос
             current_time = time.time()
             time_since_last_query = current_time - last_query_time
-            time_to_wait = max(0, min_interval - time_since_last_query)
+            time_to_wait = max(0, current_pause - time_since_last_query)
             while True:
                 if time_to_wait > 0:
                     # Если нужно подождать, ждем до конца интервала
@@ -39,16 +40,20 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
                 try:
                     result = await request_func(*args, **kwargs)
                     last_query_time = time.time()
-                    sleep_on_error = min_interval
+                    current_pause = current_pause/2
+                    if current_pause < base_interval:
+                        current_pause = current_pause
                     return result
                 except exceptions.ApiForbiddenError:
                     raise exceptions.ApiForbiddenError
                 except exceptions.UnknownApiRequestError as e:
                     logger.error(f'Ошибка при запросе к API: {e},'
-                                 f' повтор через {sleep_on_error} секунд')
-                    await asyncio.sleep(sleep_on_error)
+                                 f' повтор через {current_pause} секунд')
+                    await asyncio.sleep(current_pause)
 
-                    sleep_on_error *= 2
+                    current_pause *= 2
+                    if current_pause > 120:
+                        current_pause = 120
 
         return wrapper
 
@@ -163,11 +168,83 @@ class AdvertApi(ABC_WB_API):
         return advs
 
 
+    @_try_except_decorator(1, 6)
+    async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
+        url = f'https://advert-api.wb.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}'
+        data = {
+            "excluded": phrases
+        }
+
+        async with aiohttp.ClientSession() as session:
+            await self.requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
+            logger.debug('Минус-фразы установлены')
+
+
+
+class ContentApi(ABC_WB_API):
+    _only_read = api_rights.OnlyRead.FALSE
+    _rights: set = {api_rights.Rights.CONTENT}
+
+
+    async def get_subcategories(self):
+        @_try_except_decorator(1, 1)
+        async def request(session, url)-> list[Subcategory]:
+            all_categories = []
+            response = await self.requests(session, 'GET', url,
+                                           headers=self.headers.standart)
+            answer = json.loads(response)
+            for data in answer['data']:
+                subcategory = Subcategory(**data)
+                all_categories.append(subcategory)
+            return all_categories
+
+
+
+        offset = 0
+        limit = 1000
+
+        all_categories = []
+        async with aiohttp.ClientSession() as session:
+            while True:
+                url = f'https://suppliers-api.wildberries.ru/content/v2/object/all?offset={offset}&limit={limit}'
+                categories = await request(session, url)
+                if categories:
+                     all_categories.extend(categories)
+                if not categories:
+                    break
+                else:
+                    offset = offset + limit
+
+        return all_categories
+
+
+
+    async def get_patent_categories(self):
+        url = 'https://suppliers-api.wildberries.ru/content/v2/object/parent/all'
+        async with aiohttp.ClientSession() as session:
+            response_text = await self.requests(session, 'GET', url,
+                                                headers=self.headers.standart)
+            answer = json.loads(response_text)
+            return answer['data']
+
+
+
+    async def get_parent_category_to_subcategory_dict(self):
+        subcategories = await self.get_subcategories()
+        parent_id_to_subcategories = {}
+        for category in subcategories:
+            parent_id = category.parentID
+            if parent_id not in parent_id_to_subcategories:
+                parent_id_to_subcategories[parent_id] = []
+            parent_id_to_subcategories[parent_id].append(category.subjectName)
+        return parent_id_to_subcategories
+
+
 
 class WBApi:
     def __init__(self, wb_user_cabinet: app.my_types.WBUserCabinet):
         self.advert = AdvertApi(wb_user_cabinet)
-
+        self.content = ContentApi(wb_user_cabinet)
 
 
 

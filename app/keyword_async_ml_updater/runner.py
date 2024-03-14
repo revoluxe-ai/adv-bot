@@ -7,9 +7,6 @@ import asyncio
 from .users_manager import users_manager
 
 
-
-
-
 sm = get_async_session_maker()
 
 logger = logging.getLogger(__name__)
@@ -42,68 +39,68 @@ class Runner:
                     )
 
     async def _main_loop(self):
-        update_featers_block = asyncio.Event()
-        update_featers_block.set()
+        update_model_on_new_features = asyncio.Event()
         need_update_model = asyncio.Event()
         need_update_model.set()
-
+        predicted = asyncio.Event()
+        predicted.set()
         await asyncio.gather(
-            # self.update_cards_in_graph(),
-            # self.run_update_keyword_stat(need_update_model),
-            # self.run_update_vectors(update_featers_block, need_update_model),
-            self.run_update_model(update_featers_block, need_update_model),
-            self.run_update_predict_ctr(update_featers_block),
-            # self.run_update_keywords_status(update_featers_block),
+            self.update_cards_in_graph(),
+            self.run_update_keyword_stat(need_update_model),
+            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            self.run_update_model(update_model_on_new_features, need_update_model),
+            self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            self.run_update_keywords_on_wb(),
 
             return_exceptions=False
             )
 
-    async def run_update_predict_ctr(self, update_featers_block: asyncio.Event):
-        await self._manager.update_predict_ctr(update_featers_block)
+    async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
+        await self._manager.update_predict_ctr(update_model_on_new_features, predicted)
 
-
-
-    async def run_update_keyword_stat(self,  need_update_model:asyncio.Event):
+    async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
         tasks = {}
         while True:
             wb_user_cabinets = await users_manager.fetch_super_wb_user_cabinets()
             for super_wb_user_cabinet in wb_user_cabinets:
                 cabinet_id = super_wb_user_cabinet.id
                 if cabinet_id not in tasks:
-                    tasks[cabinet_id] = \
-                    asyncio.create_task(
-                    self._manager.update_keyword_stat(super_wb_user_cabinet,
-                     need_update_model))
+                    task = asyncio.create_task(
+                        self._manager.update_keyword_stat(super_wb_user_cabinet, need_update_model))
+                    def delete_task(cabinet_id=cabinet_id):
+                        logger.warning('Срабатывание колбэка удаления задачи')
+                        tasks.pop(cabinet_id)
+                    task.add_done_callback(delete_task)
+                    tasks[cabinet_id] = task
                 else:
                     if tasks[cabinet_id].done():
-                        logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id.name}')
+                        logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
                         if tasks[cabinet_id].exception():
                             logger.error(f'Ошибка обновления статистики ключей: {tasks[cabinet_id].exception()}')
 
 
 
 
-    async def run_update_vectors(self, update_featers_block: asyncio.Event,
-                                  need_update_model:asyncio.Event):
+    async def run_update_vectors(self, need_update_model:asyncio.Event,
+                                 update_model_on_new_features:asyncio.Event, predicted:asyncio.Event):
         while True:
             await self._manager.update_wb_adv_phrase_in_db()
-            await self._manager.update_vectors_exec_mode(update_featers_block)
+            await self._manager.update_vectors_exec_mode(update_model_on_new_features, predicted)
             need_update_model.set()
             await asyncio.sleep(1)
 
-    async def run_update_keywords_status(self, update_featers_block):
+    async def run_update_keywords_on_wb(self):
         while True:
             await self._manager\
-                .update_keywords_in_advs(update_featers_block)
+                .update_keywords_in_advs()
 
 
-
-    async def run_update_model(self, update_featers_block, need_update_model:asyncio.Event):
+    async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):
         while True:
             fit_logger.debug('Старт цикла обновления модели')
             await need_update_model.wait()
             fit_logger.debug('need_update_model.wait пройден')
-            await self._manager.update_model(update_featers_block)
+            await self._manager.update_model(update_model_on_new_features)
             fit_logger.debug('Цикл обновления модели завершен')
             await asyncio.sleep(1)
             fit_logger.debug('Установка clear для need_update_model')

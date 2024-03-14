@@ -1,7 +1,7 @@
 import datetime
 import os.path
 import typing
-
+from . import data_managers
 import joblib
 import xgboost
 
@@ -39,18 +39,19 @@ global_model: typing.Union[xgboost.XGBModel, None] = None
 
 path = 'app/keyword_async_ml_updater/model/'
 
-def save_model(model: xgboost.XGBModel, time_stamp):
+def save_model(model: xgboost.XGBModel, time_stamp = None):
     model_path = os.path.join(path, 'model.json')
     joblib.dump(model, model_path)
 
-    with open(f'{path}/time_stamp.txt', 'w') as file:
-        file.write(time_stamp)
+    if time_stamp:
+        with open(f'{path}/time_stamp.txt', 'w') as file:
+            file.write(time_stamp)
 
 def load_model():
     model = joblib.load(os.path.join(path, 'model.json'))
-    with open(f'{path}/time_stamp.txt', 'r') as file:
-        time_stamp = file.read()
-    return model, time_stamp
+    # with open(f'{path}/time_stamp.txt', 'r') as file:
+    #     time_stamp = file.read()
+    return model
 
 
 
@@ -113,105 +114,44 @@ class Fitter(AbcManager):
         fit_logger.debug('Модель обучена')
 
 
-    def _get_enough_views(self, ctr, n):
-         return int(1/ctr/n)
-
-
-
-    async def get_min_str_settings(self):
-        async with sm() as session:  # session: AsyncSession
-            result = await session.execute(
-                select(AdvSetting).options(selectinload(AdvSetting.wb_cabinet),
-                                           selectinload(AdvSetting.wb_cards))
-            )
-            settings = result.scalars().all()
-        adv_id_min_ctr = {}
-        shop_category_min_ctr = {}
-
-        for setting in settings:
-            min_ctr = setting.min_ctr
-            if min_ctr:
-                adv_id_min_ctr[setting.adv_id] = min_ctr
-            wb_category_name = setting.wb_category_name
-            cabinet = setting.wb_cabinet
-            if cabinet not in shop_category_min_ctr:
-                shop_category_min_ctr[cabinet] = {}
-            if wb_category_name not in shop_category_min_ctr[cabinet]:
-                shop_category_min_ctr[cabinet][wb_category_name] = []
-            shop_category_min_ctr[cabinet][wb_category_name].append(setting.min_ctr)
-
-
-        for cabinet in shop_category_min_ctr:
-            for wb_category_name in shop_category_min_ctr[cabinet]:
-                min_ctrs = shop_category_min_ctr[cabinet][wb_category_name]
-                min_ctrs = [ctr for ctr in min_ctrs if ctr is not None]
-                avg_min_ctr = sum(min_ctrs) / len(min_ctrs) if min_ctrs else 0
-                shop_category_min_ctr[cabinet][wb_category_name] = avg_min_ctr
-        shop_avg_min_ctr = {}
-        for cabinet in shop_category_min_ctr:
-            category_avg_ctrs = list(shop_category_min_ctr[cabinet].values())
-            shop_avg_min_ctr[cabinet] = sum(category_avg_ctrs) / len(category_avg_ctrs)
-
-        # Вычисление общего среднего ctr
-        global_base_ctr = 5
-        all_avg_ctrs = list(shop_avg_min_ctr.values())
-        overall_avg_ctr = sum(all_avg_ctrs) / len(all_avg_ctrs)/100 if sum(all_avg_ctrs) else global_base_ctr/100
-        async with sm() as session:  # session: AsyncSession
-            result = await session.execute(
-                select(WBCard).options(selectinload(WBCard.wb_cabinet))
-            )
-            wbcards:list[WBCard] = result.scalars().all()
-
-        nmid_cabitet_category_refs = {}
-        for card in wbcards:
-            wb_category: WBCategory = card.wb_category
-            nmid_cabitet_category_refs[card.nmid] = {'cabinet': card.wb_cabinet,
-                                                     'wb_category_name': wb_category.wb_category_name}
-
-        return adv_id_min_ctr, shop_category_min_ctr, shop_avg_min_ctr, overall_avg_ctr, nmid_cabitet_category_refs
+    def _get_enough_views(self, ctr):
+         return int(1/ctr)
 
 
 
     async def _bayesian_apply(self, df: pd.DataFrame):
-        adv_id_min_ctr, shop_category_min_ctr, shop_avg_min_ctr, overall_avg_ctr, nmid_cabitet_category_refs = \
-            await self.get_min_str_settings()
-        def get_min_ctr(adv_id, nmids):
-            nmid = nmids[0]
-            if nmid not in nmid_cabitet_category_refs:
-                return overall_avg_ctr
-            if adv_id in adv_id_min_ctr:
-                return adv_id_min_ctr[adv_id]
-            cabinet = nmid_cabitet_category_refs[nmid]['cabinet']
-            wb_category_name =  nmid_cabitet_category_refs[nmid]['wb_category_name']
-            if cabinet in shop_category_min_ctr and wb_category_name in shop_category_min_ctr[cabinet]:
-                return shop_category_min_ctr[cabinet][wb_category_name]
-            if cabinet in shop_avg_min_ctr:
-                return shop_avg_min_ctr[cabinet]
-            return overall_avg_ctr
+        async with sm() as session:
+            category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data(session)
 
         def calculate_ctr(row):
-            adv_id = row['adv_id']
             clicks = row['clicks']
             views = row['views']
-            nmids = row['nmids']
-            min_ctr = get_min_ctr(adv_id, nmids)  # default_min_ctr - значение CTR по умолчанию
-            enough_views = self._get_enough_views(min_ctr, 1)
+            wb_category_name = row['wb_category_name']
+            min_ctr = category_name_to_min_ctr.get(wb_category_name, 0)
+            if min_ctr > 0:
+                 enough_views = self._get_enough_views(min_ctr)
+            else:
+                if views > 0:
+                    return clicks / views
+                else:
+                    return 0
             clicks = clicks + 1
             views = views + enough_views
             ctr = clicks / views
             return ctr
-
         # Предположим, что adv_id_to_min_ctr - это ваш словарь с минимальными CTR для каждого adv_id
         df['ctr'] = df.apply(calculate_ctr, axis=1)
-
         return df
 
-    async def _get_df_for_fit(self, timestamp_str)-> pd.DataFrame:
+    async def _get_df_for_fit(self)-> pd.DataFrame:
+        keyword_text_keyword_features = {}
         async with sm() as sess:
             result = await sess.execute(
                 select(AdvSetting)
                 .options(
                     selectinload(AdvSetting.adv_keywords),
+                    # Убедитесь, что есть связь для wb_cards и wb_category, и что они правильно определены в моделях
+                    selectinload(AdvSetting.wb_cards).selectinload(WBCard.wb_category),
                     selectinload(AdvSetting.keyword_settings).selectinload(KeywordSetting.adv_keywords),
                 )
             )
@@ -220,19 +160,28 @@ class Fitter(AbcManager):
 
             data_rows = []
 
-
             for adv in adv_settings:
+                wb_category = await data_managers.get_wb_category(adv, sess)
+                nmid_featers = {}
+                keyword_stats = await data_managers.get_keyword_statistic(sess, adv)
+                keyword_text_to_keyword_stat = {}
+                for keyword_stat in keyword_stats:
+                    keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
+
                 item_features_list = []
                 for nmid in adv.nmids:
-                    item_feature = await sess.execute(
-                        select(ItemFeature).where(ItemFeature.nmid == nmid)
-                    )
-                    item_features = item_feature.scalars().all()
-                    if not item_features:
-                        continue
-                    for item_feature in item_features:
-                        item_feature.timestamp = timestamp_str
+                    if nmid in nmid_featers:
+                        item_feature = nmid_featers[nmid]
+                    else:
+                        item_feature = await sess.execute(
+                            select(ItemFeature).where(ItemFeature.nmid == nmid)
+                        )
+                        item_feature = item_feature.scalars().one()
+                        nmid_featers[nmid] = item_feature
+                    if item_feature:
                         item_features_list.append(item_feature.vector)
+                if not item_features_list:
+                    continue
 
                 # Вычисляем средние значения фичей товаров, если они есть
 
@@ -243,28 +192,32 @@ class Fitter(AbcManager):
 
                 for keyword_setting in keyword_settings:
                     text = keyword_setting.text
-                    keyword_feature = await sess.execute(
-                        select(KeywordFeature).where(KeywordFeature.keyword == text)
-                    )
-                    keyword_feature = keyword_feature.scalars().first()
+                    if text in keyword_text_keyword_features:
+                        keyword_feature = keyword_text_keyword_features[text]
+                    else:
+                        keyword_feature = await sess.execute(
+                            select(KeywordFeature).where(KeywordFeature.keyword == text)
+                        )
+                        keyword_feature = keyword_feature.scalars().first()
+                        keyword_text_keyword_features[text] = keyword_feature
                     if not keyword_feature:
                         continue
                     keyword_features = keyword_feature.vector
-                    clicks = sum([adv_keyword.clicks for adv_keyword in keyword_setting.adv_keywords])
-                    views = sum([adv_keyword.views for adv_keyword in keyword_setting.adv_keywords])
-                    spend = sum([adv_keyword.spend for adv_keyword in keyword_setting.adv_keywords])
-                    row = {
-                        'adv_id': adv.adv_id,
-                        'keyword': keyword_setting.text,
-                        'views': views,
-                        'clicks': clicks,
-                        'spend': spend,
-                        'nmids': adv.nmids,
-                        **avg_item_features,
-                        **{f'keyword_feature_{i}': keyword_features[i] for i in  range(len(keyword_features))},
-                    }
-                    data_rows.append(row)
-            await sess.commit()
+                    keyword_stat = keyword_text_to_keyword_stat.get(text)
+                    if keyword_stat:
+                        row = {
+                            'adv_id': adv.adv_id,
+                            'keyword': keyword_setting.text,
+                            'views': keyword_stat.views,
+                            'clicks': keyword_stat.clicks,
+                            'spend': keyword_stat.spend,
+                            'nmids': adv.nmids,
+                            'wb_category_name': wb_category.wb_category_name,
+                            **avg_item_features,
+                            **{f'keyword_feature_{i}': keyword_features[i] for i in  range(len(keyword_features))},
+                        }
+                        data_rows.append(row)
+
 
         df = pd.DataFrame(data_rows)
         if len(df) > 0:
@@ -272,18 +225,16 @@ class Fitter(AbcManager):
             df['ctr'] = df['clicks'] / df['views']
         return df
 
-
-
     async def _fit_modelGradientBoosting(self):
-        timestamp = datetime.datetime.now()
-        timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+
         fit_logger.debug('Поток обучения запущен, получение данных')
-        df = await self._get_df_for_fit(timestamp)
+        df = await self._get_df_for_fit()
         fit_logger.debug('Данные получены')
         df:pd.DataFrame = await self._bayesian_apply(df)
-        await asyncio.to_thread(df.to_csv,'work_folder/df_for_fit.csv', index=False)
+        await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
         y = df['ctr']
-        X = df.drop(['keyword', 'views', 'ctr', 'clicks',  'adv_id', 'spend', 'nmids'], axis=1)
+        X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
+                    axis=1)
         fit_logger.debug('Данные подготовлены')
         # Создание модели градиентного бустинга
         model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
@@ -306,7 +257,7 @@ class Fitter(AbcManager):
         model.fit(X, y)
         fit_logger.debug('Модель обучена')
         model = typing.cast(xgboost.XGBModel, model.named_steps['xgbregressor'])
-        await asyncio.to_thread(save_model, model, timestamp_str)
+        await asyncio.to_thread(save_model, model, time_stamp= None)
 
 
 
@@ -314,13 +265,13 @@ class Fitter(AbcManager):
 class Predictor:
 
     def _predict(self, df: pd.DataFrame)-> typing.Union[pd.DataFrame, None]:
-        model, timestamp_str = load_model()
+        model = load_model()
         X = df.drop(['keyword', 'adv_id'], axis=1)
         y = model.predict(X)
         df['predicted_ctr'] = y
         return df
 
-    async def predict_ctr_for_keywords(self, update_featers_block):
+    async def predict_ctr_for_keywords(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
         async with sm() as session:
             stmt = select(AdvSetting).options(
                 selectinload(AdvSetting.adv_keywords),
@@ -329,8 +280,9 @@ class Predictor:
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
             logger.debug('Ожидание разрешения обновления ключей')
-            await update_featers_block.wait()
+            await update_model_on_new_features.wait()
             logger.debug('Блокировка снята')
+            predicted.clear()
             df_for_predict = await self._get_df_for_predict(all_adv_settings, session)
             predict_df = await asyncio.to_thread(self._predict, df_for_predict)
             predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
@@ -351,6 +303,8 @@ class Predictor:
                 keyword_setting = result.scalar()
                 keyword_setting.predict_ctr = predict_ctr
             await session.commit()
+            logger.debug('Предсказания обновлены')
+
 
 
 
@@ -358,7 +312,6 @@ class Predictor:
 
     async def _get_df_for_predict(self, adv_settings: list[AdvSetting], session)-> pd.DataFrame:
        data_rows = []
-       timestamp = None
        for adv in adv_settings:
            item_features_list = []
            for nmid in adv.nmids:

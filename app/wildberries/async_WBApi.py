@@ -19,7 +19,7 @@ from  .data_classes.card_from_wb import CardFromWB
 from .data_classes.interfaces import ShopInterface
 from .data_classes.wb_shop import WbShop
 from .data_classes  import interfaces
-
+from .models import AdvSetting
 
 logger = logging.getLogger(__name__)
 
@@ -298,8 +298,8 @@ class async_WBApi(ABC_WB_API):
 
 
 
-    async def set_minus_phrases(self, adv: Adv, phrases: list):
-        url = f'https://advert-api.wb.ru/adv/v1/auto/set-excluded?id={adv.advertId}'
+    async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
+        url = f'https://advert-api.wb.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}'
         timer = 5
         data = {
             "excluded": phrases

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import datetime
 import typing
@@ -14,9 +15,10 @@ from . import exceptions
 from app.db.base import BaseTable
 from sqlalchemy.schema import UniqueConstraint
 
+from session_maker import get_async_session_maker
 
 
-
+_sm = get_async_session_maker()
 
 
 
@@ -159,7 +161,6 @@ class AdvSetting(BaseTable):
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'))
     wb_cabinet = relationship('WBCabinet', back_populates='adv_settings',
                               lazy='joined')
-    min_ctr = Column(Integer)
     wb_cards = relationship('WBCard', back_populates='adv_setting', uselist=True)  # Изменено на множественное число
     active_status = Column(String, default=False)
     adv_keywords = relationship('AdvKeyword', back_populates='adv_setting',
@@ -168,99 +169,27 @@ class AdvSetting(BaseTable):
     nmids = Column(JSONB, default=[])
     keyword_settings = relationship('KeywordSetting', back_populates='adv_setting',
                                     uselist=True)
-
-
-
-
-
-    @hybrid_property
-    def wb_category_name(self):
-        if self.wb_cards:
-            return self.wb_cards[0].wb_category_name
-        return None
-
-    @wb_category_name.expression
-    def wb_category_name(cls):
-        return select([WBCard.wb_category_name]).where(WBCard.adv_setting_id == cls.id).limit(1).label(
-            "wb_category_name")
-
+    pass_days = Column(Integer, default=30)
+    boost = Column(Float, server_default=text('1.1'))
 
 
 
 
 class KeywordSetting(BaseTable):
+
+    """
+    hard_status
+    0 - black listA
+    1 - in test
+    2 - white list
+
+    """
     text = Column(String, nullable=False)
     adv_setting_id: Mapped[int] = mapped_column(ForeignKey('advsetting.id'))
     adv_setting: Mapped[AdvSetting] = relationship('AdvSetting', back_populates='keyword_settings', uselist=False)
     predict_ctr = Column(Float, nullable=True)
-    pass_days = Column(Integer, nullable=False, default=30)
     adv_keywords = relationship('AdvKeyword', back_populates='keyword_setting', uselist=True)
+    hard_status = Column(Integer, default=1)
     __table_args__ = (UniqueConstraint('text', 'adv_setting_id'),)
 
 
-
-    @hybrid_property
-    def clicks(self):
-        clicks = 0
-        adv_setting = self.adv_setting
-        now = datetime.datetime.now()
-        adv_keywords = filter(lambda x: x.keyword == self.text and x.date > now - datetime.timedelta(days=self.pass_days),
-                              adv_setting.adv_keywords)
-        for keyword in adv_keywords:
-            clicks += keyword.clicks
-        return clicks
-
-
-    @clicks.expression
-    def clicks(cls):
-        # Использование text для задания интервала времени для PostgreSQL
-        return (select([func.sum(AdvKeyword.clicks)])
-                .where(AdvKeyword.keyword == cls.text,
-                       AdvKeyword.date > func.now() - text(f"'{cls.pass_days} days'::interval"))
-                .label('clicks'))
-
-
-    @hybrid_property
-    def views(self):
-        views = 0
-        adv_setting = self.adv_setting
-        now = datetime.datetime.now()
-        adv_keywords = filter(lambda x: x.keyword == self.text and x.date > now - datetime.timedelta(days=self.pass_days),
-                              adv_setting.adv_keywords)
-        for keyword in adv_keywords:
-            views += keyword.views
-        return views
-
-
-    @views.expression
-    def views(cls):
-        # Использование text для задания интервала времени для PostgreSQL
-        return (select([func.sum(AdvKeyword.views)])
-                .where(AdvKeyword.keyword == cls.text,
-                       AdvKeyword.date > func.now() - text(f"'{cls.pass_days} days'::interval"))
-                .label('views'))
-
-    @hybrid_property
-    def spend(self):
-        spend = 0
-        adv_setting = self.adv_setting
-        now = datetime.datetime.now()
-        adv_keywords = filter(lambda x: x.keyword == self.text and x.date > now - datetime.timedelta(days=self.pass_days),
-                              adv_setting.adv_keywords)
-        for keyword in adv_keywords:
-            spend += keyword.spend
-        return spend
-
-
-    @spend.expression
-    def spend(cls):
-        # Использование text для задания интервала времени для PostgreSQL
-        return (select([func.sum(AdvKeyword.spend)])
-                .where(AdvKeyword.keyword == cls.text,
-                       AdvKeyword.date > func.now() - text(f"'{cls.pass_days} days'::interval"))
-                .label('spend'))
-
-
-    # @hybrid_property
-    # def timestamp(self):
-    #     return (select([func.max(AdvKeyword.date)])

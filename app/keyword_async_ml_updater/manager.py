@@ -21,6 +21,7 @@ from sqlalchemy.future import select
 from app.faiss_manager.faiss_index_manager import FaissManager
 from app.session_maker import get_async_session_maker
 from app.text_master.Transformers import Word2Vec
+from . import data_managers
 from .ABC_manager import AbcManager
 from .data_managers import DataGetter, DataSetter
 import asyncio
@@ -89,70 +90,69 @@ class Manager(AbcManager):
         wb_cabinet = cabinet.wb_cabinet
 
         wb_api = WBApi(cabinet)
+        update_signal = False
+        async with sm() as session:
+            stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
+            result = (await session.execute(stmt)).unique()
+            for adv_setting in result.scalars():
+                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+                logger.debug(f'Ключевые слова для {adv_setting.name} получены')
+                for keyword in keywords:
+                    stmt = select(AdvKeyword)\
+                    .options(joinedload(AdvKeyword.keyword_setting))\
+                    .where(and_(AdvKeyword.text == keyword.text,
+                                                    AdvKeyword.date == keyword.date,
+                                                    AdvKeyword.adv_setting_id == adv_setting.id))
 
-        while True:
-            update_signal = False
-            async with sm() as session:
-                stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
-                result = (await session.execute(stmt)).unique()
-                for adv_setting in result.scalars():
-                    keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
-                    for keyword in keywords:
-                        stmt = select(AdvKeyword)\
-                        .options(joinedload(AdvKeyword.keyword_setting))\
-                        .where(and_(AdvKeyword.text == keyword.text,
-                                                        AdvKeyword.date == keyword.date,
-                                                        AdvKeyword.adv_setting_id == adv_setting.id))
-
-                        keyword_db = await session.execute(stmt)
-                        keyword_db: AdvKeyword = keyword_db.scalar()
-                        if not keyword_db:
-                            keyword_db = AdvKeyword()
+                    keyword_db = await session.execute(stmt)
+                    keyword_db: AdvKeyword = keyword_db.scalar()
+                    if not keyword_db:
+                        keyword_db = AdvKeyword()
+                        stmt = select(KeywordSetting).where(and_(KeywordSetting.text == keyword.text,
+                                                            KeywordSetting.adv_setting_id == adv_setting.id))
+                        keyword_setting = await session.execute(stmt)
+                        keyword_setting = keyword_setting.scalar()
+                        if not keyword_setting:
+                             keyword_setting = KeywordSetting()
+                             keyword_setting.text = keyword.text
+                             keyword_setting.adv_setting_id = adv_setting.id
+                             keyword_db.keyword_setting = keyword_setting
+                        session.add(keyword_db)
+                        keyword_db.adv_setting = adv_setting
+                        keyword_db.text = keyword.text
+                        keyword_db.date = keyword.date
+                        update_signal = True
+                    else:
+                        if not keyword_db.keyword_setting:
                             stmt = select(KeywordSetting).where(and_(KeywordSetting.text == keyword.text,
-                                                                KeywordSetting.adv_setting_id == adv_setting.id))
+                                                                     KeywordSetting.adv_setting_id == adv_setting.id))
                             keyword_setting = await session.execute(stmt)
                             keyword_setting = keyword_setting.scalar()
                             if not keyword_setting:
-                                 keyword_setting = KeywordSetting()
-                                 keyword_setting.text = keyword.text
-                                 keyword_setting.adv_setting_id = adv_setting.id
-                                 keyword_db.keyword_setting = keyword_setting
-                            session.add(keyword_db)
-                            keyword_db.adv_setting = adv_setting
-                            keyword_db.text = keyword.text
-                            keyword_db.date = keyword.date
+                                keyword_setting = KeywordSetting()
+                                keyword_setting.text = keyword.text
+                                keyword_setting.adv_setting_id = adv_setting.id
+                            keyword_db.keyword_setting = keyword_setting
+                        if any([keyword_db.views != keyword.views,
+                                keyword_db.clicks != keyword.clicks]):
                             update_signal = True
-                        else:
-                            if not keyword_db.keyword_setting:
-                                stmt = select(KeywordSetting).where(and_(KeywordSetting.text == keyword.text,
-                                                                         KeywordSetting.adv_setting_id == adv_setting.id))
-                                keyword_setting = await session.execute(stmt)
-                                keyword_setting = keyword_setting.scalar()
-                                if not keyword_setting:
-                                    keyword_setting = KeywordSetting()
-                                    keyword_setting.text = keyword.text
-                                    keyword_setting.adv_setting_id = adv_setting.id
-                                keyword_db.keyword_setting = keyword_setting
-                            if any([keyword_db.views != keyword.views,
-                                    keyword_db.clicks != keyword.clicks]):
-                                update_signal = True
-                        keyword_db.views = keyword.views
-                        keyword_db.clicks = keyword.clicks
-                        keyword_db.spend = keyword.spend
-                        keyword_db.update_timestamp = keyword.update_timestamp
-                        await session.merge(keyword_db)
-                    await session.commit()
-                    if update_signal:
-                        need_update_model.set()
-                        update_signal = False
+                    keyword_db.views = keyword.views
+                    keyword_db.clicks = keyword.clicks
+                    keyword_db.spend = keyword.spend
+                    keyword_db.update_timestamp = keyword.update_timestamp
+                    await session.merge(keyword_db)
+                await session.commit()
+                if update_signal:
+                    need_update_model.set()
+                    update_signal = False
 
 
-    async def graph_vector_update(self, update_featers_block:asyncio.Event) -> None:
+    async def graph_vector_update(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event) -> None:
         # power = self._shop_manager.power
         length = 2**4
         if True:
             await self.graph_updater.update_graph_run(length)
-        await self.graph_updater.get_nmids_and_keyword_featers_for_ml(update_featers_block)
+        await self.graph_updater.get_nmids_and_keyword_featers_for_ml(update_model_on_new_features, predicted)
 
 
     # async def update_cards(self, file_working:asyncio.Lock):
@@ -229,10 +229,12 @@ class Manager(AbcManager):
         return joblib.load(model_path)
 
 
-    async def update_keywords_in_advs(self, update_featers_block: asyncio.Event) -> list[typing.Awaitable]:
+    async def update_keywords_in_advs(self) -> list[typing.Awaitable]:
         # while True:
             update_tasks: dict[int, asyncio.Task] = {}
             async  with sm() as session:
+                category_name_to_min_ctr = await data_managers.\
+                    get_category_name_min_ctr_final_data(session)
                 subquery = select(AdvSetting.id).where(
                     AdvSetting.bot_active == True,
                     AdvSetting.wb_cabinet_id == WBCabinet.id
@@ -241,9 +243,9 @@ class Manager(AbcManager):
                 stmt = select(WBCabinet).options(
                     joinedload(WBCabinet.wb_user_cabinets).joinedload(WBUserCabinet.user)
                 ).where(subquery)
-
                 result = await session.execute(stmt)
                 wb_cabinets: list[WBCabinet] = result.unique().scalars().all()
+
                 for wb_cabinet in wb_cabinets:
                     if wb_cabinet.id not in update_tasks:
                         wb_user_cabinets: list[WBUserCabinet] = wb_cabinet.wb_user_cabinets
@@ -254,9 +256,8 @@ class Manager(AbcManager):
                         super_wb_user_cabinet = WBUserCabinet()
                         super_wb_user_cabinet.wb_cabinet = wb_cabinet
                         super_wb_user_cabinet.user = super_user
-                        wb_api = WBApi(super_wb_user_cabinet)
-                        data_setter = DataSetter(super_wb_user_cabinet, self._aiosm)
-                        task = asyncio.create_task(data_setter.update_minus_keywords(wb_api))
+                        data_setter = DataSetter(super_wb_user_cabinet)
+                        task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
                         update_tasks[wb_cabinet.id] = task
                     else:
                         if update_tasks[wb_cabinet.id].done():
@@ -266,22 +267,22 @@ class Manager(AbcManager):
 
 
 
-    async def update_model(self, saving_data_for_predictor):
+    async def update_model(self, update_model_on_new_features):
         fit_logger.debug('Старт обучения и сохранения модели')
-        await self.fit_and_save_model(saving_data_for_predictor)
+        await self.fit_and_save_model()
         fit_logger.debug('Устанавливаю сет, разрешаю обновление ключей')
-        saving_data_for_predictor.set()
+        update_model_on_new_features.set()
 
     def __save_model(self, model, model_path):
         joblib.dump(model, model_path)
 
 
-    async def fit_and_save_model(self, model_saving: asyncio.Lock):
+    async def fit_and_save_model(self):
         await self._fitter.getGradientBoostingFullFitModel()
 
 
-    async def update_vectors_exec_mode(self, update_featers_block: asyncio.Event):
-        await self.graph_vector_update(update_featers_block)
+    async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
+        await self.graph_vector_update(update_model_on_new_features, predicted)
 
 
 
@@ -439,8 +440,8 @@ class Manager(AbcManager):
         except ValueError:
             return False
 
-    async def update_predict_ctr(self, update_featers_block):
-        await self._predictor.predict_ctr_for_keywords(update_featers_block)
+    async def update_predict_ctr(self, update_model_on_new_features, predicted: asyncio.Event):
+        await self._predictor.predict_ctr_for_keywords(update_model_on_new_features, predicted)
 
 
 

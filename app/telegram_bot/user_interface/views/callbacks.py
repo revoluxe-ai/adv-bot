@@ -52,6 +52,7 @@ class BotActive:
 class Min_ctr(CallbackData, prefix="min_ctr"):
     action: str
     adv_original_id: int
+    wb_user_cabinet_original_id: int
 
 
 class AddNewToken(CallbackData, prefix="add_new_token"):

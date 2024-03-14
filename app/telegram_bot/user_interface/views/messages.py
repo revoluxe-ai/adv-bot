@@ -81,10 +81,12 @@ class GetCardsApiError(Text):
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
     def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message],
-                  chat_id: int, wb_user_cabinet: WBUserCabinet,
+                  chat_id: int, wb_user_cabinet_original_id: int,
+                 adv_settings: list[AdvSetting],
                  page: int = 1):
         super().__init__(bot, last_message, chat_id)
-        self._wb_user_cabinet = wb_user_cabinet
+        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+        self._adv_settings = adv_settings
         self._page = page
 
     @property
@@ -93,7 +95,8 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     @property
     def keyboard(self):
-        return keyboards.get_advs_keyboard_with_paginator(self._wb_user_cabinet,
+        return keyboards.get_advs_keyboard_with_paginator(self._wb_user_cabinet_original_id,
+                                                          self._adv_settings,
                                                           self._page,
                                                           self.on_page)
 
@@ -182,7 +185,7 @@ class CabinetExistsInSystem(Text):
     text = 'Этот кабинет уже существует в системе, мы его добавим вам...'
 
 
-class WrongMinCTR:
+class WrongMinCTR(Text):
 
     text = 'Минимальный CTR должен быть числом от 0 до 100. Попробуйте снова:'
 

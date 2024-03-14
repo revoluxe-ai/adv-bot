@@ -3,6 +3,9 @@ import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from app.NeoDataScience.driver import DataScience
 from app.keyword_async_ml_updater.ML import DataGetter, Fitter
+from app.keyword_async_ml_updater.data_managers import get_category_name_min_ctr_final_data
+from app.keyword_async_ml_updater import data_managers
+from unittest.mock import AsyncMock, patch
 
 
 @pytest.mark.asyncio
@@ -118,3 +121,31 @@ async def test_bayesian_apply():
     # Checking if the DataFrame is modified as expected
     assert 'ctr' in result_df.columns
     assert result_df['ctr'][0] > 0
+
+
+
+@pytest.mark.asyncio
+async def test_get_category_name_min_ctr_final_data():
+    mock_query_result = MagicMock()
+    mock_query_result.unique.return_value.scalars.return_value.all.return_value = [MagicMock(),
+                                                                                   MagicMock()]  # Пример с двумя объектами AdvSetting
+
+    # Настройка асинхронного мока сессии, чтобы возвращать настроенный мок результата запроса
+    session = AsyncMock()
+    session.execute.return_value = mock_query_result  # Обратите внимание, здесь не используется await, так как мы настраиваем возвращаемое значение
+
+    # Define the expected output
+    expected_output = {1: 0.1, 2: 0.2}
+
+    # Call the function with the mock session
+    result = await get_category_name_min_ctr_final_data(session)
+
+    # Assert that the function returns the expected output
+    assert result == expected_output
+
+
+
+
+
+
+

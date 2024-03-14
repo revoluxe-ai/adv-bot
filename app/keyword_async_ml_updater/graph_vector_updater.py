@@ -73,7 +73,7 @@ class GraphUpdater:
 
 
 
-    async def get_nmids_and_keyword_featers_for_ml(self,  update_featers_block: asyncio.Event):
+    async def get_nmids_and_keyword_featers_for_ml(self,  update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
         nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors()
         keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors()
         async with sm() as session:
@@ -97,7 +97,8 @@ class GraphUpdater:
                     keyword.vector = vector
                 keyword.timestamp = None
                 session.add(keyword)
-            update_featers_block.clear()
+            await predicted.wait()
+            update_model_on_new_features.clear()
             await session.commit()
             logger.debug('Вектора обновлены')
 

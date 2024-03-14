@@ -21,14 +21,6 @@
       "filename": "errors.log",
       "mode": "a",
       "encoding": "utf-8"
-    },
-    "sqlalchemy_debug": {
-      "class": "logging.FileHandler",
-      "level": "DEBUG",
-      "formatter": "custom",
-      "filename": "sqlalchemy_debug.log",
-      "mode": "a",
-      "encoding": "utf-8"
     }
   },
   "loggers": {
@@ -52,14 +44,20 @@
       "handlers": ["console"],
       "propagate": false
     },
+
     "gensim.models.keyedvectors": {
       "level": "CRITICAL",
       "handlers": ["console"],
       "propagate": false
     },
     "sqlalchemy.engine": {
-      "level": "DEBUG",
-      "handlers": ["sqlalchemy_debug"],
+      "level": "CRITICAL",
+      "handlers": ["console"],
+      "propagate": false
+    },
+    "app.wildberries.ABC_WB_API": {
+      "level": "ERROR",
+      "handlers": ["console"],
       "propagate": false
     },
     "NeoDataScience.driver": {

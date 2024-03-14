@@ -35,7 +35,7 @@ class WbRequestApiMixin(ABC):
                     if code := json_answer.get('code'):
                         raise exceptions.ApiErrorWithCode(code, \
                                                           json_answer.get('message'), json_answer.get('rejection'))
-            logger.debug(f'Ответ от {url}: {text}')
+
             return text
 
 
@@ -74,7 +74,7 @@ class ABC_WB_API(WbRequestApiMixin):
 
     def __init__(self, wb_user_cabinet: app.my_types.WBUserCabinet):
         tokens: list[WBToken]= wb_user_cabinet.user.wb_tokens
-        tokens = [token for token in tokens if token.shop_id == wb_user_cabinet.wb_cabinet.shop_id]
+        # tokens = [token for token in tokens if token.shop_id == wb_user_cabinet.wb_cabinet.shop_id]
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_user_cabinet)
@@ -100,7 +100,6 @@ class ABC_WB_API(WbRequestApiMixin):
     def chunks(lst, n):
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
-
 
 
 
