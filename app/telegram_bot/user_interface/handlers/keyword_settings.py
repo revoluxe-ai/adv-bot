@@ -42,11 +42,13 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
        adv_setting: AdvSetting = result.unique().scalars().one()
        keywords = await utils.get_keywords_for_keyboard(session, adv_setting)
        chat_id = callback.message.chat.id
+       page = callback_data.page
        last_message, message_type = await messages.AdvKeywordsSetting(bot,
                                                                       last_message,
                                                                       chat_id,
                                                                       keywords,
-                                                                      adv_setting)()
+                                                                      adv_setting,
+                                                                      page)()
        return last_message, message_type
 
 

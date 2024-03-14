@@ -185,16 +185,17 @@ async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
         global_keywordstats_list.extend(keywordstat_list)
 
     final_wb_category_name_to_min_ctr = {}
+    percentile_value = 10
     for wb_category, keywordstat_list in wb_category_to_keywordstat_list.items():
         ctr_percentile = np.percentile([keywordstat.ctr for keywordstat in keywordstat_list],
-                                       10)  # Исправлена переменная здесь
+                                       percentile_value)  # Исправлена переменная здесь
         wb_category_name = wb_category.wb_category_name
         if ctr_percentile == 0:
             parentId = category_name_to_parent_id[wb_category_name]
             keywordstats = parent_category_to_keywordstat_list[parentId]
-            ctr_percentile = np.percentile([kw.ctr for kw in keywordstats], 10)  # Исправлена переменная здесь
+            ctr_percentile = np.percentile([kw.ctr for kw in keywordstats], percentile_value)  # Исправлена переменная здесь
             if ctr_percentile == 0:
-                ctr_percentile = np.percentile([kw.ctr for kw in global_keywordstats_list], 10)  # И еще здесь
+                ctr_percentile = np.percentile([kw.ctr for kw in global_keywordstats_list], percentile_value)  # И еще здесь
             final_wb_category_name_to_min_ctr[wb_category_name] = ctr_percentile
         else:
             final_wb_category_name_to_min_ctr[wb_category_name] = ctr_percentile  # И тут
@@ -220,6 +221,7 @@ async def get_good_bad_phrases(session, adv_setting: AdvSetting,
         keyword_stat = keyword_text_to_keyword_stat.get(keyword_setting.text, None)
         if not keyword_stat:
             good_keywords.append(keyword_setting.text)
+            continue
         if min_ctr == 0:
             good_keywords.append(keyword_setting.text)
             continue
