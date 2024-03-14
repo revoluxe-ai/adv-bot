@@ -12,19 +12,7 @@ sm = get_async_session_maker()
 logger = logging.getLogger(__name__)
 
 fit_logger = logging.getLogger('fit_logger')
-# Вспомогательная функция для запуска асинхронной функции в отдельном процессе
-def run_async_func_in_process(async_func, *args, **kwargs):
-    print('Запускаем асинхронную функцию внутри отдельного цикла событий')
-    loop = asyncio.app_event_loop()
-    asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(async_func(*args, **kwargs))
-    loop.close()
-    return result
 
-# Обёртка для синхронного вызова
-def run_update_keywords_in_advs_sync(run_update_keywords_in_advs, event):
-    print('Запускаем асинхронную функцию внутри отдельного цикла событий')
-    return run_async_func_in_process(run_update_keywords_in_advs, event)
 
 
 class Runner:
@@ -45,7 +33,6 @@ class Runner:
         predicted = asyncio.Event()
         predicted.set()
         await asyncio.gather(
-            self.update_cards_in_graph(),
             self.run_update_keyword_stat(need_update_model),
             self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
             self.run_update_model(update_model_on_new_features, need_update_model),

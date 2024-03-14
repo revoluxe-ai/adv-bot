@@ -14,6 +14,15 @@
       "formatter": "custom",
       "stream": "ext://sys.stdout"
     },
+    "sql_handler": {
+      "class": "logging.FileHandler",
+      "level": "DEBUG",
+      "formatter": "custom",
+      "filename": "sql.log",
+      "mode": "a",
+      "encoding": "utf-8"
+    },
+
     "file": {
       "class": "logging.FileHandler",
       "level": "ERROR",
@@ -51,8 +60,8 @@
       "propagate": false
     },
     "sqlalchemy.engine": {
-      "level": "CRITICAL",
-      "handlers": ["console"],
+      "level": "DEBUG",
+      "handlers": ["sql_handler"],
       "propagate": false
     },
     "app.wildberries.ABC_WB_API": {
