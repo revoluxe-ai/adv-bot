@@ -186,17 +186,18 @@ async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
 
     final_wb_category_name_to_min_ctr = {}
     for wb_category, keywordstat_list in wb_category_to_keywordstat_list.items():
-        ctr_percentil = np.percentile([keywordstat.ctr for keywordstat in  keywordstat_list], 10)
+        ctr_percentile = np.percentile([keywordstat.ctr for keywordstat in keywordstat_list],
+                                       10)  # Исправлена переменная здесь
         wb_category_name = wb_category.wb_category_name
-        if ctr_percentil == 0:
+        if ctr_percentile == 0:
             parentId = category_name_to_parent_id[wb_category_name]
             keywordstats = parent_category_to_keywordstat_list[parentId]
-            ctr_pencentile = np.percentile([kw.ctr for kw in keywordstats], 10)
-            if ctr_percentil == 0:
-                ctr_pencentile = np.percentile([kw.ctr for kw in global_keywordstats_list], 10)
-            final_wb_category_name_to_min_ctr[wb_category_name] = ctr_pencentile
+            ctr_percentile = np.percentile([kw.ctr for kw in keywordstats], 10)  # Исправлена переменная здесь
+            if ctr_percentile == 0:
+                ctr_percentile = np.percentile([kw.ctr for kw in global_keywordstats_list], 10)  # И еще здесь
+            final_wb_category_name_to_min_ctr[wb_category_name] = ctr_percentile
         else:
-            final_wb_category_name_to_min_ctr[wb_category_name] = ctr_pencentile
+            final_wb_category_name_to_min_ctr[wb_category_name] = ctr_percentile  # И тут
     return final_wb_category_name_to_min_ctr
 
 
