@@ -88,7 +88,6 @@ class Manager(AbcManager):
 
     async def update_keyword_stat(self, cabinet:WBUserCabinet, need_update_model:asyncio.Event):
         wb_cabinet = cabinet.wb_cabinet
-
         wb_api = WBApi(cabinet)
         update_signal = False
         async with sm() as session:
@@ -331,6 +330,7 @@ class Manager(AbcManager):
                     phrase_data_list.append(phrase_data)
 
             await self._gds.add_keyword_phrase(phrase_data_list)
+            await asyncio.sleep(1)
 
 
 
