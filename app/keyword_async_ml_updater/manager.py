@@ -230,7 +230,6 @@ class Manager(AbcManager):
 
 
     async def update_keywords_in_advs(self) -> list[typing.Awaitable]:
-        # while True:
             update_tasks: dict[int, asyncio.Task] = {}
             async  with sm() as session:
                 category_name_to_min_ctr = await data_managers.\

@@ -93,6 +93,7 @@ class Runner:
         while True:
             await self._manager\
                 .update_keywords_in_advs()
+            await asyncio.sleep(1)
 
 
     async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):

@@ -14,6 +14,8 @@ from .models import WBToken, AdvSetting
 from . import exceptions
 from . import api_rights
 import app
+from cachetools import TTLCache
+from cachetools.func import ttl_cache
 
 
 
@@ -185,7 +187,7 @@ class ContentApi(ABC_WB_API):
     _only_read = api_rights.OnlyRead.FALSE
     _rights: set = {api_rights.Rights.CONTENT}
 
-
+    @ttl_cache(ttl=60*60*48)
     async def get_subcategories(self):
         @_try_except_decorator(1, 1)
         async def request(session, url)-> list[Subcategory]:

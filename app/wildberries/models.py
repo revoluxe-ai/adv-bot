@@ -156,6 +156,10 @@ class WBCard(BaseTable): # Изменено название таблицы
         return urls
 
 class AdvSetting(BaseTable):
+    def __repr__(self):
+        return f'name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}'
+
+
     adv_id = Column(BIGINT(), unique=True)
     name = Column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'))
