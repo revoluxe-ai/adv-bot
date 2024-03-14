@@ -3,7 +3,7 @@ import multiprocessing
 import re
 import typing
 from datetime import datetime
-
+from app.keyword_async_ml_updater import data_managers
 from app.wildberries.api import WBApi
 from collections import defaultdict
 from functools import partial
@@ -292,47 +292,42 @@ class Manager(AbcManager):
 
     async def update_wb_adv_phrase_in_db(self):
         async with sm() as session:
-            stmt_agg = select(
-                AdvKeyword.text,
-                func.sum(AdvKeyword.views).label("total_views"),
-                func.sum(AdvKeyword.clicks).label("total_clicks"),
-                func.sum(AdvKeyword.spend).label("total_spend"),
-                AdvSetting.adv_id, AdvSetting.id, AdvSetting.nmids
-            ).join(AdvSetting, AdvSetting.id == AdvKeyword.adv_setting_id
-                   ).group_by(AdvSetting.adv_id, AdvSetting.id, AdvKeyword.text, AdvSetting.nmids)
+            stmt = select(AdvSetting)
+            result = await session.execute(stmt)
+            adv_settings = result.unique().scalars().all()
+            adv_setting_keyword_stats = {}
+            for adv_setting in adv_settings:
+                keyword_stats = await data_managers.get_keyword_statistic(session, adv_setting)
+                adv_setting_keyword_stats[adv_setting] = keyword_stats
 
-            result_agg = await session.execute(stmt_agg)
-            keywords_agg = result_agg.fetchall()
-
-            # Расчет максимального и минимального CTR для нормализации
-            total_max_ctr = max(
-                row.total_clicks / row.total_views for row in keywords_agg if row.total_views > 0)
-            total_min_ctr = min(
-                row.total_clicks / row.total_views for row in keywords_agg if row.total_views > 0)
-
+            total_min_ctr = min([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
+             for keyword_stat in keyword_stats])
+            total_max_ctr = max([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
+                for keyword_stat in keyword_stats])
             phrase_data_list = []
-            for row in keywords_agg:
-                ctr = row.total_clicks / row.total_views if row.total_views > 0 else 0
-                # Расчет нормализованного CTR для каждой фразы
-                n_ctr = ((ctr - total_min_ctr) / (total_max_ctr - total_min_ctr)
-                         if total_max_ctr > total_min_ctr else 0)
-                words = row.text.split()
-                keywords = []
-                for word in words:
-                    vector = await self._word2vec.average_vector_from_sentence(row.text)
-                    if vector is not None:
-                        vector = list(vector)
-                    keywords.append(KeywordStatForNeo(text=word, vector=vector))
+            for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
+                for keyword_stat in keyword_stats:
+                    ctr = keyword_stat.ctr
+                    # Расчет нормализованного CTR для каждой фразы
+                    n_ctr = ((ctr - total_min_ctr) / (total_max_ctr - total_min_ctr)
+                             if total_max_ctr > total_min_ctr else 0)
+                    words = keyword_stat.text.split()
+                    keywords = []
+                    for word in words:
+                        vector = await self._word2vec.average_vector_from_sentence(word)
+                        if vector is not None:
+                            vector = list(vector)
+                        keywords.append(KeywordStatForNeo(text=word, vector=vector))
 
-                phrase_data = KeywordPhrase(
-                    text=row.text,
-                    ctr=n_ctr,  # Используем рассчитанный нормализованный CTR
-                    target_nmids=row.nmids if n_ctr > 0 else [] ,  # Используем nmids напрямую из результатов запроса
-                    words=keywords,
-                    word2vec =  await self._word2vec.average_vector_from_sentence(row.text)
+                    phrase_data = KeywordPhrase(
+                        text=keyword_stat.text,
+                        ctr=n_ctr,
+                        target_nmids=adv_setting.nmids if n_ctr > 0 else [] ,
+                        words=keywords,
+                        word2vec =  await self._word2vec.average_vector_from_sentence(keyword_stat.text)
 
-                )
-                phrase_data_list.append(phrase_data)
+                    )
+                    phrase_data_list.append(phrase_data)
 
             await self._gds.add_keyword_phrase(phrase_data_list)
 
