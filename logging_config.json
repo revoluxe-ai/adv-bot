@@ -15,12 +15,14 @@
       "stream": "ext://sys.stdout"
     },
     "sql_handler": {
-      "class": "logging.FileHandler",
-      "level": "DEBUG",
-      "formatter": "custom",
-      "filename": "sql.log",
-      "mode": "a",
-      "encoding": "utf-8"
+        "class": "logging.handlers.RotatingFileHandler",
+        "level": "DEBUG",
+        "formatter": "custom",
+        "filename": "sql.log",
+        "mode": "a",
+        "encoding": "utf-8",
+        "maxBytes": 10485760,
+        "backupCount": 100
     },
 
     "file": {
