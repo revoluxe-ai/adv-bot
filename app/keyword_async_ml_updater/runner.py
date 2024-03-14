@@ -45,12 +45,12 @@ class Runner:
         predicted = asyncio.Event()
         predicted.set()
         await asyncio.gather(
-            self.update_cards_in_graph(),
-            self.run_update_keyword_stat(need_update_model),
+            # self.update_cards_in_graph(),
+            # self.run_update_keyword_stat(need_update_model),
             self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
-            self.run_update_model(update_model_on_new_features, need_update_model),
-            self.run_update_predict_ctr(update_model_on_new_features, predicted),
-            self.run_update_keywords_on_wb(),
+            # self.run_update_model(update_model_on_new_features, need_update_model),
+            # self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            # self.run_update_keywords_on_wb(),
 
             return_exceptions=False
             )

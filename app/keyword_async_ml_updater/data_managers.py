@@ -69,16 +69,18 @@ async def get_keyword_statistic(session, adv_setting: AdvSetting, hard_statuses:
     result = await session.execute(stmt)
     rows = result.all()  # Получение всех результатов запроса
 
-    # Преобразование в список объектов KeywordStatFromDB
-    keyword_stats = [
-        KeywordStatFromDB(
-            row.keyword_text,
-            min(row.total_clicks, row.total_views) if row.total_clicks and row.total_views else 0,
-            row.total_views or 0,
-            row.total_spend or 0,
-        )
-        for row in rows
-    ]
+    keyword_stats = []
+    for row in rows:
+        text = row.keyword_text
+        if text:
+            keyword_stat = KeywordStatFromDB(
+                row.keyword_text,
+                min(row.total_clicks, row.total_views) if row.total_clicks and row.total_views else 0,
+                row.total_views or 0,
+                row.total_spend or 0,
+            )
+            keyword_stats.append(keyword_stat)
+
 
     return keyword_stats
 
