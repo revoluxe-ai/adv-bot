@@ -4,7 +4,7 @@ from python_modules import path_setting_funcs
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 
-def get_async_session_maker(pool_size=20, max_overflow=40):
+def get_async_session_maker(pool_size=500, max_overflow=600):
     """Функция для создания асинхронного генератора сессий с увеличенным размером пула и очереди."""
     db_connector = path_setting_funcs.get_alchemy_row()
     # Дополняем строку подключения для использования асинхронного драйвера
@@ -18,11 +18,9 @@ def get_async_session_maker(pool_size=20, max_overflow=40):
     )
 
     # Создаем асинхронный sessionmaker
-    async_session_maker = sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
+    async_session_maker = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+
     return async_session_maker
 
 
