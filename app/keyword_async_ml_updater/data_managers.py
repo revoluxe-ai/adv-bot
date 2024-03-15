@@ -164,7 +164,7 @@ async def get_parent_id_categories_subcategories_list() -> defaultdict[Any, list
     return parent_categories_subcategories_list
 
 
-@cached_stampede(ttl=60, key="get_category_name_min_ctr_final_data")
+@cached_stampede(ttl=60*60*3, key="get_category_name_min_ctr_final_data")
 async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
     parent_categories_to_subcategories_list = await get_parent_id_categories_subcategories_list()
     category_name_to_parent_id = {}

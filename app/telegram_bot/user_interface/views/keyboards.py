@@ -192,7 +192,7 @@ def get_keywords_setting_keyboard(keywords: list[KeywordForKeyboard], adv_settin
             hard_status = 'БС'
 
         turn_on = '✅' if keyword.turn_on else '❌'
-        text = f'{turn_on} {keyword.text} Клики: {clicks} Показы: {views} CTR: ({round(ctr, 2)*100} %) ({hard_status})'
+        text = f'{turn_on}({hard_status}){keyword.text} ({clicks}/{views})({round(ctr, 2)*100} %)'
 
 
         inline_keyboard = [InlineKeyboardButton(text= text,
