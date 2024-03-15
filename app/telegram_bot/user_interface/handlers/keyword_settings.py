@@ -45,6 +45,9 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
        state_data = await state.get_data()
        adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
        wb_user_cabinet_original_id = state_data.get('wb_user_cabinet_original_id')
+
+       main_photos = await data_managers.get_main_photos(session, adv_setting)
+
        last_message, message_type = await messages.AdvKeywordsSetting(bot,
                                                                       last_message,
                                                                       chat_id,

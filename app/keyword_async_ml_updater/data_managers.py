@@ -1,8 +1,11 @@
 import asyncio
+import io
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, NamedTuple
+
+from PIL import Image
 from aiocache import cached_stampede
 from aiocache.decorators import cached
 
@@ -430,5 +433,27 @@ class DataSetter:
         logger.info(f'{str(nmid)} Негативные ключи: {bads}')
 
 
+async def get_main_photos(session, adv_setting):
+    smtp = (select(WBCard).where(WBCard.nmid.in_(adv_setting.nmids))
+            .options(selectinload(WBCard.photos)))
+    result = await session.execute(smtp)
+    wb_cards: list[WBCard] = result.unique().scalars().all()
+    main_photos: list[str] = [card.photos[0] for card in wb_cards][:10]
 
+@staticmethod
+async def __download_and_resize_image(url, session, max_size=1280):
+    async with session.get(url) as response:
+        # Убедитесь, что запрос был успешным
+        assert response.status == 200
+        image_data = await response.read()
 
+        # Открываем изображение используя BytesIO
+        with io.BytesIO(image_data) as image_file:
+            with Image.open(image_file) as img:
+                # Масштабируем изображение, сохраняя пропорции
+                img.thumbnail((max_size, max_size))
+
+                # Сохраняем изображение в BytesIO объект
+                with io.BytesIO() as output:
+                    img.save(output, format="JPEG")
+                    return output.getvalue()
