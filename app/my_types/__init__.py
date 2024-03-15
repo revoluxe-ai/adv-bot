@@ -9,6 +9,8 @@ from app.wildberries.data_classes.subcategories import Subcategory
 from app.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
 
 
+
+
 __all__ = ['WBUserCabinet',
            'AdvSetting',
            'User',
@@ -20,5 +22,4 @@ __all__ = ['WBUserCabinet',
             'AdvKeyword',
            'Subcategory',
            'KeywordStatFromDB',
-           'KeywordForKeyboard'
            ]

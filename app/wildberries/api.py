@@ -15,7 +15,6 @@ from . import exceptions
 from . import api_rights
 import app
 
-from cachetools.func import ttl_cache
 
 
 
@@ -188,7 +187,7 @@ class ContentApi(ABC_WB_API):
     _only_read = api_rights.OnlyRead.FALSE
     _rights: set = {api_rights.Rights.CONTENT}
 
-    @ttl_cache(ttl=60*60*48)
+
     async def get_subcategories(self):
         @_try_except_decorator(1, 1)
         async def request(session, url)-> list[Subcategory]:
@@ -232,15 +231,15 @@ class ContentApi(ABC_WB_API):
 
 
 
-    async def get_parent_category_to_subcategory_dict(self):
-        subcategories = await self.get_subcategories()
-        parent_id_to_subcategories = {}
-        for category in subcategories:
-            parent_id = category.parentID
-            if parent_id not in parent_id_to_subcategories:
-                parent_id_to_subcategories[parent_id] = []
-            parent_id_to_subcategories[parent_id].append(category.subjectName)
-        return parent_id_to_subcategories
+    # async def get_parent_category_to_subcategory_dict(self):
+    #     subcategories = await self.get_subcategories()
+    #     parent_id_to_subcategories = {}
+    #     for category in subcategories:
+    #         parent_id = category.parentID
+    #         if parent_id not in parent_id_to_subcategories:
+    #             parent_id_to_subcategories[parent_id] = []
+    #         parent_id_to_subcategories[parent_id].append(category.subjectName)
+    #     return parent_id_to_subcategories
 
 
 

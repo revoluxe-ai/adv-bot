@@ -1,3 +1,6 @@
+from app import redis_func_cache
+redis_func_cache.set_config()
+
 import nest_asyncio
 from app.wildberries.adv_data_updater import ShopDataUpdater
 nest_asyncio.apply()

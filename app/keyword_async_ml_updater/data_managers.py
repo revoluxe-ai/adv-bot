@@ -3,8 +3,8 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, NamedTuple
-from dataclasses import dataclass
-from cachetools.func import ttl_cache
+from aiocache import cached_stampede
+from aiocache.decorators import cached
 
 import numpy as np
 import pydantic
@@ -32,6 +32,7 @@ from app.NeoDataScience.driver import DataScience
 from app.wildberries.models import KeywordSetting, AdvKeyword, WBCategory, WBCard, WBCabinet
 
 logger = logging.getLogger(__name__)
+
 
 
 _sm = get_async_session_maker()
@@ -163,7 +164,7 @@ async def get_parent_id_categories_subcategories_list() -> defaultdict[Any, list
     return parent_categories_subcategories_list
 
 
-@ttl_cache(ttl=15*60)
+@cached_stampede(ttl=60, key="get_category_name_min_ctr_final_data")
 async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
     parent_categories_to_subcategories_list = await get_parent_id_categories_subcategories_list()
     category_name_to_parent_id = {}
@@ -205,6 +206,11 @@ async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
 
 async def get_good_bad_phrases(session, adv_setting: AdvSetting,
                                min_ctr: float)->tuple[list[str], list[str]]:
+    stmt = select(AdvSetting).where(AdvSetting.id == adv_setting.id).options(
+        selectinload(AdvSetting.keyword_settings)
+    )
+    result = await session.execute(stmt)
+    adv_setting: AdvSetting = result.unique().scalar()
     keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
     good_keywords: list[KeywordSetting] = []
     bad_keywords: list[KeywordSetting] = []
@@ -334,6 +340,7 @@ class DataGetter(AbcManager):
     async def listProgress(self, jobid):
         result = await self._gds.get_status_job(jobid)
         return result
+
 
 async def get_wb_category(adv_setting: AdvSetting, session)-> WBCategory:
     nmid = adv_setting.nmids[0]

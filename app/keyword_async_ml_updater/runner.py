@@ -22,11 +22,12 @@ class Runner:
 
 
     def run(self, debug_mode: bool):
-        asyncio.run(self._main_loop(),
+        logger.debug('Запуск цикла обновления ключей')
+        asyncio.run(self.main_loop(),
                     debug=debug_mode
                     )
 
-    async def _main_loop(self):
+    async def main_loop(self):
         update_model_on_new_features = asyncio.Event()
         need_update_model = asyncio.Event()
         need_update_model.set()
