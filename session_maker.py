@@ -1,11 +1,23 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from python_modules import path_setting_funcs
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 session_maker = None
 
 def get_async_session_maker(pool_size=500, max_overflow=1000):
+    def log_connect(dbapi_con, con_record):
+        logger.info("Соединение открыто")
+
+    # Функция для логирования закрытия соединения
+    def log_close(dbapi_con, con_record):
+        logger.info("Соединение закрыто")
+
     if not session_maker:
         """Функция для создания асинхронного генератора сессий с увеличенным размером пула и очереди."""
         db_connector = path_setting_funcs.get_alchemy_row()
@@ -28,6 +40,9 @@ def get_async_session_maker(pool_size=500, max_overflow=1000):
     # Время жизни неактивного соединения в секундах
             # Максимальное количество соединений сверх размера пула
         )
+        sync_engine =  engine.sync_engine
+        event.listen(sync_engine, "connect", log_connect)
+        event.listen(sync_engine, "close", log_close)
 
         # Создаем асинхронный sessionmaker
         async_session_maker = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)

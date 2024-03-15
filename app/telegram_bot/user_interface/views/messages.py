@@ -1,10 +1,12 @@
-from aiogram.types import FSInputFile
+import io
+
+from aiogram.types import FSInputFile, InputFile
 from typing import Union
 
 from app.db.associations import WBUserCabinet
 from ..message_templates.templates import (TextWithKeyboard,
-                                                                        Text,
-                                                                        TextWithKeyboardPagination)
+                                           Text,
+                                           TextWithKeyboardPagination, TextWithKeyboarAndImage)
 from app.telegram_bot.redis_manager import LastMessage
 from . import keyboards
 from aiogram import Bot
@@ -199,16 +201,18 @@ class CabinetNameTooLong(Text):
     text = 'Название кабинета слишком длинное. Попробуйте снова(не более 50 символов):'
 
 
-class AdvKeywordsSetting(TextWithKeyboard):
+class AdvKeywordsSetting(TextWithKeyboarAndImage):
     def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int,
                  keywords: list[KeywordForKeyboard], adv_setting: AdvSetting,  wb_user_cabinet_original_id,
-                                                                      adv_choice_last_page, page):
+                                                                      adv_choice_last_page,
+                                                                      image: str, page):
         super().__init__(bot, last_message, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
         self._page = page
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._adv_choice_last_page = adv_choice_last_page
+        self._image = image
 
 
     text = ('Статистика и настройка ключевых слов \n'
@@ -219,7 +223,9 @@ class AdvKeywordsSetting(TextWithKeyboard):
             'ЧС   - ключевое слово в черном списке \n'
             'Авто  - ключевое слово на автоуправлении \n'
             'Информация перед ключевым словом: клики/показы/CTR \n')
-
+    @property
+    def image(self):
+        return self._image
 
     @property
     def keyboard(self):

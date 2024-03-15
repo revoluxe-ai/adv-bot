@@ -35,7 +35,8 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
 
     async with (_sm() as session):
        stmt = select(AdvSetting
-                     ).options(selectinload(AdvSetting.keyword_settings))\
+                     ).options(selectinload(AdvSetting.keyword_settings),
+                               )\
        .where(AdvSetting.id == adv_original_id)
        result = await session.execute(stmt)
        adv_setting: AdvSetting = result.unique().scalars().one()
@@ -46,8 +47,8 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
        adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
        wb_user_cabinet_original_id = state_data.get('wb_user_cabinet_original_id')
 
-       main_photos = await data_managers.get_main_photos(session, adv_setting)
-
+       nmids = adv_setting.nmids
+       main_photos = await data_managers.get_main_photos(session, nmids[:1])
        last_message, message_type = await messages.AdvKeywordsSetting(bot,
                                                                       last_message,
                                                                       chat_id,
@@ -55,6 +56,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
                                                                       adv_setting,
                                                                       wb_user_cabinet_original_id,
                                                                       adv_choice_last_page,
+                                                                      main_photos[0],
                                                                       page)()
 
 

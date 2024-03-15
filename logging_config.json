@@ -63,16 +63,11 @@
       "handlers": ["console"],
       "propagate": false
     },
-    "sqlalchemy.engine":  {
-      "level": "DEBUG",
-      "handlers": ["console", "sql_handler"],
-      "propagate": false
-    },
 
 
     "sqlalchemy.engine": {
-      "level": "DEBUG",
-      "handlers": ["sql_handler"],
+      "level": "INFO",
+      "handlers": ["sql_handler", "console"],
       "propagate": false
     },
     "app.wildberries.ABC_WB_API": {

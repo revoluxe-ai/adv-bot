@@ -11,6 +11,7 @@ from aiocache.decorators import cached
 
 import numpy as np
 import pydantic
+from aiogram.client.session import aiohttp
 
 import app
 from app.keyword_async_ml_updater.models import KeywordFeature
@@ -433,27 +434,29 @@ class DataSetter:
         logger.info(f'{str(nmid)} Негативные ключи: {bads}')
 
 
-async def get_main_photos(session, adv_setting):
-    smtp = (select(WBCard).where(WBCard.nmid.in_(adv_setting.nmids))
-            .options(selectinload(WBCard.photos)))
+async def get_main_photos(session, nmids: list[int]):
+    smtp = (select(WBCard).where(WBCard.nmid.in_(nmids)))
     result = await session.execute(smtp)
     wb_cards: list[WBCard] = result.unique().scalars().all()
-    main_photos: list[str] = [card.photos[0] for card in wb_cards][:10]
+    main_photos: list[str] = [wb_card.photos[0] for wb_card in wb_cards]
+    return main_photos
+
 
 @staticmethod
 async def __download_and_resize_image(url, session, max_size=1280):
-    async with session.get(url) as response:
-        # Убедитесь, что запрос был успешным
-        assert response.status == 200
-        image_data = await response.read()
+    while True:
+        async with session.get(url) as response:
+            if response.status != 200:
+                await asyncio.sleep(1)
+                continue
+            image_data = await response.read()
+            # Открываем изображение используя BytesIO
+            with io.BytesIO(image_data) as image_file:
+                with Image.open(image_file) as img:
+                    # Масштабируем изображение, сохраняя пропорции
+                    img.thumbnail((max_size, max_size))
 
-        # Открываем изображение используя BytesIO
-        with io.BytesIO(image_data) as image_file:
-            with Image.open(image_file) as img:
-                # Масштабируем изображение, сохраняя пропорции
-                img.thumbnail((max_size, max_size))
-
-                # Сохраняем изображение в BytesIO объект
-                with io.BytesIO() as output:
-                    img.save(output, format="JPEG")
-                    return output.getvalue()
+                    # Сохраняем изображение в BytesIO объект
+                    with io.BytesIO() as output:
+                        img.save(output, format="JPEG")
+                        return output.getvalue()

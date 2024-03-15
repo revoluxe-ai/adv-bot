@@ -92,3 +92,28 @@ class TextWithKeyboardPagination(Base):
                                                         text=self.text,
                                                         reply_markup=self.keyboard)
         return last_message, self.get_content_type()
+
+
+class TextWithKeyboarAndImage(Base):
+    @property
+    @abstractmethod
+    def text(self):
+        pass
+
+    @property
+    @abstractmethod
+    def keyboard(self):
+        pass
+
+    @property
+    @abstractmethod
+    def image(self):
+        pass
+
+    async def __call__(self):
+        # Отправка нового сообщения без попытки редактирования существующего
+        last_message = await self.bot.send_photo(chat_id=self.chat_id,
+                                                 photo=self.image,
+                                                 caption=self.text,
+                                                 reply_markup=self.keyboard)
+        return last_message, self.get_content_type()
