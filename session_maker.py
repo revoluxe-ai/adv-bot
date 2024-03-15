@@ -20,7 +20,8 @@ def get_async_session_maker(pool_size=500, max_overflow=600):
         # Настройки тайм-аутов для asyncpg
         connect_args={
             "command_timeout": 60  # Тайм-аут для операций с базой данных в секундах
-        }
+        },
+        pool_pre_ping=True
         # Максимальное количество соединений сверх размера пула
     )
 

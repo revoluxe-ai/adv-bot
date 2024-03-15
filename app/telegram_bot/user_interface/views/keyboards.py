@@ -172,6 +172,8 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  app.my_types.WBUse
 
 
 def get_keywords_setting_keyboard(keywords: list[KeywordForKeyboard], adv_setting: AdvSetting,
+                                  wb_user_cabinet_original_id: int,
+                                   adv_choice_last_page,
                                   page=1):
     on_page = 5
     start_index = (page - 1) * on_page
@@ -213,6 +215,11 @@ def get_keywords_setting_keyboard(keywords: list[KeywordForKeyboard], adv_settin
                                                 adv_original_id=adv_setting.id,
                                                 type='by_adv',
                                                 page=next_page).pack())])
+
+    bottoms.append([InlineKeyboardButton(text='Вернуться к списку кампаний',
+                                         callback_data=callbacks.ChoiceAdvPaginator(
+                                             wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                                             page=adv_choice_last_page).pack())])
     keyboard = InlineKeyboardMarkup(inline_keyboard=bottoms)
     return keyboard
 

@@ -1,12 +1,15 @@
 import aiogram
 import json
 
+from aiogram.fsm.context import FSMContext
+
 from app.my_types import LastMessage
 from app.telegram_bot.user_interface.views import callbacks
 from app.telegram_bot.user_interface.handlers.adv_setting import choice_adv_paginator, adv
 
 
-async def to_shop(bot: aiogram.Bot, last_message: LastMessage, wb_user_cabinet_original_id: int):
+async def to_shop(bot: aiogram.Bot, last_message: LastMessage, wb_user_cabinet_original_id: int,
+                  state: FSMContext):
     user = aiogram.types.User(id=last_message.from_user.id,
                               is_bot=False, first_name=last_message.from_user.first_name)
     chat_instance = json.dumps(last_message.chat.__dict__)
@@ -24,7 +27,9 @@ async def to_shop(bot: aiogram.Bot, last_message: LastMessage, wb_user_cabinet_o
 
     last_message, message_type = await choice_adv_paginator(fake_callback_query,
                                                             callback_data,
-                                                            bot, last_message)
+                                                            bot,
+                                                            state,
+                                                            last_message)
 
     return last_message, message_type
 

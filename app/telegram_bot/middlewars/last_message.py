@@ -24,8 +24,8 @@ class LastMessageMiddleWare(BaseMiddleware):
             event: Message, data: Dict[str, Any]) -> Any:
         state: Union[FSMContext, None] = data.get('state', None)
         if isinstance(event, aiogram.types.CallbackQuery):
-            if state:
-                await state.clear()
+            # if state:
+            #     await state.clear()
             chat_id = event.message.chat.id
         elif isinstance(event, aiogram.types.Message):
             chat_id = event.chat.id

@@ -201,18 +201,24 @@ class CabinetNameTooLong(Text):
 
 class AdvKeywordsSetting(TextWithKeyboard):
     def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int,
-                 keywords: list[KeywordForKeyboard], adv_setting: AdvSetting, page):
+                 keywords: list[KeywordForKeyboard], adv_setting: AdvSetting,  wb_user_cabinet_original_id,
+                                                                      adv_choice_last_page, page):
         super().__init__(bot, last_message, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
         self._page = page
+        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+        self._adv_choice_last_page = adv_choice_last_page
 
 
     text = 'Статистика и настройка ключевых слов:'
 
     @property
     def keyboard(self):
-        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting, self._page)
+        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
+                                                       self._wb_user_cabinet_original_id,
+                                                       self._adv_choice_last_page,
+                                                       self._page)
 
 
 class KeywordSettingMessage(TextWithKeyboard):

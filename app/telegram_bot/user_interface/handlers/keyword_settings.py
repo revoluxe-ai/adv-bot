@@ -23,12 +23,11 @@ router = Router()
 _sm = get_async_session_maker()
 
 
-
-
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'by_adv'))
 async def setting_keywords_by_adv(callback: types.CallbackQuery,
                                   callback_data: callbacks.SettingKeywords,
                                   bot: aiogram.Bot,
+                                  state: FSMContext,
                                   last_message:LastMessage):
     if callback.id != 'fake_id':
         await callback.answer()
@@ -43,12 +42,19 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
        keywords = await utils.get_keywords_for_keyboard(session, adv_setting)
        chat_id = callback.message.chat.id
        page = callback_data.page
+       state_data = await state.get_data()
+       adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
+       wb_user_cabinet_original_id = state_data.get('wb_user_cabinet_original_id')
        last_message, message_type = await messages.AdvKeywordsSetting(bot,
                                                                       last_message,
                                                                       chat_id,
                                                                       keywords,
                                                                       adv_setting,
+                                                                      wb_user_cabinet_original_id,
+                                                                      adv_choice_last_page,
                                                                       page)()
+
+
        return last_message, message_type
 
 

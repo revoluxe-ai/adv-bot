@@ -86,7 +86,7 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 
         wb_cabinet_original_id = catch_cab.id
         last_message, message_type = await app.telegram_bot.user_interface \
-            .views.to_shop(bot, last_message, wb_cabinet_original_id)
+            .views.to_shop(bot, last_message, wb_cabinet_original_id, state)
         await redis_manager.set_last_message(last_message, message_type)
         return last_message, message_type
 
@@ -152,7 +152,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             """
             await state.clear()
             last_message = await app.telegram_bot.user_interface\
-                .views.to_shop(bot, last_message, shop_id)
+                .views.to_shop(bot, last_message, shop_id, state)
             await redis_manager.set_last_message(last_message, message_type)
             return last_message, message_type
         else:
@@ -273,5 +273,5 @@ async def select_shop(callback_query: types.CallbackQuery,
     await callback_query.answer('Выбор магазина (кабинета)')
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     last_message, message_type = await app.telegram_bot.user_interface.views\
-        .to_shop(bot, last_message, wb_user_cabinet_original_id)
+        .to_shop(bot, last_message, wb_user_cabinet_original_id, state)
     return last_message, message_type
