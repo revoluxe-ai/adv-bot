@@ -21,7 +21,8 @@ def get_async_session_maker(pool_size=500, max_overflow=600):
         connect_args={
             "command_timeout": 60  # Тайм-аут для операций с базой данных в секундах
         },
-        pool_pre_ping=True
+        pool_pre_ping=True,
+        max_inactive_connection_lifetime=3 # Время жизни неактивного соединения в секундах
         # Максимальное количество соединений сверх размера пула
     )
 
