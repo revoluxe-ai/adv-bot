@@ -66,7 +66,7 @@
 
 
     "sqlalchemy.engine": {
-      "level": "INFO",
+      "level": "CRITICAL",
       "handlers": ["sql_handler", "console"],
       "propagate": false
     },

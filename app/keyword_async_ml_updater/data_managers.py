@@ -69,7 +69,6 @@ async def get_keyword_statistic(session, adv_setting: AdvSetting, hard_statuses:
 
     # Группировка по тексту ключевых слов и идентификатору настройки рекламной кампании вне зависимости от условия
     stmt = stmt.group_by(AdvKeyword.text, KeywordSetting.adv_setting_id)
-
     result = await session.execute(stmt)
     rows = result.all()  # Получение всех результатов запроса
 
@@ -148,7 +147,7 @@ async def get_wb_category_to_keywordstat_list(session) -> defaultdict[WBCategory
     adv_settings: list[AdvSetting] = result.unique().scalars().all()
     wb_category_to_keywordstat_list = defaultdict(list)
     for adv_setting in adv_settings:
-        wb_category = await get_wb_category(adv_setting, session)
+        wb_category = await get_wb_category(session, adv_setting,)
         keyword_stats = await get_keyword_statistic(session, adv_setting,[2])
         for keyword_stat in keyword_stats:
             if keyword_stat.views:
@@ -169,14 +168,14 @@ async def get_parent_id_categories_subcategories_list() -> defaultdict[Any, list
 
 
 @cached_stampede(ttl=60*60*3, key="get_category_name_min_ctr_final_data")
-async def get_category_name_min_ctr_final_data(session) -> dict[int, float]:
+async def get_category_name_min_ctr_final_data() -> dict[int, float]:
     parent_categories_to_subcategories_list = await get_parent_id_categories_subcategories_list()
     category_name_to_parent_id = {}
     for parent_id, subcategories in parent_categories_to_subcategories_list.items():
         for subcategory in subcategories:
             category_name_to_parent_id[subcategory.subjectName] = parent_id
-
-    wb_category_to_keywordstat_list = await get_wb_category_to_keywordstat_list(session)
+    async with _sm() as session:
+         wb_category_to_keywordstat_list = await get_wb_category_to_keywordstat_list(session)
     parent_category_to_keywordstat_list = {}
     for wb_category, keywordstat_list in wb_category_to_keywordstat_list.items():
         wb_category_name = wb_category.wb_category_name
@@ -213,6 +212,7 @@ async def get_good_bad_phrases(session, adv_setting: AdvSetting,
     stmt = select(AdvSetting).where(AdvSetting.id == adv_setting.id).options(
         selectinload(AdvSetting.keyword_settings)
     )
+
     result = await session.execute(stmt)
     adv_setting: AdvSetting = result.unique().scalar()
     keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
@@ -346,7 +346,7 @@ class DataGetter(AbcManager):
         return result
 
 
-async def get_wb_category(adv_setting: AdvSetting, session)-> WBCategory:
+async def get_wb_category(session, adv_setting: AdvSetting)-> WBCategory:
     nmid = adv_setting.nmids[0]
     smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
     wb_card = await session.execute(smtp)
@@ -402,7 +402,7 @@ class DataSetter:
             adv_settings: list[AdvSetting] = result.unique().scalars().all()
             for adv_setting in adv_settings:
                 if adv_setting.bot_active:
-                    category:WBCategory = await get_wb_category(adv_setting, session)
+                    category:WBCategory = await get_wb_category(session, adv_setting)
                     min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
                     good_phrases, bad_phrases = await get_good_bad_phrases(session, adv_setting, min_ctr)
                     await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
@@ -434,10 +434,11 @@ class DataSetter:
         logger.info(f'{str(nmid)} Негативные ключи: {bads}')
 
 
-async def get_main_photos(session, nmids: list[int]):
-    smtp = (select(WBCard).where(WBCard.nmid.in_(nmids)))
-    result = await session.execute(smtp)
-    wb_cards: list[WBCard] = result.unique().scalars().all()
+async def get_main_photos(nmids: list[int]):
+    async with _sm() as session:
+        smtp = (select(WBCard).where(WBCard.nmid.in_(nmids)))
+        result = await session.execute(smtp)
+        wb_cards: list[WBCard] = result.unique().scalars().all()
     main_photos: list[str] = [wb_card.photos[0] for wb_card in wb_cards]
     return main_photos
 

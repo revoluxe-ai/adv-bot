@@ -1,16 +1,18 @@
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from python_modules import path_setting_funcs
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 
 
-def get_async_session_maker():
+def get_async_session_maker(pool_size=50, max_overflow=100):
     """Функция для создания асинхронного генератора сессий."""
     db_connector = path_setting_funcs.get_alchemy_row()
     # Дополняем строку подключения для использования асинхронного драйвера
     async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
-    engine = create_async_engine(async_db_connector)
+    engine = create_async_engine(async_db_connector,
+                                 pool_size=pool_size,
+                                 max_overflow=max_overflow,
+                                 echo=True,)
 
     # Создаем асинхронный sessionmaker
     async_session_maker = sessionmaker(

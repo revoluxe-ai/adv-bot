@@ -8,11 +8,12 @@ from app.telegram_bot.user_interface.views import callbacks
 from app.telegram_bot.user_interface.handlers.adv_setting import choice_adv_paginator, adv
 
 
-async def to_shop(bot: aiogram.Bot, last_message: LastMessage, wb_user_cabinet_original_id: int,
-                  state: FSMContext):
-    user = aiogram.types.User(id=last_message.from_user.id,
-                              is_bot=False, first_name=last_message.from_user.first_name)
-    chat_instance = json.dumps(last_message.chat.__dict__)
+async def to_shop(bot: aiogram.Bot, wb_user_cabinet_original_id: int,
+                  state: FSMContext, from_user_original_id: int, chat_instance: aiogram.types.Chat):
+
+    user = aiogram.types.User(id=from_user_original_id,
+                              is_bot=False, first_name='FakeUser')
+    # chat_instance = json.dumps(last_message.chat.__dict__)
     callback_data = callbacks.ChoiceAdvPaginator(page=1,
                                                  wb_user_cabinet_original_id =wb_user_cabinet_original_id)
     # Создание callback_data в соответствии с ожиданиями вашего обработчика
@@ -21,17 +22,14 @@ async def to_shop(bot: aiogram.Bot, last_message: LastMessage, wb_user_cabinet_o
         id="fake_id",
         from_user=user,
         data=callback_data_packed,  # Используем данные напрямую без дополнительной сериализации
-        message=last_message,
+        message=None,
         bot=bot,
-        chat_instance=chat_instance) # Десериализация данных в словарь
+        chat_instance= json.dumps(chat_instance.__dict__)
+    ) # Десериализация данных в словарь
 
-    last_message, message_type = await choice_adv_paginator(fake_callback_query,
-                                                            callback_data,
-                                                            bot,
-                                                            state,
-                                                            last_message)
+    await choice_adv_paginator(fake_callback_query, callback_data, bot, state)
 
-    return last_message, message_type
+
 
 
 async def to_adv_setting(bot: aiogram.Bot,

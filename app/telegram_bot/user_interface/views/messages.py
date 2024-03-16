@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class ShopChoice(TextWithKeyboard):
-    def __init__(self, bot:Bot, last_message: Union[LastMessage, None, Message],
+    def __init__(self, bot:Bot, chat_id: int,
                  all_shops: list[app.my_types.WBUserCabinet]):
-        chat_id = last_message.chat.id
-        super().__init__(bot, last_message, chat_id)
+        super().__init__(bot, chat_id)
         self.__all_shops = all_shops
+
 
     @property
     def text(self):
@@ -39,8 +39,8 @@ class ShopChoice(TextWithKeyboard):
 
 
 class ShopNameGet(Text):
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int):
-        super().__init__(bot, last_message, chat_id)
+    def __init__(self, bot: Bot, chat_id: int):
+        super().__init__(bot,  chat_id)
 
     @property
     def text(self):
@@ -61,8 +61,8 @@ class ShopApiGet(Text):
 
 class ShopAddedSuccess(Text):
 
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int, cabinet_name: str):
-        super().__init__(bot, last_message, chat_id)
+    def __init__(self, bot: Bot, cabinet_name: str):
+        super().__init__(bot,)
         self.__cabinet_name = cabinet_name
 
     @property
@@ -83,11 +83,11 @@ class GetCardsApiError(Text):
 
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message],
+    def __init__(self, bot: Bot,
                   chat_id: int, wb_user_cabinet_original_id: int,
                  adv_settings: list[AdvSetting],
                  page: int = 1):
-        super().__init__(bot, last_message, chat_id)
+        super().__init__(bot, chat_id)
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._adv_settings = adv_settings
         self._page = page
@@ -119,11 +119,11 @@ class ShopUpdateInfo(Text):
 
 
 class AdvSettingMenu(TextWithKeyboard):
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message],
+    def __init__(self, bot: Bot,
+                 chat_id: int,
                  wb_user_cabinet: WBUserCabinet,
-                 adv: AdvSetting,
-                 chat_id: int):
-        super().__init__(bot, last_message, chat_id)
+                 adv: AdvSetting):
+        super().__init__(bot, chat_id)
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
 
@@ -145,9 +145,8 @@ class NotValideToken(Text):
 
 
 class ApiForrbidenError(Text):
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message],
-                 chat_id: int, wb_user_cabinet: app.my_types.WBUserCabinet):
-        super().__init__(bot, last_message, chat_id)
+    def __init__(self, bot: Bot, wb_user_cabinet: app.my_types.WBUserCabinet):
+        super().__init__(bot)
         self.__wb_user_cabinet = wb_user_cabinet
 
 
@@ -161,11 +160,11 @@ class ApiForrbidenError(Text):
 
 
 class AddNewTokenGet(Text):
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int,
+    def __init__(self, bot: Bot,
                  wb_user_cabinet: app.my_types.WBUserCabinet):
 
         self.__wb_user_cabinet = wb_user_cabinet
-        super().__init__(bot, last_message, chat_id)
+        super().__init__(bot)
 
     @property
     def text(self):
@@ -202,11 +201,11 @@ class CabinetNameTooLong(Text):
 
 
 class AdvKeywordsSetting(TextWithKeyboarAndImage):
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int,
+    def __init__(self, bot: Bot, chat_id,
                  keywords: list[KeywordForKeyboard], adv_setting: AdvSetting,  wb_user_cabinet_original_id,
                                                                       adv_choice_last_page,
                                                                       image: str, page):
-        super().__init__(bot, last_message, chat_id)
+        super().__init__(bot, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
         self._page = page
@@ -236,9 +235,9 @@ class AdvKeywordsSetting(TextWithKeyboarAndImage):
 
 
 class KeywordSettingMessage(TextWithKeyboard):
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int,
+    def __init__(self, bot: Bot, chat_id: int,
                  keyword_setting: KeywordSetting, adv_setting: AdvSetting):
-        super().__init__(bot, last_message, chat_id)
+        super().__init__(bot, chat_id)
         self._keyword_setting = keyword_setting
         self._adv_setting = adv_setting
 

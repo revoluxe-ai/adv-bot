@@ -17,8 +17,8 @@ class KeywordForKeyboard:
 
 
 async def get_keywords_for_keyboard(session, adv_setting: AdvSetting)-> list[KeywordForKeyboard]:
-    category: WBCategory = await data_managers.get_wb_category(adv_setting, session)
-    category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data(session)
+    category: WBCategory = await data_managers.get_wb_category(session, adv_setting)
+    category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
     min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
     good_phrases, bad_phrases = await  data_managers.get_good_bad_phrases(session, adv_setting, min_ctr)
     keyword_stats:list[KeywordStatFromDB] = await data_managers.get_keyword_statistic(session, adv_setting)

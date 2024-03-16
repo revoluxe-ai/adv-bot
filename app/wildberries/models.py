@@ -16,7 +16,7 @@ from app.db.base import BaseTable
 from sqlalchemy.schema import UniqueConstraint
 
 from session_maker import get_async_session_maker
-
+from ..db.associations import WBUserCabinet
 
 _sm = get_async_session_maker()
 
@@ -28,7 +28,7 @@ class WBCabinet(BaseTable):
     wb_cards = relationship('WBCard', back_populates='wb_cabinet', uselist=True)
     wb_categories = relationship('WBCategory', uselist=True)
     adv_settings = relationship('AdvSetting', back_populates='wb_cabinet', uselist=True)
-    wb_user_cabinets = relationship("WBUserCabinet", back_populates="wb_cabinet", uselist=True,
+    wb_user_cabinets: Mapped[WBUserCabinet] = relationship("WBUserCabinet", back_populates="wb_cabinet", uselist=True,
                                     lazy='joined')
 
 
@@ -163,7 +163,7 @@ class AdvSetting(BaseTable):
     adv_id = Column(BIGINT(), unique=True)
     name = Column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'))
-    wb_cabinet = relationship('WBCabinet', back_populates='adv_settings',
+    wb_cabinet: Mapped[WBCabinet] = relationship('WBCabinet', back_populates='adv_settings',
                               lazy='joined')
     wb_cards = relationship('WBCard', back_populates='adv_setting', uselist=True)  # Изменено на множественное число
     active_status = Column(String, default=False)

@@ -120,9 +120,8 @@ class Fitter(AbcManager):
 
 
     async def _bayesian_apply(self, df: pd.DataFrame):
-        async with sm() as session:
-            category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data(session)
 
+        category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
         def calculate_ctr(row):
             clicks = row['clicks']
             views = row['views']
@@ -161,7 +160,7 @@ class Fitter(AbcManager):
             data_rows = []
 
             for adv in adv_settings:
-                wb_category = await data_managers.get_wb_category(adv, sess)
+                wb_category = await data_managers.get_wb_category(sess, adv, )
                 nmid_featers = {}
                 keyword_stats = await data_managers.get_keyword_statistic(sess, adv)
                 keyword_text_to_keyword_stat = {}

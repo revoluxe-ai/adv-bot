@@ -1,69 +1,37 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-from python_modules import path_setting_funcs
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+import threading
 import logging
-
+from python_modules import path_setting_funcs
 
 logger = logging.getLogger(__name__)
 
-
-session_maker = None
+# Создаем экземпляр threading.local для хранения данных специфичных для каждого потока
+thread_local = threading.local()
 
 def get_async_session_maker(pool_size=500, max_overflow=1000):
-    def log_connect(dbapi_con, con_record):
-        logger.info("Соединение открыто")
+    def log_checkout(dbapi_con, con_record, con_proxy):
+        logger.info("Соединение взято из пула")
 
-    # Функция для логирования закрытия соединения
-    def log_close(dbapi_con, con_record):
-        logger.info("Соединение закрыто")
+    def log_checkin(dbapi_con, con_record):
+        logger.info("Соединение возвращено в пул")
 
-    if not session_maker:
-        """Функция для создания асинхронного генератора сессий с увеличенным размером пула и очереди."""
+    if not hasattr(thread_local, "session_maker"):
         db_connector = path_setting_funcs.get_alchemy_row()
-        # Дополняем строку подключения для использования асинхронного драйвера
         async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
-
-        # Создаем асинхронный движок с настроенными параметрами pool_size и max_overflow
         engine = create_async_engine(
             async_db_connector,
-            pool_size=pool_size,  # Размер пула соединений
-            max_overflow=max_overflow,
-            pool_timeout=30,  # Время ожидания в секундах при попытке получить соединение из пула
-            pool_recycle=1000,  # Время в секундах, после которого соединение будет переподключено
-            # Настройки тайм-аутов для asyncpg
-            connect_args={
-                "command_timeout": 60  # Тайм-аут для операций с базой данных в секундах
-            },
-            pool_pre_ping=True,
-            echo=True,
-    # Время жизни неактивного соединения в секундах
-            # Максимальное количество соединений сверх размера пула
+            echo=False,
+            # Параметры pool_size и max_overflow можно добавить здесь
         )
-        sync_engine =  engine.sync_engine
-        event.listen(sync_engine, "connect", log_connect)
-        event.listen(sync_engine, "close", log_close)
+        sync_engine = engine.sync_engine
+        event.listen(sync_engine, "checkout", log_checkout)
+        event.listen(sync_engine, "checkin", log_checkin)
 
-        # Создаем асинхронный sessionmaker
         async_session_maker = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-        _session_maker = async_session_maker
-        return async_session_maker
-    else:
-        return session_maker
-
-
-
-
-
-
-
+        thread_local.session_maker = async_session_maker
+    return thread_local.session_maker
 
 def get_session_maker():
-    """функция не отражала суть"""
-    return get_session()
-
-def get_session():
-    db_connector = path_setting_funcs.get_alchemy_row()
-    engine = create_engine(
-        db_connector)
-    return sessionmaker(bind=engine)
+    return get_async_session_maker()  # Изменено на вызов get_async_session_maker
