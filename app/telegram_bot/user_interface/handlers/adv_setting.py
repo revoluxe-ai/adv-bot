@@ -129,7 +129,7 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
 @router.callback_query(callbacks.TurnAdv.filter(F.action == 'on'))
 async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
                       callback_data: callbacks.TurnAdv,
-                      bot: aiogram.Bot, last_message: LastMessage):
+                      bot: aiogram.Bot):
     await callback.answer('Включаю бота')
     adv_id = callback_data.adv_original_id
     async with sm() as session:
@@ -142,13 +142,12 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
     await state.update_data(adv_original_id=adv_id)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
-        wb_user_cabinet = await session.execute(select(WBUserCabinet) \
+         wb_user_cabinet = await session.execute(select(WBUserCabinet) \
                                                 .where(WBUserCabinet.id == wb_user_cabinet_original_id))
-        wb_user_cabinet = wb_user_cabinet.scalar()
-    last_message, message_type = await messages.AdvSettingMenu(bot,
-                                                               wb_user_cabinet,
-                                                               adv)()
-    return last_message, message_type
+         wb_user_cabinet = wb_user_cabinet.scalar()
+    chat_id = callback.message.chat.id
+    await messages.AdvSettingMenu(bot,chat_id, wb_user_cabinet, adv)()
+    return
 
 
 @router.callback_query(callbacks.TurnAdv.filter(F.action == 'off'))
