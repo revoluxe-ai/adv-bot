@@ -16,7 +16,7 @@ sm = get_async_session_maker()
 
 logger = logging.getLogger(__name__)
 
-_aiofunc_parallel_run_queue = asyncio.Queue()
+_coroutine_parallel_run_queue = asyncio.Queue()
 
 
 async def consumer():
@@ -24,12 +24,12 @@ async def consumer():
     active_tasks = []
     while True:
         logger.info('Consumer waiting for task')
-        if _aiofunc_parallel_run_queue.empty() and active_tasks:
+        if _coroutine_parallel_run_queue.empty() and active_tasks:
             logger.info('Consumer waiting for task')
             done, _ = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
             # Удалять задачи из списка active_tasks здесь не нужно, так как мы используем колбэки для их удаления
         else:
-            coroutine: asyncio.Future = await _aiofunc_parallel_run_queue.get()
+            coroutine: asyncio.Future = await _coroutine_parallel_run_queue .get()
             task =  asyncio.create_task(coroutine)
             task.add_done_callback(lambda t, lst=active_tasks: lst.remove(t))
             active_tasks.append(task)
@@ -59,7 +59,7 @@ class ShopDataUpdater:
             if not_existing_adv_ids:
                 await self.__update_advs_in_db(not_existing_adv_ids)
             func = partial(self.__update_advs_in_db, existind_advs_ids)
-            await _aiofunc_parallel_run_queue.put(func)
+            await _coroutine_parallel_run_queue.put(func)
 
 
     async def __update_advs_in_db(self, adv_ids:set[int]):
@@ -94,7 +94,7 @@ class ShopDataUpdater:
                             nmids_collection.add(nmid)
 
         func = partial(self.__update_cards, nmids_collection)
-        await _aiofunc_parallel_run_queue.put(func)
+        await _coroutine_parallel_run_queue.put(func)
 
 
     async def __update_cards(self, nmids:set[int]):
