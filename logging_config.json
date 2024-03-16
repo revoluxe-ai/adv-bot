@@ -65,9 +65,9 @@
     },
 
 
-    "sqlalchemy.engine": {
-      "level": "CRITICAL",
-      "handlers": ["sql_handler", "console"],
+    "sqlalchemy.engine.Engine": {
+      "level": "DEBUG",
+      "handlers": ["sql_handler"],
       "propagate": false
     },
     "app.wildberries.ABC_WB_API": {
