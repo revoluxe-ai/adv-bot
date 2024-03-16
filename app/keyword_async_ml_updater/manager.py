@@ -27,6 +27,8 @@ from .data_managers import DataGetter, DataSetter
 import asyncio
 from .graph_vector_updater import GraphUpdater
 from app.wildberries.data_classes.namedtuples import KeywordStatForNeo, KeywordPhrase
+from .users_manager import users_manager
+from .. import utils
 from ..db.associations import WBUserCabinet
 # from ..shop_manager import ShopManager
 from .ML import Fitter
@@ -232,36 +234,28 @@ class Manager(AbcManager):
             update_tasks: dict[int, asyncio.Task] = {}
             category_name_to_min_ctr = await data_managers.\
                 get_category_name_min_ctr_final_data()
-            async with sm() as session:
-                subquery = select(AdvSetting.id).where(
-                    AdvSetting.bot_active == True,
-                    AdvSetting.wb_cabinet_id == WBCabinet.id
-                ).exists()
-
-                stmt = select(WBCabinet).options(
-                    joinedload(WBCabinet.wb_user_cabinets).joinedload(WBUserCabinet.user)
-                ).where(subquery)
-                result = await session.execute(stmt)
-                wb_cabinets: list[WBCabinet] = result.unique().scalars().all()
-
-            for wb_cabinet in wb_cabinets:
-                if wb_cabinet.id not in update_tasks:
-                    wb_user_cabinets: list[WBUserCabinet] = wb_cabinet.wb_user_cabinets
-                    users: list[User] = [wb_user_cabinet.user for wb_user_cabinet in wb_user_cabinets]
-                    tokens: list[WBToken] = [token for user in users for token in user.wb_tokens if token.shop_id == wb_cabinet.shop_id]
-                    super_user = User()
-                    super_user.wb_tokens = tokens
-                    super_wb_user_cabinet = WBUserCabinet()
-                    super_wb_user_cabinet.wb_cabinet = wb_cabinet
-                    super_wb_user_cabinet.user = super_user
+            # async with sm() as session:
+            #     subquery = select(AdvSetting.id).where(
+            #         AdvSetting.bot_active == True,
+            #         AdvSetting.wb_cabinet_id == WBCabinet.id
+            #     ).exists()
+            #
+            #     stmt = select(WBCabinet).options(
+            #         joinedload(WBCabinet.wb_user_cabinets).joinedload(WBUserCabinet.user)
+            #     ).where(subquery)
+            #     result = await session.execute(stmt)
+            #     wb_cabinets: list[WBCabinet] = result.unique().scalars().all()
+            super_wb_user_cabinets = await users_manager.fetch_super_wb_user_cabinets()
+            for super_wb_user_cabinet in super_wb_user_cabinets:
+                if super_wb_user_cabinet.id not in update_tasks:
                     data_setter = DataSetter(super_wb_user_cabinet)
                     task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
-                    update_tasks[wb_cabinet.id] = task
+                    update_tasks[super_wb_user_cabinet.id] = task
                 else:
-                    if update_tasks[wb_cabinet.id].done():
-                        if update_tasks[wb_cabinet.id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet.id].exception()}')
-                        del update_tasks[wb_cabinet.id]
+                    if update_tasks[super_wb_user_cabinet.id].done():
+                        if update_tasks[super_wb_user_cabinet.id].exception():
+                            logger.error(f'Ошибка обновления ключей: {update_tasks[super_wb_user_cabinet.id].exception()}')
+                        del update_tasks[super_wb_user_cabinet.id]
 
 
 

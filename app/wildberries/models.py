@@ -28,8 +28,8 @@ class WBCabinet(BaseTable):
     wb_cards = relationship('WBCard', back_populates='wb_cabinet', uselist=True)
     wb_categories = relationship('WBCategory', uselist=True)
     adv_settings = relationship('AdvSetting', back_populates='wb_cabinet', uselist=True)
-    wb_user_cabinets: Mapped[WBUserCabinet] = relationship("WBUserCabinet", back_populates="wb_cabinet",
-                                                           uselist=True, lazy='joined')
+    wb_user_cabinets: Mapped[list[WBUserCabinet]] = relationship("WBUserCabinet",
+                                                           back_populates="wb_cabinet")
 
 
 class WBToken(BaseTable):

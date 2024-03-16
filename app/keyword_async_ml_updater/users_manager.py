@@ -19,21 +19,17 @@ class UsersManager:
     async def fetch_super_wb_user_cabinets():
         all_super_wb_user_cabinets = []
         async with sm() as session:
-            query = select(WBCabinet)\
-                .options( joinedload(WBCabinet.wb_user_cabinets,
-                                     WBUserCabinet.user,
-                                     User.wb_tokens),
-                selectinload(WBCabinet.adv_settings))
+            query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets)\
+                                                 .selectinload(WBUserCabinet.user)\
+                                                  .selectinload(User.wb_tokens))
 
             wb_cabinets = await session.execute(query)
-            wb_cabinets: list[WBCabinet] = wb_cabinets.unique().scalars().all()
+            wb_cabinets = wb_cabinets.scalars().all()
             for wb_cabinet in wb_cabinets:
                 super_user = User()
                 shop_id = wb_cabinet.shop_id
                 tokens_for_shop = set()
-                wb_user_cabinets: list[WBUserCabinet] = wb_cabinet.wb_user_cabinets
-                if  not isinstance(wb_user_cabinets, list):
-                    wb_user_cabinets = [wb_user_cabinets]
+                wb_user_cabinets = wb_cabinet.wb_user_cabinets
                 for wb_user_cabinet in wb_user_cabinets:
                     user = wb_user_cabinet.user
                     [tokens_for_shop.add(token) for token in user.wb_tokens if token.shop_id == shop_id]
