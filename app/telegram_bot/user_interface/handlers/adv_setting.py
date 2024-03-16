@@ -12,7 +12,7 @@ from app.my_types import LastMessage
 from ..views import callbacks
 from ...redis_manager import RedisManager
 
-from app.telegram_bot.wb_user_cabinet_manager import CabinetManager
+from app.telegram_bot.wb_user_cabinet_manager import get_cabinet_manager
 
 sm = get_async_session_maker()
 
@@ -35,31 +35,33 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
     await state.update_data(wb_user_cabinet_page=page)
     check_data = await state.get_data()
     logger.debug(f'check_data: {check_data}')
-    async with sm() as session:
-        stmt = (
-            select(WBUserCabinet)
-            .join(WBUserCabinet.wb_cabinet)  # Явно указываем соединение с WBCabinet
-            .options(
-                joinedload(WBUserCabinet.wb_cabinet).
-                joinedload(WBCabinet.adv_settings),  # Загружаем adv_settings
-                joinedload(WBUserCabinet.user)  # Загружаем информацию о пользователе
-            )
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)  # Условие должно быть скорректировано
-        )
-        result = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = result.scalars().first()
-        if not wb_user_cabinet.wb_cabinet.adv_settings:
-            adv_settings_stmt = select(AdvSetting).options(joinedload(AdvSetting.wb_cabinet)
-                                                           .joinedload(WBCabinet.adv_settings)) \
-                .where(AdvSetting.wb_cabinet_id == wb_user_cabinet.wb_cabinet.id)
-            adv_settings_result = await session.execute(adv_settings_stmt)
-            wb_user_cabinet.wb_cabinet.adv_settings = adv_settings_result.scalars().all()
+    # async with sm() as session:
+    #     stmt = (
+    #         select(WBUserCabinet)
+    #         .join(WBUserCabinet.wb_cabinet)  # Явно указываем соединение с WBCabinet
+    #         .options(
+    #             joinedload(WBUserCabinet.wb_cabinet).
+    #             joinedload(WBCabinet.adv_settings),  # Загружаем adv_settings
+    #             joinedload(WBUserCabinet.user)  # Загружаем информацию о пользователе
+    #         )
+    #         .where(WBUserCabinet.id == wb_user_cabinet_original_id)  # Условие должно быть скорректировано
+    #     )
+    #     result = await session.execute(stmt)
+    #     wb_user_cabinet: WBUserCabinet = result.scalars().first()
+    #     if not wb_user_cabinet.wb_cabinet.adv_settings:
+    #         adv_settings_stmt = select(AdvSetting).options(joinedload(AdvSetting.wb_cabinet)
+    #                                                        .joinedload(WBCabinet.adv_settings)) \
+    #             .where(AdvSetting.wb_cabinet_id == wb_user_cabinet.wb_cabinet.id)
+    #         adv_settings_result = await session.execute(adv_settings_stmt)
+    #         wb_user_cabinet.wb_cabinet.adv_settings = adv_settings_result.scalars().all()
     if page == 1:
-        user_cabinet_manager = CabinetManager(wb_user_cabinet)
+        user_cabinet_manager = await get_cabinet_manager(wb_user_cabinet_original_id)
         await user_cabinet_manager.update_all_data()
-        # await session.refresh(wb_user_cabinet)
-    wb_cabinet = wb_user_cabinet.wb_cabinet
-    adv_settings = wb_cabinet.adv_settings
+    async with sm() as session:
+        stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_user_cabinet_original_id)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+
     data = await state.get_data()
     chat_id = data['chat_id']
 

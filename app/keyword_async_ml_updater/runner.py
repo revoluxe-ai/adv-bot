@@ -20,7 +20,6 @@ class Runner:
         self._manager = Manager()
         self._data_getter = DataGetter()
 
-
     def run(self, debug_mode: bool):
         logger.debug('Запуск цикла обновления ключей')
         asyncio.run(self.main_loop(),
