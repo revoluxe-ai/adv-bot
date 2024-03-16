@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # Создаем экземпляр threading.local для хранения данных специфичных для каждого потока
 # thread_local = threading.local()
 
-def get_async_session_maker(pool_size=500, max_overflow=1000):
+def get_async_session_maker(pool_size=100, max_overflow=200):
     def log_checkout(dbapi_con, con_record, con_proxy):
         logger.info("Соединение взято из пула")
 
@@ -23,6 +23,8 @@ def get_async_session_maker(pool_size=500, max_overflow=1000):
     engine = create_async_engine(
         async_db_connector,
         echo=False,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
         # Параметры pool_size и max_overflow можно добавить здесь
     )
     sync_engine = engine.sync_engine
