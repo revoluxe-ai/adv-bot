@@ -148,7 +148,7 @@ async def get_wb_category_to_keywordstat_list(session) -> defaultdict[WBCategory
     wb_category_to_keywordstat_list = defaultdict(list)
     for adv_setting in adv_settings:
         wb_category = await get_wb_category(session, adv_setting,)
-        keyword_stats = await get_keyword_statistic(session, adv_setting,[2])
+        keyword_stats = await get_keyword_statistic(session, adv_setting,[1, 2])
         for keyword_stat in keyword_stats:
             if keyword_stat.views:
                 wb_category_to_keywordstat_list[wb_category].append(keyword_stat)
