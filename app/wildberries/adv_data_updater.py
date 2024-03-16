@@ -58,7 +58,7 @@ class ShopDataUpdater:
             not_existing_adv_ids = set(adv_ids) - set(existind_advs_ids)
             if not_existing_adv_ids:
                 await self.__update_advs_in_db(not_existing_adv_ids)
-            func = partial(self.__update_advs_in_db, existind_advs_ids)
+            func = self.__update_advs_in_db(existind_advs_ids)
             await _coroutine_parallel_run_queue.put(func)
 
 
@@ -93,7 +93,7 @@ class ShopDataUpdater:
                         for nmid in nmids:
                             nmids_collection.add(nmid)
 
-        func = partial(self.__update_cards, nmids_collection)
+        func = self.__update_cards(nmids_collection)
         await _coroutine_parallel_run_queue.put(func)
 
 
