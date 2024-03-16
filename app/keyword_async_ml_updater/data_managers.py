@@ -7,7 +7,7 @@ from typing import Any, NamedTuple
 
 from PIL import Image
 from aiocache import cached_stampede
-from aiocache.decorators import cached
+
 
 import numpy as np
 import pydantic

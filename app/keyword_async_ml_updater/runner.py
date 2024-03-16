@@ -43,7 +43,9 @@ class Runner:
             )
 
     async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
-        await self._manager.update_predict_ctr(update_model_on_new_features, predicted)
+        while True:
+             await self._manager.update_predict_ctr(update_model_on_new_features, predicted)
+             await asyncio.sleep(1)
 
     async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
         tasks = {}
@@ -63,7 +65,7 @@ class Runner:
                             logger.error(f'Ошибка обновления статистики ключей: {tasks[cabinet_id].exception()}')
 
                         del tasks[cabinet_id]
-
+                await asyncio.sleep(1)
 
 
     async def run_update_vectors(self, need_update_model:asyncio.Event,
@@ -91,6 +93,7 @@ class Runner:
             await asyncio.sleep(1)
             fit_logger.debug('Установка clear для need_update_model')
             need_update_model.clear()
+            await asyncio.sleep(1)
 
     async def update_cards_in_graph(self):
         while True:
