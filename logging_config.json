@@ -67,7 +67,7 @@
 
     "sqlalchemy.engine.Engine": {
       "level": "DEBUG",
-      "handlers": ["sql_handler"],
+      "handlers": ["sql_handler", "console"],
       "propagate": false
     },
     "app.wildberries.ABC_WB_API": {
