@@ -10,9 +10,6 @@ from python_modules import path_setting_funcs
 from .global_router import global_router
 import logging
 logging.basicConfig(level=logging.DEBUG)
-from aiogram import utils
-import asyncio
-from app.wildberries.adv_data_updater import consumer as shop_updater
 from python_modules.logger import setup_logging
 
 

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class User(BaseTable):
-    user_telegram_id = Column(Integer, nullable=False, unique=True)
+    user_telegram_id = Column(BIGINT, nullable=False, unique=True)
     username = Column(String)
     wb_tokens: Mapped[list['WBToken']] = relationship('WBToken',
                              back_populates='user')

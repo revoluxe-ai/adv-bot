@@ -1,4 +1,6 @@
 import asyncio
+from typing import Union
+
 import aiogram
 from aiogram import Router, types
 from aiogram.fsm.context import FSMContext
@@ -78,7 +80,7 @@ async def add_shop(callback_query: types.CallbackQuery,
 
 @router.message(StateFilter(states.CabinetRegistration.cabinet_name))
 async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMContext):
-    catch_cab = None
+    catch_cab: Union[WBUserCabinet, None] = None
     cabinet_name = message.text
     chat_id = message.chat.id
     if len(cabinet_name) > 50:
@@ -175,7 +177,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
                         for wb_user_cabinet in user.wb_user_cabinets]
         else:
             shop_ids = []
-        wb_user_cabinets = user.wb_user_cabinets
+        wb_user_cabinets: list[WBUserCabinet] = user.wb_user_cabinets
         if shop_ids and shop_id in shop_ids:
             await messages. \
                 CabinetExistsForUser(bot,  message.chat.id)()
@@ -187,7 +189,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             await state.clear()
             wb_user_cabinet_original_id = [wb_user_cabinet for wb_user_cabinet in wb_user_cabinets\
                                            if wb_user_cabinet.wb_cabinet.shop_id == shop_id][0]
-            chat_instance = message.chat
+
             chat_id = message.chat.id
             await state.update_data(char_id=chat_id)
             async with sm() as session:
