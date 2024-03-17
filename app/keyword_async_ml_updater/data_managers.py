@@ -132,7 +132,7 @@ async def get_global_super_wb_user_cabinet(shop_id_filter: list[str] = None) -> 
         wbcabinet = WBCabinet()
         wb_user_cabinet.wb_cabinet = wbcabinet
         wb_user_cabinet.user = super_user
-        return wb_user_cabinet
+    return wb_user_cabinet
 
 
 

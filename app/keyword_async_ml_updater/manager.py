@@ -94,12 +94,12 @@ class Manager(AbcManager):
         update_signal = False
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
-        result = (await session.execute(stmt)).unique()
-        for adv_setting in result.scalars():
-            keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
-            logger.debug(f'Ключевые слова для {adv_setting.name} получены')
-            for keyword in keywords:
-                async with sm() as session:
+            result = (await session.execute(stmt)).unique()
+            adv_settings = result.scalars().all()
+            for adv_setting in adv_settings:
+                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+                logger.debug(f'Ключевые слова для {adv_setting.name} получены')
+                for keyword in keywords:
                     stmt = select(AdvKeyword)\
                     .options(joinedload(AdvKeyword.keyword_setting))\
                     .where(and_(AdvKeyword.text == keyword.text,
@@ -119,7 +119,6 @@ class Manager(AbcManager):
                              keyword_setting.text = keyword.text
                              keyword_setting.adv_setting_id = adv_setting.id
                              keyword_db.keyword_setting = keyword_setting
-                        session.add(keyword_db)
                         keyword_db.adv_setting = adv_setting
                         keyword_db.text = keyword.text
                         keyword_db.date = keyword.date
@@ -252,16 +251,16 @@ class Manager(AbcManager):
 
     async def update_model(self, update_model_on_new_features):
         fit_logger.debug('Старт обучения и сохранения модели')
-        await self.fit_and_save_model()
+        await self.fit_and_save_model(update_model_on_new_features)
         fit_logger.debug('Устанавливаю сет, разрешаю обновление ключей')
-        update_model_on_new_features.set()
+
 
     def __save_model(self, model, model_path):
         joblib.dump(model, model_path)
 
 
-    async def fit_and_save_model(self):
-        await self._fitter.getGradientBoostingFullFitModel()
+    async def fit_and_save_model(self, update_model_on_new_features):
+        await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
 
 
     async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):

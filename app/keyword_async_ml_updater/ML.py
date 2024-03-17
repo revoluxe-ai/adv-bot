@@ -109,8 +109,8 @@ class Fitter(AbcManager):
 
         return df_final
 
-    async def getGradientBoostingFullFitModel(self):
-        await self._fit_modelGradientBoosting()
+    async def getGradientBoostingFullFitModel(self, update_model_on_new_features):
+        await self._fit_modelGradientBoosting(update_model_on_new_features)
         fit_logger.debug('Модель обучена')
 
 
@@ -223,13 +223,14 @@ class Fitter(AbcManager):
             df['ctr'] = df['clicks'] / df['views']
         return df
 
-    async def _fit_modelGradientBoosting(self):
+    async def _fit_modelGradientBoosting(self, update_model_on_new_features):
         fit_logger.debug('Поток обучения запущен, получение данных')
         df = await self._get_df_for_fit()
         fit_logger.debug('Данные получены')
-        df:pd.DataFrame = await self._bayesian_apply(df)
         if len(df) == 0:
+            logger.debug('Нет данных для обучения')
             return
+        df:pd.DataFrame = await self._bayesian_apply(df)
         await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
         y = df['ctr']
         X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
@@ -257,7 +258,7 @@ class Fitter(AbcManager):
         fit_logger.debug('Модель обучена')
         model = typing.cast(xgboost.XGBModel, model.named_steps['xgbregressor'])
         await asyncio.to_thread(save_model, model, time_stamp= None)
-
+        update_model_on_new_features.set()
 
 
 
