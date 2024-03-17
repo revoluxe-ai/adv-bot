@@ -7,8 +7,6 @@ from app.telegram_bot.user_interface.handlers import keyword_settings
 
 
 global_router = Router()
-global_router.message.middleware(middlewars.HardErrorMiddleware())
-global_router.callback_query.middleware(middlewars.HardErrorMiddleware())
 global_router.message.middleware(middlewars.ThrottlingMiddleware())
 global_router.include_routers(exceptions.user_router)
 global_router.include_routers(exceptions.admin_router)

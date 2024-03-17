@@ -18,8 +18,9 @@ class User(BaseTable):
     user_telegram_id = Column(BIGINT, nullable=False, unique=True)
     username = Column(String)
     wb_tokens: Mapped[list['WBToken']] = relationship('WBToken',
-                             back_populates='user')
-    wb_user_cabinets: Mapped[list['WBUserCabinet']] = relationship("WBUserCabinet", back_populates="user",)
+                             back_populates='user', cascade="all, delete-orphan")
+    wb_user_cabinets: Mapped[list['WBUserCabinet']] = relationship("WBUserCabinet", back_populates="user",
+                                                                   cascade="all, delete-orphan")
 
 
 

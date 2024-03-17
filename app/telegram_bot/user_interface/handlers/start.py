@@ -50,7 +50,8 @@ redis_manager = RedisManager()
 async def start_registration(message: types.Message, bot: aiogram.Bot):
     user_id = message.from_user.id
     async with sm() as session:
-        stmt = select(User).options(joinedload(User.wb_user_cabinets).joinedload(
+        stmt = select(User)\
+            .options(selectinload(User.wb_user_cabinets).joinedload(
             WBUserCabinet.wb_cabinet)) \
             .where(User.user_telegram_id == user_id)
         result = await session.execute(stmt)
@@ -62,11 +63,11 @@ async def start_registration(message: types.Message, bot: aiogram.Bot):
             session.add(user)
             await session.commit()
             await session.refresh(user)
-    wb_user_cabinets = user.wb_user_cabinets
-    chat_id = message.chat.id
-    await messages. \
-            ShopChoice(bot, chat_id, wb_user_cabinets)()
-
+        wb_user_cabinets = user.wb_user_cabinets
+        chat_id = message.chat.id
+        await messages. \
+                ShopChoice(bot, chat_id, wb_user_cabinets)()
+    return
 
 @router.callback_query(callbacks.Shop.filter(aiogram.F.action == callbacks.Action.new))
 async def add_shop(callback_query: types.CallbackQuery,
@@ -149,9 +150,11 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
         cabinet_name = data_state['cabinet_name'].strip()
         user_id = message.from_user.id
         async with sm() as session:
-            stmt = select(User).options(joinedload(User.wb_user_cabinets).joinedload(
-                WBUserCabinet.wb_cabinet)) \
-                .where(User.user_telegram_id == user_id)
+            stmt = select(User).options(
+                selectinload(User.wb_user_cabinets).\
+                    selectinload(WBUserCabinet.wb_cabinet),
+                selectinload(User.wb_tokens)
+            ).where(User.user_telegram_id == user_id)
             result = await session.execute(stmt)
             user = result.scalar()
             if not user:
@@ -160,16 +163,15 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
                             wb_tokens=[])
                 session.add(user)
                 await session.commit()
-                await session.refresh(user)
+        async with sm() as session:
             wb_user_cabinet = WBUserCabinet(name=cabinet_name)
             wb_user_cabinet.user = user
             wb_user_cabinet.wb_cabinet = wb_models.WBCabinet()
             wb_user_cabinet.wb_cabinet.shop_id = wb_token.shop_id
             user.wb_user_cabinets.append(wb_user_cabinet)
             user.wb_tokens.append(wb_token)
-            session.add(user)
             await session.commit()
-            await session.refresh(user)
+
 
         shop_id = wb_token.shop_id
         if user.wb_user_cabinets:
@@ -187,13 +189,16 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             Если кабинет существует, то отправляем самоколбек на него
             """
             await state.clear()
-            wb_user_cabinet_original_id = [wb_user_cabinet for wb_user_cabinet in wb_user_cabinets\
+            wb_user_cabinet = [wb_user_cabinet for wb_user_cabinet in wb_user_cabinets\
                                            if wb_user_cabinet.wb_cabinet.shop_id == shop_id][0]
-
+            wb_user_cabinet_original_id = wb_user_cabinet.id
             chat_id = message.chat.id
             await state.update_data(char_id=chat_id)
             async with sm() as session:
-                stmt = select(AdvSetting).where(AdvSetting.wb_user_cabinet_id == wb_user_cabinet_original_id)
+                stmt = select(AdvSetting)\
+                    .join(AdvSetting.wb_cabinet)\
+                    .join(WBCabinet.wb_user_cabinets)\
+                    .where(WBUserCabinet.id == wb_user_cabinet_original_id)
                 result = await session.execute(stmt)
                 adv_settings = result.scalars().all()
             await messages.AdvCompanyChoicing \

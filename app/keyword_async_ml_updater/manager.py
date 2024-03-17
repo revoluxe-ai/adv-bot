@@ -280,14 +280,16 @@ class Manager(AbcManager):
             result = await session.execute(stmt)
             adv_settings = result.unique().scalars().all()
             adv_setting_keyword_stats = {}
-            for adv_setting in adv_settings:
-                keyword_stats = await data_managers.get_keyword_statistic(adv_setting)
-                adv_setting_keyword_stats[adv_setting] = keyword_stats
-
-        total_min_ctr = min([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
-         for keyword_stat in keyword_stats])
-        total_max_ctr = max([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
-            for keyword_stat in keyword_stats])
+        for adv_setting in adv_settings:
+            keyword_stats = await data_managers.get_keyword_statistic(adv_setting)
+            adv_setting_keyword_stats[adv_setting] = keyword_stats
+        ctrs = [keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() for keyword_stat in keyword_stats]
+        if len(ctrs) > 0:
+             total_min_ctr = min(ctrs)
+             total_max_ctr = max(ctrs)
+        else:
+            total_min_ctr = 0
+            total_max_ctr = 0
         phrase_data_list = []
         for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
             for keyword_stat in keyword_stats:

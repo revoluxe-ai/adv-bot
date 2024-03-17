@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 import threading
 import logging
@@ -59,4 +59,6 @@ def get_async_session_maker(pool_size=100, max_overflow=200):
     return thread_local.session_maker
 
 def get_session_maker():
-    return get_async_session_maker()  # Изменено на вызов get_async_session_maker
+    connector = path_setting_funcs.get_alchemy_row()
+    engine = create_engine(connector)
+    return sessionmaker(bind=engine)

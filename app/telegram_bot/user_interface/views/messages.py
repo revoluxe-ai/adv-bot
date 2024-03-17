@@ -7,11 +7,10 @@ from app.db.associations import WBUserCabinet
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
                                            TextWithKeyboardPagination, TextWithKeyboarAndImage)
-from app.telegram_bot.redis_manager import LastMessage
+
 from . import keyboards
 from aiogram import Bot
-from aiogram.types import Message
-from app.wildberries.data_classes.adv import Adv as WbAdv
+
 import logging
 import app
 from app.wildberries.models import AdvSetting, WBCabinet, KeywordSetting
