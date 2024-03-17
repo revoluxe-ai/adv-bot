@@ -235,28 +235,18 @@ class Manager(AbcManager):
             update_tasks: dict[int, asyncio.Task] = {}
             category_name_to_min_ctr = await data_managers.\
                 get_category_name_min_ctr_final_data()
-            # async with sm() as session:
-            #     subquery = select(AdvSetting.id).where(
-            #         AdvSetting.bot_active == True,
-            #         AdvSetting.wb_cabinet_id == WBCabinet.id
-            #     ).exists()
-            #
-            #     stmt = select(WBCabinet).options(
-            #         joinedload(WBCabinet.wb_user_cabinets).joinedload(WBUserCabinet.user)
-            #     ).where(subquery)
-            #     result = await session.execute(stmt)
-            #     wb_cabinets: list[WBCabinet] = result.unique().scalars().all()
-            super_wb_user_cabinets = await users_manager.fetch_super_wb_user_cabinets()
-            for super_wb_user_cabinet in super_wb_user_cabinets:
-                if super_wb_user_cabinet.id not in update_tasks:
-                    data_setter = DataSetter(super_wb_user_cabinet)
-                    task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
-                    update_tasks[super_wb_user_cabinet.id] = task
-                else:
-                    if update_tasks[super_wb_user_cabinet.id].done():
-                        if update_tasks[super_wb_user_cabinet.id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[super_wb_user_cabinet.id].exception()}')
-                        del update_tasks[super_wb_user_cabinet.id]
+
+            # super_wb_user_cabinets = await users_manager.fetch_super_wb_user_cabinets()
+            # for super_wb_user_cabinet in super_wb_user_cabinets:
+            #     if super_wb_user_cabinet.id not in update_tasks:
+            #         data_setter = DataSetter(super_wb_user_cabinet)
+            #         task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
+            #         update_tasks[super_wb_user_cabinet.id] = task
+            #     else:
+            #         if update_tasks[super_wb_user_cabinet.id].done():
+            #             if update_tasks[super_wb_user_cabinet.id].exception():
+            #                 logger.error(f'Ошибка обновления ключей: {update_tasks[super_wb_user_cabinet.id].exception()}')
+            #             del update_tasks[super_wb_user_cabinet.id]
 
 
 
