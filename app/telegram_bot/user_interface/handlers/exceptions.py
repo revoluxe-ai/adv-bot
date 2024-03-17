@@ -22,18 +22,18 @@ admin_telegram_id = 373435337
 user_router = Router()
 
 
-
-
-@user_router.errors(ExceptionTypeFilter(my_exc.ApiForbiddenError))
-async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-    await state.clear()
-    logger.debug( 'Текущее состояние: %s', await state.get_state())
-    chat_id = error_event.update.message.chat.id
-
-    wb_user_cabinet: app.my_types.WBUserCabinet = error_event.exception.__dict__['wb_user_cabinet']
-    await errors_message.AddNewToken(bot, chat_id, wb_user_cabinet)()
-    return
-
+#
+#
+# @user_router.errors(ExceptionTypeFilter(my_exc.ApiForbiddenError))
+# async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+#     await state.clear()
+#     logger.debug( 'Текущее состояние: %s', await state.get_state())
+#     chat_id = error_event.update.message.chat.id
+#
+#     wb_user_cabinet: app.my_types.WBUserCabinet = error_event.exception.__dict__['wb_user_cabinet']
+#     await errors_message.AddNewToken(bot, chat_id, wb_user_cabinet)()
+#     return
+#
 
 admin_router = Router()
 

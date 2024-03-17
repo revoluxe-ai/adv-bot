@@ -53,7 +53,8 @@ def get_async_session_maker(pool_size=100, max_overflow=200):
         event.listen(sync_engine, "checkout", log_checkout)
         event.listen(sync_engine, "checkin", log_checkin)
 
-        async_session_maker = sessionmaker(engine, expire_on_commit=False,
+        async_session_maker = sessionmaker(engine,
+                                           expire_on_commit=False,
                                            class_=AsyncSession)
         thread_local.session_maker = async_session_maker
     return thread_local.session_maker

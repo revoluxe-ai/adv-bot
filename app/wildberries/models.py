@@ -162,7 +162,7 @@ class AdvSetting(BaseTable):
 
     adv_id = Column(BIGINT(), unique=True)
     name = Column(String, nullable=False)
-    wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'))
+    wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet: Mapped[WBCabinet] = relationship('WBCabinet', back_populates='adv_settings',
                               lazy='joined')
     wb_cards = relationship('WBCard', back_populates='adv_setting', uselist=True)  # Изменено на множественное число

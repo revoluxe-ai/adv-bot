@@ -3,13 +3,16 @@ from .import my_types
 from . import utils
 from .wildberries.api import WBApi
 from .keyword_async_ml_updater import data_managers
-from app.telegram_bot import client_bot
 from . import redis_func_cache
+from app.wildberries.adv_data_updater import ShopDataUpdater
+
 
 __all__ = ['KeywordUpdateRunner',
               'my_types',
               'utils',
               'WBApi',
               'data_managers',
-                'client_bot'
+           "ShopDataUpdater"
               ]
+
+

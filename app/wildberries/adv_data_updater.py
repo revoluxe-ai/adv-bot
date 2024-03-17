@@ -83,6 +83,7 @@ class ShopDataUpdater:
                     adv_in_db = models.AdvSetting()
                     adv_in_db.adv_id = adv.advertId
                     adv_in_db.name = adv.name
+                    await session.merge(self.__wb_cabinet)
                     adv_in_db.wb_cabinet = self.__wb_cabinet
                     adv_in_db.nmids = adv.nmids
                     adv_in_db.active_status = adv.status_native

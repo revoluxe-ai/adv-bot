@@ -1,8 +1,9 @@
+import asyncio
+
 from app import redis_func_cache
 redis_func_cache.set_config()
 
 import nest_asyncio
-from app.wildberries.adv_data_updater import ShopDataUpdater
 nest_asyncio.apply()
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
@@ -11,7 +12,7 @@ from .global_router import global_router
 import logging
 logging.basicConfig(level=logging.DEBUG)
 from python_modules.logger import setup_logging
-
+from app.wildberries.adv_data_updater import consumer as shop_updater
 
 setup_logging()
 
@@ -27,9 +28,9 @@ async def run():
     bot = Bot(token=token)
     dp = Dispatcher(storage=storage)
     dp.include_router(global_router)
-    # task = asyncio.create_task(shop_updater())
+    task = asyncio.create_task(shop_updater())
     await dp.start_polling(bot, skip_updates=True)
-    # await task
+    await task
 
 
 
