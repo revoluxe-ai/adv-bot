@@ -224,11 +224,12 @@ class Fitter(AbcManager):
         return df
 
     async def _fit_modelGradientBoosting(self):
-
         fit_logger.debug('Поток обучения запущен, получение данных')
         df = await self._get_df_for_fit()
         fit_logger.debug('Данные получены')
         df:pd.DataFrame = await self._bayesian_apply(df)
+        if len(df) == 0:
+            return
         await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
         y = df['ctr']
         X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
