@@ -11,10 +11,10 @@ class UnknownInnerError(mt.Text):
 
 
 class AddNewToken(mt.TextWithKeyboard):
-    def __init__(self, bot, last_message: LastMessage, chat_id: int,
+    def __init__(self, bot, chat_id: int,
                  wb_user_cabinet: app.my_types.WBUserCabinet,
 ):
-        super().__init__(bot, last_message, chat_id)
+        super().__init__(bot, chat_id)
         self.wb_user_cabinet = wb_user_cabinet
 
     text = ("Произошла ошибка, необходимо добавить новый токен для магазина или, если хотите, "

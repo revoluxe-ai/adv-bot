@@ -159,9 +159,9 @@ class Fitter(AbcManager):
         data_rows = []
 
         for adv in adv_settings:
-            wb_category = await data_managers.get_wb_category(sess, adv)
+            wb_category = await data_managers.get_wb_category(adv)
             nmid_featers = {}
-            keyword_stats = await data_managers.get_keyword_statistic(sess, adv)
+            keyword_stats = await data_managers.get_keyword_statistic(adv)
             keyword_text_to_keyword_stat = {}
             for keyword_stat in keyword_stats:
                 keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
@@ -271,7 +271,7 @@ class Predictor:
 
     async def predict_ctr_for_keywords(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
         logger.debug('Ожидание разрешения обновления ключей')
-        # await update_model_on_new_features.wait()
+        await update_model_on_new_features.wait()
         logger.debug('Блокировка снята')
         async with sm() as session:
             stmt = select(AdvSetting).options(

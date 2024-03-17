@@ -29,12 +29,10 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
     await state.clear()
     logger.debug( 'Текущее состояние: %s', await state.get_state())
     chat_id = error_event.update.message.chat.id
-    last_message = await redis_manager.get_last_message(chat_id)
-    wb_user_cabinet: app.types.WBUserCabinet = error_event.exception.__dict__['wb_user_cabinet']
-    last_message, message_type = await errors_message.AddNewToken(bot, last_message,
-                                                                  chat_id,
-                                                                  wb_user_cabinet)()
-    return last_message, message_type
+
+    wb_user_cabinet: app.my_types.WBUserCabinet = error_event.exception.__dict__['wb_user_cabinet']
+    await errors_message.AddNewToken(bot, chat_id, wb_user_cabinet)()
+    return
 
 
 admin_router = Router()

@@ -5,7 +5,7 @@ from sqlalchemy import pool
 from alembic import context
 from sqlalchemy.orm import configure_mappers
 
-from alchemy_row import row
+from app.alchemy_row import row
 from app.keyword_async_ml_updater.models import Base as BaseE
 from app.db.base import Base as BaseF
 

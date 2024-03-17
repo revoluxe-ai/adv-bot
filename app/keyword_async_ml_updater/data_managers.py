@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, NamedTuple
 
+import aiocache
 from PIL import Image
 from aiocache import cached_stampede
 
@@ -14,7 +15,7 @@ import pydantic
 from aiogram.client.session import aiohttp
 
 import app
-from app.keyword_async_ml_updater.models import KeywordFeature
+from app.keyword_async_ml_updater.models import KeywordFeature, GlobalCategorySetting
 from app.telegram_bot.models import User
 from app.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
 from app.session_maker import get_async_session_maker
@@ -42,7 +43,7 @@ logger = logging.getLogger(__name__)
 _sm = get_async_session_maker()
 
 
-async def get_keyword_statistic(session, adv_setting: AdvSetting, hard_statuses: list[int] = None)->list[KeywordStatFromDB]:
+async def get_keyword_statistic(adv_setting: AdvSetting, hard_statuses: list[int] = None)->list[KeywordStatFromDB]:
     today = datetime.now().date()
     pass_days = adv_setting.pass_days
     base_stmt = (
@@ -69,8 +70,9 @@ async def get_keyword_statistic(session, adv_setting: AdvSetting, hard_statuses:
 
     # Группировка по тексту ключевых слов и идентификатору настройки рекламной кампании вне зависимости от условия
     stmt = stmt.group_by(AdvKeyword.text, KeywordSetting.adv_setting_id)
-    result = await session.execute(stmt)
-    rows = result.all()  # Получение всех результатов запроса
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        rows = result.all()  # Получение всех результатов запроса
 
     keyword_stats = []
     for row in rows:
@@ -136,89 +138,65 @@ async def get_global_super_wb_user_cabinet(shop_id_filter: list[str] = None) -> 
 
 
 
-async def get_wb_category_to_keywordstat_list(session) -> defaultdict[WBCategory, list[KeywordStatFromDB]]:
+async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[KeywordStatFromDB]]:
     stmt = select(AdvSetting).options(
         selectinload(AdvSetting.adv_keywords),
         selectinload(AdvSetting.keyword_settings),
         selectinload(AdvSetting.wb_cards)
     )
-
-    result = await session.execute(stmt)
-    adv_settings: list[AdvSetting] = result.unique().scalars().all()
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = result.unique().scalars().all()
     wb_category_to_keywordstat_list = defaultdict(list)
     for adv_setting in adv_settings:
-        wb_category = await get_wb_category(session, adv_setting,)
-        keyword_stats = await get_keyword_statistic(session, adv_setting,[1, 2])
+        wb_category = await get_wb_category(adv_setting)
+        wb_category_name = wb_category.wb_category_name
+        keyword_stats = await get_keyword_statistic(adv_setting,[1, 2])
         for keyword_stat in keyword_stats:
             if keyword_stat.views:
-                wb_category_to_keywordstat_list[wb_category].append(keyword_stat)
+                wb_category_to_keywordstat_list[wb_category_name].append(keyword_stat)
     return wb_category_to_keywordstat_list
 
 
-@cached_stampede(ttl=60*60*3, key="get_category_name_min_ctr_final_data")
-async def get_parent_id_categories_subcategories_list() -> defaultdict[Any, list[app.my_types.Subcategory]]:
+# @cached_stampede(ttl=60*60*24, key="get_category_name_min_ctr_final_data", cache=aiocache.RedisCache)
+async def get_parent_id_categories_subcategories_name_list() -> defaultdict[Any, list[app.my_types.Subcategory]]:
     user_cabinet = await get_global_super_wb_user_cabinet()
     wb_api = WBApi(user_cabinet)
     subcategories: list[app.my_types.Subcategory] = await wb_api.content.get_subcategories()
     parent_categories = defaultdict(list)
     for category in subcategories:
-        parent_categories[category.parentID].append(category)
-    parent_categories_subcategories_list = parent_categories
-    return parent_categories_subcategories_list
+        parent_categories[category.parentID].append(category.subjectName)
+    parent_categories_subcategories_name_list = parent_categories
+    return parent_categories_subcategories_name_list
 
 
-@cached_stampede(ttl=60, key="get_category_name_min_ctr_final_data")
+# @cached_stampede(ttl=60, key="get_category_name_min_ctr_final_data", cache=aiocache.RedisCache)
 async def get_category_name_min_ctr_final_data() -> dict[int, float]:
-    parent_categories_to_subcategories_list = await get_parent_id_categories_subcategories_list()
-    category_name_to_parent_id = {}
-    for parent_id, subcategories in parent_categories_to_subcategories_list.items():
-        for subcategory in subcategories:
-            category_name_to_parent_id[subcategory.subjectName] = parent_id
     async with _sm() as session:
-         wb_category_to_keywordstat_list = await get_wb_category_to_keywordstat_list(session)
-    parent_category_to_keywordstat_list = {}
-    for wb_category, keywordstat_list in wb_category_to_keywordstat_list.items():
-        wb_category_name = wb_category.wb_category_name
-        parentId = category_name_to_parent_id[wb_category_name]
-        if parentId not in parent_category_to_keywordstat_list:
-            parent_category_to_keywordstat_list[parentId] = []
-        parent_category_to_keywordstat_list[parentId].extend(keywordstat_list)
-
-    global_keywordstats_list = []
-    for keywordstat_list in parent_category_to_keywordstat_list.values():
-        global_keywordstats_list.extend(keywordstat_list)
-
-    final_wb_category_name_to_min_ctr = {}
-    percentile_value = 10
-    for wb_category, keywordstat_list in wb_category_to_keywordstat_list.items():
-        ctr_percentile = np.percentile([keywordstat.ctr for keywordstat in keywordstat_list],
-                                       percentile_value)  # Исправлена переменная здесь
-        wb_category_name = wb_category.wb_category_name
-        if ctr_percentile == 0:
-            parentId = category_name_to_parent_id[wb_category_name]
-            keywordstats = parent_category_to_keywordstat_list[parentId]
-            ctr_percentile = np.percentile([kw.ctr for kw in keywordstats], percentile_value)  # Исправлена переменная здесь
-            if ctr_percentile == 0:
-                ctr_percentile = np.percentile([kw.ctr for kw in global_keywordstats_list], percentile_value)  # И еще здесь
-            final_wb_category_name_to_min_ctr[wb_category_name] = ctr_percentile
-        else:
-            final_wb_category_name_to_min_ctr[wb_category_name] = ctr_percentile  # И тут
-    return final_wb_category_name_to_min_ctr
+        stmt = select(GlobalCategorySetting.category_name, GlobalCategorySetting.min_ctr)
+        result = await session.execute(stmt)
+        global_category_settings: list[GlobalCategorySetting] = result.all()
+    get_category_name_min_ctr = {}
+    for row in global_category_settings:
+        category_name = row[0]
+        min_ctr = row[1]
+        get_category_name_min_ctr[category_name] = min_ctr
+    return get_category_name_min_ctr
 
 
 
-async def get_good_bad_phrases(session, adv_setting: AdvSetting,
+async def get_good_bad_phrases(adv_setting: AdvSetting,
                                min_ctr: float)->tuple[list[str], list[str]]:
     stmt = select(AdvSetting).where(AdvSetting.id == adv_setting.id).options(
         selectinload(AdvSetting.keyword_settings)
     )
-
-    result = await session.execute(stmt)
-    adv_setting: AdvSetting = result.unique().scalar()
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        adv_setting: AdvSetting = result.unique().scalar()
     keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
     good_keywords: list[KeywordSetting] = []
     bad_keywords: list[KeywordSetting] = []
-    keyword_stats = await get_keyword_statistic(session, adv_setting)
+    keyword_stats = await get_keyword_statistic(adv_setting)
     keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
 
     for keyword_setting in keyword_settings:
@@ -346,10 +324,11 @@ class DataGetter(AbcManager):
         return result
 
 
-async def get_wb_category(session, adv_setting: AdvSetting)-> WBCategory:
+async def get_wb_category(adv_setting: AdvSetting)-> WBCategory:
     nmid = adv_setting.nmids[0]
-    smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
-    wb_card = await session.execute(smtp)
+    async with _sm() as session:
+        smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
+        wb_card = await session.execute(smtp)
     wb_card : WBCategory = wb_card.unique().scalar()
     wb_category = wb_card.wb_category
     return wb_category
@@ -394,20 +373,20 @@ class DataSetter:
 
     async def update_minus_keywords(self, category_name_to_min_ctr):
         async with _sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.bot_active == True) \
+            stmt = select(AdvSetting) \
                 .options(selectinload(AdvSetting.keyword_settings)
                          .selectinload(KeywordSetting.adv_keywords))\
-            .where (AdvSetting.bot_active == True)
+            .where (and_(AdvSetting.bot_active == True, AdvSetting.bot_active == True))
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.unique().scalars().all()
-            for adv_setting in adv_settings:
-                if adv_setting.bot_active:
-                    category:WBCategory = await get_wb_category(session, adv_setting)
-                    min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
-                    good_phrases, bad_phrases = await get_good_bad_phrases(session, adv_setting, min_ctr)
-                    await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
-                    logger.debug(f'Обновил минус слова для {adv_setting.name} {bad_phrases}')
-
+        for adv_setting in adv_settings:
+            if adv_setting.bot_active:
+                category:WBCategory = await get_wb_category(adv_setting)
+                min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
+                good_phrases, bad_phrases = await get_good_bad_phrases(adv_setting, min_ctr)
+                await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
+                logger.debug(f'Обновил минус слова для {adv_setting.name} {bad_phrases}')
+        return
 
 
 

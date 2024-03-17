@@ -67,6 +67,7 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
 
 
 class AdvertApi(ABC_WB_API):
+
     _rights: set = {api_rights.Rights.PROMOTION}
     _only_read = api_rights.OnlyRead.FALSE
     live_company_status = [4, 9, 11]

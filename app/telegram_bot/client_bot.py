@@ -30,9 +30,9 @@ async def run():
     bot = Bot(token=token)
     dp = Dispatcher(storage=storage)
     dp.include_router(global_router)
-    task = asyncio.create_task(shop_updater())
+    # task = asyncio.create_task(shop_updater())
     await dp.start_polling(bot, skip_updates=True)
-    await task
+    # await task
 
 
 

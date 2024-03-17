@@ -1,4 +1,5 @@
 from aiocache import caches
+from aiocache.serializers import PickleSerializer
 
 def set_config():
     caches.set_config({

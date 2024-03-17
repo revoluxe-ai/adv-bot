@@ -49,7 +49,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.future import select
 from .ML import Predictor
 from app.db.associations import WBUserCabinet
-from app.keyword_async_ml_updater.models import ItemFeature, KeywordFeature
+from app.keyword_async_ml_updater.models import ItemFeature, KeywordFeature, GlobalCategorySetting
 from app.my_types import WBCabinet
 from app.telegram_bot.models import User
 from app.wildberries.models import AdvSetting, AdvKeyword, KeywordSetting
@@ -236,17 +236,17 @@ class Manager(AbcManager):
             category_name_to_min_ctr = await data_managers.\
                 get_category_name_min_ctr_final_data()
 
-            # super_wb_user_cabinets = await users_manager.fetch_super_wb_user_cabinets()
-            # for super_wb_user_cabinet in super_wb_user_cabinets:
-            #     if super_wb_user_cabinet.id not in update_tasks:
-            #         data_setter = DataSetter(super_wb_user_cabinet)
-            #         task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
-            #         update_tasks[super_wb_user_cabinet.id] = task
-            #     else:
-            #         if update_tasks[super_wb_user_cabinet.id].done():
-            #             if update_tasks[super_wb_user_cabinet.id].exception():
-            #                 logger.error(f'Ошибка обновления ключей: {update_tasks[super_wb_user_cabinet.id].exception()}')
-            #             del update_tasks[super_wb_user_cabinet.id]
+            super_wb_user_cabinets = await users_manager.fetch_super_wb_user_cabinets()
+            for super_wb_user_cabinet in super_wb_user_cabinets:
+                if super_wb_user_cabinet.id not in update_tasks:
+                    data_setter = DataSetter(super_wb_user_cabinet)
+                    task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
+                    update_tasks[super_wb_user_cabinet.id] = task
+                else:
+                    if update_tasks[super_wb_user_cabinet.id].done():
+                        if update_tasks[super_wb_user_cabinet.id].exception():
+                            logger.error(f'Ошибка обновления ключей: {update_tasks[super_wb_user_cabinet.id].exception()}')
+                        del update_tasks[super_wb_user_cabinet.id]
 
 
 
@@ -281,7 +281,7 @@ class Manager(AbcManager):
             adv_settings = result.unique().scalars().all()
             adv_setting_keyword_stats = {}
             for adv_setting in adv_settings:
-                keyword_stats = await data_managers.get_keyword_statistic(session, adv_setting)
+                keyword_stats = await data_managers.get_keyword_statistic(adv_setting)
                 adv_setting_keyword_stats[adv_setting] = keyword_stats
 
         total_min_ctr = min([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
@@ -419,6 +419,59 @@ class Manager(AbcManager):
 
     async def update_predict_ctr(self, update_model_on_new_features, predicted: asyncio.Event):
         await self._predictor.predict_ctr_for_keywords(update_model_on_new_features, predicted)
+
+    @staticmethod
+    async def update_min_ctr_in_global_wb_category_settings():
+        parent_categories_to_subcategories_name_list = await data_managers.get_parent_id_categories_subcategories_name_list()
+        category_name_to_parent_id = {}
+        for parent_id, subcategories in parent_categories_to_subcategories_name_list.items():
+            for subcategory in subcategories:
+                category_name_to_parent_id[subcategory] = parent_id
+        wb_category_to_keywordstat_list = await data_managers.get_wb_category_to_keywordstat_list()
+        parent_category_to_keywordstat_list = {}
+        for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
+            parentId = category_name_to_parent_id[wb_category_name]
+            if parentId not in parent_category_to_keywordstat_list:
+                parent_category_to_keywordstat_list[parentId] = []
+            parent_category_to_keywordstat_list[parentId].extend(keywordstat_list)
+        global_keywordstats_list = []
+        for keywordstat_list in parent_category_to_keywordstat_list.values():
+            global_keywordstats_list.extend(keywordstat_list)
+        global_keywordstats_list = [keywordstat for keywordstat in global_keywordstats_list if keywordstat.ctr > 0]
+        final_wb_category_name_to_min_ctr = {}
+        percentile = 14
+        for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
+            ctrs = np.array([keywordstat.ctr for keywordstat in keywordstat_list if keywordstat.ctr > 0])
+            if ctrs.size > 0:
+                min_ctr = np.percentile(ctrs, percentile)
+                final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
+            else:
+                parentId = category_name_to_parent_id[wb_category_name]
+                keywordstats = parent_category_to_keywordstat_list[parentId]
+                ctrs = np.array([keywordstat.ctr for keywordstat in keywordstats if keywordstat.ctr > 0])
+                if ctrs.size > 0:
+                    min_ctr = np.percentile(ctrs, percentile)
+                    final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
+                else:
+                    ctrs = np.array([kw.ctr for kw in global_keywordstats_list])
+                    if ctrs.size > 0:
+                        min_ctr = np.percentile(ctrs, percentile)
+                        final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
+                    else:
+                        final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
+        async with sm() as session:
+            for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
+                stmt = select(GlobalCategorySetting) \
+                    .where(GlobalCategorySetting.category_name == wb_category_name)
+                category_setting = await session.execute(stmt)
+                category_setting = category_setting.scalar()
+                if not category_setting:
+                    category_setting = GlobalCategorySetting(category_name=wb_category_name, min_ctr=min_ctr)
+                    session.add(category_setting)
+                else:
+                    category_setting.min_ctr = min_ctr
+                await session.execute(stmt)
+            await session.commit()
 
 
 

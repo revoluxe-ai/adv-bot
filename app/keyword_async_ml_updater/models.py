@@ -28,3 +28,9 @@ class KeywordFeature(Base):
     keyword = Column(String, nullable=False, unique=True)
     vector = Column(JSONB, nullable=False)
 
+
+
+class GlobalCategorySetting(BaseTable):
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category_name = Column(String, nullable=False, unique=True)
+    min_ctr = Column(Float, nullable=False)

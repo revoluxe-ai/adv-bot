@@ -12,11 +12,17 @@ thread_local = threading.local()
 
 lock_counter = threading.Lock()
 
+thread_local.connect_opened = False
+
 conn_counter = 0
 
 def get_async_session_maker(pool_size=100, max_overflow=200):
     def log_checkout(dbapi_con, con_record, con_proxy):
         logger.debug("Соединение взято из пула")
+        # if thread_local.connect_opened:
+        #     raise Exception("Соединение уже открыто")
+        # else:
+        #     thread_local.connect_opened = True
         global conn_counter
         with lock_counter:
             conn_counter += 1
@@ -27,6 +33,10 @@ def get_async_session_maker(pool_size=100, max_overflow=200):
         global conn_counter
         with lock_counter:
             conn_counter -= 1
+        # if not thread_local.connect_opened:
+        #      raise Exception("Соединение не было открыто")
+        # else:
+        #     thread_local.connect_opened = False
         logger.debug(f"Количество соединений: {conn_counter}")
 
     if not hasattr(thread_local, "session_maker"):

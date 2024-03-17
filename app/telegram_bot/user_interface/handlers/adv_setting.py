@@ -166,11 +166,9 @@ async def turn_adv_off(callback: types.CallbackQuery, callback_data: callbacks.T
         wb_user_cabinet = await session.execute(select(WBUserCabinet) \
                                                 .where(WBUserCabinet.id == wb_user_cabinet_original_id))
         wb_user_cabinet = wb_user_cabinet.scalar()
-    last_message, message_type = await messages.AdvSettingMenu(bot,
-                                                               wb_user_cabinet,
-                                                               adv)()
-    return last_message, message_type
-
+    chat_id = callback.message.chat.id
+    await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet,adv)()
+    return
 #
 #
 # @router.callback_query(callbacks.Min_ctr.filter(F.action == 'change'))

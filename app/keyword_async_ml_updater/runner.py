@@ -1,3 +1,4 @@
+
 from app.session_maker import get_async_session_maker
 import typing
 from app.keyword_async_ml_updater.data_managers import DataGetter
@@ -5,8 +6,6 @@ from .manager import Manager
 import logging
 import asyncio
 from .users_manager import users_manager
-
-
 sm = get_async_session_maker()
 
 logger = logging.getLogger(__name__)
@@ -33,12 +32,12 @@ class Runner:
         predicted = asyncio.Event()
         predicted.set()
         await asyncio.gather(
-            # self.run_update_keyword_stat(need_update_model),
-            # self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
-            # self.run_update_model(update_model_on_new_features, need_update_model),
-            # self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            self.run_update_keyword_stat(need_update_model),
+            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            self.run_update_model(update_model_on_new_features, need_update_model),
+            self.run_update_predict_ctr(update_model_on_new_features, predicted),
             self.run_update_keywords_on_wb(),
-
+            self.update_min_ctr_in_global_wb_category_settings(),
             return_exceptions=False
             )
 
@@ -101,6 +100,10 @@ class Runner:
             logger.debug('Карточки обновлены')
             await asyncio.sleep(60)
 
+    async def update_min_ctr_in_global_wb_category_settings(self):
+        while True:
+            await self._manager.update_min_ctr_in_global_wb_category_settings()
+            await asyncio.sleep(1)
 
 
 

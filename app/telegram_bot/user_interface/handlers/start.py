@@ -219,8 +219,9 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
                 await session.refresh(user)
                 cabinet_manager = CabinetManager(wb_user_cabinet)
                 await cabinet_manager.update_all_data()
+                chat_id = message.chat.id
                 await messages. \
-                    ShopAddedSuccess(bot, cabinet_name)()
+                    ShopAddedSuccess(bot, chat_id, cabinet_name)()
                 await state.clear()
                 await redis_manager.set_last_message(last_message, message_type)
                 all_shops:list[WBUserCabinet] = [cabinet for cabinet in user.wb_user_cabinets]
@@ -267,8 +268,9 @@ async def add_app_token(callback_query: types.CallbackQuery,
         wb_user_cabinet = result.scalars().first()
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(states.AddNewToken.token)
+    chat_id = callback_query.message.chat.id
     await messages. \
-        AddNewTokenGet(bot, wb_user_cabinet)()
+        AddNewTokenGet(bot, chat_id, wb_user_cabinet)()
     # return last_message, message_type
 
 

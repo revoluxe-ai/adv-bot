@@ -39,7 +39,7 @@ class UsersManager:
                 super_wb_user_cabinet.user = super_user
                 super_wb_user_cabinet.wb_cabinet = wb_cabinet
                 all_super_wb_user_cabinets.append(super_wb_user_cabinet)
-            return all_super_wb_user_cabinets
+        return all_super_wb_user_cabinets
 
 
 users_manager = UsersManager()

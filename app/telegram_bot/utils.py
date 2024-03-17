@@ -16,12 +16,12 @@ class KeywordForKeyboard:
     turn_on: bool
 
 
-async def get_keywords_for_keyboard(session, adv_setting: AdvSetting)-> list[KeywordForKeyboard]:
-    category: WBCategory = await data_managers.get_wb_category(session, adv_setting)
+async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[KeywordForKeyboard]:
+    category: WBCategory = await data_managers.get_wb_category(adv_setting)
     category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
     min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
-    good_phrases, bad_phrases = await  data_managers.get_good_bad_phrases(session, adv_setting, min_ctr)
-    keyword_stats:list[KeywordStatFromDB] = await data_managers.get_keyword_statistic(session, adv_setting)
+    good_phrases, bad_phrases = await  data_managers.get_good_bad_phrases(adv_setting, min_ctr)
+    keyword_stats:list[KeywordStatFromDB] = await data_managers.get_keyword_statistic( adv_setting)
     keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
     keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
 

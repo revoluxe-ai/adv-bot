@@ -22,7 +22,7 @@ class WbRequestApiMixin(ABC):
             except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
                 if e.status == 401:
                     raise exceptions.ApiForbiddenError('API доступ запрещен',
-                                                       shop_id=self._shop_id) from e
+                                                       wb_user_cabinet) from e
                 else:
                     # Для всех других ошибок 4xx и 5xx
                     raise exceptions.UnknownApiRequestError(e) from e
@@ -62,25 +62,14 @@ class ABC_WB_API(WbRequestApiMixin):
     _single_adv_files = os.path.join(current_path, 'singe_adv_files')
     _single_advs_report = os.path.join(current_path, 'single_advs_report.csv')
 
-    @property
-    @abstractmethod
-    def _rights(self) -> set[str]:
-        pass
-
-    @property
-    @abstractmethod
-    def _only_read(self):
-        pass
 
     def __init__(self, wb_user_cabinet: app.my_types.WBUserCabinet):
         tokens: list[WBToken]= wb_user_cabinet.user.wb_tokens
-        # tokens = [token for token in tokens if token.shop_id == wb_user_cabinet.wb_cabinet.shop_id]
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_user_cabinet)
-        # if len(set(token.shop_id for token in tokens)) > 1:
-        #     raise exceptions.TokensFromDifferentShopsError
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
+        self._wb_user_cabinet = wb_user_cabinet
         for token in tokens:
             if  self._rights.issubset(token.categories) \
                     and self._only_read == token.read_only:
@@ -93,6 +82,18 @@ class ABC_WB_API(WbRequestApiMixin):
                     ))
         self.headers = Headers(current_token)
         self._shop_id = current_token.shop_id
+
+
+    @property
+    @abstractmethod
+    def _rights(self) -> set[str]:
+        pass
+
+    @property
+    @abstractmethod
+    def _only_read(self):
+        pass
+
 
 
 

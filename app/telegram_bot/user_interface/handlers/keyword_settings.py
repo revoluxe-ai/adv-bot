@@ -38,7 +38,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
         .where(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
         adv_setting: AdvSetting = result.unique().scalars().one()
-        keywords = await utils.get_keywords_for_keyboard(session, adv_setting)
+    keywords = await utils.get_keywords_for_keyboard( adv_setting)
     page = callback_data.page
     state_data = await state.get_data()
     adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
