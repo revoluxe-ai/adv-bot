@@ -9,7 +9,7 @@ from app.wildberries.data_classes.adv import Adv
 from ...user_interface.views.callbacks import TurnAdv
 from .callbacks import Action
 from sqlalchemy import select
-from session_maker import get_async_session_maker
+from app.session_maker import get_async_session_maker
 from ...utils import KeywordForKeyboard
 
 sm = get_async_session_maker()

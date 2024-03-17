@@ -61,8 +61,8 @@ class ShopApiGet(Text):
 
 class ShopAddedSuccess(Text):
 
-    def __init__(self, bot: Bot, cabinet_name: str):
-        super().__init__(bot,)
+    def __init__(self, bot: Bot, chat_id, cabinet_name: str):
+        super().__init__(bot, chat_id)
         self.__cabinet_name = cabinet_name
 
     @property
@@ -145,8 +145,8 @@ class NotValideToken(Text):
 
 
 class ApiForrbidenError(Text):
-    def __init__(self, bot: Bot, wb_user_cabinet: app.my_types.WBUserCabinet):
-        super().__init__(bot)
+    def __init__(self, bot: Bot, chat_id, wb_user_cabinet: app.my_types.WBUserCabinet):
+        super().__init__(bot, chat_id)
         self.__wb_user_cabinet = wb_user_cabinet
 
 
@@ -160,11 +160,11 @@ class ApiForrbidenError(Text):
 
 
 class AddNewTokenGet(Text):
-    def __init__(self, bot: Bot,
+    def __init__(self, bot: Bot, chat_id,
                  wb_user_cabinet: app.my_types.WBUserCabinet):
 
         self.__wb_user_cabinet = wb_user_cabinet
-        super().__init__(bot)
+        super().__init__(bot, chat_id)
 
     @property
     def text(self):
@@ -172,10 +172,10 @@ class AddNewTokenGet(Text):
 
 
 class GetMinCtr(Text):
-    def __init__(self, bot: Bot, last_message: Union[LastMessage, None, Message], chat_id: int,
+    def __init__(self, bot: Bot,  chat_id: int,
                  adv: AdvSetting):
         self.__adv = adv
-        super().__init__(bot, last_message, chat_id)
+        super().__init__(bot, chat_id)
 
     @property
     def text(self):

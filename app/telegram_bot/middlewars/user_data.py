@@ -5,7 +5,7 @@ from typing import Awaitable, Callable, Dict, Any, Union
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from aiogram.fsm.context import FSMContext
-from session_maker import get_async_session_maker
+from app.session_maker import get_async_session_maker
 from .. import redis_manager as __redis_manager
 from ..models import User
 from ...db.associations import WBUserCabinet

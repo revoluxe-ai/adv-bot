@@ -156,65 +156,65 @@ class Fitter(AbcManager):
             # Используйте unique() для удаления дубликатов перед получением списка объектов
             adv_settings = result.scalars().unique().all()
 
-            data_rows = []
+        data_rows = []
 
-            for adv in adv_settings:
-                wb_category = await data_managers.get_wb_category(sess, adv, )
-                nmid_featers = {}
-                keyword_stats = await data_managers.get_keyword_statistic(sess, adv)
-                keyword_text_to_keyword_stat = {}
-                for keyword_stat in keyword_stats:
-                    keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
+        for adv in adv_settings:
+            wb_category = await data_managers.get_wb_category(sess, adv)
+            nmid_featers = {}
+            keyword_stats = await data_managers.get_keyword_statistic(sess, adv)
+            keyword_text_to_keyword_stat = {}
+            for keyword_stat in keyword_stats:
+                keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
 
-                item_features_list = []
-                for nmid in adv.nmids:
-                    if nmid in nmid_featers:
-                        item_feature = nmid_featers[nmid]
-                    else:
-                        item_feature = await sess.execute(
-                            select(ItemFeature).where(ItemFeature.nmid == nmid)
-                        )
-                        item_feature = item_feature.scalars().one()
-                        nmid_featers[nmid] = item_feature
-                    if item_feature:
-                        item_features_list.append(item_feature.vector)
-                if not item_features_list:
+            item_features_list = []
+            for nmid in adv.nmids:
+                if nmid in nmid_featers:
+                    item_feature = nmid_featers[nmid]
+                else:
+                    item_feature = await sess.execute(
+                        select(ItemFeature).where(ItemFeature.nmid == nmid)
+                    )
+                    item_feature = item_feature.scalars().one()
+                    nmid_featers[nmid] = item_feature
+                if item_feature:
+                    item_features_list.append(item_feature.vector)
+            if not item_features_list:
+                continue
+
+            # Вычисляем средние значения фичей товаров, если они есть
+
+            avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
+            avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
+
+            keyword_settings: list[KeywordSetting] = adv.keyword_settings
+
+            for keyword_setting in keyword_settings:
+                text = keyword_setting.text
+                if text in keyword_text_keyword_features:
+                    keyword_feature = keyword_text_keyword_features[text]
+                else:
+                    keyword_feature = await sess.execute(
+                        select(KeywordFeature).where(KeywordFeature.keyword == text)
+                    )
+                    keyword_feature = keyword_feature.scalars().first()
+                    keyword_text_keyword_features[text] = keyword_feature
+                if not keyword_feature:
                     continue
-
-                # Вычисляем средние значения фичей товаров, если они есть
-
-                avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
-                avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
-
-                keyword_settings: list[KeywordSetting] = adv.keyword_settings
-
-                for keyword_setting in keyword_settings:
-                    text = keyword_setting.text
-                    if text in keyword_text_keyword_features:
-                        keyword_feature = keyword_text_keyword_features[text]
-                    else:
-                        keyword_feature = await sess.execute(
-                            select(KeywordFeature).where(KeywordFeature.keyword == text)
-                        )
-                        keyword_feature = keyword_feature.scalars().first()
-                        keyword_text_keyword_features[text] = keyword_feature
-                    if not keyword_feature:
-                        continue
-                    keyword_features = keyword_feature.vector
-                    keyword_stat = keyword_text_to_keyword_stat.get(text)
-                    if keyword_stat:
-                        row = {
-                            'adv_id': adv.adv_id,
-                            'keyword': keyword_setting.text,
-                            'views': keyword_stat.views,
-                            'clicks': keyword_stat.clicks,
-                            'spend': keyword_stat.spend,
-                            'nmids': adv.nmids,
-                            'wb_category_name': wb_category.wb_category_name,
-                            **avg_item_features,
-                            **{f'keyword_feature_{i}': keyword_features[i] for i in  range(len(keyword_features))},
-                        }
-                        data_rows.append(row)
+                keyword_features = keyword_feature.vector
+                keyword_stat = keyword_text_to_keyword_stat.get(text)
+                if keyword_stat:
+                    row = {
+                        'adv_id': adv.adv_id,
+                        'keyword': keyword_setting.text,
+                        'views': keyword_stat.views,
+                        'clicks': keyword_stat.clicks,
+                        'spend': keyword_stat.spend,
+                        'nmids': adv.nmids,
+                        'wb_category_name': wb_category.wb_category_name,
+                        **avg_item_features,
+                        **{f'keyword_feature_{i}': keyword_features[i] for i in  range(len(keyword_features))},
+                    }
+                    data_rows.append(row)
 
 
         df = pd.DataFrame(data_rows)
@@ -270,6 +270,9 @@ class Predictor:
         return df
 
     async def predict_ctr_for_keywords(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
+        logger.debug('Ожидание разрешения обновления ключей')
+        # await update_model_on_new_features.wait()
+        logger.debug('Блокировка снята')
         async with sm() as session:
             stmt = select(AdvSetting).options(
                 selectinload(AdvSetting.adv_keywords),
@@ -277,14 +280,14 @@ class Predictor:
             )
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
-            logger.debug('Ожидание разрешения обновления ключей')
-            await update_model_on_new_features.wait()
-            logger.debug('Блокировка снята')
-            predicted.clear()
+
+        predicted.clear()
+        async with sm() as session:
             df_for_predict = await self._get_df_for_predict(all_adv_settings, session)
-            predict_df = await asyncio.to_thread(self._predict, df_for_predict)
-            predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
-            predict_df.to_csv('work_folder/предсказания.csv')
+        predict_df = await asyncio.to_thread(self._predict, df_for_predict)
+        predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
+        await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
+        async with sm() as session:
             for n, row in predict_df.iterrows():
                 adv_id = row['adv_id']
                 keyword = row['keyword']

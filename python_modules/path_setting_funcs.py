@@ -1,3 +1,4 @@
+import aiofiles
 import yaml
 import os
 
@@ -7,6 +8,18 @@ def get_document_by_key_name(file_path, key_name):
         for dict_ in doc:
             if key_name in dict_:
                 return dict_[key_name]
+    raise Exception(f'Ключ {key_name} не найден в файле {file_path}')
+
+
+
+
+async def get_document_by_key_name_async(file_path, key_name):
+    async with aiofiles.open(file_path, 'r', encoding='utf8') as file:
+        content = await file.read()
+    doc = yaml.load_all(content, Loader=yaml.FullLoader)
+    for dict_ in doc:
+        if key_name in dict_:
+            return dict_[key_name]
     raise Exception(f'Ключ {key_name} не найден в файле {file_path}')
 
 
@@ -29,6 +42,17 @@ def get_alchemy_row():
     postgres_password = get_document_by_key_name(file_path, 'postgres-password')
     postgres_user = get_document_by_key_name(file_path, 'postgres-user')
     db_connector = f'postgresql://{postgres_user}:{postgres_password}@{postgres_host}:5432/{postgres_dbname}'
+    return db_connector
+
+
+
+async def get_alchemy_row_async():
+    file_path = get_setting_path()
+    postgres_dbname = await get_document_by_key_name_async(file_path, 'postgres-dbname')
+    postgres_host = await get_document_by_key_name(file_path, 'postgres-host')
+    postgres_password = await get_document_by_key_name(file_path, 'postgres-password')
+    postgres_user = await get_document_by_key_name(file_path, 'postgres-user')
+    db_connector = f'postgresql+asyncpg://{postgres_user}:{postgres_password}@{postgres_host}:5432/{postgres_dbname}'
     return db_connector
 
 

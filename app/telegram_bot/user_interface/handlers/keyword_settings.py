@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from app.db.associations import WBUserCabinet
 from app.wildberries.models import WBCabinet, AdvSetting, KeywordSetting
 from sqlalchemy.future import select
-from session_maker import get_async_session_maker
+from app.session_maker import get_async_session_maker
 from ..views import messages
 from app.my_types import LastMessage
 from ..views import callbacks

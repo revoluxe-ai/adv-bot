@@ -38,7 +38,7 @@ class AdvType:
 class Adv:
     def __init__(self, data):
         self._data_model = AdvData(**data)  # Используйте Pydantic для валидации
-        self._data = self._data_model.dict()  # Преобразуйте обратно в словарь, если нужно
+        self._data = self._data_model.model_dump()  # Преобразуйте обратно в словарь, если нужно
 
     @property
     def category_name(self):

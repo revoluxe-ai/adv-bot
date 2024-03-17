@@ -11,7 +11,7 @@ from app.wildberries.api import WBApi
 from app.wildberries.adv_data_updater import ShopDataUpdater
 from app.wildberries.api_rights import TokenRightChecker
 from app.wildberries.models import WBCabinet
-from session_maker import get_async_session_maker
+from app.session_maker import get_async_session_maker
 
 
 _sm = get_async_session_maker()

@@ -53,7 +53,7 @@ from app.keyword_async_ml_updater.models import ItemFeature, KeywordFeature
 from app.my_types import WBCabinet
 from app.telegram_bot.models import User
 from app.wildberries.models import AdvSetting, AdvKeyword, KeywordSetting
-from session_maker import get_async_session_maker
+from app.session_maker import get_async_session_maker
 
 predictor = Predictor()
 
@@ -94,11 +94,12 @@ class Manager(AbcManager):
         update_signal = False
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
-            result = (await session.execute(stmt)).unique()
-            for adv_setting in result.scalars():
-                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
-                logger.debug(f'Ключевые слова для {adv_setting.name} получены')
-                for keyword in keywords:
+        result = (await session.execute(stmt)).unique()
+        for adv_setting in result.scalars():
+            keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+            logger.debug(f'Ключевые слова для {adv_setting.name} получены')
+            for keyword in keywords:
+                async with sm() as session:
                     stmt = select(AdvKeyword)\
                     .options(joinedload(AdvKeyword.keyword_setting))\
                     .where(and_(AdvKeyword.text == keyword.text,
@@ -293,37 +294,37 @@ class Manager(AbcManager):
                 keyword_stats = await data_managers.get_keyword_statistic(session, adv_setting)
                 adv_setting_keyword_stats[adv_setting] = keyword_stats
 
-            total_min_ctr = min([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
-             for keyword_stat in keyword_stats])
-            total_max_ctr = max([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
-                for keyword_stat in keyword_stats])
-            phrase_data_list = []
-            for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
-                for keyword_stat in keyword_stats:
-                    ctr = keyword_stat.ctr
-                    # Расчет нормализованного CTR для каждой фразы
-                    n_ctr = ((ctr - total_min_ctr) / (total_max_ctr - total_min_ctr)
-                             if total_max_ctr > total_min_ctr else 0)
-                    words = keyword_stat.text.split()
-                    keywords = []
-                    for word in words:
-                        vector = await self._word2vec.average_vector_from_sentence(word)
-                        if vector is not None:
-                            vector = list(vector)
-                        keywords.append(KeywordStatForNeo(text=word, vector=vector))
+        total_min_ctr = min([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
+         for keyword_stat in keyword_stats])
+        total_max_ctr = max([keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() \
+            for keyword_stat in keyword_stats])
+        phrase_data_list = []
+        for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
+            for keyword_stat in keyword_stats:
+                ctr = keyword_stat.ctr
+                # Расчет нормализованного CTR для каждой фразы
+                n_ctr = ((ctr - total_min_ctr) / (total_max_ctr - total_min_ctr)
+                         if total_max_ctr > total_min_ctr else 0)
+                words = keyword_stat.text.split()
+                keywords = []
+                for word in words:
+                    vector = await self._word2vec.average_vector_from_sentence(word)
+                    if vector is not None:
+                        vector = list(vector)
+                    keywords.append(KeywordStatForNeo(text=word, vector=vector))
 
-                    phrase_data = KeywordPhrase(
-                        text=keyword_stat.text,
-                        ctr=n_ctr,
-                        target_nmids=adv_setting.nmids if n_ctr > 0 else [] ,
-                        words=keywords,
-                        word2vec =  await self._word2vec.average_vector_from_sentence(keyword_stat.text)
+                phrase_data = KeywordPhrase(
+                    text=keyword_stat.text,
+                    ctr=n_ctr,
+                    target_nmids=adv_setting.nmids if n_ctr > 0 else [] ,
+                    words=keywords,
+                    word2vec =  await self._word2vec.average_vector_from_sentence(keyword_stat.text)
 
-                    )
-                    phrase_data_list.append(phrase_data)
+                )
+                phrase_data_list.append(phrase_data)
 
-            await self._gds.add_keyword_phrase(phrase_data_list)
-            await asyncio.sleep(1)
+        await self._gds.add_keyword_phrase(phrase_data_list)
+        await asyncio.sleep(1)
 
 
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):

@@ -6,9 +6,6 @@ from ..views import keyboards
 
 
 class UnknownInnerError(mt.Text):
-    def __init__(self, bot, last_message: LastMessage, chat_id: int):
-        super().__init__(bot, last_message, chat_id)
-
 
     text = "Произошла неизвестная ошибка. Администратор уже уведомлен. Попробуйте позже."
 

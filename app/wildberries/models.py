@@ -15,7 +15,7 @@ from . import exceptions
 from app.db.base import BaseTable
 from sqlalchemy.schema import UniqueConstraint
 
-from session_maker import get_async_session_maker
+from app.session_maker import get_async_session_maker
 from ..db.associations import WBUserCabinet
 
 _sm = get_async_session_maker()

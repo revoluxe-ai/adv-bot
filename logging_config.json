@@ -87,10 +87,11 @@
       "level": "WARNING",
       "handlers": ["console"],
       "propagate": false
-    }
-  },
+    },
   "root": {
     "level": "DEBUG",
-    "handlers": ["console", "error_to_file", "common_file"]
+    "handlers": ["console"]
   }
-}
+}}
+
+

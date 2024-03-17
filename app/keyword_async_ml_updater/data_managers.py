@@ -17,7 +17,7 @@ import app
 from app.keyword_async_ml_updater.models import KeywordFeature
 from app.telegram_bot.models import User
 from app.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
-from session_maker import get_async_session_maker
+from app.session_maker import get_async_session_maker
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.my_types import WBUserCabinet
@@ -350,7 +350,7 @@ async def get_wb_category(session, adv_setting: AdvSetting)-> WBCategory:
     nmid = adv_setting.nmids[0]
     smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
     wb_card = await session.execute(smtp)
-    wb_card : WBCategory = wb_card .unique().scalar()
+    wb_card : WBCategory = wb_card.unique().scalar()
     wb_category = wb_card.wb_category
     return wb_category
 
@@ -443,7 +443,7 @@ async def get_main_photos(nmids: list[int]):
     return main_photos
 
 
-@staticmethod
+
 async def __download_and_resize_image(url, session, max_size=1280):
     while True:
         async with session.get(url) as response:

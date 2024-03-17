@@ -10,7 +10,7 @@ from app.wildberries import models
 from sqlalchemy.future import select
 
 from app.wildberries.models import AdvSetting, WBCabinet
-from session_maker import get_async_session_maker
+from app.session_maker import get_async_session_maker
 from app.telegram_bot.user_interface import states
 from app.telegram_bot.user_interface.views import messages
 from aiogram.filters import StateFilter, CommandStart
@@ -210,7 +210,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
                     wb_cabinet.shop_id = shop_id
                 else:
                     last_message, message_type = await messages. \
-                        CabinetExistsInSystem(bot)()
+                        CabinetExistsInSystem(bot, chat_id)()
                 wb_user_cabinet.wb_cabinet = wb_cabinet
                 user.wb_user_cabinets.append(wb_user_cabinet)
                 user.wb_tokens.append(wb_token)
@@ -225,7 +225,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
                 await redis_manager.set_last_message(last_message, message_type)
                 all_shops:list[WBUserCabinet] = [cabinet for cabinet in user.wb_user_cabinets]
                 await messages. \
-                    ShopChoice(bot, all_shops)()
+                    ShopChoice(bot, chat_id, all_shops)()
 
 
 @router.callback_query(callbacks.DeleteWbUserCabinet.filter())
@@ -248,8 +248,9 @@ async def delete_shop(callback_query: types.CallbackQuery,
         user = wb_user_cabinet.user
         await session.refresh(user)
     all_shops = user.wb_user_cabinets
+    chat_id = callback_query.message.chat.id
     await messages. \
-        ShopChoice(bot, all_shops)()
+        ShopChoice(bot, chat_id, all_shops)()
     return
 
 
@@ -285,26 +286,27 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
     api = api.strip()
     wb_token = wb_models.WBToken(api_key=api)
     user.wb_tokens.append(wb_token)
+    chat_id = message.chat.id
     try:
          check_right = await CabinetManager.check_token_for_adv(wb_user_cabinet)
     except NotValidTokenError:
-        last_message, message_type = await messages. \
-            NotValideToken(bot)()
-        return last_message, message_type
+         await messages. \
+            NotValideToken(bot, chat_id)()
+         return
     if not check_right:
-        last_message, message_type = await messages. \
-            GetApiForrbidenError(bot)()
-        return last_message, message_type
+        await messages. \
+            GetApiForrbidenError(bot, chat_id)()
+        return
     else:
         async with sm() as session:
             session.add(user)
             await session.commit()
             await session.refresh(user)
         await messages. \
-            ShopAddedSuccess(bot, wb_user_cabinet.name)()
+            ShopAddedSuccess(bot, chat_id, wb_user_cabinet.name)()
         all_shops = wb_user_cabinet.user.wb_user_cabinets
         await messages. \
-            ShopChoice(bot, all_shops)()
+            ShopChoice(bot, chat_id, all_shops)()
         await state.clear()
         return
 
