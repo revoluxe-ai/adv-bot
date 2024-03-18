@@ -83,11 +83,17 @@
       "handlers": ["console"],
       "propagate": false
     },
+    "session_maker": {
+        "level": "INFO",
+        "handlers": ["console"],
+        "propagate": false
+    },
     "NeoDataScience.driver": {
       "level": "WARNING",
       "handlers": ["console"],
       "propagate": false
     },
+
   "root": {
     "level": "DEBUG",
     "handlers": ["console"]
