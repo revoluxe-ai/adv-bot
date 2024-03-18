@@ -74,7 +74,7 @@ class AdvertApi(ABC_WB_API):
     auto_adv_types = [8]
 
 
-    @_try_except_decorator(4, 1)
+    @_try_except_decorator(2, 1)
     async def get_keywords_stat(self, adv_setting: AdvSetting)-> list[KeywordStat]:
         keywords = []
         url = f'https://advert-api.wb.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}'
@@ -98,7 +98,7 @@ class AdvertApi(ABC_WB_API):
 
 
 
-    @_try_except_decorator(1, 1)
+    @_try_except_decorator(1, 2)
     async def get_cards_by_text(self, texts: set[Union[str, int]]):
         cards = []
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
