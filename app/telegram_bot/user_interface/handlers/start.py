@@ -163,7 +163,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
         result = await session.execute(stmt)
         user = result.scalar()
     async with sm() as session:
-        session.merge(wb_token)
+        await session.merge(wb_token)
         session.merge(user)
         wb_token.user = user #сразу добавляем юзеру токен
         await session.commit()
