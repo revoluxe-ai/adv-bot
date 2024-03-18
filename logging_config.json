@@ -83,7 +83,7 @@
       "handlers": ["console"],
       "propagate": false
     },
-    "session_maker": {
+    "app.session_maker": {
         "level": "INFO",
         "handlers": ["console"],
         "propagate": false
