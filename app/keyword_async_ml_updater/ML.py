@@ -157,7 +157,6 @@ class Fitter(AbcManager):
             adv_settings = result.scalars().unique().all()
 
         data_rows = []
-
         for adv in adv_settings:
             wb_category = await data_managers.get_wb_category(adv)
             nmid_featers = {}
@@ -165,16 +164,16 @@ class Fitter(AbcManager):
             keyword_text_to_keyword_stat = {}
             for keyword_stat in keyword_stats:
                 keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
-
             item_features_list = []
             for nmid in adv.nmids:
                 if nmid in nmid_featers:
                     item_feature = nmid_featers[nmid]
                 else:
-                    item_feature = await sess.execute(
-                        select(ItemFeature).where(ItemFeature.nmid == nmid)
-                    )
-                    item_feature = item_feature.scalars().one()
+                    async with sm() as session:
+                        item_feature = await session.execute(
+                            select(ItemFeature).where(ItemFeature.nmid == nmid)
+                        )
+                        item_feature = item_feature.scalars().one()
                     nmid_featers[nmid] = item_feature
                 if item_feature:
                     item_features_list.append(item_feature.vector)
@@ -193,10 +192,11 @@ class Fitter(AbcManager):
                 if text in keyword_text_keyword_features:
                     keyword_feature = keyword_text_keyword_features[text]
                 else:
-                    keyword_feature = await sess.execute(
-                        select(KeywordFeature).where(KeywordFeature.keyword == text)
-                    )
-                    keyword_feature = keyword_feature.scalars().first()
+                    async with sm() as sess:
+                        keyword_feature = await sess.execute(
+                            select(KeywordFeature).where(KeywordFeature.keyword == text)
+                        )
+                        keyword_feature = keyword_feature.scalars().first()
                     keyword_text_keyword_features[text] = keyword_feature
                 if not keyword_feature:
                     continue
@@ -271,10 +271,8 @@ class Predictor:
         df['predicted_ctr'] = y
         return df
 
-    async def predict_ctr_for_keywords(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
-        logger.debug('Ожидание разрешения обновления ключей')
-        await update_model_on_new_features.wait()
-        logger.debug('Блокировка снята')
+    async def predict_ctr_for_keywords(self,  predicted: asyncio.Event):
+
         async with sm() as session:
             stmt = select(AdvSetting).options(
                 selectinload(AdvSetting.adv_keywords),

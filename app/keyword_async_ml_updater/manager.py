@@ -418,8 +418,8 @@ class Manager(AbcManager):
         except ValueError:
             return False
 
-    async def update_predict_ctr(self, update_model_on_new_features, predicted: asyncio.Event):
-        await self._predictor.predict_ctr_for_keywords(update_model_on_new_features, predicted)
+    async def update_predict_ctr(self, predicted: asyncio.Event):
+        await self._predictor.predict_ctr_for_keywords( predicted)
 
     @staticmethod
     async def update_min_ctr_in_global_wb_category_settings():

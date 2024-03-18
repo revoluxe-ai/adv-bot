@@ -32,11 +32,11 @@ class Runner:
         predicted = asyncio.Event()
         predicted.set()
         await asyncio.gather(
-            # self.update_min_ctr_in_global_wb_category_settings(),
-            # self.run_update_keyword_stat(need_update_model),
-            # self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
-            # self.run_update_model(update_model_on_new_features, need_update_model),
-            # self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            self.update_min_ctr_in_global_wb_category_settings(),
+            self.run_update_keyword_stat(need_update_model),
+            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            self.run_update_model(update_model_on_new_features, need_update_model),
+            self.run_update_predict_ctr(update_model_on_new_features, predicted),
             self.run_update_keywords_on_wb(),
 
             return_exceptions=False
@@ -44,7 +44,10 @@ class Runner:
 
     async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
         while True:
-             await self._manager.update_predict_ctr(update_model_on_new_features, predicted)
+             logger.debug('Ожидание разрешения обновления ключей')
+             await update_model_on_new_features.wait()
+             logger.debug('Блокировка снята')
+             await self._manager.update_predict_ctr( predicted)
              await asyncio.sleep(1)
 
     async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
