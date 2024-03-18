@@ -191,8 +191,6 @@ class Fitter(AbcManager):
             keyword_settings: list[KeywordSetting] = adv.keyword_settings
 
             for keyword_setting in keyword_settings:
-                if keyword_setting.hard_status not in [0, 2]:
-                    continue
                 text = keyword_setting.text
                 if text in keyword_text_keyword_features:
                     keyword_feature = keyword_text_keyword_features[text]
