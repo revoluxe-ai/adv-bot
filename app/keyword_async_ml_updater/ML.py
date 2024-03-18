@@ -162,6 +162,8 @@ class Fitter(AbcManager):
         data_rows = []
         for adv in adv_settings:
             wb_category = await data_managers.get_wb_category(adv)
+            if not wb_category:
+                continue
             nmid_featers = {}
             keyword_stats = await data_managers.get_keyword_statistic(adv)
             keyword_text_to_keyword_stat = {}

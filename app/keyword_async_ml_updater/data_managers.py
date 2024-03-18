@@ -3,7 +3,7 @@ import io
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Union
 
 import aiocache
 from PIL import Image
@@ -149,7 +149,9 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
         adv_settings: list[AdvSetting] = result.unique().scalars().all()
     wb_category_to_keywordstat_list = defaultdict(list)
     for adv_setting in adv_settings:
-        wb_category = await get_wb_category(adv_setting)
+        wb_category: Union[WBCategory, None] = await get_wb_category(adv_setting)
+        if not wb_category:
+            continue
         wb_category_name = wb_category.wb_category_name
         keyword_stats = await get_keyword_statistic(adv_setting,[1, 2])
         for keyword_stat in keyword_stats:
@@ -324,13 +326,16 @@ class DataGetter(AbcManager):
         return result
 
 
-async def get_wb_category(adv_setting: AdvSetting)-> WBCategory:
+async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     nmid = adv_setting.nmids[0]
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
     wb_card : WBCategory = wb_card.unique().scalar()
-    wb_category = wb_card.wb_category
+    if wb_card:
+        wb_category = wb_card.wb_category
+    else:
+        return None
     return wb_category
 
 #
@@ -382,6 +387,8 @@ class DataSetter:
         for adv_setting in adv_settings:
             if adv_setting.bot_active:
                 category:WBCategory = await get_wb_category(adv_setting)
+                if not category:
+                    continue
                 min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
                 good_phrases, bad_phrases = await get_good_bad_phrases(adv_setting, min_ctr)
                 await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
