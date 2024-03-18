@@ -178,7 +178,11 @@ class Fitter(AbcManager):
                         item_feature = await session.execute(
                             select(ItemFeature).where(ItemFeature.nmid == nmid)
                         )
-                        item_feature = item_feature.scalars().one()
+                        item_feature = item_feature.scalars()
+                        if item_feature:
+                            item_feature = item_feature.one()
+                        else:
+                            continue
                     nmid_featers[nmid] = item_feature
                 if item_feature:
                     item_features_list.append(item_feature.vector)

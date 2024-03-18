@@ -61,7 +61,6 @@ class ShopDataUpdater:
 
     async def __update_advs_in_db(self, adv_ids:set[int]):
         wb_api = self.__wb_api
-        wb_user_cabinet = self._wb_user_cabinet
         advs = await wb_api.advert.get_advs(list(adv_ids))
         nmids_collection = set()
         async with sm() as session:
