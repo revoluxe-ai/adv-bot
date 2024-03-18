@@ -232,8 +232,7 @@ class Manager(AbcManager):
 
     async def update_keywords_in_advs(self) -> list[typing.Awaitable]:
             update_tasks: dict[int, asyncio.Task] = {}
-            category_name_to_min_ctr = await data_managers.\
-                get_category_name_min_ctr_final_data()
+            category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
 
             super_wb_user_cabinets = await users_manager.fetch_super_wb_user_cabinets()
             for super_wb_user_cabinet in super_wb_user_cabinets:
