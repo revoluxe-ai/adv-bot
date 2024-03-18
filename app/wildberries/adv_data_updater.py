@@ -33,7 +33,7 @@ async def consumer():
             task =  asyncio.create_task(coroutine)
             task.add_done_callback(lambda t, lst=active_tasks: lst.remove(t))
             active_tasks.append(task)
-
+        await asyncio.sleep(1)
 
 class ShopDataUpdater:
     def __init__(self, wb_api: WBApi, wb_user_cabinet: WBUserCabinet):
