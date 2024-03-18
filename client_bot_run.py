@@ -6,8 +6,5 @@ setup_logging()
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(run())
-    except KeyboardInterrupt as e:
-        raise KeyboardInterrupt
+    asyncio.run(run())
 

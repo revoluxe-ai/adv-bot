@@ -31,10 +31,10 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
             nonlocal current_pause
             nonlocal last_query_time
             # Рассчитываем время, через которое можно сделать следующий запрос
-            current_time = time.time()
-            time_since_last_query = current_time - last_query_time
-            time_to_wait = max(0, current_pause - time_since_last_query)
             while True:
+                current_time = time.time()
+                time_since_last_query = current_time - last_query_time
+                time_to_wait = max(0, current_pause - time_since_last_query)
                 if time_to_wait > 0:
                     # Если нужно подождать, ждем до конца интервала
                     await asyncio.sleep(time_to_wait)

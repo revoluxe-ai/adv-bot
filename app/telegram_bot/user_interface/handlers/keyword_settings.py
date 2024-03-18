@@ -2,7 +2,7 @@ import aiogram
 from aiogram import Router, types, F
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import and_
+from sqlalchemy import and_, join
 from sqlalchemy.orm import joinedload, selectinload
 from app.db.associations import WBUserCabinet
 from app.wildberries.models import WBCabinet, AdvSetting, KeywordSetting
@@ -35,21 +35,26 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
 
     async with _sm() as session:
         stmt = select(AdvSetting) \
-            .options(selectinload(AdvSetting.keyword_settings),
-                     selectinload(AdvSetting.wb_cabinet) \
-                     .selectinload(WBCabinet.wb_user_cabinets) \
-                     .selectinload(WBUserCabinet.user)) \
-            .join(User, AdvSetting.user_id == User.id).\
-             where(and_(AdvSetting.id == adv_original_id,
-            User.user_telegram_id == callback.from_user.id))
-    result = await session.execute(stmt)
-    adv_setting: AdvSetting = result.unique().scalars().one()
+            .where(AdvSetting.id == adv_original_id)
+        result = await session.execute(stmt)
+        adv_setting: AdvSetting = result.scalar()
 
-    keywords = await utils.get_keywords_for_keyboard( adv_setting)
+    keywords = await utils.get_keywords_for_keyboard(adv_setting)
     page = callback_data.page
     state_data = await state.get_data()
     adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
-    wb_user_cabinet_original_id = adv_setting.wb_cabinet.wb_user_cabinets[0].id
+    async with _sm() as session:
+        stmt = select(WBUserCabinet) \
+            .join(User, User.id == WBUserCabinet.user_id) \
+        .join(WBCabinet,
+              WBCabinet.id == WBUserCabinet.wb_cabinet_id) \
+        .options(selectinload(WBUserCabinet.user),
+                 selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings)) \
+            .where(and_(User.user_telegram_id == callback.from_user.id,
+                        WBCabinet.id == adv_setting.wb_cabinet_id))
+        wb_user_cabinet = await session.execute(stmt)
+    wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
+    wb_user_cabinet_original_id = wb_user_cabinet.id
     nmids = adv_setting.nmids
     main_photos = await data_managers.get_main_photos(nmids[:1])
     chat_id = callback.message.chat.id

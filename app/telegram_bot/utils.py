@@ -1,10 +1,15 @@
+from sqlalchemy import select
+
 from app import data_managers
 from app.my_types import AdvSetting
 from dataclasses import dataclass
 
 from app.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
 from app.wildberries.models import KeywordSetting, WBCategory
+from app.session_maker import get_async_session_maker
 
+
+_sm = get_async_session_maker()
 
 @dataclass
 class KeywordForKeyboard:
@@ -23,8 +28,14 @@ async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[KeywordForK
     good_phrases, bad_phrases = await  data_managers.get_good_bad_phrases(adv_setting, min_ctr)
     keyword_stats:list[KeywordStatFromDB] = await data_managers.get_keyword_statistic( adv_setting)
     keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
-    keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
+    async with _sm () as session:
+        stmt = (
+            select(KeywordSetting)
+            .where(KeywordSetting.adv_setting_id == adv_setting.id)
+        )
+        result = await session.execute(stmt)
 
+    keyword_settings = result.scalars().all()
     keywords = []
     for keyword_setting in keyword_settings:
         text = keyword_setting.text
