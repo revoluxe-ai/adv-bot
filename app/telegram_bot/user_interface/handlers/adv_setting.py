@@ -47,8 +47,8 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
 
-    data = await state.get_data()
-    chat_id = data['chat_id']
+
+    chat_id = callback.message.chat.id
 
     await messages.AdvCompanyChoicing \
         (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=page)()

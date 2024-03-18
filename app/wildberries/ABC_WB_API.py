@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 class WbRequestApiMixin(ABC):
 
+    @property
+    @abstractmethod
+    def _wb_user_cabinet(self) -> app.my_types.WBUserCabinet:
+        pass
+
     async def requests(self, session, method, url, data=None, json_data=None, headers=None, ):
         async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
             try:
@@ -22,7 +27,7 @@ class WbRequestApiMixin(ABC):
             except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
                 if e.status == 401:
                     raise exceptions.ApiForbiddenError('API доступ запрещен',
-                                                       wb_user_cabinet) from e
+                                                       self._wb_user_cabinet) from e
                 else:
                     # Для всех других ошибок 4xx и 5xx
                     raise exceptions.UnknownApiRequestError(e) from e
@@ -64,6 +69,7 @@ class ABC_WB_API(WbRequestApiMixin):
 
 
     def __init__(self, wb_user_cabinet: app.my_types.WBUserCabinet):
+        self.__wb_user_cabinet = wb_user_cabinet
         tokens: list[WBToken]= wb_user_cabinet.user.wb_tokens
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
@@ -82,6 +88,15 @@ class ABC_WB_API(WbRequestApiMixin):
                     ))
         self.headers = Headers(current_token)
         self._shop_id = current_token.shop_id
+
+
+    @property
+    def _wb_user_cabinet(self):
+        return self.__wb_user_cabinet
+
+    @_wb_user_cabinet.setter
+    def _wb_user_cabinet(self, value):
+        self.__wb_user_cabinet = value
 
 
     @property

@@ -2,6 +2,7 @@ import aiogram
 from aiogram import Router, types, F
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import and_
 from sqlalchemy.orm import joinedload, selectinload
 from app.db.associations import WBUserCabinet
 from app.wildberries.models import WBCabinet, AdvSetting, KeywordSetting
@@ -11,6 +12,7 @@ from ..views import messages
 from app.my_types import LastMessage
 from ..views import callbacks
 from .. import states
+from ...models import User
 from ...redis_manager import RedisManager
 from app import data_managers
 from app.telegram_bot.wb_user_cabinet_manager import CabinetManager
@@ -31,19 +33,22 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
     await callback.answer()
     adv_original_id: int = callback_data.adv_original_id
 
-    async with (_sm() as session):
-        stmt = select(AdvSetting
-                     ).options(selectinload(AdvSetting.keyword_settings),
-                               )\
-        .where(AdvSetting.id == adv_original_id)
+    async with _sm() as session:
+        stmt = select(AdvSetting)\
+              .options(selectinload(AdvSetting.keyword_settings),
+                       selectinload(AdvSetting.wb_cabinet)\
+                      .selectinload(WBCabinet.wb_user_cabinets)\
+                       .selectinload(WBUserCabinet.user))\
+               .where(and_(AdvSetting.id == adv_original_id,
+                     User.id == callback.from_user.id))
         result = await session.execute(stmt)
         adv_setting: AdvSetting = result.unique().scalars().one()
+
     keywords = await utils.get_keywords_for_keyboard( adv_setting)
     page = callback_data.page
     state_data = await state.get_data()
     adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
-    wb_user_cabinet_original_id = state_data.get('last_wb_user_cabinet_original_id')
-    assert wb_user_cabinet_original_id
+    wb_user_cabinet_original_id = adv_setting.wb_cabinet.wb_user_cabinets[0].id
     nmids = adv_setting.nmids
     main_photos = await data_managers.get_main_photos(nmids[:1])
     chat_id = callback.message.chat.id

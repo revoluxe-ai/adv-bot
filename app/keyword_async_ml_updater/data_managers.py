@@ -368,7 +368,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> WBCategory:
 class DataSetter:
     def __init__(self, wb_user_cabinet: WBUserCabinet):
         self._wb_api = WBApi(wb_user_cabinet)
-
+        self._wb_user_cabinet = wb_user_cabinet
 
 
     async def update_minus_keywords(self, category_name_to_min_ctr):
