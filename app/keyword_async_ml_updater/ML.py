@@ -153,9 +153,9 @@ class Fitter(AbcManager):
                     selectinload(AdvSetting.adv_keywords),
                     # Убедитесь, что есть связь для wb_cards и wb_category, и что они правильно определены в моделях
                     selectinload(AdvSetting.wb_cards).selectinload(WBCard.wb_category),
-                    selectinload(AdvSetting.keyword_settings).selectinload(KeywordSetting.adv_keywords),
-                )
-            ).where(KeywordSetting.hard_status in [0, 2])
+                    selectinload(AdvSetting.keyword_settings).selectinload(KeywordSetting.adv_keywords)
+                ).where(KeywordSetting.hard_status.in_(0, 2))
+            )
             # Используйте unique() для удаления дубликатов перед получением списка объектов
             adv_settings = result.scalars().unique().all()
 
