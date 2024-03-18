@@ -34,15 +34,16 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
     adv_original_id: int = callback_data.adv_original_id
 
     async with _sm() as session:
-        stmt = select(AdvSetting)\
-              .options(selectinload(AdvSetting.keyword_settings),
-                       selectinload(AdvSetting.wb_cabinet)\
-                      .selectinload(WBCabinet.wb_user_cabinets)\
-                       .selectinload(WBUserCabinet.user))\
-               .where(and_(AdvSetting.id == adv_original_id,
-                     User.id == callback.from_user.id))
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.unique().scalars().one()
+        stmt = select(AdvSetting) \
+            .options(selectinload(AdvSetting.keyword_settings),
+                     selectinload(AdvSetting.wb_cabinet) \
+                     .selectinload(WBCabinet.wb_user_cabinets) \
+                     .selectinload(WBUserCabinet.user)) \
+            .join(User, AdvSetting.user_id == User.id).\
+             where(and_(AdvSetting.id == adv_original_id,
+            User.user_telegram_id == callback.from_user.id))
+    result = await session.execute(stmt)
+    adv_setting: AdvSetting = result.unique().scalars().one()
 
     keywords = await utils.get_keywords_for_keyboard( adv_setting)
     page = callback_data.page

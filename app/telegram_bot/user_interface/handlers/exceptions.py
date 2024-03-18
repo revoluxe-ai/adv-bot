@@ -43,6 +43,9 @@ admin_router = Router()
 async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
     await state.clear()
     message = error_event.update.message
+    exception = error_event.exception
+    if isinstance(exception, KeyboardInterrupt):
+        raise exception
     if message is None:
         chat_id = error_event.update.callback_query.message.chat.id
     else:
