@@ -32,12 +32,12 @@ class Runner:
         predicted = asyncio.Event()
         predicted.set()
         await asyncio.gather(
-            self.update_min_ctr_in_global_wb_category_settings(),
-            self.run_update_keyword_stat(need_update_model),
-            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            # self.update_min_ctr_in_global_wb_category_settings(),
+            # self.run_update_keyword_stat(need_update_model),
+            # self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
             self.run_update_model(update_model_on_new_features, need_update_model),
-            self.run_update_predict_ctr(update_model_on_new_features, predicted),
-            self.run_update_keywords_on_wb(),
+            # self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            # self.run_update_keywords_on_wb(),
 
             return_exceptions=False
             )
@@ -87,7 +87,7 @@ class Runner:
     async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):
         while True:
             fit_logger.debug('Старт цикла обновления модели')
-            await need_update_model.wait()
+            # await need_update_model.wait()
             fit_logger.debug('need_update_model.wait пройден')
             await self._manager.update_model(update_model_on_new_features)
             fit_logger.debug('Цикл обновления модели завершен')

@@ -444,15 +444,15 @@ async def __download_and_resize_image(url, session, max_size=1280):
 
 async def get_adv_keyword_text_in_black_list()-> list[tuple[int, str]]:
     async with _sm() as session:
-        stmt = select(AdvKeyword)\
-            .join(AdvKeyword.adv_setting)\
-            .options(AdvKeyword.keyword_setting).where(KeywordSetting.hard_status == 0)
+        stmt = select(KeywordSetting)\
+            .options(selectinload(KeywordSetting.adv_setting))\
+        .where(KeywordSetting.hard_status == 0)
         result = await session.execute(stmt)
-        adv_keywords: list[AdvKeyword] = result.unique().scalars().all()
+        keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
     adv_keyword_text_in_black_list = []
-    for adv_keyword in adv_keywords:
-        adv_setting: AdvSetting = adv_keyword.adv_setting
-        adv_keyword_text_in_black_list.append((adv_setting.adv_id, adv_keyword.text))
+    for keyword_setting in keyword_settings:
+        adv_setting = keyword_setting.adv_setting
+        adv_keyword_text_in_black_list.append((adv_setting.adv_id, keyword_setting.text))
 
     return adv_keyword_text_in_black_list
 
