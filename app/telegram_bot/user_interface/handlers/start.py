@@ -111,7 +111,7 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
             stmt = select(AdvSetting)\
             .options(selectinload(AdvSetting.wb_cabinet)\
             .selectinload(WBCabinet.wb_user_cabinets))\
-            .where(AdvSetting.wb_cabinet.wb_user_cabinet_id == wb_user_cabinet_original_id)
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
             result = await session.execute(stmt)
             adv_settings = result.unique().scalars().all()
 
@@ -126,8 +126,7 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 
 @router.message(StateFilter(states.CabinetRegistration.api))
 async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMContext):
-    chat_id = message.chat.id
-    await messages.ShopUpdateInfo(bot, chat_id)()
+
     api = message.text
     api = api.strip()
 
@@ -151,7 +150,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
         await messages. \
             GetApiForrbidenError(bot, chat_id)()
         return
-
+    await messages.ShopUpdateInfo(bot, chat_id)()
     data_state: dict = await state.get_data()
     cabinet_name = data_state['cabinet_name'].strip()
     user_id = message.from_user.id
@@ -163,15 +162,15 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
         result = await session.execute(stmt)
         user = result.scalar()
     async with sm() as session:
-        await session.merge(wb_token)
-        session.merge(user)
-        wb_token.user = user #сразу добавляем юзеру токен
+        user.wb_tokens.append(wb_token)
+        await session.merge(user)
+        user.wb_tokens.append(wb_token)#сразу добавляем юзеру токен
         await session.commit()
     #проверяем есть ли кабинет именно у этого юзера
     async with sm() as session:
         stmt = select(WBCabinet)\
-        .options(selectinload(WBCabinet.wb_user_cabinets)
-                 .selectinload(WBUserCabinet.user))\
+        .join(WBCabinet.wb_user_cabinets)\
+        .join(WBUserCabinet.user)\
         .where(and_(WBCabinet.shop_id == wb_token.shop_id,
                     WBUserCabinet.user_id == user.id))
         result = await session.execute(stmt)
