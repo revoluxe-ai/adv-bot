@@ -32,6 +32,7 @@ class Runner:
         predicted = asyncio.Event()
         predicted.set()
         await asyncio.gather(
+            self.update_advs_in_db(),
             self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_keyword_stat(need_update_model),
             self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
@@ -106,6 +107,10 @@ class Runner:
         while True:
             await self._manager.update_min_ctr_in_global_wb_category_settings()
             await asyncio.sleep(1)
+
+    async def update_advs_in_db(self):
+        while True:
+           await self._manager.tasks_run_for_update_advs_in_db()
 
 
 

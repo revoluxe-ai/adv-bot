@@ -54,7 +54,7 @@ from app.my_types import WBCabinet
 from app.telegram_bot.models import User
 from app.wildberries.models import AdvSetting, AdvKeyword, KeywordSetting
 from app.session_maker import get_async_session_maker
-
+from app import ShopDataUpdater
 predictor = Predictor()
 
 
@@ -473,6 +473,27 @@ class Manager(AbcManager):
                     category_setting.min_ctr = min_ctr
                 await session.execute(stmt)
             await session.commit()
+
+    async def tasks_run_for_update_advs_in_db(self):
+        wb_super_wb_users = await users_manager.fetch_super_wb_user_cabinets()
+        tasks = {}
+        for wb_super_wb_user  in wb_super_wb_users:
+            wb_api = WBApi(wb_super_wb_user)
+            advs_updater = ShopDataUpdater(wb_api, wb_super_wb_user)
+            id_ = wb_super_wb_user.id
+            if id_ not in tasks:
+                task = asyncio.create_task(advs_updater.update_all_data())
+                tasks[id_] = task
+            else:
+                if tasks[id_].done():
+                    if tasks[id_].exception():
+                        logger.error(f'Ошибка обновления ключей: {tasks[id_].exception()}')
+                    task = asyncio.create_task(wb_api.advert.update_all_data())
+                    tasks[id_] = task
+
+
+
+
 
 
 

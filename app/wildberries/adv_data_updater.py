@@ -1,14 +1,11 @@
-from functools import partial
-
 from .api import WBApi
-from .models import AdvSetting
 import asyncio
 from sqlalchemy import select
 from . import models
 from app.session_maker import get_async_session_maker
 import json
 import logging
-import typing
+
 from app.db.associations import WBUserCabinet
 
 
@@ -38,7 +35,7 @@ async def consumer():
 class ShopDataUpdater:
     def __init__(self, wb_api: WBApi, wb_user_cabinet: WBUserCabinet):
         self.__wb_api = wb_api
-        self.__wb_cabinet = wb_user_cabinet.wb_cabinet
+        self._wb_user_cabinet = wb_user_cabinet.wb_cabinet
 
 
 
@@ -64,6 +61,7 @@ class ShopDataUpdater:
 
     async def __update_advs_in_db(self, adv_ids:set[int]):
         wb_api = self.__wb_api
+        wb_user_cabinet = self._wb_user_cabinet
         advs = await wb_api.advert.get_advs(list(adv_ids))
         nmids_collection = set()
         async with sm() as session:
@@ -80,16 +78,15 @@ class ShopDataUpdater:
                         for nmid in nmids:
                             nmids_collection.add(nmid)
                 else:
-                    adv_in_db = models.AdvSetting()
-                    adv_in_db.adv_id = adv.advertId
-                    adv_in_db.name = adv.name
-                    await session.merge(self.__wb_cabinet)
-                    adv_in_db.wb_cabinet = self.__wb_cabinet
-                    adv_in_db.nmids = adv.nmids
-                    adv_in_db.active_status = adv.status_native
-                    await session.merge(adv_in_db)
-                    nmids = adv.nmids
-                    await session.commit()
+                    with session.no_autoflush:
+                        adv_in_db = models.AdvSetting()
+                        adv_in_db.adv_id = adv.advertId
+                        adv_in_db.name = adv.name
+                        adv_in_db.wb_cabinet = self._wb_user_cabinet
+                        adv_in_db.nmids = adv.nmids
+                        adv_in_db.active_status = adv.status_native
+                        nmids = adv.nmids
+                        await session.commit()
                     if nmids:
                         for nmid in nmids:
                             nmids_collection.add(nmid)
@@ -115,7 +112,7 @@ class ShopDataUpdater:
                     db_card.name = card.name
                     db_card.wb_category_name = card.wb_category_name
                     db_card.json = json.dumps(card.data)
-                    db_card.wb_cabinet = self.__wb_cabinet
+                    db_card.wb_cabinet = self._wb_user_cabinet
                     db_card.nmid = card.nmid
                     session.add(db_card)
                     stmt = select(models.WBCategory) \
@@ -125,7 +122,7 @@ class ShopDataUpdater:
                     if not category:
                         category = models.WBCategory()
                         category.wb_category_name = card.wb_category_name
-                        category.wb_cabinet = self.__wb_cabinet
+                        category.wb_cabinet = self._wb_user_cabinet
                         session.add(category)
                     db_card.wb_category = category
                     await session.commit()

@@ -25,7 +25,7 @@ class UsersManager:
 
             wb_cabinets = await session.execute(query)
             wb_cabinets = wb_cabinets.scalars().all()
-            for wb_cabinet in wb_cabinets:
+            for  wb_cabinet in wb_cabinets:
                 super_user = User()
                 shop_id = wb_cabinet.shop_id
                 tokens_for_shop = set()
