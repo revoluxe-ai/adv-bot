@@ -119,11 +119,14 @@ class Fitter(AbcManager):
 
 
 
-    async def _bayesian_apply(self, df: pd.DataFrame):
+    async def _bayesian_apply(self, df: pd.DataFrame, adv_keyword_text_in_black_list: list[tuple[int, str]]):
         category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
         def calculate_ctr(row):
             clicks = row['clicks']
             views = row['views']
+            adv_id = row['adv_id']
+            if (adv_id, row['keyword']) in adv_keyword_text_in_black_list:
+                return 0
             wb_category_name = row['wb_category_name']
             min_ctr = category_name_to_min_ctr.get(wb_category_name, 0)
             if min_ctr > 0:
@@ -230,7 +233,8 @@ class Fitter(AbcManager):
         if len(df) == 0:
             logger.debug('Нет данных для обучения')
             return
-        df:pd.DataFrame = await self._bayesian_apply(df)
+        adv_keyword_text_in_black_list: list[tuple[int, str]] = await data_managers.get_adv_keyword_text_in_black_list()
+        df:pd.DataFrame = await self._bayesian_apply(df, adv_keyword_text_in_black_list)
         await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
         y = df['ctr']
         X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],

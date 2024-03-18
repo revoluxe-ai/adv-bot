@@ -440,3 +440,19 @@ async def __download_and_resize_image(url, session, max_size=1280):
                     with io.BytesIO() as output:
                         img.save(output, format="JPEG")
                         return output.getvalue()
+
+
+async def get_adv_keyword_text_in_black_list()-> list[tuple[int, str]]:
+    async with _sm() as session:
+        stmt = select(AdvKeyword)\
+            .join(AdvKeyword.adv_setting).where(AdvKeyword.hard_status == 0)
+        result = await session.execute(stmt)
+        adv_keywords: list[AdvKeyword] = result.unique().scalars().all()
+    adv_keyword_text_in_black_list = []
+    for adv_keyword in adv_keywords:
+        adv_setting: AdvSetting = adv_keyword.adv_setting
+        adv_keyword_text_in_black_list.append((adv_setting.adv_id, adv_keyword.text))
+
+    return adv_keyword_text_in_black_list
+
+
