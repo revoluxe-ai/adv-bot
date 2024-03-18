@@ -36,9 +36,9 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
     check_data = await state.get_data()
     logger.debug(f'check_data: {check_data}')
 
-    if page == 1:
-        user_cabinet_manager = await get_cabinet_manager(wb_user_cabinet_original_id)
-        await user_cabinet_manager.update_all_data()
+    # if page == 1:
+    #     user_cabinet_manager = await get_cabinet_manager(wb_user_cabinet_original_id)
+    #     await user_cabinet_manager.update_all_data()
     async with (sm() as session):
         stmt = select(AdvSetting)\
         .join(AdvSetting.wb_cabinet)\
