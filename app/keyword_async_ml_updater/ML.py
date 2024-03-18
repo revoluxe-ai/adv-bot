@@ -154,7 +154,7 @@ class Fitter(AbcManager):
                     # Убедитесь, что есть связь для wb_cards и wb_category, и что они правильно определены в моделях
                     selectinload(AdvSetting.wb_cards).selectinload(WBCard.wb_category),
                     selectinload(AdvSetting.keyword_settings).selectinload(KeywordSetting.adv_keywords)
-                ).where(KeywordSetting.hard_status.in_([0, 2]))
+                )
             )
             # Используйте unique() для удаления дубликатов перед получением списка объектов
             adv_settings = result.scalars().unique().all()
@@ -191,6 +191,8 @@ class Fitter(AbcManager):
             keyword_settings: list[KeywordSetting] = adv.keyword_settings
 
             for keyword_setting in keyword_settings:
+                if keyword_setting.hard_status not in [0,2]:
+                    continue
                 text = keyword_setting.text
                 if text in keyword_text_keyword_features:
                     keyword_feature = keyword_text_keyword_features[text]
