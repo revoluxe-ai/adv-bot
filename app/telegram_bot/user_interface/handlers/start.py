@@ -322,8 +322,8 @@ async def select_shop(callback_query: types.CallbackQuery,
         result = await session.execute(stmt)
         wb_user_cabinet = result.scalar()
     wb_api = WBApi(wb_user_cabinet)
-    updater = ShopDataUpdater(wb_api, wb_user_cabinet)
-    await updater.update_all_data()
+    # updater = ShopDataUpdater(wb_api, wb_user_cabinet)
+    # await updater.update_all_data()
 
     async with sm() as session:
         stmt = select(AdvSetting
