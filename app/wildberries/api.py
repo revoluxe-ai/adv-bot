@@ -141,7 +141,7 @@ class AdvertApi(ABC_WB_API):
         return cards
 
 
-    @_try_except_decorator(5, 1)
+    @_try_except_decorator(2, 1)
     async def get_advertIds(self, statuses: list, adv_types)->list[Adv]:
         advertIds = []
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
