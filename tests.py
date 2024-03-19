@@ -53,7 +53,7 @@ async def test_get_nmid_vectors():
         assert all(isinstance(i, float) for i in item[1]), "The vector should be a list of floats"
 
 
-pytest.mark.asyncio
+
 @patch('sqlalchemy.ext.asyncio.create_async_session', new_callable=AsyncMock)
 async def test___get_df_for_fit(mock_session):
     # Подготовка мокированных данных для возвращения

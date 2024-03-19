@@ -480,12 +480,28 @@ class Manager(AbcManager):
 
                         del tasks[id_]
 
-    async def update_all_data_in_db(self):
-        wb_user_cabinets = await super_cabinet_manager.get_super_wb_user_cabinets()
-        for wb_user_cabinet in wb_user_cabinets:
-            wb_api = WBApi(wb_user_cabinet)
-            shop_data_updater = ShopDataUpdater(wb_api, wb_user_cabinet)
-            await shop_data_updater.update_all_data()
+    async def update_all_data_in_db_run(self):
+        tasks = {}
+        while True:
+            wb_user_cabinets = await super_cabinet_manager.get_super_wb_user_cabinets()
+            for wb_user_cabinet in wb_user_cabinets:
+                if wb_user_cabinet.id not in tasks:
+                    wb_api = WBApi(wb_user_cabinet)
+                    shop_data_updater = ShopDataUpdater(wb_api, wb_user_cabinet)
+                    task = asyncio.create_task(shop_data_updater.update_all_data())
+                    tasks[wb_user_cabinet.id] = task
+                else:
+                    task: asyncio.Task = tasks[wb_user_cabinet.id]
+                    if task.done():
+                        if task.exception():
+                            logger.error('Ошибка общего обновления WB')
+                        del tasks[wb_user_cabinet.id]
+
+
+
+
+
+
 
 
 

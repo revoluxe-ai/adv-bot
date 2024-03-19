@@ -308,17 +308,17 @@ async def select_shop(callback_query: types.CallbackQuery,
 
     chat_id = message.chat.id
     await state.update_data(chat_id = chat_id)
-    async with sm() as session:
-        stmt = select(WBUserCabinet).options(
-            selectinload(WBUserCabinet.wb_cabinet),
-            selectinload(WBUserCabinet.user).
-             selectinload(User.wb_tokens))\
-        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        result = await session.execute(stmt)
-        wb_user_cabinet = result.scalar()
-    wb_api = WBApi(wb_user_cabinet)
-    # updater = ShopDataUpdater(wb_api, wb_user_cabinet)
-    # await updater.update_all_data()
+    # async with sm() as session:
+    #     stmt = select(WBUserCabinet).options(
+    #         selectinload(WBUserCabinet.wb_cabinet),
+    #         selectinload(WBUserCabinet.user).
+    #          selectinload(User.wb_tokens))\
+    #     .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    #     result = await session.execute(stmt)
+    #     wb_user_cabinet = result.scalar()
+    # wb_api = WBApi(wb_user_cabinet)
+    # # updater = ShopDataUpdater(wb_api, wb_user_cabinet)
+    # # await updater.update_all_data()
 
     async with sm() as session:
         stmt = select(AdvSetting

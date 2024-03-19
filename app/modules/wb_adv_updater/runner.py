@@ -108,9 +108,8 @@ class Runner:
             await asyncio.sleep(1)
 
     async def update_all_data_in_db(self):
-        while True:
-            await self._manager.update_all_data_in_db()
-            await asyncio.sleep(1)
+        await self._manager.update_all_data_in_db_run()
+
 
 
 

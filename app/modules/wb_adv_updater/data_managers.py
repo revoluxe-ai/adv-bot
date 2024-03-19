@@ -116,7 +116,7 @@ async def get_keyword_statistic(adv_setting: AdvSetting,
 #     return adjusted_clicks, total_views, total_spend
 
 
-async def get_global_super_wb_user_cabinet(shop_id_filter: list[str] = None) -> WBUserCabinet:
+async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
     async with _sm() as session:
         stmt = select(User).options(selectinload(User.wb_tokens))
         result = await session.execute(stmt)
