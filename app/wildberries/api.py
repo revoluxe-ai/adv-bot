@@ -26,33 +26,21 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
     base_interval = interval_seconds / requests_per_interval
     last_query_time = 0
     current_pause = base_interval
-    total_successful_time = 0  # Общее время между успешными запросами
-    successful_requests = 0  # Количество успешных запросов
 
     def decorator(request_func):
         async def wrapper(*args, **kwargs):
-            nonlocal last_query_time, current_pause, total_successful_time, successful_requests
-
+            nonlocal last_query_time, current_pause
             while True:
                 current_time = time.time()
-                if last_query_time > 0:
-                    time_since_last_query = current_time - last_query_time
-                    # Накапливаем среднее время между успешными запросами
-                    total_successful_time += time_since_last_query
-                    successful_requests += 1
 
-                time_to_wait = max(0, current_pause - (current_time - last_query_time))
-                if time_to_wait > 0:
-                    await asyncio.sleep(time_to_wait)
+                time_since_last_query = current_time - last_query_time
 
+                time_to_wait = current_pause - time_since_last_query
+                await asyncio.sleep(time_to_wait)
                 try:
                     result = await request_func(*args, **kwargs)
                     last_query_time = time.time()
-
-                    # Вычисляем среднее время между успешными запросами и корректируем паузу
-                    if successful_requests > 0:
-                        average_successful_time = total_successful_time / successful_requests
-                        current_pause = max(base_interval, average_successful_time)
+                    current_pause = (base_interval + current_pause) / 2
 
                     return result
                 except exceptions.ApiForbiddenError:
@@ -60,12 +48,12 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
                 except (exceptions.UnknownApiRequestError,
                         aiohttp.client_exceptions.ClientConnectorError, aiohttp.client_exceptions.ClientOSError) as e:
                     logger.error(f'Ошибка при запросе к API: {e}, повтор через {current_pause} секунд')
-                    await asyncio.sleep(current_pause)
-
-                    current_pause *= 2  # Увеличиваем паузу при ошибках
+                    current_pause *= 2
                     if current_pause > 120:
                         current_pause = 120
-                    last_query_time = time.time()  # Обновляем время последнего запроса для корректного расчета паузы
+                finally:
+                    last_query_time = time.time()
+
 
         return wrapper
 
