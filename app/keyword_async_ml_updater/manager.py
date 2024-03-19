@@ -151,8 +151,8 @@ class Manager(AbcManager):
     async def graph_vector_update(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event) -> None:
         # power = self._shop_manager.power
         length = 2**4
-        if True:
-            await self.graph_updater.update_graph_run(length)
+        await self.graph_updater.update_graph_run(length)
+        await asyncio.sleep(1)
         await self.graph_updater.get_nmids_and_keyword_featers_for_ml(update_model_on_new_features, predicted)
 
 
