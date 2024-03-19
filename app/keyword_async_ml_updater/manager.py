@@ -475,23 +475,22 @@ class Manager(AbcManager):
             await session.commit()
 
     async def tasks_run_for_update_advs_in_db(self):
+        tasks = {}
         while True:
             wb_super_wb_users = await users_manager.fetch_super_wb_user_cabinets()
-            tasks = {}
             for wb_super_wb_user  in wb_super_wb_users:
-                wb_api = WBApi(wb_super_wb_user)
-                advs_updater = ShopDataUpdater(wb_api, wb_super_wb_user)
                 id_ = wb_super_wb_user.id
                 if id_ not in tasks:
+                    wb_api = WBApi(wb_super_wb_user)
+                    advs_updater = ShopDataUpdater(wb_api, wb_super_wb_user)
                     task = asyncio.create_task(advs_updater.update_all_data())
                     tasks[id_] = task
                 else:
                     if tasks[id_].done():
                         if tasks[id_].exception():
                             logger.error(f'Ошибка обновления ключей: {tasks[id_].exception()}')
-                        task = asyncio.create_task(wb_api.advert.update_all_data())
-                        tasks[id_] = task
 
+                        del tasks[id_]
 
 
 
