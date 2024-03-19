@@ -19,14 +19,14 @@ async def update_advs_in_db(advs, wb_user_cabinet: my_types.WBUserCabinet):
                     existing_adv.name = adv.name
                     existing_adv.nmids = adv.nmids
             else:
-                    with session.no_autoflush:
-                            adv_in_db = my_types.AdvSetting()
-                            adv_in_db.adv_id = adv.advertId
-                            adv_in_db.name = adv.name
-                            adv_in_db.wb_cabinet = wb_user_cabinet
-                            adv_in_db.nmids = adv.nmids
-                            adv_in_db.active_status = adv.status_native
-                            await session.commit()
+                    adv_in_db = my_types.AdvSetting()
+                    adv_in_db.adv_id = adv.advertId
+                    adv_in_db.name = adv.name
+                    adv_in_db.wb_cabinet = wb_user_cabinet
+                    adv_in_db.nmids = adv.nmids
+                    adv_in_db.active_status = adv.status_native
+                    await session.add(adv_in_db)
+        await session.commit()
 
 
 async def update_cards_in_db(cards, wb_user_cabinet):
