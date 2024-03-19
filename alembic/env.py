@@ -5,9 +5,9 @@ from sqlalchemy import pool
 from alembic import context
 from sqlalchemy.orm import configure_mappers
 
-from app.alchemy_row import row
+from app.utils.alchemy_row import row
 from app.keyword_async_ml_updater.models import Base as BaseE
-from app.db.base import Base as BaseF
+from app.utils.db import Base as BaseF
 
 
 # this is the Alembic Config object, which provides

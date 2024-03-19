@@ -1,7 +1,5 @@
-from app import redis_func_cache
-redis_func_cache.set_config()
+from app.modules.wb_adv_updater.runner import Runner
 from python_modules.logger import setup_logging
-from app.keyword_async_ml_updater.runner import Runner
 import logging
 
 

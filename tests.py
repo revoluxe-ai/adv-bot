@@ -1,10 +1,10 @@
 import pandas as pd
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
-from app.NeoDataScience.driver import DataScience
+from app.utils.NeoDataScience.driver import DataScience
 from app.keyword_async_ml_updater.ML import DataGetter, Fitter
-from app.keyword_async_ml_updater.data_managers import get_category_name_min_ctr_final_data
-from app.keyword_async_ml_updater import data_managers
+from app.modules.keyword_async_ml_updater.data_managers import get_category_name_min_ctr_final_data
+from app.modules.keyword_async_ml_updater import data_managers
 from unittest.mock import AsyncMock, patch
 
 

@@ -1,6 +1,6 @@
 from select import select
 
-from app.session_maker import  get_session_maker
+from app.utils.db.session_maker import  get_session_maker
 from app.telegram_bot.models import User
 
 sm = get_session_maker()

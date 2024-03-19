@@ -1,12 +1,8 @@
 
-from app.wildberries.models import AdvSetting, WBToken, WBCabinet, AdvKeyword
-from app.telegram_bot.models import *
-from app.db.associations import WBUserCabinet
-from app.wildberries.exceptions import *
-from app.telegram_bot.my_types import *
-from app.wildberries.data_classes.keywordstat import KeywordStat
-from app.wildberries.data_classes.subcategories import Subcategory
-from app.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
+from ..modules.common_slaves.wildberries.models import *
+from app.modules.common_slaves.wildberries.data_classes.keywordstat import KeywordStat
+from app.modules.wb_adv_updater.models import GlobalCategorySetting
+
 
 
 
@@ -16,10 +12,10 @@ __all__ = ['WBUserCabinet',
            'User',
            'WBToken',
            'WBUserCabinet',
-           'LastMessage',
            'KeywordStat',
            'WBCabinet',
             'AdvKeyword',
            'Subcategory',
            'KeywordStatFromDB',
+            GlobalCategorySetting
            ]

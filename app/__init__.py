@@ -1,16 +1,8 @@
-from .import my_types
-from . import utils
-from .wildberries.api import WBApi
-from .keyword_async_ml_updater import data_managers
-from . import redis_func_cache
-from app.wildberries.adv_data_updater import ShopDataUpdater
-
-__all__ = [
-              'my_types',
-              'utils',
-              'WBApi',
-              'data_managers',
-           "ShopDataUpdater"
-              ]
-
-
+from .utils.redis_func_cache import set_config
+set_config()
+from . import admin_bot
+from . import client_bot
+from .modules.common_slaves.wildberries.models import WBUserCabinet
+from .modules.common_slaves.wildberries import exceptions as exc
+from .modules.common_slaves.wildberries import wb_db_manager
+from .admin_bot import sender as admin_sender
