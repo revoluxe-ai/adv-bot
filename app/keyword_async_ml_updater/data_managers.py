@@ -43,9 +43,11 @@ logger = logging.getLogger(__name__)
 _sm = get_async_session_maker()
 
 
-async def get_keyword_statistic(adv_setting: AdvSetting, hard_statuses: list[int] = None)->list[KeywordStatFromDB]:
-    today = datetime.now().date()
-    pass_days = adv_setting.pass_days
+async def get_keyword_statistic(adv_setting: AdvSetting,
+                                pass_time: Union[timedelta, None],
+                                hard_statuses: list[int] = None,
+                                )->list[KeywordStatFromDB]:
+
     base_stmt = (
         select(
             AdvKeyword.text.label("keyword_text"),
@@ -54,9 +56,13 @@ async def get_keyword_statistic(adv_setting: AdvSetting, hard_statuses: list[int
             func.sum(AdvKeyword.clicks).label("total_clicks")  # Используйте total_clicks для суммы кликов
         )
         .join(KeywordSetting, AdvKeyword.keyword_setting_id == KeywordSetting.id)
-        .where(AdvKeyword.date >= today - timedelta(days=pass_days))
-
     )
+    if  pass_time:
+         today = datetime.today()
+         base_stmt = base_stmt\
+        .where(AdvKeyword.date >= today - pass_time)
+
+
     if hard_statuses:
         # Фильтрация по hard_statuses и adv_setting_id и добавление группировки
         stmt = base_stmt.where(
@@ -65,7 +71,8 @@ async def get_keyword_statistic(adv_setting: AdvSetting, hard_statuses: list[int
                 KeywordSetting.adv_setting_id == adv_setting.id
             )
         )
-    else: stmt = base_stmt.where(KeywordSetting.adv_setting_id == adv_setting.id)
+    else:
+        stmt = base_stmt.where(KeywordSetting.adv_setting_id == adv_setting.id)
 
 
     # Группировка по тексту ключевых слов и идентификатору настройки рекламной кампании вне зависимости от условия
@@ -153,7 +160,7 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
         if not wb_category:
             continue
         wb_category_name = wb_category.wb_category_name
-        keyword_stats = await get_keyword_statistic(adv_setting,[1, 2])
+        keyword_stats = await get_keyword_statistic(adv_setting, None, [1, 2])
         for keyword_stat in keyword_stats:
             if keyword_stat.views:
                 wb_category_to_keywordstat_list[wb_category_name].append(keyword_stat)
@@ -198,7 +205,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting,
     keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
     good_keywords: list[KeywordSetting] = []
     bad_keywords: list[KeywordSetting] = []
-    keyword_stats = await get_keyword_statistic(adv_setting)
+    keyword_stats = await get_keyword_statistic(adv_setting, None)
     keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
 
     for keyword_setting in keyword_settings:

@@ -165,7 +165,7 @@ class Fitter(AbcManager):
             if not wb_category:
                 continue
             nmid_featers = {}
-            keyword_stats = await data_managers.get_keyword_statistic(adv)
+            keyword_stats = await data_managers.get_keyword_statistic(adv, None)
             keyword_text_to_keyword_stat = {}
             for keyword_stat in keyword_stats:
                 keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
