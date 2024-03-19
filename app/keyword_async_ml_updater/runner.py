@@ -109,8 +109,7 @@ class Runner:
             await asyncio.sleep(1)
 
     async def update_advs_in_db(self):
-        while True:
-           await self._manager.tasks_run_for_update_advs_in_db()
+        await self._manager.tasks_run_for_update_advs_in_db()
 
 
 
