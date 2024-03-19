@@ -109,6 +109,8 @@ class async_WBApi(ABC_WB_API):
         await self.tune_company(company, nmids)
         return company
 
+
+
     async def get_adv_companies(self, adv_ids: list[int]):
         url = 'https://advert-api.wb.ru/adv/v1/promotion/adverts'
         advs = []
