@@ -85,3 +85,13 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
                                  wb_cabinet = wb_cabinet)
 
         return access
+
+
+async def get_super_user_access():
+    accesses = await get_accesses_for_wb_cabinets()
+    tokens = [token for access in accesses for token in access.tokens]
+    super_user_access = WBCabinetAccess(tokens = tokens,
+                                        wb_user_cabinet = None,
+                                        wb_cabinet = None)
+
+    return super_user_access

@@ -74,10 +74,10 @@ class Manager(AbcManager):
 
 
     @staticmethod
-    async def update_keyword_stat(cabinet:WBUserCabinet, need_update_model:asyncio.Event):
-        wb_cabinet = cabinet.wb_cabinet
-        wb_api = WBApi(cabinet)
+    async def update_keyword_stat(access, need_update_model:asyncio.Event):
+        wb_api = WBApi(access)
         update_signal = False
+        wb_cabinet = access.wb_cabinet
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
             result = (await session.execute(stmt)).unique()
@@ -222,17 +222,18 @@ class Manager(AbcManager):
         while True:
             category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
 
-            super_wb_user_cabinets = await super_cabinet_manager.get_super_wb_user_cabinets()
-            for super_wb_user_cabinet in super_wb_user_cabinets:
-                if super_wb_user_cabinet.id not in update_tasks:
-                    data_setter = DataSetter(super_wb_user_cabinet)
+            accesses  = await super_cabinet_manager.get_accesses_for_wb_cabinets()
+            for access in accesses:
+                wb_cabinet_id = access.wb_cabinet.id
+                if wb_cabinet_id  not in update_tasks:
+                    data_setter = DataSetter(access)
                     task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
-                    update_tasks[super_wb_user_cabinet.id] = task
+                    update_tasks[wb_cabinet_id] = task
                 else:
-                    if update_tasks[super_wb_user_cabinet.id].done():
-                        if update_tasks[super_wb_user_cabinet.id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[super_wb_user_cabinet.id].exception()}')
-                        del update_tasks[super_wb_user_cabinet.id]
+                    if update_tasks[wb_cabinet_id].done():
+                        if update_tasks[wb_cabinet_id].exception():
+                            logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}')
+                        del update_tasks[wb_cabinet_id]
 
 
 

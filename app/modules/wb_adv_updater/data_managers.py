@@ -7,6 +7,7 @@ from typing import Any, Union
 
 from PIL import Image
 
+from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils.db.models import User
@@ -25,6 +26,8 @@ from app.modules.common_slaves.wildberries.api import WBApi
 
 from app.utils.NeoDataScience.driver import DataScience
 from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvKeyword, WBCategory, WBCard, WBCabinet
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +161,7 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
 
 # @cached_stampede(ttl=60*60*24, key="get_category_name_min_ctr_final_data", cache=aiocache.RedisCache)
 async def get_parent_id_categories_subcategories_name_list() -> defaultdict[Any, list[Subcategory]]:
-    user_cabinet = await get_global_super_wb_user_cabinet()
+    user_cabinet = await super_cabinet_manager.get_super_user_access()
     wb_api = WBApi(user_cabinet)
     subcategories: list[Subcategory] = await wb_api.content.get_subcategories()
     parent_categories = defaultdict(list)
@@ -329,9 +332,9 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     return wb_category
 
 class DataSetter:
-    def __init__(self, wb_user_cabinet: WBUserCabinet):
-        self._wb_api = WBApi(wb_user_cabinet)
-        self._wb_user_cabinet = wb_user_cabinet
+    def __init__(self, access: WBCabinetAccess):
+        self._wb_api = WBApi(access)
+        self._wb_user_cabinet = access.wb_user_cabinet
 
 
     async def update_minus_keywords(self, category_name_to_min_ctr):

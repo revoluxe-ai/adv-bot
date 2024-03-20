@@ -32,12 +32,12 @@ class Runner:
         predicted.set()
         await asyncio.gather(
             self.update_all_data_in_db(),
-            # self.update_min_ctr_in_global_wb_category_settings(),
-            # self.run_update_keyword_stat(need_update_model),
-            # self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
-            # self.run_update_model(update_model_on_new_features, need_update_model),
-            # self.run_update_predict_ctr(update_model_on_new_features, predicted),
-            # self.run_update_keywords_on_wb(),
+            self.update_min_ctr_in_global_wb_category_settings(),
+            self.run_update_keyword_stat(need_update_model),
+            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            self.run_update_model(update_model_on_new_features, need_update_model),
+            self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            self.run_update_keywords_on_wb(),
 
             return_exceptions=False
             )
@@ -53,12 +53,12 @@ class Runner:
     async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
         tasks = {}
         while True:
-            wb_user_cabinets = await users_manager.get_super_wb_user_cabinets()
-            for super_wb_user_cabinet in wb_user_cabinets:
-                cabinet_id = super_wb_user_cabinet.id
+            accesses = await users_manager.get_accesses_for_wb_cabinets()
+            for access in accesses:
+                cabinet_id = access.wb_cabinet.id
                 if cabinet_id not in tasks:
                     task = asyncio.create_task(
-                        self._manager.update_keyword_stat(super_wb_user_cabinet, need_update_model))
+                        self._manager.update_keyword_stat(access, need_update_model))
                     tasks[cabinet_id] = task
 
                 else:

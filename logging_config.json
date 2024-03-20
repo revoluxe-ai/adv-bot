@@ -74,7 +74,7 @@
       "propagate": false
     },
     "sqlalchemy.engine.Engine": {
-      "level": "DEBUG",
+      "level": "WARNING",
       "handlers": ["console"],
       "propagate": false
     },
