@@ -41,7 +41,11 @@ class CardFromWB(WBCard):
 
     def __init__(self, data):
         super().__init__()
-        self.data = data
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
 
     @property
     def name(self):

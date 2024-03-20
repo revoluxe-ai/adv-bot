@@ -63,7 +63,7 @@ class ShopAddedSuccess(Text):
 
     @property
     def text(self):
-        return f'Магазин {self.__cabinet_name} успешно добавлен!'
+        return f'Магазин {self.__cabinet_name} успешно добавлен, идет обновление данных...'
 
 
 

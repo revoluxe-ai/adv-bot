@@ -35,7 +35,8 @@ class WBCabinet(BaseTable):
     wb_categories = relationship('WBCategory', uselist=True)
     adv_settings = relationship('AdvSetting', back_populates='wb_cabinet', uselist=True)
     wb_user_cabinets: Mapped[list[WBUserCabinet]] = relationship("WBUserCabinet",
-                                                           back_populates="wb_cabinet")
+                                                           back_populates="wb_cabinet",
+                                                                 )
 
 
 class WBToken(BaseTable):

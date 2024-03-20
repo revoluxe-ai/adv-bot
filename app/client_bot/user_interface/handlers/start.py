@@ -10,6 +10,7 @@ from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabine
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError, ApiForbiddenError
 from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.utils.db.session_maker import get_async_session_maker
 from   .. import states
 from ..views import messages
@@ -21,8 +22,8 @@ from ..views import callbacks
 from app.my_types import User
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from app.modules.common_slaves.wildberries import models as wb_models
-
-
+from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
+from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
 
 logger = logging.getLogger(__name__)
@@ -124,15 +125,12 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
 
     api = message.text
     api = api.strip()
-
+    user_telegram_id = message.from_user.id
     wb_token = wb_models.WBToken(api_key=api)
-    fake_user: User = User()
-    fake_user.wb_tokens.append(wb_token)
-    fake_wb_user_cabinet = WBUserCabinet(name=(await state.get_data())['cabinet_name'])
-    fake_wb_user_cabinet.user = fake_user
+    access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
     chat_id = message.chat.id
     try:
-         check_right = await CabinetManager.check_token_for_adv(fake_wb_user_cabinet)
+         check_right = await CabinetManager.check_token_for_adv(access)
     except NotValidTokenError:
         await messages. \
             NotValideToken(bot, chat_id)()
@@ -199,12 +197,16 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             await messages. \
                 ShopAddedSuccess(bot, chat_id, cabinet_name)()
 
+    access = await scm.get_access_for_wb_user_cabinet(wb_user_cabinet)
+    shop_updater = ShopDataUpdater(access)
+    await shop_updater.quick_update_all_data()
     async with sm() as session:
         stmt = select(WBUserCabinet).options(
-            joinedload(WBUserCabinet.user))\
-            .where(WBUserCabinet.user_id == user.id)
+            selectinload(WBUserCabinet.user))\
+        .where(User.user_telegram_id == user_telegram_id )
         result = await session.execute(stmt)
         wb_user_cabinets = result.scalars().all()
+
     await messages. \
         ShopChoice(bot, chat_id, wb_user_cabinets)()
     return

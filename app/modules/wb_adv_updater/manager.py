@@ -462,44 +462,40 @@ class Manager(AbcManager):
                 await session.execute(stmt)
             await session.commit()
 
-    async def tasks_run_for_update_advs_in_db(self):
-        tasks = {}
-        while True:
-            wb_super_wb_users = await users_manager.get_super_wb_user_cabinets()
-            for wb_super_wb_user  in wb_super_wb_users:
-                id_ = wb_super_wb_user.id
-                if id_ not in tasks:
-                    wb_api = WBApi(wb_super_wb_user)
-                    advs_updater = ShopDataUpdater(wb_api, wb_super_wb_user)
-                    task = asyncio.create_task(advs_updater.quick_update_all_data())
-                    tasks[id_] = task
-                else:
-                    if tasks[id_].done():
-                        if tasks[id_].exception():
-                            logger.error(f'Ошибка обновления ключей: {tasks[id_].exception()}')
-
-                        del tasks[id_]
+    # async def tasks_run_for_update_advs_in_db(self):
+    #     tasks = {}
+    #     while True:
+    #         wb_super_wb_users = await users_manager.get_super_wb_user_cabinets()
+    #         for wb_super_wb_user  in wb_super_wb_users:
+    #             id_ = wb_super_wb_user.id
+    #             if id_ not in tasks:
+    #                 wb_api = WBApi(wb_super_wb_user)
+    #                 advs_updater = ShopDataUpdater(wb_api, wb_super_wb_user)
+    #                 task = asyncio.create_task(advs_updater.quick_update_all_data())
+    #                 tasks[id_] = task
+    #             else:
+    #                 if tasks[id_].done():
+    #                     if tasks[id_].exception():
+    #                         logger.error(f'Ошибка обновления ключей: {tasks[id_].exception()}')
+    #
+    #                     del tasks[id_]
 
     async def update_all_data_in_db_run(self):
         tasks = {}
         while True:
-            wb_user_cabinets = await super_cabinet_manager.get_super_wb_user_cabinets()
-            for wb_user_cabinet in wb_user_cabinets:
-                if wb_user_cabinet.id not in tasks:
-                    wb_api = WBApi(wb_user_cabinet)
-                    shop_data_updater = ShopDataUpdater(wb_api, wb_user_cabinet)
-                    task = asyncio.create_task(shop_data_updater.update_all_data())
-                    tasks[wb_user_cabinet.id] = task
-                else:
-                    task: asyncio.Task = tasks[wb_user_cabinet.id]
-                    if task.done():
-                        if task.exception():
-                            logger.error('Ошибка общего обновления WB')
-                        del tasks[wb_user_cabinet.id]
+             wb_accesses = await super_cabinet_manager.get_accesses_for_wb_cabinets()
+             for wb_access in wb_accesses:
+                 if wb_access.wb_cabinet.id not in tasks:
+                     shop_data_updater = ShopDataUpdater(wb_access)
+                     task = asyncio.create_task(shop_data_updater.update_all_data())
+                     tasks[wb_access.wb_cabinet.id] = task
+                 else:
+                     if tasks[wb_access.wb_cabinet.id].done():
+                         if tasks[wb_access.wb_cabinet.id].exception():
+                             logger.error(f'Ошибка обновления ключей: {tasks[wb_access.wb_cabinet.id].exception()}')
+                         del tasks[wb_access.wb_cabinet.id]
 
-
-
-
+             await asyncio.sleep(1)
 
 
 

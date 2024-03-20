@@ -13,8 +13,7 @@ from .data_classes.subcategories import Subcategory
 from .models import AdvSetting
 from . import exceptions
 from . import api_rights
-import app
-
+from .super_cabinet_manager import WBCabinetAccess
 
 
 
@@ -95,38 +94,6 @@ class AdvertApi(ABC_WB_API):
         return keywords
 
 
-
-    @_try_except_decorator(1, 2)
-    async def get_cards_by_text(self, texts: set[Union[str, int]]):
-        cards = []
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
-        async with aiohttp.ClientSession() as session:
-            for text in texts:
-                text = str(text)
-                data_for_req = {
-                    "settings": {
-                        "sort": {
-                            "ascending": False
-                        },
-                        "cursor": {
-                            "limit": 1
-                        },
-                        "filter": {
-                            "withPhoto": -1,
-                            'textSearch': text
-
-                        }
-                    }
-                }
-                async with session.post(url, json=data_for_req, headers=self.headers.standart) as response:
-                    answer = await self.requests(session, 'POST', url,
-                                           json_data=data_for_req,
-                                           headers=self.headers.standart)
-                    answer = json.loads(answer)
-                card_json = answer['cards'][0]
-                card = CardFromWB(card_json)
-                cards.append(card)
-        return cards
 
 
     @_try_except_decorator(1, 3)
@@ -228,24 +195,44 @@ class ContentApi(ABC_WB_API):
             answer = json.loads(response_text)
             return answer['data']
 
+    @_try_except_decorator(1, 2)
+    async def get_cards_by_text(self, texts: set[Union[str, int]]):
+        cards = []
+        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        async with aiohttp.ClientSession() as session:
+            for text in texts:
+                text = str(text)
+                data_for_req = {
+                    "settings": {
+                        "sort": {
+                            "ascending": False
+                        },
+                        "cursor": {
+                            "limit": 1
+                        },
+                        "filter": {
+                            "withPhoto": -1,
+                            'textSearch': text
 
-
-    # async def get_parent_category_to_subcategory_dict(self):
-    #     subcategories = await self.get_subcategories()
-    #     parent_id_to_subcategories = {}
-    #     for category in subcategories:
-    #         parent_id = category.parentID
-    #         if parent_id not in parent_id_to_subcategories:
-    #             parent_id_to_subcategories[parent_id] = []
-    #         parent_id_to_subcategories[parent_id].append(category.subjectName)
-    #     return parent_id_to_subcategories
-
+                        }
+                    }
+                }
+                async with session.post(url, json=data_for_req, headers=self.headers.standart) as response:
+                    answer = await self.requests(session, 'POST', url,
+                                                 json_data=data_for_req,
+                                                 headers=self.headers.standart)
+                    answer = json.loads(answer)
+                card_json = answer['cards'][0]
+                card = CardFromWB(card_json)
+                cards.append(card)
+        return cards
 
 
 class WBApi:
-    def __init__(self, wb_user_cabinet: app.modules.common_slaves.wildberries.models.WBUserCabinet):
-        self.advert = AdvertApi(wb_user_cabinet)
-        self.content = ContentApi(wb_user_cabinet)
+    def __init__(self, wb_access: WBCabinetAccess):
+        self.advert = AdvertApi(wb_access)
+        self.content = ContentApi(wb_access)
+        self._wb_access = wb_access
 
 
 

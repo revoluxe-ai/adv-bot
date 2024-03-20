@@ -1,3 +1,8 @@
+import dataclasses
+from typing import Union
+from dataclasses import dataclass
+from . import exceptions
+from .models import WBToken
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
@@ -5,39 +10,78 @@ from sqlalchemy import select
 from app.utils.db.models import User
 import logging
 
+
+
 sm = get_async_session_maker()
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class WBCabinetAccess:
+    def __repr__(self):
+        return f'{self.wb_cabinet.shop_id}'
+
+    tokens: list[WBToken]
+    wb_user_cabinet: Union[WBUserCabinet | None]
+    wb_cabinet: Union[WBCabinet | None]
 
 
 
-
-
-@staticmethod
-async def get_super_wb_user_cabinets():
-    all_super_wb_user_cabinets = []
+async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
+    accesses = []
     async with sm() as session:
-        query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets)\
-                                             .selectinload(WBUserCabinet.user)\
-                                              .selectinload(User.wb_tokens))
+        query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
+                                          .selectinload(WBUserCabinet.user) \
+                                          .selectinload(User.wb_tokens))
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
-        for  wb_cabinet in wb_cabinets:
-            super_user = User()
-            shop_id = wb_cabinet.shop_id
-            tokens_for_shop = set()
+        api_key_pass = set()
+        for wb_cabinet in wb_cabinets:
             wb_user_cabinets = wb_cabinet.wb_user_cabinets
+            shop_id = wb_cabinet.shop_id
+            tokens_for_wb_cabinet: list[WBToken] = []
             for wb_user_cabinet in wb_user_cabinets:
                 user = wb_user_cabinet.user
-                [tokens_for_shop.add(token) for token in user.wb_tokens if token.shop_id == shop_id]
-            super_user.wb_tokens = list(tokens_for_shop)
-            super_wb_user_cabinet = WBUserCabinet()
-            super_wb_user_cabinet.id = wb_cabinet.id
-            super_wb_user_cabinet.user = super_user
-            super_wb_user_cabinet.wb_cabinet = wb_cabinet
-            all_super_wb_user_cabinets.append(super_wb_user_cabinet)
-    return all_super_wb_user_cabinets
+                tokens: list[WBToken] = user.wb_tokens
+                for token in tokens:
+                    if token.api_key in api_key_pass:
+                        continue
+                    else:
+                        api_key_pass.add(token.api_key)
+                    try:
+                        token_shop_id = token.shop_id
+                        if shop_id == token_shop_id:
+                            tokens_for_wb_cabinet.append(token)
+                    except exceptions.TokenExpiredError:
+                        logger.error('Срок действия токена истек')
+
+            access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
+                                     wb_user_cabinet = None,
+                                     wb_cabinet = wb_cabinet)
+            accesses.append(access)
+    return accesses
 
 
+
+async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
+    async with sm() as session:
+        stmt = (
+            select(WBUserCabinet)\
+            .options(
+                selectinload(WBUserCabinet.wb_cabinet),
+                selectinload(WBUserCabinet.user)
+                .selectinload(User.wb_tokens)  # Загружаем информацию о пользователе
+            )
+            .where(WBUserCabinet.id == wb_user_cabinet.id)  # Условие должно быть скорректировано
+        )
+        result = await session.execute(stmt)
+        wb_user_cabinet: WBUserCabinet = result.scalars().first()
+        user = wb_user_cabinet.user
+        tokens = user.wb_tokens
+        wb_cabinet = wb_user_cabinet.wb_cabinet
+        access = WBCabinetAccess(tokens = tokens,
+                                 wb_user_cabinet = wb_user_cabinet,
+                                 wb_cabinet = wb_cabinet)
+
+        return access

@@ -6,16 +6,14 @@ from app.utils.db.base import BaseTable
 Base = declarative_base()
 
 
-class ItemFeature(Base):
-    __tablename__ = 'item_features'
+class ItemFeature(BaseTable):
     id = Column(Integer, primary_key=True, autoincrement=True)
     nmid = Column(Integer, nullable=False, unique=True)
     vector = Column(JSONB, nullable=False)
 
 
 
-class KeywordFeature(Base):
-    __tablename__ = 'keyword_features'
+class KeywordFeature(BaseTable):
     id = Column(Integer, primary_key=True, autoincrement=True)
     keyword = Column(String, nullable=False, unique=True)
     vector = Column(JSONB, nullable=False)

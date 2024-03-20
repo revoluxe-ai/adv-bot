@@ -1,12 +1,18 @@
 from abc import ABC, abstractmethod
 import os
+from typing import Union
+
 from . import exceptions
 import json
 import aiohttp
 import logging
 from . import models
 import app
-from .models import WBToken
+from .models import WBToken, WBUserCabinet
+from .super_cabinet_manager import WBCabinetAccess
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +73,9 @@ class ABC_WB_API(WbRequestApiMixin):
     _single_advs_report = os.path.join(current_path, 'single_advs_report.csv')
 
 
-    def __init__(self, wb_user_cabinet: app.my_types.WBUserCabinet):
-        self.__wb_user_cabinet = wb_user_cabinet
-        tokens: list[WBToken]= wb_user_cabinet.user.wb_tokens
+    def __init__(self, wb_access: WBCabinetAccess):
+        tokens: list[WBToken]= wb_access.tokens
+        wb_user_cabinet: Union[WBUserCabinet] = wb_access.wb_user_cabinet
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_user_cabinet)
