@@ -320,7 +320,11 @@ class DataGetter(AbcManager):
 
 
 async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
-    nmid = adv_setting.nmids[0]
+    try:
+         nmid = adv_setting.nmids[0]
+    except:
+        logger.error(f'У {adv_setting.name} нет товаров')
+        return None
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
