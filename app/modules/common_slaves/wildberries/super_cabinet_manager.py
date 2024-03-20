@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WBCabinetAccess:
     def __repr__(self):
-        return f'{self.wb_cabinet.shop_id}'
+        return  f'ShopId: {self.wb_cabinet.shop_id}'
 
     tokens: list[WBToken]
     wb_user_cabinet: Union[WBUserCabinet | None]

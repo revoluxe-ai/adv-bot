@@ -24,6 +24,7 @@ class WBUserCabinet(BaseTable):
     user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
+    __table_args__ = (UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),)
 
 
 
@@ -40,10 +41,14 @@ class WBCabinet(BaseTable):
 
 
 class WBToken(BaseTable):
+    def __repr__(self):
+        return f'user_id: {self.user_id}, shop_id: {self.shop_id}'
     api_key = Column(String, nullable=False)
     user_id = Column(Integer, ForeignKey('user.id'))
     user = relationship('User', back_populates='wb_tokens',
                         lazy='joined')
+    __table_args__ = (UniqueConstraint('api_key', 'user_id', name='_api_key_user_id_uc'),)
+
 
 
     @property

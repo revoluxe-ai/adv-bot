@@ -26,7 +26,7 @@ class ShopChoice(TextWithKeyboard):
 
     @property
     def text(self):
-        return 'Выберете магазин (кабинет) или добавьте новый:'
+        return 'Выберите магазин (кабинет) или добавьте новый:'
 
     @property
     def keyboard(self):
@@ -90,7 +90,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     @property
     def text(self):
-        return 'Выберете рекламную кампанию:'
+        return 'Выберите рекламную кампанию:'
 
     @property
     def keyboard(self):
@@ -209,15 +209,21 @@ class AdvKeywordsSetting(TextWithKeyboarAndImage):
         self._adv_choice_last_page = adv_choice_last_page
         self._image = image
 
+    @property
+    def text(self):
+         if not self._keywords:
+             return 'Ключевые слова еще не получены, зайдите позже'
+         else:
+            text =   ('Статистика и настройка ключевых слов \n'
+                     'Расшифровка: \n'
+                     '✅  - ключевое слово активно \n'
+                     '❌  - ключевое слово не активно \n'
+                     ' БС - ключевое слово в белом списке \n'
+                     'ЧС   - ключевое слово в черном списке \n'
+                     'Авто  - ключевое слово на автоуправлении \n'
+                     'Информация перед ключевым словом: клики/показы/CTR \n')
+            return text
 
-    text = ('Статистика и настройка ключевых слов \n'
-            'Расшифровка: \n'
-            '✅  - ключевое слово активно \n'
-            '❌  - ключевое слово не активно \n'
-            ' БС - ключевое слово в белом списке \n'
-            'ЧС   - ключевое слово в черном списке \n'
-            'Авто  - ключевое слово на автоуправлении \n'
-            'Информация перед ключевым словом: клики/показы/CTR \n')
     @property
     def image(self):
         return self._image

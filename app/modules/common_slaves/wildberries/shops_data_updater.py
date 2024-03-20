@@ -80,8 +80,10 @@ class ShopDataUpdater:
             if nmids:
                 for nmid in nmids:
                     nmids_collection.add(nmid)
-        cards = await wb_api.content.get_cards_by_text(nmids_collection)
-        func = wb_db_manager.update_cards_in_db(cards , self.__wb_cabinet)
+        async def update_cards():
+            cards = await wb_api.content.get_cards_by_text(nmids_collection)
+            await wb_db_manager.update_cards_in_db(cards, self.__wb_cabinet)
+        func = update_cards()
         await _coroutine_parallel_run_queue.put(func)
 
     # async def __update_cards(self, nmids:set[int]):

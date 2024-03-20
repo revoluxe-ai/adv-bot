@@ -6,7 +6,7 @@ import aiogram
 from aiogram import Router, types
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.orm import joinedload, selectinload
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, WBToken
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError, ApiForbiddenError
 from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
@@ -154,11 +154,11 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
         .where(User.user_telegram_id == user_id)
         result = await session.execute(stmt)
         user = result.scalar()
-    async with sm() as session:
-        user.wb_tokens.append(wb_token)
-        await session.merge(user)
-        user.wb_tokens.append(wb_token)#сразу добавляем юзеру токен
-        await session.commit()
+        wb_tokens: list[WBToken] = user.wb_tokens
+        if wb_token.api_key not in [token.api_key for token in wb_tokens]:
+            wb_tokens.append(wb_token)
+            await session.commit()
+
     #проверяем есть ли кабинет именно у этого юзера
     async with sm() as session:
         stmt = select(WBCabinet)\
@@ -173,10 +173,18 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
                                                     WBUserCabinet.user_id == user.id))
             result = await session.execute(stmt)
             wb_user_cabinet = result.scalar()
+
             await messages. \
                 CabinetExistsForUser(bot,chat_id)()
+            wb_cabinet = wb_user_cabinet.wb_cabinet
+            async with sm() as session:
+                 stmt = select(AdvSetting)\
+                     .options(selectinload(AdvSetting.wb_cabinet))\
+                     .where(WBCabinet.id ==  wb_cabinet.id)
+                 result = await session.execute(stmt)
+                 adv_settings = result.unique().scalars().all()
             await messages. \
-                    AdvCompanyChoicing(bot, chat_id, wb_user_cabinet.id, wb_user_cabinet.adv_settings, page=1)()
+                    AdvCompanyChoicing(bot, chat_id, wb_user_cabinet.id, adv_settings, page=1)()
             return
         else: #если кабинета у юзера нет
             #проверяем есть ли такой кабинет вообще
@@ -186,7 +194,8 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             wb_cabinet = result.scalar()
             if not wb_cabinet: #если кабинета нет, то создаем кабинет
                 wb_cabinet = WBCabinet(shop_id=wb_token.shop_id)
-            #создаем wb_user_cabinet
+                session.add(wb_cabinet)
+            access.wb_cabinet = wb_cabinet
             wb_user_cabinet = WBUserCabinet(name=cabinet_name)
             wb_user_cabinet.user = user
             user.wb_tokens.append(wb_token)
@@ -197,12 +206,11 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             await messages. \
                 ShopAddedSuccess(bot, chat_id, cabinet_name)()
 
-    access = await scm.get_access_for_wb_user_cabinet(wb_user_cabinet)
     shop_updater = ShopDataUpdater(access)
     await shop_updater.quick_update_all_data()
     async with sm() as session:
-        stmt = select(WBUserCabinet).options(
-            selectinload(WBUserCabinet.user))\
+        stmt = select(WBUserCabinet)\
+            .join(WBUserCabinet.user)\
         .where(User.user_telegram_id == user_telegram_id )
         result = await session.execute(stmt)
         wb_user_cabinets = result.scalars().all()
