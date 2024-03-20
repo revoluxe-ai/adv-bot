@@ -21,7 +21,7 @@ class WbRequestApiMixin(ABC):
 
     @property
     @abstractmethod
-    def _wb_user_cabinet(self) -> app.my_types.WBUserCabinet:
+    def _wb_user_cabinet(self) :
         pass
 
     async def requests(self, session, method, url, data=None, json_data=None, headers=None, ):

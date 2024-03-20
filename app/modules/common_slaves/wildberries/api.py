@@ -45,7 +45,8 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
                 except exceptions.ApiForbiddenError:
                     raise
                 except (exceptions.UnknownApiRequestError,
-                        aiohttp.client_exceptions.ClientConnectorError, aiohttp.client_exceptions.ClientOSError) as e:
+                        aiohttp.client_exceptions.ClientConnectorError, aiohttp.client_exceptions.ClientOSError,
+                        aiohttp.client_exceptions.ServerDisconnectedError) as e:
                     logger.error(f'Ошибка при запросе к API: {e}, повтор через {current_pause} секунд')
                     current_pause *= 2
                     if current_pause > 120:
