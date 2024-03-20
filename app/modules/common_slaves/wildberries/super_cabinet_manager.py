@@ -36,7 +36,6 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
-        api_key_pass = set()
         for wb_cabinet in wb_cabinets:
             wb_user_cabinets = wb_cabinet.wb_user_cabinets
             shop_id = wb_cabinet.shop_id
@@ -45,10 +44,6 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                 user = wb_user_cabinet.user
                 tokens: list[WBToken] = user.wb_tokens
                 for token in tokens:
-                    if token.api_key in api_key_pass:
-                        continue
-                    else:
-                        api_key_pass.add(token.api_key)
                     try:
                         token_shop_id = token.shop_id
                         if shop_id == token_shop_id:

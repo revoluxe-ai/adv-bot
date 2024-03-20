@@ -75,63 +75,70 @@ class Manager(AbcManager):
 
     @staticmethod
     async def update_keyword_stat(access, need_update_model:asyncio.Event):
-        wb_api = WBApi(access)
-        update_signal = False
-        wb_cabinet = access.wb_cabinet
-        async with sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
-            result = (await session.execute(stmt)).unique()
-            adv_settings = result.scalars().all()
-            for adv_setting in adv_settings:
-                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
-                logger.debug(f'Ключевые слова для {adv_setting.name} получены')
-                for keyword in keywords:
-                    stmt = select(AdvKeyword)\
-                    .options(joinedload(AdvKeyword.keyword_setting))\
-                    .where(and_(AdvKeyword.text == keyword.text,
-                                                    AdvKeyword.date == keyword.date,
-                                                    AdvKeyword.adv_setting_id == adv_setting.id))
+        try:
+            wb_api = WBApi(access)
+            update_signal = False
+            wb_cabinet = access.wb_cabinet
+            async with sm() as session:
+                stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
+                result = (await session.execute(stmt)).unique()
+                adv_settings = result.scalars().all()
+                for adv_setting in adv_settings:
+                    keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+                    logger.debug(f'Ключевые слова для {adv_setting.name} получены')
+                    for keyword in keywords:
+                        stmt = select(AdvKeyword)\
+                        .options(joinedload(AdvKeyword.keyword_setting))\
+                        .where(and_(AdvKeyword.text == keyword.text,
+                                                        AdvKeyword.date == keyword.date,
+                                                        AdvKeyword.adv_setting_id == adv_setting.id))
 
-                    keyword_db = await session.execute(stmt)
-                    keyword_db: AdvKeyword = keyword_db.scalar()
-                    if not keyword_db:
-                        keyword_db = AdvKeyword()
-                        stmt = select(KeywordSetting).where(and_(KeywordSetting.text == keyword.text,
-                                                            KeywordSetting.adv_setting_id == adv_setting.id))
-                        keyword_setting = await session.execute(stmt)
-                        keyword_setting = keyword_setting.scalar()
-                        if not keyword_setting:
-                             keyword_setting = KeywordSetting()
-                             keyword_setting.text = keyword.text
-                             keyword_setting.adv_setting_id = adv_setting.id
-                             keyword_db.keyword_setting = keyword_setting
-                        keyword_db.adv_setting = adv_setting
-                        keyword_db.text = keyword.text
-                        keyword_db.date = keyword.date
-                        update_signal = True
-                    else:
-                        if not keyword_db.keyword_setting:
+                        keyword_db = await session.execute(stmt)
+                        keyword_db: AdvKeyword = keyword_db.scalar()
+                        if not keyword_db:
+                            keyword_db = AdvKeyword()
                             stmt = select(KeywordSetting).where(and_(KeywordSetting.text == keyword.text,
-                                                                     KeywordSetting.adv_setting_id == adv_setting.id))
+                                                                KeywordSetting.adv_setting_id == adv_setting.id))
                             keyword_setting = await session.execute(stmt)
                             keyword_setting = keyword_setting.scalar()
                             if not keyword_setting:
-                                keyword_setting = KeywordSetting()
-                                keyword_setting.text = keyword.text
-                                keyword_setting.adv_setting_id = adv_setting.id
+                                 keyword_setting = KeywordSetting()
+                                 keyword_setting.text = keyword.text
+                                 keyword_setting.adv_setting_id = adv_setting.id
+                                 session.add(keyword_setting)
                             keyword_db.keyword_setting = keyword_setting
-                        if any([keyword_db.views != keyword.views,
-                                keyword_db.clicks != keyword.clicks]):
+                            keyword_db.adv_setting = adv_setting
+                            keyword_db.text = keyword.text
+                            keyword_db.date = keyword.date
+                            session.add(keyword_db)
                             update_signal = True
-                    keyword_db.views = keyword.views
-                    keyword_db.clicks = keyword.clicks
-                    keyword_db.spend = keyword.spend
-                    keyword_db.update_timestamp = keyword.update_timestamp
-                    await session.merge(keyword_db)
-                await session.commit()
-                if update_signal:
-                    need_update_model.set()
-                    update_signal = False
+                        else:
+                            if not keyword_db.keyword_setting:
+                                stmt = select(KeywordSetting).where(and_(KeywordSetting.text == keyword.text,
+                                                                         KeywordSetting.adv_setting_id == adv_setting.id))
+                                keyword_setting = await session.execute(stmt)
+                                keyword_setting = keyword_setting.scalar()
+                                if not keyword_setting:
+                                    keyword_setting = KeywordSetting()
+                                    session.add(keyword_setting)
+                                    keyword_setting.text = keyword.text
+                                    keyword_setting.adv_setting_id = adv_setting.id
+                                keyword_db.keyword_setting = keyword_setting
+                            if any([keyword_db.views != keyword.views,
+                                    keyword_db.clicks != keyword.clicks]):
+                                update_signal = True
+                                keyword_db.views = keyword.views
+                                keyword_db.clicks = keyword.clicks
+                                keyword_db.spend = keyword.spend
+
+
+                    await session.commit()
+                    if update_signal:
+                        need_update_model.set()
+                        update_signal = False
+        except Exception as e:
+            print(e)
+            pass
 
 
     async def graph_vector_update(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event) -> None:

@@ -57,7 +57,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
                                   adv_setting,
                                   wb_user_cabinet_original_id,
                                   adv_choice_last_page,
-                                  main_photos[0],
+                                  main_photos[0] if main_photos else None,
                                   page)()
 
 
