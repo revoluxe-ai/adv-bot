@@ -10,4 +10,5 @@ class User(BaseTable):
                              back_populates='user', cascade="all, delete-orphan")
     wb_user_cabinets: Mapped[list['WBUserCabinet']] = relationship("WBUserCabinet", back_populates="user",
                                                                    cascade="all, delete-orphan")
+    adv_updater_user_chat_id: Mapped[int] = Column(BIGINT, nullable=True)
 

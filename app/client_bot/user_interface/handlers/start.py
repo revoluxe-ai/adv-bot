@@ -56,6 +56,7 @@ async def start_registration(message: types.Message, bot: aiogram.Bot):
         if not user:
             user = User(user_telegram_id=user_id,
                         username=message.from_user.username,
+                        adv_updater_user_chat_id = message.chat.id,
                         wb_tokens=[])
             session.add(user)
             await session.commit()
