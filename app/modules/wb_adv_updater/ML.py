@@ -34,7 +34,7 @@ model_folder = 'app/keyword_async_ml_updater/model'
 
 global_model: typing.Union[xgboost.XGBModel, None] = None
 
-path = 'app/keyword_async_ml_updater/model/'
+path = 'app/modules/wb_adv_updater/model'
 
 def save_model(model: xgboost.XGBModel, time_stamp = None):
     model_path = os.path.join(path, 'model.json')

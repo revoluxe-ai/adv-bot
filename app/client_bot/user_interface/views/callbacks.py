@@ -9,9 +9,9 @@ class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
     page: int
 
 
-class Action(str, Enum):
+class Action:
     new = 'new'
-    select= 'select'
+    select = 'select'
 
 
 
