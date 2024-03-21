@@ -16,9 +16,7 @@ from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
 
 
-
 logger = logging.getLogger(__name__)
-
 
 
 def _try_except_decorator(requests_per_interval, interval_seconds):

@@ -503,7 +503,7 @@ class Manager(AbcManager):
                              logger.error(f'Ошибка обновления ключей: {tasks[wb_access.wb_cabinet.id].exception()}')
                          del tasks[wb_access.wb_cabinet.id]
 
-             await asyncio.sleep(1)
+             await asyncio.sleep(30*60)
 
 
 
