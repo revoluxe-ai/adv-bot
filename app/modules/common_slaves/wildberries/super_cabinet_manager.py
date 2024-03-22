@@ -50,11 +50,11 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                             tokens_for_wb_cabinet.append(token)
                     except exceptions.TokenExpiredError:
                         logger.error('Срок действия токена истек')
-
-            access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
+            if tokens_for_wb_cabinet:
+                access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
                                      wb_user_cabinet = None,
                                      wb_cabinet = wb_cabinet)
-            accesses.append(access)
+                accesses.append(access)
     return accesses
 
 
