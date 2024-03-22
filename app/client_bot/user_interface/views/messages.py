@@ -252,4 +252,26 @@ class KeywordSettingMessage(TextWithKeyboard):
         return keyboards.get_keyword_setting_keyboard(self._keyword_setting, self._adv_setting)
 
 
+class GetNameOfNewAdvCompany(Text):
+    text = 'Введите название новой рекламной кампании, максимум 128 символов:'
 
+
+class TooLongNameOfNewAdvCompany(Text):
+    text = 'Название кампании слишком длинное. Попробуйте снова, должно быть не более 128 символов:'
+
+
+class GetNmidOfNewAdvCompany(Text):
+    text = ('Какие товары добавить в кампанию? Вы можете указать несколько товаров'
+            'В качестве разделителя можете использовать пробел, запятую, точку с запятой или точку.'
+            'Указать можно артикулы WB или ваши артикулы. По возможности не создавайте РК более, '
+            'чем на один товар:')
+
+
+class NotFoundNmidOfNewAdvCompany(Text):
+    def __init__(self, bot: Bot, chat_id: int, not_found_items: list[str]):
+        self.__not_found_items = not_found_items
+        super().__init__(bot, chat_id)
+
+    @property
+    def text(self):
+        return f'Товары с идентификаторами {", ".join(self.__not_found_items)} не найдены. Попробуйте снова:'

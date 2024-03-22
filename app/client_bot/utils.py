@@ -61,7 +61,3 @@ async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[KeywordForK
     return keywords
 
 
-
-
-
-

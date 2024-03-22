@@ -2,12 +2,16 @@ import logging
 import aiogram
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
-from app.modules.common_slaves.wildberries.models import WBUserCabinet,  WBCabinet, AdvSetting
+from sqlalchemy import or_
+
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, AdvSetting, WBCard
 from sqlalchemy.future import select
 from app.utils.db.session_maker import get_async_session_maker
 from ..views import messages
 from ..views import callbacks
-from ...redis_manager import RedisManager
+from ... import manager
+from .. import states
+from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
 
 sm = get_async_session_maker()
 
@@ -18,37 +22,64 @@ logger = logging.getLogger(__name__)
 
 
 @router.callback_query(callbacks.Adv.filter(F.action == 'new'))
-async def pr
-async def choice_adv_paginator(callback: types.CallbackQuery,
-                               callback_data: callbacks.ChoiceAdvPaginator,
-                               bot: aiogram.Bot,
-                               state: FSMContext):
-
-    await bot.answer_callback_query(callback_query_id=callback.id)
-    wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
-    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-    page = callback_data.page
-    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-    await state.update_data(wb_user_cabinet_page=page)
-    check_data = await state.get_data()
-    logger.debug(f'check_data: {check_data}')
-
-    # if page == 1:
-    #     user_cabinet_manager = await get_cabinet_manager(wb_user_cabinet_original_id)
-    #     await user_cabinet_manager.update_all_data()
-    async with (sm() as session):
-        stmt = select(AdvSetting)\
-        .join(AdvSetting.wb_cabinet)\
-        .join(WBCabinet.wb_user_cabinets)\
-        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
-
-
-    chat_id = callback.message.chat.id
-
-    await messages.AdvCompanyChoicing \
-        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=page)()
-
+async def process_adv_new(callback: types.CallbackQuery, callback_data: callbacks.Adv,
+                          bot: aiogram.Bot,
+                          state: FSMContext):
+    await bot.answer_callback_query(callback.id)
+    await state.set_state(states.CreateNewAdvCompany.waiting_for_name)
+    await messages.GetNameOfNewAdvCompany(bot, callback.message.chat.id)()
     return
+
+
+@router.message(state=states.CreateNewAdvCompany.waiting_for_name)
+async def process_adv_new_name(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if len(text) > 120:
+        await state.clear()
+        await state.set_state(states.CreateNewAdvCompany.waiting_for_name)
+        await messages.TooLongNameOfNewAdvCompany(message.bot, message.chat.id)()
+        return
+
+    await state.update_data(adv_company_name=text)
+    await state.set_state(states.CreateNewAdvCompany.waiting_for_nmids)
+    await messages.GetNmidOfNewAdvCompany(message.bot, message.chat.id)()
+    return
+
+
+@router.message(state=states.CreateNewAdvCompany.waiting_for_nmids)
+async def process_adv_new_nmids(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    text = text.replace(' ', '')
+    text = text.replace(',', ' ')
+    text = text.replace(';', ' ')
+    text = text.replace('.', ' ')
+
+    items = text.split()
+    items = list(set(items))
+    items = [int(item) for item in items if item.isdigit()]
+    not_founded_items = set()
+    founded_nmids = set()
+    async with sm() as session:
+       for item in items:
+           stmt = select(WBCard)\
+           .where(or_(WBCard.nmid == item,
+                      WBCard.offer_id == item))
+           result = await session.execute(stmt)
+           card = result.scalars().first()
+           if not card:
+               not_founded_items.add(item)
+           else:
+                founded_nmids.add(card.nmid)
+    if not_founded_items:
+        await state.set_state(states.CreateNewAdvCompany.waiting_for_nmids)
+        not_founded_items = [str(item) for item in not_founded_items]
+        await messages.NotFoundNmidOfNewAdvCompany(message.bot, message.chat.id, not_founded_items)()
+        return
+    else:
+        data = await state.get_data()
+        adv_company_name = data['adv_company_name']
+        await state.clear()
+        access = scm.get_access_for_wb_user_cabinet()
+        await manager.create_new_adv_company(adv_company_name, founded_nmids, access)
+
 
