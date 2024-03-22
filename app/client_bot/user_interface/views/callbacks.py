@@ -35,7 +35,7 @@ class Shop(CallbackData, prefix="shop"):
 #     card_id: int
 class Adv(CallbackData, prefix="adv"):
     action: str
-    adv_original_id: int
+    adv_original_id: Union [int | None]
     wb_user_cabinet_original_id: int
 
 

@@ -46,38 +46,15 @@ def get_budget_type_keyboard(balances):
 
 
 
-#
-#
-# def get_timezone_keyboard():
-#     # Инициализация клавиатуры без указания row_width
-#
-#     timezones = [
-#         ('Калининград (UTC+2)', TimeZoneCallbackData(timezone=2).pack()),
-#         ('Москва (UTC+3)', TimeZoneCallbackData(timezone=3).pack()),
-#         ('Самара (UTC+4)', TimeZoneCallbackData(timezone=4).pack()),
-#         ('Екатеринбург (UTC+5)', TimeZoneCallbackData(timezone=5).pack()),
-#         ('Омск (UTC+6)',   TimeZoneCallbackData(timezone=6).pack()),
-#         ('Красноярск (UTC+7)', TimeZoneCallbackData(timezone=7).pack()),
-#         ('Иркутск (UTC+8)', TimeZoneCallbackData(timezone=8).pack()),
-#         ('Якутск (UTC+9)', TimeZoneCallbackData(timezone=9).pack()),
-#         ('Владивосток (UTC+10)', TimeZoneCallbackData(timezone=10).pack()),
-#         ('Среднеколымск (UTC+11)', TimeZoneCallbackData(timezone=11).pack()),
-#         ('Анадырь (UTC+12)', TimeZoneCallbackData(timezone=12).pack())
-#     ]
-#
-#     buttons = []
-#     for label, callback_data in timezones:
-#         button = InlineKeyboardButton(text=label, callback_data=callback_data)
-#         buttons.append([button])  # Добавление кнопки в клавиатуру
-#     timezone_keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-#     return timezone_keyboard
 
 
-# def get_main_menu_keyboard():
-#     keyboard = InlineKeyboardMarkup()
-#     keyboard.add(InlineKeyboardButton(text='Тип бюджета', callback_data='add_adv'))
-#     keyboard.add(InlineKeyboardButton(text='Добавить магазин', callback_data='add_shop'))
-#     return keyboard
+
+
+
+
+
+
+
 
 def get_adv_list_keyboard(advs: list[Adv]):
     buttons = []

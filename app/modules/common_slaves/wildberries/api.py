@@ -146,6 +146,51 @@ class AdvertApi(ABC_WB_API):
             await self.requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
             logger.debug('Минус-фразы установлены')
 
+    async def create_adv_company(self, nmids: list, budget_type: int, budget: int) -> Union[Adv, str]:
+        """
+        0 - balance
+        1 - net
+        3 - bonus
+
+        """
+        assert budget >= 500
+        if budget_type == 'balance':
+            budget_type = 0
+        elif budget_type == 'net':
+            budget_type = 1
+        elif budget_type == 'bonus':
+            budget_type = 3
+        cards = await self.get_cards()
+        catch_card = None
+        for card in cards:
+            if card.nmid in nmids:
+                catch_card = card
+                break
+        subjectID = catch_card.subjectID
+
+        url = 'https://advert-api.wb.ru/adv/v1/save-ad'
+        data_json = {
+            "type": 8,
+            "name": ', '.join([str(nmid) for nmid in nmids]),
+            "subjectId": subjectID,
+            "sum": budget,
+            "btype": budget_type,
+            "on_pause": True
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=data_json, headers=self.headers.standart) as response:
+                answer = await response.text()
+                if 'error' in answer:
+                    error = json.loads(answer)['error']
+                    return error
+        adv_id = int(answer)  # Это предполагает, что ответ содержит ID рекламной кампании
+        company = (await self.get_adv_companies([adv_id]))[0]
+        await asyncio.sleep(60)  # Замена sleep на асинхронный asyncio.sleep
+        await self.tune_company(company, nmids)
+        return company
+
+
 
 
 class ContentApi(ABC_WB_API):

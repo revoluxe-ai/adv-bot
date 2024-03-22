@@ -15,3 +15,8 @@ class ChangeMinCTR(StatesGroup):
 
 class AddNewToken(StatesGroup):
     token = State()
+
+
+class CreateNewAdvCompany(StatesGroup):
+    waiting_for_name = State()
+    waiting_for_nmids = State()

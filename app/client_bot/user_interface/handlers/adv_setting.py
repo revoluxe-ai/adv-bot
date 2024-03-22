@@ -60,9 +60,21 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
     async with sm() as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
-        wb_user_cabinet = await session.execute(select(WBUserCabinet) \
-                                                .where(WBUserCabinet.id == wb_user_cabinet_original_id))
-        wb_user_cabinet = wb_user_cabinet.scalar()
+    if not adv:
+        await bot.send_message(callback.message.chat.id, 'Кампания не найдена, попробуйте еще раз')
+        async with sm() as session:
+            adv_settings = await session.execute(select(AdvSetting)\
+                                                .join(AdvSetting.wb_cabinet)\
+            .join(WBCabinet.wb_user_cabinets)\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id))
+            adv_settings = adv_settings.scalars().all()
+        await messages.AdvCompanyChoicing(bot, callback.message.chat.id, wb_user_cabinet_original_id, adv_settings)()
+        return
+    else:
+        async with sm() as session:
+            wb_user_cabinet = await session.execute(select(WBUserCabinet) \
+                                                    .where(WBUserCabinet.id == wb_user_cabinet_original_id))
+            wb_user_cabinet = wb_user_cabinet.scalar()
     chat_id = callback.message.chat.id
     await messages.AdvSettingMenu(bot,
                                                                chat_id,
@@ -71,39 +83,6 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
                                                                )()
     return
 
-# @router.message(StateFilter(states.ChangeMinCTR.min_ctr))
-# async def change_min_ctr(message: types.Message, state: FSMContext, bot: aiogram.Bot, last_message:LastMessage):
-#     min_ctr = message.text
-#     if not min_ctr.isdigit():
-#         last_message, message_type = messages.\
-#             WrongMinCTR(bot, last_message, message.chat.id)()
-#         return last_message, message_type
-#     min_ctr = int(min_ctr)
-#     if 0 > min_ctr > 100:
-#         last_message, message_type = (messages.\
-#             WrongMinCTR(bot, last_message, message.chat.id)())
-#         return last_message, message_type
-#     async with sm() as session:
-#         data = await state.get_data()
-#         adv_original_id = data['adv_original_id']
-#         adv = await session.execute(select(AdvSetting)\
-#                                     .where(AdvSetting.id == adv_original_id))
-#         adv: AdvSetting = adv.scalar()
-#         adv.min_ctr = min_ctr/100
-#         wb_user_cabinet = await session.execute(select(WBUserCabinet)\
-#                     .where(WBUserCabinet.id == data['wb_user_cabinet_original_id']))
-#         wb_user_cabinet = wb_user_cabinet.scalar()
-#         await session.commit()
-#     await state.clear()
-#     last_message, message_type = await messages.\
-#         MinCTRChanged(bot, last_message, message.chat.id)()
-#     await redis_manager.set_last_message(last_message, message_type)
-#     await state.clear()
-#     last_message, message_type = await messages.AdvSettingMenu(bot, last_message,
-#                                                 wb_user_cabinet,
-#                                                 adv, message.chat.id)()
-#
-#     return last_message, message_type
 
 
 @router.callback_query(callbacks.TurnAdv.filter(F.action == 'on'))
