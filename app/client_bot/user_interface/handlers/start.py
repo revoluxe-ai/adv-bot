@@ -115,9 +115,10 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
         await messages.AdvCompanyChoicing \
             (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=1)()
     else:
-        await state.update_data(cabinet_name=message.text)
+        cabinet_name = message.text
+        await state.update_data(cabinet_name=cabinet_name)
         await state.set_state(states.CabinetRegistration.api)
-        await messages.ShopApiGet(bot, chat_id)()
+        await messages.AddNewTokenGet(bot, chat_id, cabinet_name)()
 
 
 
@@ -253,7 +254,7 @@ async def delete_shop(callback_query: types.CallbackQuery,
 async def add_app_token(callback_query: types.CallbackQuery,
                   callback_data: callbacks.AddNewToken,
                   bot: aiogram.Bot, state: FSMContext):
-    await callback_query.answer('Добавление нового токена')
+    await callback_query.answer()
     logger.debug('Текущее состояние: %s', await state.get_state())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
@@ -263,8 +264,9 @@ async def add_app_token(callback_query: types.CallbackQuery,
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(states.AddNewToken.token)
     chat_id = callback_query.message.chat.id
+    cabinet_name = wb_user_cabinet.name
     await messages. \
-        AddNewTokenGet(bot, chat_id, wb_user_cabinet)()
+        AddNewTokenGet(bot, chat_id, cabinet_name)()
 
 
 

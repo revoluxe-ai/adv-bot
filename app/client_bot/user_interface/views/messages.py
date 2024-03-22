@@ -5,7 +5,9 @@ from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           KeywordSetting)
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
-                                           TextWithKeyboardPagination, TextWithKeyboarAndImage)
+                                           TextWithImage,
+                                           TextWithKeyboardPagination,
+                                           TextWithKeyboarAndImage)
 
 from . import keyboards
 from aiogram import Bot
@@ -44,15 +46,7 @@ class ShopNameGet(Text):
 
 
 
-class ShopApiGet(Text):
-    text = 'Введите API ключ магазина (кабинета):'
 
-
-    @property
-    def image(self):
-        photo_path = 'wb/keyword_async_ml_updater/bot/images/api_setting.png'
-        photo = FSInputFile(photo_path)
-        return photo
 
 
 class ShopAddedSuccess(Text):
@@ -149,22 +143,30 @@ class ApiForrbidenError(Text):
     text = ('Ошибка настройки прав: нет доступа в рекламе. Пожалуйста, '
             'создайте новый API-ключ с требуемыми правами и добавьте кабинет снова. '
             'Все ваши настройки будут сохранены')
-    @property
-    def keyword(self):
-        return (keyboards.add_app_api_or_delete_user_wb_cabinet
-                (self.__wb_user_cabinet_original_id))
 
 
-class AddNewTokenGet(Text):
+
+class AddNewTokenGet(TextWithImage):
     def __init__(self, bot: Bot, chat_id,
-                 wb_user_cabinet: app.my_types.WBUserCabinet):
+                 cabinet_name: str):
 
-        self.__wb_user_cabinet = wb_user_cabinet
+        self.__cabinet_name  = cabinet_name
         super().__init__(bot, chat_id)
 
     @property
     def text(self):
-        return  f'Пришлите новый Api ключ дла магазина (кабинета) {self.__wb_user_cabinet.name}:'
+        return  (f'Пришлите новый Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n'
+                 'Для работы бота нужны права Контент (анализ карточек для управления ключами) и Продвижение ('
+                 'загрузка рекламной статистики и управление ключевыми словами)')
+
+
+
+    @property
+    def image(self):
+        photo_path = 'app/client_bot/images/api_setting.png'
+        photo = FSInputFile(photo_path)
+        return photo
+
 
 
 class GetMinCtr(Text):
