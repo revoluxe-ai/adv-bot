@@ -58,7 +58,7 @@ webhook_requests_handler = SimpleRequestHandler(
 app = web.Application()
 webhook_requests_handler.register(app, path=WEBHOOK_PATH)
 setup_application(app, dp, bot=bot)
-print(bot.get_webhook_info())
+
 
 async def start_web_server():
     runner = web.AppRunner(app)
@@ -66,6 +66,7 @@ async def start_web_server():
     site = web.TCPSite(runner, WEB_SERVER_HOST, WEB_SERVER_PORT)
     await site.start()
     print(f'Server started at http://{WEB_SERVER_HOST}:{WEB_SERVER_PORT}')
+    print(f'Webhook url: {await bot.get_webhook_info()}')
 
 
 async def run_shop_updater():
