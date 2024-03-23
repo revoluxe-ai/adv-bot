@@ -9,7 +9,7 @@ from . import echo_handler
 
 
 global_router = Router()
-global_router.include_routers(echo_handler.router)
+# global_router.include_routers(echo_handler.router)
 global_router.message.middleware(middlewars.ThrottlingMiddleware())
 
 setting_path = path_setting_funcs.get_setting_path()

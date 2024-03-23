@@ -13,8 +13,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 from python_modules import path_setting_funcs
 from .global_router import global_router
-import logging
-logging.basicConfig(level=logging.DEBUG)
+
 from python_modules.logger import setup_logging
 from app.modules.common_slaves.wildberries.shops_data_updater import consumer as shop_updater
 
@@ -43,8 +42,9 @@ token = path_setting_funcs.get_document_by_key_name(path_setting,
 bot = Bot(token=token)
 
 dp = Dispatcher(storage=storage)
-dp.include_router(global_router)
 dp.startup.register(on_startup)
+dp.include_router(global_router)
+
 
 webhook_requests_handler = SimpleRequestHandler(
                             dispatcher=dp,
