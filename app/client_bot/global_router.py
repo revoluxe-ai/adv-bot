@@ -5,10 +5,11 @@ from .user_interface.handlers import adv_setting
 from .user_interface.handlers import exceptions
 from .user_interface.handlers import keyword_settings
 from python_modules import path_setting_funcs
-
+from . import echo_handler
 
 
 global_router = Router()
+global_router.include_routers(echo_handler.router)
 global_router.message.middleware(middlewars.ThrottlingMiddleware())
 
 setting_path = path_setting_funcs.get_setting_path()
@@ -19,6 +20,8 @@ try:
     global_router.include_routers(exceptions.admin_router)
 except:
     pass
+
+
 
 global_router.include_routers(start.router)
 global_router.include_routers(adv_setting.router)
