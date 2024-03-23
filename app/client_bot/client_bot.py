@@ -1,4 +1,6 @@
 import asyncio
+import secrets
+import string
 
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
@@ -32,7 +34,7 @@ WEB_SERVER_PORT = 8080
 BASE_WEBHOOK_URL = 'https://tiriel.ru'
 WEBHOOK_PATH = "/telegram_webhook"
 path_setting = path_setting_funcs.get_setting_path()
-WEBHOOK_SECRET = path_setting_funcs.get_document_by_key_name(path_setting, 'web_hook_secret')
+WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
 
 async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}", secret_token=WEBHOOK_SECRET)
@@ -56,6 +58,7 @@ webhook_requests_handler = SimpleRequestHandler(
 app = web.Application()
 webhook_requests_handler.register(app, path=WEBHOOK_PATH)
 setup_application(app, dp, bot=bot)
+print(bot.get_webhook_info())
 
 async def start_web_server():
     runner = web.AppRunner(app)
