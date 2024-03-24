@@ -28,10 +28,10 @@ storage = RedisStorage.from_url('redis://localhost:6379/0')
 
 WEB_SERVER_HOST = "127.0.0.1"
 # Port for incoming request from reverse proxy. Should be any available port
-WEB_SERVER_PORT = 8080
+WEB_SERVER_PORT = 8090
 
 
-BASE_WEBHOOK_URL = 'https://tiriel.ru/'
+BASE_WEBHOOK_URL = 'https://tiriel.ru'
 WEBHOOK_PATH = "/telegram_webhook"
 path_setting = path_setting_funcs.get_setting_path()
 WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
@@ -40,6 +40,10 @@ async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
                           secret_token=WEBHOOK_SECRET
                           )
+async def on_shutdown(bot: Bot) -> None:
+    await bot.delete_webhook()
+    await storage.close()
+
 
 token = path_setting_funcs.get_document_by_key_name(path_setting,
                                                         'client_bot_token')
@@ -47,6 +51,7 @@ bot = Bot(token=token)
 
 dp = Dispatcher(storage=storage)
 dp.startup.register(on_startup)
+dp.shutdown.register(on_shutdown)
 dp.include_router(global_router)
 
 
@@ -70,6 +75,13 @@ async def start_web_server():
     await site.start()
     print(f'Server started at http://{WEB_SERVER_HOST}:{WEB_SERVER_PORT}')
     print(f'Webhook url: {await bot.get_webhook_info()}')
+
+
+async def stop_web_server():
+    await app.shutdown()
+    await app.cleanup()
+    await dp.storage.close()
+
 
 
 async def run_shop_updater():
