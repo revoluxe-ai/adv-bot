@@ -31,13 +31,15 @@ WEB_SERVER_HOST = "127.0.0.1"
 WEB_SERVER_PORT = 8080
 
 
-BASE_WEBHOOK_URL = 'https://tiriel.ru'
+BASE_WEBHOOK_URL = 'https://tiriel.ru/'
 WEBHOOK_PATH = "/telegram_webhook"
 path_setting = path_setting_funcs.get_setting_path()
 WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
 
 async def on_startup(bot: Bot) -> None:
-    await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}", secret_token=WEBHOOK_SECRET)
+    await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
+                          secret_token=WEBHOOK_SECRET
+                          )
 
 token = path_setting_funcs.get_document_by_key_name(path_setting,
                                                         'client_bot_token')
@@ -51,7 +53,8 @@ dp.include_router(global_router)
 webhook_requests_handler = SimpleRequestHandler(
                             dispatcher=dp,
                             bot=bot,
-                            secret_token=WEBHOOK_SECRET)
+                            secret_token=WEBHOOK_SECRET
+)
 
 
 
