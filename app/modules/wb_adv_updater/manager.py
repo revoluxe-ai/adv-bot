@@ -24,12 +24,13 @@ from app.utils.image_master.image_master2 import ImageMaster
 import pymystem3
 from app.utils.image_master.image_tools import ImageTools
 import asyncio
-from app import admin_sender
+from app.admin_bot import sender as admin_sender
 import pandas as pd
 from sqlalchemy import and_
 from sqlalchemy.orm import joinedload
 from sqlalchemy.future import select
 from .ML import Predictor
+import datetime
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
                                                           AdvKeyword,
@@ -50,8 +51,19 @@ fit_logger = logging.getLogger('fit_logger')
 
 sm = get_async_session_maker()
 
+class MessageCounter:
+    _last_time_send = None
+    _period = datetime.timedelta(minutes=10)
+    def add_send(self):
+        time = datetime.datetime.now()
+        self._last_time_send = time
 
+    def check_last_time(self):
+        now = datetime.datetime.now()
+        if now - self._last_time_send > self._period:
+            return True
 
+message_counter = MessageCounter()
 
 class Manager(AbcManager):
     _fitter = Fitter()
@@ -457,7 +469,10 @@ class Manager(AbcManager):
                         final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
         async with sm() as session:
             for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
-                await admin_sender.send_message(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
+                if message_counter.check_last_time():
+                    await admin_sender.send_message(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
+                    message_counter.add_send()
+
                 stmt = select(GlobalCategorySetting) \
                     .where(GlobalCategorySetting.category_name == wb_category_name)
                 category_setting = await session.execute(stmt)
