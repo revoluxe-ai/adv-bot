@@ -1,8 +1,6 @@
 from app.utils.image_master import image_tools
 from PIL import Image as PilImage
-from . import db
-
-
+from app.client_bot.client_bot_sender import db
 
 
 
@@ -23,7 +21,6 @@ async def save_telegram_file(image_path: str, image_id: int):
     await db.add_file(image_id, dhash)
 
 
-async
 
 
 

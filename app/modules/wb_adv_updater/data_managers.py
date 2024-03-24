@@ -429,3 +429,9 @@ async def get_adv_keyword_text_in_black_list()-> list[tuple[int, str]]:
     return adv_keyword_text_in_black_list
 
 
+async def get_all_users()-> list[User]:
+    async with _sm() as session:
+        stmt = select(User)
+        result = await session.execute(stmt)
+        users: list[User] = result.unique().scalars().all()
+    return users
