@@ -32,7 +32,7 @@ class Runner:
         predicted.set()
         await asyncio.gather(
             self.update_all_data_in_db(),
-            self.update_min_ctr_in_global_wb_category_settings(),
+            # self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_keyword_stat(need_update_model),
             self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
             self.run_update_model(update_model_on_new_features, need_update_model),
