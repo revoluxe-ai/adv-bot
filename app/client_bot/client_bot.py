@@ -25,15 +25,19 @@ setup_logging()
 # Создание хранилища с Redis
 storage = RedisStorage.from_url('redis://localhost:6379/0')
 
+path_setting = path_setting_funcs.get_setting_path()
 
 WEB_SERVER_HOST = "127.0.0.1"
 # Port for incoming request from reverse proxy. Should be any available port
-WEB_SERVER_PORT = 8090
+
+PORT = path_setting_funcs.get_document_by_key_name (path_setting, 'bot_port')
+
+WEB_SERVER_PORT = PORT
 
 
 BASE_WEBHOOK_URL = 'https://tiriel.ru'
 WEBHOOK_PATH = "/telegram_webhook"
-path_setting = path_setting_funcs.get_setting_path()
+
 WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
 
 async def on_startup(bot: Bot) -> None:
