@@ -36,7 +36,7 @@ WEB_SERVER_PORT = PORT
 
 
 BASE_WEBHOOK_URL = 'https://tiriel.ru'
-WEBHOOK_PATH = "/telegram_webhook"
+WEBHOOK_PATH = path_setting_funcs.get_document_by_key_name (path_setting, 'hook_handler')
 
 WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
 
