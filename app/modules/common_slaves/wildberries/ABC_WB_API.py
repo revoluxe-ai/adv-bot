@@ -98,8 +98,8 @@ class ABC_WB_API(WbRequestApiMixin):
                    (f'Нет токена с правами {self._rights} и only_read = {self._only_read}',
                     wb_user_cabinet=wb_user_cabinet
                     ))
-        self.headers = Headers(current_token)
-        self._shop_id = current_token.shop_id
+        self.headers = Headers(self._current_token)
+        self._shop_id = self._current_token.shop_id
 
 
     @property
