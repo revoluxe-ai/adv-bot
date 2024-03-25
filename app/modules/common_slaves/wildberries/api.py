@@ -49,6 +49,7 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
                     current_pause *= 2
                     if current_pause > 120:
                         current_pause = 120
+
                 finally:
                     last_query_time = time.time()
 

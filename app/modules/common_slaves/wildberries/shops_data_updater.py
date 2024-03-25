@@ -7,7 +7,7 @@ import logging
 from . import wb_db_manager
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.common_slaves.wildberries.api import WBApi
-
+from app import exc
 
 
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
@@ -40,11 +40,11 @@ async def consumer():
 class ShopDataUpdater:
 
     def __repr__(self):
-        return f'{self.__wb_cabinet.shop_id}'
+        return f'{self._wb_cabinet.shop_id}'
 
     def __init__(self, wb_access:  WBCabinetAccess):
         self.__wb_api = WBApi(wb_access)
-        self.__wb_cabinet = wb_access.wb_cabinet
+        self._wb_cabinet = wb_access.wb_cabinet
 
 
 
@@ -74,7 +74,7 @@ class ShopDataUpdater:
         wb_api = self.__wb_api
         advs = await wb_api.advert.get_advs(list(adv_ids))
         nmids_collection = set()
-        await wb_db_manager.update_advs_in_db(advs, self.__wb_cabinet)
+        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
         for adv in advs:
             nmids = adv.nmids
             if nmids:
@@ -82,7 +82,7 @@ class ShopDataUpdater:
                     nmids_collection.add(nmid)
         async def update_cards():
             cards = await wb_api.content.get_cards_by_text(nmids_collection)
-            await wb_db_manager.update_cards_in_db(cards, self.__wb_cabinet)
+            await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
         func = update_cards()
         await _coroutine_parallel_run_queue.put(func)
 
@@ -93,19 +93,24 @@ class ShopDataUpdater:
 
 
     async def update_all_data(self):
-        wb_api = self.__wb_api
-        advert_api = wb_api.advert
-        adv_ids = await advert_api.get_advertIds(advert_api.live_company_status,
-                                                 advert_api.auto_adv_types)
-        advs: list[Adv] = await advert_api.get_advs(adv_ids)
+        try:
+            wb_api = self.__wb_api
+            advert_api = wb_api.advert
+            adv_ids = await advert_api.get_advertIds(advert_api.live_company_status,
+                                                     advert_api.auto_adv_types)
+            advs: list[Adv] = await advert_api.get_advs(adv_ids)
 
-        await wb_db_manager.update_advs_in_db(advs, self.__wb_cabinet)
+            await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
 
-        nmids = set()
-        for adv in advs:
-            nmids.update(adv.nmids)
-        cards = await wb_api.content.get_cards_by_text(nmids)
-        await wb_db_manager.update_cards_in_db(cards, self.__wb_cabinet)
+            nmids = set()
+            for adv in advs:
+                nmids.update(adv.nmids)
+            cards = await wb_api.content.get_cards_by_text(nmids)
+            await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+        except exc.ApiForbiddenError as exceprion:
+            logger.error(exceprion)
+        except Exception as exception:
+            logger.error(exception)
 
 
 

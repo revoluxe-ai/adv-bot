@@ -25,28 +25,31 @@ class WbRequestApiMixin(ABC):
         pass
 
     async def requests(self, session, method, url, data=None, json_data=None, headers=None, ):
-        async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
-            try:
-                logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
-                response.raise_for_status()
-            except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
-                if e.status == 401:
-                    raise exceptions.ApiForbiddenError('API доступ запрещен',
-                                                       self._wb_user_cabinet) from e
-                else:
-                    # Для всех других ошибок 4xx и 5xx
-                    raise exceptions.UnknownApiRequestError(e) from e
+        while True:
+            async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
+                try:
+                    logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
+                    response.raise_for_status()
+                except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
+                    if e.status == 401:
+                        self._free_tokens = {self._free_tokens} - {self._current_token}
+                        self._current_token = self._free_tokens.pop()
+                        self.headers = Headers(self._current_token)
 
-            # Если код не в блоке except, значит ответ был успешным (статус 200-299)
-            text = await response.text()
-            if text:
-                json_answer = json.loads(text)
-                if isinstance(json_answer, dict):
-                    if code := json_answer.get('code'):
-                        raise exceptions.ApiErrorWithCode(code, \
-                                                          json_answer.get('message'), json_answer.get('rejection'))
+                    else:
+                        # Для всех других ошибок 4xx и 5xx
+                        raise exceptions.UnknownApiRequestError(e) from e
 
-            return text
+                # Если код не в блоке except, значит ответ был успешным (статус 200-299)
+                text = await response.text()
+                if text:
+                    json_answer = json.loads(text)
+                    if isinstance(json_answer, dict):
+                        if code := json_answer.get('code'):
+                            raise exceptions.ApiErrorWithCode(code, \
+                                                              json_answer.get('message'), json_answer.get('rejection'))
+
+                return text
 
 
 
@@ -81,12 +84,15 @@ class ABC_WB_API(WbRequestApiMixin):
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_user_cabinet)
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
+
         self._wb_user_cabinet = wb_user_cabinet
         for token in tokens:
             if  self._rights.issubset(token.categories) \
                     and self._only_read == token.read_only:
                 current_token = token
+                self._free_tokens = set(tokens) - {current_token}
                 break
+
         else:
             raise (exceptions.ApiForbiddenError
                    (f'Нет токена с правами {self._rights} и only_read = {self._only_read}',

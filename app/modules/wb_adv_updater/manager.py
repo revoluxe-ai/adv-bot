@@ -151,7 +151,7 @@ class Manager(AbcManager):
                         need_update_model.set()
                         update_signal = False
         except Exception as e:
-            print(e)
+            logger.error(e)
             pass
 
 
@@ -517,10 +517,10 @@ class Manager(AbcManager):
                  else:
                      if tasks[wb_access.wb_cabinet.id].done():
                          if tasks[wb_access.wb_cabinet.id].exception():
-                             logger.error(f'Ошибка обновления ключей: {tasks[wb_access.wb_cabinet.id].exception()}')
+                             logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}')
                          del tasks[wb_access.wb_cabinet.id]
 
-             await asyncio.sleep(30*60)
+             await asyncio.sleep(30)
 
 
 

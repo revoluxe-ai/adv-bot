@@ -161,8 +161,8 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
 
 # @cached_stampede(ttl=60*60*24, key="get_category_name_min_ctr_final_data", cache=aiocache.RedisCache)
 async def get_parent_id_categories_subcategories_name_list() -> defaultdict[Any, list[Subcategory]]:
-    user_cabinet = await super_cabinet_manager.get_super_user_access()
-    wb_api = WBApi(user_cabinet)
+    access = await super_cabinet_manager.get_super_user_access()
+    wb_api = WBApi(access)
     subcategories: list[Subcategory] = await wb_api.content.get_subcategories()
     parent_categories = defaultdict(list)
     for category in subcategories:
