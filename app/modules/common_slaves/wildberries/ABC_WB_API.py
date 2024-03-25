@@ -32,7 +32,7 @@ class WbRequestApiMixin(ABC):
                     response.raise_for_status()
                 except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
                     if e.status == 401:
-                        self._free_tokens = {self._free_tokens} - {self._current_token}
+                        self._free_tokens = self._free_tokens - {self._current_token}
                         self._current_token = self._free_tokens.pop()
                         self.headers = Headers(self._current_token)
 
