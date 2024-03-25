@@ -435,3 +435,16 @@ async def get_all_users()-> list[User]:
         result = await session.execute(stmt)
         users: list[User] = result.unique().scalars().all()
     return users
+
+
+async def get_all_shops_for_user(user:User):
+    async with _sm() as session:
+        stmt = select(WBUserCabinet).where(WBUserCabinet.user_id == user.id)
+        result = await session.execute(stmt)
+        wb_user_cabinets = result.scalar()
+        if wb_user_cabinets:
+            return  wb_user_cabinets.all()
+        else:
+            return []
+
+

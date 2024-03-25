@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy import create_engine, ForeignKey
 from sqlalchemy.orm import relationship
 
-from app.utils.image_master.image_tools import ImageTools
+from app.utils.image_master import image_tools
 from python_modules import path_setting_funcs
 import os
 from PIL import Image as PilImage
@@ -190,7 +190,7 @@ class Image(Base):
 
 
     def show(self):
-        it = ImageTools()
+        it = image_tools
         img = it.resize_image_proportionally(self.pil_image, 200)
         img.show()
 

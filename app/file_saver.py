@@ -1,7 +1,6 @@
 from app.utils.image_master import image_tools
 from PIL import Image as PilImage
-from app.client_bot.client_bot_sender import db
-
+from app.admin_bot.sender import db
 
 
 async def _get_telegram_file(image_path: str):
