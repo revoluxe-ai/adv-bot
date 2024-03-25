@@ -1,3 +1,4 @@
+import asyncio
 import dataclasses
 from typing import Union
 from dataclasses import dataclass
@@ -88,9 +89,15 @@ async def get_super_user_access():
     tokens = [token for access in accesses for token in access.tokens]
     leave_tokens = []
     for token in tokens:
-        checker = TokenRightChecker(token)
-        if await checker.adverts() and await checker.content():
-            leave_tokens.append(token)
+        while True:
+            try:
+                checker = TokenRightChecker(token)
+                if await checker.adverts() and await checker.content():
+                    leave_tokens.append(token)
+                    break
+            except Exception as exc:
+                logger.error(exc)
+                await asyncio.sleep(1)
 
 
     super_user_access = WBCabinetAccess(tokens = leave_tokens,
