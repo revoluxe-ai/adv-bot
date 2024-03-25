@@ -89,8 +89,8 @@ class ABC_WB_API(WbRequestApiMixin):
         for token in tokens:
             if  self._rights.issubset(token.categories) \
                     and self._only_read == token.read_only:
-                current_token = token
-                self._free_tokens = set(tokens) - {current_token}
+                self._current_token = token
+                self._free_tokens = set(tokens) - {self._current_token}
                 break
 
         else:
