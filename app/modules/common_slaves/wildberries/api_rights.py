@@ -23,14 +23,24 @@ class Rights:
 import aiohttp
 import logging
 from .exceptions import ApiForbiddenError
-from .ABC_WB_API import ABC_WB_API
+from .ABC_WB_API import ABC_WB_API, WbRequestApiMixin, Headers
 
 logger = logging.getLogger(__name__)
 
 
 
 
-class TokenRightChecker(app.modules.common_slaves.wildberries.ABC_WB_API.ABC_WB_API):
+class TokenRightChecker(WbRequestApiMixin):
+     def __init__(self, token):
+        self.token = token
+        self.headers = Headers(token)
+
+     @property
+     def _wb_user_cabinet(self):
+        return None
+
+
+
 
      @property
      def _only_read(self):

@@ -132,7 +132,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
     access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
     chat_id = message.chat.id
     try:
-         check_right = await CabinetManager.check_token_for_adv(access)
+         check_right = await CabinetManager.check_access(wb_token)
     except NotValidTokenError:
         await messages. \
             NotValideToken(bot, chat_id)()
@@ -286,7 +286,7 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
     user.wb_tokens.append(wb_token)
     chat_id = message.chat.id
     try:
-         check_right = await CabinetManager.check_token_for_adv(wb_user_cabinet)
+         check_right = await CabinetManager.check_access(wb_user_cabinet)
     except NotValidTokenError:
          await messages. \
             NotValideToken(bot, chat_id)()

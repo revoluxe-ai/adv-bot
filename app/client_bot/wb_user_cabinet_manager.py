@@ -2,6 +2,7 @@ import asyncio
 
 import app
 from app.modules.common_slaves.wildberries.api_rights import TokenRightChecker
+from app.modules.common_slaves.wildberries.models import WBToken
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -47,8 +48,9 @@ class CabinetManager:
 
 
     @classmethod
-    async def check_token_for_adv(cls, access: WBCabinetAccess):
-        right_checker = TokenRightChecker(access)
+    async def check_access(cls, token: WBToken):
+
+        right_checker = TokenRightChecker(token)
         return all(await asyncio.gather(
             right_checker.adverts(),
             right_checker.content()))

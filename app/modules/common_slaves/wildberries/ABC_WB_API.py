@@ -9,7 +9,9 @@ import logging
 from . import models
 import app
 from .models import WBToken, WBUserCabinet
-from .super_cabinet_manager import WBCabinetAccess
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .super_cabinet_manager import WBCabinetAccess
 
 
 
@@ -73,7 +75,7 @@ class ABC_WB_API(WbRequestApiMixin):
     _single_advs_report = os.path.join(current_path, 'single_advs_report.csv')
 
 
-    def __init__(self, wb_access: WBCabinetAccess):
+    def __init__(self, wb_access: 'WBCabinetAccess'):
         tokens: list[WBToken]= wb_access.tokens
         wb_user_cabinet: Union[WBUserCabinet] = wb_access.wb_user_cabinet
 

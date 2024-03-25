@@ -2,6 +2,7 @@ import dataclasses
 from typing import Union
 from dataclasses import dataclass
 from . import exceptions
+from .api_rights import TokenRightChecker
 from .models import WBToken
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
@@ -85,7 +86,14 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
 async def get_super_user_access():
     accesses = await get_accesses_for_wb_cabinets()
     tokens = [token for access in accesses for token in access.tokens]
-    super_user_access = WBCabinetAccess(tokens = tokens,
+    leave_tokens = []
+    for token in tokens:
+        checker = TokenRightChecker(token)
+        if await checker.adverts() and await checker.content():
+            leave_tokens.append(token)
+
+
+    super_user_access = WBCabinetAccess(tokens = leave_tokens,
                                         wb_user_cabinet = None,
                                         wb_cabinet = None)
 
