@@ -60,6 +60,8 @@ class MessageCounter:
 
     def check_last_time(self):
         now = datetime.datetime.now()
+        if self._last_time_send is None:
+            return True
         if now - self._last_time_send > self._period:
             return True
 
