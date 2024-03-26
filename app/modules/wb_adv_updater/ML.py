@@ -320,7 +320,8 @@ class Predictor:
        data_rows = []
        for adv in adv_settings:
            item_features_list = []
-           for nmid in adv.nmids:
+           nmids = adv.nmids if adv.nmids else []
+           for nmid in nmids:
                item_feature = await session.execute(
                    select(ItemFeature).where(ItemFeature.nmid == nmid)
                )

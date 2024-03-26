@@ -29,10 +29,8 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
             nonlocal last_query_time, current_pause
             while True:
                 current_time = time.time()
-
                 time_since_last_query = current_time - last_query_time
-
-                time_to_wait = current_pause - time_since_last_query
+                time_to_wait = max(current_pause - time_since_last_query, 0)
                 await asyncio.sleep(time_to_wait)
                 try:
                     result = await request_func(*args, **kwargs)
@@ -45,10 +43,11 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
                 except (exceptions.UnknownApiRequestError,
                         aiohttp.client_exceptions.ClientConnectorError, aiohttp.client_exceptions.ClientOSError,
                         aiohttp.client_exceptions.ServerDisconnectedError) as e:
-                    logger.error(f'Ошибка при запросе к API: {e}, повтор через {current_pause} секунд')
                     current_pause *= 2
                     if current_pause > 120:
                         current_pause = 120
+                    logger.error(f'Ошибка при запросе к API: {e}, повтор через {current_pause} секунд')
+
 
                 finally:
                     last_query_time = time.time()
