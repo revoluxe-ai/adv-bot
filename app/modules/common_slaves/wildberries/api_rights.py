@@ -1,4 +1,6 @@
 import asyncio
+import functools
+
 from app.utils import redis_manager
 from aiocache import cached_stampede
 from asyncio import Lock
@@ -6,6 +8,9 @@ class OnlyRead:
     TRUE = True
     FALSE = False
 
+
+
+locker = Lock()
 
 class Rights:
     CONTENT = 'Контент'
@@ -30,6 +35,9 @@ logger = logging.getLogger(__name__)
 
 
 
+
+
+
 class TokenRightChecker(WbRequestApiMixin):
      def __init__(self, token):
         self.token = token
@@ -50,16 +58,19 @@ class TokenRightChecker(WbRequestApiMixin):
 
      async def adverts(self):
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
-        async with aiohttp.ClientSession() as session:
-            try:
+        try:
+            async with aiohttp.ClientSession() as session:
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
-                # logger.debug('Проверка прав на рекламу прошла успешно')
-            except ApiForbiddenError:
-                raise
-            except UnknownApiRequestError as e:
-                logger.error(e)
-            except aiohttp.client_exceptions.ServerDisconnectedError as e:
-                logger.error(e)
+                    # logger.debug('Проверка прав на рекламу прошла успешно')
+        except ApiForbiddenError:
+            raise
+        except UnknownApiRequestError as e:
+            logger.error(e)
+        except aiohttp.client_exceptions.ServerDisconnectedError as e:
+            logger.error(e)
+        except aiohttp.client_exceptions.ClientOSError as e:
+            logger.error(e)
+
 
 
      async def content(self):
@@ -78,15 +89,19 @@ class TokenRightChecker(WbRequestApiMixin):
                 }
             }
         }
-        async with aiohttp.ClientSession() as session:
-            try:
+        try:
+            async with aiohttp.ClientSession() as session:
                 await self.requests(session, 'POST',  url, json_data=data_for_req,
-                                    headers=self.headers.standart)
-                logger.debug('Проверка прав на контент прошла успешно')
-            except ApiForbiddenError:
-                raise
-            except Exception as e:
-                logger.error(e)
+                                        headers=self.headers.standart)
+        except ApiForbiddenError:
+            raise
+        except UnknownApiRequestError as e:
+            logger.error(e)
+        except aiohttp.client_exceptions.ServerDisconnectedError as e:
+            logger.error(e)
+        except aiohttp.client_exceptions.ClientOSError as e:
+            logger.error(e)
+
 
 
 
@@ -98,7 +113,7 @@ async def check_token(token):
         # logger.debug('Права на токен уже проверены')
         return
     try:
-        async with Lock():
+        async with locker:
             checker = TokenRightChecker(token)
             await asyncio.gather(checker.adverts(), checker.content())
         await redis_manager.set_token_rights(hash_token, timeout=60*60)
