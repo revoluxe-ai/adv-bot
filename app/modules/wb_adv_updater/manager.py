@@ -40,7 +40,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.wb_adv_updater import data_managers
 from app.modules.common_slaves.wildberries import super_cabinet_manager as users_manager
-
+from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 predictor = Predictor()
 
@@ -88,7 +88,7 @@ class Manager(AbcManager):
 
 
     @staticmethod
-    async def update_keyword_stat(access, need_update_model:asyncio.Event):
+    async def update_keyword_stat(access: WBCabinetAccess, need_update_model:asyncio.Event):
         try:
             wb_api = WBApi(access)
             update_signal = False
@@ -298,8 +298,9 @@ class Manager(AbcManager):
         else:
             total_min_ctr = 0
             total_max_ctr = 0
-        phrase_data_list = []
+
         for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
+            phrase_data_list = []
             for keyword_stat in keyword_stats:
                 ctr = keyword_stat.ctr
                 # Расчет нормализованного CTR для каждой фразы
@@ -323,8 +324,8 @@ class Manager(AbcManager):
                 )
                 phrase_data_list.append(phrase_data)
 
-        await self._gds.add_keyword_phrase(phrase_data_list)
-        await asyncio.sleep(1)
+            await self._gds.add_keyword_phrase(phrase_data_list)
+            await asyncio.sleep(3)
 
 
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):
