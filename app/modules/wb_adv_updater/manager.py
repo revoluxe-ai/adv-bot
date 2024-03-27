@@ -19,7 +19,8 @@ from ..common_slaves.wildberries import super_cabinet_manager
 from .ML import Fitter
 from app.my_types import KeywordStat
 from app.utils.NeoDataScience.driver import DataScience
-from app.modules.common_slaves.wildberries.data_classes.card_from_wb import (WBCard)
+from app.modules.common_slaves.wildberries.models import WBCard
+
 from app.utils.image_master.image_master2 import ImageMaster
 import pymystem3
 from app.utils.image_master.image_tools import ImageTools
@@ -365,14 +366,10 @@ class Manager(AbcManager):
        return index
 
     async def __update_cards_in_graph_for_shops(self):
-        async with sm() as db_session:  # Предполагается использование асинхронной сессии
+        async with sm() as db_session:
             stmt = select(WBCard).where(WBCard.updated == False)
-            # Используем stream() для получения результатов как асинхронного генератора
             result = await db_session.stream(stmt)
             async for wbcard in result.scalars():
-                if wbcard.updated:  # Проверяем, действительно ли нужно обновлять
-                    continue
-
                 main_image_url: str = wbcard.photos[0]
                 async with aiohttp.ClientSession() as http_session:
                     async with http_session.get(main_image_url) as response:

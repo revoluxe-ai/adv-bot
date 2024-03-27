@@ -95,7 +95,7 @@
     },
 
   "root": {
-    "level": "DEBAG",
+    "level": "DEBUG",
     "handlers": ["console"]
   }
 }}
