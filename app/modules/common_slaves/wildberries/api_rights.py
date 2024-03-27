@@ -58,6 +58,9 @@ class TokenRightChecker(WbRequestApiMixin):
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
             except ApiForbiddenError:
                 return False
+            except Exception as e:
+                logger.error(e)
+                return True
             return True
 
 
@@ -83,6 +86,9 @@ class TokenRightChecker(WbRequestApiMixin):
                                     headers=self.headers.standart)
             except ApiForbiddenError:
                 return False
+            except Exception as e:
+                logger.error(e)
+                return True
             return True
 
 
