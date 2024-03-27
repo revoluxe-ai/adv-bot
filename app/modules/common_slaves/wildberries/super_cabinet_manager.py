@@ -4,7 +4,7 @@ from typing import Union
 from dataclasses import dataclass
 from . import exceptions
 from . import api_rights
-from .exceptions import ApiForbiddenError
+from .exceptions import ApiForbiddenError, UnknownApiRequestError
 from .models import WBToken
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
@@ -12,7 +12,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from sqlalchemy import select
 from app.utils.db.models import User
 import logging
-
+import aiohttp
 
 
 sm = get_async_session_maker()
@@ -60,14 +60,13 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                         await api_rights.check_token(token)
                         users_live_tokens.append(token)
                     except ApiForbiddenError:
-
-                        smtp = select(WBUserCabinet).join(WBUserCabinet.user)\
-                        .options(selectinload(WBUserCabinet.user))\
-                        .where(WBUserCabinet.id == wb_user_cabinet.id)
-                        await session.execute(smtp)
-                        logger.error(f'Токен не прошел проверку:'
-                                     f' {wb_user_cabinet.user.username}'
-                                     f'{wb_user_cabinet.name}')
+                        raise
+                    except UnknownApiRequestError as e:
+                        logger.error(e)
+                    except aiohttp.client_exceptions.ServerDisconnectedError as e:
+                        logger.error(e)
+                    except aiohttp.client_exceptions.ClientOSError as e:
+                        logger.error(e)
                     finally:
                         await asyncio.sleep(1)
                 tokens_for_wb_cabinet.extend(users_live_tokens)

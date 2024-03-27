@@ -58,18 +58,11 @@ class TokenRightChecker(WbRequestApiMixin):
 
      async def adverts(self):
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
-        try:
-            async with aiohttp.ClientSession() as session:
+
+        async with aiohttp.ClientSession() as session:
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
                     # logger.debug('Проверка прав на рекламу прошла успешно')
-        except ApiForbiddenError:
-            raise
-        except UnknownApiRequestError as e:
-            logger.error(e)
-        except aiohttp.client_exceptions.ServerDisconnectedError as e:
-            logger.error(e)
-        except aiohttp.client_exceptions.ClientOSError as e:
-            logger.error(e)
+
 
 
 
@@ -89,18 +82,11 @@ class TokenRightChecker(WbRequestApiMixin):
                 }
             }
         }
-        try:
-            async with aiohttp.ClientSession() as session:
-                await self.requests(session, 'POST',  url, json_data=data_for_req,
+
+        async with aiohttp.ClientSession() as session:
+            await self.requests(session, 'POST',  url, json_data=data_for_req,
                                         headers=self.headers.standart)
-        except ApiForbiddenError:
-            raise
-        except UnknownApiRequestError as e:
-            logger.error(e)
-        except aiohttp.client_exceptions.ServerDisconnectedError as e:
-            logger.error(e)
-        except aiohttp.client_exceptions.ClientOSError as e:
-            logger.error(e)
+
 
 
 
