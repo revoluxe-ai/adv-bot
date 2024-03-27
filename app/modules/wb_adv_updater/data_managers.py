@@ -357,7 +357,7 @@ class DataSetter:
                 min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
                 good_phrases, bad_phrases = await get_good_bad_phrases(adv_setting, min_ctr)
                 await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
-                logger.debug(f'Обновил минус слова для {adv_setting.name} {bad_phrases}')
+                logger.info(f'Обновил минус слова для {adv_setting.name} {bad_phrases}')
         return
 
 
