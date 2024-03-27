@@ -1,4 +1,5 @@
-
+from app.utils.redis_func_cache import  set_config
+set_config()
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.wb_adv_updater.data_managers import DataGetter
 from .manager import Manager

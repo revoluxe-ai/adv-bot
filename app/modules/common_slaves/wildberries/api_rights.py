@@ -37,9 +37,6 @@ class TokenRightChecker(WbRequestApiMixin):
      def _wb_user_cabinet(self):
         return None
 
-
-
-
      @property
      def _only_read(self):
          return OnlyRead.FALSE
@@ -56,11 +53,10 @@ class TokenRightChecker(WbRequestApiMixin):
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
                 logger.debug('Проверка прав на рекламу прошла успешно')
             except ApiForbiddenError:
-                return False
+                raise
             except UnknownApiRequestError as e:
                 logger.error(e)
-                return True
-            return True
+
 
 
      async def content(self)-> bool:
@@ -84,11 +80,10 @@ class TokenRightChecker(WbRequestApiMixin):
                 await self.requests(session, 'POST',  url, json_data=data_for_req,
                                     headers=self.headers.standart)
                 logger.debug('Проверка прав на контент прошла успешно')
-            except UnknownApiRequestError:
-                return False
+            except ApiForbiddenError:
+                raise
             except Exception as e:
                 logger.error(e)
-                return True
-            return True
+
 
 

@@ -4,6 +4,7 @@ from typing import Union
 from dataclasses import dataclass
 from . import exceptions
 from .api_rights import TokenRightChecker
+from .exceptions import ApiForbiddenError
 from .models import WBToken
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
@@ -55,11 +56,12 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                         logger.error('Срок действия токена истек')
                         continue
                     checker = TokenRightChecker(token)
-                    check = await asyncio.gather(checker.adverts(),
+                    try:
+                        await asyncio.gather(checker.adverts(),
                                                  checker.content())
-                    if check:
                         tokens_for_wb_cabinet.append(token)
-                    else:
+                    except ApiForbiddenError:
+
                         smtp = select(WBUserCabinet).join(WBUserCabinet.user)\
                         .selectinload(WBUserCabinet.user)\
                         .where(WBUserCabinet.id == wb_user_cabinet.id)
@@ -67,8 +69,6 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                         logger.error(f'Токен не прошел проверку:'
                                      f' {wb_user_cabinet.user.username}'
                                      f'{wb_user_cabinet.name}')
-
-
 
             if tokens_for_wb_cabinet:
                 access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
