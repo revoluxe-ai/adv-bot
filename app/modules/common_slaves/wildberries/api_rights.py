@@ -53,7 +53,7 @@ class TokenRightChecker(WbRequestApiMixin):
         async with aiohttp.ClientSession() as session:
             try:
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
-                logger.debug('Проверка прав на рекламу прошла успешно')
+                # logger.debug('Проверка прав на рекламу прошла успешно')
             except ApiForbiddenError:
                 raise
             except UnknownApiRequestError as e:
@@ -93,7 +93,7 @@ async def check_token(token):
     hash_token = hash(token)
     check = await redis_manager.get_token_rights(hash_token)
     if check:
-        # logger.debug('Права на токен уже проверены')
+        logger.debug('Права на токен уже проверены')
         return
     try:
         async with Lock():
