@@ -55,7 +55,9 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                         logger.error('Срок действия токена истек')
                         continue
                     checker = TokenRightChecker(token)
-                    if await checker.adverts() and await checker.content():
+                    check = await asyncio.gather(checker.adverts(),
+                                                 checker.content())
+                    if check:
                         tokens_for_wb_cabinet.append(token)
 
 
