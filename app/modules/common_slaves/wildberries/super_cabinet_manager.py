@@ -48,7 +48,7 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                 tokens: list[WBToken] = user.wb_tokens
                 for token in tokens:
                     try:
-                        token_shop_id = token.shop_id
+                        token_shop_id = wb_cabinet.shop_id
                         if shop_id == token_shop_id:
                             tokens_for_wb_cabinet.append(token)
                     except exceptions.TokenExpiredError:
@@ -59,6 +59,15 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                                                  checker.content())
                     if check:
                         tokens_for_wb_cabinet.append(token)
+                    else:
+                        smtp = select(WBUserCabinet).join(WBUserCabinet.user)\
+                        .selectinload(WBUserCabinet.user)\
+                        .where(WBUserCabinet.id == wb_user_cabinet.id)
+                        await session.execute(smtp)
+                        logger.error(f'Токен не прошел проверку:'
+                                     f' {wb_user_cabinet.user.username}'
+                                     f'{wb_user_cabinet.name}')
+
 
 
             if tokens_for_wb_cabinet:
@@ -68,7 +77,7 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                 accesses.append(access)
             else:
                 wb_cabinet.active = False
-        await session.commit()
+                await session.commit()
 
 
     return accesses

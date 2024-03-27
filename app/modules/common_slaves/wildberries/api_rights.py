@@ -54,6 +54,7 @@ class TokenRightChecker(WbRequestApiMixin):
         async with aiohttp.ClientSession() as session:
             try:
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
+                logger.debug('Проверка прав на рекламу прошла успешно')
             except ApiForbiddenError:
                 return False
             except UnknownApiRequestError as e:
@@ -82,9 +83,10 @@ class TokenRightChecker(WbRequestApiMixin):
             try:
                 await self.requests(session, 'POST',  url, json_data=data_for_req,
                                     headers=self.headers.standart)
-            except ApiForbiddenError:
+                logger.debug('Проверка прав на контент прошла успешно')
+            except UnknownApiRequestError:
                 return False
-            except UnknownApiRequestError as e:
+            except Exception as e:
                 logger.error(e)
                 return True
             return True

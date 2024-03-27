@@ -88,6 +88,12 @@
         "handlers": ["console"],
         "propagate": false
     },
+    "app.utils.db.session_maker": {
+        "level": "CRITICAL",
+        "handlers": ["console"],
+        "propagate": false
+    },
+
     "NeoDataScience.driver": {
       "level": "WARNING",
       "handlers": ["console"],
@@ -95,7 +101,7 @@
     },
 
   "root": {
-    "level": "INFO",
+    "level": "DEBUG",
     "handlers": ["console"]
   }
 }}
