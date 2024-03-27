@@ -43,3 +43,7 @@ class ApiForbiddenError(Exception):
        self.wb_user_cabinet = wb_user_cabinet
        m = 'API доступ запрещен'
        super().__init__(f'{m} text: {self.text}')
+
+
+class TooManyRequests(Exception):
+    pass

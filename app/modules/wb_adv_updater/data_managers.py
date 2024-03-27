@@ -338,17 +338,16 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
 class DataSetter:
     def __init__(self, access: WBCabinetAccess):
         self._wb_api = WBApi(access)
-        self._wb_user_cabinet = access.wb_user_cabinet
+        self._wb_cabinet = access.wb_cabinet
 
 
     async def update_minus_keywords(self, category_name_to_min_ctr):
         async with _sm() as session:
             stmt = select(AdvSetting) \
-                .options(selectinload(AdvSetting.keyword_settings)
-                         .selectinload(KeywordSetting.adv_keywords))\
-            .where (and_(AdvSetting.bot_active == True, AdvSetting.bot_active == True))
+              .where (and_(AdvSetting.bot_active == True,
+                         AdvSetting.wb_cabinet_id == self._wb_cabinet.id))
             result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.unique().scalars().all()
+            adv_settings: list[AdvSetting] = result.scalars().all()
         for adv_setting in adv_settings:
             if adv_setting.bot_active:
                 category:WBCategory = await get_wb_category(adv_setting)

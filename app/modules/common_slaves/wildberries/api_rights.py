@@ -27,7 +27,7 @@ class Rights:
 
 import aiohttp
 import logging
-from .exceptions import ApiForbiddenError, UnknownApiRequestError
+from .exceptions import ApiForbiddenError, UnknownApiRequestError, TooManyRequests
 from .ABC_WB_API import ABC_WB_API, WbRequestApiMixin, Headers
 
 logger = logging.getLogger(__name__)
@@ -61,9 +61,6 @@ class TokenRightChecker(WbRequestApiMixin):
 
         async with aiohttp.ClientSession() as session:
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
-
-
-
 
 
      async def content(self):
@@ -103,5 +100,9 @@ async def check_token(token):
             checker = TokenRightChecker(token)
             await asyncio.gather(checker.adverts(), checker.content())
         await redis_manager.set_token_rights(hash_token, timeout=60*60)
+    except ApiForbiddenError:
+        logger.error(f'Токен отозван')
     except UnknownApiRequestError:
         logger.error('Ошибка проверки токена (пропущено)')
+    except TooManyRequests:
+        logger.error('Превышен лимит запросов')

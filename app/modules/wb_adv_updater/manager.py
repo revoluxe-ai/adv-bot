@@ -237,12 +237,12 @@ class Manager(AbcManager):
         update_tasks: dict[int, asyncio.Task] = {}
         while True:
             category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
-
             accesses  = await super_cabinet_manager.get_accesses_for_wb_cabinets()
             for access in accesses:
                 wb_cabinet_id = access.wb_cabinet.id
                 if wb_cabinet_id  not in update_tasks:
                     data_setter = DataSetter(access)
+                    logger.debug(access.wb_cabinet.id)
                     task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
                     update_tasks[wb_cabinet_id] = task
                 else:

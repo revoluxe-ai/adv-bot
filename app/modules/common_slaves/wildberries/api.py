@@ -10,56 +10,57 @@ import time
 import json
 from .data_classes.keywordstat import KeywordStat
 from .data_classes.subcategories import Subcategory
+from .exceptions import ApiForbiddenError
 from .models import AdvSetting
 from . import exceptions
 from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
-
+import time
 
 logger = logging.getLogger(__name__)
 
 
-def _try_except_decorator(requests_per_interval, interval_seconds):
-    first_request = True
-    base_interval = interval_seconds / requests_per_interval
-    last_query_time = 0
-    current_pause = base_interval
+def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=50, max_delay=120):
+    def decorator(func):
+        async def wrapper(instance, *args, **kwargs):
+            if not hasattr(instance, '_api_call_state'):
+                instance._api_call_state = {}
 
-    def decorator(request_func):
-        async def wrapper(*args, **kwargs):
-            nonlocal last_query_time, current_pause, first_request
-            while True:
+            method_name = func.__name__
+            if method_name not in instance._api_call_state:
+                instance._api_call_state[method_name] = {
+                    '_last_query_time': 0,
+                    '_current_pause': interval_seconds / requests_per_interval,
+                    '_attempts': 0,
+                     '_first_request': True
+                }
+
+            state = instance._api_call_state[method_name]
+            while state['_attempts'] < max_attempts:
                 current_time = time.time()
-                time_since_last_query = current_time - last_query_time
-                time_to_wait = max(current_pause - time_since_last_query, 0)
-                if not first_request:
+                time_since_last_query = current_time - state['_last_query_time']
+                time_to_wait = max(state['_current_pause'] - time_since_last_query, 0)
+                if state['_first_request']:
+                    logger.debug(f'Пауза между запросами: {time_to_wait} секунд')
                     await asyncio.sleep(time_to_wait)
-                else:
-                    first_request = False
+                    state['_first_request'] = False
+
                 try:
-                    result = await request_func(*args, **kwargs)
-                    last_query_time = time.time()
-                    current_pause = (base_interval + current_pause) / 2
-                    if current_pause < base_interval:
-                        current_pause = base_interval
+                    result = await func(instance, *args, **kwargs)
+                    state['_last_query_time'] = time.time()
+                    state['_current_pause'] = (interval_seconds / requests_per_interval + state['_current_pause']) / 2
+                    state['_attempts'] = 0  # Сброс попыток после успешного выполнения
                     return result
-                except exceptions.ApiForbiddenError:
+                except ApiForbiddenError:
                     raise
-                except exceptions.UnknownApiRequestError as e:
-                    current_pause *= 2
-                    if current_pause > 120:
-                        current_pause = 120
-                    logger.error(f'Ошибка при запросе к API: {e}, повтор через {current_pause} секунд')
-                    await asyncio.sleep(time_to_wait)
-
-
-
+                except Exception as e:
+                    logger.error('Ошибка запроса к wb: %s', e)# Замените Exception на ваше конкретное исключение, если нужно
+                    state['_attempts'] += 1
+                    state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
+                    if state['_attempts'] >= max_attempts:
+                        raise e
         return wrapper
-
     return decorator
-
-
-
 
 
 
@@ -71,7 +72,7 @@ class AdvertApi(ABC_WB_API):
     auto_adv_types = [8]
 
 
-    @_try_except_decorator(2, 1)
+    @try_except_decorator(2, 1)
     async def get_keywords_stat(self, adv_setting: AdvSetting)-> list[KeywordStat]:
         keywords = []
         url = f'https://advert-api.wb.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}'
@@ -96,7 +97,7 @@ class AdvertApi(ABC_WB_API):
 
 
 
-    @_try_except_decorator(1, 3)
+    @try_except_decorator(1, 3)
     async def get_advertIds(self, statuses: list, adv_types)->list[Adv]:
         advertIds = []
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
@@ -115,7 +116,7 @@ class AdvertApi(ABC_WB_API):
                         advertIds.append(advertId)
 
         return advertIds
-    @_try_except_decorator(1, 2)
+    @try_except_decorator(1, 2)
     async def get_advs(self, adv_ids: list):
         advs = []
         url = f'https://advert-api.wb.ru/adv/v1/promotion/adverts'
@@ -129,14 +130,14 @@ class AdvertApi(ABC_WB_API):
                         advs.append(adv)
         return advs
 
-    @_try_except_decorator(1, 1)
+    @try_except_decorator(1, 1)
     async def get_live_advs(self):
         adv_ids = await self.get_advertIds(self.live_company_status, self.auto_adv_types)
         advs = await self.get_advs(adv_ids)
         return advs
 
 
-    @_try_except_decorator(1, 6)
+    @try_except_decorator(1, 6)
     async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
         url = f'https://advert-api.wb.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}'
         data = {
@@ -200,7 +201,7 @@ class ContentApi(ABC_WB_API):
 
 
     async def get_subcategories(self):
-        @_try_except_decorator(1, 1)
+        @try_except_decorator(1, 1)
         async def request(session, url)-> list[Subcategory]:
             all_categories = []
             response = await self.requests(session, 'GET', url,
@@ -240,7 +241,7 @@ class ContentApi(ABC_WB_API):
             answer = json.loads(response_text)
             return answer['data']
 
-    @_try_except_decorator(1, 2)
+    @try_except_decorator(1, 2)
     async def get_cards_by_text(self, texts: set[Union[str, int]]):
         cards = []
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'

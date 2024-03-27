@@ -34,7 +34,8 @@ class WbRequestApiMixin(ABC):
             except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
                 if e.status == 401:
                     raise exceptions.ApiForbiddenError('Неверный API ключ', wb_user_cabinet=self._wb_user_cabinet) from e
-
+                if e.status == 429:
+                    raise exceptions.TooManyRequests from e
                 else:
                     # Для всех других ошибок 4xx и 5xx
                     raise exceptions.UnknownApiRequestError(e) from e

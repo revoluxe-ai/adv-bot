@@ -60,13 +60,17 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                         await api_rights.check_token(token)
                         users_live_tokens.append(token)
                     except ApiForbiddenError:
-                        raise
+                        logger.error('Токен отозван')
+                        continue
                     except UnknownApiRequestError as e:
                         logger.error(e)
+                        users_live_tokens.append(token)
                     except aiohttp.client_exceptions.ServerDisconnectedError as e:
                         logger.error(e)
+                        users_live_tokens.append(token)
                     except aiohttp.client_exceptions.ClientOSError as e:
                         logger.error(e)
+                        users_live_tokens.append(token)
                     finally:
                         await asyncio.sleep(1)
                 tokens_for_wb_cabinet.extend(users_live_tokens)
