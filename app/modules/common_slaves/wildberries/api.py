@@ -20,22 +20,28 @@ logger = logging.getLogger(__name__)
 
 
 def _try_except_decorator(requests_per_interval, interval_seconds):
+    first_request = True
     base_interval = interval_seconds / requests_per_interval
     last_query_time = 0
     current_pause = base_interval
 
     def decorator(request_func):
         async def wrapper(*args, **kwargs):
-            nonlocal last_query_time, current_pause
+            nonlocal last_query_time, current_pause, first_request
             while True:
                 current_time = time.time()
                 time_since_last_query = current_time - last_query_time
                 time_to_wait = max(current_pause - time_since_last_query, 0)
-
+                if not first_request:
+                    await asyncio.sleep(time_to_wait)
+                else:
+                    first_request = False
                 try:
                     result = await request_func(*args, **kwargs)
                     last_query_time = time.time()
                     current_pause = (base_interval + current_pause) / 2
+                    if current_pause < base_interval:
+                        current_pause = base_interval
                     return result
                 except exceptions.ApiForbiddenError:
                     raise
