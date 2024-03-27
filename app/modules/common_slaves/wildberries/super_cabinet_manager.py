@@ -68,6 +68,8 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                         logger.error(f'Токен не прошел проверку:'
                                      f' {wb_user_cabinet.user.username}'
                                      f'{wb_user_cabinet.name}')
+                    finally:
+                        await asyncio.sleep(1)
                 tokens_for_wb_cabinet.extend(users_live_tokens)
 
             if tokens_for_wb_cabinet:
@@ -78,7 +80,7 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
             else:
                 wb_cabinet.active = False
                 await session.commit()
-            await asyncio.sleep(1)
+
 
     return accesses
 
