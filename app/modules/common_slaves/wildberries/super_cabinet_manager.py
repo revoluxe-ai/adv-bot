@@ -47,11 +47,11 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
             for wb_user_cabinet in wb_user_cabinets:
                 user = wb_user_cabinet.user
                 tokens: list[WBToken] = user.wb_tokens
+                users_live_tokens = []
                 for token in tokens:
                     try:
                         token_shop_id = wb_cabinet.shop_id
-                        if shop_id == token_shop_id:
-                            tokens_for_wb_cabinet.append(token)
+                        assert shop_id == token_shop_id
                     except exceptions.TokenExpiredError:
                         logger.error('Срок действия токена истек')
                         continue
@@ -59,16 +59,17 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                     try:
                         await asyncio.gather(checker.adverts(),
                                                  checker.content())
-                        tokens_for_wb_cabinet.append(token)
+                        users_live_tokens.append(token)
                     except ApiForbiddenError:
 
                         smtp = select(WBUserCabinet).join(WBUserCabinet.user)\
-                        .selectinload(WBUserCabinet.user)\
+                        .options(selectinload(WBUserCabinet.user))\
                         .where(WBUserCabinet.id == wb_user_cabinet.id)
                         await session.execute(smtp)
                         logger.error(f'Токен не прошел проверку:'
                                      f' {wb_user_cabinet.user.username}'
                                      f'{wb_user_cabinet.name}')
+                tokens_for_wb_cabinet.extend(users_live_tokens)
 
             if tokens_for_wb_cabinet:
                 access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
