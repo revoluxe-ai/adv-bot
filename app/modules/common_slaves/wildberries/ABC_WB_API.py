@@ -38,7 +38,8 @@ class WbRequestApiMixin(ABC):
                 else:
                     # Для всех других ошибок 4xx и 5xx
                     raise exceptions.UnknownApiRequestError(e) from e
-
+            except aiohttp.ClientError as e:
+                raise exceptions.UnknownApiRequestError(e) from e
 
             # Если код не в блоке except, значит ответ был успешным (статус 200-299)
             text = await response.text()

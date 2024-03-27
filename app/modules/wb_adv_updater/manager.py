@@ -324,8 +324,10 @@ class Manager(AbcManager):
 
                 )
                 phrase_data_list.append(phrase_data)
-
-            await self._gds.add_keyword_phrase(phrase_data_list)
+            try:
+                 await self._gds.add_keyword_phrase(phrase_data_list)
+            except Exception as exc:
+                logger.error(f'Ошибка добавления фразы  в граф: {exc}')
             await asyncio.sleep(3)
 
 
