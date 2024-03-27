@@ -54,7 +54,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                 except ApiForbiddenError:
                     raise
                 except Exception as e:
-                    logger.error('Ошибка запроса к wb: %s', e)# Замените Exception на ваше конкретное исключение, если нужно
+                    logger.error('Ошибка запроса к wb: %s', e)
                     state['_attempts'] += 1
                     state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:
@@ -81,6 +81,9 @@ class AdvertApi(ABC_WB_API):
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             update_timestamp = datetime.datetime.now()
+            if not answer:
+                logger.error('Нет данных по ключевым словам: %s', adv_setting.name)
+                return  []
             for data in answer:
                 wb_timestamp = datetime.datetime.fromisoformat(data['date']).date()
                 stat = data['stat']

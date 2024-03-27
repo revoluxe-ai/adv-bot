@@ -349,17 +349,17 @@ class DataSetter:
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
         for adv_setting in adv_settings:
-            if adv_setting.bot_active:
-                category:WBCategory = await get_wb_category(adv_setting)
-                if not category:
-                    continue
-                min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
-                good_phrases, bad_phrases = await get_good_bad_phrases(adv_setting, min_ctr)
-                if bad_phrases:
-                    await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
-                    logger.info(f'Обновил минус слова для {adv_setting.name} {bad_phrases}')
-                else:
-                    logger.info(f'Нет минус слов для {adv_setting.name}')
+            category:WBCategory = await get_wb_category(adv_setting)
+            if not category:
+                continue
+            min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
+            good_phrases, bad_phrases = await get_good_bad_phrases(adv_setting, min_ctr)
+            if bad_phrases:
+                await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
+                logger.info(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
+                logger.info(f'Позитивные слова {good_phrases}')
+            else:
+                logger.info(f'Нет минус слов для {adv_setting.name}')
         return
 
 
