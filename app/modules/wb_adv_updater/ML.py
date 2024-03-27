@@ -188,7 +188,7 @@ class Fitter(AbcManager):
                 smtp = select(KeywordSetting).join(
                     KeywordSetting.adv_setting
                 ).filter(
-                    KeywordSetting.adv_setting_id == adv.adv_id
+                    KeywordSetting.adv_setting_id == adv.id
                 )
                 keyword_settings = await session.execute(smtp)
                 keyword_settings = keyword_settings.scalars().all()
