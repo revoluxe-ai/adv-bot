@@ -58,6 +58,8 @@ class TokenRightChecker(WbRequestApiMixin):
                 raise
             except UnknownApiRequestError as e:
                 logger.error(e)
+            except aiohttp.client_exceptions.ServerDisconnectedError as e:
+                logger.error(e)
 
 
      async def content(self):
