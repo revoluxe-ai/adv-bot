@@ -52,6 +52,10 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                             tokens_for_wb_cabinet.append(token)
                     except exceptions.TokenExpiredError:
                         logger.error('Срок действия токена истек')
+                        checker = TokenRightChecker(token)
+                        if await checker.adverts() and await checker.content():
+                            tokens_for_wb_cabinet.append(token)
+
             if tokens_for_wb_cabinet:
                 access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
                                      wb_user_cabinet = None,
