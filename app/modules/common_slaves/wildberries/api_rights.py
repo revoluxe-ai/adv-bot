@@ -93,12 +93,12 @@ async def check_token(token):
     hash_token = hash(token)
     check = await redis_manager.get_token_rights(hash_token)
     if check:
-        logger.debug('Права на токен уже проверены')
+        # logger.debug('Права на токен уже проверены')
         return
     try:
         async with Lock():
             checker = TokenRightChecker(token)
             await asyncio.gather(checker.adverts(), checker.content())
-        await redis_manager.set_token_rights(hash_token, timeout=60)
+        await redis_manager.set_token_rights(hash_token, timeout=60*60)
     except UnknownApiRequestError:
         logger.error('Ошибка проверки токена (пропущено)')

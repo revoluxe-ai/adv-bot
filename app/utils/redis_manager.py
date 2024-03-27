@@ -14,10 +14,10 @@ async def set_token_rights(hash_token, timeout):
     # now = datetime.datetime.now()
     # expire = now + datetime.timedelta(seconds=timeout)
 
-    await redis_client.set(hash_token, 'True', ex = timeout)
+    await redis_client.set('token_rights:' + str(hash_token), 'True', ex = timeout)
     return None
 
 
 async def get_token_rights(hash_token):
-    answer = await redis_client.get(hash_token)
+    answer = await redis_client.get('token_rights:'  + str(hash_token))
     return answer
