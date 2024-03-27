@@ -79,7 +79,7 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
             else:
                 wb_cabinet.active = False
                 await session.commit()
-
+            await asyncio.sleep(1)
 
     return accesses
 
