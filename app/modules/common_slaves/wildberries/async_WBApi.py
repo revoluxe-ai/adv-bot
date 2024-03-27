@@ -300,25 +300,6 @@ class async_WBApi(ABC_WB_API):
 
 
 
-    async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
-        url = f'https://advert-api.wb.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}'
-        timer = 5
-        data = {
-            "excluded": phrases
-        }
-
-        async with aiohttp.ClientSession() as session:
-            while True:
-                try:
-                    response = await session.post(url, json=data, headers=self.headers.standart)
-                    response.raise_for_status()  # Генерирует исключение для ответов с ошибкой
-                    logger.debug('Минус-фразы установлены')
-                    break
-                except aiohttp.ClientError as e:
-                    logger.error(f'РК {adv.name} Ошибка установки минус-фраз: {e}')
-                    await asyncio.sleep(timer)  # Асинхронная задержка перед следующей попыткой
-                    timer *= 2  # Увеличиваем таймер вдвое для экспоненциального отката
-
     async def get_adv_balances(self):
         url = 'https://advert-api.wb.ru/adv/v1/balance'
         async with aiohttp.ClientSession() as session:

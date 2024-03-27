@@ -21,38 +21,32 @@ logger = logging.getLogger(__name__)
 
 def _try_except_decorator(requests_per_interval, interval_seconds):
     base_interval = interval_seconds / requests_per_interval
+    last_query_time = 0
+    current_pause = base_interval
 
     def decorator(request_func):
         async def wrapper(*args, **kwargs):
-            nonlocal base_interval
-            last_query_time = 0
-            current_pause = base_interval
+            nonlocal last_query_time, current_pause
             while True:
                 current_time = time.time()
                 time_since_last_query = current_time - last_query_time
                 time_to_wait = max(current_pause - time_since_last_query, 0)
-                await asyncio.sleep(time_to_wait)
+
                 try:
-                    response = await request_func(*args, **kwargs)
-                    if response.status == 401:
-                        raise exceptions.ApiForbiddenError("Unauthorized access, token may have expired.")
-                    elif response.status >= 400:
-                        raise Exception(f"HTTP Error {response.status}: {await response.text()}")
                     last_query_time = time.time()
+                    result = await request_func(*args, **kwargs)
                     current_pause = (base_interval + current_pause) / 2
-                    return response
-                except exceptions.ApiForbiddenError as e:
-                    # Ошибка авторизации, возможно, требуется обновление токена или прекращение выполнения
-                    logger.error(f'Ошибка авторизации: {e}')
+                    return result
+                except exceptions.ApiForbiddenError:
                     raise
-                except Exception as e:
-                    # Любые другие ошибки, кроме ошибок авторизации
+                except exceptions.UnknownApiRequestError as e:
                     current_pause *= 2
                     if current_pause > 120:
                         current_pause = 120
                     logger.error(f'Ошибка при запросе к API: {e}, повтор через {current_pause} секунд')
-                finally:
-                    last_query_time = time.time()
+                    await asyncio.sleep(time_to_wait)
+
+
 
         return wrapper
 

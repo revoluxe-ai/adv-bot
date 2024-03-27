@@ -61,7 +61,7 @@ class TokenRightChecker(WbRequestApiMixin):
 
         async with aiohttp.ClientSession() as session:
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
-                    # logger.debug('Проверка прав на рекламу прошла успешно')
+
 
 
 
