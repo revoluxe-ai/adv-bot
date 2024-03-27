@@ -36,13 +36,10 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
                     result = await request_func(*args, **kwargs)
                     last_query_time = time.time()
                     current_pause = (base_interval + current_pause) / 2
-
                     return result
                 except exceptions.ApiForbiddenError:
                     raise
-                except (exceptions.UnknownApiRequestError,
-                        aiohttp.client_exceptions.ClientConnectorError, aiohttp.client_exceptions.ClientOSError,
-                        aiohttp.client_exceptions.ServerDisconnectedError) as e:
+                except Exception as e:
                     current_pause *= 2
                     if current_pause > 120:
                         current_pause = 120
