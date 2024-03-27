@@ -145,16 +145,9 @@ class Fitter(AbcManager):
         keyword_text_keyword_features = {}
         async with sm() as sess:
             result = await sess.execute(
-                select(AdvSetting)
-                .options(
-                    selectinload(AdvSetting.adv_keywords),
-                    # Убедитесь, что есть связь для wb_cards и wb_category, и что они правильно определены в моделях
-                    selectinload(AdvSetting.wb_cards).selectinload(WBCard.wb_category),
-                    selectinload(AdvSetting.keyword_settings).selectinload(KeywordSetting.adv_keywords)
-                )
-            )
-            # Используйте unique() для удаления дубликатов перед получением списка объектов
-            adv_settings = result.scalars().unique().all()
+                select(AdvSetting))
+
+            adv_settings = result.scalars().all()
 
         data_rows = []
         for adv in adv_settings:
@@ -189,7 +182,17 @@ class Fitter(AbcManager):
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
             avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-            keyword_settings: list[KeywordSetting] = adv.keyword_settings
+
+
+            async with sm() as session:
+                smtp = select(KeywordSetting).join(
+                    KeywordSetting.adv_setting
+                ).filter(
+                    KeywordSetting.adv_setting_id == adv.adv_id
+                )
+                keyword_settings = await session.execute(smtp)
+                keyword_settings = keyword_settings.scalars().all()
+
 
             for keyword_setting in keyword_settings:
                 text = keyword_setting.text
@@ -232,7 +235,7 @@ class Fitter(AbcManager):
         df = await self._get_df_for_fit()
         fit_logger.debug('Данные получены')
         if len(df) == 0:
-            logger.debug('Нет данных для обучения')
+            logger.info('Нет данных для обучения')
             return
         adv_keyword_text_in_black_list: list[tuple[int, str]] = await data_managers.get_adv_keyword_text_in_black_list()
         df:pd.DataFrame = await self._bayesian_apply(df, adv_keyword_text_in_black_list)

@@ -31,6 +31,7 @@ class Runner:
         predicted = asyncio.Event()
         predicted.set()
         await asyncio.gather(
+            self.update_cards_in_graph(),
             self.update_all_data_in_db(),
             self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_keyword_stat(need_update_model),

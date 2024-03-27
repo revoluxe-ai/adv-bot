@@ -109,8 +109,7 @@ class ShopDataUpdater:
             await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
         except exc.ApiForbiddenError as exceprion:
             logger.error(exceprion)
-        except Exception as exception:
-            logger.error(exception)
+
 
 
 
