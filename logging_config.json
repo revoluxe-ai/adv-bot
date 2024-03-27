@@ -102,7 +102,7 @@
 
   "root": {
     "level": "DEBUG",
-    "handlers": ["console"]
+    "handlers": ["console", "error_to_file"]
   }
 }}
 
