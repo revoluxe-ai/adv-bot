@@ -1,4 +1,6 @@
-
+import asyncio
+from app.utils import redis_manager
+from aiocache import cached_stampede
 
 class OnlyRead:
     TRUE = True
@@ -46,7 +48,7 @@ class TokenRightChecker(WbRequestApiMixin):
          return {Rights.CONTENT, Rights.PROMOTION}
 
 
-     async def adverts(self)-> bool:
+     async def adverts(self):
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
         async with aiohttp.ClientSession() as session:
             try:
@@ -58,8 +60,7 @@ class TokenRightChecker(WbRequestApiMixin):
                 logger.error(e)
 
 
-
-     async def content(self)-> bool:
+     async def content(self):
         limit = 1
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
         data_for_req = {
@@ -87,3 +88,16 @@ class TokenRightChecker(WbRequestApiMixin):
 
 
 
+
+async def check_token(token):
+    hash_token = hash(token)
+    check = await redis_manager.get_token_rights(hash_token)
+    if check:
+        logger.debug('Права на токен уже проверены')
+        return
+    try:
+        checker = TokenRightChecker(token)
+        await asyncio.gather(checker.adverts(), checker.content())
+        await redis_manager.set_token_rights(hash_token, timeout=60)
+    except UnknownApiRequestError:
+        logger.error('Ошибка проверки токена (пропущено)')

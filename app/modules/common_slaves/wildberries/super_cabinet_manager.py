@@ -3,7 +3,7 @@ import dataclasses
 from typing import Union
 from dataclasses import dataclass
 from . import exceptions
-from .api_rights import TokenRightChecker
+from . import api_rights
 from .exceptions import ApiForbiddenError
 from .models import WBToken
 from sqlalchemy.orm import selectinload
@@ -55,10 +55,9 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                     except exceptions.TokenExpiredError:
                         logger.error('Срок действия токена истек')
                         continue
-                    checker = TokenRightChecker(token)
+
                     try:
-                        await asyncio.gather(checker.adverts(),
-                                                 checker.content())
+                        await api_rights.check_token(token)
                         users_live_tokens.append(token)
                     except ApiForbiddenError:
 
@@ -115,10 +114,8 @@ async def get_super_user_access():
     for token in tokens:
         while True:
             try:
-                checker = TokenRightChecker(token)
-                if await checker.adverts() and await checker.content():
-                    leave_tokens.append(token)
-                    break
+                await api_rights.check_token(token)
+                leave_tokens.append(token)
             except Exception as exc:
                 logger.error(exc)
                 await asyncio.sleep(1)
