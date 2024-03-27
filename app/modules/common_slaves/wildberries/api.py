@@ -33,8 +33,8 @@ def _try_except_decorator(requests_per_interval, interval_seconds):
                 time_to_wait = max(current_pause - time_since_last_query, 0)
 
                 try:
-                    last_query_time = time.time()
                     result = await request_func(*args, **kwargs)
+                    last_query_time = time.time()
                     current_pause = (base_interval + current_pause) / 2
                     return result
                 except exceptions.ApiForbiddenError:
