@@ -46,8 +46,8 @@ class Runner:
 
                 return_exceptions=False
                 )
-        except Exception as e:
-            logger.error(traceback.print_exc())
+        except Exception:
+            logging.exception("Произошла ошибка:")
 
     async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
         while True:
