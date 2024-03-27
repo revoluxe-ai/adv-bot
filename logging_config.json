@@ -102,7 +102,7 @@
 
   "root": {
     "level": "INFO",
-    "handlers": ["console", "error_to_file"]
+    "handlers": ["console", "error_to_file", "common_file"]
   }
 }}
 
