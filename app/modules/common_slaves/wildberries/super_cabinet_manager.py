@@ -34,7 +34,8 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
     async with sm() as session:
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
-                                          .selectinload(User.wb_tokens))
+                                          .selectinload(User.wb_tokens))\
+        .where(WBCabinet.active == True)
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
@@ -63,6 +64,11 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                                      wb_user_cabinet = None,
                                      wb_cabinet = wb_cabinet)
                 accesses.append(access)
+            else:
+                wb_cabinet.active = False
+        await session.commit()
+
+
     return accesses
 
 

@@ -1,5 +1,3 @@
-import app
-
 
 
 class OnlyRead:
@@ -22,7 +20,7 @@ class Rights:
 
 import aiohttp
 import logging
-from .exceptions import ApiForbiddenError
+from .exceptions import ApiForbiddenError, UnknownApiRequestError
 from .ABC_WB_API import ABC_WB_API, WbRequestApiMixin, Headers
 
 logger = logging.getLogger(__name__)
@@ -58,7 +56,7 @@ class TokenRightChecker(WbRequestApiMixin):
                 await self.requests(session, 'GET', url, headers=self.headers.standart)
             except ApiForbiddenError:
                 return False
-            except Exception as e:
+            except UnknownApiRequestError as e:
                 logger.error(e)
                 return True
             return True
@@ -86,7 +84,7 @@ class TokenRightChecker(WbRequestApiMixin):
                                     headers=self.headers.standart)
             except ApiForbiddenError:
                 return False
-            except Exception as e:
+            except UnknownApiRequestError as e:
                 logger.error(e)
                 return True
             return True

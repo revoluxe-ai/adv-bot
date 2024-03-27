@@ -1,12 +1,17 @@
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+#это нужно для нормальной работы alembic
+from app.modules.wb_adv_updater.models import *
+from app.modules.common_slaves.wildberries.models import *
+from app.utils.db.models import *
+
 
 from alembic import context
 from sqlalchemy.orm import configure_mappers
 
 from app.utils.alchemy_row import row
-from app.utils.db.base import Base
+from app.utils.db.base import BaseTable as Base
 
 
 # this is the Alembic Config object, which provides

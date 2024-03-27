@@ -38,7 +38,7 @@ class WBCabinet(BaseTable):
     wb_user_cabinets: Mapped[list[WBUserCabinet]] = relationship("WBUserCabinet",
                                                            back_populates="wb_cabinet",
                                                                  )
-
+    active = Column(Boolean, default=True)
 
 class WBToken(BaseTable):
     def __repr__(self):
