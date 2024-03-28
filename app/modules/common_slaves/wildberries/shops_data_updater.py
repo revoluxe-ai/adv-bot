@@ -108,7 +108,7 @@ class ShopDataUpdater:
             cards = await wb_api.content.get_cards_by_text(nmids)
             await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
         except exc.ApiForbiddenError:
-            logger.error('Попытка обновлений с отозванны')
+            logger.error('Попытка обновлений с отозванным токеном')
 
 
 

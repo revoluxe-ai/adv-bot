@@ -804,20 +804,21 @@ RETURN graphName
     #                        topK=topK).data()
     #         logger.debug(result)
 
-    async def get_nmid_vectors(self) -> typing.List[typing.Tuple[int, typing.List[float]]]:
+    async def get_nmid_vectors(self,  nmids: list[int]) -> typing.List[typing.Tuple[int, typing.List[float]]]:
         query = """
-        MATCH (item:Item)
+        MATCH (item:Item) WHERE NOT item.nmid  IN  $nmids 
+        AND item.fastrp IS NOT NULL
         RETURN item.nmid as nmid, item.fastrp as vector
         """
-        async def get_nmid_vectors(tx, query):
-            result = await tx.run(query)
+        async def get_nmid_vectors(tx, query, nmids):
+            result = await tx.run(query, nmids=nmids)
             records = await result.data()
             return records
 
 
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                records = await session.read_transaction(get_nmid_vectors, query)
+                records = await session.read_transaction(get_nmid_vectors, query, nmids)
 
         data = []
         for record in records:
@@ -829,14 +830,15 @@ RETURN graphName
                 logger.debug(f'Вектор не найден для nmid: {nmid}')
         return data
 
-    async def get_keywords_vectors(self) -> typing.List[typing.Tuple[str, typing.List[float]]]:
+    async def get_keywords_vectors(self, texts: list[str]) -> typing.List[typing.Tuple[str, typing.List[float]]]:
         query = """
         MATCH (k:KeywordPhrase) WHERE k.fastrp IS NOT NULL
+        AND NOT k.text IN $texts
         RETURN k.text as keyword, k.fastrp as vector
         """
 
         async def get_keywords_vectors(tx, query):
-            result = await tx.run(query)
+            result = await tx.run(query, texts = texts)
             records = await result.data()
             data = []
             for record in records:

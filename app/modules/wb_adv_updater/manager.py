@@ -151,7 +151,7 @@ class Manager(AbcManager):
 
 
     async def graph_vector_update(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event) -> None:
-        # power = self._shop_manager.power
+
         length = 2**4
         await self.graph_updater.update_graph_run(length)
         await asyncio.sleep(1)
@@ -243,8 +243,16 @@ class Manager(AbcManager):
                 if wb_cabinet_id  not in update_tasks:
                     data_setter = DataSetter(access)
                     logger.debug(access.wb_cabinet.id)
-                    task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr))
-                    update_tasks[wb_cabinet_id] = task
+                    async with sm() as session:
+                        stmt = select(AdvSetting) \
+                            .where(and_(AdvSetting.bot_active == True,
+                                        AdvSetting.wb_cabinet_id == wb_cabinet_id))
+                        result = await session.execute(stmt)
+                        adv_settings: list[AdvSetting] = result.scalars().all()
+                    if adv_settings:
+                        task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr,
+                                                                                 adv_settings))
+                        update_tasks[wb_cabinet_id] = task
                 else:
                     if update_tasks[wb_cabinet_id].done():
                         if update_tasks[wb_cabinet_id].exception():

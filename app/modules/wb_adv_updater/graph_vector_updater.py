@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import hashlib
 import logging
 import os
@@ -69,35 +70,53 @@ class GraphUpdater:
 
                else:
                     raise  # Перебросить исключение, если ошибка не связана с выполняющимся заданием
-
-
-
-    async def get_nmids_and_keyword_featers_for_ml(self,  update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
-        nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors()
-        keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors()
+    async def _update_nmids_vectors(self):
+        timestamp = datetime.datetime.now()
+        async with sm() as session:
+            stmt = select(ItemFeature.nmid)
+            result = await session.execute(stmt)
+            nmids = result.scalars().all()
+        nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors(nmids)
         async with sm() as session:
             for nmid, vector in nmids_vectors:
-                stmt = select(ItemFeature).where(ItemFeature.nmid == nmid)
-                item = await session.execute(stmt)
-                item = item.scalar()
-                if not item:
-                    item = ItemFeature(nmid=nmid, vector=vector)
-                else:
-                    item.vector = vector
-                item.timestamp = None
+                item = ItemFeature(nmid=nmid, vector=vector)
+                item.timestamp = timestamp
                 session.add(item)
-            for keyword_text, vector in keywords_vectors:
-                stmt = select(KeywordFeature).where(KeywordFeature.keyword == keyword_text)
-                keyword = await session.execute(stmt)
-                keyword = keyword.scalar()
-                if not keyword:
-                    keyword = KeywordFeature(keyword=keyword_text, vector=vector)
-                else:
-                    keyword.vector = vector
-                keyword.timestamp = None
-                session.add(keyword)
-            await predicted.wait()
-            update_model_on_new_features.clear()
             await session.commit()
-            logger.debug('Вектора обновлены')
+        logger.debug('Вектора для nmids обновлены')
+
+    async def get_nmids_and_keyword_featers_for_ml(self,
+                                                   update_model_on_new_features: asyncio.Event,
+                                                   predicted: asyncio.Event):
+        await predicted.wait()
+        await asyncio.gather(self._update_nmids_vectors(),
+                       self._update_keywords_vectors())
+        update_model_on_new_features.set()
+
+
+
+    async def _update_keywords_vectors(self):
+        timestamp = datetime.datetime.now()
+        async with sm() as session:
+            stmt = select(KeywordFeature.keyword)
+            result = await session.execute(stmt)
+            keywords_text = result.scalars().all()
+        keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors(keywords_text)
+        async with sm() as session:
+            count = 0  # Счетчик для отслеживания количества обработанных записей
+            BATCH_SIZE = 100 # Размер порции для коммита
+
+            for keyword_text, vector in keywords_vectors:
+                logger.debug('Обновление вектора для ключа')
+                keyword = KeywordFeature(keyword=keyword_text, vector=vector)
+                keyword.timestamp = timestamp
+                session.add(keyword)
+                count += 1  # Увеличиваем счетчик на 1
+                if count % BATCH_SIZE == 0:  # Если достигнут размер порции
+                    await session.commit()  # Выполняем коммит
+                    logger.debug('Промежуточный коммит выполнен')
+
+            if count % BATCH_SIZE != 0:  # Если после последнего коммита остались несохраненные записи
+                await session.commit()  # Выполняем окончательный коммит
+                logger.debug('Вектора для ключей обновлены')
 

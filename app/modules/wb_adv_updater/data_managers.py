@@ -341,13 +341,7 @@ class DataSetter:
         self._wb_cabinet = access.wb_cabinet
 
 
-    async def update_minus_keywords(self, category_name_to_min_ctr):
-        async with _sm() as session:
-            stmt = select(AdvSetting) \
-              .where (and_(AdvSetting.bot_active == True,
-                         AdvSetting.wb_cabinet_id == self._wb_cabinet.id))
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.scalars().all()
+    async def update_minus_keywords(self, adv_settings, category_name_to_min_ctr):
         for adv_setting in adv_settings:
             category:WBCategory = await get_wb_category(adv_setting)
             if not category:

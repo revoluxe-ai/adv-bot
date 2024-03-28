@@ -289,9 +289,9 @@ class Predictor:
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
 
-        predicted.clear()
-        async with sm() as session:
-            df_for_predict = await self._get_df_for_predict(all_adv_settings, session)
+        # predicted.clear()
+
+        df_for_predict = await self._get_df_for_predict(all_adv_settings)
         predict_df = await asyncio.to_thread(self._predict, df_for_predict)
         predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
         await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
@@ -319,44 +319,53 @@ class Predictor:
 
 
 
-    async def _get_df_for_predict(self, adv_settings: list[AdvSetting], session)-> pd.DataFrame:
+    async def _get_df_for_predict(self, adv_settings: list[AdvSetting])-> pd.DataFrame:
        data_rows = []
-       for adv in adv_settings:
-           item_features_list = []
-           nmids = adv.nmids if adv.nmids else []
-           for nmid in nmids:
-               item_feature = await session.execute(
-                   select(ItemFeature).where(ItemFeature.nmid == nmid)
-               )
-               item_features = item_feature.scalars().all()
-               for item_feature in item_features:
-                   item_features_list.append(item_feature.vector)
-
-           # Вычисляем средние значения фичей товаров, если они есть
-
-           avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
-           avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
-
-           for keyword in adv.keyword_settings:
-               keyword_feature = await session.execute(
-                   select(KeywordFeature).where(KeywordFeature.keyword == keyword.text)
-               )
-               keyword_feature = keyword_feature.scalars().first()
-               if not keyword_feature:
+       async with sm() as session:
+           for adv in adv_settings:
+               logger.debug(f'Обработка кампании {adv.name}')
+               if not adv.nmids:
+                   logger.debug('Нет nmids: %s', adv.name)
                    continue
-               keyword_features = keyword_feature.vector
+               nmids = adv.nmids
+               item_features = await session.execute(
+                   select(ItemFeature).where(ItemFeature.nmid.in_(nmids))
+               )
+               item_features = item_features.scalars().all()
 
+               item_features = [item_feature.vector for item_feature in item_features]
 
+               avg_item_features = pd.DataFrame(item_features).mean().to_dict()
+               avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-               row = {
-                   'adv_id': adv.adv_id,
-                   'keyword': keyword.text,
-                   **avg_item_features,
-                   **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
-               }
-               data_rows.append(row)
+               keywords = [keyword.text for keyword in adv.keyword_settings]
 
+               # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
+               keyword_features_result = await session.execute(
+                   select(KeywordFeature).where(KeywordFeature.keyword.in_(keywords))
+               )
+               keyword_features_list = keyword_features_result.scalars().all()
+
+               # Преобразуем список объектов KeywordFeature в словарь для быстрого доступа
+               keyword_features_dict = {kf.keyword: kf.vector for kf in keyword_features_list}
+
+               for keyword in adv.keyword_settings:
+                   # Получаем векторы для каждого ключевого слова
+                   keyword_features = keyword_features_dict.get(keyword.text)
+                   if not keyword_features:
+                       continue
+
+                   # Собираем данные для строки
+                   row = {
+                       'adv_id': adv.adv_id,
+                       'keyword': keyword.text,
+                       **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
+                       **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
+                   }
+                   data_rows.append(row)
+       logger.debug('Формирование df')
        df = pd.DataFrame(data_rows)
+       logger.debug('Df готов')
        return df
 
 
