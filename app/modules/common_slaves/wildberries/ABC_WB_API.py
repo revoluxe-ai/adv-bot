@@ -35,9 +35,10 @@ class WbRequestApiMixin(ABC):
                 if e.status == 401:
                     raise exceptions.ApiForbiddenError('Неверный API ключ', wb_user_cabinet=self._wb_user_cabinet) from e
                 if e.status == 429:
+                    logger.error(f'Превышен лимит запросов к API. Ошибка: {url}')
                     raise exceptions.TooManyRequests from e
                 else:
-                    # Для всех других ошибок 4xx и 5xx
+                    #
                     raise exceptions.UnknownApiRequestError(e) from e
             except Exception as e:
                 raise exceptions.UnknownApiRequestError(e) from e

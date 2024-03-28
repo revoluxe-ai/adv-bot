@@ -22,7 +22,9 @@ from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
 
 from .data_managers import DataGetter
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
-fit_logger = logging.getLogger('fit_logger')
+
+
+
 
 sm = get_async_session_maker()
 
@@ -94,21 +96,10 @@ class Fitter(AbcManager):
 
 
 
-    def __read_files_for_fit(self):
-        # Загрузка данных
-        df_items_keywords_stat = pd.read_csv(self.keyword_stat_df_path)
-        fit_logger.debug('Данные загружены')
-        df_nmids_vectors = pd.read_csv(self.nmids_vectors_path)
-        df_keyword_vectors = pd.read_csv(self.keywords_vectors_path)
-        df_items_keywords_stat = self.fill_average_vector(df_items_keywords_stat, df_nmids_vectors)
-        # Объединение с df_keyword_vectors
-        df_final = df_items_keywords_stat.merge(df_keyword_vectors, how='left', on='keyword')
-
-        return df_final
 
     async def getGradientBoostingFullFitModel(self, update_model_on_new_features):
         await self._fit_modelGradientBoosting(update_model_on_new_features)
-        fit_logger.debug('Модель обучена')
+        logger.debug('Модель обучена')
 
 
     def _get_enough_views(self, ctr):
@@ -231,9 +222,9 @@ class Fitter(AbcManager):
         return df
 
     async def _fit_modelGradientBoosting(self, update_model_on_new_features):
-        fit_logger.debug('Поток обучения запущен, получение данных')
+        logger.debug('Поток обучения запущен, получение данных')
         df = await self._get_df_for_fit()
-        fit_logger.debug('Данные получены')
+        logger.debug('Данные получены')
         if len(df) == 0:
             logger.info('Нет данных для обучения')
             return
@@ -243,14 +234,14 @@ class Fitter(AbcManager):
         y = df['ctr']
         X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
                     axis=1)
-        fit_logger.debug('Данные подготовлены')
+        logger.debug('Данные подготовлены')
         # Создание модели градиентного бустинга
         model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
         if settings.cv:
-            fit_logger.debug('Начало кросс-валидации')
+            logger.debug('Начало кросс-валидации')
             cv = KFold(n_splits=5, random_state=42, shuffle=True)
             scores = cross_validate(model, X, y, scoring='neg_mean_squared_error', cv=cv)
-            fit_logger.debug('Кросс-валидация завершена')
+            logger.debug('Кросс-валидация завершена')
             mse_scores = -scores['test_score']
             # Вычисление и вывод метрик
             mean_mse = mse_scores.mean()
@@ -261,9 +252,9 @@ class Fitter(AbcManager):
             print(f"Mean CV MSE: {mean_mse}")
             print(f"Standard Deviation of CV MSE: {std_dev_mse}")
             print(f"Max difference between CV MSE scores: {max_difference}")
-        fit_logger.debug('Обучение модели на полных данных')
+        logger.debug('Обучение модели на полных данных')
         model.fit(X, y)
-        fit_logger.debug('Модель обучена')
+        logger.debug('Модель обучена')
         model = typing.cast(xgboost.XGBModel, model.named_steps['xgbregressor'])
         await asyncio.to_thread(save_model, model, time_stamp= None)
         update_model_on_new_features.set()

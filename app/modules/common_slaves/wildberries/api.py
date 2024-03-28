@@ -10,7 +10,7 @@ import time
 import json
 from .data_classes.keywordstat import KeywordStat
 from .data_classes.subcategories import Subcategory
-from .exceptions import ApiForbiddenError
+from .exceptions import ApiForbiddenError, TooManyRequests
 from .models import AdvSetting
 from . import exceptions
 from . import api_rights
@@ -53,8 +53,13 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                     return result
                 except ApiForbiddenError:
                     raise
+                except TooManyRequests:
+                    state['_attempts'] += 1
+                    state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
+                    if state['_attempts'] >= max_attempts:
+                        raise
                 except Exception as e:
-                    logger.error('Ошибка запроса к wb: %s', e)
+                    logger.error(f'Ошибка запроса к wb: {e}', e)
                     state['_attempts'] += 1
                     state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:

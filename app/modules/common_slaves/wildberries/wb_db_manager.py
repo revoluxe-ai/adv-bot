@@ -20,7 +20,9 @@ async def update_advs_in_db(advs, wb_cabinet: WBCabinet):
             if existing_adv:
                 existing_adv.active_status = adv.status_native
                 existing_adv.name = adv.name
-                existing_adv.nmids = adv.nmids
+                nmids = adv.nmids
+                if nmids:
+                    existing_adv.nmids = adv.nmids
             else:
                 stmt = select(WBCabinet)\
                 .where(WBCabinet.id == wb_cabinet.id)

@@ -48,7 +48,6 @@ predictor = Predictor()
 
 logger = logging.getLogger(__name__)
 
-fit_logger = logging.getLogger('fit_logger')
 
 sm = get_async_session_maker()
 
@@ -91,7 +90,6 @@ class Manager(AbcManager):
     @staticmethod
     async def update_keyword_stat(access: WBCabinetAccess, need_update_model:asyncio.Event):
         wb_api = WBApi(access)
-        update_signal = False
         wb_cabinet = access.wb_cabinet
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
@@ -125,7 +123,7 @@ class Manager(AbcManager):
                         keyword_db.text = keyword.text
                         keyword_db.date = keyword.date
                         session.add(keyword_db)
-                        update_signal = True
+
                     else:
                         if not keyword_db.keyword_setting:
                             stmt = select(KeywordSetting).where(and_(KeywordSetting.text == keyword.text,
@@ -140,14 +138,14 @@ class Manager(AbcManager):
                             keyword_db.keyword_setting = keyword_setting
                         if any([keyword_db.views != keyword.views,
                                 keyword_db.clicks != keyword.clicks]):
-                            update_signal = True
                             keyword_db.views = keyword.views
                             keyword_db.clicks = keyword.clicks
                             keyword_db.spend = keyword.spend
                 await session.commit()
-                if update_signal:
-                    need_update_model.set()
-                    update_signal = False
+                logger.debug(f'Статистика ключевых слов для {adv_setting.name} обновлена')
+                logger.debug(f'Установка set для need_update_model')
+                need_update_model.set()
+
 
 
     async def graph_vector_update(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event) -> None:
@@ -155,7 +153,10 @@ class Manager(AbcManager):
         length = 2**4
         await self.graph_updater.update_graph_run(length)
         await asyncio.sleep(1)
-        await self.graph_updater.get_nmids_and_keyword_featers_for_ml(update_model_on_new_features, predicted)
+        await predicted.wait()
+        await self.graph_updater.get_nmids_and_keyword_featers_for_ml()
+        update_model_on_new_features.set()
+
 
 
     # async def update_cards(self, file_working:asyncio.Lock):
@@ -250,8 +251,8 @@ class Manager(AbcManager):
                         result = await session.execute(stmt)
                         adv_settings: list[AdvSetting] = result.scalars().all()
                     if adv_settings:
-                        task = asyncio.create_task(data_setter.update_minus_keywords(category_name_to_min_ctr,
-                                                                                 adv_settings))
+                        task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings,
+                                                                                     category_name_to_min_ctr))
                         update_tasks[wb_cabinet_id] = task
                 else:
                     if update_tasks[wb_cabinet_id].done():
@@ -262,9 +263,9 @@ class Manager(AbcManager):
 
 
     async def update_model(self, update_model_on_new_features):
-        fit_logger.debug('Старт обучения и сохранения модели')
+        logger.debug('Старт обучения и сохранения модели')
         await self.fit_and_save_model(update_model_on_new_features)
-        fit_logger.debug('Устанавливаю сет, разрешаю обновление ключей')
+        logger.debug('Устанавливаю сет, разрешаю обновление ключей')
 
 
     def __save_model( model, model_path):

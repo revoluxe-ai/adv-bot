@@ -13,8 +13,6 @@ sm = get_async_session_maker()
 
 logger = logging.getLogger(__name__)
 
-fit_logger = logging.getLogger('fit_logger')
-
 
 
 class Runner:
@@ -35,6 +33,7 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
+            self.run_update_keywords_on_wb(),
             self.update_cards_in_graph(),
             self.update_all_data_in_db(),
             self.update_min_ctr_in_global_wb_category_settings(),
@@ -42,7 +41,7 @@ class Runner:
             self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
             self.run_update_model(update_model_on_new_features, need_update_model),
             self.run_update_predict_ctr(update_model_on_new_features, predicted),
-            self.run_update_keywords_on_wb(),
+
             return_exceptions=False
             )
 
@@ -82,22 +81,24 @@ class Runner:
             await self._manager.update_wb_adv_phrase_in_db()
             await self._manager.update_vectors_exec_mode(update_model_on_new_features, predicted)
             need_update_model.set()
+            logger.debug('Установка set для need_update_model')
             await asyncio.sleep(1)
 
     async def run_update_keywords_on_wb(self):
         await self._manager\
             .update_keywords_in_advs()
+        await asyncio.sleep(1)
 
 
     async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):
         while True:
-            fit_logger.debug('Старт цикла обновления модели')
+            logger.debug('Старт цикла обновления модели')
             await need_update_model.wait()
-            fit_logger.debug('need_update_model.wait пройден')
+            logger.debug('need_update_model.wait пройден')
             await self._manager.update_model(update_model_on_new_features)
-            fit_logger.debug('Цикл обновления модели завершен')
+            logger.debug('Цикл обновления модели завершен')
             await asyncio.sleep(1)
-            fit_logger.debug('Установка clear для need_update_model')
+            logger.debug('Установка clear для need_update_model')
             need_update_model.clear()
             await asyncio.sleep(1)
 
@@ -105,7 +106,7 @@ class Runner:
         while True:
             await self._manager.update_cards_in_graph()
             logger.debug('Карточки обновлены')
-            await asyncio.sleep(60)
+            await asyncio.sleep(1)
 
     async def update_min_ctr_in_global_wb_category_settings(self):
         while True:
@@ -114,7 +115,7 @@ class Runner:
 
     async def update_all_data_in_db(self):
         await self._manager.update_all_data_in_db_run()
-
+        await asyncio.sleep(1)
 
 
 

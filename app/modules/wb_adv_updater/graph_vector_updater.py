@@ -85,13 +85,10 @@ class GraphUpdater:
             await session.commit()
         logger.debug('Вектора для nmids обновлены')
 
-    async def get_nmids_and_keyword_featers_for_ml(self,
-                                                   update_model_on_new_features: asyncio.Event,
-                                                   predicted: asyncio.Event):
-        await predicted.wait()
+    async def get_nmids_and_keyword_featers_for_ml(self):
         await asyncio.gather(self._update_nmids_vectors(),
                        self._update_keywords_vectors())
-        update_model_on_new_features.set()
+
 
 
 

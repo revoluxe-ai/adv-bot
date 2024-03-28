@@ -99,9 +99,26 @@
       "handlers": ["console"],
       "propagate": false
     },
+    "app.modules.common_slaves.wildberries.api_rights":{
+
+        "level": "CRITICAL",
+        "handlers": ["console"],
+        "propagate": false
+        },
+    "app.modules.wb_adv_updater.runner": {
+        "level": "CRITICAL",
+        "handlers": ["console"],
+        "propagate": false
+    },
+    "app.modules.common_slaves.wildberries.ABC_WB_API":  {
+        "level": "CRITICAL",
+        "handlers": ["console"],
+        "propagate": false
+    },
+
 
   "root": {
-    "level": "DEBUG",
+    "level": "INFO",
     "handlers": ["console", "error_to_file", "common_file"]
   }
 }}
