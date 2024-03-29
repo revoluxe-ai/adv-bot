@@ -208,6 +208,9 @@ class KeywordSetting(BaseTable):
     predict_ctr = Column(Float, nullable=True)
     adv_keywords = relationship('AdvKeyword', back_populates='keyword_setting', uselist=True)
     hard_status = Column(Integer, default=1)
+    added_clicks = Column(Integer)
+    added_views = Column(Integer)
+    auto_block = Column(Boolean)
     __table_args__ = (UniqueConstraint('text', 'adv_setting_id'),
                       Index('ix_text_adv_setting_id', 'text', 'adv_setting_id'))
 

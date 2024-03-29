@@ -209,6 +209,14 @@ def get_keyword_setting_keyboard(keyword: KeywordSetting, adv_setting: AdvSettin
                                            keyword_setting_original_id=keyword.id).pack())]
         buttoms.append(buttom)
 
+    if keyword.auto_block:
+        bottom = [InlineKeyboardButton(text='Тестировать дальше',
+                                       callback_data=callbacks.ChangeKeywordHardStatus(
+                                           new_hard_status=-1,
+                                           keyword_setting_original_id=keyword.id).pack())]
+
+        buttoms.append(bottom)
+
     if keyword.hard_status in [0, 2]:
         buttom = [InlineKeyboardButton(text='В авто',
                                        callback_data=callbacks.ChangeKeywordHardStatus(

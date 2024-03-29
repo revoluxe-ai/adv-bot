@@ -3,8 +3,11 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, AdvSetting, KeywordSetting, \
+    WBCategory
 from sqlalchemy.future import select
+
+from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils.db.session_maker import get_async_session_maker
 from ..views import messages
 from ..views import callbacks
@@ -123,11 +126,30 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
         keyword_setting = await session.execute(select(KeywordSetting)
          .options(selectinload(KeywordSetting.adv_setting))
                                                .where(KeywordSetting.id == keyword_setting_original_id))
-        keyword_setting = keyword_setting.scalar()
-        keyword_setting.hard_status = new_hard_status
+        keyword_setting: KeywordSetting = keyword_setting.scalar()
+        adv_setting = keyword_setting.adv_setting
+        if new_hard_status > 0:
+           keyword_setting.hard_status = new_hard_status
+
+        elif new_hard_status == -1:
+            category: WBCategory = await data_managers.get_wb_category(adv_setting)
+            smtp = select(GlobalCategorySetting.min_ctr)\
+            .where(GlobalCategorySetting.category_name == category.wb_category_name)
+            min_ctr = await session.execute(smtp)
+            min_ctr = min_ctr.scalar()
+            add_views = int(round(1/min_ctr/2))
+            add_clicks = 1
+            if not keyword_setting.added_views:
+                keyword_setting.added_views = 0
+            keyword_setting.added_views += add_views
+            if not keyword_setting.added_clicks:
+                keyword_setting.added_clicks = 0
+            keyword_setting.added_clicks += add_clicks
+            keyword_setting.auto_block = False
+
         await session.commit()
 
-    adv_setting = keyword_setting.adv_setting
+
     chat_id = callback.message.chat.id
     await messages.KeywordSettingMessage(bot, chat_id, keyword_setting, adv_setting)()
 
