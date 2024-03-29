@@ -130,7 +130,7 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
                                                .where(KeywordSetting.id == keyword_setting_original_id))
         keyword_setting: KeywordSetting = keyword_setting.scalar()
         adv_setting = keyword_setting.adv_setting
-        if new_hard_status > 0:
+        if new_hard_status >= 0:
            keyword_setting.hard_status = new_hard_status
 
         elif new_hard_status == -1:
