@@ -57,10 +57,15 @@ class Runner:
 
     async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
         tasks = {}
+        not_first_runs = set()
         while True:
             accesses = await users_manager.get_accesses_for_wb_cabinets()
             for access in accesses:
                 cabinet_id = access.wb_cabinet.id
+                if cabinet_id in not_first_runs:
+                    await asyncio.sleep(15*60)
+                else:
+                    not_first_runs.add(cabinet_id)
                 if cabinet_id not in tasks:
                     task = asyncio.create_task(
                         self._manager.update_keyword_stat(access, need_update_model))
