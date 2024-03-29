@@ -50,18 +50,21 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                 users_live_tokens = []
                 for token in tokens:
                     try:
-                        token_shop_id = wb_cabinet.shop_id
-                        assert shop_id == token_shop_id
+                        token_shop_id = token.shop_id
                     except exceptions.TokenExpiredError:
                         logger.error('Срок действия токена истек')
                         continue
-
+                    if token_shop_id != shop_id:
+                        continue
                     try:
                         await api_rights.check_token(token)
                         users_live_tokens.append(token)
                     except ApiForbiddenError:
                         logger.error('Токен отозван')
+                        token.active = False
+                        session.commit()
                         continue
+
                     except UnknownApiRequestError as e:
                         logger.error(e)
                         users_live_tokens.append(token)
