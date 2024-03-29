@@ -49,6 +49,8 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                 tokens: list[WBToken] = user.wb_tokens
                 users_live_tokens = []
                 for token in tokens:
+                    if not token.active:
+                        continue
                     try:
                         token_shop_id = token.shop_id
                     except exceptions.TokenExpiredError:
@@ -83,9 +85,6 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                                      wb_user_cabinet = None,
                                      wb_cabinet = wb_cabinet)
                 accesses.append(access)
-            else:
-                wb_cabinet.active = False
-                await session.commit()
 
 
     return accesses
