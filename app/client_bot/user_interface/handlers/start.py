@@ -124,7 +124,6 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 
 @router.message(StateFilter(states.CabinetRegistration.api))
 async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMContext):
-
     api = message.text
     api = api.strip()
     user_telegram_id = message.from_user.id
@@ -132,16 +131,12 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
     access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
     chat_id = message.chat.id
     try:
-         check_right = await CabinetManager.check_access(wb_token)
+        await CabinetManager.check_access(wb_token)
     except NotValidTokenError:
         await messages. \
             NotValideToken(bot, chat_id)()
         return
     except ApiForbiddenError:
-        await messages. \
-            GetApiForrbidenError(bot, chat_id)()
-        return
-    if not check_right:
         await messages. \
             GetApiForrbidenError(bot, chat_id)()
         return
