@@ -50,9 +50,18 @@ token = path_setting_funcs.get_document_by_key_name(path_setting,
 bot = Bot(token=token)
 
 dp = Dispatcher(storage=storage)
-dp.startup.register(on_startup)
-dp.shutdown.register(on_shutdown)
 dp.include_router(global_router)
+
+try:
+    test_mode = path_setting_funcs.get_document_by_key_name(path_setting,
+                                                        'test_mode')
+except:
+    test_mode = False
+
+if not test_mode:
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
 
 
 webhook_requests_handler = SimpleRequestHandler(
@@ -91,9 +100,13 @@ async def run_shop_updater():
 
 
 async def run():
-    await asyncio.gather(start_web_server(),
-                         run_shop_updater())
-
-
+    if test_mode:
+        await bot.delete_webhook()
+        # Запускаем бота с пулингом вместо вебхука
+        await dp.storage.close()  # Закрываем хранилище перед запуском, чтобы избежать конфликтов
+        await dp.start_polling(bot, skip_updates=True, on_startup=on_startup, on_shutdown=on_shutdown)
+    else:
+        # Оригинальная логика запуска с вебхуком и дополнительными задачами
+        await asyncio.gather(start_web_server(), run_shop_updater())
 
 
