@@ -45,7 +45,8 @@ async def get_keyword_statistic(adv_setting: AdvSetting,
             AdvKeyword.text.label("keyword_text"),
             func.sum(AdvKeyword.views).label("total_views"),
             func.sum(AdvKeyword.spend).label("total_spend"),
-            func.sum(AdvKeyword.clicks).label("total_clicks")  # Используйте total_clicks для суммы кликов
+            func.sum(AdvKeyword.clicks).label("total_clicks"),
+            # Используйте total_clicks для суммы кликов
         )
         .join(KeywordSetting, AdvKeyword.keyword_setting_id == KeywordSetting.id)
     )

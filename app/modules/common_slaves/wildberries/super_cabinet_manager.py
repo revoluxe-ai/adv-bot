@@ -52,7 +52,7 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                     if not token.active:
                         continue
                     try:
-                        token_shop_id = token.shop_id
+                        token_shop_id = token.shop_id# Используйте total_clicks для суммы кликов
                     except exceptions.TokenExpiredError:
                         logger.error('Срок действия токена истек')
                         continue

@@ -1,6 +1,6 @@
 import json
 import datetime
-
+from sqlalchemy import Index
 from sqlalchemy import (Column, Integer, String, ForeignKey,
                         BIGINT, Boolean, Float, DateTime, text)
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -12,6 +12,8 @@ from app.utils.db.base import BaseTable
 from sqlalchemy.schema import UniqueConstraint
 
 from app.utils.db.session_maker import get_async_session_maker
+
+
 
 _sm = get_async_session_maker()
 from app.utils.db.models import User
@@ -47,6 +49,7 @@ class WBToken(BaseTable):
     user_id = Column(Integer, ForeignKey('user.id'))
     user = relationship('User', back_populates='wb_tokens',
                         lazy='joined')
+    active = Column(Boolean, default=True)
     __table_args__ = (UniqueConstraint('api_key', 'user_id', name='_api_key_user_id_uc'),)
 
 
@@ -205,6 +208,7 @@ class KeywordSetting(BaseTable):
     predict_ctr = Column(Float, nullable=True)
     adv_keywords = relationship('AdvKeyword', back_populates='keyword_setting', uselist=True)
     hard_status = Column(Integer, default=1)
-    __table_args__ = (UniqueConstraint('text', 'adv_setting_id'),)
+    __table_args__ = (UniqueConstraint('text', 'adv_setting_id'),
+                      Index('ix_text_adv_setting_id', 'text', 'adv_setting_id'))
 
 
