@@ -148,8 +148,7 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  app.my_types.WBUse
 
 def get_keywords_setting_keyboard(keywords: list[KeywordForKeyboard], adv_setting: AdvSetting,
                                   wb_user_cabinet_original_id: int,
-                                   adv_choice_last_page,
-                                  page=1):
+                                   page):
     on_page = 5
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
@@ -194,13 +193,14 @@ def get_keywords_setting_keyboard(keywords: list[KeywordForKeyboard], adv_settin
     bottoms.append([InlineKeyboardButton(text='Вернуться к списку кампаний',
                                          callback_data=callbacks.ChoiceAdvPaginator(
                                              wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                                             page=adv_choice_last_page).pack())])
+                                             page=page).pack())])
     keyboard = InlineKeyboardMarkup(inline_keyboard=bottoms)
     return keyboard
 
 
 
-def get_keyword_setting_keyboard(keyword: KeywordSetting, adv_setting: AdvSetting, return_to: str = 'by_adv',):
+def get_keyword_setting_keyboard(keyword: KeywordSetting, adv_setting: AdvSetting, page,
+                                 return_to: str = 'by_adv',):
     buttoms = []
     if keyword.hard_status in [0, 1]:
         buttom = [InlineKeyboardButton(text='В белый список',
@@ -232,9 +232,11 @@ def get_keyword_setting_keyboard(keyword: KeywordSetting, adv_setting: AdvSettin
         buttoms.append(buttom)
 
     buttoms.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
-                                         callback_data=callbacks.SettingKeywords(
+                                             callback_data=callbacks.SettingKeywords(
                                              adv_original_id=adv_setting.id,
-                                             type=return_to).pack())])
+                                             type=return_to,
+                                             page=page,
+                                             ).pack())])
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttoms)
     return keyboard

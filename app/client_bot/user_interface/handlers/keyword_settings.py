@@ -29,7 +29,8 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
                                   state: FSMContext,):
     await callback.answer()
     adv_original_id: int = callback_data.adv_original_id
-
+    last_page = callback_data.page
+    await state.update_data(last_keyword_setting_page=last_page)
     async with _sm() as session:
         stmt = select(AdvSetting) \
             .where(AdvSetting.id == adv_original_id)
@@ -37,9 +38,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
         adv_setting: AdvSetting = result.scalar()
 
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
-    page = callback_data.page
-    state_data = await state.get_data()
-    adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
+    # adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
     async with _sm() as session:
         stmt = select(WBUserCabinet) \
             .join(User, User.id == WBUserCabinet.user_id) \
@@ -59,9 +58,8 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
                                   keywords,
                                   adv_setting,
                                   wb_user_cabinet_original_id,
-                                  adv_choice_last_page,
                                   main_photos[0] if main_photos else None,
-                                  page)()
+                                  last_page)()
 
 
     return
@@ -70,7 +68,8 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
 
 
 @router.callback_query(callbacks.SettingKeywords.filter())
-async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot):
+async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,
+                           state: FSMContext):
     keyword_original_id: int = callback_data.keyword_original_id
     async with _sm() as session:
        stmt = select(KeywordSetting
@@ -80,19 +79,19 @@ async def setting_keywords(callback: types.CallbackQuery, callback_data: callbac
        keyword_setting: KeywordSetting = result.scalars().one()
     adv_setting: AdvSetting = keyword_setting.adv_setting
     chat_id = callback.message.chat.id
+
+    data = await state.get_data()
+    page = data.get('last_keyword_setting_page', 1)
     await messages.KeywordSettingMessage(bot, chat_id, keyword_setting,
-                                                                     adv_setting)()
+     adv_setting, page)()
 
     return
-
-
-
 
 
 @router.callback_query(callbacks.SettingKeyword.filter())
 async def setting_keyword(callback: types.CallbackQuery,
                           callback_data: callbacks.SettingKeyword,
-                          bot: aiogram.Bot):
+                          bot: aiogram.Bot, state: FSMContext):
 
     await callback.answer()
 
@@ -104,10 +103,13 @@ async def setting_keyword(callback: types.CallbackQuery,
                                                .where(KeywordSetting.id == keyword_setting_original_id))
         keyword_setting = keyword_setting.scalar()
 
+    data = await state.get_data()
+    page = data.get('last_keyword_setting_page', 1)
+
     adv_setting = keyword_setting.adv_setting
     chat_id = callback.message.chat.id
     await messages.KeywordSettingMessage(bot, chat_id, keyword_setting,
-                                                                      adv_setting)()
+                                                                      adv_setting, page)()
 
     return
 
@@ -117,7 +119,7 @@ async def setting_keyword(callback: types.CallbackQuery,
 @router.callback_query(callbacks.ChangeKeywordHardStatus.filter())
 async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
-                                     bot: aiogram.Bot):
+                                     bot: aiogram.Bot, state: FSMContext):
 
     await callback.answer()
     new_hard_status = callback_data.new_hard_status
@@ -148,10 +150,11 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
             keyword_setting.auto_block = False
 
         await session.commit()
-
+    data = await state.get_data()
+    page = data.get('last_keyword_setting_page', 1)
 
     chat_id = callback.message.chat.id
-    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting, adv_setting)()
+    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting, adv_setting, page)()
 
     return
 
