@@ -142,6 +142,7 @@ class Manager(AbcManager):
                             keyword_db.clicks = keyword.clicks
                             keyword_db.spend = keyword.spend
                 await session.commit()
+                await asyncio.sleep(1)
                 logger.debug(f'Статистика ключевых слов для {adv_setting.name} обновлена')
                 logger.debug(f'Установка set для need_update_model')
                 need_update_model.set()

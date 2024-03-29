@@ -54,6 +54,7 @@ class Runner:
              await self._manager.update_predict_ctr( predicted)
              await asyncio.sleep(1)
 
+
     async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
         tasks = {}
         while True:

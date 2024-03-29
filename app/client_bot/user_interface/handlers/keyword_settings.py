@@ -114,8 +114,7 @@ async def setting_keyword(callback: types.CallbackQuery,
 @router.callback_query(callbacks.ChangeKeywordHardStatus.filter())
 async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
-                                     bot: aiogram.Bot,
-                                     ):
+                                     bot: aiogram.Bot):
 
     await callback.answer()
     new_hard_status = callback_data.new_hard_status
