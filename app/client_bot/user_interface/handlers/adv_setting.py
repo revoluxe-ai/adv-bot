@@ -57,6 +57,7 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
 @router.callback_query(callbacks.Adv.filter())
 async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
               bot: aiogram.Bot):
+    await messages.LongTimeOperation(bot, callback.message.chat.id)()
     await bot.answer_callback_query(callback.id)
     adv_original_id = callback_data.adv_original_id
 
