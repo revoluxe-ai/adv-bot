@@ -200,15 +200,15 @@ class CabinetNameTooLong(Text):
 
 class AdvKeywordsSetting(TextWithKeyboarAndImage):
     def __init__(self, bot: Bot, chat_id,
-                 keywords: list[KeywordForKeyboard],
-                 adv_setting: AdvSetting,
-                 wb_user_cabinet_original_id,
-                image: str, page):
+                 keywords: list[KeywordForKeyboard], adv_setting: AdvSetting, wb_user_cabinet_original_id,
+                 adv_choice_last_page,
+                 image: str, page):
         super().__init__(bot, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
         self._page = page
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+        self._adv_choice_last_page = adv_choice_last_page
         self._image = image
 
     @property
@@ -233,6 +233,7 @@ class AdvKeywordsSetting(TextWithKeyboarAndImage):
     @property
     def keyboard(self):
         return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
+                                                       self._adv_choice_last_page,
                                                        self._wb_user_cabinet_original_id,
                                                        self._page)
 

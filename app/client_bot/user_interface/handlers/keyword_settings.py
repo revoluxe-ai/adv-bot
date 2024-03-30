@@ -29,8 +29,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
                                   state: FSMContext,):
     await callback.answer()
     adv_original_id: int = callback_data.adv_original_id
-    last_page = callback_data.page
-    await state.update_data(last_keyword_setting_page=last_page)
+
     async with _sm() as session:
         stmt = select(AdvSetting) \
             .where(AdvSetting.id == adv_original_id)
@@ -38,14 +37,16 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
         adv_setting: AdvSetting = result.scalar()
 
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
-    # adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
+    page = callback_data.page
+    state_data = await state.get_data()
+    adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
     async with _sm() as session:
         stmt = select(WBUserCabinet) \
             .join(User, User.id == WBUserCabinet.user_id) \
-        .join(WBCabinet,
-              WBCabinet.id == WBUserCabinet.wb_cabinet_id) \
-        .options(selectinload(WBUserCabinet.user),
-                 selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings)) \
+            .join(WBCabinet,
+                  WBCabinet.id == WBUserCabinet.wb_cabinet_id) \
+            .options(selectinload(WBUserCabinet.user),
+                     selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings)) \
             .where(and_(User.user_telegram_id == callback.from_user.id,
                         WBCabinet.id == adv_setting.wb_cabinet_id))
         wb_user_cabinet = await session.execute(stmt)
@@ -55,12 +56,12 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
     main_photos = await data_managers.get_main_photos(nmids[:1])
     chat_id = callback.message.chat.id
     await messages.AdvKeywordsSetting(bot, chat_id,
-                                  keywords,
-                                  adv_setting,
-                                  wb_user_cabinet_original_id,
-                                  main_photos[0] if main_photos else None,
-                                  last_page)()
-
+                                      keywords,
+                                      adv_setting,
+                                      wb_user_cabinet_original_id,
+                                      adv_choice_last_page,
+                                      main_photos[0] if main_photos else None,
+                                      page)()
 
     return
 
