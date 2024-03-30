@@ -125,6 +125,7 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      bot: aiogram.Bot, state: FSMContext):
 
     await callback.answer()
+    await messages.LongTimeOperation(bot, callback.message.chat.id)()
     new_hard_status = callback_data.new_hard_status
     keyword_setting_original_id = callback_data.keyword_setting_original_id
     async with _sm() as session:

@@ -303,3 +303,5 @@ class NotFoundNmidOfNewAdvCompany(Text):
         return f'Товары с идентификаторами {", ".join(self.__not_found_items)} не найдены. Попробуйте снова:'
 
 
+class LongTimeOperation(Text):
+    text = 'Операция может занять некоторые время, пожалуйста, подождите...'
