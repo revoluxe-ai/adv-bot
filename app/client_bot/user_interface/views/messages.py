@@ -200,9 +200,9 @@ class CabinetNameTooLong(Text):
 
 class AdvKeywordsSetting(TextWithKeyboarAndImage):
     def __init__(self, bot: Bot, chat_id,
-                 keywords: list[KeywordForKeyboard], adv_setting: AdvSetting,  wb_user_cabinet_original_id,
-                                                                      adv_choice_last_page,
-                                                                      image: str, page):
+                 keywords: list[KeywordForKeyboard], adv_setting: AdvSetting, wb_user_cabinet_original_id,
+                 adv_choice_last_page,
+                 image: str, page):
         super().__init__(bot, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
@@ -233,17 +233,18 @@ class AdvKeywordsSetting(TextWithKeyboarAndImage):
     @property
     def keyboard(self):
         return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
-                                                       self._wb_user_cabinet_original_id,
                                                        self._adv_choice_last_page,
+                                                       self._wb_user_cabinet_original_id,
                                                        self._page)
 
 
 class KeywordSettingMessage(TextWithKeyboard):
     def __init__(self, bot: Bot, chat_id: int,
-                 keyword_setting: KeywordSetting, adv_setting: AdvSetting):
+                 keyword_setting: KeywordSetting, adv_setting: AdvSetting, page: int):
         super().__init__(bot, chat_id)
         self._keyword_setting = keyword_setting
         self._adv_setting = adv_setting
+        self._page = page
 
     @property
     def text(self):
@@ -251,7 +252,7 @@ class KeywordSettingMessage(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        return keyboards.get_keyword_setting_keyboard(self._keyword_setting, self._adv_setting)
+        return keyboards.get_keyword_setting_keyboard(self._keyword_setting, self._adv_setting, self._page)
 
 
 class GetNameOfNewAdvCompany(Text):

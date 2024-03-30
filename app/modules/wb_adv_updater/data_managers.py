@@ -195,41 +195,56 @@ async def get_good_bad_phrases(adv_setting: AdvSetting,
     async with _sm() as session:
         result = await session.execute(stmt)
         adv_setting: AdvSetting = result.unique().scalar()
-    keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
-    good_keywords: list[KeywordSetting] = []
-    bad_keywords: list[KeywordSetting] = []
-    keyword_stats = await get_keyword_statistic(adv_setting, None)
-    keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
+        keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
+        good_keywords: list[KeywordSetting] = []
+        bad_keywords: list[KeywordSetting] = []
+        keyword_stats = await get_keyword_statistic(adv_setting, None)
+        keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
 
-    for keyword_setting in keyword_settings:
-        if keyword_setting.hard_status == 2:
-           good_keywords.append(keyword_setting.text)
-           continue
-        elif keyword_setting.hard_status == 0:
-            bad_keywords.append(keyword_setting.text)
-            continue
-        keyword_stat = keyword_text_to_keyword_stat.get(keyword_setting.text, None)
-        if not keyword_stat:
-            good_keywords.append(keyword_setting.text)
-            continue
-        if min_ctr == 0:
-            good_keywords.append(keyword_setting.text)
-            continue
-        enough_views = int(1 / min_ctr)
-        views = keyword_stat.views + enough_views
-        clicks = keyword_stat.clicks + 1
-        fact_ctr = clicks / views
-        predict_ctr = keyword_setting.predict_ctr
-        if not predict_ctr:
-            predict_ctr = fact_ctr
-        elif fact_ctr > predict_ctr:
-            predict_ctr = fact_ctr
-        boost = adv_setting.boost
-        predict_ctr *= boost
-        if predict_ctr >= min_ctr:
-            good_keywords.append(keyword_setting.text)
-        else:
-            bad_keywords.append(keyword_setting.text)
+        for keyword_setting in keyword_settings:
+            if keyword_setting.hard_status == 2:
+               good_keywords.append(keyword_setting.text)
+               KeywordSetting.auto_block = False
+               continue
+            elif keyword_setting.hard_status == 0:
+                bad_keywords.append(keyword_setting.text)
+                keyword_setting .auto_block = False
+                continue
+            keyword_stat = keyword_text_to_keyword_stat.get(keyword_setting.text, None)
+            if not keyword_stat:
+                good_keywords.append(keyword_setting.text)
+                keyword_setting.auto_block = False
+                continue
+            if min_ctr == 0:
+                good_keywords.append(keyword_setting.text)
+                keyword_setting .auto_block = False
+                continue
+            added_views = keyword_setting.added_views
+            if not added_views:
+                added_views = 0
+            added_clicks = keyword_setting.added_clicks
+            if not added_clicks:
+                added_clicks = 0
+            enough_views = int(1 / min_ctr)
+            views = keyword_stat.views + enough_views + added_views
+            clicks = keyword_stat.clicks + 1 + added_clicks
+            fact_ctr = clicks / views
+            predict_ctr = keyword_setting.predict_ctr
+            if not predict_ctr:
+                predict_ctr = fact_ctr
+            elif fact_ctr > predict_ctr:
+                predict_ctr = fact_ctr
+            boost = adv_setting.boost
+            predict_ctr *= boost
+            if predict_ctr >= min_ctr:
+                good_keywords.append(keyword_setting.text)
+                keyword_setting.auto_block = False
+            else:
+                bad_keywords.append(keyword_setting.text)
+                keyword_setting.auto_block = True
+
+        await session.commit()
+
 
     return good_keywords, bad_keywords
 

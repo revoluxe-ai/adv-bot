@@ -3,8 +3,11 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, AdvSetting, KeywordSetting, \
+    WBCategory
 from sqlalchemy.future import select
+
+from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils.db.session_maker import get_async_session_maker
 from ..views import messages
 from ..views import callbacks
@@ -40,10 +43,10 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
     async with _sm() as session:
         stmt = select(WBUserCabinet) \
             .join(User, User.id == WBUserCabinet.user_id) \
-        .join(WBCabinet,
-              WBCabinet.id == WBUserCabinet.wb_cabinet_id) \
-        .options(selectinload(WBUserCabinet.user),
-                 selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings)) \
+            .join(WBCabinet,
+                  WBCabinet.id == WBUserCabinet.wb_cabinet_id) \
+            .options(selectinload(WBUserCabinet.user),
+                     selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings)) \
             .where(and_(User.user_telegram_id == callback.from_user.id,
                         WBCabinet.id == adv_setting.wb_cabinet_id))
         wb_user_cabinet = await session.execute(stmt)
@@ -53,13 +56,12 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
     main_photos = await data_managers.get_main_photos(nmids[:1])
     chat_id = callback.message.chat.id
     await messages.AdvKeywordsSetting(bot, chat_id,
-                                  keywords,
-                                  adv_setting,
-                                  wb_user_cabinet_original_id,
-                                  adv_choice_last_page,
-                                  main_photos[0] if main_photos else None,
-                                  page)()
-
+                                      keywords,
+                                      adv_setting,
+                                      wb_user_cabinet_original_id,
+                                      adv_choice_last_page,
+                                      main_photos[0] if main_photos else None,
+                                      page)()
 
     return
 
@@ -67,7 +69,8 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
 
 
 @router.callback_query(callbacks.SettingKeywords.filter())
-async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot):
+async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,
+                           state: FSMContext):
     keyword_original_id: int = callback_data.keyword_original_id
     async with _sm() as session:
        stmt = select(KeywordSetting
@@ -77,19 +80,19 @@ async def setting_keywords(callback: types.CallbackQuery, callback_data: callbac
        keyword_setting: KeywordSetting = result.scalars().one()
     adv_setting: AdvSetting = keyword_setting.adv_setting
     chat_id = callback.message.chat.id
+
+    data = await state.get_data()
+    page = data.get('last_keyword_setting_page', 1)
     await messages.KeywordSettingMessage(bot, chat_id, keyword_setting,
-                                                                     adv_setting)()
+     adv_setting, page)()
 
     return
-
-
-
 
 
 @router.callback_query(callbacks.SettingKeyword.filter())
 async def setting_keyword(callback: types.CallbackQuery,
                           callback_data: callbacks.SettingKeyword,
-                          bot: aiogram.Bot):
+                          bot: aiogram.Bot, state: FSMContext):
 
     await callback.answer()
 
@@ -101,10 +104,13 @@ async def setting_keyword(callback: types.CallbackQuery,
                                                .where(KeywordSetting.id == keyword_setting_original_id))
         keyword_setting = keyword_setting.scalar()
 
+    data = await state.get_data()
+    page = data.get('last_keyword_setting_page', 1)
+
     adv_setting = keyword_setting.adv_setting
     chat_id = callback.message.chat.id
     await messages.KeywordSettingMessage(bot, chat_id, keyword_setting,
-                                                                      adv_setting)()
+                                                                      adv_setting, page)()
 
     return
 
@@ -114,7 +120,7 @@ async def setting_keyword(callback: types.CallbackQuery,
 @router.callback_query(callbacks.ChangeKeywordHardStatus.filter())
 async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
-                                     bot: aiogram.Bot):
+                                     bot: aiogram.Bot, state: FSMContext):
 
     await callback.answer()
     new_hard_status = callback_data.new_hard_status
@@ -123,13 +129,33 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
         keyword_setting = await session.execute(select(KeywordSetting)
          .options(selectinload(KeywordSetting.adv_setting))
                                                .where(KeywordSetting.id == keyword_setting_original_id))
-        keyword_setting = keyword_setting.scalar()
-        keyword_setting.hard_status = new_hard_status
-        await session.commit()
+        keyword_setting: KeywordSetting = keyword_setting.scalar()
+        adv_setting = keyword_setting.adv_setting
+        if new_hard_status >= 0:
+           keyword_setting.hard_status = new_hard_status
 
-    adv_setting = keyword_setting.adv_setting
+        elif new_hard_status == -1:
+            category: WBCategory = await data_managers.get_wb_category(adv_setting)
+            smtp = select(GlobalCategorySetting.min_ctr)\
+            .where(GlobalCategorySetting.category_name == category.wb_category_name)
+            min_ctr = await session.execute(smtp)
+            min_ctr = min_ctr.scalar()
+            add_views = int(round(1/min_ctr/2))
+            add_clicks = 1
+            if not keyword_setting.added_views:
+                keyword_setting.added_views = 0
+            keyword_setting.added_views += add_views
+            if not keyword_setting.added_clicks:
+                keyword_setting.added_clicks = 0
+            keyword_setting.added_clicks += add_clicks
+            keyword_setting.auto_block = False
+
+        await session.commit()
+    data = await state.get_data()
+    page = data.get('last_keyword_setting_page', 1)
+
     chat_id = callback.message.chat.id
-    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting, adv_setting)()
+    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting, adv_setting, page)()
 
     return
 
