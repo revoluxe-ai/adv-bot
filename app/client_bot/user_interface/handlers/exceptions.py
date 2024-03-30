@@ -47,10 +47,16 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
         raise exception
     if message is None:
         chat_id = error_event.update.callback_query.message.chat.id
+        user_name = error_event.update.callback_query.from_user.username
     else:
         chat_id = message.chat.id
+        user_name = message.from_user.username
     await bot.send_message(chat_id=chat_id,
-                           text='Произошла ошибка, администратор уже уведомлен. Попробуйте позже.')
+                           text='Произошла ошибка, но вы не волнуйте! Бот продолжает работать '
+                                'и по прежнему выполняет свои функции. Проблема только в интерфейсе, а администратор'
+                                ' уже уведомлен о ней. Попробуйте выполнить нужное вам действие еще раз или вернитесь'
+                                ' в главное меню, через команду /start . Связаться с разработчиком вы можете по '
+                                'этому контакту: @skyline360_1')
     trace_error = traceback.format_exc()
     logger.error(trace_error)
 
@@ -75,7 +81,7 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
         # Если в трейсе нет упоминания пакета, информируем об этом
         await bot.send_message(admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены.")
 
-    await bot.send_message(admin_telegram_id, 'Telegram ID пользователя: %s' % chat_id)
+    await bot.send_message(admin_telegram_id, 'Ник пользователя: %s' % user_name )
 
 
 

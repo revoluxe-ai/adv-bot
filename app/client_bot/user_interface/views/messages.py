@@ -102,7 +102,9 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     @property
     def text(self):
-        return 'Выберите рекламную кампанию:'
+        return ('Выберите рекламную кампанию для настройки или проверки. \n'
+                '✅ - кампания проверялась в течение последних 24 часов\n'
+                 '❓ - кампания не проверялась в течение последних 24 часов\n')
 
     @property
     def keyboard(self):

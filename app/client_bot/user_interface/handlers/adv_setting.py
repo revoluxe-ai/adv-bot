@@ -40,7 +40,8 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
         stmt = select(AdvSetting)\
         .join(AdvSetting.wb_cabinet)\
         .join(WBCabinet.wb_user_cabinets)\
-        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
+        .order_by(AdvSetting.name)
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
 
@@ -69,7 +70,8 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
             adv_settings = await session.execute(select(AdvSetting)\
                                                 .join(AdvSetting.wb_cabinet)\
             .join(WBCabinet.wb_user_cabinets)\
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id))
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id))\
+            .order_by(AdvSetting.name)
             adv_settings = adv_settings.scalars().all()
         await messages.AdvCompanyChoicing(bot, callback.message.chat.id, wb_user_cabinet_original_id, adv_settings)()
         return

@@ -188,7 +188,8 @@ class AdvSetting(BaseTable):
     keyword_settings = relationship('KeywordSetting', back_populates='adv_setting',
                                     uselist=True)
     pass_days = Column(Integer, default=30)
-    boost = Column(Float, server_default=text('1.1'))
+    boost = Column(Float, server_default=text('1'))
+
 
 
 
