@@ -104,7 +104,7 @@ async def run():
         await bot.delete_webhook()
         # Запускаем бота с пулингом вместо вебхука
         await dp.storage.close()  # Закрываем хранилище перед запуском, чтобы избежать конфликтов
-        await dp.start_polling(bot, skip_updates=True, on_startup=on_startup, on_shutdown=on_shutdown)
+        await dp.start_polling(bot, on_startup=on_startup, on_shutdown=on_shutdown)
     else:
         # Оригинальная логика запуска с вебхуком и дополнительными задачами
         await asyncio.gather(start_web_server(), run_shop_updater())
