@@ -141,7 +141,12 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
                 .where(GlobalCategorySetting.category_name == category.wb_category_name)
             min_ctr = await session.execute(smtp)
             min_ctr = min_ctr.scalar()
-            clicks, views, spend = await data_managers.get_keyword_statistic(keyword_setting)
+            clicks, views, _ = await data_managers.get_keyword_statistic(keyword_setting)
+            if keyword_setting.added_clicks:
+                clicks += keyword_setting.added_clicks
+            if keyword_setting.added_views:
+                views += keyword_setting.added_views
+
             n = 10 # Процент увеличения CTR, который вы хотите достичь
 
             # Расчет нового CTR
