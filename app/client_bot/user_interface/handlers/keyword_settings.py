@@ -14,7 +14,7 @@ from ..views import callbacks
 from app.utils.db.models import User
 from app.modules.wb_adv_updater import data_managers
 from app.client_bot import utils
-
+from app.utils import redis_manager
 
 router = Router()
 
@@ -56,6 +56,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
     nmids = adv_setting.nmids
     main_photos = await data_managers.get_main_photos(nmids[:1])
     chat_id = callback.message.chat.id
+    await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(bot, chat_id,
                                       keywords,
                                       adv_setting,

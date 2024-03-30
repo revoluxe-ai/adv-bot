@@ -21,3 +21,14 @@ async def set_token_rights(hash_token, timeout):
 async def get_token_rights(hash_token):
     answer = await redis_client.get('token_rights:'  + str(hash_token))
     return answer
+
+
+
+async def set_check_last_24_hours(adv_original_id):
+    await redis_client.set('check_adv_last_24_hours:' + str(adv_original_id), 'True', ex = 60*60*24)
+
+
+async def check_last_24_hours(adv_original_id):
+    answer = await redis_client.get('check_adv_last_24_hours:' + str(adv_original_id))
+    return answer
+

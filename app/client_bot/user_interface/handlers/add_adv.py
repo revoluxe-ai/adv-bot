@@ -3,7 +3,7 @@ import aiogram
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import or_
-
+from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, AdvSetting, WBCard
 from sqlalchemy.future import select
 from app.utils.db.session_maker import get_async_session_maker

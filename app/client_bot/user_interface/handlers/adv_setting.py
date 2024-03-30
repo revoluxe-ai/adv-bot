@@ -7,12 +7,14 @@ from sqlalchemy.future import select
 from app.utils.db.session_maker import get_async_session_maker
 from ..views import messages
 from ..views import callbacks
-from ...redis_manager import RedisManager
+from app.utils import redis_manager
 
 sm = get_async_session_maker()
 
 router = Router()
-redis_manager = RedisManager()
+
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,6 +58,7 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
               bot: aiogram.Bot):
     await bot.answer_callback_query(callback.id)
     adv_original_id = callback_data.adv_original_id
+
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
