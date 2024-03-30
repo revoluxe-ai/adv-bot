@@ -31,10 +31,10 @@ async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[KeywordForK
         return []
     category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
     min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
-    good_phrases, bad_phrases = await  data_managers.get_good_bad_phrases(adv_setting, min_ctr)
+    good_phrases, bad_phrases = await data_managers.get_good_bad_phrases(adv_setting, min_ctr)
     pass_days =  datetime.timedelta(days=adv_setting.pass_days)
 
-    keyword_stats:list[KeywordStatFromDB] = await data_managers.get_keyword_statistic(adv_setting, pass_days)
+    keyword_stats:list[KeywordStatFromDB] = await data_managers.get_keywords_statistic(adv_setting, pass_days)
     keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
     async with _sm () as session:
         stmt = (

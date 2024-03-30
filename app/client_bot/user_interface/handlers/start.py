@@ -100,20 +100,10 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
             break
     if catch_cab:
         await state.clear()
+        await state.set_state(states.CabinetRegistration.cabinet_name)
         await messages. \
-            CabinetExistsForUser(bot, chat_id)()
-        await asyncio.sleep(1)
-        wb_user_cabinet_original_id = catch_cab.id
-        async with (sm() as session):
-            stmt = select(AdvSetting)\
-            .options(selectinload(AdvSetting.wb_cabinet)\
-            .selectinload(WBCabinet.wb_user_cabinets))\
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-            result = await session.execute(stmt)
-            adv_settings = result.unique().scalars().all()
+            CabinetNameExists(bot, chat_id)()
 
-        await messages.AdvCompanyChoicing \
-            (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=1)()
     else:
         cabinet_name = message.text
         await state.update_data(cabinet_name=cabinet_name)
@@ -172,11 +162,11 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             wb_user_cabinet = result.scalar()
 
             await messages. \
-                CabinetExistsForUser(bot,chat_id)()
+                CabinetExistsForUser(bot, chat_id)()
             wb_cabinet = wb_user_cabinet.wb_cabinet
             async with sm() as session:
                  stmt = select(AdvSetting)\
-                     .options(selectinload(AdvSetting.wb_cabinet))\
+                      .join(AdvSetting.wb_cabinet)\
                      .where(WBCabinet.id ==  wb_cabinet.id)
                  result = await session.execute(stmt)
                  adv_settings = result.unique().scalars().all()

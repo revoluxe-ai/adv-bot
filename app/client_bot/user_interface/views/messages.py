@@ -126,8 +126,15 @@ class AdvSettingMenu(TextWithKeyboard):
         return keyboards.get_adv_setting_keyboard(self.wb_user_cabinet,  self.adv)
 
 
+class CabinetNameExists(Text):
+    text = 'Кабинет с таким именем уже существует, введите другое имя для кабинета:'
+
+
 class CabinetExistsForUser(Text):
-    text = 'Этот кабинет уже был добавлен вам ранее. Сейчас я предоставлю вам его...'
+    text = "Этот кабинет уже был добавлен вам ранее. Сейчас я предоставлю вам его..."
+
+
+
 
 
 class NotValideToken(Text):
@@ -240,11 +247,11 @@ class AdvKeywordsSetting(TextWithKeyboarAndImage):
 
 class KeywordSettingMessage(TextWithKeyboard):
     def __init__(self, bot: Bot, chat_id: int,
-                 keyword_setting: KeywordSetting, adv_setting: AdvSetting, page: int):
+                 keyword_setting: KeywordSetting, adv_setting: AdvSetting, last_page: int):
         super().__init__(bot, chat_id)
         self._keyword_setting = keyword_setting
         self._adv_setting = adv_setting
-        self._page = page
+        self._page = last_page
 
     @property
     def text(self):
@@ -278,3 +285,5 @@ class NotFoundNmidOfNewAdvCompany(Text):
     @property
     def text(self):
         return f'Товары с идентификаторами {", ".join(self.__not_found_items)} не найдены. Попробуйте снова:'
+
+

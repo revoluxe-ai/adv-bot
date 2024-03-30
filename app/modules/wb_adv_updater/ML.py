@@ -146,7 +146,7 @@ class Fitter(AbcManager):
             if not wb_category:
                 continue
             nmid_featers = {}
-            keyword_stats = await data_managers.get_keyword_statistic(adv, None)
+            keyword_stats = await data_managers.get_keywords_statistic(adv, None)
             keyword_text_to_keyword_stat = {}
             for keyword_stat in keyword_stats:
                 keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
@@ -303,6 +303,7 @@ class Predictor:
                 keyword_setting = result.scalar()
                 keyword_setting.predict_ctr = predict_ctr
             await session.commit()
+            await  asyncio.sleep(1)
             logger.debug('Предсказания обновлены')
 
 

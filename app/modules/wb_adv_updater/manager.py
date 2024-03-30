@@ -294,7 +294,7 @@ class Manager(AbcManager):
             adv_settings = result.unique().scalars().all()
             adv_setting_keyword_stats = {}
         for adv_setting in adv_settings:
-            keyword_stats = await data_managers.get_keyword_statistic(adv_setting, None)
+            keyword_stats = await data_managers.get_keywords_statistic(adv_setting, None)
             adv_setting_keyword_stats[adv_setting] = keyword_stats
         ctrs = [keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() for keyword_stat in keyword_stats]
         if len(ctrs) > 0:

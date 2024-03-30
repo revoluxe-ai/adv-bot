@@ -38,6 +38,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
 
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     page = callback_data.page
+    await state.update_data(last_keyword_setting_page=page)
     state_data = await state.get_data()
     adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
     async with _sm() as session:
@@ -136,18 +137,24 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
 
         elif new_hard_status == -1:
             category: WBCategory = await data_managers.get_wb_category(adv_setting)
-            smtp = select(GlobalCategorySetting.min_ctr)\
-            .where(GlobalCategorySetting.category_name == category.wb_category_name)
+            smtp = select(GlobalCategorySetting.min_ctr) \
+                .where(GlobalCategorySetting.category_name == category.wb_category_name)
             min_ctr = await session.execute(smtp)
             min_ctr = min_ctr.scalar()
-            add_views = int(round(1/min_ctr/2))
-            add_clicks = 1
-            if not keyword_setting.added_views:
-                keyword_setting.added_views = 0
-            keyword_setting.added_views += add_views
+            clicks, views, spend = await data_managers.get_keyword_statistic(keyword_setting)
+            n = 10 # Процент увеличения CTR, который вы хотите достичь
+
+            # Расчет нового CTR
+            new_ctr = min_ctr * (1 + n / 100)
+
+            # Вычисление необходимого количества дополнительных кликов
+            add_clicks = max([int(round(new_ctr * views - clicks)), 1])
+
+            # Добавление кликов без изменения показов
             if not keyword_setting.added_clicks:
                 keyword_setting.added_clicks = 0
             keyword_setting.added_clicks += add_clicks
+
             keyword_setting.auto_block = False
 
         await session.commit()

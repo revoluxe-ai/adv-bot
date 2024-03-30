@@ -27,7 +27,7 @@ from app.modules.common_slaves.wildberries.api import WBApi
 from app.utils.NeoDataScience.driver import DataScience
 from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvKeyword, WBCategory, WBCard, WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
-
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,21 @@ logger = logging.getLogger(__name__)
 _sm = get_async_session_maker()
 
 
-async def get_keyword_statistic(adv_setting: AdvSetting,
-                                pass_time: Union[timedelta, None],
-                                hard_statuses: list[int] = None,
-                                )->list[KeywordStatFromDB]:
+
+async def measure_time(func):
+    async def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = await func(*args, **kwargs)  # Используйте await для асинхронного вызова
+        end_time = time.time()
+        print(f"{func.__name__} выполнена за {end_time - start_time} секунд.")
+        return result
+    return wrapper
+
+
+async def get_keywords_statistic(adv_setting: AdvSetting,
+                                 pass_time: Union[timedelta, None],
+                                 hard_statuses: list[int] = None,
+                                 )->list[KeywordStatFromDB]:
 
     base_stmt = (
         select(
@@ -91,33 +102,33 @@ async def get_keyword_statistic(adv_setting: AdvSetting,
 
 
 
-#
-# async def get_keyword_statistic(session, keyword_setting: KeywordSetting):
-#     today = datetime.now().date()
-#     pass_days = keyword_setting.adv_setting.pass_days
-#     stmt = (
-#         select(
-#             func.sum(AdvKeyword.clicks).label("total_clicks"),
-#             func.sum(AdvKeyword.views).label("total_views"),
-#             func.sum(AdvKeyword.spend).label("total_spend"),
-#             func.greatest(func.sum(AdvKeyword.clicks), func.sum(AdvKeyword.views)).label("adjusted_clicks")
-#         )
-#         .join(KeywordSetting, AdvKeyword.keyword_setting_id == KeywordSetting.id)  # Явное указание соединения
-#         .where(
-#                 AdvKeyword.date >= today - timedelta(days=pass_days)
-#         )
-#     )
-#
-#     result = await session.execute(stmt)
-#     total_clicks, total_views, total_spend, adjusted_clicks = result.one()
-#     if total_views is None:
-#         total_views = 0
-#         total_clicks = 0
-#         total_spend = 0
-#
-#     # Исправляем клики, если они превышают просмотры
-#     adjusted_clicks = min(total_clicks, total_views)
-#     return adjusted_clicks, total_views, total_spend
+
+async def get_keyword_statistic(keyword_setting: KeywordSetting,
+                                pass_days: Union[int, None] = None) -> tuple[int, int, int]:
+    today = datetime.now().date()
+    async with _sm() as session:
+        stmt = (
+            select(
+                func.coalesce(func.sum(AdvKeyword.clicks), 0).label("total_clicks"),
+                func.coalesce(func.sum(AdvKeyword.views), 0).label("total_views"),
+                func.coalesce(func.sum(AdvKeyword.spend), 0).label("total_spend"),
+                func.greatest(func.sum(AdvKeyword.clicks), func.sum(AdvKeyword.views)).label("adjusted_clicks")
+            )
+            .join(KeywordSetting, AdvKeyword.keyword_setting_id == KeywordSetting.id)  # Явное указание соединения
+        ).where(KeywordSetting.id == keyword_setting.id)
+
+        if pass_days:
+            stmt = stmt.where(
+                AdvKeyword.date >= today - timedelta(days=pass_days)
+            )
+
+        result = await session.execute(stmt)
+        total_clicks, total_views, total_spend, adjusted_clicks = result.one()
+
+    # Исправляем клики, если они превышают просмотры
+    total_clicks = min(total_clicks, total_views)
+    return total_clicks, total_views, total_spend
+
 
 
 async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
@@ -153,7 +164,7 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
         if not wb_category:
             continue
         wb_category_name = wb_category.wb_category_name
-        keyword_stats = await get_keyword_statistic(adv_setting, None, [1, 2])
+        keyword_stats = await get_keywords_statistic(adv_setting, None, [1, 2])
         for keyword_stat in keyword_stats:
             if keyword_stat.views:
                 wb_category_to_keywordstat_list[wb_category_name].append(keyword_stat)
@@ -189,26 +200,24 @@ async def get_category_name_min_ctr_final_data() -> dict[int, float]:
 
 async def get_good_bad_phrases(adv_setting: AdvSetting,
                                min_ctr: float)->tuple[list[str], list[str]]:
-    stmt = select(AdvSetting).where(AdvSetting.id == adv_setting.id).options(
-        selectinload(AdvSetting.keyword_settings)
-    )
+
     async with _sm() as session:
+        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.unique().scalar()
-        keyword_settings: list[KeywordSetting] = adv_setting.keyword_settings
+        keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
         good_keywords: list[KeywordSetting] = []
         bad_keywords: list[KeywordSetting] = []
-        keyword_stats = await get_keyword_statistic(adv_setting, None)
+        keyword_stats = await get_keywords_statistic(adv_setting, None)
         keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
 
         for keyword_setting in keyword_settings:
             if keyword_setting.hard_status == 2:
                good_keywords.append(keyword_setting.text)
-               KeywordSetting.auto_block = False
+               keyword_setting.auto_block = False
                continue
             elif keyword_setting.hard_status == 0:
                 bad_keywords.append(keyword_setting.text)
-                keyword_setting .auto_block = False
+                keyword_setting.auto_block = False
                 continue
             keyword_stat = keyword_text_to_keyword_stat.get(keyword_setting.text, None)
             if not keyword_stat:
