@@ -7,5 +7,9 @@ r = Runner()
 if __name__ == '__main__':
     level = logging.INFO
     setup_logging()
-    r.run(debug_mode = False)
-
+    while True:
+        try:
+            r.run(debug_mode = False)
+            break
+        except:
+            continue
