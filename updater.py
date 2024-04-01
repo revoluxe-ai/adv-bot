@@ -11,5 +11,7 @@ if __name__ == '__main__':
         try:
             r.run(debug_mode = False)
             break
+        except InterruptedError:
+            raise
         except:
             continue
