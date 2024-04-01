@@ -7,8 +7,16 @@ import app
 
 class Base(ABC):
     def __init__(self, bot: aiogram.Bot, chat_id: int):
-        self.bot = bot
-        self.chat_id = chat_id
+        self._bot = bot
+        self._chat_id = chat_id
+
+    @property
+    def bot(self):
+        return self._bot
+
+    @property
+    def chat_id(self):
+        return self._chat_id
 
 
 
@@ -41,4 +49,5 @@ class Base(ABC):
                              text: str,
                              keyboard: aiogram.types.InlineKeyboardMarkup):
         return last_message.text == text and last_message.reply_markup == keyboard
+
 

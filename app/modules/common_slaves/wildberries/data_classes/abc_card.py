@@ -3,7 +3,7 @@ from collections import namedtuple
 Path = namedtuple('Path', ['position', 'path'])
 import inspect
 from typing import final
-from app.utils.image_master.image_tools import ImageTools
+from app.utils.image_master import image_tools
 import re
 import os
 import PIL
@@ -13,14 +13,13 @@ from app.utils.image_master.database.model import WB_CARD_MEDIA_FOLDER
 from PIL import Image
 
 
-image_tools = ImageTools()
 
 
 class WbItem(metaclass=ABCMeta):
 
     def __init__(self):
         self._brand = None
-        self._image_tools = ImageTools()
+        self._image_tools = image_tools
 
 
 
