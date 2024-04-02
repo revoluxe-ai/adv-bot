@@ -34,7 +34,10 @@ WEB_SERVER_PORT = 8090
 BASE_WEBHOOK_URL = 'https://tiriel.ru'
 WEBHOOK_PATH = "/telegram_webhook"
 path_setting = path_setting_funcs.get_setting_path()
-WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
+# WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
+WEBHOOK_SECRET = '89779uoiugkftyeoilyeligoyuv'
+
+
 
 async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
