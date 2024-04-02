@@ -5,7 +5,7 @@ path_settings = path_setting_funcs.get_setting_path()
 
 AccountId = path_setting_funcs.get_document_by_key_name(path_settings, 'AccountId')
 
-SecretKey =
+SecretKey = ...
 
 Configuration.configure('<Account Id>', '<Secret Key>')
 
