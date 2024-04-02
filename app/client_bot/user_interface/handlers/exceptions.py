@@ -1,4 +1,5 @@
 from aiogram import Router
+from aiogram.exceptions import TelegramForbiddenError
 from aiogram.filters.exception import ExceptionTypeFilter
 
 from aiogram.types.error_event import ErrorEvent
@@ -36,6 +37,12 @@ user_router = Router()
 
 admin_router = Router()
 
+
+
+@admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
+async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+    logger.error('Юзер заблокировал бота')
+    return
 
 
 @admin_router.errors(ExceptionTypeFilter(Exception))

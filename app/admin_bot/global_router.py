@@ -1,8 +1,7 @@
 from aiogram import Router
-from .handlers import router as admin_bot_handlers
-
+from . import catch_chat_id
 
 global_router = Router()
 
 
-global_router.include_router(admin_bot_handlers)
+global_router.include_router(catch_chat_id.router)

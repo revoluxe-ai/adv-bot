@@ -34,8 +34,8 @@ class ShopChoice(TextWithKeyboard):
                 
                 'В настоящий момент бот проходит бета-тестирование, поэтому вы можете пользоваться его функционалом'
                 ' без ограничений совершенно бесплатно.\n\n'
-                'Канал бота - @auto_wb_master\n'
-                'Связь с разработчиком: @skyline360_1\n\n'
+                
+                'Для использования функционала бота вы должны быть подписаны на канал поддержки - @auto_wb_master\n\n'
                 
                 'Внимание! Сейчас бот работает только с автоматическими рекламными кампаниями'
                 'с включенным Бустом и отключенными показами в Карточках\n\n'
@@ -55,9 +55,6 @@ class ShopNameGet(Text):
     @property
     def text(self):
         return 'Введите название магазина (кабинета):'
-
-
-
 
 
 
@@ -325,3 +322,13 @@ class NotFoundNmidOfNewAdvCompany(Text):
 
 class LongTimeOperation(Text):
     text = 'Операция может занять некоторые время, пожалуйста, подождите...'
+
+
+
+class NeedSubscribe(TextWithKeyboard):
+    text = ('Для использования функций вы должны быть подписаны на канал службы поддержки')
+
+
+    @property
+    def keyboard(self):
+        return keyboards.get_subscribe_keyboard()
