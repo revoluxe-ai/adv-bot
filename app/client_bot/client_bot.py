@@ -30,7 +30,9 @@ path_setting = path_setting_funcs.get_setting_path()
 WEB_SERVER_HOST = "127.0.0.1"
 # Port for incoming request from reverse proxy. Should be any available port
 
+PORT = 8090
 
+WEB_SERVER_PORT = PORT
 
 
 BASE_WEBHOOK_URL = 'https://tiriel.ru'
@@ -83,9 +85,6 @@ setup_application(app, dp, bot=bot)
 
 
 async def start_web_server():
-    path_setting = path_setting_funcs.get_setting_path()
-    PORT = path_setting_funcs.get_document_by_key_name(path_setting, 'bot_port')
-    WEB_SERVER_PORT = PORT
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, WEB_SERVER_HOST, WEB_SERVER_PORT)
