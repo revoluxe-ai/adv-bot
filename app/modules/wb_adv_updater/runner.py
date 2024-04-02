@@ -91,7 +91,6 @@ class Runner:
             await asyncio.sleep(1)
 
     async def run_update_keywords_on_wb(self):
-        logger.debug()
         await self._manager\
             .update_keywords_in_advs()
         await asyncio.sleep(1)
