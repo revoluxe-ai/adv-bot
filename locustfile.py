@@ -1,31 +1,30 @@
 from locust import HttpUser, task, between
-
-
 from python_modules import path_setting_funcs
 
 
-setting_path = path_setting_funcs.get_setting_path()
 
-key =
+key = '89779uoiugkftyeoilyeligoyuv'
 
 
 class TelegramBotUser(HttpUser):
+    host = 'https://tiriel.ru'
     wait_time = between(1, 5)  # Пользователи будут отправлять запрос каждые 1-5 секунд
 
     @task
     def send_message(self):
-        self.client.post("'https://tiriel.ru/telegram_webhook?key=", json={
+        headers = {'X-Telegram-Bot-Api-Secret-Token': '89779uoiugkftyeoilyeligoyuv'}
+        self.client.post(f"/telegram_webhook", json={
             "update_id": 123456789,
             "message": {
                 "message_id": 123,
                 "from": {
-                    "id": 123456789,
+                    "id": 373435337,
                     "is_bot": False,
                     "first_name": "Test",
                     "username": "testuser"
                 },
                 "chat": {
-                    "id": 123456789,
+                    "id": 373435337,
                     "first_name": "Test",
                     "username": "testuser",
                     "type": "private"
@@ -33,4 +32,6 @@ class TelegramBotUser(HttpUser):
                 "date": 1441645532,
                 "text": "/start",
             }
-        })
+        },
+                         headers=headers
+                         )
