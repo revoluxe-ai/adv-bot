@@ -7,7 +7,6 @@ from sqlalchemy.future import select
 from app.utils.db.session_maker import get_async_session_maker
 from ..views import messages
 from ..views import callbacks
-from app.utils import redis_manager
 
 sm = get_async_session_maker()
 
@@ -26,10 +25,7 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
 
     await bot.answer_callback_query(callback_query_id=callback.id)
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
-    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     page = callback_data.page
-    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-    await state.update_data(wb_user_cabinet_page=page)
     check_data = await state.get_data()
     logger.debug(f'check_data: {check_data}')
 
@@ -49,14 +45,14 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
     chat_id = callback.message.chat.id
 
     await messages.AdvCompanyChoicing \
-        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=page)()
+        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=page)(state)
 
     return
 
 
 @router.callback_query(callbacks.Adv.filter())
 async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
-              bot: aiogram.Bot):
+              bot: aiogram.Bot, state: FSMContext):
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     await bot.answer_callback_query(callback.id)
     adv_original_id = callback_data.adv_original_id
@@ -74,7 +70,8 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
             .where(WBUserCabinet.id == wb_user_cabinet_original_id))\
             .order_by(AdvSetting.name)
             adv_settings = adv_settings.scalars().all()
-        await messages.AdvCompanyChoicing(bot, callback.message.chat.id, wb_user_cabinet_original_id, adv_settings)()
+        await messages.AdvCompanyChoicing\
+            (bot, callback.message.chat.id, wb_user_cabinet_original_id, adv_settings)(state)
         return
     else:
         async with sm() as session:

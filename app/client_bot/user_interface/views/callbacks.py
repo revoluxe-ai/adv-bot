@@ -77,3 +77,6 @@ class ChangeKeywordHardStatus(CallbackData, prefix="change_keyword_hard_status")
     new_hard_status: int
     keyword_setting_original_id: int
 
+
+class CheckSubscribe(CallbackData, prefix="check_subscribe"):
+    pass

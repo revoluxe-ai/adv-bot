@@ -23,7 +23,7 @@ from app.modules.common_slaves.wildberries.models import WBCard
 
 from app.utils.image_master.image_master2 import ImageMaster
 import pymystem3
-from app.utils.image_master.image_tools import ImageTools
+from app.utils.image_master import image_tools
 import asyncio
 from app.admin_bot import sender as admin_sender
 import pandas as pd
@@ -84,7 +84,7 @@ class Manager(AbcManager):
         self._word2vec = Word2Vec()
         self._aiosm = get_async_session_maker()
         self._pymystem = pymystem3.Mystem()
-        self._image_tools = ImageTools()
+        self._image_tools = image_tools
 
 
     @staticmethod

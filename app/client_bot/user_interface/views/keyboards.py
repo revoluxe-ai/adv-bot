@@ -1,6 +1,8 @@
 import asyncio
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting
 from ...user_interface.views.callbacks import BudgetForCreatingAdv
@@ -250,4 +252,8 @@ def get_keyword_setting_keyboard(keyword: KeywordSetting, adv_setting: AdvSettin
     return keyboard
 
 
-
+def get_subscribe_keyboard():
+    builder = InlineKeyboardBuilder()
+    button = InlineKeyboardButton(text='Подписаться', url='https://t.me/auto_wb_master')
+    builder.row(button)
+    return builder.as_markup()

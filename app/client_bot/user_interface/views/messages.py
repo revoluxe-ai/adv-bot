@@ -1,5 +1,7 @@
-from aiogram.types import FSInputFile
+import asyncio
 
+from aiogram.types import FSInputFile
+from aiogram.fsm.context import FSMContext
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
                                                           KeywordSetting)
@@ -32,8 +34,8 @@ class ShopChoice(TextWithKeyboard):
                 
                 'В настоящий момент бот проходит бета-тестирование, поэтому вы можете пользоваться его функционалом'
                 ' без ограничений совершенно бесплатно.\n\n'
-                'Канал бота - @auto_wb_master\n'
-                'Связь с разработчиком: @skyline360_1\n\n'
+                
+                'Для использования функционала бота вы должны быть подписаны на канал поддержки - @auto_wb_master\n\n'
                 
                 'Внимание! Сейчас бот работает только с автоматическими рекламными кампаниями'
                 ' с включенным Бустом и отключенными показами в Карточках\n\n'
@@ -53,9 +55,6 @@ class ShopNameGet(Text):
     @property
     def text(self):
         return 'Введите название магазина (кабинета):'
-
-
-
 
 
 
@@ -82,7 +81,24 @@ class GetCardsApiError(Text):
     text = ('Ошибка настройки прав: нет доступа в контенту. Пожалуйста, создайте новый API-ключ с требуемыми правами и попробуйте снова.')
 
 
+
+
+
 class AdvCompanyChoicing(TextWithKeyboardPagination):
+    
+    async def __call__(self, state: FSMContext):
+        await state.update_data(last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id)
+        await state.update_data(last_wb_user_cabinet_page=self._page) #последняя страница выбора рк
+        return await super().__call__()
+
+    @staticmethod
+    async def get_state_data(state: FSMContext)->(int, int):
+        data = await state.get_data()
+        last_wb_user_cabinet_original_id = data.get('last_wb_user_cabinet_original_id')
+        last_wb_user_cabinet_page = data.get('last_wb_user_cabinet_page')
+        return last_wb_user_cabinet_original_id, last_wb_user_cabinet_page
+
+
     def __init__(self, bot: Bot,
                   chat_id: int, wb_user_cabinet_original_id: int,
                  adv_settings: list[AdvSetting],
@@ -91,6 +107,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._adv_settings = adv_settings
         self._page = page
+
 
     @property
     def text(self):
@@ -305,3 +322,13 @@ class NotFoundNmidOfNewAdvCompany(Text):
 
 class LongTimeOperation(Text):
     text = 'Операция может занять некоторые время, пожалуйста, подождите...'
+
+
+
+class NeedSubscribe(TextWithKeyboard):
+    text = ('Для использования функций вы должны быть подписаны на канал службы поддержки')
+
+
+    @property
+    def keyboard(self):
+        return keyboards.get_subscribe_keyboard()

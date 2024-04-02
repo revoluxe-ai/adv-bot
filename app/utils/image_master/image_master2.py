@@ -8,7 +8,7 @@ from PIL import Image as PilImg
 from app.utils.faiss_manager.faiss_index_manager  import FaissManager
 from app.utils.image_master.database.model import Image
 from tqdm import tqdm
-from app.utils.image_master.image_tools import ImageTools
+from app.utils.image_master import image_tools
 from app.utils.faiss_manager.faiss_index import Index
 
 
@@ -27,7 +27,7 @@ class ImageMaster:
 
     def __init__(self, load_indexes = False):
 
-        im_tools = ImageTools()
+        im_tools = image_tools
         self._im_tools = im_tools
         current_folder = os.path.dirname(os.path.abspath(__file__))
         self._images_folder = os.path.join(current_folder, 'image_sources')
