@@ -3,7 +3,7 @@ import secrets
 import string
 
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-from aiohttp import web
+
 
 from ..utils import redis_func_cache
 
@@ -30,15 +30,13 @@ path_setting = path_setting_funcs.get_setting_path()
 WEB_SERVER_HOST = "127.0.0.1"
 # Port for incoming request from reverse proxy. Should be any available port
 
-PORT = path_setting_funcs.get_document_by_key_name (path_setting, 'bot_port')
 
-WEB_SERVER_PORT = PORT
 
 
 BASE_WEBHOOK_URL = 'https://tiriel.ru'
 
 WEBHOOK_PATH = "/telegram_webhook"
-path_setting = path_setting_funcs.get_setting_path()
+
 WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
 # WEBHOOK_SECRET = '89779uoiugkftyeoilyeligoyuv' #для нагрузочных тестов
 
@@ -85,6 +83,9 @@ setup_application(app, dp, bot=bot)
 
 
 async def start_web_server():
+    path_setting = path_setting_funcs.get_setting_path()
+    PORT = path_setting_funcs.get_document_by_key_name(path_setting, 'bot_port')
+    WEB_SERVER_PORT = PORT
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, WEB_SERVER_HOST, WEB_SERVER_PORT)
