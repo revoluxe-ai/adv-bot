@@ -329,5 +329,5 @@ async def select_shop(callback_query: types.CallbackQuery,
 
 
     await messages.AdvCompanyChoicing \
-        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=1)()
+        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=1)(state)
     return

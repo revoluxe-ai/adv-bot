@@ -90,13 +90,12 @@ class GetCardsApiError(Text):
 class AdvCompanyChoicing(TextWithKeyboardPagination):
     
     async def __call__(self, state: FSMContext):
-
         await state.update_data(last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id)
-        await state.update_data(last_wb_user_cabinet_page=self._page)
+        await state.update_data(last_wb_user_cabinet_page=self._page) #последняя страница выбора рк
         return await super().__call__()
 
     @staticmethod
-    async def get_state(state: FSMContext)->(int, int):
+    async def get_state_data(state: FSMContext)->(int, int):
         data = await state.get_data()
         last_wb_user_cabinet_original_id = data.get('last_wb_user_cabinet_original_id')
         last_wb_user_cabinet_page = data.get('last_wb_user_cabinet_page')
