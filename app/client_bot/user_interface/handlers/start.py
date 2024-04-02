@@ -171,7 +171,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
                  result = await session.execute(stmt)
                  adv_settings = result.unique().scalars().all()
             await messages. \
-                    AdvCompanyChoicing(bot, chat_id, wb_user_cabinet.id, adv_settings, page=1)()
+                    AdvCompanyChoicing(bot, chat_id, wb_user_cabinet.id, adv_settings, page=1)(state)
             return
         else: #если кабинета у юзера нет
             #проверяем есть ли такой кабинет вообще

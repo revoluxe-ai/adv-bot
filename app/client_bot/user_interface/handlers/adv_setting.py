@@ -26,10 +26,9 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
 
     await bot.answer_callback_query(callback_query_id=callback.id)
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
-    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     page = callback_data.page
-    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-    await state.update_data(wb_user_cabinet_page=page)
+    await state.update_data(last_wb_user_cabinet_page=page)
     check_data = await state.get_data()
     logger.debug(f'check_data: {check_data}')
 
