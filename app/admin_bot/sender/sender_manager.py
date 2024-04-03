@@ -48,13 +48,3 @@ async def send_message(text: str):
 
 
 
-
-
-
-
-
-
-
-async def send_message(text: str):
-    await bot.send_message(admin_chat_id, text)
-
