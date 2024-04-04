@@ -59,7 +59,7 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
         chat_id = message.chat.id
         user_name = message.from_user.username
     await bot.send_message(chat_id=chat_id,
-                           text='Произошла ошибка, но вы не волнуйте! Бот продолжает работать '
+                           text='Произошла ошибка, но не волнуйте! Бот продолжает работать '
                                 'и по прежнему выполняет свои функции. Проблема только в интерфейсе, а администратор'
                                 ' уже уведомлен о ней. Попробуйте выполнить нужное вам действие еще раз или вернитесь'
                                 ' в главное меню, через команду /start . Связаться с разработчиком вы можете по '

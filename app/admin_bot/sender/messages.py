@@ -3,6 +3,42 @@ from app.client_bot.user_interface.views import keyboards
 
 
 
+class NewFeaturesInBot(message_templates.TextWithImage):
+
+    @property
+    def text(self):
+        return ('Привет! Наш бот остается лучшим инструментом '
+                'для рекламы на Wildberries, предоставляя вам неоспоримое преимущество '
+                'в продвижении. Однако, совершенству нет предела: недавно мы добавили несколько новых функций, которые '
+                'сделают вашу работу еще эффективнее. Одна из них - это автоматическая отметка кампаний, которые проверялись '
+                'пользователем кабинета (вами или вашими сотрудниками) за последние сутки. Теперь вам не нужно тратить время, '
+                'заходя по нескольку раз в день в одни и те же кампании для контроля работы бота. \n\n'
+                'Также выложили на канал инструкцию по автоматизации рекламы на WB с помощью нашего бота - @auto_wb_master '
+                'и рекомендации по работе с ним. Подписывайтесь и следите за новостями! \n\n')
+
+
+    @property
+    def image(self):
+        if hasattr(self, '_image'):
+            return self._image
+        else:
+            return 'app/admin_bot/sender/images/advs_with_checking.png'
+
+
+    @image.setter
+    def image(self, value):
+        self._image = value
+
+
+
+
+
+
+
+
+
+
+
 
 class AddImageOnApi(message_templates.TextWithKeyboard):
     def __init__(self, bot, chat_id, all_shops):

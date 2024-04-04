@@ -83,13 +83,9 @@
       "handlers": ["console"],
       "propagate": false
     },
-    "app.session_maker": {
-        "level": "INFO",
-        "handlers": ["console"],
-        "propagate": false
-    },
+
     "app.utils.db.session_maker": {
-        "level": "CRITICAL",
+        "level": "DEBUG",
         "handlers": ["console"],
         "propagate": false
     },
