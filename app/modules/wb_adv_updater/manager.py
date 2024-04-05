@@ -475,9 +475,9 @@ class Manager(AbcManager):
                         final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
         async with sm() as session:
             for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
-                if message_counter.check_last_time():
-                    await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
-                    message_counter.add_send()
+                # if message_counter.check_last_time():
+                await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
+                message_counter.add_send()
 
                 stmt = select(GlobalCategorySetting) \
                     .where(GlobalCategorySetting.category_name == wb_category_name)
