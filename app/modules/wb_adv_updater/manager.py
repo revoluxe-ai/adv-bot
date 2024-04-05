@@ -25,7 +25,7 @@ from app.utils.image_master.image_master2 import ImageMaster
 import pymystem3
 from app.utils.image_master import image_tools
 import asyncio
-from app.admin_bot import sender as admin_sender
+from app.admin_bot.sender import sender_manager as admin_sender
 import pandas as pd
 from sqlalchemy import and_
 from sqlalchemy.orm import joinedload
@@ -476,7 +476,7 @@ class Manager(AbcManager):
         async with sm() as session:
             for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
                 if message_counter.check_last_time():
-                    await admin_sender.send_message(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
+                    await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
                     message_counter.add_send()
 
                 stmt = select(GlobalCategorySetting) \
