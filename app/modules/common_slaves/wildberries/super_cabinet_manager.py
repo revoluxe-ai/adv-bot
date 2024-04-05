@@ -119,13 +119,12 @@ async def get_super_user_access():
     tokens = [token for access in accesses for token in access.tokens]
     leave_tokens = []
     for token in tokens:
-        while True:
             try:
                 await api_rights.check_token(token)
                 leave_tokens.append(token)
             except Exception as exc:
                 logger.error(exc)
-                await asyncio.sleep(1)
+                await asyncio.sleep(0)
 
 
     super_user_access = WBCabinetAccess(tokens = leave_tokens,
