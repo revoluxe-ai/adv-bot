@@ -33,6 +33,7 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
+            self.check_accesses(),
             self.run_update_keywords_on_wb(),
             self.update_cards_in_graph(),
             self.update_all_data_in_db(),
@@ -123,5 +124,9 @@ class Runner:
         await self._manager.update_all_data_in_db_run()
         await asyncio.sleep(1)
 
+    async def check_accesses(self):
+        while True:
+            await self._manager.check_accesses()
+            await asyncio.sleep(1)
 
 

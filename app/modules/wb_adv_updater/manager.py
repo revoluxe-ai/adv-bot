@@ -42,6 +42,9 @@ from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpd
 from app.modules.wb_adv_updater import data_managers
 from app.modules.common_slaves.wildberries import super_cabinet_manager as users_manager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from .shops_manager import rights_control
+
+
 
 predictor = Predictor()
 
@@ -525,6 +528,9 @@ class Manager(AbcManager):
                          del tasks[wb_access.wb_cabinet.id]
 
              await asyncio.sleep(30)
+
+    async def check_accesses(self):
+        await rights_control.check_all()
 
 
 
