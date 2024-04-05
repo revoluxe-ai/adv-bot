@@ -189,18 +189,27 @@ class AddNewTokenGet(TextWithImage):
         self.__cabinet_name  = cabinet_name
         super().__init__(bot, chat_id)
 
+        self._image = 'app/client_bot/images/api_setting.png'
+
     @property
     def text(self):
         return  (f'Пришлите новый Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n'
                  'Для работы бота нужны права Контент (анализ карточек для управления ключами) и Продвижение ('
                  'загрузка рекламной статистики и управление ключевыми словами)')
 
+    @property
+
+
 
 
     @property
     def image(self):
-        photo_path = 'app/client_bot/images/api_setting.png'
-        return photo_path
+        return self._image
+
+
+    @image.setter
+    def image(self, value):
+        self._image = value
 
 
 
