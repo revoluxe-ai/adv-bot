@@ -57,3 +57,7 @@ class AddImageOnApi(message_templates.TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_shop_keyboard(self.__all_shops)
+
+
+class BetaTesIsDone(message_templates.Text):
+    ...

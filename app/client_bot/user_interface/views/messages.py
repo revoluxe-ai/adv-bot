@@ -200,8 +200,7 @@ class AddNewTokenGet(TextWithImage):
     @property
     def image(self):
         photo_path = 'app/client_bot/images/api_setting.png'
-        photo = FSInputFile(photo_path)
-        return photo
+        return photo_path
 
 
 
