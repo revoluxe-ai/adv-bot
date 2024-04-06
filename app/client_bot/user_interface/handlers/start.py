@@ -11,6 +11,7 @@ from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError,
 from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from   .. import states
 from ..views import messages
@@ -46,6 +47,17 @@ redis_manager = RedisManager()
 @router.message(CommandStart())
 async def start_registration(message: types.Message, bot: aiogram.Bot):
     user_id = message.from_user.id
+    text = message.text
+    referral_link = None
+    if text:
+        text = text.split(' ')
+        if len(text) > 1 and text[1].isdigit():
+            referral_link_id = int(text[1])
+            async with sm() as session:
+                stmt = select(RefLink).where(RefLink.id == referral_link_id)
+                result = await session.execute(stmt)
+                referral_link = result.scalar()
+
     async with sm() as session:
         stmt = select(User)\
             .options(joinedload(User.wb_user_cabinets).joinedload(
@@ -57,7 +69,8 @@ async def start_registration(message: types.Message, bot: aiogram.Bot):
             user = User(user_telegram_id=user_id,
                         username=message.from_user.username,
                         adv_updater_user_chat_id = message.chat.id,
-                        wb_tokens=[])
+                        wb_tokens=[],
+                        reffered_by = referral_link)
             session.add(user)
             await session.commit()
             await session.refresh(user)

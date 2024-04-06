@@ -1,5 +1,5 @@
 import asyncio
-
+from app.utils.db.session_maker import get_async_session_maker
 from aiogram.types import FSInputFile
 from aiogram.fsm.context import FSMContext
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
@@ -11,14 +11,34 @@ from ..message_templates.templates import (TextWithKeyboard,
                                            TextWithKeyboardPagination,
                                            TextWithKeyboardAndImage)
 
-from . import keyboards
+from . import keyboards, db_manager
 from aiogram import Bot
 
 import logging
 import app
 from ...utils import KeywordForKeyboard
-
+from .import texts
 logger = logging.getLogger(__name__)
+
+
+
+_sm = get_async_session_maker()
+
+class MainMenu(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id: int, user_original_id: int):
+        super().__init__(bot, chat_id)
+        self.__user_original_id = user_original_id
+
+
+    @property
+    def text(self):
+        return texts.get_main_menu_text(self.__user_original_id)
+
+
+
+
+
 
 
 class ShopChoice(TextWithKeyboard):
@@ -337,3 +357,21 @@ class NeedSubscribe(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_subscribe_keyboard()
+
+
+class RefProgram(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id: int):
+        self._user_telegram_id = chat_id
+        super().__init__(bot, chat_id)
+
+    async def __call__(self):
+        ref_statistic = await db_manager.get_ref_statistic(self._user_telegram_id)
+
+
+        await super().__call__()
+
+
+
+
+
