@@ -42,6 +42,10 @@ class WBCabinet(BaseTable):
                                                                  )
     active = Column(Boolean, default=True)
 
+    expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
+
+
+
 class WBToken(BaseTable):
     def __repr__(self):
         return f'user_id: {self.user_id}, shop_id: {self.shop_id}'
