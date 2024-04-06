@@ -59,5 +59,7 @@ class AddImageOnApi(message_templates.TextWithKeyboard):
         return keyboards.get_shop_keyboard(self.__all_shops)
 
 
-class BetaTesIsDone(message_templates.Text):
-    ...
+class BetaTestIsDone(message_templates.Text):
+
+    text = ('Добрый день! Мы завершаем бета-тестирование бота и благодарим вас за участие. '
+            'Сегодня все ')

@@ -24,7 +24,7 @@ test_user_ids = [5378020690, 373435337]
 
 
 
-message = messages.BetaTesIsDone
+message = messages.BetaTestIsDone
 
 
 async def send_to_users_out_channel():
@@ -43,7 +43,7 @@ async def send_to_users_out_channel():
             continue
         if not check:
             try:
-                await messages.NewFeaturesInBot(bot, user_id)()
+                await message(bot, user_id)()
                 await redis_manager.set_message_send(hash, user_id)
                 await asyncio.sleep(1)
 
