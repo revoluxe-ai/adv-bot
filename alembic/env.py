@@ -6,7 +6,7 @@ from app.modules.wb_adv_updater.models import *
 from app.modules.common_slaves.wildberries.models import *
 from app.utils.db.models import *
 from app.admin_bot.sender.utils.db.models import *
-# from app.payments.db.models import *
+from app.payments.db.models import *
 
 
 from alembic import context

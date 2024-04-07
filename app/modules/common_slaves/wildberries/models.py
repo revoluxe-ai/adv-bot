@@ -10,20 +10,23 @@ from sqlalchemy.dialects.postgresql import JSONB
 from . import exceptions
 from app.utils.db.base import BaseTable
 from sqlalchemy.schema import UniqueConstraint
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.utils.db.models import User
 
 from app.utils.db.session_maker import get_async_session_maker
 
 
 
 _sm = get_async_session_maker()
-from app.utils.db.models import User
 
 
 class WBUserCabinet(BaseTable):
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
     user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
-    user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
+    user: Mapped['User']  = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
     __table_args__ = (UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),)

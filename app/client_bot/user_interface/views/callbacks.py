@@ -80,3 +80,8 @@ class ChangeKeywordHardStatus(CallbackData, prefix="change_keyword_hard_status")
 
 class CheckSubscribe(CallbackData, prefix="check_subscribe"):
     pass
+
+
+class RefProgram(CallbackData, prefix="ref_program"):
+    """select or new"""
+    action: str

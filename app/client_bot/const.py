@@ -1,4 +1,7 @@
 
+CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'
+
+
 MAX_MESSAGE_LENGTH = 4096
 
 

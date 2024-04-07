@@ -20,3 +20,7 @@ class AddNewToken(StatesGroup):
 class CreateNewAdvCompany(StatesGroup):
     waiting_for_name = State()
     waiting_for_nmids = State()
+
+
+class RefProgram(StatesGroup):
+    getting_name = State()

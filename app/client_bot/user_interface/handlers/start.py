@@ -20,7 +20,7 @@ from aiogram.types import Message
 from ...redis_manager import RedisManager
 import logging
 from ..views import callbacks
-from app.my_types import User
+from app.utils.db.models import User
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from app.modules.common_slaves.wildberries import models as wb_models
 from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
@@ -45,20 +45,22 @@ redis_manager = RedisManager()
 
 
 @router.message(CommandStart())
-async def start_registration(message: types.Message, bot: aiogram.Bot):
-    user_id = message.from_user.id
-    text = message.text
-    referral_link = None
-    if text:
-        text = text.split(' ')
-        if len(text) > 1 and text[1].isdigit():
-            referral_link_id = int(text[1])
-            async with sm() as session:
-                stmt = select(RefLink).where(RefLink.id == referral_link_id)
-                result = await session.execute(stmt)
-                referral_link = result.scalar()
-
+async def start_registration(message: types.Message, bot: aiogram.Bot, state:FSMContext):
+    await state.clear()
     async with sm() as session:
+        user_id = message.from_user.id
+        text = message.text
+        referral_link = None
+        if text:
+            text = text.split(' ')
+            if len(text) > 1 and text[1].isdigit():
+                referral_link_id = int(text[1])
+                stmt = select(RefLink)\
+                .options(selectinload(RefLink.referred_users))\
+                .where(RefLink.id == referral_link_id)
+                result = await session.execute(stmt)
+                referral_link:RefLink = result.scalar()
+
         stmt = select(User)\
             .options(joinedload(User.wb_user_cabinets).joinedload(
             WBUserCabinet.wb_cabinet)) \
@@ -69,9 +71,10 @@ async def start_registration(message: types.Message, bot: aiogram.Bot):
             user = User(user_telegram_id=user_id,
                         username=message.from_user.username,
                         adv_updater_user_chat_id = message.chat.id,
-                        wb_tokens=[],
-                        reffered_by = referral_link)
+                        wb_tokens=[])
             session.add(user)
+            if referral_link:
+                referral_link.referred_users.append(user)
             await session.commit()
             await session.refresh(user)
             wb_user_cabinets = []

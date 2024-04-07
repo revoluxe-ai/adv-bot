@@ -1,4 +1,8 @@
 import asyncio
+from aiogram.utils import deep_linking
+from tabulate import tabulate
+
+from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from aiogram.types import FSInputFile
 from aiogram.fsm.context import FSMContext
@@ -367,9 +371,89 @@ class RefProgram(TextWithKeyboard):
 
     async def __call__(self):
         ref_statistic = await db_manager.get_ref_statistic(self._user_telegram_id)
-
-
+        self._ref_statistic = ref_statistic
         await super().__call__()
+
+    @property
+    def text(self):
+        if not self._ref_statistic:
+            return "У вас еще нет реферальных ссылок. Создайте новую ссылку по кнопке ниже: "
+
+        # Заголовок таблицы и разделитель
+        header = f"{'Имя реф.ссылки':<15} | {'Количество рефералов':>20} | {'Сумма платежей':>10}"
+        divider = "-----------------------------------------------------------------------------"
+
+        # Формирование строк таблицы
+        rows = [f"{stat.name:<15}             |    {stat.referrals_count:>20}                 |  {stat.total_payments:>15}" for stat in self._ref_statistic]
+
+        # Сборка итогового текста
+        table = [header, divider] + rows
+        return '\n'.join(table)
+
+
+    keyboard = keyboards.get_ref_program_keyboard()
+
+
+class RefLinkGetName(Text):
+    text = 'Введите название для новой реферальной ссылки. Название будете видеть только вы:'
+
+
+class RefLinkNameTooLong(Text):
+    text = 'Название ссылки слишком длинное, должно быть не больше 30 символов. Попробуйте снова:'
+
+
+class RefLinkNameAlreadyExists(Text):
+    text = 'Такое название ссылки уже существует. Попробуйте снова:'
+
+
+class RefLinkCreated(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id: int, ref_link: RefLink):
+        self._ref_link = ref_link
+        self._bot = bot
+        super().__init__(bot, chat_id)
+
+
+    async def __call__(self):
+        self._link = await deep_linking.create_start_link(self._bot, str(self._ref_link.id))
+        await super().__call__()
+
+    @property
+    def text(self):
+        return (f'Ссылка {self._ref_link.name} успешно создана. \n\n' 
+               f'Вот ссылка, по которой вы можете приглашать пользователей: '
+                f'{self._link}')
+
+
+    keyboard = keyboards.get_return_for_your_ref_links()
+
+
+
+class RefProgramSelect(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id: int):
+        self._user_telegram_id = chat_id
+        super().__init__(bot, chat_id)
+
+
+
+    async def __call__(self):
+        ref_links = await db_manager.get_ref_names_and_links(self._user_telegram_id, self.bot)
+        self._ref_links = ref_links
+        await super().__call__()
+
+
+    @property
+    def text(self):
+        text = 'Ваши реф.ссылки:\n\n'
+        for ref in self._ref_links:
+            text += f'{ref.name}: {ref.link}\n'
+        return text
+
+
+
+    keyboard = keyboards.get_return_for_your_ref_links()
+
 
 
 

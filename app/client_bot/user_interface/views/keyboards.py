@@ -257,3 +257,23 @@ def get_subscribe_keyboard():
     button = InlineKeyboardButton(text='Подписаться', url='https://t.me/auto_wb_master')
     builder.row(button)
     return builder.as_markup()
+
+
+def get_ref_program_keyboard():
+    builder = InlineKeyboardBuilder()
+    button = InlineKeyboardButton(text='Создать новую реф.ссылку', callback_data = callbacks.RefProgram(
+        action='new').pack())
+    builder.row(button)
+    button = InlineKeyboardButton(text='Существующие ссылки и их имена', callback_data= callbacks.RefProgram(
+        action='select').pack())
+    builder.row(button)
+    return builder.as_markup()
+
+
+def get_return_for_your_ref_links():
+    builder = InlineKeyboardBuilder()
+    button = InlineKeyboardButton(text = 'Назад', callback_data= callbacks.RefProgram(
+        action='return').pack())
+
+    builder.row(button)
+    return builder.as_markup()
