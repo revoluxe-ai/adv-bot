@@ -20,12 +20,17 @@ def async_semaphore_wrapper(semaphore):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            async with semaphore:
-                return await func(*args, **kwargs)
+            while True:
+                try:
+                    return await func(*args, **kwargs)
+                except neo4j.exceptions.TransientError:
+                    logger.error('Ошибка взаимной блокировки, повтор транзакции через 5 сек')
+                    await asyncio.sleep(5)
+
         return wrapper
     return decorator
 
-class AsyncSemaphoreMeta(type):
+class AsyncMeta(type):
     def __new__(cls, name, bases, dct):
         semaphore = asyncio.Semaphore(3)
         for key, value in dct.items():
@@ -37,7 +42,7 @@ class AsyncSemaphoreMeta(type):
 
 
 
-class DataScience:
+class DataScience(metaclass=AsyncMeta):
     def __init__(self):
         self.MAIN_GRAPH_NAME = 'main'
         with open('setting.yaml', 'r', encoding='utf-8') as file:
