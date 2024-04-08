@@ -22,7 +22,7 @@ from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
 
 from .data_managers import DataGetter
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
-
+from app.admin_bot.sender import sender_manager
 
 
 
@@ -248,10 +248,13 @@ class Fitter(AbcManager):
             std_dev_mse = mse_scores.std()
             max_difference = mse_scores.max() - mse_scores.min()
 
-            print("CV MSE scores:", mse_scores)
-            print(f"Mean CV MSE: {mean_mse}")
-            print(f"Standard Deviation of CV MSE: {std_dev_mse}")
-            print(f"Max difference between CV MSE scores: {max_difference}")
+            await sender_manager.send_message_to_admin(
+            f"CV MSE scores: {mse_scores}\n"
+            f"Mean CV MSE: {mean_mse}\n"
+            f"Standard Deviation of CV MSE: {std_dev_mse}\n"
+            f"Max difference between CV MSE scores: {max_difference}\n"
+
+            )
         logger.debug('Обучение модели на полных данных')
         model.fit(X, y)
         logger.debug('Модель обучена')
