@@ -84,8 +84,8 @@ class Runner:
     async def run_update_vectors(self, need_update_model:asyncio.Event,
                                  update_model_on_new_features:asyncio.Event, predicted:asyncio.Event):
         while True:
-            await self._manager.update_wb_adv_phrase_in_db()
-            await self._manager.update_vectors_exec_mode(update_model_on_new_features, predicted)
+            await asyncio.gather(self._manager.update_wb_adv_phrase_in_db(),
+            self._manager.update_vectors_exec_mode(update_model_on_new_features, predicted))
             need_update_model.set()
             logger.debug('Установка set для need_update_model')
             await asyncio.sleep(1)
