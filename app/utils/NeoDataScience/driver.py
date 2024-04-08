@@ -27,7 +27,7 @@ def async_semaphore_wrapper(semaphore):
 
 class AsyncSemaphoreMeta(type):
     def __new__(cls, name, bases, dct):
-        semaphore = asyncio.Semaphore(2)
+        semaphore = asyncio.Semaphore(1)
         for key, value in dct.items():
             if callable(value) and asyncio.iscoroutinefunction(value):
                 dct[key] = async_semaphore_wrapper(semaphore)(value)
@@ -37,7 +37,7 @@ class AsyncSemaphoreMeta(type):
 
 
 
-class DataScience(metaclass=AsyncSemaphoreMeta):
+class DataScience():
     def __init__(self):
         self.MAIN_GRAPH_NAME = 'main'
         with open('setting.yaml', 'r', encoding='utf-8') as file:
