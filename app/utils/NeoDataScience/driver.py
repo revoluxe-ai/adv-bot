@@ -27,7 +27,7 @@ def async_semaphore_wrapper(semaphore):
 
 class AsyncSemaphoreMeta(type):
     def __new__(cls, name, bases, dct):
-        semaphore = asyncio.Semaphore(1)
+        semaphore = asyncio.Semaphore(2)
         for key, value in dct.items():
             if callable(value) and asyncio.iscoroutinefunction(value):
                 dct[key] = async_semaphore_wrapper(semaphore)(value)
