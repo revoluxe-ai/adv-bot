@@ -331,6 +331,7 @@ class Manager(AbcManager):
             # try:
             await self._gds.add_keyword_phrase(phrase_data_list)
             await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
+            await asyncio.sleep(0)
             # except Exception as exc:
             #     logger.error(f'Ошибка добавления фразы  в граф: {exc}')
             # await asyncio.sleep(3)
