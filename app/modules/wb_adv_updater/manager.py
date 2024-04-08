@@ -301,7 +301,7 @@ class Manager(AbcManager):
 
     async def _update_wb_adv_phrase_in_db(self):
         async with sm() as session:
-            stmt = select(AdvSetting)
+            stmt = select(AdvSetting).where(AdvSetting.active_status == True)
             result = await session.execute(stmt)
             adv_settings = result.unique().scalars().all()
             adv_setting_keyword_stats = {}
