@@ -277,8 +277,13 @@ class Manager(AbcManager):
         await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
 
 
-    async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
-        await self.graph_vector_update(update_model_on_new_features, predicted)
+    async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event,
+                                       need_update_model):
+
+        while True:
+             await self.graph_vector_update(update_model_on_new_features, predicted)
+             need_update_model.set()
+             await asyncio.sleep(0)
 
 
     def __get_keyword_stat(self):
@@ -287,9 +292,10 @@ class Manager(AbcManager):
 
 
 
-    async def update_wb_adv_phrase_in_db(self):
+    async def update_wb_adv_phrase_in_db(self, need_update_model):
         while True:
             await self._update_wb_adv_phrase_in_db()
+            need_update_model.set()
             await asyncio.sleep(0)
 
 
