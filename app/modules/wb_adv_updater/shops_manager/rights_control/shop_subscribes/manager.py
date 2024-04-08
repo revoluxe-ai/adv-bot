@@ -27,8 +27,3 @@ async def check_shop_subscribes():
 
 
 
-
-
-
-async def check_all():
-    return None
