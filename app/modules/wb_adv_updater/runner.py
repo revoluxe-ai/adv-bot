@@ -33,7 +33,7 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
-            self.run_update_keywords_on_wb(),
+            # self.run_update_keywords_on_wb(),
             self.update_cards_in_graph(),
             self.update_all_data_in_db(),
             self.update_min_ctr_in_global_wb_category_settings(),
@@ -121,6 +121,7 @@ class Runner:
 
     async def update_all_data_in_db(self):
         await self._manager.update_all_data_in_db_run()
+        logger.debug("Данные в базе обновлены")
         await asyncio.sleep(1)
 
 
