@@ -328,11 +328,11 @@ class Manager(AbcManager):
 
                 )
                 phrase_data_list.append(phrase_data)
-            try:
-                 await self._gds.add_keyword_phrase(phrase_data_list)
-            except Exception as exc:
-                logger.error(f'Ошибка добавления фразы  в граф: {exc}')
-            await asyncio.sleep(3)
+            # try:
+            await self._gds.add_keyword_phrase(phrase_data_list)
+            # except Exception as exc:
+            #     logger.error(f'Ошибка добавления фразы  в граф: {exc}')
+            # await asyncio.sleep(3)
 
 
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):

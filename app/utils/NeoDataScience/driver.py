@@ -1,4 +1,4 @@
-
+import asyncio
 import logging
 import typing
 import neo4j
@@ -13,8 +13,30 @@ from app.modules.common_slaves.wildberries.data_classes.namedtuples import Keywo
 
 logger = logging.getLogger(__name__)
 
+from functools import wraps
 
-class DataScience:
+def async_semaphore_wrapper(semaphore):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            async with semaphore:
+                return await func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+class AsyncSemaphoreMeta(type):
+    def __new__(cls, name, bases, dct):
+        semaphore = asyncio.Semaphore(1)
+        for key, value in dct.items():
+            if callable(value) and asyncio.iscoroutinefunction(value):
+                dct[key] = async_semaphore_wrapper(semaphore)(value)
+        return super().__new__(cls, name, bases, dct)
+
+
+
+
+
+class DataScience(metaclass=AsyncSemaphoreMeta):
     def __init__(self):
         self.MAIN_GRAPH_NAME = 'main'
         with open('setting.yaml', 'r', encoding='utf-8') as file:
