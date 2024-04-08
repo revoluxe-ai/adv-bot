@@ -91,10 +91,37 @@
     },
 
     "NeoDataScience.driver": {
-      "level": "WARNING",
+      "level": "DEBUG",
       "handlers": ["console"],
       "propagate": false
     },
+    "app.modules.common.slaves.wildberries.api": {
+        "level": "ERROR",
+        "handlers": ["console"],
+        "propagate": false
+        },
+
+    "app.modules.wb_adv_updater.manager": {
+      "level": "ERROR",
+        "handlers": ["console"],
+        "propagate": false
+
+
+  },
+    "app.modules.wb_adv_updater.data_managers ": {
+       "level": "CRITICAL",
+        "handlers": ["console"],
+        "propagate": false
+    },
+
+    "app.modules.common_slaves.wildberries.api": {
+       "level": "ERROR",
+        "handlers": ["console"],
+        "propagate": false
+        }
+  },
+
+
     "app.modules.common_slaves.wildberries.api_rights":{
 
         "level": "CRITICAL",
@@ -117,6 +144,6 @@
     "level": "DEBUG",
     "handlers": ["console", "error_to_file", "common_file"]
   }
-}}
+}
 
 

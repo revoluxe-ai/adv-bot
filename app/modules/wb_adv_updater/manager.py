@@ -280,19 +280,31 @@ class Manager(AbcManager):
         await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
 
 
-    async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
-        await self.graph_vector_update(update_model_on_new_features, predicted)
+    async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event,
+                                       need_update_model):
 
-
+        while True:
+             await self.graph_vector_update(update_model_on_new_features, predicted)
+             need_update_model.set()
+             await asyncio.sleep(0)
 
 
     def __get_keyword_stat(self):
         kw_df = pd.read_csv(self.keyword_stat_df_path)
         return kw_df
 
-    async def update_wb_adv_phrase_in_db(self):
+
+
+    async def update_wb_adv_phrase_in_db(self, need_update_model):
+        while True:
+            await self._update_wb_adv_phrase_in_db()
+            need_update_model.set()
+            await asyncio.sleep(0)
+
+
+    async def _update_wb_adv_phrase_in_db(self):
         async with sm() as session:
-            stmt = select(AdvSetting)
+            stmt = select(AdvSetting).filter(AdvSetting.active_status == 'started')
             result = await session.execute(stmt)
             adv_settings = result.unique().scalars().all()
             adv_setting_keyword_stats = {}
@@ -331,11 +343,12 @@ class Manager(AbcManager):
 
                 )
                 phrase_data_list.append(phrase_data)
-            try:
-                 await self._gds.add_keyword_phrase(phrase_data_list)
-            except Exception as exc:
-                logger.error(f'Ошибка добавления фразы  в граф: {exc}')
-            await asyncio.sleep(3)
+            # try:
+            await self._gds.add_keyword_phrase(phrase_data_list)
+            await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
+            # except Exception as exc:
+            #     logger.error(f'Ошибка добавления фразы  в граф: {exc}')
+            # await asyncio.sleep(3)
 
 
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):

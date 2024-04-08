@@ -1,9 +1,10 @@
-
+import asyncio
 import logging
 import typing
 import neo4j
 import yaml
 
+from app.admin_bot.sender import sender_manager
 from app.modules.common_slaves.wildberries.models import WBCard, WBCategory
 from collections import defaultdict
 from neo4j import AsyncGraphDatabase
@@ -13,8 +14,35 @@ from app.modules.common_slaves.wildberries.data_classes.namedtuples import Keywo
 
 logger = logging.getLogger(__name__)
 
+from functools import wraps
 
-class DataScience:
+def async_semaphore_wrapper(semaphore):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            while True:
+                try:
+                    return await func(*args, **kwargs)
+                except neo4j.exceptions.TransientError:
+                    logger.error('Ошибка взаимной блокировки, повтор транзакции через 5 сек')
+                    await asyncio.sleep(5)
+
+        return wrapper
+    return decorator
+
+class AsyncMeta(type):
+    def __new__(cls, name, bases, dct):
+        semaphore = asyncio.Semaphore(3)
+        for key, value in dct.items():
+            if callable(value) and asyncio.iscoroutinefunction(value):
+                dct[key] = async_semaphore_wrapper(semaphore)(value)
+        return super().__new__(cls, name, bases, dct)
+
+
+
+
+
+class DataScience(metaclass=AsyncMeta):
     def __init__(self):
         self.MAIN_GRAPH_NAME = 'main'
         with open('setting.yaml', 'r', encoding='utf-8') as file:
@@ -521,12 +549,12 @@ RETURN graphName
         return result
 
     async def update_fastrp(self, leingth):
-        logger.debug('Начинаю fasp обучение')
+        await sender_manager.send_message_to_admin('Начинаю fasp обучение')
         await self.drop_graph(self.MAIN_GRAPH_NAME)
         await self.drop_graph(self.SHOP_GRAPH_NAME)
         await self.create_base_graph(self.MAIN_GRAPH_NAME)
         await self.fit_fastrp(self.MAIN_GRAPH_NAME, fastrp_vector_len = leingth)
-        logger.debug('Fastrp обучение завершено')
+        await sender_manager.send_message_to_admin('Fastrp обучение завершено')
 
 
 

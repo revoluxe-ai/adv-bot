@@ -29,7 +29,7 @@ message = messages.BetaTestIsDone
 
 async def send_to_users_out_channel():
     users = await data_managers.get_all_users()
-    users = [user for user in users if user.user_telegram_id in test_user_ids]
+    # users = [user for user in users if user.user_telegram_id in test_user_ids]
     hash = sha256(str(message).encode()).hexdigest()
     for user in users:
         if await redis_manager.check_message_send(hash, user.user_telegram_id):

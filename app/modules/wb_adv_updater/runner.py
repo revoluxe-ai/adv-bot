@@ -84,12 +84,11 @@ class Runner:
 
     async def run_update_vectors(self, need_update_model:asyncio.Event,
                                  update_model_on_new_features:asyncio.Event, predicted:asyncio.Event):
-        while True:
-            await self._manager.update_wb_adv_phrase_in_db()
-            await self._manager.update_vectors_exec_mode(update_model_on_new_features, predicted)
-            need_update_model.set()
-            logger.debug('Установка set для need_update_model')
-            await asyncio.sleep(1)
+
+        await asyncio.gather(self._manager.update_wb_adv_phrase_in_db(need_update_model),
+        self._manager.update_vectors_exec_mode(update_model_on_new_features, predicted, need_update_model))
+
+
 
     async def run_update_keywords_on_wb(self):
         await self._manager\
@@ -122,6 +121,7 @@ class Runner:
 
     async def update_all_data_in_db(self):
         await self._manager.update_all_data_in_db_run()
+        logger.debug("Данные в базе обновлены")
         await asyncio.sleep(1)
 
     async def check_accesses(self):
