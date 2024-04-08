@@ -37,7 +37,7 @@ class AsyncSemaphoreMeta(type):
 
 
 
-class DataScience():
+class DataScience(metaclass=AsyncSemaphoreMeta):
     def __init__(self):
         self.MAIN_GRAPH_NAME = 'main'
         with open('setting.yaml', 'r', encoding='utf-8') as file:

@@ -281,13 +281,19 @@ class Manager(AbcManager):
         await self.graph_vector_update(update_model_on_new_features, predicted)
 
 
-
-
     def __get_keyword_stat(self):
         kw_df = pd.read_csv(self.keyword_stat_df_path)
         return kw_df
 
+
+
     async def update_wb_adv_phrase_in_db(self):
+        while True:
+            await self._update_wb_adv_phrase_in_db()
+            await asyncio.sleep(0)
+
+
+    async def _update_wb_adv_phrase_in_db(self):
         async with sm() as session:
             stmt = select(AdvSetting)
             result = await session.execute(stmt)
@@ -331,7 +337,6 @@ class Manager(AbcManager):
             # try:
             await self._gds.add_keyword_phrase(phrase_data_list)
             await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
-            await asyncio.sleep(0)
             # except Exception as exc:
             #     logger.error(f'Ошибка добавления фразы  в граф: {exc}')
             # await asyncio.sleep(3)
