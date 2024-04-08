@@ -141,7 +141,7 @@
 
 
   "root": {
-    "level": "INFO",
+    "level": "DEBUG",
     "handlers": ["console", "error_to_file", "common_file"]
   }
 }
