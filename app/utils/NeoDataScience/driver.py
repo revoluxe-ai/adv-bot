@@ -750,13 +750,12 @@ RETURN graphName
             ON MATCH SET r2.dist = phrase.ctr
 
         """
-        try:
-            async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
-                async with driver.session() as session:
-                    result = await session.write_transaction(
-                        lambda tx: tx.run(query, parameters = {'data_list': data_list}))
-        except:
-            pass
+
+        async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                result = await session.write_transaction(
+                    lambda tx: tx.run(query, parameters = {'data_list': data_list}))
+
         return result
 
 
