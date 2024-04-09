@@ -4,7 +4,7 @@ import typing
 import neo4j
 import yaml
 
-from app.admin_bot.sender import sender_manager
+
 from app.modules.common_slaves.wildberries.models import WBCard, WBCategory
 from collections import defaultdict
 from neo4j import AsyncGraphDatabase
@@ -549,12 +549,11 @@ RETURN graphName
         return result
 
     async def update_fastrp(self, leingth):
-        await sender_manager.send_message_to_admin('Начинаю fasp обучение')
         await self.drop_graph(self.MAIN_GRAPH_NAME)
         await self.drop_graph(self.SHOP_GRAPH_NAME)
         await self.create_base_graph(self.MAIN_GRAPH_NAME)
         await self.fit_fastrp(self.MAIN_GRAPH_NAME, fastrp_vector_len = leingth)
-        await sender_manager.send_message_to_admin('Fastrp обучение завершено')
+
 
 
 

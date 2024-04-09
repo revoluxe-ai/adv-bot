@@ -46,6 +46,8 @@ class WBCabinet(BaseTable):
     active = Column(Boolean, default=True)
 
     expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
+    expiration_alarm_days_pass = Column(Integer, default=None)
+    demo: Mapped[bool] = Column(Boolean, default=True)
 
 
 

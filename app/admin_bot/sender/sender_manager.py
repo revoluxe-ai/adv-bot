@@ -1,18 +1,17 @@
 import aiogram
 from aiogram.exceptions import TelegramForbiddenError
 from .utils import utils
-from app.client_bot.client_bot import bot
-from . import messages
-from app.client_bot.user_interface.message_templates.base import Base as MessageTemplate
+from app.client_bot.bot import bot
 from app.client_bot.utils import data_managers
 import asyncio
 from app.admin_bot.sender import redis_manager
 from hashlib import sha256
 import logging
-from app.client_bot import const
+
 from python_modules.logger import setup_logging
 from . import messages
-
+from ...modules.common_slaves.wildberries.models import WBUserCabinet
+from ...utils.db.models import User
 
 setup_logging()
 
@@ -83,5 +82,6 @@ async def send_message_to_admin(text: str):
     await bot.send_message(admin_chat_id, text)
 
 
-
-
+async def send_message_to_user(wb_user_cabinet: WBUserCabinet, message):
+    user: User = wb_user_cabinet.user
+    await message(bot, user.user_telegram_id, wb_user_cabinet.name)()

@@ -123,6 +123,7 @@ class TextWithKeyboardPagination(Base):
     def on_page(self):
         pass
 
+
     async def __call__(self) -> (LastMessage, str):
 
         last_message = await self.bot.send_message(chat_id=self.chat_id,

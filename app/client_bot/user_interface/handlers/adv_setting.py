@@ -17,6 +17,20 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
+
+@router.callback_query(callbacks.Shop.filter(aiogram.F.action.select))
+async def shop_menu_process(callback: types.CallbackQuery,
+                            callback_data: callbacks.Shop,
+                            bot: aiogram.Bot,
+                            state: FSMContext):
+
+    await callback.answer()
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    await messages.ShopMenu(bot, callback.message.chat.id, state, wb_user_cabinet_original_id)()
+
+
+
+
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
 async def choice_adv_paginator(callback: types.CallbackQuery,
                                callback_data: callbacks.ChoiceAdvPaginator,

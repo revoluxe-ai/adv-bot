@@ -1,3 +1,4 @@
+import sqlalchemy.orm.session
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -15,7 +16,7 @@ thread_local.connect_opened = False
 
 conn_counter = 0
 
-def get_async_session_maker(pool_size=100, max_overflow=200):
+def get_async_session_maker(pool_size=100, max_overflow=200)-> sessionmaker:
     def log_checkout(dbapi_con, con_record, con_proxy):
         logger.debug("Соединение взято из пула")
         global conn_counter

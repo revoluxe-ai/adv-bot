@@ -1,5 +1,4 @@
 from aiogram.filters.callback_data import CallbackData
-from enum import Enum
 from typing import Union
 
 
@@ -12,6 +11,7 @@ class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
 class Action:
     new = 'new'
     select = 'select'
+    buy = 'buy'
 
 
 
@@ -85,3 +85,8 @@ class CheckSubscribe(CallbackData, prefix="check_subscribe"):
 class RefProgram(CallbackData, prefix="ref_program"):
     """select or new"""
     action: str
+
+
+class OrderSubscribe(CallbackData, prefix="order_subscribe"):
+    period_days: int
+    price: int

@@ -6,7 +6,7 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 
 
 from ..utils import redis_func_cache
-
+from app.client_bot.bot import bot
 redis_func_cache.set_config()
 from aiohttp import web
 import nest_asyncio
@@ -53,9 +53,6 @@ async def on_shutdown(bot: Bot) -> None:
     await storage.close()
 
 
-token = path_setting_funcs.get_document_by_key_name(path_setting,
-                                                        'client_bot_token')
-bot = Bot(token=token)
 
 dp = Dispatcher(storage=storage)
 dp.include_router(global_router)

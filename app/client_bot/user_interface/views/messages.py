@@ -1,14 +1,19 @@
 import asyncio
+import datetime
 from aiogram.utils import deep_linking
-from tabulate import tabulate
+from sqlalchemy import select
 
-from app.utils.db.models import RefLink
+
+from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
 from aiogram.types import FSInputFile
 from aiogram.fsm.context import FSMContext
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
-                                                          KeywordSetting)
+                                                          KeywordSetting, WBCabinet)
+from typing import TYPE_CHECKING
+
+
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
                                            TextWithImage,
@@ -20,7 +25,10 @@ from aiogram import Bot
 
 import logging
 import app
-from ...utils import KeywordForKeyboard
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...utils import KeywordForKeyboard
 from .import texts
 logger = logging.getLogger(__name__)
 
@@ -47,7 +55,7 @@ class MainMenu(TextWithKeyboard):
 
 class ShopChoice(TextWithKeyboard):
     def __init__(self, bot:Bot, chat_id: int,
-                 all_shops: list[app.my_types.WBUserCabinet]):
+                 all_shops: list[WBUserCabinet]):
         super().__init__(bot, chat_id)
         self.__all_shops = all_shops
 
@@ -56,8 +64,8 @@ class ShopChoice(TextWithKeyboard):
     def text(self):
         return (
                 
-                'Бот разрабатывался и продолжает разрабатываться'
-                ' с целью сделать продвижение на Wildberries максимально эффективным.\n\n'
+                'Бот разрабатывался и продолжает разрабатываться '
+                'с целью сделать продвижение на Wildberries максимально эффективным.\n\n'
                 
                 'Для использования функционала бота вы должны быть подписаны на канал поддержки - @auto_wb_master\n\n'
                  
@@ -108,6 +116,7 @@ class GetCardsApiError(Text):
 class AdvCompanyChoicing(TextWithKeyboardPagination):
     
     async def __call__(self, state: FSMContext):
+
         await state.update_data(last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id)
         await state.update_data(last_wb_user_cabinet_page=self._page) #последняя страница выбора рк
         return await super().__call__()
@@ -192,7 +201,7 @@ class NotValideToken(Text):
 
 
 class ApiForrbidenError(Text):
-    def __init__(self, bot: Bot, chat_id, wb_user_cabinet: app.my_types.WBUserCabinet):
+    def __init__(self, bot: Bot, chat_id, wb_user_cabinet: WBUserCabinet):
         super().__init__(bot, chat_id)
         self.__wb_user_cabinet = wb_user_cabinet
 
@@ -261,7 +270,7 @@ class CabinetNameTooLong(Text):
 
 class AdvKeywordsSetting(TextWithKeyboardAndImage):
     def __init__(self, bot: Bot, chat_id,
-                 keywords: list[KeywordForKeyboard], adv_setting: AdvSetting, wb_user_cabinet_original_id,
+                 keywords: list['KeywordForKeyboard'], adv_setting: AdvSetting, wb_user_cabinet_original_id,
                  adv_choice_last_page,
                  image: str, page):
         super().__init__(bot, chat_id)
@@ -455,7 +464,48 @@ class RefProgramSelect(TextWithKeyboard):
     keyboard = keyboards.get_return_for_your_ref_links()
 
 
+class ShopMenu(TextWithKeyboard):
 
+    def __init__(self, bot: Bot, chat_id: int, state: FSMContext, wb_user_cabinet_original_id: int):
+       self._state = state
+       self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+       self._price_for_month = 4900
+       super().__init__(bot, chat_id)
 
+    async def __call__(self):
+        async with _sm() as session:
+            stmt = select(WBUserCabinet)\
+                 .join(WBUserCabinet.wb_cabinet)\
+                .filter(WBUserCabinet.id == self._wb_user_cabinet_original_id)
+            result = session.execute(stmt)
+            self._wb_user_cabinet: WBUserCabinet = result.scalar()
+            self._wb_cabinet: WBCabinet = self._wb_user_cabinet.wb_cabinet
+
+        await super().__call__()
+
+    @property
+    def text(self):
+        now = datetime.datetime.now()
+        text = f'Магазин: {self._wb_user_cabinet.wb_cabinet.name}\n'
+        expiration_time: datetime.datetime = self._wb_cabinet.expiration_time
+        days_left = (expiration_time - now).days
+        expiration_time_str = expiration_time.strftime('%Y-%m-%d %H:%M')
+        if self._wb_cabinet.demo and expiration_time> now:
+            text += ('Для этого магазина включен демо-режим. Вам доступны все опции и сервисы до '
+                         f"""{expiration_time.strftime('%Y-%m-%d %H:%M')} \n"""
+                     "После этого дальнейшее использование бота для данного магазина станет платным. \n"
+                     f'Стоимость месячной подписки составляет {self._price_for_month} рублей для одного магазина.\n'
+                     'После оплаты услуга считается оказанной, возврат средств не производится'
+                     'Если вы оплатите подписку до конца демо-периода, то мы компенсируем оставшееся'
+                     f' время демо-периода в двойном размере (+ {days_left}')
+        elif not self._wb_cabinet.demo and expiration_time > now:
+            text += f'Тариф магазина оплачен до  {expiration_time_str}\n'
+
+        return text
+
+    @property
+    def keyboard(self):
+        return keyboards.get_shop_menu_keyboard(self._wb_user_cabinet,
+                                                price_for_month=self._price_for_month )
 
 

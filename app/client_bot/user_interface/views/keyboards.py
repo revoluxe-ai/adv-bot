@@ -1,10 +1,11 @@
 import asyncio
+import datetime
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.utils import redis_manager
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
 from ...user_interface.views.callbacks import BudgetForCreatingAdv
 import app
 from ...user_interface.views import callbacks
@@ -12,12 +13,15 @@ from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from ...user_interface.views.callbacks import TurnAdv
 from .callbacks import Action
 from app.utils.db.session_maker import get_async_session_maker
-from ...utils import KeywordForKeyboard
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...utils import KeywordForKeyboard
 
 sm = get_async_session_maker()
 
 
-def get_shop_keyboard(all_shops: list[app.my_types.WBUserCabinet]):
+def get_shop_keyboard(all_shops: list[WBUserCabinet]):
     # Создаем список для строк кнопок
     keyboard_buttons = []
 
@@ -140,7 +144,7 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
 
 
 
-def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  app.my_types.WBUserCabinet):
+def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  WBUserCabinet):
     wb_user_cabinet_original_id = wb_user_cabinet.id
     buttons = [
         [InlineKeyboardButton(text='Добавить новый токен',
@@ -155,7 +159,7 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  app.my_types.WBUse
     return keyboard
 
 
-def get_keywords_setting_keyboard(keywords: list[KeywordForKeyboard], adv_setting: AdvSetting,
+def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_setting: AdvSetting,
                                   adv_choice_last_page,
                                   wb_user_cabinet_original_id: int,
                                    page):
@@ -274,6 +278,35 @@ def get_return_for_your_ref_links():
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text = 'Назад', callback_data= callbacks.RefProgram(
         action='return').pack())
+
+    builder.row(button)
+    return builder.as_markup()
+
+
+def get_shop_menu_keyboard(wb_user_cabinet:  WBUserCabinet, price_for_month: int):
+    wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
+    expiration_time: datetime.datetime = wb_cabinet.expiration_time
+    demo: bool = wb_cabinet.demo
+    now = datetime.datetime.now()
+
+    builder = InlineKeyboardBuilder()
+
+    button = InlineKeyboardButton(text='Настройки рекламы', callback_data=callbacks.ChoiceAdvPaginator(
+        wb_user_cabinet_original_id = wb_user_cabinet.id, page = 1).pack())
+
+    builder.row(button)
+
+    if demo and expiration_time > now:
+        button = InlineKeyboardButton(text='Продлить и получить бонус',
+                                      callback_data=callbacks.OrderSubscribe(
+                                          period_days = 47,
+                                          price = price_for_month
+
+                                      ).pack())
+    elif not demo and expiration_time > now:
+        button = InlineKeyboardButton(text='Продлить подписку',
+                                      callback_data=callbacks.OrderSubscribe(period_days = 30,
+                                                                             price = price_for_month).pack())
 
     builder.row(button)
     return builder.as_markup()
