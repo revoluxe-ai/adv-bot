@@ -51,6 +51,7 @@ async def ref_program_getting_name(message: types.Message, bot: aiogram.Bot, sta
 
 @router.callback_query(callbacks.RefProgram.filter(F.action == 'select'))
 async def ref_program_select(callback: types.CallbackQuery, bot: aiogram.Bot):
+    await callback.answer()
     await messages.RefProgramSelect(bot, callback.message.chat.id)()
     return
 
