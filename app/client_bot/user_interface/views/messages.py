@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from aiogram.utils import deep_linking
 from sqlalchemy import select
-
+from sqlalchemy.orm import joinedload
 
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
@@ -11,7 +11,7 @@ from aiogram.fsm.context import FSMContext
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
                                                           KeywordSetting, WBCabinet)
-from typing import TYPE_CHECKING
+from app.utils.suffixes import get_day_suffix
 
 
 from ..message_templates.templates import (TextWithKeyboard,
@@ -475,37 +475,52 @@ class ShopMenu(TextWithKeyboard):
     async def __call__(self):
         async with _sm() as session:
             stmt = select(WBUserCabinet)\
-                 .join(WBUserCabinet.wb_cabinet)\
+                 .options(joinedload(WBUserCabinet.wb_cabinet))\
                 .filter(WBUserCabinet.id == self._wb_user_cabinet_original_id)
-            result = session.execute(stmt)
-            self._wb_user_cabinet: WBUserCabinet = result.scalar()
+            result = await session.execute(stmt)
+            self._wb_user_cabinet: WBUserCabinet = result.scalar_one()
             self._wb_cabinet: WBCabinet = self._wb_user_cabinet.wb_cabinet
+        self._now = datetime.datetime.now()
+        self._expiration_time: datetime.datetime = self._wb_cabinet.expiration_time
+        self._expiration_time_str = self._expiration_time.strftime('%d-%m-%Y-%H:%M')
+        self._days_left = (self._expiration_time- self._now).days + 1
+
 
         await super().__call__()
 
     @property
     def text(self):
-        now = datetime.datetime.now()
-        text = f'Магазин: {self._wb_user_cabinet.wb_cabinet.name}\n'
-        expiration_time: datetime.datetime = self._wb_cabinet.expiration_time
-        days_left = (expiration_time - now).days
-        expiration_time_str = expiration_time.strftime('%Y-%m-%d %H:%M')
-        if self._wb_cabinet.demo and expiration_time> now:
+
+        text = f'Магазин: {self._wb_user_cabinet.name}\n'
+
+
+        if self._wb_cabinet.demo and self._expiration_time> self._now:
             text += ('Для этого магазина включен демо-режим. Вам доступны все опции и сервисы до '
-                         f"""{expiration_time.strftime('%Y-%m-%d %H:%M')} \n"""
+                         f"""{self._expiration_time_str} \n"""
                      "После этого дальнейшее использование бота для данного магазина станет платным. \n"
                      f'Стоимость месячной подписки составляет {self._price_for_month} рублей для одного магазина.\n'
-                     'После оплаты услуга считается оказанной, возврат средств не производится'
+                     'После оплаты услуга считается оказанной, возврат средств не производится. '
                      'Если вы оплатите подписку до конца демо-периода, то мы компенсируем оставшееся'
-                     f' время демо-периода в двойном размере (+ {days_left}')
-        elif not self._wb_cabinet.demo and expiration_time > now:
-            text += f'Тариф магазина оплачен до  {expiration_time_str}\n'
+                     f' время демо-периода в двойном размере ( итого + {get_day_suffix(self._days_left*2)}) ')
+        elif not self._wb_cabinet.demo and self._expiration_time > self._now:
+            text += (f'Тариф магазина оплачен до  {self._expiration_time_str}\n'
+                     f'Стоимость месячной подписки составляет {self._price_for_month} рублей для одного магазина.\n'
+                     'После оплаты услуга считается оказанной, возврат средств не производится. ')
+
+
+        elif self._expiration_time < self._now:
+            text += 'Тариф магазина не оплачен\n'
 
         return text
 
     @property
     def keyboard(self):
         return keyboards.get_shop_menu_keyboard(self._wb_user_cabinet,
-                                                price_for_month=self._price_for_month )
+                                                price_for_month=self._price_for_month, bonus_days= self._days_left*2)
+
+
+class OrderSubscribe(Text):
+
+    text = "Заказ на подписку получен, для оплаты свяжитесь с администратором бота @skyline360_1"
 
 

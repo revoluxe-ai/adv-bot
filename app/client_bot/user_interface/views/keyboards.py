@@ -283,7 +283,7 @@ def get_return_for_your_ref_links():
     return builder.as_markup()
 
 
-def get_shop_menu_keyboard(wb_user_cabinet:  WBUserCabinet, price_for_month: int):
+def get_shop_menu_keyboard(wb_user_cabinet:  WBUserCabinet, price_for_month: int, bonus_days: int):
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     expiration_time: datetime.datetime = wb_cabinet.expiration_time
     demo: bool = wb_cabinet.demo
@@ -291,7 +291,7 @@ def get_shop_menu_keyboard(wb_user_cabinet:  WBUserCabinet, price_for_month: int
 
     builder = InlineKeyboardBuilder()
 
-    button = InlineKeyboardButton(text='Настройки рекламы', callback_data=callbacks.ChoiceAdvPaginator(
+    button = InlineKeyboardButton(text='Настройка рекламы', callback_data=callbacks.ChoiceAdvPaginator(
         wb_user_cabinet_original_id = wb_user_cabinet.id, page = 1).pack())
 
     builder.row(button)
@@ -299,7 +299,7 @@ def get_shop_menu_keyboard(wb_user_cabinet:  WBUserCabinet, price_for_month: int
     if demo and expiration_time > now:
         button = InlineKeyboardButton(text='Продлить и получить бонус',
                                       callback_data=callbacks.OrderSubscribe(
-                                          period_days = 47,
+                                          period_days = 30 + bonus_days,
                                           price = price_for_month
 
                                       ).pack())

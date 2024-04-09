@@ -7,6 +7,7 @@ from sqlalchemy.future import select
 from app.utils.db.session_maker import get_async_session_maker
 from ..views import messages
 from ..views import callbacks
+from ..views.callbacks import Action
 
 sm = get_async_session_maker()
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 
-@router.callback_query(callbacks.Shop.filter(aiogram.F.action.select))
+@router.callback_query(callbacks.Shop.filter(aiogram.F.action == Action.select))
 async def shop_menu_process(callback: types.CallbackQuery,
                             callback_data: callbacks.Shop,
                             bot: aiogram.Bot,
