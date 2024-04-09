@@ -26,6 +26,7 @@ async def ref_program(message: types.Message, bot: aiogram.Bot):
 
 @router.callback_query(callbacks.RefProgram.filter(F.action == 'new'))
 async def ref_program_new(callback: types.CallbackQuery, bot: aiogram.Bot,state: FSMContext):
+    await  callback.answer()
     await state.set_state(states.RefProgram.getting_name)
     message = callback.message
     await messages.RefLinkGetName(bot, message.chat.id)()
