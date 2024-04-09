@@ -74,7 +74,6 @@ class GraphUpdater:
                     raise  # Перебросить исключение, если ошибка не связана с выполняющимся заданием
 
     async def _update_nmids_vectors(self):
-        timestamp = datetime.datetime.now()
         async with sm() as session:
             stmt = select(ItemFeature.nmid)
             result = await session.execute(stmt)

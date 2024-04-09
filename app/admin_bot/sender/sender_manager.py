@@ -72,7 +72,9 @@ async def send_to_all_users():
            await asyncio.sleep(5)
 
 
-async def send_message_to_admin(text: str):
+async def send_message_to_admin(text: str, off = True):
+    if off:
+        return
     await bot.send_message(admin_chat_id, text)
 
 
