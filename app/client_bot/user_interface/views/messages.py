@@ -483,7 +483,8 @@ class ShopMenu(TextWithKeyboard):
         self._now = datetime.datetime.now()
         self._expiration_time: datetime.datetime = self._wb_cabinet.expiration_time
         self._expiration_time_str = self._expiration_time.strftime('%d-%m-%Y-%H:%M')
-        self._days_left = (self._expiration_time- self._now).days + 1
+        self.days_left = (self._expiration_time - self._now).days + 1
+        self.bonus_days = self.days_left * 2
 
 
         await super().__call__()
@@ -501,7 +502,7 @@ class ShopMenu(TextWithKeyboard):
                      f'Стоимость месячной подписки составляет {self._price_for_month} рублей для одного магазина.\n'
                      'После оплаты услуга считается оказанной, возврат средств не производится. '
                      'Если вы оплатите подписку до конца демо-периода, то мы компенсируем оставшееся'
-                     f' время демо-периода в двойном размере ( итого + {get_day_suffix(self._days_left*2)}) ')
+                     f' время демо-периода в двойном размере ( итого + {get_day_suffix(self.bonus_days)}) ')
         elif not self._wb_cabinet.demo and self._expiration_time > self._now:
             text += (f'Тариф магазина оплачен до  {self._expiration_time_str}\n'
                      f'Стоимость месячной подписки составляет {self._price_for_month} рублей для одного магазина.\n'
@@ -516,7 +517,7 @@ class ShopMenu(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_shop_menu_keyboard(self._wb_user_cabinet,
-                                                price_for_month=self._price_for_month, bonus_days= self._days_left*2)
+                                                price_for_month=self._price_for_month, bonus_days=self.bonus_days)
 
 
 class OrderSubscribe(Text):

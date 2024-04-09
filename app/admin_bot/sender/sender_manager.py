@@ -54,12 +54,6 @@ async def send_to_users_out_channel():
                 if http_session:
                     await http_session.close()
 
-
-
-
-
-
-
 async def send_to_all_users():
     users = await data_managers.get_all_users()
     users = [user for user in users if user.user_telegram_id in test_user_ids]
