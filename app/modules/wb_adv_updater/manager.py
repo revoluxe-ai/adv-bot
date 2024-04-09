@@ -41,6 +41,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.wb_adv_updater import data_managers
 from app.modules.common_slaves.wildberries import super_cabinet_manager as users_manager
+from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
 
@@ -246,7 +247,11 @@ class Manager(AbcManager):
             for access in accesses:
                 wb_cabinet_id = access.wb_cabinet.id
                 if wb_cabinet_id  not in update_tasks:
-                    data_setter = DataSetter(access)
+                    try:
+                        data_setter = DataSetter(access)
+                    except ApiForbiddenError:
+                        logger.error(f'Нет нужных прав у токена')
+                        continue
                     logger.debug(access.wb_cabinet.id)
                     async with sm() as session:
                         stmt = select(AdvSetting) \
@@ -532,7 +537,11 @@ class Manager(AbcManager):
              wb_accesses = await super_cabinet_manager.get_accesses_for_wb_cabinets()
              for wb_access in wb_accesses:
                  if wb_access.wb_cabinet.id not in tasks:
-                     shop_data_updater = ShopDataUpdater(wb_access)
+                     try:
+                          shop_data_updater = ShopDataUpdater(wb_access)
+                     except ApiForbiddenError:
+                         logger.error(f'Нет нужных прав у токена')
+                         continue
                      task = asyncio.create_task(shop_data_updater.update_all_data())
                      tasks[wb_access.wb_cabinet.id] = task
                  else:
