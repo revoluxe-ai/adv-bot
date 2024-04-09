@@ -85,10 +85,10 @@ class GraphUpdater:
             for nmid, vector in nmids_vectors:
                 stmt = (
                     pg_insert(ItemFeature).
-                    values(nmid=nmid, vector=vector, timestamp=timestamp).
+                    values(nmid=nmid, vector=vector).
                     on_conflict_do_update(
                         index_elements=['nmid'],  # Specify the column(s) that trigger a conflict
-                        set_=dict(vector=vector, timestamp=timestamp)  # Specify which columns to update
+                        set_=dict(vector=vector)  # Specify which columns to update
                     )
                 )
                 await session.execute(stmt)
