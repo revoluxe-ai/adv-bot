@@ -12,6 +12,8 @@ from neo4j import exceptions
 from sqlalchemy import select
 
 from .models import ItemFeature, KeywordFeature
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +72,7 @@ class GraphUpdater:
 
                else:
                     raise  # Перебросить исключение, если ошибка не связана с выполняющимся заданием
+
     async def _update_nmids_vectors(self):
         timestamp = datetime.datetime.now()
         async with sm() as session:
@@ -77,11 +80,18 @@ class GraphUpdater:
             result = await session.execute(stmt)
             nmids = result.scalars().all()
         nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors(nmids)
+
         async with sm() as session:
             for nmid, vector in nmids_vectors:
-                item = ItemFeature(nmid=nmid, vector=vector)
-                item.timestamp = timestamp
-                session.add(item)
+                stmt = (
+                    pg_insert(ItemFeature).
+                    values(nmid=nmid, vector=vector, timestamp=timestamp).
+                    on_conflict_do_update(
+                        index_elements=['nmid'],  # Specify the column(s) that trigger a conflict
+                        set_=dict(vector=vector, timestamp=timestamp)  # Specify which columns to update
+                    )
+                )
+                await session.execute(stmt)
             await session.commit()
         logger.debug('Вектора для nmids обновлены')
 
