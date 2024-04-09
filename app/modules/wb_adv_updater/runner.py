@@ -33,7 +33,7 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
-            self.check_accesses(),
+            # self.check_accesses(),
             self.run_update_keywords_on_wb(),
             self.update_cards_in_graph(),
             self.update_all_data_in_db(),
