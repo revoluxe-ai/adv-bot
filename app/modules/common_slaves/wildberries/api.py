@@ -115,6 +115,8 @@ class AdvertApi(ABC_WB_API):
             answer = json.loads(response_text)
             # Используем json.loads для преобразования текста ответа в JSON
             adverts:list = answer['adverts']
+            if not adverts:
+                return []
             for advert in adverts:
                 adv_type = advert['type']
                 adv_status = advert['status']
