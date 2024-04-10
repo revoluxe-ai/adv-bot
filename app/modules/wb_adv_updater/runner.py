@@ -1,6 +1,8 @@
 import traceback
 
 from app.utils.redis_func_cache import  set_config
+from ...admin_bot.sender import sender_manager
+
 set_config()
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.wb_adv_updater.data_managers import DataGetter
@@ -50,9 +52,12 @@ class Runner:
     async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
         while True:
              logger.debug('Ожидание разрешения обновления ключей')
+             await sender_manager.send_message_to_admin('Ожидание разрешения обновления ключей')
              await update_model_on_new_features.wait()
              logger.debug('Блокировка снята')
+             await sender_manager.send_message_to_admin('Блокировка снята')
              await self._manager.update_predict_ctr( predicted)
+             await sender_manager.send_message_to_admin('Обновление ctr ключей завершено')
              await asyncio.sleep(1)
 
 
