@@ -25,7 +25,7 @@ from app.utils.image_master.image_master2 import ImageMaster
 import pymystem3
 from app.utils.image_master import image_tools
 import asyncio
-from app.admin_bot.sender import sender_manager as admin_sender
+from app.admin_bot.sender import sender_manager as admin_sender, sender_manager
 import pandas as pd
 from sqlalchemy import and_
 from sqlalchemy.orm import joinedload
@@ -158,9 +158,14 @@ class Manager(AbcManager):
         length = 2**4
         await self.graph_updater.update_graph_run(length)
         await asyncio.sleep(1)
+        await sender_manager.send_message_to_admin('Вектора обновлены')
+        await sender_manager.send_message_to_admin('Ожидание предсказаний')
         await predicted.wait()
+        await sender_manager.send_message_to_admin('Ожидание предсказаний пройдено')
         await self.graph_updater.get_nmids_and_keyword_featers_for_ml()
+        await sender_manager.send_message_to_admin('Вектора для ML обновлены')
         update_model_on_new_features.set()
+
 
 
 

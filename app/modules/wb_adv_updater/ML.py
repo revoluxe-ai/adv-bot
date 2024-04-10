@@ -223,11 +223,15 @@ class Fitter(AbcManager):
 
     async def _fit_modelGradientBoosting(self, update_model_on_new_features):
         logger.debug('Поток обучения запущен, получение данных')
+        await sender_manager.send_message_to_admin('Поток обучения запущен, получение данных')
         df = await self._get_df_for_fit()
+        await sender_manager.send_message_to_admin('Данные получены')
         logger.debug('Данные получены')
         if len(df) == 0:
+            await sender_manager.send_message_to_admin('Нет данных для обучения')
             logger.info('Нет данных для обучения')
             return
+        await sender_manager.send_message_to_admin('Подготовка данных и обучение')
         adv_keyword_text_in_black_list: list[tuple[int, str]] = await data_managers.get_adv_keyword_text_in_black_list()
         df:pd.DataFrame = await self._bayesian_apply(df, adv_keyword_text_in_black_list)
         await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
@@ -261,6 +265,7 @@ class Fitter(AbcManager):
         model = typing.cast(xgboost.XGBModel, model.named_steps['xgbregressor'])
         await asyncio.to_thread(save_model, model, time_stamp= None)
         update_model_on_new_features.set()
+
 
 
 
