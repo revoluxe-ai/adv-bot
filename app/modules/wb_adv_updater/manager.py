@@ -306,8 +306,10 @@ class Manager(AbcManager):
 
 
     async def update_wb_adv_phrase_in_db(self, need_update_model):
+        """update_model_on_new_features.set()"""
         while True:
             await self._update_wb_adv_phrase_in_db()
+
             need_update_model.set()
             await asyncio.sleep(0)
 
@@ -356,6 +358,7 @@ class Manager(AbcManager):
             # try:
             await self._gds.add_keyword_phrase(phrase_data_list)
             await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
+
             # except Exception as exc:
             #     logger.error(f'Ошибка добавления фразы  в граф: {exc}')
             # await asyncio.sleep(3)
@@ -558,8 +561,7 @@ class Manager(AbcManager):
              await asyncio.sleep(30)
 
     async def check_accesses(self):
-        await rights_control.check_all()
-
+       await rights_control.check_all()
 
 
 

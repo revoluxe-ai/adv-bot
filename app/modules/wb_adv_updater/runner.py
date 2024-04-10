@@ -23,7 +23,6 @@ class Runner:
         self._data_getter = DataGetter()
 
     def run(self, debug_mode: bool):
-        logger.debug('Запуск цикла обновления ключей')
         asyncio.run(self.main_loop(),
                     debug=debug_mode)
 
@@ -55,7 +54,7 @@ class Runner:
              await sender_manager.send_message_to_admin('Ожидание разрешения обновления ключей')
              await update_model_on_new_features.wait()
              logger.debug('Блокировка снята')
-             await sender_manager.send_message_to_admin('Блокировка снята')
+             await sender_manager.send_message_to_admin('Блокировка на обновление ключей снята')
              await self._manager.update_predict_ctr( predicted)
              await sender_manager.send_message_to_admin('Обновление ctr ключей завершено')
              await asyncio.sleep(1)
@@ -92,7 +91,7 @@ class Runner:
 
         await asyncio.gather(self._manager.update_wb_adv_phrase_in_db(need_update_model),
         self._manager.update_vectors_exec_mode(update_model_on_new_features, predicted, need_update_model))
-
+        update_model_on_new_features.set()
 
 
     async def run_update_keywords_on_wb(self):

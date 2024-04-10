@@ -2,6 +2,8 @@ import asyncio
 import dataclasses
 from typing import Union
 from dataclasses import dataclass
+
+from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from . import exceptions
 from . import api_rights
 from .exceptions import ApiForbiddenError, UnknownApiRequestError
@@ -120,7 +122,7 @@ async def get_super_user_access():
     leave_tokens = []
     for token in tokens:
             try:
-                await api_rights.check_token(token)
+                await CabinetManager.check_access(token)
                 leave_tokens.append(token)
             except Exception as exc:
                 logger.error(exc)

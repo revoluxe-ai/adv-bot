@@ -19,16 +19,20 @@ class TestPeriodExpire(templates.Text):
 
     async def __call__(self):
         async with _sm() as session:
-            stmt = select(WBUserCabinet)\
+            stmt = select(WBUserCabinet.name)\
+                .filter(WBUserCabinet.id == self._wb_user_cabinet.id)
+            result = await session.execute(stmt)
+            self._wb_cabinet_name = result.scalar()
 
 
 
 
-        super().__call__()
+        await super().__call__()
 
 
     @property
     def text(self):
-        return (f'Срок действия вашего тестового периода закончится через {get_day_suffix(self._days)}.'
+        return (f'Срок действия вашего тестового периода для магазина {self._wb_cabinet_name}'
+                f' закончится через {get_day_suffix(self._days)}.'
                 f' Если вы оплачиваете тариф до конца тестового периода, то дополнительный месяц подписки мы вам подарим!')
 
