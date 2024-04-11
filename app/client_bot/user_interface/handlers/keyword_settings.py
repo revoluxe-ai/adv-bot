@@ -54,7 +54,10 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
     wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
     wb_user_cabinet_original_id = wb_user_cabinet.id
     nmids = adv_setting.nmids
-    main_photos = await data_managers.get_main_photos(nmids[:1])
+    if nmids:
+        main_photos = await data_managers.get_main_photos(nmids[:1])
+    else:
+        main_photos = None
     chat_id = callback.message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(bot, chat_id,
