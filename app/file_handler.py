@@ -22,8 +22,8 @@ async def get_telegram_image(image_path: str, bot: aiogram.Bot) -> Union[InputFi
 
 
 
-async def _get_telegram_file(image_path: str, bot: Bot) -> Union[str, InputFile]:
-    if image_path.startswith('http'):
+async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[str, InputFile]:
+    if  image_path.startswith('http'):
         # Загрузка изображения по HTTP
         async with aiohttp.ClientSession() as session:
             async with session.get(image_path) as response:
