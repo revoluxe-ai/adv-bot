@@ -198,6 +198,7 @@ class AdvSetting(BaseTable):
                                     uselist=True)
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text('1'))
+    type: Mapped[int] = Column(Integer, nullable=True)
 
 
 

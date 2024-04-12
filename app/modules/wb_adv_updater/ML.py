@@ -203,6 +203,7 @@ class Fitter(AbcManager):
                 if keyword_stat:
                     row = {
                         'adv_id': adv.adv_id,
+                        'type': adv.type if adv.type else 0,
                         'keyword': keyword_setting.text,
                         'views': keyword_stat.views,
                         'clicks': keyword_stat.clicks,
@@ -256,7 +257,8 @@ class Fitter(AbcManager):
             f"CV MSE scores: {mse_scores}\n"
             f"Mean CV MSE: {mean_mse}\n"
             f"Standard Deviation of CV MSE: {std_dev_mse}\n"
-            f"Max difference between CV MSE scores: {max_difference}\n"
+            f"Max difference between CV MSE scores: {max_difference}\n",
+                off = False
 
             )
         logger.debug('Обучение модели на полных данных')
@@ -358,6 +360,7 @@ class Predictor:
                    # Собираем данные для строки
                    row = {
                        'adv_id': adv.adv_id,
+                       'type': adv.type if adv.type else 0,
                        'keyword': keyword.text,
                        **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
                        **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},

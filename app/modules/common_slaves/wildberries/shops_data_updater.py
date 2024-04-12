@@ -57,7 +57,7 @@ class ShopDataUpdater:
     async def __quick_update_advs(self):
         wb_api  = self.__wb_api
         advert_api = wb_api.advert
-        adv_ids = await advert_api.get_advertIds(advert_api.live_company_status, advert_api.auto_adv_types)
+        adv_ids: list[Adv] = await advert_api.get_advertIds(advert_api.live_company_status, advert_api.auto_adv_types)
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()

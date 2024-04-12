@@ -74,7 +74,7 @@ class AdvertApi(ABC_WB_API):
     _rights: set = {api_rights.Rights.PROMOTION}
     _only_read = api_rights.OnlyRead.FALSE
     live_company_status = [4, 9, 11]
-    auto_adv_types = [8]
+    auto_adv_types = [8, 9]
 
 
     @try_except_decorator(2, 1)
@@ -142,7 +142,7 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 1)
     async def get_live_advs(self):
-        adv_ids = await self.get_advertIds(self.live_company_status, self.auto_adv_types)
+        adv_ids: list[Adv] = await self.get_advertIds(self.live_company_status, self.auto_adv_types)
         advs = await self.get_advs(adv_ids)
         return advs
 
