@@ -115,11 +115,7 @@ class GetCardsApiError(Text):
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
     
-    async def __call__(self, state: FSMContext):
 
-        await state.update_data(last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id)
-        await state.update_data(last_wb_user_cabinet_page=self._page) #последняя страница выбора рк
-        return await super().__call__()
 
     @staticmethod
     async def get_state_data(state: FSMContext)->(int, int):
@@ -130,13 +126,29 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
 
     def __init__(self, bot: Bot,
+                  state: FSMContext,
                   chat_id: int, wb_user_cabinet_original_id: int,
-                 adv_settings: list[AdvSetting],
                  page: int = 1):
         super().__init__(bot, chat_id)
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-        self._adv_settings = adv_settings
         self._page = page
+        self._state = state
+
+
+    async def __call__(self):
+        await self._state.update_data(last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id)
+        await self._state.update_data(last_wb_user_cabinet_page=self._page)  # последняя страница выбора рк
+
+        async with _sm() as session:
+            stmt = select(AdvSetting) \
+                .join(AdvSetting.wb_cabinet) \
+                .join(WBCabinet.wb_user_cabinets) \
+                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id) \
+                .order_by(AdvSetting.name)
+            result = await session.execute(stmt)
+            self._adv_settings = result.scalars().all()
+
+        await super().__call__()
 
 
     @property

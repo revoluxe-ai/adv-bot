@@ -47,20 +47,13 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
     # if page == 1:
     #     user_cabinet_manager = await get_cabinet_manager(wb_user_cabinet_original_id)
     #     await user_cabinet_manager.update_all_data()
-    async with (sm() as session):
-        stmt = select(AdvSetting)\
-        .join(AdvSetting.wb_cabinet)\
-        .join(WBCabinet.wb_user_cabinets)\
-        .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
-        .order_by(AdvSetting.name)
-        result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+
 
 
     chat_id = callback.message.chat.id
 
     await messages.AdvCompanyChoicing \
-        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=page)(state)
+        (bot, chat_id, state, wb_user_cabinet_original_id, page=page)()
 
     return
 

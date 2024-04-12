@@ -120,7 +120,11 @@
         "propagate": false
         }
   },
-
+  "app.modules.wb_adv_updater.ML": {
+       "level": "DEBUG",
+        "handlers": ["console"],
+        "propagate": false
+        },
 
     "app.modules.common_slaves.wildberries.api_rights":{
 
@@ -141,7 +145,7 @@
 
 
   "root": {
-    "level": "DEBUG",
+    "level": "INFO",
     "handlers": ["console", "error_to_file", "common_file"]
   }
 }

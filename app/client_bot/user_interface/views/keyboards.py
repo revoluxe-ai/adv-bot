@@ -117,7 +117,8 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
         check_text = '✅' if check_last_24_hours else '❓'
         button_text =  check_text \
             + adv.name + ' (Бот включен)' if adv.bot_active else adv.name\
-            + ' (Бот отключен)'
+            + ' (Бот отключен)' \
+            + '(АРК)' if adv.type == 8 else '(П+К)'
         callback_data = callbacks.Adv(action='select', adv_original_id=adv.id,
                                       wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack()
         keyboard_buttons.append([InlineKeyboardButton(text=button_text,
