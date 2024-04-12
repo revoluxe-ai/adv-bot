@@ -20,6 +20,7 @@ async def update_advs_in_db(advs, wb_cabinet: WBCabinet):
             if existing_adv:
                 existing_adv.active_status = adv.status_native
                 existing_adv.name = adv.name
+                existing_adv.type = adv.type
                 nmids = adv.nmids
                 if nmids:
                     existing_adv.nmids = adv.nmids
