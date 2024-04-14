@@ -135,35 +135,42 @@ class Fitter(AbcManager):
     async def _get_df_for_fit(self) -> pd.DataFrame:
         data_rows = []
         async with sm() as session:
-            # Запрос всех кампаний за один раз
             result = await session.execute(select(AdvSetting))
             adv_settings = result.scalars().all()
 
         logger.debug(f'Всего кампаний: {len(adv_settings)}')
 
+        # Собираем уникальные nmids и keywords для запросов
         nmids_batch = set()
+        keywords_batch = set()
         for adv in adv_settings:
-            if not adv.nmids:
-                logger.error(f'Нет nmids для кампании {adv.name}')
-                continue
             nmids_batch.update(adv.nmids)
+            if adv.keyword_settings:
+                keywords_batch.update([ks.text for ks in adv.keyword_settings])
 
-        # Получаем все необходимые ItemFeature в одном запросе
+        # Получаем все необходимые ItemFeature и KeywordFeature в одном запросе
+        nmid_to_item_features = {}
+        keyword_to_features = {}
         if nmids_batch:
-            logger.debug(f'Запрос фичей для {len(nmids_batch)} nmids')
             async with sm() as session:
                 item_features_result = await session.execute(
                     select(ItemFeature).where(ItemFeature.nmid.in_(nmids_batch))
                 )
-            item_features_list = item_features_result.scalars().all()
-            nmid_to_item_features = {item_feature.nmid: item_feature.vector for item_feature in item_features_list}
+                nmid_to_item_features = {item_feature.nmid: item_feature.vector for item_feature in
+                                         item_features_result.scalars().all()}
+
+        if keywords_batch:
+            async with sm() as session:
+                keyword_features_result = await session.execute(
+                    select(KeywordFeature).where(KeywordFeature.keyword.in_(keywords_batch))
+                )
+                keyword_to_features = {kf.keyword: kf.vector for kf in keyword_features_result.scalars().all()}
 
         for adv in adv_settings:
             wb_category = await data_managers.get_wb_category(adv)
-            if not wb_category:
-                continue
+            keyword_stats = await data_managers.get_keywords_statistic(adv, None)
+            keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
 
-            # Собираем фичи товаров для текущей кампании
             item_features_list = [nmid_to_item_features.get(nmid) for nmid in adv.nmids if
                                   nmid in nmid_to_item_features]
             if not item_features_list:
@@ -172,39 +179,35 @@ class Fitter(AbcManager):
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
             avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-            # Обработка ключевых слов для текущей кампании
-            async with sm() as session:
-                smtp = select(KeywordSetting).join(KeywordSetting.adv_setting).filter(
-                    KeywordSetting.adv_setting_id == adv.id)
-                keyword_settings = await session.execute(smtp)
-                keyword_settings = keyword_settings.scalars().all()
-
-            keyword_texts = [ks.text for ks in keyword_settings]
-            keyword_features_batch = {}
-            if keyword_texts:
-                async with sm() as session:
-                    keyword_features_result = await session.execute(
-                        select(KeywordFeature).where(KeywordFeature.keyword.in_(keyword_texts))
-                    )
-                keyword_features_batch = {kf.keyword: kf.vector for kf in keyword_features_result.scalars().all()}
-
-            for keyword_setting in keyword_settings:
-                keyword_features = keyword_features_batch.get(keyword_setting.text)
+            for keyword_setting in adv.keyword_settings:
+                keyword_features = keyword_to_features.get(keyword_setting.text)
                 if not keyword_features:
                     logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
                     continue
+
+                keyword_stat = keyword_stat_dict.get(keyword_setting.text)
+                if not keyword_stat:
+                    continue
+
                 row = {
                     'adv_id': adv.adv_id,
                     'keyword': keyword_setting.text,
+                    'views': keyword_stat.views,
+                    'clicks': keyword_stat.clicks,
+                    'spend': keyword_stat.spend,
+                    'nmids': adv.nmids,
                     'wb_category_name': wb_category.wb_category_name,
                     **avg_item_features,
-                    **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
+                    **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))}
                 }
                 data_rows.append(row)
-                logger.debug(f'Данные собраны для ключевого слова {keyword_setting.text}')
 
         df = pd.DataFrame(data_rows)
-        logger.debug('Данные собраны')
+        if df.empty:
+            return df
+
+        df = df[df.views > 0]
+        df['ctr'] = df['clicks'] / df['views']
         return df
 
 
