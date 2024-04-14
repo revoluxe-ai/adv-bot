@@ -146,9 +146,10 @@ class Fitter(AbcManager):
         nmids_batch = set()
         keywords_batch = set()
         for adv in adv_settings:
-            nmids_batch.update(adv.nmids)
-            if adv.keyword_settings:
-                keywords_batch.update([ks.text for ks in adv.keyword_settings])
+            if adv.nmids:
+                nmids_batch.update(adv.nmids)
+                if adv.keyword_settings:
+                    keywords_batch.update([ks.text for ks in adv.keyword_settings])
 
         # Получаем все необходимые ItemFeature и KeywordFeature в одном запросе
         nmid_to_item_features = {}
