@@ -185,6 +185,8 @@ class Fitter(AbcManager):
             keyword_stats = await data_managers.get_keywords_statistic(adv, None)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
 
+            if not adv.nmids:
+                continue
             item_features_list = [nmid_to_item_features.get(nmid) for nmid in adv.nmids if
                                   nmid in nmid_to_item_features]
             if not item_features_list:
