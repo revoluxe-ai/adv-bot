@@ -132,6 +132,20 @@ class Fitter(AbcManager):
         df['ctr'] = df.apply(calculate_ctr, axis=1)
         return df
 
+    @staticmethod
+    async def __fetch_keyword_features(session, keywords):
+        keyword_to_features = {}
+        # Определение размера батча (например, 100 элементов)
+        batch_size = 100
+        for i in range(0, len(keywords), batch_size):
+            batch = keywords[i:i + batch_size]
+            result = await session.execute(
+                select(KeywordFeature).where(KeywordFeature.keyword.in_(batch))
+            )
+            for kf in result.scalars().all():
+                keyword_to_features[kf.keyword] = kf.vector
+        return keyword_to_features
+
     async def _get_df_for_fit(self) -> pd.DataFrame:
         data_rows = []
         async with sm() as session:
@@ -164,10 +178,7 @@ class Fitter(AbcManager):
 
         if keywords_batch:
             async with sm() as session:
-                keyword_features_result = await session.execute(
-                    select(KeywordFeature).where(KeywordFeature.keyword.in_(keywords_batch))
-                )
-                keyword_to_features = {kf.keyword: kf.vector for kf in keyword_features_result.scalars().all()}
+                keyword_to_features = await self.__fetch_keyword_features(session, list(keywords_batch))
 
         for adv in adv_settings:
             wb_category = await data_managers.get_wb_category(adv)
