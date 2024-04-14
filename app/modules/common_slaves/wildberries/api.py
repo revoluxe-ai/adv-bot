@@ -136,8 +136,11 @@ class AdvertApi(ABC_WB_API):
                                                     headers=self.headers.standart)
                 answer = json.loads(response_text)
                 for advert in answer:
+                    try:
                         adv = Adv(advert)
-                        advs.append(adv)
+                    except:
+                        pass
+                    advs.append(adv)
         return advs
 
     @try_except_decorator(1, 1)

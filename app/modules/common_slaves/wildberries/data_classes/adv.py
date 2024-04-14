@@ -1,25 +1,39 @@
 from .adv_stat_classes import SimpleStat
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict
 
+
+class Subject(BaseModel):
+    id: int
+    name: str
+
+class Menu(BaseModel):
+    id: int
+    name: str
+
+class UnitedParams(BaseModel):
+    catalogCPM: int
+    searchCPM: int
+    subject: Subject
+    menus: List[Menu]
+    nms: List[int]
 
 class AutoParams(BaseModel):
-    subject: dict = Field(..., description="Subject details")
-    active: dict = Field(..., description="Active details")
-    nms: Union[list[int], None] = Field(default_factory=list, description="NM ids")
+    active: Dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
+    # Добавьте другие поля, которые ожидаются в `autoParams`
 
 class AdvData(BaseModel):
-    autoParams: AutoParams = Field(..., description="Auto parameters")
-    type: int = Field(..., description="Advert type")
-    status: int = Field(..., description="Advert status")
-    advertId: int= Field(..., description="Advert ID")
-    changeTime: str = Field(..., description="Change time")
-    createTime: str = Field(..., description="Create time")
-    dailyBudget: Optional[float] = Field(None, description="Daily budget")
-    endTime: Optional[str] = Field(None, description="End time")
-    name: str = Field(..., description="Name")
-    startTime: Optional[str] = Field(None, description="Start time")
-
+    endTime: str
+    createTime: str
+    changeTime: str
+    startTime: str
+    name: str
+    unitedParams: List[UnitedParams]
+    dailyBudget: int
+    advertId: int
+    status: int
+    type: int
+    autoParams: Optional[AutoParams] = None
 
 
 
