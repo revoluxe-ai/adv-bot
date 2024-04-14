@@ -143,6 +143,8 @@ class Fitter(AbcManager):
 
         nmids_batch = set()
         for adv in adv_settings:
+            if not adv.nmids:
+                continue
             nmids_batch.update(adv.nmids)
 
         # Получаем все необходимые ItemFeature в одном запросе
