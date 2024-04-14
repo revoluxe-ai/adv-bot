@@ -310,3 +310,13 @@ def get_shop_menu_keyboard(wb_user_cabinet:  WBUserCabinet, price_for_month: int
 
     builder.row(button)
     return builder.as_markup()
+
+
+def get_payment_keyboard(price_for_month: int, period_days, bonus_days: int):
+    builder = InlineKeyboardBuilder()
+    button = InlineKeyboardButton(text='Продлить подписку',
+                                  callback_data=callbacks.OrderSubscribe(period_days=period_days + bonus_days,
+                                                                         price=price_for_month).pack())
+
+    builder.row(button)
+    return builder.as_markup()
