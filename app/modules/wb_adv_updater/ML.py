@@ -144,11 +144,13 @@ class Fitter(AbcManager):
         nmids_batch = set()
         for adv in adv_settings:
             if not adv.nmids:
+                logger.error(f'Нет nmids для кампании {adv.name}')
                 continue
             nmids_batch.update(adv.nmids)
 
         # Получаем все необходимые ItemFeature в одном запросе
         if nmids_batch:
+            logger.debug(f'Запрос фичей для {len(nmids_batch)} nmids')
             async with sm() as session:
                 item_features_result = await session.execute(
                     select(ItemFeature).where(ItemFeature.nmid.in_(nmids_batch))
