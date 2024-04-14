@@ -135,7 +135,8 @@ class Fitter(AbcManager):
     async def _get_df_for_fit(self) -> pd.DataFrame:
         data_rows = []
         async with sm() as session:
-            result = await session.execute(select(AdvSetting))
+            result = await session.execute(select(AdvSetting))\
+                .options(selectinload(AdvSetting.keyword_settings))
             adv_settings = result.scalars().all()
 
         logger.debug(f'Всего кампаний: {len(adv_settings)}')
