@@ -132,101 +132,79 @@ class Fitter(AbcManager):
         df['ctr'] = df.apply(calculate_ctr, axis=1)
         return df
 
-    async def _get_df_for_fit(self)-> pd.DataFrame:
-        keyword_text_keyword_features = {}
-        async with sm() as sess:
-            result = await sess.execute(
-                select(AdvSetting))
-
+    async def _get_df_for_fit_optimized(self) -> pd.DataFrame:
+        data_rows = []
+        async with sm() as session:
+            # Запрос всех кампаний за один раз
+            result = await session.execute(select(AdvSetting))
             adv_settings = result.scalars().all()
 
-        data_rows = []
         logger.debug(f'Всего кампаний: {len(adv_settings)}')
-        for n, adv in enumerate(adv_settings):
-            logger.debug(f'Проход кампании, сбор данных: {n}')
+
+        nmids_batch = set()
+        for adv in adv_settings:
+            nmids_batch.update(adv.nmids)
+
+        # Получаем все необходимые ItemFeature в одном запросе
+        if nmids_batch:
+            async with sm() as session:
+                item_features_result = await session.execute(
+                    select(ItemFeature).where(ItemFeature.nmid.in_(nmids_batch))
+                )
+            item_features_list = item_features_result.scalars().all()
+            nmid_to_item_features = {item_feature.nmid: item_feature.vector for item_feature in item_features_list}
+
+        for adv in adv_settings:
             wb_category = await data_managers.get_wb_category(adv)
             if not wb_category:
                 continue
-            nmid_featers = {}
-            keyword_stats = await data_managers.get_keywords_statistic(adv, None)
-            logger.debug(f'Ключевых слов: {len(keyword_stats)}')
-            keyword_text_to_keyword_stat = {}
-            for n, keyword_stat in enumerate(keyword_stats):
-                logger.debug(f'Проход ключевого слова, сбор данных: {n}')
-                keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
-            item_features_list = []
-            for nmid in adv.nmids:
-                if nmid in nmid_featers:
-                    item_feature = nmid_featers[nmid]
-                else:
-                    async with sm() as session:
-                        item_feature = await session.execute(
-                            select(ItemFeature).where(ItemFeature.nmid == nmid)
-                        )
-                        item_feature = item_feature.scalars().one_or_none()
-                        if not item_feature:
-                            continue
-                    nmid_featers[nmid] = item_feature
-                if item_feature:
-                    item_features_list.append(item_feature.vector)
+
+            # Собираем фичи товаров для текущей кампании
+            item_features_list = [nmid_to_item_features.get(nmid) for nmid in adv.nmids if
+                                  nmid in nmid_to_item_features]
             if not item_features_list:
                 continue
-
-            # Вычисляем средние значения фичей товаров, если они есть
 
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
             avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-
-
+            # Обработка ключевых слов для текущей кампании
             async with sm() as session:
-                smtp = select(KeywordSetting).join(
-                    KeywordSetting.adv_setting
-                ).filter(
-                    KeywordSetting.adv_setting_id == adv.id
-                )
+                smtp = select(KeywordSetting).join(KeywordSetting.adv_setting).filter(
+                    KeywordSetting.adv_setting_id == adv.id)
                 keyword_settings = await session.execute(smtp)
                 keyword_settings = keyword_settings.scalars().all()
 
+            keyword_texts = [ks.text for ks in keyword_settings]
+            keyword_features_batch = {}
+            if keyword_texts:
+                async with sm() as session:
+                    keyword_features_result = await session.execute(
+                        select(KeywordFeature).where(KeywordFeature.keyword.in_(keyword_texts))
+                    )
+                keyword_features_batch = {kf.keyword: kf.vector for kf in keyword_features_result.scalars().all()}
 
-            for n, keyword_setting in enumerate(keyword_settings):
-                logger.debug(f'Проход ключевого слова, сбор данных: {n}')
-                text = keyword_setting.text
-                if text in keyword_text_keyword_features:
-                    keyword_feature = keyword_text_keyword_features[text]
-                else:
-                    async with sm() as sess:
-                        keyword_feature = await sess.execute(
-                            select(KeywordFeature).where(KeywordFeature.keyword == text)
-                        )
-                        keyword_feature = keyword_feature.scalars().first()
-                    keyword_text_keyword_features[text] = keyword_feature
-                if not keyword_feature:
-                    logger.debug(f'Нет фичи для ключевого слова {text}')
+            for keyword_setting in keyword_settings:
+                keyword_features = keyword_features_batch.get(keyword_setting.text)
+                if not keyword_features:
+                    logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
                     continue
-                keyword_features = keyword_feature.vector
-                keyword_stat = keyword_text_to_keyword_stat.get(text)
-                if keyword_stat:
-                    row = {
-                        'adv_id': adv.adv_id,
-                        'keyword': keyword_setting.text,
-                        'views': keyword_stat.views,
-                        'clicks': keyword_stat.clicks,
-                        'spend': keyword_stat.spend,
-                        'nmids': adv.nmids,
-                        'wb_category_name': wb_category.wb_category_name,
-                        **avg_item_features,
-                        **{f'keyword_feature_{i}': keyword_features[i] for i in  range(len(keyword_features))},
-                    }
-                    data_rows.append(row)
-                    logger.debug(f'Данные собраны для ключевого слова {text}')
-
+                row = {
+                    'adv_id': adv.adv_id,
+                    'keyword': keyword_setting.text,
+                    'wb_category_name': wb_category.wb_category_name,
+                    **avg_item_features,
+                    **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
+                }
+                data_rows.append(row)
+                logger.debug(f'Данные собраны для ключевого слова {keyword_setting.text}')
 
         df = pd.DataFrame(data_rows)
-        if len(df) > 0:
-            df = df[df.views > 0]
-            df['ctr'] = df['clicks'] / df['views']
         return df
+
+
+
+
 
     async def _fit_modelGradientBoosting(self, update_model_on_new_features):
         logger.debug('Поток обучения запущен, получение данных')
@@ -295,7 +273,7 @@ class Predictor:
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
 
-        # predicted.clear()
+        predicted.clear()
 
         df_for_predict = await self._get_df_for_predict(all_adv_settings)
         predict_df = await asyncio.to_thread(self._predict, df_for_predict)

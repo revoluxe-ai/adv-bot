@@ -64,7 +64,11 @@
       "handlers": ["console"],
       "propagate": true
     },
-
+    "app.utils.db.session_maker": {
+      "level": "CRITICAL",
+      "handlers": ["console"],
+      "propagate": false
+    },
 
     "gensim.models.keyedvectors": {
       "level": "CRITICAL",
