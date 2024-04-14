@@ -204,6 +204,7 @@ class Fitter(AbcManager):
                 logger.debug(f'Данные собраны для ключевого слова {keyword_setting.text}')
 
         df = pd.DataFrame(data_rows)
+        logger.debug('Данные собраны')
         return df
 
 
