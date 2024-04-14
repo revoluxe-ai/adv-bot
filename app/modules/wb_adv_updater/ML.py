@@ -132,7 +132,7 @@ class Fitter(AbcManager):
         df['ctr'] = df.apply(calculate_ctr, axis=1)
         return df
 
-    async def _get_df_for_fit_optimized(self) -> pd.DataFrame:
+    async def _get_df_for_fit(self) -> pd.DataFrame:
         data_rows = []
         async with sm() as session:
             # Запрос всех кампаний за один раз
