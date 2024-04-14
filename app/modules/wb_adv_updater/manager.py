@@ -333,9 +333,15 @@ class Manager(AbcManager):
             total_min_ctr = 0
             total_max_ctr = 0
 
+        keyword_phrases_in_db = await self._gds.get_keyword_phrases()
+
+
         for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
             phrase_data_list = []
             for keyword_stat in keyword_stats:
+                if keyword_stat.text in keyword_phrases_in_db:
+                    logger.debug(f'Фраза {keyword_stat.text} уже есть в базе данных')
+                    continue
                 ctr = keyword_stat.ctr
                 # Расчет нормализованного CTR для каждой фразы
                 n_ctr = ((ctr - total_min_ctr) / (total_max_ctr - total_min_ctr)
@@ -357,7 +363,7 @@ class Manager(AbcManager):
 
                 )
                 phrase_data_list.append(phrase_data)
-            # try:
+
             await self._gds.add_keyword_phrase(phrase_data_list)
             await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
 
