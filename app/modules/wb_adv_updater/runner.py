@@ -102,7 +102,7 @@ class Runner:
     async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):
         while True:
             logger.debug('Старт цикла обновления модели')
-            await need_update_model.wait()
+            # await need_update_model.wait()
             logger.debug('need_update_model.wait пройден')
             await self._manager.update_model(update_model_on_new_features)
             logger.debug('Цикл обновления модели завершен')

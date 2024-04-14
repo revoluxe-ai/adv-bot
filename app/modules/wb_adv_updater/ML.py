@@ -141,14 +141,18 @@ class Fitter(AbcManager):
             adv_settings = result.scalars().all()
 
         data_rows = []
-        for adv in adv_settings:
+        logger.debug(f'Всего кампаний: {len(adv_settings)}')
+        for n, adv in enumerate(adv_settings):
+            logger.debug(f'Проход кампании, сбор данных: {n}')
             wb_category = await data_managers.get_wb_category(adv)
             if not wb_category:
                 continue
             nmid_featers = {}
             keyword_stats = await data_managers.get_keywords_statistic(adv, None)
+            logger.debug(f'Ключевых слов: {len(keyword_stats)}')
             keyword_text_to_keyword_stat = {}
-            for keyword_stat in keyword_stats:
+            for n, keyword_stat in enumerate(keyword_stats):
+                logger.debug(f'Проход ключевого слова, сбор данных: {n}')
                 keyword_text_to_keyword_stat[keyword_stat.text] = keyword_stat
             item_features_list = []
             for nmid in adv.nmids:
@@ -185,7 +189,8 @@ class Fitter(AbcManager):
                 keyword_settings = keyword_settings.scalars().all()
 
 
-            for keyword_setting in keyword_settings:
+            for n, keyword_setting in enumerate(keyword_settings):
+                logger.debug(f'Проход ключевого слова, сбор данных: {n}')
                 text = keyword_setting.text
                 if text in keyword_text_keyword_features:
                     keyword_feature = keyword_text_keyword_features[text]
@@ -197,6 +202,7 @@ class Fitter(AbcManager):
                         keyword_feature = keyword_feature.scalars().first()
                     keyword_text_keyword_features[text] = keyword_feature
                 if not keyword_feature:
+                    logger.debug(f'Нет фичи для ключевого слова {text}')
                     continue
                 keyword_features = keyword_feature.vector
                 keyword_stat = keyword_text_to_keyword_stat.get(text)
@@ -213,6 +219,7 @@ class Fitter(AbcManager):
                         **{f'keyword_feature_{i}': keyword_features[i] for i in  range(len(keyword_features))},
                     }
                     data_rows.append(row)
+                    logger.debug(f'Данные собраны для ключевого слова {text}')
 
 
         df = pd.DataFrame(data_rows)
