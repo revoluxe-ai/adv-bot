@@ -275,7 +275,7 @@ class Predictor:
 
     def _predict(self, df: pd.DataFrame)-> typing.Union[pd.DataFrame, None]:
         model = load_model()
-        X = df.drop(['keyword', 'adv_id'], axis=1)
+        X = df.drop(['keyword', 'adv_id', 'type'], axis=1)
         y = model.predict(X)
         df['predicted_ctr'] = y
         return df
