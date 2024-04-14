@@ -160,7 +160,7 @@ class Manager(AbcManager):
         await asyncio.sleep(1)
         await sender_manager.send_message_to_admin('Вектора обновлены')
         await sender_manager.send_message_to_admin('Ожидание предсказаний')
-        # await predicted.wait()
+        # await predicted.wait() # это вроде как и не надо, без него работает
         await sender_manager.send_message_to_admin('Ожидание предсказаний пройдено')
         await self.graph_updater.get_nmids_and_keyword_featers_for_ml()
         await sender_manager.send_message_to_admin('Вектора для ML обновлены')
@@ -309,7 +309,7 @@ class Manager(AbcManager):
         """update_model_on_new_features.set()"""
         while True:
             await self._update_wb_adv_phrase_in_db_bot_active()
-
+            await sender_manager.send_message_to_admin('Все Фразы обновлены')
             need_update_model.set()
             await asyncio.sleep(0)
 
