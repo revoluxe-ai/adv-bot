@@ -249,6 +249,7 @@ class Fitter(AbcManager):
         X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
                     axis=1)
         logger.debug('Данные подготовлены')
+        await sender_manager.send_message_to_admin('Данные для обучения подготовлены')
         # Создание модели градиентного бустинга
         model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
         if settings.cv:
