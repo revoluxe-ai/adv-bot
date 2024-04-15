@@ -10,15 +10,19 @@ sm = get_session_maker()
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
 
+client_link = 'https://t.me/inavsek'
+
+client_name = client_link.replace('https://t.me/', '')
+
 if __name__ == '__main__':
 
     with sm() as session:
        stmt = select(User)\
        .join(User.wb_tokens)\
-       .filter(User.username == 'Aleksey0394')
+       .filter(User.username == client_name)
 
        user = session.execute(stmt).scalar()
 
        for token in  user.wb_tokens:
-            print(token.shop_id)
+            print(token.api_key)
 

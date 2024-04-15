@@ -82,7 +82,7 @@ class Runner:
                             logger.error(f'Ошибка обновления статистики ключей: {tasks[cabinet_id].exception()}')
 
                         del tasks[cabinet_id]
-                await asyncio.sleep(1)
+            await asyncio.sleep(0)
 
 
     async def run_update_vectors(self, need_update_model:asyncio.Event,
