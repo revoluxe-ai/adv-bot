@@ -1037,6 +1037,23 @@ RETURN graphName
 
         logger.debug(result)
 
+    async def get_keyword_phrases(self) -> list[str]:
+        query = """
+        MATCH (phrase:KeywordPhrase)
+        RETURN phrase.text as keyword
+        """
+        async def get_keyword_phrases(tx, query):
+            result = await tx.run(query)
+            records = await result.data()
+            return [record['keyword'] for record in records]
+
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                data = await session.read_transaction(get_keyword_phrases, query)
+
+        return data
+
+
 
 
 

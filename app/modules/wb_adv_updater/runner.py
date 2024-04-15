@@ -34,12 +34,12 @@ class Runner:
 
         await asyncio.gather(
             self.check_accesses(),
-            self.run_update_keywords_on_wb(),
+            # self.run_update_keywords_on_wb(),
             self.update_cards_in_graph(),
             self.update_all_data_in_db(),
             self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_keyword_stat(need_update_model),
-            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            # self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
             self.run_update_model(update_model_on_new_features, need_update_model),
             self.run_update_predict_ctr(update_model_on_new_features, predicted),
 
@@ -102,7 +102,7 @@ class Runner:
     async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):
         while True:
             logger.debug('Старт цикла обновления модели')
-            await need_update_model.wait()
+            # await need_update_model.wait()
             logger.debug('need_update_model.wait пройден')
             await self._manager.update_model(update_model_on_new_features)
             logger.debug('Цикл обновления модели завершен')

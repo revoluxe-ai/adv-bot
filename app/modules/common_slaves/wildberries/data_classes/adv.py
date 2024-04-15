@@ -28,7 +28,7 @@ class AdvData(BaseModel):
     changeTime: str
     startTime: str
     name: str
-    unitedParams: List[UnitedParams]
+    unitedParams: Optional[List[UnitedParams]] = None
     dailyBudget: int
     advertId: int
     status: int
