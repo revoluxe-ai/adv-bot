@@ -194,7 +194,7 @@ class AdvSetting(BaseTable):
                                 uselist=True)
     bot_active = Column(Boolean, default=False)
     nmids = Column(JSONB, default=[])
-    keyword_settings: Mapped['KeywordSetting'] = relationship('KeywordSetting', back_populates='adv_setting',
+    keyword_settings: Mapped[list['KeywordSetting']] = relationship('KeywordSetting', back_populates='adv_setting',
                                     uselist=True)
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text('1'))
