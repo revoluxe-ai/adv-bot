@@ -341,6 +341,7 @@ class Manager(AbcManager):
             for keyword_stat in keyword_stats:
                 if keyword_stat.text in keyword_phrases_in_db:
                     logger.debug(f'Фраза {keyword_stat.text} уже есть в базе данных')
+                    await asyncio.sleep(0)
                     continue
                 ctr = keyword_stat.ctr
                 # Расчет нормализованного CTR для каждой фразы
@@ -363,6 +364,7 @@ class Manager(AbcManager):
 
                 )
                 phrase_data_list.append(phrase_data)
+                await asyncio.sleep(0)
 
             await self._gds.add_keyword_phrase(phrase_data_list)
             await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
