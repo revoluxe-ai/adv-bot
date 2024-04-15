@@ -285,7 +285,7 @@ class Predictor:
 
     def _predict(self, df: pd.DataFrame)-> typing.Union[pd.DataFrame, None]:
         model = load_model()
-        X = df.drop(['keyword', 'adv_id', 'adv_type'], axis=1)
+        X = df.drop(['keyword', 'adv_id'], axis=1)
         y = model.predict(X)
         df['predicted_ctr'] = y
         return df
@@ -370,7 +370,7 @@ class Predictor:
                    # Собираем данные для строки
                    row = {
                        'adv_id': adv.adv_id,
-                       'type': adv.type if adv.type else 0,
+                       'adv_type': adv.type if adv.type else 0,
                        'keyword': keyword.text,
                        **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
                        **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
