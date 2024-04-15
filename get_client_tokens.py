@@ -15,10 +15,10 @@ if __name__ == '__main__':
     with sm() as session:
        stmt = select(User)\
        .join(User.wb_tokens)\
-       .filter(User.username == 'Irenka_Raz')
+       .filter(User.username == 'Aleksey0394')
 
        user = session.execute(stmt).scalar()
 
        for token in  user.wb_tokens:
-            print(token.api_key)
+            print(token.shop_id)
 

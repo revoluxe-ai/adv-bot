@@ -53,7 +53,8 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
     chat_id = callback.message.chat.id
 
     await messages.AdvCompanyChoicing \
-        (bot, chat_id, state, wb_user_cabinet_original_id, page=page)()
+        (bot, state, chat_id, wb_user_cabinet_original_id, page=page)()
+        # (bot, chat_id, state, wb_user_cabinet_original_id, page=page)()
 
     return
 
