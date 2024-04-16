@@ -199,10 +199,12 @@ class Fitter(AbcManager):
                 keyword_features = keyword_to_features.get(keyword_setting.text)
                 if not keyword_features:
                     logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
+                    await asyncio.sleep(0)
                     continue
 
                 keyword_stat = keyword_stat_dict.get(keyword_setting.text)
                 if not keyword_stat:
+                    await asyncio.sleep(0)
                     continue
 
                 row = {
@@ -218,6 +220,7 @@ class Fitter(AbcManager):
                     **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))}
                 }
                 data_rows.append(row)
+                await asyncio.sleep(0)
 
         df = pd.DataFrame(data_rows)
         if df.empty:
