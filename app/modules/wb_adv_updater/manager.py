@@ -315,12 +315,14 @@ class Manager(AbcManager):
 
 
     async def _update_wb_adv_phrase_in_db_bot_active(self):
+        await sender_manager.send_message_to_admin('Обновление фраз в neo4j')
         async with sm() as session:
             stmt = select(AdvSetting)\
             .filter(and_(AdvSetting.active_status == 'started',
                          AdvSetting.bot_active == True))
             result = await session.execute(stmt)
             adv_settings = result.unique().scalars().all()
+            await sender_manager.send_message_to_admin('Кампании для обновления фраз получены')
             adv_setting_keyword_stats = {}
         for adv_setting in adv_settings:
             keyword_stats = await data_managers.get_keywords_statistic(adv_setting, None)
@@ -333,8 +335,9 @@ class Manager(AbcManager):
         #     total_min_ctr = 0
         #     total_max_ctr = 0
 
+        await sender_manager.send_message_to_admin('Получаем существующие базы из neo')
         keyword_phrases_in_db = await self._gds.get_keyword_phrases()
-
+        await sender_manager.send_message_to_admin('Существующие фразы из Neo получены')
 
         for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
             phrase_data_list = []
