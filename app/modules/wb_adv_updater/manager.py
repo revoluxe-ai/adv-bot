@@ -325,7 +325,9 @@ class Manager(AbcManager):
             await sender_manager.send_message_to_admin('Кампании для обновления фраз получены')
             adv_setting_keyword_stats = {}
         for adv_setting in adv_settings:
+            await sender_manager.send_message_to_admin(f'Получаем статистику ключей для {adv_setting.name}')
             keyword_stats = await data_managers.get_keywords_statistic(adv_setting, None)
+            await sender_manager.send_message_to_admin(f'Статистика ключей для {adv_setting.name} получена')
             adv_setting_keyword_stats[adv_setting] = keyword_stats
         # ctrs = [keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() for keyword_stat in keyword_stats]
         # if len(ctrs) > 0:
