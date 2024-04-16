@@ -325,13 +325,13 @@ class Manager(AbcManager):
         for adv_setting in adv_settings:
             keyword_stats = await data_managers.get_keywords_statistic(adv_setting, None)
             adv_setting_keyword_stats[adv_setting] = keyword_stats
-        ctrs = [keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() for keyword_stat in keyword_stats]
-        if len(ctrs) > 0:
-             total_min_ctr = min(ctrs)
-             total_max_ctr = max(ctrs)
-        else:
-            total_min_ctr = 0
-            total_max_ctr = 0
+        # ctrs = [keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() for keyword_stat in keyword_stats]
+        # if len(ctrs) > 0:
+        total_min_ctr = 0
+        total_max_ctr = 100
+        # else:
+        #     total_min_ctr = 0
+        #     total_max_ctr = 0
 
         keyword_phrases_in_db = await self._gds.get_keyword_phrases()
 
@@ -354,6 +354,7 @@ class Manager(AbcManager):
                     if vector is not None:
                         vector = list(vector)
                     keywords.append(KeywordStatForNeo(text=word, vector=vector))
+                    await asyncio.sleep(0)
 
                 phrase_data = KeywordPhrase(
                     text=keyword_stat.text,
@@ -367,6 +368,7 @@ class Manager(AbcManager):
                 await asyncio.sleep(0)
 
             await self._gds.add_keyword_phrase(phrase_data_list)
+            await asyncio.sleep(0)
             await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
 
 
