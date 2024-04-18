@@ -440,7 +440,13 @@ class Manager(AbcManager):
                 dhash = await asyncio.to_thread(self._image_tools.dhash, pil_image)
 
                 logger.debug(f"Обновляем карточку: {wbcard.name}")
-                characteristics_word = await self._process_product_data(wbcard)
+                try:
+                    characteristics_word = await self._process_product_data(wbcard)
+                except Exception:
+                    logger.error(f"Ошибка при обработке данных для карточки с именем: {wbcard.nmid}")
+                    continue
+
+
                 await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)
 
                 wbcard.updated = True  # Обновляем статус
