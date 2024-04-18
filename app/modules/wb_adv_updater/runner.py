@@ -122,7 +122,10 @@ class Runner:
 
     async def update_min_ctr_in_global_wb_category_settings(self):
         while True:
-            await self._manager.update_min_ctr_in_global_wb_category_settings()
+            try:
+                 await self._manager.update_min_ctr_in_global_wb_category_settings()
+            except Exception as e:
+                logger.error(f'Ошибка обновления минимальных цен {e}')
             await asyncio.sleep(1)
 
     async def update_all_data_in_db(self):
