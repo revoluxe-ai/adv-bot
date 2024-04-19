@@ -12,10 +12,10 @@ class Menu(BaseModel):
     name: str
 
 class UnitedParams(BaseModel):
-    catalogCPM: int
+    # catalogCPM: int
     searchCPM: int
     subject: Subject
-    menus: List[Menu]
+    # menus: List[Menu]
     nms: List[int]
 
 class AutoParams(BaseModel):

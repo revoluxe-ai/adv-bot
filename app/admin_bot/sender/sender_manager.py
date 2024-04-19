@@ -75,8 +75,10 @@ async def send_to_all_users():
 async def send_message_to_admin(text: str, off = False):
     if off:
         return
-    await bot.send_message(admin_chat_id, text)
-
+    try:
+        await bot.send_message(admin_chat_id, text)
+    except Exception as exc:
+        logger.error(f'Ошибка при отправке сообщения админу {exc}')
 
 async def send_message_to_user(wb_user_cabinet: WBUserCabinet, message):
     user: User = wb_user_cabinet.user

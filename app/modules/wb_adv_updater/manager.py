@@ -145,11 +145,11 @@ class Manager(AbcManager):
                             keyword_db.views = keyword.views
                             keyword_db.clicks = keyword.clicks
                             keyword_db.spend = keyword.spend
-            await session.commit()
-            await asyncio.sleep(60)
-            logger.debug(f'Статистика ключевых слов для {adv_setting.name} обновлена')
-            logger.debug(f'Установка set для need_update_model')
-            need_update_model.set()
+                await session.commit()
+                await asyncio.sleep(0)
+                logger.debug(f'Статистика ключевых слов для {adv_setting.name} обновлена')
+                logger.debug(f'Установка set для need_update_model')
+                need_update_model.set()
 
 
 
@@ -315,26 +315,31 @@ class Manager(AbcManager):
 
 
     async def _update_wb_adv_phrase_in_db_bot_active(self):
+        await sender_manager.send_message_to_admin('Обновление фраз в neo4j')
         async with sm() as session:
             stmt = select(AdvSetting)\
             .filter(and_(AdvSetting.active_status == 'started',
                          AdvSetting.bot_active == True))
             result = await session.execute(stmt)
             adv_settings = result.unique().scalars().all()
+            await sender_manager.send_message_to_admin('Кампании для обновления фраз получены')
             adv_setting_keyword_stats = {}
         for adv_setting in adv_settings:
+            await sender_manager.send_message_to_admin(f'Получаем статистику ключей для {adv_setting.name}')
             keyword_stats = await data_managers.get_keywords_statistic(adv_setting, None)
+            await sender_manager.send_message_to_admin(f'Статистика ключей для {adv_setting.name} получена')
             adv_setting_keyword_stats[adv_setting] = keyword_stats
-        ctrs = [keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() for keyword_stat in keyword_stats]
-        if len(ctrs) > 0:
-             total_min_ctr = min(ctrs)
-             total_max_ctr = max(ctrs)
-        else:
-            total_min_ctr = 0
-            total_max_ctr = 0
+        # ctrs = [keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() for keyword_stat in keyword_stats]
+        # if len(ctrs) > 0:
+        total_min_ctr = 0
+        total_max_ctr = 100
+        # else:
+        #     total_min_ctr = 0
+        #     total_max_ctr = 0
 
+        await sender_manager.send_message_to_admin('Получаем существующие базы из neo')
         keyword_phrases_in_db = await self._gds.get_keyword_phrases()
-
+        await sender_manager.send_message_to_admin('Существующие фразы из Neo получены')
 
         for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
             phrase_data_list = []
@@ -354,6 +359,7 @@ class Manager(AbcManager):
                     if vector is not None:
                         vector = list(vector)
                     keywords.append(KeywordStatForNeo(text=word, vector=vector))
+                    await asyncio.sleep(0)
 
                 phrase_data = KeywordPhrase(
                     text=keyword_stat.text,
@@ -367,6 +373,7 @@ class Manager(AbcManager):
                 await asyncio.sleep(0)
 
             await self._gds.add_keyword_phrase(phrase_data_list)
+            await asyncio.sleep(0)
             await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
 
 
@@ -433,7 +440,13 @@ class Manager(AbcManager):
                 dhash = await asyncio.to_thread(self._image_tools.dhash, pil_image)
 
                 logger.debug(f"Обновляем карточку: {wbcard.name}")
-                characteristics_word = await self._process_product_data(wbcard)
+                try:
+                    characteristics_word = await self._process_product_data(wbcard)
+                except Exception:
+                    logger.error(f"Ошибка при обработке данных для карточки с именем: {wbcard.nmid}")
+                    continue
+
+
                 await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)
 
                 wbcard.updated = True  # Обновляем статус

@@ -179,15 +179,9 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
 
             await messages. \
                 CabinetExistsForUser(bot, chat_id)()
-            wb_cabinet = wb_user_cabinet.wb_cabinet
-            async with sm() as session:
-                 stmt = select(AdvSetting)\
-                      .join(AdvSetting.wb_cabinet)\
-                     .where(WBCabinet.id ==  wb_cabinet.id)
-                 result = await session.execute(stmt)
-                 adv_settings = result.unique().scalars().all()
+
             await messages. \
-                    AdvCompanyChoicing(bot, chat_id, wb_user_cabinet.id, adv_settings, page=1)(state)
+                    AdvCompanyChoicing(bot, state, chat_id, wb_user_cabinet.id, page=1)()
             return
         else: #если кабинета у юзера нет
             #проверяем есть ли такой кабинет вообще
@@ -323,16 +317,7 @@ async def select_shop(callback_query: types.CallbackQuery,
     chat_id = message.chat.id
     # await state.update_data(chat_id = chat_id)
 
-    async with sm() as session:
-        stmt = select(AdvSetting
-                      )\
-            .join(AdvSetting.wb_cabinet) \
-            .join(WBCabinet.wb_user_cabinets) \
-            .filter(WBUserCabinet.id == wb_user_cabinet_original_id)
-        result = await session.execute(stmt)
-        adv_settings = result.unique().scalars().all()
-
 
     await messages.AdvCompanyChoicing \
-        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=1)(state)
+        (bot, state, chat_id, wb_user_cabinet_original_id, page=1)()
     return

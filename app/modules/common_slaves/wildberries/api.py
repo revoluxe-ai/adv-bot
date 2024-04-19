@@ -59,7 +59,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                     if state['_attempts'] >= max_attempts:
                         raise
                 except Exception as e:
-                    logger.error(f'Ошибка запроса к wb: {e}', e)
+                    logger.error(f'Ошибка запроса к wb: {e}')
                     state['_attempts'] += 1
                     state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:
@@ -136,10 +136,7 @@ class AdvertApi(ABC_WB_API):
                                                     headers=self.headers.standart)
                 answer = json.loads(response_text)
                 for advert in answer:
-                    try:
-                        adv = Adv(advert)
-                    except:
-                        pass
+                    adv = Adv(advert)
                     advs.append(adv)
         return advs
 

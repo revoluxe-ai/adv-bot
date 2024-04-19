@@ -1,10 +1,10 @@
 import asyncio
-from app import client_bot
+from app.client_bot.client_bot import run
 from python_modules.logger import setup_logging
 setup_logging()
 
 
 
 if __name__ == "__main__":
-    asyncio.run(client_bot.run())
+    asyncio.run(run())
 

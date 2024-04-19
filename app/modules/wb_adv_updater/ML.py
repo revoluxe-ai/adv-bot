@@ -199,10 +199,12 @@ class Fitter(AbcManager):
                 keyword_features = keyword_to_features.get(keyword_setting.text)
                 if not keyword_features:
                     logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
+                    await asyncio.sleep(0)
                     continue
 
                 keyword_stat = keyword_stat_dict.get(keyword_setting.text)
                 if not keyword_stat:
+                    await asyncio.sleep(0)
                     continue
 
                 row = {
@@ -218,6 +220,7 @@ class Fitter(AbcManager):
                     **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))}
                 }
                 data_rows.append(row)
+                await asyncio.sleep(0)
 
         df = pd.DataFrame(data_rows)
         if df.empty:
@@ -249,6 +252,7 @@ class Fitter(AbcManager):
         X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
                     axis=1)
         logger.debug('Данные подготовлены')
+        await sender_manager.send_message_to_admin('Данные для обучения подготовлены')
         # Создание модели градиентного бустинга
         model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
         if settings.cv:
@@ -284,7 +288,7 @@ class Predictor:
 
     def _predict(self, df: pd.DataFrame)-> typing.Union[pd.DataFrame, None]:
         model = load_model()
-        X = df.drop(['keyword', 'adv_id', 'type'], axis=1)
+        X = df.drop(['keyword', 'adv_id'], axis=1)
         y = model.predict(X)
         df['predicted_ctr'] = y
         return df
@@ -369,7 +373,7 @@ class Predictor:
                    # Собираем данные для строки
                    row = {
                        'adv_id': adv.adv_id,
-                       'type': adv.type if adv.type else 0,
+                       'adv_type': adv.type if adv.type else 0,
                        'keyword': keyword.text,
                        **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
                        **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},

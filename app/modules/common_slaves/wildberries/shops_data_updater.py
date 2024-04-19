@@ -99,16 +99,17 @@ class ShopDataUpdater:
             adv_ids = await advert_api.get_advertIds(advert_api.live_company_status,
                                                      advert_api.auto_adv_types)
             advs: list[Adv] = await advert_api.get_advs(adv_ids)
-
-            await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
-
-            nmids = set()
-            for adv in advs:
-                nmids.update(adv.nmids)
-            cards = await wb_api.content.get_cards_by_text(nmids)
-            await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
         except exc.ApiForbiddenError:
             logger.error('Попытка обновлений с отозванным токеном')
+            return
+        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
+
+        nmids = set()
+        for adv in advs:
+            nmids.update(adv.nmids)
+        cards = await wb_api.content.get_cards_by_text(nmids)
+        await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+
 
 
 

@@ -61,15 +61,15 @@ class Runner:
 
     async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
         tasks = {}
-        not_first_runs = set()
+        # not_first_runs = set()
         while True:
             accesses = await users_manager.get_accesses_for_wb_cabinets()
             for access in accesses:
                 cabinet_id = access.wb_cabinet.id
-                if cabinet_id in not_first_runs:
-                    await asyncio.sleep(15*60)
-                else:
-                    not_first_runs.add(cabinet_id)
+                # if cabinet_id in not_first_runs:
+                #     await asyncio.sleep(15*60)
+                # else:
+                #     not_first_runs.add(cabinet_id)
                 if cabinet_id not in tasks:
                     task = asyncio.create_task(
                         self._manager.update_keyword_stat(access, need_update_model))
@@ -82,7 +82,7 @@ class Runner:
                             logger.error(f'Ошибка обновления статистики ключей: {tasks[cabinet_id].exception()}')
 
                         del tasks[cabinet_id]
-                await asyncio.sleep(1)
+            await asyncio.sleep(0)
 
 
     async def run_update_vectors(self, need_update_model:asyncio.Event,
@@ -102,10 +102,13 @@ class Runner:
     async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):
         while True:
             logger.debug('Старт цикла обновления модели')
+            await sender_manager.send_message_to_admin('Ожидание разрешения на обновление модели')
             # await need_update_model.wait()
             logger.debug('need_update_model.wait пройден')
+            await sender_manager.send_message_to_admin('Блокировка на обновление модели снята')
             await self._manager.update_model(update_model_on_new_features)
             logger.debug('Цикл обновления модели завершен')
+            await sender_manager.send_message_to_admin('Обновление модели завершено')
             await asyncio.sleep(1)
             logger.debug('Установка clear для need_update_model')
             need_update_model.clear()
@@ -119,7 +122,10 @@ class Runner:
 
     async def update_min_ctr_in_global_wb_category_settings(self):
         while True:
-            await self._manager.update_min_ctr_in_global_wb_category_settings()
+            try:
+                 await self._manager.update_min_ctr_in_global_wb_category_settings()
+            except Exception as e:
+                logger.error(f'Ошибка обновления минимальных цен {e}')
             await asyncio.sleep(1)
 
     async def update_all_data_in_db(self):
