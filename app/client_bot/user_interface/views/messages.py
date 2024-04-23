@@ -526,8 +526,12 @@ class ShopMenu(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        return keyboards.get_shop_menu_keyboard(self._wb_user_cabinet,
-                                                price_for_month=self._price_for_month, bonus_days=self.bonus_days)
+        return keyboards.get_shop_menu_keyboard(
+            self._wb_user_cabinet,
+            self._wb_cabinet.id,
+            price_for_month=self._price_for_month,
+            bonus_days=self.bonus_days,
+        )
 
 
 class OrderSubscribe(Text):

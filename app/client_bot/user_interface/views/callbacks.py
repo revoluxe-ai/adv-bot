@@ -81,3 +81,4 @@ class RefProgram(CallbackData, prefix="ref_program"):
 class OrderSubscribe(CallbackData, prefix="order_subscribe"):
     period_days: int
     price: int
+    wb_cabinet_original_id: int
