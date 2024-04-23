@@ -536,7 +536,7 @@ class ShopMenu(TextWithKeyboard):
 
 class OrderSubscribe(Text):
 
-    text = "Заказ на подписку получен, для оплаты свяжитесь с администратором бота @skyline360_1"
+    text = "В случае проблем с оплатой свяжитесь с администратором бота @skyline360_1"
 
 
 class NoMainPhotos(Text):
