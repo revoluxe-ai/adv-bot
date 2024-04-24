@@ -3,10 +3,6 @@ from python_modules.path_setting_funcs import get_document_by_key_name
 setting_path = 'setting.yaml'
 
 
-
-
-
-
 class Settings:
 
     @property
