@@ -13,6 +13,9 @@ class Settings:
     def cv(self):
         return get_document_by_key_name(setting_path, 'cv')
 
+    @property
+    def test_mode(self):
+        return get_document_by_key_name(setting_path, 'test_mode')
+
 
 settings = Settings()
-
