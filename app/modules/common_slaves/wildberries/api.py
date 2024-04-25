@@ -200,7 +200,18 @@ class AdvertApi(ABC_WB_API):
         await self.tune_company(company, nmids)
         return company
 
-
+    @try_except_decorator(1, 1)
+    async def pause_company(self, adv_id: int):
+        url = f'https://advert-api.wb.ru/adv/v0/pause?id={adv_id}'
+        async with aiohttp.ClientSession() as session:
+            try:
+                await self.requests(session, 'GET',
+                                url,
+                                headers=self.headers.standart)
+                logger.debug(f'Рекламная кампания {adv_id} успешно поставлена на паузу')
+            except:
+                raise
+        return
 
 
 class ContentApi(ABC_WB_API):

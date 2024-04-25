@@ -1,5 +1,6 @@
 from aiogram import Router
 from . import middlewars
+from .middlewars.check_rights import check_subscribe_on_shop
 from .user_interface.handlers import adv_setting
 from .user_interface.handlers import exceptions
 from .user_interface.handlers import keyword_settings
@@ -26,5 +27,5 @@ common_router.include_routers(keyword_settings.router)
 
 
 common_router.callback_query.middleware(middlewars.CheckSubscribeOnChannel())
-
+common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())
 

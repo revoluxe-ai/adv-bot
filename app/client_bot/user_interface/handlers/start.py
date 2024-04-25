@@ -14,6 +14,8 @@ from   .. import states
 from ..views import messages
 from aiogram.filters import StateFilter, CommandStart
 from aiogram.types import Message
+
+from ..views.callbacks import Action
 from ...redis_manager import RedisManager
 import logging
 from ..views import callbacks
@@ -22,70 +24,72 @@ from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from app.modules.common_slaves.wildberries import models as wb_models
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
-
 logger = logging.getLogger(__name__)
-
-
-
-
 
 sm = get_async_session_maker()
 
 router = Router()
 
-
 redis_manager = RedisManager()
 
 
+@router.callback_query(callbacks.Start.filter())
 @router.message(CommandStart())
-async def start_registration(message: types.Message, bot: aiogram.Bot, state:FSMContext):
+async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+
     await state.clear()
+
+    if isinstance(message, types.CallbackQuery):
+        await message.answer()
+
     async with sm() as session:
         user_id = message.from_user.id
-        text = message.text
-        referral_link = None
-        if text:
-            text = text.split(' ')
+        if isinstance(message, types.Message) and message.text:
+            text = message.text.split(' ')
             if len(text) > 1 and text[1].isdigit():
                 referral_link_id = int(text[1])
-                stmt = select(RefLink)\
-                .options(selectinload(RefLink.referred_users))\
-                .where(RefLink.id == referral_link_id)
-                result = await session.execute(stmt)
-                referral_link:RefLink = result.scalar()
+                stmt = select(RefLink) \
+                    .options(selectinload(RefLink.referred_users)) \
+                    .where(RefLink.id == referral_link_id)
+                referral_link = (await session.execute(stmt)).scalar()
 
-        stmt = select(User)\
-            .options(joinedload(User.wb_user_cabinets).joinedload(
-            WBUserCabinet.wb_cabinet)) \
-            .where(User.user_telegram_id == user_id)
+        stmt = select(User).options(
+            joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
+        ).where(User.user_telegram_id == user_id)
+
         result = await session.execute(stmt)
         user = result.scalar()
+
         if not user:
-            user = User(user_telegram_id=user_id,
-                        username=message.from_user.username,
-                        adv_updater_user_chat_id = message.chat.id,
-                        wb_tokens=[])
+            user = User(
+                user_telegram_id=user_id,
+                username=message.from_user.username,
+                adv_updater_user_chat_id=message.chat.id,
+                wb_tokens=[],
+            )
             session.add(user)
+
             if referral_link:
                 referral_link.referred_users.append(user)
+
             await session.commit()
             await session.refresh(user)
             wb_user_cabinets = []
         else:
             wb_user_cabinets = user.wb_user_cabinets
-        chat_id = message.chat.id
-        await messages. \
-                ShopChoice(bot, chat_id, wb_user_cabinets)()
-    return
 
-@router.callback_query(callbacks.Shop.filter(aiogram.F.action == callbacks.Action.new))
+        chat_id = message.chat.id if isinstance(message, types.Message) else message.message.chat.id
+
+        await messages.ShopChoice(bot, chat_id, wb_user_cabinets)()
+
+
+@router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(callback_query: types.CallbackQuery,
                    bot: aiogram.Bot, state: FSMContext):
     await callback_query.answer('Добавление нового магазина (кабинета)')
     await state.set_state(states.CabinetRegistration.cabinet_name)
     chat_id: int = callback_query.message.chat.id
     await messages.ShopNameGet(bot, chat_id)()
-
 
 
 @router.message(StateFilter(states.CabinetRegistration.cabinet_name))
@@ -313,3 +317,16 @@ async def select_shop(callback_query: types.CallbackQuery,
     await messages.AdvCompanyChoicing \
         (bot, state, chat_id, wb_user_cabinet_original_id, page=1)()
     return
+
+
+@router.callback_query(callbacks.Shop.filter(aiogram.F.action == Action.select))
+async def shop_menu_process(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.Shop,
+    bot: aiogram.Bot,
+    state: FSMContext,
+):
+
+    await callback.answer()
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    await messages.ShopMenu(bot, callback.message.chat.id, state, wb_user_cabinet_original_id)()

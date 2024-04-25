@@ -19,16 +19,16 @@ from ..common_slaves.wildberries import super_cabinet_manager
 from .ML import Fitter
 from app.my_types import KeywordStat
 from app.utils.NeoDataScience.driver import DataScience
-from app.modules.common_slaves.wildberries.models import WBCard
+from app.modules.common_slaves.wildberries.models import WBCard, WBCabinet
 
 from app.utils.image_master.image_master2 import ImageMaster
 import pymystem3
 from app.utils.image_master import image_tools
 import asyncio
-from app.admin_bot.sender import sender_manager as admin_sender, sender_manager
+from app.admin_bot.sender import sender_manager as admin_sender, sender_manager, messages
 import pandas as pd
 from sqlalchemy import and_
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.future import select
 from .ML import Predictor
 import datetime
@@ -40,8 +40,7 @@ from app.modules.wb_adv_updater import data_managers
 from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
-
-
+from app.client_bot.bot import bot
 
 predictor = Predictor()
 
@@ -536,21 +535,52 @@ class Manager(AbcManager):
              await asyncio.sleep(30)
 
     async def check_accesses(self):
-       await rights_control.check_all()
+        await rights_control.check_all()
 
+    async def shop_subscribe_control(self):
+        while True:
+            async with sm() as session:
+                stmt = select(WBCabinet) \
+                    .options(
+                    selectinload(WBCabinet.wb_user_cabinets)\
+                    .selectinload(WBUserCabinet.user),
+                    selectinload(WBCabinet.adv_settings)
+                ).where(
+                    and_(
+                        WBCabinet.expiration_time < datetime.datetime.now(),
+                        WBCabinet.active is True
+                    )
+                )
+                wb_cabinets_expirated_and_active = await session.execute(stmt).scalars().all()
 
+                for wb_cabinet in wb_cabinets_expirated_and_active:
+                    access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
+                    wb_api = WBApi(access)
+                    adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                    for adv_setting in adv_settings:
+                        if adv_setting.bot_active is True and adv_setting.active_status == 'started':
+                            try:
+                                await wb_api.advert.pause_company(adv_setting.adv_id)
+                            except:
+                                logger.error(f'Ошибка при попытке остановить кампанию {adv_setting.adv_id}')
+                                continue
+                            adv_setting.bot_active = False
+                    wb_cabinet.active = False
+                    await session.commit()
+                    wb_user_cabinets = wb_cabinet.wb_user_cabinets
+                    for wb_user_cabinet in wb_user_cabinets:
+                        user = wb_user_cabinet.user
+                        try:
+                            await messages.ShopExpiredSubscriptionMessage(
+                                bot,
+                                wb_user_cabinet.user.user_telegram_id,
+                                wb_user_cabinet,
+                            )()
+                            logger.debug(f'Сообщение о просроченной подписке отправлено для юзера {user.username}')
+                        except Exception as exc:
+                            logger.error(
+                                f'Ошибка при отправке сообщения о просроченной подписке '
+                                f'для юзера {user.username}: {exc}'
+                            )
+                            await asyncio.sleep(1)

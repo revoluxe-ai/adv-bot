@@ -133,3 +133,32 @@ async def get_super_user_access():
                                         wb_cabinet = None)
 
     return super_user_access
+
+
+async def get_access_for_wb_cabinet(wb_cabinet_id: int) -> WBCabinetAccess:
+    async with sm() as session:
+        stmt = (
+            select(WBCabinet)
+            .options(selectinload(WBCabinet.wb_user_cabinets)
+                     .selectinload(WBUserCabinet.user)
+                     .selectinload(User.wb_tokens))
+            .where(WBCabinet.id == wb_cabinet_id)
+        )
+        result = await session.execute(stmt)
+        wb_cabinet: WBCabinet = result.scalars().first()
+        wb_user_cabinets = wb_cabinet.wb_user_cabinets
+        tokens = []
+        for wb_user_cabinet in wb_user_cabinets:
+            user = wb_user_cabinet.user
+            user_tokens = user.wb_tokens
+            tokens.extend(user_tokens)
+        live_tokens = []
+        for token in user_tokens:
+            try:
+                await CabinetManager.check_access(token)
+                live_tokens.append(token)
+            except Exception as exc:
+                logger.error(f'Токен не прошел проверку: {exc}')
+                continue
+
+        return WBCabinetAccess(tokens=live_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet)

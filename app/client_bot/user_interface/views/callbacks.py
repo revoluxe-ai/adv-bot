@@ -21,7 +21,11 @@ class BudgetForCreatingAdv(CallbackData, prefix="budget"):
 
 class Shop(CallbackData, prefix="shop"):
     action: str
-    wb_user_cabinet_original_id: Union[int, None] = None
+    wb_user_cabinet_original_id: int
+
+
+class ShopNew(CallbackData, prefix="shop_new"):
+    pass
 
 
 class Adv(CallbackData, prefix="adv"):
@@ -82,3 +86,7 @@ class OrderSubscribe(CallbackData, prefix="order_subscribe"):
     period_days: int
     price: int
     wb_cabinet_original_id: int
+
+
+class Start(CallbackData, prefix="start"):
+    pass

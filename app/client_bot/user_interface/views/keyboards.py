@@ -27,13 +27,16 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet]):
     for wb_user_cabinet in all_shops:
         shop_name = wb_user_cabinet.name
         wb_user_cabinet_original_id = wb_user_cabinet.id
-        button = InlineKeyboardButton(text=shop_name, callback_data=callbacks \
-                                      .Shop(action=Action.select,
-                                            wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack())
+        button = InlineKeyboardButton(
+            text=shop_name,
+            callback_data=callbacks.Shop(
+                action=Action.select,
+                wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack()
+        )
         # Добавляем кнопку в список строк кнопок
         keyboard_buttons.append([button])  # Каждая кнопка в своем списке, т.е. каждая в новой строке
-    button = InlineKeyboardButton(text='Добавить магазин', callback_data=callbacks.Shop\
-        (action=Action.new).pack())
+    button = InlineKeyboardButton(text='Добавить магазин', callback_data=callbacks.ShopNew().pack())
+
     keyboard_buttons.append([button])
     # Создаем InlineKeyboardMarkup с переданным списком кнопок
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
@@ -139,8 +142,16 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
                                                           wb_user_cabinet_original_id=wb_user_cabinet_original_id,
                                                           page=next_page).pack())])
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-    return keyboard
+    button = InlineKeyboardButton(
+        text='Вернуться к меню магазина',
+        callback_data=callbacks.Shop(
+            action=Action.select,
+            wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack(),
+    )
+
+    keyboard_buttons.append([button])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
 
 
@@ -296,12 +307,14 @@ def get_shop_menu_keyboard(
 
     builder = InlineKeyboardBuilder()
 
-    button = InlineKeyboardButton(text='Настройка рекламы', callback_data=callbacks.ChoiceAdvPaginator(
-        wb_user_cabinet_original_id = wb_user_cabinet.id, page = 1).pack())
-
-    builder.row(button)
-
-    if demo and expiration_time > now:
+    if expiration_time > now:
+        button = InlineKeyboardButton(
+            text='Настройка рекламы',
+            callback_data=callbacks.ChoiceAdvPaginator(
+                wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
+        )
+        builder.row(button)
+    if demo:
         button = InlineKeyboardButton(
             text='Продлить и получить бонус',
             callback_data=callbacks.OrderSubscribe(
@@ -310,7 +323,8 @@ def get_shop_menu_keyboard(
                 wb_cabinet_original_id=wb_cabinet_original_id
             ).pack()
         )
-    elif not demo and expiration_time > now:
+        builder.row(button)
+    else:
         button = InlineKeyboardButton(
             text='Продлить подписку',
             callback_data=callbacks.OrderSubscribe(
@@ -319,16 +333,29 @@ def get_shop_menu_keyboard(
                 wb_cabinet_original_id=wb_cabinet_original_id
             ).pack()
         )
+        builder.row(button)
 
+    button = InlineKeyboardButton(
+        text='Вернуться к списку магазинов',
+        callback_data=callbacks.Start().pack(),
+    )
     builder.row(button)
     return builder.as_markup()
 
 
-def get_payment_keyboard(price_for_month: int, period_days, bonus_days: int):
+def get_payment_keyboard(price_for_month: int, period_days, bonus_days: int, wb_cabinet_original_id):
     builder = InlineKeyboardBuilder()
-    button = InlineKeyboardButton(text='Продлить подписку',
-                                  callback_data=callbacks.OrderSubscribe(period_days=period_days + bonus_days,
-                                                                         price=price_for_month).pack())
+    button = InlineKeyboardButton(
+        text='Продлить подписку',
+        callback_data=callbacks.OrderSubscribe(
+            period_days=period_days + bonus_days,
+            price=price_for_month,
+            wb_cabinet_original_id=wb_cabinet_original_id).pack(),
+    )
+    builder.row(button)
+
+    button = InlineKeyboardButton(text='К списку магазинов', callback_data=callbacks.Start().pack())
 
     builder.row(button)
+
     return builder.as_markup()

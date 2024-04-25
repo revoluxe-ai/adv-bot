@@ -1,6 +1,7 @@
+from app.client_bot import const
 from app.client_bot.user_interface import message_templates
 from app.client_bot.user_interface.views import keyboards
-
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 
 class NewFeaturesInBot(message_templates.TextWithImage):
@@ -70,3 +71,27 @@ class BetaTestIsDone(message_templates.Text):
             'Если вы еще не успели оценить преимущество данного бота для продвижения на Wildberries, '
             'рекомендуем это сделать прямо '
             'сейчас, ведь он радикально меняет правила игры на этом рынке - /start')
+
+
+class ShopExpiredSubscriptionMessage(message_templates.TextWithKeyboard):
+
+    def __init__(self, bot, chat_id, wb_user_cabinet: WBUserCabinet):
+        super().__init__(bot, chat_id)
+        self._wb_user_cabinet = wb_user_cabinet
+
+    @property
+    def text(self):
+        return (f"Ваша подписка на магазин {self._wb_user_cabinet.name} истекла, "
+                f"бот деактивирован, а во избежание расходования средств все "
+                f"кампании, для которых бот был активирован, поставлены на паузу. "
+                
+                " Для продления подписки перейдите в раздел 'Мои магазины' ")
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard(
+            const.PRICE_PER_MONTH,
+            period_days=30,
+            bonus_days=0,
+            wb_cabinet_original_id=self._wb_user_cabinet.id,
+        )

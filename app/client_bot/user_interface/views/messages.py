@@ -1,7 +1,7 @@
 import datetime
 from aiogram.utils import deep_linking
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
@@ -24,6 +24,8 @@ from aiogram import Bot
 import logging
 import app
 from typing import TYPE_CHECKING
+
+from app.client_bot import const
 
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard
@@ -61,7 +63,7 @@ class ShopChoice(TextWithKeyboard):
     @property
     def text(self):
         return (
-                
+
                 'Бот разрабатывался и продолжает разрабатываться '
                 'с целью сделать продвижение на Wildberries максимально эффективным.\n\n'
                 
@@ -112,8 +114,6 @@ class GetCardsApiError(Text):
 
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
-    
-
 
     @staticmethod
     async def get_state_data(state: FSMContext)->(int, int):
@@ -122,21 +122,19 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         last_wb_user_cabinet_page = data.get('last_wb_user_cabinet_page')
         return last_wb_user_cabinet_original_id, last_wb_user_cabinet_page
 
-
-    def __init__(self, bot: Bot,
-                  state: FSMContext,
-                  chat_id: int, wb_user_cabinet_original_id: int,
-                 page: int = 1):
+    def __init__(
+        self, bot: Bot,
+        state: FSMContext,
+        chat_id: int,
+        wb_user_cabinet_original_id: int,
+        page: int = 1,
+    ):
         super().__init__(bot, chat_id)
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._page = page
         self._state = state
 
-
     async def __call__(self):
-        await self._state.update_data(last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id)
-        await self._state.update_data(last_wb_user_cabinet_page=self._page)  # последняя страница выбора рк
-
         async with _sm() as session:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
@@ -145,6 +143,18 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                 .order_by(AdvSetting.name)
             result = await session.execute(stmt)
             self._adv_settings = result.scalars().all()
+            stmt = (
+                select(WBCabinet.id)
+                .where(WBCabinet.wb_user_cabinets
+                       .any(WBUserCabinet == self._wb_user_cabinet_original_id))
+            )
+            result = await session.execute(stmt)
+            wb_cabinet_original_id = result.scalar()
+            await self._state.update_data(
+                last_wb_cabinet_original_id=wb_cabinet_original_id,
+                last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
+                last_wb_user_cabinet_page=self._page
+            )
 
         await super().__call__()
 
@@ -279,10 +289,17 @@ class CabinetNameTooLong(Text):
 
 
 class AdvKeywordsSetting(TextWithKeyboardAndImage):
-    def __init__(self, bot: Bot, chat_id,
-                 keywords: list['KeywordForKeyboard'], adv_setting: AdvSetting, wb_user_cabinet_original_id,
-                 adv_choice_last_page,
-                 image: str, page):
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id,
+        keywords: list['KeywordForKeyboard'],
+        adv_setting: AdvSetting,
+        wb_user_cabinet_original_id,
+        adv_choice_last_page,
+        image: str,
+        page,
+    ):
         super().__init__(bot, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
@@ -479,14 +496,13 @@ class ShopMenu(TextWithKeyboard):
     def __init__(self, bot: Bot, chat_id: int, state: FSMContext, wb_user_cabinet_original_id: int):
        self._state = state
        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-       self._price_for_month = 4900
        super().__init__(bot, chat_id)
 
     async def __call__(self):
         async with _sm() as session:
             stmt = select(WBUserCabinet)\
-                 .options(joinedload(WBUserCabinet.wb_cabinet))\
-                .filter(WBUserCabinet.id == self._wb_user_cabinet_original_id)
+                .options(selectinload(WBUserCabinet.wb_cabinet)).where(
+                WBUserCabinet.id == self._wb_user_cabinet_original_id)
             result = await session.execute(stmt)
             self._wb_user_cabinet: WBUserCabinet = result.scalar_one()
             self._wb_cabinet: WBCabinet = self._wb_user_cabinet.wb_cabinet
@@ -495,8 +511,10 @@ class ShopMenu(TextWithKeyboard):
         self._expiration_time_str = self._expiration_time.strftime('%d-%m-%Y-%H:%M')
         self.days_left = (self._expiration_time - self._now).days + 1
         self.bonus_days = self.days_left * 2
-
-
+        await self._state.update_data(
+            last_wb_user_cabinet_original_id=self._wb_user_cabinet.id,
+            last_wb_cabinet_original_id=self._wb_cabinet.id,
+        )
         await super().__call__()
 
     @property
@@ -509,13 +527,13 @@ class ShopMenu(TextWithKeyboard):
             text += ('Для этого магазина включен демо-режим. Вам доступны все опции и сервисы до '
                          f"""{self._expiration_time_str} \n"""
                      "После этого дальнейшее использование бота для данного магазина станет платным. \n"
-                     f'Стоимость месячной подписки составляет {self._price_for_month} рублей для одного магазина.\n'
+                     f'Стоимость месячной подписки составляет {const.PRICE_PER_MONTH} рублей для одного магазина.\n'
                      'После оплаты услуга считается оказанной, возврат средств не производится. '
                      'Если вы оплатите подписку до конца демо-периода, то мы компенсируем оставшееся'
                      f' время демо-периода в двойном размере ( итого + {get_day_suffix(self.bonus_days)}) ')
         elif not self._wb_cabinet.demo and self._expiration_time > self._now:
             text += (f'Тариф магазина оплачен до  {self._expiration_time_str}\n'
-                     f'Стоимость месячной подписки составляет {self._price_for_month} рублей для одного магазина.\n'
+                     f'Стоимость месячной подписки составляет {const.PRICE_PER_MONTH} рублей для одного магазина.\n'
                      'После оплаты услуга считается оказанной, возврат средств не производится. ')
 
 
@@ -529,7 +547,7 @@ class ShopMenu(TextWithKeyboard):
         return keyboards.get_shop_menu_keyboard(
             self._wb_user_cabinet,
             self._wb_cabinet.id,
-            price_for_month=self._price_for_month,
+            price_for_month=const.PRICE_PER_MONTH,
             bonus_days=self.bonus_days,
         )
 
@@ -541,3 +559,33 @@ class OrderSubscribe(Text):
 
 class NoMainPhotos(Text):
     text = 'Не удалось загрузить фотографию товара, участвующего в кампании. Обратитесь на канал поддержки'
+
+
+class ExpiredSubscription(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id: int, wb_cabinet_original_id: int):
+        self._wb_cabinet_original_id = wb_cabinet_original_id
+        super().__init__(bot, chat_id)
+
+    async def __call__(self):
+        async with _sm() as session:
+            stmt = select(WBCabinet).where(WBCabinet.id == self._wb_cabinet_original_id)
+            result = await session.execute(stmt)
+            self._wb_cabinet = result.scalar()
+        await super().__call__()
+
+    @property
+    def text(self):
+        return (
+            f'Подписка на этот магазин истекла.'
+            f' Для продолжения работы с магазином оплатите подписку.'
+        )
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard(
+            self._wb_cabinet.id,
+            period_days=30,
+            bonus_days=0,
+            wb_cabinet_original_id=self._wb_cabinet.id,
+        )

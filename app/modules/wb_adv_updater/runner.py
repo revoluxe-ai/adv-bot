@@ -33,7 +33,8 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
-            self.check_accesses(),
+            self.shop_subscribe_control(),
+            self.demo_subscribe(),
             self.run_update_keywords_on_wb(),
             self.update_cards_in_graph(),
             self.update_all_data_in_db(),
@@ -130,9 +131,12 @@ class Runner:
         logger.debug("Данные в базе обновлены")
         await asyncio.sleep(1)
 
-    async def check_accesses(self):
+    async def demo_subscribe(self):
         while True:
             await self._manager.check_accesses()
             await asyncio.sleep(1)
+
+    async def shop_subscribe_control(self):
+        await self._manager.shop_subscribe_control()
 
 

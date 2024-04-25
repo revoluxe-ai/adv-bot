@@ -1,5 +1,5 @@
 
-PRICE_FOR_ONE_MONTH = 3000
+PRICE_PER_MONTH = 3000
 
 
 CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'

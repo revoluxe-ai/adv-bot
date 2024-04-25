@@ -31,7 +31,7 @@ async def check_all():
 async def send_messages_for_shop_subscribes_expire():
     now = datetime.datetime.now()
     today = now.date()
-    if 7 <= now.hour <= 16:
+    if 12 <= now.hour <= 16:
         for n, row in enumerate(_messages_period):
             days = row[0]
             message = row[1]
@@ -57,8 +57,6 @@ async def send_messages_for_shop_subscribes_expire():
                     wb_user_cabinets = wb_cabinet.wb_user_cabinets
                     for wb_user_cabinet in wb_user_cabinets:
                         user_telegram_id = wb_user_cabinet.user.user_telegram_id
-                        if user_telegram_id != 373435337:  # Это условие может быть удалено, если оно больше не нужно
-                            continue
                         await message(bot, user_telegram_id, days, wb_user_cabinet)()
                         wb_cabinet.expiration_alarm_days_pass = days
                         await session.commit()

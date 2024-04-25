@@ -4,13 +4,14 @@ from datetime import timedelta
 from aiogram import Router
 import aiogram
 from aiogram import types
+from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice, Message
 from sqlalchemy import select
 from app.admin_bot.sender import sender_manager
 from app.client_bot.user_interface.views import callbacks, messages
 import asyncio
 
-from app.modules.common_slaves.wildberries.models import WBCabinet
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.payments.db.models import Payment
 from settings.settings_master import settings
 from app.utils.suffixes import get_day_suffix
@@ -64,7 +65,7 @@ async def pre_checkout_query_handler(pre_checkout_query: types.PreCheckoutQuery,
 
 
 @router.message(aiogram.F.successful_payment)
-async def successful_payment_handler(message: types.Message, bot: aiogram.Bot):
+async def successful_payment_handler(message: types.Message, state: FSMContext, bot: aiogram.Bot):
     successful_payment = message.successful_payment
     payload = json.loads(successful_payment.invoice_payload)
     cost = successful_payment.total_amount / 100
@@ -89,8 +90,8 @@ async def successful_payment_handler(message: types.Message, bot: aiogram.Bot):
 
         wb_cabinet: WBCabinet = result.scalars().first()
         wb_cabinet.demo = False
+        wb_cabinet.active = True
         wb_cabinet.expiration_time += timedelta(days=period)
-
         payment = Payment()
         payment.user = user
         payment.amount = cost
@@ -99,3 +100,8 @@ async def successful_payment_handler(message: types.Message, bot: aiogram.Bot):
         await session.commit()
 
     await messages.OrderSubscribe(bot, message.chat.id)()
+    state_data = await state.get_data()
+    last_wb_user_cabinet_original_id = state_data.get('last_wb_user_cabinet_original_id')
+
+    if last_wb_user_cabinet_original_id:
+        await messages.ShopMenu(bot, message.chat.id, state, last_wb_user_cabinet_original_id)()
