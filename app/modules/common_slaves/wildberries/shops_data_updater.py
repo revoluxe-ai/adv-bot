@@ -1,4 +1,3 @@
-from .api import WBApi
 import asyncio
 from sqlalchemy import select
 from . import models
@@ -10,8 +9,6 @@ from app.modules.common_slaves.wildberries.api import WBApi
 from app import exc
 
 
-from app.modules.common_slaves.wildberries.models import WBUserCabinet
-import app
 from .data_classes.adv import Adv
 
 sm = get_async_session_maker()
@@ -85,12 +82,6 @@ class ShopDataUpdater:
             await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
         func = update_cards()
         await _coroutine_parallel_run_queue.put(func)
-
-    # async def __update_cards(self, nmids:set[int]):
-    #     cards = await self.__wb_api.advert.get_cards_by_text(nmids)
-    #     await app.utils.db.db_manager.update_cards_in_db(cards, self._wb_user_cabinet)
-    #
-
 
     async def update_all_data(self):
         try:

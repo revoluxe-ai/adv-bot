@@ -7,7 +7,7 @@ from aiogram import types
 import aiogram
 import logging
 
-from aiogram.types import FSInputFile, InputFile, BufferedInputFile
+from aiogram.types import BufferedInputFile
 
 from .base import Base
 from app import file_handler

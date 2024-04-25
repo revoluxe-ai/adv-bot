@@ -17,7 +17,7 @@ from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
 from sqlalchemy import select, and_
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, KeywordSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
 
 from .data_managers import DataGetter
@@ -48,8 +48,7 @@ def save_model(model: xgboost.XGBModel, time_stamp = None):
 
 def load_model():
     model = joblib.load(os.path.join(path, 'model.json'))
-    # with open(f'{path}/time_stamp.txt', 'r') as file:
-    #     time_stamp = file.read()
+
     return model
 
 

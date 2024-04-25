@@ -1,5 +1,5 @@
 from app.utils.db.session_maker import get_session_maker
-from app.utils.db.models import User, WBCabinet, WBUserCabinet, WBToken
+from app.utils.db.models import User, WBCabinet, WBUserCabinet
 
 sm = get_session_maker()
 

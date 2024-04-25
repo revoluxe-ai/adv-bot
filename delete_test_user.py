@@ -1,5 +1,5 @@
 import asyncio
-from sqlalchemy import text, select
+from sqlalchemy import select
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 

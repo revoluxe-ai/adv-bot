@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from datetime import datetime, timedelta, timezone
 from aiogram import types as tp
 import aiogram

@@ -7,7 +7,6 @@ import json
 import aiohttp
 import logging
 from . import models
-import app
 from .models import WBToken, WBUserCabinet
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:

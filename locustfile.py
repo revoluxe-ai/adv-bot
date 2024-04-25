@@ -1,5 +1,4 @@
 from locust import HttpUser, task, between
-from python_modules import path_setting_funcs
 
 
 

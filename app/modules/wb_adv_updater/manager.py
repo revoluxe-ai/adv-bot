@@ -32,15 +32,11 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.future import select
 from .ML import Predictor
 import datetime
-from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
-                                                          AdvSetting,
-                                                          AdvKeyword,
-                                                          KeywordSetting)
+from app.modules.common_slaves.wildberries.models import (AdvSetting, AdvKeyword, KeywordSetting)
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.wb_adv_updater import data_managers
-from app.modules.common_slaves.wildberries import super_cabinet_manager as users_manager
 from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
@@ -166,36 +162,10 @@ class Manager(AbcManager):
         await sender_manager.send_message_to_admin('Вектора для ML обновлены')
         update_model_on_new_features.set()
 
-
-
-
-    # async def update_cards(self, file_working:asyncio.Lock):
-    #     loop = asyncio.get_event_loop()
-    #     def get_shops():
-    #         shops = self._shop_manager.get_all_shops()
-    #         return shops
-    #     shops = await loop.run_in_executor(None, get_shops)
-    #     tasks = [self._data_getter.get_cards_for_shop(shop) for shop in shops]
-    #     cards_list = await asyncio.gather(*tasks)
-    #     cards = [card for sub_list in cards_list for card in sub_list]
-    #     df = self._data_getter.get_nmid_offer_id_df(cards)
-    #     # await self._gds.add_wb_cards(cards)
-    #     await asyncio.sleep(60*60)
-
-
-        #
-        # def save_df(df, nmid_offer_id_shop_name_df_path):
-        #     df.to_csv(nmid_offer_id_shop_name_df_path, index=False)
-        #
-        # async with file_working:
-        #     await loop.run_in_executor(None, save_df, df, self.nmid_offer_id_shop_name_df_path)
-
-
     def save_full_predict(self):
         # Загрузка данных с помощью Dask
         nmids_vectors = dd.read_csv(self.nmids_vectors_path)
         keyword_vectors = dd.read_csv(self.keywords_vectors_path)
-        # nmid_offer_id_df = dd.read_csv(self.nmid_offer_id_shop_name_df_path)
 
         # Получение уникальных значений
         nmids = nmids_vectors['nmid'].unique().compute()
@@ -329,13 +299,8 @@ class Manager(AbcManager):
             keyword_stats = await data_managers.get_keywords_statistic(adv_setting, None)
             await sender_manager.send_message_to_admin(f'Статистика ключей для {adv_setting.name} получена')
             adv_setting_keyword_stats[adv_setting] = keyword_stats
-        # ctrs = [keyword_stat.ctr for keyword_stats in adv_setting_keyword_stats.values() for keyword_stat in keyword_stats]
-        # if len(ctrs) > 0:
         total_min_ctr = 0
         total_max_ctr = 100
-        # else:
-        #     total_min_ctr = 0
-        #     total_max_ctr = 0
 
         await sender_manager.send_message_to_admin('Получаем существующие базы из neo')
         keyword_phrases_in_db = await self._gds.get_keyword_phrases()
@@ -535,9 +500,6 @@ class Manager(AbcManager):
                         final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
         async with sm() as session:
             for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
-                # if message_counter.check_last_time():
-                #      await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
-
 
                 stmt = select(GlobalCategorySetting) \
                     .where(GlobalCategorySetting.category_name == wb_category_name)
@@ -551,24 +513,6 @@ class Manager(AbcManager):
                 await session.execute(stmt)
             await session.commit()
             message_counter.add_send()
-
-    # async def tasks_run_for_update_advs_in_db(self):
-    #     tasks = {}
-    #     while True:
-    #         wb_super_wb_users = await users_manager.get_super_wb_user_cabinets()
-    #         for wb_super_wb_user  in wb_super_wb_users:
-    #             id_ = wb_super_wb_user.id
-    #             if id_ not in tasks:
-    #                 wb_api = WBApi(wb_super_wb_user)
-    #                 advs_updater = ShopDataUpdater(wb_api, wb_super_wb_user)
-    #                 task = asyncio.create_task(advs_updater.quick_update_all_data())
-    #                 tasks[id_] = task
-    #             else:
-    #                 if tasks[id_].done():
-    #                     if tasks[id_].exception():
-    #                         logger.error(f'Ошибка обновления ключей: {tasks[id_].exception()}')
-    #
-    #                     del tasks[id_]
 
     async def update_all_data_in_db_run(self):
         tasks = {}

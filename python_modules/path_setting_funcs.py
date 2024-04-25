@@ -1,6 +1,5 @@
 import aiofiles
 import yaml
-import os
 
 def get_document_by_key_name(file_path, key_name):
     with open(file_path, 'r', encoding='utf8') as file:

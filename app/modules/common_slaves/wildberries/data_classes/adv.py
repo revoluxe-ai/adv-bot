@@ -1,6 +1,5 @@
-from .adv_stat_classes import SimpleStat
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Union, Dict
+from pydantic import BaseModel
+from typing import Optional, List, Dict
 
 
 class Subject(BaseModel):
@@ -12,10 +11,8 @@ class Menu(BaseModel):
     name: str
 
 class UnitedParams(BaseModel):
-    # catalogCPM: int
     searchCPM: int
     subject: Subject
-    # menus: List[Menu]
     nms: List[int]
 
 class AutoParams(BaseModel):

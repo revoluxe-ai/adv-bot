@@ -171,7 +171,6 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
     return wb_category_to_keywordstat_list
 
 
-# @cached_stampede(ttl=60*60*24, key="get_category_name_min_ctr_final_data", cache=aiocache.RedisCache)
 async def get_parent_id_categories_subcategories_name_list() -> defaultdict[Any, list[Subcategory]]:
     access = await super_cabinet_manager.get_super_user_access()
     wb_api = WBApi(access)
@@ -183,7 +182,6 @@ async def get_parent_id_categories_subcategories_name_list() -> defaultdict[Any,
     return parent_categories_subcategories_name_list
 
 
-# @cached_stampede(ttl=60, key="get_category_name_min_ctr_final_data", cache=aiocache.RedisCache)
 async def get_category_name_min_ctr_final_data() -> dict[int, float]:
     async with _sm() as session:
         stmt = select(GlobalCategorySetting.category_name, GlobalCategorySetting.min_ctr)

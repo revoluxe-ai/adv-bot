@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 from typing import Union
 from dataclasses import dataclass
 

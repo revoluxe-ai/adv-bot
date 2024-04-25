@@ -1,7 +1,5 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from python_modules.path_setting_funcs import get_document_by_key_name, get_setting_path
-import platform
 import asyncio
 import platform
 

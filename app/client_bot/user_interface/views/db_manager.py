@@ -1,5 +1,4 @@
 import aiogram
-from sqlalchemy import select, func
 
 from app.payments.db.models import Payment
 from app.utils.db.models import User, RefLink, user_reflink_association

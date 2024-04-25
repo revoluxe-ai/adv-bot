@@ -1,7 +1,5 @@
-import asyncio
 from operator import and_
 from typing import Union
-from app.modules import wb_adv_updater
 import aiogram
 from aiogram import Router, types
 from aiogram.fsm.context import FSMContext
@@ -9,7 +7,6 @@ from sqlalchemy.orm import joinedload, selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, WBToken
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError, ApiForbiddenError
 from sqlalchemy.future import select
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
@@ -23,7 +20,6 @@ from ..views import callbacks
 from app.utils.db.models import User
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from app.modules.common_slaves.wildberries import models as wb_models
-from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
 
@@ -36,9 +32,6 @@ logger = logging.getLogger(__name__)
 sm = get_async_session_maker()
 
 router = Router()
-# router.message.middleware(middlewars.UserDataMiddleware())
-# router.callback_query.middleware(middlewars.UserDataMiddleware())
-
 
 
 redis_manager = RedisManager()
@@ -315,7 +308,6 @@ async def select_shop(callback_query: types.CallbackQuery,
     message = callback_query.message
 
     chat_id = message.chat.id
-    # await state.update_data(chat_id = chat_id)
 
 
     await messages.AdvCompanyChoicing \

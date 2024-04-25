@@ -44,17 +44,10 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
     check_data = await state.get_data()
     logger.debug(f'check_data: {check_data}')
 
-    # if page == 1:
-    #     user_cabinet_manager = await get_cabinet_manager(wb_user_cabinet_original_id)
-    #     await user_cabinet_manager.update_all_data()
-
-
-
     chat_id = callback.message.chat.id
 
     await messages.AdvCompanyChoicing \
         (bot, state, chat_id, wb_user_cabinet_original_id, page=page)()
-        # (bot, chat_id, state, wb_user_cabinet_original_id, page=page)()
 
     return
 
@@ -139,21 +132,3 @@ async def turn_adv_off(callback: types.CallbackQuery, callback_data: callbacks.T
     chat_id = callback.message.chat.id
     await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet,adv)()
     return
-#
-#
-# @router.callback_query(callbacks.Min_ctr.filter(F.action == 'change'))
-# async def change_min_ctr(callback: types.CallbackQuery,  callback_data: callbacks.Min_ctr,
-#                          bot: aiogram.Bot, state: FSMContext, last_message:LastMessage):
-#     await callback.answer()
-#     adv_original_id = callback_data.adv_original_id
-#     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-#     async with sm() as session:
-#         adv = await session.execute(select(AdvSetting)\
-#                                     .where(AdvSetting.id == adv_original_id))
-#         adv: AdvSetting = adv.scalar()
-#     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-#     await state.update_data(adv_original_id=adv_original_id)
-#     await state.set_state(states.ChangeMinCTR.min_ctr)
-#     last_message, message_type = await messages.GetMinCtr(bot, last_message,
-#                                                            callback.message.chat.id, adv)()
-#     return last_message, message_type

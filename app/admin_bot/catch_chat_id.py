@@ -1,4 +1,3 @@
-import aiogram
 from aiogram import Router
 from aiogram.filters import chat_member_updated, IS_NOT_MEMBER, IS_MEMBER
 

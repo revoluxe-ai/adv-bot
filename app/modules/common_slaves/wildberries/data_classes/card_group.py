@@ -1,8 +1,6 @@
 from .abc_card import CardGroupABC
 from .card_from_neo4j import CardFromDB
 from .card_from_wb import CardFromWB
-from collections import defaultdict as dd
-from .abc_card import WBCard
 from typing import List, Dict
 
 

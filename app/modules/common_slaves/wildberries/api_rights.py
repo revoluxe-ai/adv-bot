@@ -1,8 +1,6 @@
 import asyncio
-import functools
 
 from app.utils import redis_manager
-from aiocache import cached_stampede
 from asyncio import Lock
 class OnlyRead:
     TRUE = True
@@ -28,7 +26,7 @@ class Rights:
 import aiohttp
 import logging
 from .exceptions import ApiForbiddenError, UnknownApiRequestError, TooManyRequests
-from .ABC_WB_API import ABC_WB_API, WbRequestApiMixin, Headers
+from .ABC_WB_API import WbRequestApiMixin, Headers
 
 logger = logging.getLogger(__name__)
 

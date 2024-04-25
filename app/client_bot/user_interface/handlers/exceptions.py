@@ -3,11 +3,8 @@ from aiogram.exceptions import TelegramForbiddenError
 from aiogram.filters.exception import ExceptionTypeFilter
 
 from aiogram.types.error_event import ErrorEvent
-# from app.telegram_bot.redis_manager import RedisManager
-import app
 import aiogram
 import traceback
-# redis_manager = app.telegram_bot.redis_manager.RedisManager()
 from aiogram.fsm.context import FSMContext
 import logging
 from app import client_bot as tb
@@ -20,21 +17,6 @@ logger = logging.getLogger(__name__)
 admin_telegram_id = 373435337
 
 user_router = Router()
-
-
-#
-#
-# @user_router.errors(ExceptionTypeFilter(my_exc.ApiForbiddenError))
-# async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-#     await state.clear()
-#     logger.debug( 'Текущее состояние: %s', await state.get_state())
-#     chat_id = error_event.update.message.chat.id
-#
-#     wb_user_cabinet: app.my_types.WBUserCabinet = error_event.exception.__dict__['wb_user_cabinet']
-#     await errors_message.AddNewToken(bot, chat_id, wb_user_cabinet)()
-#     return
-#
-
 admin_router = Router()
 
 

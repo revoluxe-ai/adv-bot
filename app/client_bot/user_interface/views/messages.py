@@ -1,12 +1,10 @@
-import asyncio
 import datetime
 from aiogram.utils import deep_linking
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from app.utils.db.models import RefLink, User
+from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
-from aiogram.types import FSInputFile
 from aiogram.fsm.context import FSMContext
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,

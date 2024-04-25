@@ -7,7 +7,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
 from ...user_interface.views.callbacks import BudgetForCreatingAdv
-import app
 from ...user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from ...user_interface.views.callbacks import TurnAdv

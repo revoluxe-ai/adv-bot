@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 import aiogram
 
 import datetime
-import app
 
 class Base(ABC):
     def __init__(self, bot: aiogram.Bot, chat_id: int):

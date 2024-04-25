@@ -1,23 +1,4 @@
 from .abc_card import WBCard
-from .card_statistic import CardStatistic
-
-
-# class Size:
-#     def __init__(self, data):
-#         self._size = data['dimensions']
-#
-#     @property
-#     def height(self):
-#         return self._size['height']
-#
-#     @property
-#     def leigth(self):
-#         return self._size['length']
-#
-#     @property
-#     def width(self):
-#         return self._size['width']
-
 
 
 class CardFromWB(WBCard):
@@ -77,10 +58,6 @@ class CardFromWB(WBCard):
     @property
     def brand(self):
         return self.data['brand']
-
-    # def item_size(self):
-    #     size = Size(self.data)
-    #     return size
 
     @property
     def characterisics(self):

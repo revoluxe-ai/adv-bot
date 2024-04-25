@@ -1,12 +1,11 @@
 import io
 from io import BytesIO
 from typing import Union
-import PIL
 import aiofiles
 import aiogram
 from aiogram import Bot
 from aiogram.client.session import aiohttp
-from aiogram.types import FSInputFile, InputFile, BufferedInputFile, URLInputFile
+from aiogram.types import InputFile, BufferedInputFile
 
 from app.utils.image_master import image_tools
 from PIL import Image as PilImage

@@ -32,18 +32,6 @@ class CustomFormatter(logging.Formatter):
         return wrapped
 
 def setup_logging():
-    # # Получаем логгер для библиотеки neo4j
-    # logger = logging.getLogger('neo4j')
-    # # Устанавливаем уровень логгирования, чтобы отключить DEBUG-сообщения
-    # logger.setLevel(logging.WARNING)
-    #
-    # logger = logging.getLogger('asyncio')
-    # # Устанавливаем уровень логгирования, чтобы отключить DEBUG-сообщения
-    # logger.setLevel(logging.WARNING)
-    #
-    # logger = logging.getLogger('NeoDataScience.driver')
-    # # Устанавливаем уровень логгирования, чтобы отключить DEBUG-сообщения
-    # logger.setLevel(logging.WARNING)
 
     def setup_logging_from_file(path_to_config_file):
         with open(path_to_config_file, 'r') as file:

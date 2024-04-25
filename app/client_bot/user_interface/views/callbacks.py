@@ -24,15 +24,6 @@ class Shop(CallbackData, prefix="shop"):
     wb_user_cabinet_original_id: Union[int, None] = None
 
 
-# class TimeZoneCallbackData(CallbackData, prefix="timezone"):
-#     timezone: int
-
-
-# class ChangeCabinetForCardsOrNot(CallbackData, prefix="change_cabinet"):
-#     action: str
-#     nmid: int
-#     cabinet_id: int
-#     card_id: int
 class Adv(CallbackData, prefix="adv"):
     action: str
     adv_original_id: Union [int | None]

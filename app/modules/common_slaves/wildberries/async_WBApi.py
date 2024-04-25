@@ -6,20 +6,14 @@ import time
 from typing import Union
 
 import aiohttp
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-
-
 import asyncio
 
 from exceptions import UnauthorizedError
 from python_modules.pause_func import get_pause
-from .data_classes.adv import Adv, AdvType, Balances
+from .data_classes.adv import Adv, Balances
 from .ABC_WB_API import ABC_WB_API
 from  .data_classes.card_from_wb import CardFromWB
 from .data_classes.interfaces import ShopInterface
-from .data_classes.wb_shop import WbShop
-from .data_classes  import interfaces
-from .models import AdvSetting
 
 logger = logging.getLogger(__name__)
 
