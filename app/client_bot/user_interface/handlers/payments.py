@@ -56,7 +56,7 @@ async def order_subscribe(
                         "description": 'Подписка на бота',
                         "quantity": "1",
                         "amount": {
-                            "value": {total_price},
+                            "value": total_price,
                             "currency": "RUB"
                         },
                         "vat_code": 1
