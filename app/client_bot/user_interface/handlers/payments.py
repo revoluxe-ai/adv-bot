@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice, Message
 from sqlalchemy import select
 from app.admin_bot.sender import sender_manager
+from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
 from app.client_bot.user_interface.views import callbacks, messages
 import asyncio
 
@@ -27,19 +28,42 @@ router = Router()
 
 
 @router.callback_query(callbacks.OrderSubscribe.filter())
-async def order_subscribe(callback: types.CallbackQuery, callback_data: callbacks.OrderSubscribe, bot: aiogram.Bot):
+async def order_subscribe(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.OrderSubscribe,
+    bot: aiogram.Bot,
+):
     await callback.answer()
     user_telegram_id = callback.message.chat.id
     path_setting = path_setting_funcs.get_setting_path()
-    provider_token = path_setting_funcs.get_document_by_key_name(path_setting, 'yookassa_token',)
+    provider_token = path_setting_funcs.get_document_by_key_name(path_setting, 'yookassa_token')
     days = callback_data.period_days
     total_price = TEST_SUBSCRIBE_COST if settings.test_mode else callback_data.price
-    prices = [LabeledPrice(label=f'Подписка на бота', amount=total_price * 100, )]
+    prices = [LabeledPrice(label=f'Подписка на бота', amount=total_price * 100)]
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
     payload = json.dumps(
         {
             'period': days,
             'wb_cabinet_original_id': wb_cabinet_original_id,
+        }
+    )
+
+    provider_data = json.dumps(
+        {
+            "receipt": {
+                "items": [
+                    {
+                        "description": 'Подписка на бота',
+                        "quantity": "1",
+                        "amount": {
+                            "value": {total_price},
+                            "currency": "RUB"
+                        },
+                        "vat_code": 1
+                    }
+                ],
+                "email": EMAIL_FOR_PAYMENT_RECEIPT
+            }
         }
     )
 
@@ -52,6 +76,7 @@ async def order_subscribe(callback: types.CallbackQuery, callback_data: callback
             f" за {total_price} рублей. \n"
             f"После оплаты услуга считается оказанной, возврат средств не производится. "
         ),
+        provider_data=provider_data,
         payload=payload,
         provider_token=provider_token,
         currency='RUB',

@@ -1,6 +1,6 @@
 
 PRICE_PER_MONTH = 3000
-
+EMAIL_FOR_PAYMENT_RECEIPT = 'revoluxe@gmail.com'
 
 CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'
 
