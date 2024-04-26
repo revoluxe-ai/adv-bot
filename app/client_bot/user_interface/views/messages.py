@@ -29,28 +29,18 @@ from app.client_bot import const
 
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard
-from .import texts
 logger = logging.getLogger(__name__)
 
 
 
 _sm = get_async_session_maker()
 
+
 class MainMenu(TextWithKeyboard):
 
     def __init__(self, bot: Bot, chat_id: int, user_original_id: int):
         super().__init__(bot, chat_id)
         self.__user_original_id = user_original_id
-
-
-    @property
-    def text(self):
-        return texts.get_main_menu_text(self.__user_original_id)
-
-
-
-
-
 
 
 class ShopChoice(TextWithKeyboard):
