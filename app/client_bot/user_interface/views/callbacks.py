@@ -78,6 +78,7 @@ class CheckSubscribe(CallbackData, prefix="check_subscribe"):
 
 
 class RefProgram(CallbackData, prefix="ref_program"):
+
     """select or new"""
     action: str
 
