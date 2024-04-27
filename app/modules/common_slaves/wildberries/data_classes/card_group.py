@@ -1,9 +1,8 @@
+from typing import Dict, List
+
 from .abc_card import CardGroupABC
 from .card_from_neo4j import CardFromDB
 from .card_from_wb import CardFromWB
-from typing import List, Dict
-
-
 
 
 class CardGroup(CardGroupABC):

@@ -1,14 +1,16 @@
 import asyncio
+import logging
 
 import aiohttp
 
 import app
 from app.modules.common_slaves.wildberries.api_rights import TokenRightChecker
-from app.modules.common_slaves.wildberries.exceptions import ApiForbiddenError, UnknownApiRequestError
+from app.modules.common_slaves.wildberries.exceptions import (
+    ApiForbiddenError,
+    UnknownApiRequestError,
+)
 from app.modules.common_slaves.wildberries.models import WBToken
 from app.utils.db.session_maker import get_async_session_maker
-import logging
-
 
 logger = logging.getLogger(__name__)
 

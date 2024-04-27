@@ -4,20 +4,23 @@ import string
 
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
+from app.client_bot.bot import bot
 
 from ..utils import redis_func_cache
-from app.client_bot.bot import bot
+
 redis_func_cache.set_config()
-from aiohttp import web
 import nest_asyncio
+from aiohttp import web
+
 nest_asyncio.apply()
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
-from python_modules import path_setting_funcs
-from .global_router import global_router
 
-from python_modules.logger import setup_logging
 from app.modules.common_slaves.wildberries.shops_data_updater import consumer as shop_updater
+from python_modules import path_setting_funcs
+from python_modules.logger import setup_logging
+
+from .global_router import global_router
 
 setup_logging()
 

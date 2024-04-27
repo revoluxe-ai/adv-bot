@@ -1,11 +1,11 @@
-import os
-from functools import partial
-from gensim.models.keyedvectors import KeyedVectors
 import asyncio
-from huggingface_hub import hf_hub_download
-import re
 import logging
+import os
+import re
+from functools import partial
 
+from gensim.models.keyedvectors import KeyedVectors
+from huggingface_hub import hf_hub_download
 
 logger = logging.getLogger(__name__)
 

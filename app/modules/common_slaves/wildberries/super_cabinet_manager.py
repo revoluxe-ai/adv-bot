@@ -1,20 +1,20 @@
 import asyncio
-from typing import Union
+import logging
 from dataclasses import dataclass
+from typing import Union
+
+import aiohttp
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
-from . import exceptions
-from . import api_rights
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker
+
+from . import api_rights, exceptions
 from .exceptions import ApiForbiddenError, UnknownApiRequestError
 from .models import WBToken
-from sqlalchemy.orm import selectinload
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
-from app.utils.db.session_maker import get_async_session_maker
-from sqlalchemy import select
-from app.utils.db.models import User
-import logging
-import aiohttp
-
 
 sm = get_async_session_maker()
 

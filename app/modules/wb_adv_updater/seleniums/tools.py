@@ -1,7 +1,8 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 import asyncio
 import platform
+
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 
 
 async def get_selenium():

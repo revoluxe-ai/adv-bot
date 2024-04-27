@@ -1,46 +1,56 @@
+import asyncio
+import datetime
 import logging
 import typing
-from app.modules.common_slaves.wildberries.api  import WBApi
 from io import BytesIO
 from itertools import product
+
 import dask.dataframe as dd
 import faiss
 import joblib
 import numpy as np
-from PIL import Image as PilImage
+import pandas as pd
+import pymystem3
 from aiogram.client.session import aiohttp
+from PIL import Image as PilImage
+from sqlalchemy import and_
+from sqlalchemy.future import select
+from sqlalchemy.orm import joinedload, selectinload
+
+from app.admin_bot.sender import messages, sender_manager
+from app.admin_bot.sender import sender_manager as admin_sender
+from app.client_bot.bot import bot
+from app.modules.common_slaves.wildberries.api import WBApi
+from app.modules.common_slaves.wildberries.data_classes.namedtuples import (
+    KeywordPhrase,
+    KeywordStatForNeo,
+)
+from app.modules.common_slaves.wildberries.models import (
+    AdvKeyword,
+    AdvSetting,
+    KeywordSetting,
+    WBCabinet,
+    WBCard,
+)
+from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
+from app.modules.wb_adv_updater import data_managers
+from app.modules.wb_adv_updater.models import GlobalCategorySetting
+from app.my_types import KeywordStat
+from app.utils.db.session_maker import get_async_session_maker
 from app.utils.faiss_manager.faiss_index_manager import FaissManager
+from app.utils.image_master import image_tools
+from app.utils.image_master.image_master2 import ImageMaster
+from app.utils.NeoDataScience.driver import DataScience
 from app.utils.text_master.Transformers import Word2Vec
+
+from ..common_slaves.wildberries import super_cabinet_manager
+from ..common_slaves.wildberries.exceptions import ApiForbiddenError
+from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .ABC_manager import AbcManager
 from .data_managers import DataGetter, DataSetter
 from .graph_vector_updater import GraphUpdater
-from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordStatForNeo, KeywordPhrase
-from ..common_slaves.wildberries import super_cabinet_manager
-from .ML import Fitter
-from app.my_types import KeywordStat
-from app.utils.NeoDataScience.driver import DataScience
-from app.modules.common_slaves.wildberries.models import WBCard, WBCabinet
-
-from app.utils.image_master.image_master2 import ImageMaster
-import pymystem3
-from app.utils.image_master import image_tools
-import asyncio
-from app.admin_bot.sender import sender_manager as admin_sender, sender_manager, messages
-import pandas as pd
-from sqlalchemy import and_
-from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy.future import select
-from .ML import Predictor
-import datetime
-from app.modules.common_slaves.wildberries.models import (AdvSetting, AdvKeyword, KeywordSetting)
-from app.modules.wb_adv_updater.models import GlobalCategorySetting
-from app.utils.db.session_maker import get_async_session_maker
-from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
-from app.modules.wb_adv_updater import data_managers
-from ..common_slaves.wildberries.exceptions import ApiForbiddenError
-from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from .ML import Fitter, Predictor
 from .shops_manager import rights_control
-from app.client_bot.bot import bot
 
 predictor = Predictor()
 

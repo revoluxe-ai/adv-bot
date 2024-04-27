@@ -1,6 +1,7 @@
 import aiofiles
 import yaml
 
+
 def get_document_by_key_name(file_path, key_name):
     with open(file_path, 'r', encoding='utf8') as file:
         doc = yaml.load_all(file, Loader=yaml.FullLoader)

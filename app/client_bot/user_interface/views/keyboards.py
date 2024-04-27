@@ -1,18 +1,23 @@
 import asyncio
 import datetime
+from typing import TYPE_CHECKING
 
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.utils import redis_manager
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
-from ...user_interface.views.callbacks import BudgetForCreatingAdv
-from ...user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
-from ...user_interface.views.callbacks import TurnAdv
-from .callbacks import Action
+from app.modules.common_slaves.wildberries.models import (
+    AdvSetting,
+    KeywordSetting,
+    WBCabinet,
+    WBUserCabinet,
+)
+from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker
-from typing import TYPE_CHECKING
+
+from ...user_interface.views import callbacks
+from ...user_interface.views.callbacks import BudgetForCreatingAdv, TurnAdv
+from .callbacks import Action
 
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard

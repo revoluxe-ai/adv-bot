@@ -1,7 +1,8 @@
-from .card_from_disc import CardFromDisc
+from wb.cards_manager_old.barcode_handler import BarcodeHandler
 from wb.cards_manager_old.drivers import WbNeo4j
 
-from wb.cards_manager_old.barcode_handler import BarcodeHandler
+from .card_from_disc import CardFromDisc
+
 
 class NewCard(CardFromDisc):
     def __init__(self, path, barcode_run =  True):

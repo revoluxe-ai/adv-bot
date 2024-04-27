@@ -1,12 +1,14 @@
 import logging
+
 import aiogram
-from aiogram import Router, types, F
+from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
-from app.modules.common_slaves.wildberries.models import WBUserCabinet,  WBCabinet, AdvSetting
 from sqlalchemy.future import select
+
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker
-from ..views import messages
-from ..views import callbacks
+
+from ..views import callbacks, messages
 from ..views.callbacks import Action
 
 sm = get_async_session_maker()

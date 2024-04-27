@@ -3,17 +3,17 @@ import datetime
 import hashlib
 import logging
 import os
-from app.utils.db.session_maker import get_async_session_maker
 
-from app.utils.NeoDataScience.driver import DataScience
-from .ABC_manager import AbcManager
-from .data_managers import DataGetter
 from neo4j import exceptions
 from sqlalchemy import select
-
-from .models import ItemFeature, KeywordFeature
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.utils.db.session_maker import get_async_session_maker
+from app.utils.NeoDataScience.driver import DataScience
+
+from .ABC_manager import AbcManager
+from .data_managers import DataGetter
+from .models import ItemFeature, KeywordFeature
 
 logger = logging.getLogger(__name__)
 

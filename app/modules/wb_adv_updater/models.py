@@ -1,6 +1,7 @@
-from sqlalchemy import (Column, Integer, String, Float)
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Float, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.declarative import declarative_base
+
 from app.utils.db.base import BaseTable
 
 Base = declarative_base()

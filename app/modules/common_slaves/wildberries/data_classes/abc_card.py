@@ -1,18 +1,20 @@
-from abc import abstractmethod, ABCMeta
+from abc import ABCMeta, abstractmethod
 from collections import namedtuple
+
 Path = namedtuple('Path', ['position', 'path'])
-import inspect
-from typing import final
-from app.utils.image_master import image_tools
-import re
-import os
-import PIL
-from .card_statistic import CardStatistic
 import importlib
-from app.utils.image_master.database.model import WB_CARD_MEDIA_FOLDER
+import inspect
+import os
+import re
+from typing import final
+
+import PIL
 from PIL import Image
 
+from app.utils.image_master import image_tools
+from app.utils.image_master.database.model import WB_CARD_MEDIA_FOLDER
 
+from .card_statistic import CardStatistic
 
 
 class WbItem(metaclass=ABCMeta):

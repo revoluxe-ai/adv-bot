@@ -1,4 +1,5 @@
 from aiogram import Router
+
 from . import catch_chat_id
 
 global_router = Router()

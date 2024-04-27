@@ -1,31 +1,33 @@
 import datetime
+import logging
+from typing import TYPE_CHECKING
+
+from aiogram import Bot
+from aiogram.fsm.context import FSMContext
 from aiogram.utils import deep_linking
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload, selectinload
 
+import app
+from app.client_bot import const
+from app.modules.common_slaves.wildberries.models import (
+    AdvSetting,
+    KeywordSetting,
+    WBCabinet,
+    WBUserCabinet,
+)
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
-from aiogram.fsm.context import FSMContext
-from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
-                                                          AdvSetting,
-                                                          KeywordSetting, WBCabinet)
 from app.utils.suffixes import get_day_suffix
 
-
-from ..message_templates.templates import (TextWithKeyboard,
-                                           Text,
-                                           TextWithImage,
-                                           TextWithKeyboardPagination,
-                                           TextWithKeyboardAndImage)
-
-from . import keyboards, db_manager
-from aiogram import Bot
-
-import logging
-import app
-from typing import TYPE_CHECKING
-
-from app.client_bot import const
+from ..message_templates.templates import (
+    Text,
+    TextWithImage,
+    TextWithKeyboard,
+    TextWithKeyboardAndImage,
+    TextWithKeyboardPagination,
+)
+from . import db_manager, keyboards
 
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard

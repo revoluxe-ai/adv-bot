@@ -1,6 +1,5 @@
 import os
 
-
 PROXY_FILE_PATH = './python_modules/proxies.txt'
 
 

@@ -1,22 +1,25 @@
 import logging
+import os
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, Table, UniqueConstraint
-from sqlalchemy.ext.declarative import declarative_base
+from PIL import Image as PilImage
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy import create_engine, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
 from app.utils.image_master import image_tools
 from python_modules import path_setting_funcs
-import os
-from PIL import Image as PilImage
-from sqlalchemy.ext.hybrid import hybrid_property
-
-
-
-
-
-
 
 logger  = logging.getLogger(__name__)
 

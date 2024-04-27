@@ -1,15 +1,15 @@
+from typing import Any, Awaitable, Callable, Dict
+
 from aiogram import BaseMiddleware
 from aiogram.types import Message
-from typing import Awaitable, Callable, Dict, Any
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
-from app.utils.db.session_maker import get_async_session_maker
-from .. import redis_manager as __redis_manager
-from app.utils.db.models import User
+
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker
 
-
-
+from .. import redis_manager as __redis_manager
 
 _redis_manager = __redis_manager.RedisManager()
 

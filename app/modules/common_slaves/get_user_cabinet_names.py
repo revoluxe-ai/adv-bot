@@ -1,8 +1,7 @@
-from app.utils.db.session_maker import get_async_session_maker
 from sqlalchemy import select
+
 from app.my_types import WBUserCabinet
-
-
+from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker()
 

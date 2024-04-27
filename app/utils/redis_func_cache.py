@@ -1,5 +1,6 @@
 from aiocache import caches
 
+
 def set_config():
     caches.set_config({
         'default': {

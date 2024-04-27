@@ -1,8 +1,8 @@
+import datetime
 from abc import ABC, abstractmethod
 
 import aiogram
 
-import datetime
 
 class Base(ABC):
     def __init__(self, bot: aiogram.Bot, chat_id: int):

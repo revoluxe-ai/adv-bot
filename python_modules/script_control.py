@@ -1,9 +1,6 @@
 import os
 
 
-
-
-
 class ScriptControl:
     def __init__(self):
         self.pid_file = 'script_pid.txt'

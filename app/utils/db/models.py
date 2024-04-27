@@ -1,10 +1,9 @@
-from sqlalchemy import Column, BIGINT, ForeignKey, DateTime, func
+from sqlalchemy import BIGINT, Column, DateTime, ForeignKey, String, Table, func
 from sqlalchemy.orm import Mapped, relationship
-from sqlalchemy import String
+
 from app.modules.common_slaves.wildberries.models import *
 from app.payments.db.models import Payment
-from app.utils.db.base import BaseTable, Base
-from sqlalchemy import Table
+from app.utils.db.base import Base, BaseTable
 
 user_reflink_association = Table(
     'user_reflink_association', Base.metadata,

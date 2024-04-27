@@ -1,10 +1,8 @@
 from aiogram import Router
+
 from . import middlewars
-from .user_interface.handlers import start
-from .user_interface.handlers import ref_program, payments
-
 from .common_routers import common_router
-
+from .user_interface.handlers import payments, ref_program, start
 
 global_router = Router()
 global_router.include_routers(common_router)

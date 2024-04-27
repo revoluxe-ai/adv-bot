@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey
+from sqlalchemy import Column, ForeignKey, Integer
 from sqlalchemy.orm import Mapped
 
 from app.modules.common_slaves.wildberries.models import WBCabinet

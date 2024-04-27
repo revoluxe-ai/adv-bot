@@ -1,33 +1,35 @@
 import asyncio
 import io
 import logging
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Union
 
+import pandas as pd
 from PIL import Image
-
-from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
-from app.modules.wb_adv_updater.models import GlobalCategorySetting
-from app.utils.db.models import User
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
-from app.utils.db.session_maker import get_async_session_maker
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import selectinload
 
-from app.my_types import WBUserCabinet
-from sqlalchemy import select, and_, func
-
-from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
-import pandas as pd
-from app.modules.wb_adv_updater.ABC_manager import AbcManager
-from app.my_types import AdvSetting
+from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
-
-from app.utils.NeoDataScience.driver import DataScience
-from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvKeyword, WBCategory, WBCard, WBCabinet
+from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
+from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
+from app.modules.common_slaves.wildberries.models import (
+    AdvKeyword,
+    KeywordSetting,
+    WBCabinet,
+    WBCard,
+    WBCategory,
+)
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
-import time
+from app.modules.wb_adv_updater.ABC_manager import AbcManager
+from app.modules.wb_adv_updater.models import GlobalCategorySetting
+from app.my_types import AdvSetting, WBUserCabinet
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker
+from app.utils.NeoDataScience.driver import DataScience
 
 logger = logging.getLogger(__name__)
 

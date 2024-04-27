@@ -1,13 +1,13 @@
 import datetime
-from typing import Callable, Dict, Any, Awaitable
+from typing import Any, Awaitable, Callable, Dict
 
+import aiogram
+from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 
 from app.client_bot.const import SUPPORT_CHANNEL_ID
-import aiogram
-from aiogram import BaseMiddleware
-from aiogram.types import Message, CallbackQuery
 from app.client_bot.user_interface.views import messages
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker

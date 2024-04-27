@@ -1,30 +1,29 @@
-import os.path
-import typing
-from . import data_managers
-import joblib
-import xgboost
-
-import settings
 import asyncio
 import logging
+import os.path
+import typing
 from ast import literal_eval
-from app.utils.db.session_maker import get_async_session_maker
+
+import joblib
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import  cross_validate, KFold
+import xgboost
+from sklearn.model_selection import KFold, cross_validate
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
-from sqlalchemy import select, and_
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
-from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
 
-from .data_managers import DataGetter
-from app.modules.wb_adv_updater.ABC_manager import AbcManager
+import settings
 from app.admin_bot.sender import sender_manager
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.wb_adv_updater.ABC_manager import AbcManager
+from app.modules.wb_adv_updater.models import ItemFeature, KeywordFeature
+from app.utils.db.session_maker import get_async_session_maker
 
-
+from . import data_managers
+from .data_managers import DataGetter
 
 sm = get_async_session_maker()
 

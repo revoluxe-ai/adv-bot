@@ -1,16 +1,18 @@
 import logging
+
 import aiogram
-from aiogram import Router, types, F
+from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import or_
-from app.modules.common_slaves.wildberries.models import WBCard
 from sqlalchemy.future import select
+
+from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
+from app.modules.common_slaves.wildberries.models import WBCard
 from app.utils.db.session_maker import get_async_session_maker
-from ..views import messages
-from ..views import callbacks
+
 from ... import manager
 from .. import states
-from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
+from ..views import callbacks, messages
 
 sm = get_async_session_maker()
 

@@ -1,6 +1,5 @@
 import redis
 
-
 _redis_db = redis.asyncio.Redis(host='localhost', port=6379, db=5)
 
 

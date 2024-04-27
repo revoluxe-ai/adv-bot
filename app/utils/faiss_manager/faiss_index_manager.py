@@ -1,11 +1,13 @@
 import logging
-from app.utils.image_master.database.model import Image, Keyword
-import pickle
-import faiss
 import os
-from typing import List
+import pickle
+from typing import List, Union
+
+import faiss
 from sqlalchemy.orm import Query
-from typing import Union
+
+from app.utils.image_master.database.model import Image, Keyword
+
 from .faiss_index import Index
 
 logger = logging.getLogger(__name__)

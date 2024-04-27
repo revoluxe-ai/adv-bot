@@ -1,11 +1,11 @@
 import logging
 import os
+from typing import Generator, List, Union
+
 import faiss
 import numpy as np
-from typing import List, Union, Generator
 import sqlalchemy
 from sqlalchemy.orm import Query
-
 
 logger = logging.getLogger(__name__)
 

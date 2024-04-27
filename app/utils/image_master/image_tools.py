@@ -2,12 +2,6 @@ import numpy as np
 from PIL import Image as PilImg
 
 
-
-
-
-
-
-
 def dhash(image:PilImg):
     hash_size = 16
     # Изменение размера изображения и преобразование в градации серого

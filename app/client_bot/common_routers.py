@@ -1,9 +1,9 @@
 from aiogram import Router
-from .middlewars.check_rights import check_subscribe_on_shop
-from .user_interface.handlers import adv_setting
-from .user_interface.handlers import exceptions
-from .user_interface.handlers import keyword_settings
+
 from python_modules import path_setting_funcs
+
+from .middlewars.check_rights import check_subscribe_on_shop
+from .user_interface.handlers import adv_setting, exceptions, keyword_settings
 
 common_router = Router()
 

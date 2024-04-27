@@ -1,23 +1,33 @@
-import json
 import datetime
-from sqlalchemy import Index
-from sqlalchemy import (Column, Integer, String, ForeignKey,
-                        BIGINT, Boolean, Float, DateTime, text)
-from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import relationship, Mapped, mapped_column
-import jwt
-from sqlalchemy.dialects.postgresql import JSONB
-from . import exceptions
-from app.utils.db.base import BaseTable
-from sqlalchemy.schema import UniqueConstraint
+import json
 from typing import TYPE_CHECKING
+
+import jwt
+from sqlalchemy import (
+    BIGINT,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.schema import UniqueConstraint
+
+from app.utils.db.base import BaseTable
+
+from . import exceptions
 
 if TYPE_CHECKING:
     from app.utils.db.models import User
 
 from app.utils.db.session_maker import get_async_session_maker
-
-
 
 _sm = get_async_session_maker()
 

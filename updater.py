@@ -1,7 +1,7 @@
-from app.modules.wb_adv_updater.runner import Runner
-from python_modules.logger import setup_logging
 import logging
 
+from app.modules.wb_adv_updater.runner import Runner
+from python_modules.logger import setup_logging
 
 r = Runner()
 if __name__ == '__main__':

@@ -1,4 +1,5 @@
-from aiogram.filters.state import StatesGroup, State
+from aiogram.filters.state import State, StatesGroup
+
 
 class GlobalState(StatesGroup):
     shop_choice = State()

@@ -1,20 +1,25 @@
 import aiogram
-from aiogram import Router, types, F
+from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import and_
-from sqlalchemy.orm import selectinload
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, AdvSetting, KeywordSetting, \
-    WBCategory
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
-from app.modules.wb_adv_updater.models import GlobalCategorySetting
-from app.utils.db.session_maker import get_async_session_maker
-from ..views import messages
-from ..views import callbacks
-from app.utils.db.models import User
-from app.modules.wb_adv_updater import data_managers
 from app.client_bot import utils
+from app.modules.common_slaves.wildberries.models import (
+    AdvSetting,
+    KeywordSetting,
+    WBCabinet,
+    WBCategory,
+    WBUserCabinet,
+)
+from app.modules.wb_adv_updater import data_managers
+from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils import redis_manager
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker
+
+from ..views import callbacks, messages
 
 router = Router()
 

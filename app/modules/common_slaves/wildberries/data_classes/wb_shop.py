@@ -1,5 +1,7 @@
 from python_modules import path_setting_funcs
+
 from . import interfaces
+
 
 class WbShop(interfaces.ShopInterface):
     def __init__(self, setting_path: str, name_shop: str):

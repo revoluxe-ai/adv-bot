@@ -1,6 +1,4 @@
-from locust import HttpUser, task, between
-
-
+from locust import HttpUser, between, task
 
 key = '89779uoiugkftyeoilyeligoyuv'
 

@@ -1,6 +1,7 @@
+from sqlalchemy import BIGINT, Column, String, UniqueConstraint
 from sqlalchemy.orm import Mapped
+
 from app.utils.db.base import BaseTable
-from sqlalchemy import Column, BIGINT, String, UniqueConstraint
 
 
 class TelegramFile(BaseTable):

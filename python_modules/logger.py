@@ -1,7 +1,8 @@
 import json
 import logging
-import textwrap
 import logging.config
+import textwrap
+
 
 class CustomFormatter(logging.Formatter):
     """Логгирование с цветным выводом в зависимости от уровня сообщений."""

@@ -1,8 +1,7 @@
-from sqlalchemy import Column, BIGINT, ForeignKey, String
+from sqlalchemy import BIGINT, Column, ForeignKey, String
 from sqlalchemy.orm import relationship
 
 from app.utils.db.base import BaseTable
-
 
 
 class Payment(BaseTable):

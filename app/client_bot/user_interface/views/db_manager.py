@@ -1,9 +1,9 @@
 import aiogram
+from aiogram.utils import deep_linking
 
 from app.payments.db.models import Payment
-from app.utils.db.models import User, RefLink, user_reflink_association
+from app.utils.db.models import RefLink, User, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
-from aiogram.utils import deep_linking
 
 _sm = get_async_session_maker()
 
@@ -12,8 +12,10 @@ _sm = get_async_session_maker()
 
 from dataclasses import dataclass
 from typing import List, Optional
-from sqlalchemy.future import select
+
 from sqlalchemy import func
+from sqlalchemy.future import select
+
 
 @dataclass
 class ReferralStatistic:

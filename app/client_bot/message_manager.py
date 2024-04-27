@@ -1,11 +1,8 @@
-from datetime import datetime, timedelta, timezone
-from aiogram import types as tp
-import aiogram
 import logging
+from datetime import datetime, timedelta, timezone
 
-
-
-
+import aiogram
+from aiogram import types as tp
 
 logger = logging.getLogger(__name__)
 

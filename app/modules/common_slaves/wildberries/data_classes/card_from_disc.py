@@ -1,9 +1,11 @@
-from .abc_card import WBCard, Path
-import re
-import yaml
 import os
-from image_master.database.model import Image
-from image_master.database.model import WB_CARD_MEDIA_FOLDER
+import re
+
+import yaml
+from image_master.database.model import WB_CARD_MEDIA_FOLDER, Image
+
+from .abc_card import Path, WBCard
+
 
 class CardFromDisc(WBCard):
 

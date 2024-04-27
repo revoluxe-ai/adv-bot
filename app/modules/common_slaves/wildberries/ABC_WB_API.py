@@ -1,14 +1,14 @@
-from abc import ABC, abstractmethod
-import os
-from typing import Union
-
-from . import exceptions
 import json
-import aiohttp
 import logging
-from . import models
+import os
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Union
+
+import aiohttp
+
+from . import exceptions, models
 from .models import WBToken, WBUserCabinet
-from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from .super_cabinet_manager import WBCabinetAccess
 

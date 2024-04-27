@@ -1,6 +1,7 @@
+from sqlalchemy.exc import SQLAlchemyError
+
 from . import model
 from .model import Image
-from sqlalchemy.exc import SQLAlchemyError
 
 
 class DataBase:

@@ -2,8 +2,6 @@
 from abc import ABCMeta
 
 
-
-
 class Generator(metaclass=ABCMeta):
     def __init__(self):
         # Проверка, чтобы предотвратить прямую инстанциацию

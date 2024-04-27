@@ -1,10 +1,11 @@
 import logging
 import os
-import yaml
-from .abc_card import WBCard
-from image_master.database.database import Image
 import re
 
+import yaml
+from image_master.database.database import Image
+
+from .abc_card import WBCard
 
 logger = logging.getLogger(__name__)
 

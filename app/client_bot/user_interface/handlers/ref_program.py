@@ -1,15 +1,14 @@
+import aiogram
+from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.filters.command import Command
-from aiogram import types, Router
 from aiogram.fsm.context import FSMContext
+
 from app.client_bot import utils
 from app.client_bot.user_interface.views import messages
-import aiogram
 
 from .. import states
 from ..views import callbacks
-from aiogram import F
-
 
 router = Router()
 

@@ -1,6 +1,6 @@
-from aiogram.filters.callback_data import CallbackData
 from typing import Union
 
+from aiogram.filters.callback_data import CallbackData
 
 
 class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):

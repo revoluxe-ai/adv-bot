@@ -1,14 +1,13 @@
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+from app.client_bot import const
 from app.client_bot.user_interface.message_templates import templates
 from app.client_bot.user_interface.views import keyboards
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
-from app.utils.suffixes import get_day_suffix
 from app.utils.db.session_maker import get_async_session_maker
-from app.client_bot import const
-
+from app.utils.suffixes import get_day_suffix
 
 _sm = get_async_session_maker()
 
