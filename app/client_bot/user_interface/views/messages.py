@@ -53,13 +53,11 @@ class ShopChoice(TextWithKeyboard):
     @property
     def text(self):
         return (
-
                 'Бот разрабатывался и продолжает разрабатываться '
                 'с целью сделать продвижение на Wildberries максимально эффективным.\n\n'
-                
-                'Для использования функционала бота вы должны быть подписаны на канал поддержки - @auto_wb_master\n\n'
-                 
-                'Выберите магазин (кабинет) или добавьте новый:')
+                'Наш канал поддержки - @auto_wb_master\n\n'
+                'Выберите магазин (кабинет) или добавьте новый:'
+        )
 
     @property
     def keyboard(self):
@@ -377,16 +375,6 @@ class NotFoundNmidOfNewAdvCompany(Text):
 
 class LongTimeOperation(Text):
     text = 'Операция может занять некоторые время, пожалуйста, подождите...'
-
-
-
-class NeedSubscribe(TextWithKeyboard):
-    text = ('Для использования функций вы должны быть подписаны на канал службы поддержки')
-
-
-    @property
-    def keyboard(self):
-        return keyboards.get_subscribe_keyboard()
 
 
 class RefProgram(TextWithKeyboard):
