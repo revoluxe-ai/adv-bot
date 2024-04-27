@@ -223,6 +223,7 @@ class KeywordSetting(BaseTable):
     2 - white list
 
     """
+
     text = Column(String, nullable=False)
     adv_setting_id: Mapped[int] = mapped_column(ForeignKey('advsetting.id'))
     adv_setting: Mapped[AdvSetting] = relationship('AdvSetting', back_populates='keyword_settings', uselist=False)

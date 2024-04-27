@@ -7,6 +7,7 @@ import textwrap
 class CustomFormatter(logging.Formatter):
 
     """Логгирование с цветным выводом в зависимости от уровня сообщений."""
+
     # Коды ANSI для окрашивания текста
     grey = "\x1b[38;21m"
     blue = "\x1b[34m"  # Обновлено для синего цвета

@@ -23,6 +23,7 @@ string
 isVisible
 boolean
 Видимость на сайте"""
+
     subjectID: int
     parentID: int
     subjectName: str
