@@ -1,4 +1,5 @@
-"""init migrations
+"""
+init migrations
 
 Revision ID: c964e4aa7315
 Revises: 

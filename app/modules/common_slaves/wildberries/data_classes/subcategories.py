@@ -3,7 +3,8 @@ from pydantic import BaseModel
 
 class Subcategory(BaseModel):
 
-    """subjectID
+    """
+    subjectID
 integer
 Идентификатор предмета
 
