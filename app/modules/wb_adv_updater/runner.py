@@ -117,9 +117,13 @@ class Runner:
 
     async def update_cards_in_graph(self):
         while True:
-            await self._manager.update_cards_in_graph()
-            logger.debug('Карточки обновлены')
-            await asyncio.sleep(1)
+            try:
+                await self._manager.update_cards_in_graph()
+                logger.debug('Карточки обновлены')
+                await asyncio.sleep(1)
+            except Exception as exc:
+                logger.error(f'Ошибка обновления карточек в neo4j {exc}')
+                await asyncio.sleep(1)
 
     async def update_min_ctr_in_global_wb_category_settings(self):
         while True:

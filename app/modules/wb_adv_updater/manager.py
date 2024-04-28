@@ -30,7 +30,7 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBCabinet,
-    WBCard,
+    WBCard, WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.wb_adv_updater import data_managers
@@ -561,7 +561,8 @@ class Manager(AbcManager):
                         WBCabinet.active is True
                     )
                 )
-                wb_cabinets_expirated_and_active = await session.execute(stmt).scalars().all()
+                wb_cabinets_expirated_and_active = await session.execute(stmt)
+                wb_cabinets_expirated_and_active = wb_cabinets_expirated_and_active.scalars().all()
 
                 for wb_cabinet in wb_cabinets_expirated_and_active:
                     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)

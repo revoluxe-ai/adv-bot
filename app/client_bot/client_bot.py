@@ -49,7 +49,7 @@ WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) fo
 async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
                           secret_token=WEBHOOK_SECRET,
-                          allowed_updates=['message', 'callback_query', 'inline_query', 'poll', "chat_member"])
+                          allowed_updates=dp.resolve_used_update_types())
 
 async def on_shutdown(bot: Bot) -> None:
     await bot.delete_webhook()

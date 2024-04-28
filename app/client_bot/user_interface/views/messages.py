@@ -538,7 +538,49 @@ class OrderSubscribe(Text):
 
 
 class NoMainPhotos(Text):
-    text = 'Не удалось загрузить фотографию товара, участвующего в кампании. Обратитесь на канал поддержки'
+
+    def __init__(self,
+                 bot: Bot,
+                 chat_id,
+                 keywords: list['KeywordForKeyboard'],
+                 adv_setting: AdvSetting,
+                 wb_user_cabinet_original_id,
+                 adv_choice_last_page,
+                 page):
+        super().__init__(bot, chat_id)
+        self._keywords = keywords
+        self._adv_setting = adv_setting
+        self._page = page
+        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+        self._adv_choice_last_page = adv_choice_last_page
+
+    @property
+    def text(self):
+        if not self._keywords:
+            return 'Ключевые слова еще не получены, зайдите позже'
+        else:
+            text = (
+                'Не удалось загрузить фотографию товара, участвующего в кампании, \
+                обратитесь в поддержку для решения этой проблемы'
+                'Название кампании: ' + str(self._adv_setting.name) + '\n'
+                                                                      'ID кампании: ' + str(
+                self._adv_setting.adv_id) + '\n'
+                                            'Статистика и настройка ключевых слов \n'
+                                            'Расшифровка: \n'
+                                            '✅  - ключевое слово активно \n'
+                                            '❌  - ключевое слово не активно \n'
+                                            ' БС - ключевое слово в белом списке \n'
+                                            'ЧС   - ключевое слово в черном списке \n'
+                                            'Авто  - ключевое слово на автоуправлении \n'
+                                            'Информация перед ключевым словом: клики/показы/CTR \n')
+            return text
+
+    @property
+    def keyboard(self):
+        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
+                                                       self._adv_choice_last_page,
+                                                       self._wb_user_cabinet_original_id,
+                                                       self._page)
 
 
 class ExpiredSubscription(TextWithKeyboard):

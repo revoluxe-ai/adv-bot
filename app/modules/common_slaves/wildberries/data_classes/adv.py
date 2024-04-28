@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
@@ -17,8 +18,8 @@ class UnitedParams(BaseModel):
     nms: List[int]
 
 class AutoParams(BaseModel):
-    active: Dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
-    # Добавьте другие поля, которые ожидаются в `autoParams`
+    active: Dict[str, bool]
+    nms: List[int]
 
 class AdvData(BaseModel):
     endTime: str
@@ -51,9 +52,9 @@ class Adv:
 
     def __repr__(self):
         return f'Name: {self.name}, Advert ID: {self.advertId},  Status: {self.status_native_ru}, Type: {self.adv_type}'
+
     def __init__(self, data):
-        self._data_model = AdvData(**data)  # Используйте Pydantic для валидации
-        self._data = self._data_model.model_dump()  # Преобразуйте обратно в словарь, если нужно
+        self._data = data
 
     @property
     def category_name(self):
@@ -157,16 +158,20 @@ class Adv:
 
     @property
     def nmids(self):
-        return self._data['autoParams']['nms']
+        try:
+            if self._data['type'] == 9:
+                 return self._data['unitedParams'][0]['nms']
+            else:
+                nmids = self._data['autoParams']['nms']
+                return nmids if nmids else []
+        except:
+            nmids = re.findall('\d{8,9}', self.name)
+            nmids = [int(nmid) for nmid in nmids]
+            return nmids if nmids else []
 
     @adv_type.setter
     def adv_type(self, value):
         self._type = value
-
-
-
-
-
 
 
 class Statistic:
