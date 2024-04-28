@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
@@ -11,9 +12,11 @@ from app.utils.db.session_maker import get_async_session_maker
 
 from . import messages
 
+logger = logging.getLogger(__name__)
+
 _sm = get_async_session_maker()
 
-#период в сутках - сообщение
+# период в сутках - сообщение
 _messages_period = [
     [1, messages.TestPeriodExpire],
     [2, messages.TestPeriodExpire],
@@ -26,6 +29,7 @@ _messages_period = [
 ]
 
 _messages_period.reverse()
+
 
 async def check_all():
     await send_messages_for_shop_subscribes_expire()
@@ -60,15 +64,9 @@ async def send_messages_for_shop_subscribes_expire():
                     wb_user_cabinets = wb_cabinet.wb_user_cabinets
                     for wb_user_cabinet in wb_user_cabinets:
                         user_telegram_id = wb_user_cabinet.user.user_telegram_id
-                        await message(bot, user_telegram_id, days, wb_user_cabinet)()
+                        try:
+                            await message(bot, user_telegram_id, days, wb_user_cabinet)()
+                        except Exception as e:
+                            logger.error(f'Не удалось отправить сообщение пользователю: {e}')
                         wb_cabinet.expiration_alarm_days_pass = days
                         await session.commit()
-
-
-
-
-
-
-
-
-
