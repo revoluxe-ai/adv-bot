@@ -80,7 +80,11 @@ class Runner:
                     if tasks[cabinet_id].done():
                         logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
                         if tasks[cabinet_id].exception():
-                            logger.error(f'Ошибка обновления статистики ключей: {tasks[cabinet_id].exception()}')
+                            logger.error(
+                                f'Ошибка обновления статистики ключей: '
+                                f'{tasks[cabinet_id].exception()},'
+                                f' для кабинета {cabinet_id}'
+                            )
 
                         del tasks[cabinet_id]
             await asyncio.sleep(0)
