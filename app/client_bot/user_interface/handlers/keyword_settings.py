@@ -76,6 +76,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
             page,
         )()
         await redis_manager.set_check_last_24_hours(adv_original_id)
+        return
 
     chat_id = callback.message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
