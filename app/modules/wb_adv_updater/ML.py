@@ -180,6 +180,8 @@ class Fitter(AbcManager):
 
         for adv in adv_settings:
             wb_category = await data_managers.get_wb_category(adv)
+            if not wb_category:
+                logger.error(f'Не найдена категория для кампании {adv.adv_id}')
             keyword_stats = await data_managers.get_keywords_statistic(adv, None)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
 
