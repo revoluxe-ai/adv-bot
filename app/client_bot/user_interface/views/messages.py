@@ -28,6 +28,8 @@ from ..message_templates.templates import (
     TextWithKeyboardPagination,
 )
 from . import db_manager, keyboards
+from app.utils import redis_manager
+
 
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard
@@ -341,13 +343,23 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._adv_setting = adv_setting
         self._page = last_page
 
+    async def __call__(self):
+        auto_block_status = await redis_manager.get_auto_block_status(self._keyword_setting.id)
+        self._auto_block_status = auto_block_status
+        return await super().__call__()
+
     @property
     def text(self):
         return f'Статистика и настройка ключевого слова: {self._keyword_setting.text}'
 
     @property
     def keyboard(self):
-        return keyboards.get_keyword_setting_keyboard(self._keyword_setting, self._adv_setting, self._page)
+        return keyboards.get_keyword_setting_keyboard(
+            self._keyword_setting,
+            self._adv_setting,
+            self._auto_block_status,
+            self._page,
+        )
 
 
 class GetNameOfNewAdvCompany(Text):
