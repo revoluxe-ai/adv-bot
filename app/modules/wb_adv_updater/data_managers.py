@@ -30,6 +30,7 @@ from app.my_types import AdvSetting, WBUserCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
+from app.utils import redis_manager
 
 logger = logging.getLogger(__name__)
 
@@ -214,19 +215,20 @@ async def get_good_bad_phrases(adv_setting: AdvSetting,
             if keyword_setting.hard_status == 2:
                good_keywords.append(keyword_setting.text)
                keyword_setting.auto_block = False
+               await redis_manager.set_auto_block_status(keyword_setting.id, False)
                continue
             elif keyword_setting.hard_status == 0:
                 bad_keywords.append(keyword_setting.text)
-                keyword_setting.auto_block = False
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             keyword_stat = keyword_text_to_keyword_stat.get(keyword_setting.text, None)
             if not keyword_stat:
                 good_keywords.append(keyword_setting.text)
-                keyword_setting.auto_block = False
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             if min_ctr == 0:
                 good_keywords.append(keyword_setting.text)
-                keyword_setting .auto_block = False
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             added_views = keyword_setting.added_views
             if not added_views:
@@ -247,13 +249,10 @@ async def get_good_bad_phrases(adv_setting: AdvSetting,
             predict_ctr *= boost
             if predict_ctr >= min_ctr:
                 good_keywords.append(keyword_setting.text)
-                keyword_setting.auto_block = False
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
                 bad_keywords.append(keyword_setting.text)
-                keyword_setting.auto_block = True
-
-        await session.commit()
-
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
 
     return good_keywords, bad_keywords
 
