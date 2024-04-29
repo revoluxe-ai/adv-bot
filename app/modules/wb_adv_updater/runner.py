@@ -67,8 +67,8 @@ class Runner:
         tasks = {}
         # not_first_runs = set()
         while True:
-            accesses = await users_manager.get_accesses_for_wb_cabinets()
-            for access in accesses:
+            accesses = users_manager.get_accesses_for_wb_cabinets()
+            async for access in accesses:
                 cabinet_id = access.wb_cabinet.id
 
                 if cabinet_id not in tasks:
@@ -132,7 +132,7 @@ class Runner:
     async def update_min_ctr_in_global_wb_category_settings(self):
         while True:
             try:
-                 await self._manager.update_min_ctr_in_global_wb_category_settings()
+                await self._manager.update_min_ctr_in_global_wb_category_settings()
             except Exception as e:
                 logger.error(f'Ошибка обновления минимальных цен {e}')
             await asyncio.sleep(1)

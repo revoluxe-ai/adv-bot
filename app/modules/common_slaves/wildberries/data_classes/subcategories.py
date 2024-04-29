@@ -28,7 +28,7 @@ boolean
     parentID: int
     subjectName: str
     parentName: str
-    isVisible: bool
+    isVisible: bool = None
 
 
 

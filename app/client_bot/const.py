@@ -7,5 +7,6 @@ CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'
 
 MAX_MESSAGE_LENGTH = 4096
 
+MAX_TOKENS = 5
 
 SUPPORT_CHANNEL_ID = -1002006645663

@@ -227,8 +227,8 @@ class Manager(AbcManager):
         update_tasks: dict[int, asyncio.Task] = {}
         while True:
             category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
-            accesses  = await super_cabinet_manager.get_accesses_for_wb_cabinets()
-            for access in accesses:
+            accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
+            async for access in accesses:
                 wb_cabinet_id = access.wb_cabinet.id
                 if wb_cabinet_id  not in update_tasks:
                     try:
@@ -311,7 +311,7 @@ class Manager(AbcManager):
         total_min_ctr = 0
         total_max_ctr = 100
 
-        await sender_manager.send_message_to_admin('Получаем существующие базы из neo')
+        await sender_manager.send_message_to_admin('Получаем существующие фразы из neo')
         keyword_phrases_in_db = await self._gds.get_keyword_phrases()
         await sender_manager.send_message_to_admin('Существующие фразы из Neo получены')
 
@@ -526,8 +526,8 @@ class Manager(AbcManager):
     async def update_all_data_in_db_run(self):
         tasks = {}
         while True:
-             wb_accesses = await super_cabinet_manager.get_accesses_for_wb_cabinets()
-             for wb_access in wb_accesses:
+             wb_accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
+             async for wb_access in wb_accesses:
                  if wb_access.wb_cabinet.id not in tasks:
                      try:
                           shop_data_updater = ShopDataUpdater(wb_access)

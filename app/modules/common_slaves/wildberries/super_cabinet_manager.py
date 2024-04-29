@@ -1,12 +1,13 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, AsyncGenerator
 
 import aiohttp
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.client_bot.const import MAX_TOKENS
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.utils.db.models import User
@@ -31,8 +32,7 @@ class WBCabinetAccess:
 
 
 
-async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
-    accesses = []
+async def get_accesses_for_wb_cabinets()-> AsyncGenerator[WBCabinetAccess, None]:
     async with sm() as session:
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
@@ -85,10 +85,9 @@ async def get_accesses_for_wb_cabinets()-> list[WBCabinetAccess]:
                 access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
                                      wb_user_cabinet = None,
                                      wb_cabinet = wb_cabinet)
-                accesses.append(access)
+                yield access
 
 
-    return accesses
 
 
 
@@ -116,23 +115,26 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
 
 
 async def get_super_user_access():
-    accesses = await get_accesses_for_wb_cabinets()
-    tokens = [token for access in accesses for token in access.tokens]
+
     leave_tokens = []
-    for token in tokens:
+    access_generator = get_accesses_for_wb_cabinets()
+
+    async for access in access_generator:
+        for token in access.tokens:
             try:
                 await CabinetManager.check_access(token)
                 leave_tokens.append(token)
+                if len(leave_tokens) >= MAX_TOKENS:
+                    break
             except Exception as exc:
                 logger.error(exc)
                 await asyncio.sleep(0)
 
+        if len(leave_tokens) >= MAX_TOKENS:
+            await access_generator.aclose()
+            break
 
-    super_user_access = WBCabinetAccess(tokens = leave_tokens,
-                                        wb_user_cabinet = None,
-                                        wb_cabinet = None)
-
-    return super_user_access
+    return WBCabinetAccess(tokens=leave_tokens, wb_user_cabinet=None, wb_cabinet=None)
 
 
 async def get_access_for_wb_cabinet(wb_cabinet_id: int) -> WBCabinetAccess:
