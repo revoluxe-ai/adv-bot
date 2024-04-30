@@ -566,6 +566,11 @@ class Manager(AbcManager):
 
                 for wb_cabinet in wb_cabinets_expirated_and_active:
                     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
+                    if not access:
+                        wb_cabinet.active = False
+                        logger.error('Нет активных токенов для кабинета')
+                        await session.commit()
+                        continue
                     wb_api = WBApi(access)
                     adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
 
