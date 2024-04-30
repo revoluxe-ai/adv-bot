@@ -137,7 +137,7 @@ async def get_super_user_access():
     return WBCabinetAccess(tokens=leave_tokens, wb_user_cabinet=None, wb_cabinet=None)
 
 
-async def get_access_for_wb_cabinet(wb_cabinet_id: int) -> WBCabinetAccess:
+async def get_access_for_wb_cabinet(wb_cabinet_id: int) -> Union[WBCabinetAccess, None]:
     async with sm() as session:
         stmt = (
             select(WBCabinet)
@@ -163,4 +163,6 @@ async def get_access_for_wb_cabinet(wb_cabinet_id: int) -> WBCabinetAccess:
                 logger.error(f'Токен не прошел проверку: {exc}')
                 continue
 
-        return WBCabinetAccess(tokens=live_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet)
+        return WBCabinetAccess(
+            tokens=live_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
+        ) if live_tokens else None
