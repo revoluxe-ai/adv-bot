@@ -105,7 +105,11 @@ class Manager(AbcManager):
             result = (await session.execute(stmt)).unique()
             adv_settings = result.scalars().all()
             for adv_setting in adv_settings:
-                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+                try:
+                    keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+                except:
+                    logger.error(f'Ошибка получения статистики по ключевым словам для {adv_setting.name}')
+                    continue
                 logger.debug(f'Ключевые слова для {adv_setting.name} получены')
                 for keyword in keywords:
                     stmt = select(AdvKeyword)\
