@@ -93,7 +93,7 @@ class Runner:
                                  update_model_on_new_features:asyncio.Event, predicted:asyncio.Event):
 
         await asyncio.gather(self._manager.update_wb_adv_phrase_in_db(need_update_model),
-        self._manager.update_vectors_exec_mode(update_model_on_new_features, predicted, need_update_model))
+        self._manager.update_vectors_exec_mode(update_model_on_new_features, need_update_model))
         update_model_on_new_features.set()
 
 

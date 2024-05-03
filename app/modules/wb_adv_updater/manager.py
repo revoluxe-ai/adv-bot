@@ -337,11 +337,10 @@ class Manager(AbcManager):
         await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
 
 
-    async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, predicted: asyncio.Event,
-                                       need_update_model):
+    async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, need_update_model):
 
         while True:
-             await self.graph_vector_update(update_model_on_new_features, predicted)
+             await self.graph_vector_update(update_model_on_new_features)
              need_update_model.set()
              await asyncio.sleep(0)
 
