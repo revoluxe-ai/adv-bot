@@ -603,7 +603,7 @@ class Manager(AbcManager):
                 ).where(
                     and_(
                         WBCabinet.expiration_time < datetime.datetime.now(),
-                        WBCabinet.active is True
+                        WBCabinet.active == True
                     )
                 )
                 wb_cabinets_expirated_and_active = await session.execute(stmt)
@@ -620,13 +620,13 @@ class Manager(AbcManager):
                     adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
 
                     for adv_setting in adv_settings:
-                        if adv_setting.bot_active is True and adv_setting.active_status == 'started':
+                        if adv_setting.bot_active is True:
                             try:
+                                adv_setting.bot_active = False
                                 await wb_api.advert.pause_company(adv_setting.adv_id)
                             except:
                                 logger.error(f'Ошибка при попытке остановить кампанию {adv_setting.adv_id}')
                                 continue
-                            adv_setting.bot_active = False
                     wb_cabinet.active = False
                     await session.commit()
                     wb_user_cabinets = wb_cabinet.wb_user_cabinets
