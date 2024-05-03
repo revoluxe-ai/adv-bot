@@ -615,7 +615,11 @@ class Manager(AbcManager):
                         logger.error('Нет активных токенов для кабинета')
                         await session.commit()
                         continue
-                    wb_api = WBApi(access)
+                    try:
+                        wb_api = WBApi(access)
+                    except ApiForbiddenError:
+                        logger.error(f'Нет нужных прав у токена')
+                        continue
                     adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
 
                     for adv_setting in adv_settings:
