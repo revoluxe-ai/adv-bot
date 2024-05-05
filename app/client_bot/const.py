@@ -1,5 +1,5 @@
 
-PRICE_PER_MONTH = 3000
+PRICE_PER_MONTH = 2300
 EMAIL_FOR_PAYMENT_RECEIPT = 'revoluxe@gmail.com'
 
 CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'
@@ -7,6 +7,6 @@ CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'
 
 MAX_MESSAGE_LENGTH = 4096
 
-MAX_TOKENS = 5
+MAX_TOKENS = 2
 
 SUPPORT_CHANNEL_ID = -1002006645663
