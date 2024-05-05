@@ -153,16 +153,19 @@ async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
 
 
 async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[KeywordStatFromDB]]:
+    logger.debug('Начинаю получать статистику ключевых слов для расчета min_ctr')
     stmt = select(AdvSetting).options(
         selectinload(AdvSetting.adv_keywords),
         selectinload(AdvSetting.keyword_settings),
         selectinload(AdvSetting.wb_cards)
-    )
+    ).where(and_(AdvSetting.bot_active == True, AdvSetting.active_status == 'started'))
+
     async with _sm() as session:
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.unique().scalars().all()
     wb_category_to_keywordstat_list = defaultdict(list)
     for adv_setting in adv_settings:
+        logger.info(f'Обрабатываю {adv_setting.name} для расчета min_ctr')
         wb_category: Union[WBCategory, None] = await get_wb_category(adv_setting)
         if not wb_category:
             continue
@@ -223,8 +226,8 @@ async def get_good_bad_phrases(adv_setting: AdvSetting,
                 continue
             keyword_stat = keyword_text_to_keyword_stat.get(keyword_setting.text, None)
             if not keyword_stat:
-                good_keywords.append(keyword_setting.text)
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                continue
+            if not keyword_stat.views:
                 continue
             if min_ctr == 0:
                 good_keywords.append(keyword_setting.text)
@@ -447,6 +450,22 @@ async def get_adv_keyword_text_in_black_list()-> list[tuple[int, str]]:
         adv_keyword_text_in_black_list.append((adv_setting.adv_id, keyword_setting.text))
 
     return adv_keyword_text_in_black_list
+
+async def get_adv_keyword_text_in_white_list():
+    async with _sm() as session:
+        stmt = select(KeywordSetting) \
+            .options(selectinload(KeywordSetting.adv_setting)) \
+            .where(KeywordSetting.hard_status == 2)
+        result = await session.execute(stmt)
+        keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
+    adv_keyword_text_in_white_list = []
+    for keyword_setting in keyword_settings:
+        adv_setting = keyword_setting.adv_setting
+        adv_keyword_text_in_white_list.append((adv_setting.adv_id, keyword_setting.text))
+
+    return adv_keyword_text_in_white_list
+
+
 
 
 async def get_all_users()-> list[User]:
