@@ -221,15 +221,19 @@ class Manager(AbcManager):
                                 f"{keyword.text}"
                             )
                         keyword_db.keyword_setting = keyword_setting
-                    if any(
-                        [keyword_db.views != keyword.views, keyword_db.clicks != keyword.clicks]
-                    ):
-                        logger.debug(f"Обновление статистики для {keyword.text}")
+                if any(
+                    [keyword_db.views != keyword.views, keyword_db.clicks != keyword.clicks]
+                ):
+                    logger.debug(f"Обновление статистики для {keyword.text}")
+                    async with sm() as session:
+                        session.add(keyword_db)
                         keyword_db.views = keyword.views
                         keyword_db.clicks = keyword.clicks
                         keyword_db.spend = keyword.spend
                         await session.commit()
-                        logger.debug(f"Статистика для {keyword.text} обновлена и зафиксирована")
+                    logger.debug(f"Статистика для {keyword.text} обновлена и зафиксирована")
+        return
+
 
     async def graph_vector_update(self, update_model_on_new_features: asyncio.Event) -> None:
 
@@ -519,6 +523,7 @@ class Manager(AbcManager):
         for parent_id, subcategories in parent_categories_to_subcategories_name_list.items():
             for subcategory in subcategories:
                 category_name_to_parent_id[subcategory] = parent_id
+        logger.debug('Родительские категории для расчета  min_ctr получены')
         wb_category_to_keywordstat_list = await data_managers.get_wb_category_to_keywordstat_list()
         parent_category_to_keywordstat_list = {}
         for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
@@ -566,6 +571,7 @@ class Manager(AbcManager):
                 await session.execute(stmt)
             await session.commit()
             message_counter.add_send()
+        return
 
     async def update_all_data_in_db_run(self):
         tasks = {}
