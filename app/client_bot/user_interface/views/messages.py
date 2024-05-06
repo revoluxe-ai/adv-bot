@@ -190,7 +190,9 @@ class AdvSettingMenu(TextWithKeyboard):
 
     @property
     def text(self):
-        return f'Кампания: {self.adv.name}'
+        return (f'Кампания: {self.adv.name}\n'
+                f'ID кампании: {self.adv.adv_id}\n'
+                f'Статус: {self.adv.active_status}')
 
     @property
     def keyboard(self):
