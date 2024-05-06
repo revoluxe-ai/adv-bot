@@ -31,14 +31,13 @@ class WbRequestApiMixin(ABC):
                 logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
                 response.raise_for_status()
             except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
-                if e.status == 401:
+                if e.status in (401, 403):
                     raise exceptions.ApiForbiddenError('Неверный API ключ', wb_user_cabinet=self._wb_user_cabinet) from e
                 if e.status == 429:
                     logger.error(f'Превышен лимит запросов к API. Ошибка: {url}')
                     raise exceptions.TooManyRequests from e
                 else:
-                    #
-                    raise exceptions.UnknownApiRequestError(e) from e
+                    raise exceptions.BadRequestError(e) from e
             except Exception as e:
                 raise exceptions.UnknownApiRequestError(e) from e
 
