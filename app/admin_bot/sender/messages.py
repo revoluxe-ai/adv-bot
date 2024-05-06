@@ -81,11 +81,11 @@ class ShopExpiredSubscriptionMessage(message_templates.TextWithKeyboard):
 
     @property
     def text(self):
-        return (f"Ваша подписка на магазин {self._wb_user_cabinet.name} истекла, "
-                f"бот деактивирован, а во избежание расходования средств все "
-                f"кампании, для которых бот был активирован, поставлены на паузу. "
-                
-                " Для продления подписки перейдите в раздел 'Мои магазины' ")
+        return (
+            f"Ваша подписка на магазин {self._wb_user_cabinet.name} истекла, "
+            f"бот деактивирован, а во избежание расходования средств все "
+            f"кампании, для которых бот был активирован, поставлены на паузу. "
+        )
 
     @property
     def keyboard(self):
