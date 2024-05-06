@@ -357,7 +357,6 @@ class KeywordSettingMessage(TextWithKeyboard):
         return keyboards.get_keyword_setting_keyboard(
             self._keyword_setting,
             self._adv_setting,
-            self._auto_block_status,
             self._page,
         )
 
