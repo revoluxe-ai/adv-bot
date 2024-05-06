@@ -47,3 +47,7 @@ class ApiForbiddenError(Exception):
 
 class TooManyRequests(Exception):
     pass
+
+
+class BadRequestError(Exception):
+    pass

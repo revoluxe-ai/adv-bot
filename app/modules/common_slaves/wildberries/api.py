@@ -13,7 +13,7 @@ from .data_classes.adv import Adv
 from .data_classes.card_from_wb import CardFromWB
 from .data_classes.keywordstat import KeywordStat
 from .data_classes.subcategories import Subcategory
-from .exceptions import ApiForbiddenError, TooManyRequests
+from .exceptions import ApiForbiddenError, TooManyRequests, UnknownApiRequestError, BadRequestError
 from .models import AdvSetting
 from .super_cabinet_manager import WBCabinetAccess
 
@@ -53,11 +53,11 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                     return result
                 except ApiForbiddenError:
                     raise
-                except TooManyRequests:
+                except (TooManyRequests, UnknownApiRequestError, BadRequestError) as e:
                     state['_attempts'] += 1
                     state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:
-                        raise
+                        raise e
         return wrapper
     return decorator
 
