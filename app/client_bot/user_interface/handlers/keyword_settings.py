@@ -33,6 +33,8 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
                                   bot: aiogram.Bot,
                                   state: FSMContext,):
     await callback.answer()
+    await callback.message.answer("Пожалуйста подождите, эта операция займет немного времени")
+
     adv_original_id: int = callback_data.adv_original_id
 
     async with _sm() as session:

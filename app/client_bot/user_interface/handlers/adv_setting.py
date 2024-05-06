@@ -30,6 +30,8 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
                                state: FSMContext):
 
     await bot.answer_callback_query(callback_query_id=callback.id)
+    await callback.message.answer("Пожалуйста подождите, эта операция займет немного времени")
+
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     page = callback_data.page
     check_data = await state.get_data()
