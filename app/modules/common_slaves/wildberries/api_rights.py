@@ -30,7 +30,7 @@ import logging
 import aiohttp
 
 from .ABC_WB_API import Headers, WbRequestApiMixin
-from .exceptions import ApiForbiddenError, TooManyRequests, UnknownApiRequestError
+from .exceptions import ApiForbiddenError, TooManyRequests, UnknownApiRequestError, BadRequestError
 
 logger = logging.getLogger(__name__)
 
@@ -109,3 +109,5 @@ async def check_token(token):
         logger.error('Ошибка проверки токена (пропущено)')
     except TooManyRequests:
         logger.error('Превышен лимит запросов')
+    except BadRequestError:
+        logger.error('Ошибка запроса')
