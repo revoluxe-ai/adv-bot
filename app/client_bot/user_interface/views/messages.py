@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.utils import deep_linking
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.orm import joinedload, selectinload
 
 import app
@@ -131,8 +131,13 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
                 .join(WBCabinet.wb_user_cabinets) \
-                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id) \
-                .order_by(AdvSetting.name)
+                .where(
+                and_(
+                    WBUserCabinet.id == self._wb_user_cabinet_original_id,
+                    AdvSetting.type == 8,
+                    AdvSetting.active_status.in_(['started', 'pause', 'ready_for_start'])
+                )
+            ).order_by(AdvSetting.name)
             result = await session.execute(stmt)
             self._adv_settings = result.scalars().all()
             stmt = (
@@ -307,8 +312,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
          if not self._keywords:
              return 'Ключевые слова еще не получены, зайдите позже'
          else:
-            text =   (
-
+            text = (
                      'Название кампании: ' + str(self._adv_setting.name) + '\n'
                       'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
                      'Статистика и настройка ключевых слов \n'
@@ -318,7 +322,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                      ' БС - ключевое слово в белом списке \n'
                      'ЧС   - ключевое слово в черном списке \n'
                      'Авто  - ключевое слово на автоуправлении \n'
-                     'Информация перед ключевым словом: клики/показы/CTR \n')
+                     'Информация перед ключевым словом: клики/показы/CTR \n'
+            )
             return text
 
     @property
@@ -513,8 +518,10 @@ class ShopMenu(TextWithKeyboard):
     @property
     def text(self):
 
-        text = f'Магазин: {self._wb_user_cabinet.name}\n'
-
+        text = (
+            f'Магазин: {self._wb_user_cabinet.name}\n'
+            f'Shop ID: {self._wb_cabinet.shop_id}\n'
+        )
 
         if self._wb_cabinet.demo and self._expiration_time> self._now:
             text += ('Для этого магазина включен демо-режим. Вам доступны все опции и сервисы до '
