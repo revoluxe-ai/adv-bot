@@ -117,10 +117,8 @@ class Manager(AbcManager):
         tasks = {}
         for adv_setting in adv_settings:
             if adv_setting not in tasks:
-
                 task = asyncio.create_task(Manager.keyword_stat_updater(adv_setting, wb_api))
                 tasks[adv_setting.id] = task
-
             else:
                 if tasks[adv_setting.id].done():
                     logger.info(
@@ -147,7 +145,6 @@ class Manager(AbcManager):
 
     @staticmethod
     async def keyword_stat_updater(adv_setting, wb_api):
-
         logger.debug(f"Обработка настройки {adv_setting}")
         try:
             keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
@@ -186,14 +183,12 @@ class Manager(AbcManager):
                         keyword_setting = KeywordSetting()
                         keyword_setting.text = keyword.text
                         keyword_setting.adv_setting_id = adv_setting.id
-                        session.add(keyword_setting)
-                        await session.commit()
                         logger.debug(f"KeywordSetting добавлено и зафиксировано для {keyword.text}")
                         keyword_db.keyword_setting = keyword_setting
                         keyword_db.adv_setting = adv_setting
                         keyword_db.text = keyword.text
                         keyword_db.date = keyword.date
-                        session.add(keyword_db)
+                        await session.merge(keyword_db)
                         await session.commit()
                     logger.debug(f"AdvKeyword добавлено и зафиксировано для {keyword.text}")
             else:
