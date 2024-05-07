@@ -87,8 +87,7 @@ class ShopDataUpdater:
         try:
             wb_api = self.__wb_api
             advert_api = wb_api.advert
-            adv_ids = await advert_api.get_advertIds(advert_api.live_company_status,
-                                                     advert_api.auto_adv_types)
+            adv_ids = await advert_api.get_advertIds()
             advs: list[Adv] = await advert_api.get_advs(adv_ids)
         except exc.ApiForbiddenError:
             logger.error('Попытка обновлений с отозванным токеном')

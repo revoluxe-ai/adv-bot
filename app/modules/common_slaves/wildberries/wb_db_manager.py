@@ -3,6 +3,7 @@ import json
 from sqlalchemy import select
 
 from app import my_types
+from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
@@ -10,7 +11,7 @@ from app.utils.db.session_maker import get_async_session_maker
 _sm = get_async_session_maker()
 
 
-async def update_advs_in_db(advs, wb_cabinet: WBCabinet):
+async def update_advs_in_db(advs: list[Adv], wb_cabinet: WBCabinet):
     async with _sm() as session:
         for adv in advs:
             stmt = select(my_types.AdvSetting).where(my_types.AdvSetting.adv_id == adv.advertId)

@@ -96,11 +96,8 @@ class AdvertApi(ABC_WB_API):
                     keywords.append(keyword)
         return keywords
 
-
-
-
     @try_except_decorator(1, 3)
-    async def get_advertIds(self, statuses: list, adv_types)->list[Adv]:
+    async def get_advertIds(self) -> list[Adv]:
         advertIds = []
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
         async with aiohttp.ClientSession() as session:
@@ -108,18 +105,16 @@ class AdvertApi(ABC_WB_API):
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             # Используем json.loads для преобразования текста ответа в JSON
-            adverts:list = answer['adverts']
+            adverts: list = answer['adverts']
             if not adverts:
                 return []
             for advert in adverts:
-                adv_type = advert['type']
-                adv_status = advert['status']
-                if adv_status in statuses and adv_type in adv_types:
-                    for advert in advert['advert_list']:
-                        advertId = advert['advertId']
-                        advertIds.append(advertId)
+                for advert in advert['advert_list']:
+                    advertId = advert['advertId']
+                    advertIds.append(advertId)
 
         return advertIds
+
     @try_except_decorator(1, 2)
     async def get_advs(self, adv_ids: list):
         advs = []
