@@ -131,7 +131,7 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 1)
     async def get_live_advs(self):
-        adv_ids: list[Adv] = await self.get_advertIds(self.live_company_status, self.auto_adv_types)
+        adv_ids: list[Adv] = await self.get_advertIds()
         advs = await self.get_advs(adv_ids)
         return advs
 
