@@ -63,29 +63,32 @@ class Runner:
 
 
     async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
-        tasks = {}
+        wb_cabinet_tasks = {}
+        adv_update_tasks = {}
         # not_first_runs = set()
         while True:
             accesses = users_manager.get_accesses_for_wb_cabinets()
             async for access in accesses:
                 cabinet_id = access.wb_cabinet.id
 
-                if cabinet_id not in tasks:
+                if cabinet_id not in wb_cabinet_tasks:
                     task = asyncio.create_task(
-                        self._manager.update_keyword_stat(access, need_update_model))
-                    tasks[cabinet_id] = task
+                        self._manager.update_keyword_stat(access,
+                                                          need_update_model,
+                                                          adv_update_tasks))
+                    wb_cabinet_tasks[cabinet_id] = task
 
                 else:
-                    if tasks[cabinet_id].done():
+                    if wb_cabinet_tasks[cabinet_id].done():
                         logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
-                        if tasks[cabinet_id].exception():
+                        if wb_cabinet_tasks[cabinet_id].exception():
                             logger.error(
                                 f'Ошибка обновления статистики ключей: '
-                                f'{tasks[cabinet_id].exception()},'
+                                f'{wb_cabinet_tasks[cabinet_id].exception()},'
                                 f' для кабинета {cabinet_id}'
                             )
 
-                        del tasks[cabinet_id]
+                        del wb_cabinet_tasks[cabinet_id]
             await asyncio.sleep(0)
 
 
