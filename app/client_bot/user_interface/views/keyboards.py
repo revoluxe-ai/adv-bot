@@ -229,6 +229,7 @@ def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_sett
 def get_keyword_setting_keyboard(
     keyword: KeywordSetting,
     adv_setting: AdvSetting,
+    auto_block_status,
     page,
     return_to: str = 'by_adv',
 ):
@@ -240,7 +241,7 @@ def get_keyword_setting_keyboard(
                                            keyword_setting_original_id=keyword.id).pack())]
         buttoms.append(buttom)
 
-    if keyword.auto_block:
+    if auto_block_status and keyword.hard_status == 1:
         bottom = [InlineKeyboardButton(text='Тестировать дальше',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=-1,

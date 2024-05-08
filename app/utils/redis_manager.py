@@ -45,7 +45,7 @@ async def set_auto_block_status(keywordsetting_original_id: int, auto_block_stat
 
 async def get_auto_block_status(keywordsetting_original_id: int)->bool:
     key = 'auto_block_status:' + str(keywordsetting_original_id)
-    answer = await redis_client.get(key)
+    answer = int(await redis_client.get(key))
     if answer == 0:
         auto_block_status = False
     else:

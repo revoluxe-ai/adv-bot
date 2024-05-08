@@ -255,7 +255,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting,
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
                 bad_keywords.append(keyword_setting.text)
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                await redis_manager.set_auto_block_status(keyword_setting.id, True)
 
     return good_keywords, bad_keywords
 
