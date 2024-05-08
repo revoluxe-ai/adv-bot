@@ -234,44 +234,44 @@ def get_keyword_setting_keyboard(
     page,
     return_to: str = 'by_adv',
 ):
-    buttoms = []
+    buttons = []
     if keyword.hard_status in [BLACK_LIST, AUTO_MODE]:
-        buttom = [InlineKeyboardButton(text='В белый список',
+        button = [InlineKeyboardButton(text='В белый список',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=WHITE_LIST,
                                            keyword_setting_original_id=keyword.id).pack())]
-        buttoms.append(buttom)
+        buttons.append(button)
 
     if auto_block_status and keyword.hard_status == AUTO_MODE:
-        bottom = [InlineKeyboardButton(text='Тестировать дальше',
+        button = [InlineKeyboardButton(text='Тестировать дальше',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=-AUTO_MODE,
                                            keyword_setting_original_id=keyword.id).pack())]
 
-        buttoms.append(bottom)
+        buttons.append(button)
 
     if keyword.hard_status in [BLACK_LIST, WHITE_LIST]:
-        buttom = [InlineKeyboardButton(text='В авто',
+        button = [InlineKeyboardButton(text='В авто',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=AUTO_MODE,
                                            keyword_setting_original_id=keyword.id).pack())]
-        buttoms.append(buttom)
+        buttons.append(button)
 
     if keyword.hard_status in [AUTO_MODE, WHITE_LIST]:
-        buttom = [InlineKeyboardButton(text='В черный список',
+        button = [InlineKeyboardButton(text='В черный список',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=BLACK_LIST,
                                            keyword_setting_original_id=keyword.id).pack())]
-        buttoms.append(buttom)
+        buttons.append(button)
 
-    buttoms.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
+    buttons.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
                                              callback_data=callbacks.SettingKeywords(
                                              adv_original_id=adv_setting.id,
                                              type=return_to,
                                              page=page,
                                              ).pack())])
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttoms)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard
 
 
