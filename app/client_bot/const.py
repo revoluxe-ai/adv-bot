@@ -10,3 +10,13 @@ MAX_MESSAGE_LENGTH = 4096
 MAX_TOKENS = 2
 
 SUPPORT_CHANNEL_ID = -1002006645663
+
+#
+# Статус коды ключевых слов
+#
+
+BLACK_LIST = 0
+
+AUTO_MODE = 1
+
+WHITE_LIST = 2
