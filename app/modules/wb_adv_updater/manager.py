@@ -97,7 +97,9 @@ class Manager(AbcManager):
         self._image_tools = image_tools
 
     @staticmethod
-    async def update_keyword_stat(access: WBCabinetAccess, need_update_model: asyncio.Event):
+    async def update_keyword_stat(access: WBCabinetAccess,
+                                  need_update_model: asyncio.Event,
+                                  adv_update_tasks: dict[int, asyncio.Task]):
         wb_api = WBApi(access)
         wb_cabinet = access.wb_cabinet
         logger.debug(f"Начало обновления статистики для кабинета {wb_cabinet.id}")
@@ -114,25 +116,24 @@ class Manager(AbcManager):
             adv_settings = result.scalars().all()
             logger.debug(f"Найдено {len(adv_settings)} настроек рекламы для обновления")
 
-        tasks = {}
         for adv_setting in adv_settings:
-            if adv_setting not in tasks:
+            if adv_setting not in adv_update_tasks:
                 task = asyncio.create_task(Manager.keyword_stat_updater(adv_setting, wb_api))
-                tasks[adv_setting.id] = task
+                adv_update_tasks[adv_setting.id] = task
             else:
-                if tasks[adv_setting.id].done():
+                if adv_update_tasks[adv_setting.id].done():
                     logger.info(
                         f'Задача обновления статистики ключей завершена для кабинета '
                         f'{adv_setting.name}'
                     )
-                    if tasks[adv_setting.id].exception():
+                    if adv_update_tasks[adv_setting.id].exception():
                         logger.error(
                             f'Ошибка обновления статистики ключей: '
-                            f'{tasks[adv_setting.id].exception()},'
+                            f'{adv_update_tasks[adv_setting.id].exception()},'
                             f' для кабинета {adv_setting.name}'
                         )
 
-                    del tasks[adv_setting.id]
+                    del adv_update_tasks[adv_setting.id]
                     logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
                     await session.commit()
                     logger.debug(f"Конечный коммит выполнен")
