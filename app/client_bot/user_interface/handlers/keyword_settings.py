@@ -191,7 +191,7 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
                 keyword_setting.added_clicks = 0
             keyword_setting.added_clicks += add_clicks
 
-            keyword_setting.auto_block = False
+            await redis_manager.set_auto_block_status(keyword_setting_original_id, False)
 
         await session.commit()
     data = await state.get_data()
