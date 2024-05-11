@@ -34,7 +34,7 @@ async def check_last_24_hours(adv_original_id):
 
 
 
-async def set_auto_block_status(keywordsetting_original_id: int, auto_block_status: bool)->None:
+async def set_auto_block_status(keywordsetting_original_id: int, auto_block_status: bool) -> None:
     key = 'auto_block_status:' + str(keywordsetting_original_id)
     if auto_block_status is True:
         await redis_client.set(key, 1)
@@ -43,9 +43,13 @@ async def set_auto_block_status(keywordsetting_original_id: int, auto_block_stat
     return None
 
 
-async def get_auto_block_status(keywordsetting_original_id: int)->bool:
+async def get_auto_block_status(keywordsetting_original_id: int) -> bool:
     key = 'auto_block_status:' + str(keywordsetting_original_id)
-    answer = int(await redis_client.get(key))
+    answer = await redis_client.get(key)
+    if answer is None:
+        return False
+    else:
+        answer = int(answer)
     if answer == 0:
         auto_block_status = False
     else:
