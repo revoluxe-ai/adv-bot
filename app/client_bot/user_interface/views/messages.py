@@ -578,7 +578,7 @@ class NoMainPhotos(Text):
     @property
     def text(self):
         if not self._keywords:
-            return 'Ключевые слова еще не получены, зайдите позже'
+            return 'Не получена карточка товара, обратитесь в поддержку @skyline360_1'
         else:
             text = (
                 'Не удалось загрузить фотографию товара, участвующего в кампании, \
