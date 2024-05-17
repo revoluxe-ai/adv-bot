@@ -97,8 +97,16 @@ class ShopDataUpdater:
         nmids = set()
         for adv in advs:
             nmids.update(adv.nmids)
-        cards = await wb_api.content.get_cards_by_text(nmids)
-        await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+
+        cards=[]
+        # for nmid in nmids:
+        cards = await wb_api.content.get_uploaded_products()
+
+        updated_cards = []
+        for card in cards:
+            if card['nmID'] in nmids:
+                updated_cards.append(card)
+        await wb_db_manager.update_cards_in_db(updated_cards, self._wb_cabinet)
 
 
 
