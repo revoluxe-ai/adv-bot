@@ -109,9 +109,10 @@ class AdvertApi(ABC_WB_API):
             if not adverts:
                 return []
             for advert in adverts:
-                for advert in advert['advert_list']:
-                    advertId = advert['advertId']
-                    advertIds.append(advertId)
+                if advert['type'] == 8:
+                    for advert in advert['advert_list']:
+                        advertId = advert['advertId']
+                        advertIds.append(advertId)
 
         return advertIds
 
@@ -251,7 +252,7 @@ class ContentApi(ABC_WB_API):
             answer = json.loads(response_text)
             return answer['data']
 
-    @try_except_decorator(1, 2)
+    # @try_except_decorator(1, 2)
     async def get_cards_by_text(self, texts: set[Union[str, int]]):
         cards = []
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
@@ -264,7 +265,7 @@ class ContentApi(ABC_WB_API):
                             "ascending": False
                         },
                         "cursor": {
-                            "limit": 1
+                            "limit": 100
                         },
                         "filter": {
                             "withPhoto": -1,
