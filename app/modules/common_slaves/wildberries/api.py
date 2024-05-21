@@ -40,7 +40,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                 current_time = time.time()
                 time_since_last_query = current_time - state['_last_query_time']
                 time_to_wait = max(state['_current_pause'] - time_since_last_query, 0)
-                if state['_first_request']:
+                if not state['_first_request']:
                     logger.debug(f'Пауза между запросами: {time_to_wait} секунд')
                     await asyncio.sleep(time_to_wait)
                     state['_first_request'] = False
