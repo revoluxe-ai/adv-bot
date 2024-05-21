@@ -96,8 +96,8 @@ class Manager(AbcManager):
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
 
-    @staticmethod
-    async def update_keyword_stat(access: WBCabinetAccess,
+
+    async def update_keyword_stat(self, access: WBCabinetAccess,
                                   need_update_model: asyncio.Event,
                                   adv_update_tasks: dict[int, asyncio.Task]):
         wb_api = WBApi(access)
@@ -118,7 +118,7 @@ class Manager(AbcManager):
 
         for adv_setting in adv_settings:
             if adv_setting not in adv_update_tasks:
-                task = asyncio.create_task(Manager.keyword_stat_updater(adv_setting, wb_api))
+                task = asyncio.create_task(self.keyword_stat_updater(adv_setting, wb_api))
                 adv_update_tasks[adv_setting.id] = task
             else:
                 if adv_update_tasks[adv_setting.id].done():
@@ -145,7 +145,52 @@ class Manager(AbcManager):
         return
 
     @staticmethod
-    async def keyword_stat_updater(adv_setting, wb_api):
+    async def update_keyword_stat_in_db(keyword_stat: KeywordStat, adv_setting_original_id: int):
+        async with sm() as session:
+            stmt = select(KeywordSetting).filter(KeywordSetting.text == keyword_stat.text,
+                                                 KeywordSetting.adv_setting_id == adv_setting_original_id)
+            result = await session.execute(stmt)
+            keyword_setting = result.scalar()
+        if not keyword_setting:
+            keyword_setting = KeywordSetting()
+            keyword_setting.text = keyword_stat.text
+            keyword_setting.adv_setting_id = keyword_stat.adv_setting_id
+            async with sm() as session:
+                session.add(keyword_setting)
+                await session.commit()
+
+        stmt = select(AdvKeyword).filter(and_(AdvKeyword.text == keyword_stat.text,
+                                                  AdvKeyword.date == keyword_stat.date,
+                                                  AdvKeyword.adv_setting_id == adv_setting_original_id))
+        async with sm() as session:
+            result = await session.execute(stmt)
+            keyword_db = result.scalar()
+        if not keyword_db:
+            keyword_db = AdvKeyword()
+            keyword_db.text = keyword_stat.text
+            keyword_db.date = keyword_stat.date
+            keyword_db.adv_setting_id = adv_setting_original_id
+            keyword_db.views = keyword_stat.views
+            keyword_db.clicks = keyword_stat.clicks
+            keyword_db.spend = keyword_stat.spend
+            session.add(keyword_db)
+            await session.commit()
+        else:
+            if not keyword_db.keyword_setting:
+                keyword_db.keyword_setting = keyword_setting
+                await session.commit()
+            if any(
+                [keyword_db.views != keyword_stat.views, keyword_db.clicks != keyword_stat.clicks]
+            ):
+                keyword_db.views = keyword_stat.views
+                keyword_db.clicks = keyword_stat.clicks
+                keyword_db.spend = keyword_stat.spend
+                await session.commit()
+        return
+
+
+
+    async def keyword_stat_updater(self, adv_setting, wb_api):
         logger.debug(f"Обработка настройки {adv_setting}")
         try:
             keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
@@ -154,81 +199,16 @@ class Manager(AbcManager):
                 f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
             return
         logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
-        for keyword in keywords:
-            stmt = (
-                select(AdvKeyword)
-                .options(joinedload(AdvKeyword.keyword_setting))
-                .where(and_(
-                    AdvKeyword.text == keyword.text,
-                    AdvKeyword.date == keyword.date,
-                    AdvKeyword.adv_setting_id == adv_setting.id,
-                ))
-            )
-            logger.debug(f"Проверка наличия ключевого слова в базе: {keyword.text}")
-
-            async with sm() as session:
-                keyword_db = await session.execute(stmt)
-                keyword_db: AdvKeyword = keyword_db.scalar()
-            if not keyword_db:
-                logger.debug(f"Создание нового ключевого слова {keyword.text}")
-                keyword_db = AdvKeyword()
-                stmt = select(KeywordSetting).where(and_(
-                    KeywordSetting.text == keyword.text,
-                    KeywordSetting.adv_setting_id == adv_setting.id,
-                ))
-
-                async with sm() as session:
-                    keyword_setting = await session.execute(stmt)
-                    keyword_setting = keyword_setting.scalar()
-                    if not keyword_setting:
-                        keyword_setting = KeywordSetting()
-                        keyword_setting.text = keyword.text
-                        keyword_setting.adv_setting_id = adv_setting.id
-                        logger.debug(f"KeywordSetting добавлено и зафиксировано для {keyword.text}")
-                        keyword_db.keyword_setting = keyword_setting
-                        keyword_db.adv_setting = adv_setting
-                        keyword_db.text = keyword.text
-                        keyword_db.date = keyword.date
-                        await session.merge(keyword_db)
-                        await session.commit()
-                    logger.debug(f"AdvKeyword добавлено и зафиксировано для {keyword.text}")
-            else:
-                if not keyword_db.keyword_setting:
-                    logger.debug(
-                        f"Добавление KeywordSetting для существующего ключевого слова "
-                        f"{keyword.text}"
-                    )
-                    stmt = select(KeywordSetting).where(and_(
-                        KeywordSetting.text == keyword.text,
-                        KeywordSetting.adv_setting_id == adv_setting.id,
-                    ))
-
-                    async with sm() as session:
-                        keyword_setting = await session.execute(stmt)
-                        keyword_setting = keyword_setting.scalar()
-                        if not keyword_setting:
-                            keyword_setting = KeywordSetting()
-                            session.add(keyword_setting)
-                            keyword_setting.text = keyword.text
-                            keyword_setting.adv_setting_id = adv_setting.id
-                            await session.commit()
-                            logger.debug(
-                                f"KeywordSetting создано и зафиксировано для "
-                                f"{keyword.text}"
-                            )
-                        keyword_db.keyword_setting = keyword_setting
-                if any(
-                    [keyword_db.views != keyword.views, keyword_db.clicks != keyword.clicks]
-                ):
-                    logger.debug(f"Обновление статистики для {keyword.text}")
-                    async with sm() as session:
-                        session.add(keyword_db)
-                        keyword_db.views = keyword.views
-                        keyword_db.clicks = keyword.clicks
-                        keyword_db.spend = keyword.spend
-                        await session.commit()
-                    logger.debug(f"Статистика для {keyword.text} обновлена и зафиксирована")
+        for keyword in keywords[:1]:
+            try:
+                await self.update_keyword_stat_in_db(keyword, adv_setting.id)
+            except Exception as exc:
+                logger.error(
+                    f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}'
+                )
+            await asyncio.sleep(0)
         return
+
 
 
     async def graph_vector_update(self, update_model_on_new_features: asyncio.Event) -> None:
