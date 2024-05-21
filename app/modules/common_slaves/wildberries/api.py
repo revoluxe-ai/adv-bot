@@ -109,9 +109,10 @@ class AdvertApi(ABC_WB_API):
             if not adverts:
                 return []
             for advert in adverts:
-                for advert in advert['advert_list']:
-                    advertId = advert['advertId']
-                    advertIds.append(advertId)
+                if advert['type'] == 8:
+                    for advert in advert['advert_list']:
+                        advertId = advert['advertId']
+                        advertIds.append(advertId)
 
         return advertIds
 
@@ -251,37 +252,86 @@ class ContentApi(ABC_WB_API):
             answer = json.loads(response_text)
             return answer['data']
 
-    @try_except_decorator(1, 2)
-    async def get_cards_by_text(self, texts: set[Union[str, int]]):
-        cards = []
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
-        async with aiohttp.ClientSession() as session:
-            for text in texts:
-                text = str(text)
-                data_for_req = {
-                    "settings": {
-                        "sort": {
-                            "ascending": False
-                        },
-                        "cursor": {
-                            "limit": 1
-                        },
-                        "filter": {
-                            "withPhoto": -1,
-                            'textSearch': text
+    # @try_except_decorator(1, 2)
+    # async def get_cards_by_text(self, texts: set[Union[str, int]]):
+    #     cards = []
+    #     url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+    #     async with aiohttp.ClientSession() as session:
+    #         for text in texts:
+    #             text = str(text)
+    #             data_for_req = {
+    #                 "settings": {
+    #                     "sort": {
+    #                         "ascending": False
+    #                     },
+    #                     "cursor": {
+    #                         "limit": 1
+    #                     },
+    #                     "filter": {
+    #                         "withPhoto": -1,
+    #                         'textSearch': text
+    #
+    #                     }
+    #                 }
+    #             }
+    #             async with session.post(url, json=data_for_req, headers=self.headers.standart) as response:
+    #                 answer = await self.requests(session, 'POST', url,
+    #                                              json_data=data_for_req,
+    #                                              headers=self.headers.standart)
+    #                 answer = json.loads(answer)
+    #             card_json = answer['cards'][0]
+    #             card = CardFromWB(card_json)
+    #             cards.append(card)
+    #     return cards
+    async def get_product_list(
+        self,
+        updated_at: str | None = None,
+        nm_id: int | None = None,
+    ) -> dict:
+        """Возвращает список товаров на Wildberries. """
 
-                        }
-                    }
-                }
-                async with session.post(url, json=data_for_req, headers=self.headers.standart) as response:
-                    answer = await self.requests(session, 'POST', url,
-                                                 json_data=data_for_req,
-                                                 headers=self.headers.standart)
-                    answer = json.loads(answer)
-                card_json = answer['cards'][0]
-                card = CardFromWB(card_json)
-                cards.append(card)
-        return cards
+        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+
+        limit = 100
+
+        data = json.dumps({
+            'settings': {
+                'cursor': {
+                    'limit': limit,
+                    'updatedAt': updated_at,
+                    'nmID': nm_id,
+                },
+                'filter': {
+                    'withPhoto': -1,
+                    # 'textSearch': str(nm_id),
+
+                },
+            },
+        })
+        async with aiohttp.ClientSession() as session:
+            response = await self.requests(session, 'POST', url=url, data=data, headers=self.headers.standart)
+            return json.loads(response)
+        # return self.request('POST', '/content/v2/get/cards/list', data=data)
+
+    async def get_uploaded_products(
+        self,
+        updated_at: str | None = None,
+        nm_id: int | None = None,
+    ) -> dict:
+        """Возвращает словарь выгруженных товаров на Wildberries. """
+
+        limit = 100
+
+        product_info = await self.get_product_list(updated_at, nm_id)
+        uploaded_products = product_info['cards']
+
+        cursor = product_info['cursor']
+        if cursor['total'] >= limit:
+            uploaded_products.update(
+                await self.get_uploaded_products(cursor['updatedAt'], cursor['nmID']),
+            )
+
+        return uploaded_products
 
 
 class WBApi:

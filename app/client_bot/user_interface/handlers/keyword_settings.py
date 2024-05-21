@@ -66,7 +66,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
     if nmids:
         main_photos = await data_managers.get_main_photos(nmids[:1])
     else:
-        raise Exception
+        main_photos = None
     if not main_photos:
         await messages.NoMainPhotos(
             bot,
