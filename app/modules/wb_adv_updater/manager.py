@@ -455,8 +455,8 @@ class Manager(AbcManager):
                 logger.debug(f"Обновляем карточку: {wbcard.name}")
                 try:
                     characteristics_word = await self._process_product_data(wbcard)
-                except Exception:
-                    logger.error(f"Ошибка при обработке данных для карточки с именем: {wbcard.nmid}")
+                except Exception as exc:
+                    logger.error(f"Ошибка при обработке данных для карточки с именем: {wbcard.nmid}, {exc}")
                     continue
 
                 await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)
@@ -472,14 +472,16 @@ class Manager(AbcManager):
         product_data = wbcard.card_json
         # Обработка характеристик
         characteristics_words = {}
-        for characteristic in product_data["characteristics"]:
-            char_name = characteristic['name'].lower()
-            char_value = characteristic['value']
-            if not isinstance(char_value, list) or all(
-                    self.is_number(x) for x in char_value):
-                continue
-            characteristics_words[char_name]: tuple(str, list[float]) = await self.__get_words_from_char_value(char_value)
+        if "characteristics" in product_data:
+            for characteristic in product_data["characteristics"]:
+                char_name = characteristic['name'].lower()
+                char_value = characteristic['value']
+                if not isinstance(char_value, list) or all(
+                        self.is_number(x) for x in char_value):
+                    continue
+                characteristics_words[char_name]: tuple(str, list[float]) = await self.__get_words_from_char_value(char_value)
         characteristics_words['name']: tuple(str, list[float])  = await self.__get_words_from_char_value(wbcard.name)
+        characteristics_words['description']: tuple(str, list[float]) = await self.__get_words_from_char_value(wbcard.description)
         return characteristics_words
 
     async def __get_words_from_char_value(self, char_value):
