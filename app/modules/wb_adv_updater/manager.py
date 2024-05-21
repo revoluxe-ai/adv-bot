@@ -161,6 +161,7 @@ class Manager(AbcManager):
 
         stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting))\
             .filter(and_(AdvKeyword.text == keyword_stat.text,
+
                                                   AdvKeyword.date == keyword_stat.date,
                                                   AdvKeyword.adv_setting_id == adv_setting_original_id))
         async with sm() as session:
