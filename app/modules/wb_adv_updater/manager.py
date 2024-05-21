@@ -339,7 +339,12 @@ class Manager(AbcManager):
     async def update_wb_adv_phrase_in_db(self, need_update_model):
         """update_model_on_new_features.set()"""
         while True:
-            await self._update_wb_adv_phrase_in_db_bot_active()
+            try:
+                await self._update_wb_adv_phrase_in_db_bot_active()
+            except Exception as exc:
+                logger.error(f'Ошибка обновления фраз в neo4j {exc}')
+                await asyncio.sleep(1)
+                continue
             await sender_manager.send_message_to_admin('Все Фразы обновлены')
             need_update_model.set()
             await asyncio.sleep(0)
