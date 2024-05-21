@@ -323,7 +323,12 @@ class Manager(AbcManager):
     async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, need_update_model):
 
         while True:
-             await self.graph_vector_update(update_model_on_new_features)
+             try:
+                 await self.graph_vector_update(update_model_on_new_features)
+             except Exception as exc:
+                    logger.error(f'Ошибка обновления векторов {exc}')
+                    await asyncio.sleep(1)
+                    continue
              need_update_model.set()
              await asyncio.sleep(0)
 
