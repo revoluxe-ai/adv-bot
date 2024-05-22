@@ -11,6 +11,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from . import models, wb_db_manager
 from .data_classes.adv import Adv
 
+
 sm = get_async_session_maker()
 
 logger = logging.getLogger(__name__)
@@ -98,22 +99,6 @@ class ShopDataUpdater:
         for adv in advs:
             nmids.update(adv.nmids)
 
-        cards=[]
-        # for nmid in nmids:
-        cards = await wb_api.content.get_uploaded_products()
+        cards = await wb_api.content.get_cards_by_text(nmids)
 
-        updated_cards = []
-        for card in cards:
-            if card['nmID'] in nmids:
-                updated_cards.append(card)
-        await wb_db_manager.update_cards_in_db(updated_cards, self._wb_cabinet)
-
-
-
-
-
-
-
-
-
-
+        await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
