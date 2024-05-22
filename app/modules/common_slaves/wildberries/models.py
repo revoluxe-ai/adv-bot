@@ -83,7 +83,7 @@ class WBToken(BaseTable):
         payload = self.__payload
         expire = payload.get('exp', default)
         if expire < datetime.datetime.now().timestamp():
-            raise exceptions.TokenExpiredError
+            raise exceptions.TokenExpiredError('Token expired')
         return payload.get(key)
 
 
