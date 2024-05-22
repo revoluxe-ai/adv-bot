@@ -4,6 +4,10 @@ from .abc_card import WBCard
 class CardFromWB(WBCard):
 
     @property
+    def data(self):
+        return self._data
+
+    @property
     def shop_name(self):
         return self._shop_name
 
@@ -25,70 +29,61 @@ class CardFromWB(WBCard):
         self._data = data
 
     @property
-    def data(self):
-        return self._data
-
-    @property
     def name(self):
-        return self.data['title']
+        return self._data['title']
 
 
     @property
     def techSize(self):
-        return self.data['sizes'][0]['techSize']
+        return self._data['sizes'][0]['techSize']
 
     @property
     def wb_mediaFiles(self):
-        media =  [image['big'] for image in self.data.get('photos', [])]
+        media =  [image['big'] for image in self._data.get('photos', [])]
         return media
 
     @property
     def subjectID(self):
-        return self.data['subjectID']
+        return self._data['subjectID']
 
     @property
     def wb_barcode(self):
-        return self.data['sizes'][0]['skus'][0]
+        return self._data['sizes'][0]['skus'][0]
 
 
     @property
     def offer_id(self):
-        return self.data['vendorCode']
+        return self._data['vendorCode']
 
     @property
     def brand(self):
-        return self.data['brand']
+        return self._data['brand']
 
     @property
     def characterisics(self):
-        return self.data['characteristics']
+        return self._data['characteristics']
 
 
     def createdAt(self):
-        return self.data['createdAt']
+        return self._data['createdAt']
 
 
     def updatedAt(self):
-        return self.data['updatedAt']
+        return self._data['updatedAt']
 
 
     @property
     def wb_category_name(self):
-        return self.data['subjectName']
+        return self._data['subjectName']
 
     @property
     def nmid(self)-> int:
-        return int(self.data['nmID'])
-
-
-    @property
-    def _id(self):
-        return self.nmid
+        return int(self._data['nmID'])
 
 
     @property
     def imtID(self):
-        return self.data['imtID']
+        return self._data['imtID']
 
 
 
