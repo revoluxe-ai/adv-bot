@@ -51,3 +51,7 @@ class TooManyRequests(Exception):
 
 class BadRequestError(Exception):
     pass
+
+
+class NotValidDataError(Exception):
+    pass
