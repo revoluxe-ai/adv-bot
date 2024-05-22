@@ -38,6 +38,8 @@ class WbRequestApiMixin(ABC):
                     raise exceptions.TooManyRequests from e
                 else:
                     raise exceptions.BadRequestError(e) from e
+            except exceptions.NotValidDataError as e:
+                raise exceptions.NotValidDataError(e) from e
             except Exception as e:
                 raise exceptions.UnknownApiRequestError(e) from e
 
