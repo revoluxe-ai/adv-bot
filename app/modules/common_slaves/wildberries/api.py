@@ -13,7 +13,7 @@ from .data_classes.adv import Adv
 from .data_classes.card_from_wb import CardFromWB
 from .data_classes.keywordstat import KeywordStat
 from .data_classes.subcategories import Subcategory
-from .exceptions import ApiForbiddenError, TooManyRequests, UnknownApiRequestError, BadRequestError
+from .exceptions import ApiForbiddenError, TooManyRequests, UnknownApiRequestError, BadRequestError, NotValidDataError
 from .models import AdvSetting
 from .super_cabinet_manager import WBCabinetAccess
 
@@ -52,8 +52,11 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                     state['_attempts'] = 0  # Сброс попыток после успешного выполнения
                     return result
                 except ApiForbiddenError:
-                    raise
-                except (TooManyRequests, UnknownApiRequestError, BadRequestError) as e:
+                    instance.set_next_token()
+                except (TooManyRequests,
+                        UnknownApiRequestError,
+                        BadRequestError,
+                        NotValidDataError) as e:
                     state['_attempts'] += 1
                     state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:
@@ -265,8 +268,11 @@ class ContentApi(ABC_WB_API):
     async def get_cards_by_text(self, texts):
         cards = []
         for text in texts:
-            cards.append(await self._get_cards_by_text(text))
-
+            try:
+                cards.append(await self._get_cards_by_text(text))
+            except exceptions.CardNotFoundInWB:
+                logger.error('Карточка с текстом %s не найдена на Wildberries', text)
+                continue
         return cards
 
 
@@ -295,6 +301,9 @@ class ContentApi(ABC_WB_API):
                                              json_data=data_for_req,
                                              headers=self.headers.standart)
                 answer = json.loads(answer)
+            cards = answer['cards']
+            if not cards:
+                raise exceptions.CardNotFoundInWB(f'Карточка с текстом {text} не найдена на Wildberries')
             card_json = answer['cards'][0]
             card = CardFromWB(card_json)
         return card
