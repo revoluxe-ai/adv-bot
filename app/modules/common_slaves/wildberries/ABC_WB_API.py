@@ -89,11 +89,12 @@ class ABC_WB_API(WbRequestApiMixin):
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
 
         self._wb_user_cabinet = wb_user_cabinet
-        for token in tokens:
+        for _ in range(len(tokens)):
+            token = tokens.pop()
             if  self._rights.issubset(token.categories) \
                     and self._only_read == token.read_only:
                 current_token = token
-                self._free_tokens = set(tokens) - {current_token}
+                self._free_tokens: set = set(tokens) - {current_token}
                 break
 
         else:
@@ -103,6 +104,15 @@ class ABC_WB_API(WbRequestApiMixin):
                     ))
         self.headers = Headers(current_token)
         self._shop_id = current_token.shop_id
+
+
+    def set_next_token(self):
+        if self._free_tokens:
+            token = self._free_tokens.pop()
+            self.headers = Headers(token)
+        else:
+            raise exceptions.ApiForbiddenError('Нет свободных токенов',
+                                               wb_user_cabinet=self._wb_user_cabinet)
 
 
     @property
