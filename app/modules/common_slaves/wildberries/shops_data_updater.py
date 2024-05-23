@@ -10,7 +10,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 from . import models, wb_db_manager
 from .data_classes.adv import Adv
-
+from .exceptions import NotValidDataError
 
 sm = get_async_session_maker()
 
@@ -79,26 +79,30 @@ class ShopDataUpdater:
                 for nmid in nmids:
                     nmids_collection.add(nmid)
         async def update_cards():
-            cards = await wb_api.content.get_uploaded_products(nmids_collection)
+            cards = await wb_api.content.get_cards_by_text(nmids_collection)
             await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
         func = update_cards()
         await _coroutine_parallel_run_queue.put(func)
 
     async def update_all_data(self):
+        wb_api = self.__wb_api
+        advert_api = wb_api.advert
+        adv_ids = await advert_api.get_advertIds()
         try:
-            wb_api = self.__wb_api
-            advert_api = wb_api.advert
-            adv_ids = await advert_api.get_advertIds()
             advs: list[Adv] = await advert_api.get_advs(adv_ids)
+            await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
         except exc.ApiForbiddenError:
-            logger.error('Попытка обновлений с отозванным токеном')
+            logger.error('Попытка получить данные с отозванным токеном')
             return
-        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
+        except NotValidDataError:
+            logger.error('Получены невалидные данные в РК')
 
-        nmids = set()
-        for adv in advs:
-            nmids.update(adv.nmids)
-
+        async with sm() as session:
+            stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
+            result = (await session.execute(stmt)).unique()
+            existing_advs: list[models.AdvSetting] = result.scalars().all()
+            nmids = set()
+            for adv in existing_advs:
+                nmids.update(adv.nmids)
         cards = await wb_api.content.get_cards_by_text(nmids)
-
         await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
