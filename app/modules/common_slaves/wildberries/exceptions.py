@@ -55,3 +55,7 @@ class BadRequestError(Exception):
 
 class NotValidDataError(Exception):
     pass
+
+
+class CardNotFoundInWB(Exception):
+    pass
