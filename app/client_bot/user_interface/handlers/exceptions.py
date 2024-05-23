@@ -1,6 +1,8 @@
 import logging
 import traceback
+import typing
 
+from app.modules.wb_adv_updater.exceptions import NotFoundWBCard
 import aiogram
 from aiogram import Router
 from aiogram.exceptions import TelegramForbiddenError
@@ -26,6 +28,25 @@ admin_router = Router()
 async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
     logger.error('Юзер заблокировал бота')
     return
+
+
+@admin_router.errors(ExceptionTypeFilter(NotFoundWBCard))
+async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+    message = error_event.update.message
+    exception = error_event.exception
+    exception = typing.cast(NotFoundWBCard, exception)
+
+
+    if message is None:
+        chat_id = error_event.update.callback_query.message.chat.id
+    else:
+        chat_id = message.chat.id
+    await bot.send_message(chat_id=chat_id,
+                           text='Ошибка получения карточки, обратитесь к администратору бота @skyline360_1')
+    await bot.send_message(admin_telegram_id, str(exception))
+    return
+
+
 
 
 @admin_router.errors(ExceptionTypeFilter(Exception))
@@ -72,8 +93,6 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
         await bot.send_message(admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены.")
 
     await bot.send_message(admin_telegram_id, 'Ник пользователя: %s' % user_name )
-
-
 
 
 
