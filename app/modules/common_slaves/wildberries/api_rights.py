@@ -1,8 +1,9 @@
 import asyncio
 from asyncio import Lock
-
+import datetime
 from app.utils import redis_manager
-
+from .models import WBToken
+from app.modules.common_slaves.wildberries import exceptions
 
 class OnlyRead:
     TRUE = True
@@ -91,7 +92,7 @@ class TokenRightChecker(WbRequestApiMixin):
 
 
 
-async def check_token(token):
+async def check_token(token: WBToken):
     hash_token = hash(token)
     logger.debug('Проверка прав на токен')
     check = await redis_manager.get_token_rights(hash_token)
@@ -99,6 +100,9 @@ async def check_token(token):
         logger.debug('Права на токен уже проверены')
         return
     try:
+        expire = token.expires
+        if expire < datetime.datetime.now():
+            raise exceptions.TokenExpiredError('Token expired')
         async with locker:
             checker = TokenRightChecker(token)
             await asyncio.gather(checker.adverts(), checker.content())
