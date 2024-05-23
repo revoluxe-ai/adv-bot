@@ -24,6 +24,8 @@ from app.utils.db.session_maker import get_async_session_maker
 
 from . import data_managers
 from .data_managers import DataGetter
+from app.modules.common_slaves.wildberries.exceptions import NmidsInAdvError
+
 
 sm = get_async_session_maker()
 
@@ -183,9 +185,11 @@ class Fitter(AbcManager):
                 keyword_to_features = await self.__fetch_keyword_features(session, list(keywords_batch))
 
         for adv in adv_settings:
-            wb_category = await data_managers.get_wb_category(adv)
-            if not wb_category:
-                logger.error(f'Не найдена категория для кампании {adv.adv_id}')
+            try:
+                wb_category = await data_managers.get_wb_category(adv)
+            except NmidsInAdvError:
+                logger.error(f'В рекламной карточке {adv.name} нет nmids')
+                continue
             keyword_stats = await data_managers.get_keywords_statistic(adv, None)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
 
