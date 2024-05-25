@@ -85,7 +85,7 @@
     },
 
     "app.utils.db.session_maker": {
-        "level": "CRITICAL",
+        "level": "DEBUG",
         "handlers": ["console"],
         "propagate": false
     },
