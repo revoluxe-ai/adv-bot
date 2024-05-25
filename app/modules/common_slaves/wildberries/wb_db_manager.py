@@ -43,7 +43,6 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet: WBCabinet):
 async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet):
     async with _sm() as session:
         for card in cards:
-            card = CardFromWB(card)
             stmt = select(my_types.WBCard).where(my_types.WBCard.nmid == card.nmid)
             result = await session.execute(stmt)
             existing_card = result.scalars().first()

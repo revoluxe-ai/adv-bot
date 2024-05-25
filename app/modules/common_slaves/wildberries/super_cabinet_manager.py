@@ -14,6 +14,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 from . import api_rights, exceptions
+from .api_rights import check_token
 from .exceptions import ApiForbiddenError, UnknownApiRequestError
 from .models import WBToken
 
@@ -93,25 +94,30 @@ async def get_accesses_for_wb_cabinets()-> AsyncGenerator[WBCabinetAccess, None]
 
 async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
     async with sm() as session:
-        stmt = (
-            select(WBUserCabinet)\
-            .options(
-                selectinload(WBUserCabinet.wb_cabinet),
-                selectinload(WBUserCabinet.user)
-                .selectinload(User.wb_tokens)  # Загружаем информацию о пользователе
-            )
-            .where(WBUserCabinet.id == wb_user_cabinet.id)  # Условие должно быть скорректировано
-        )
+        stmt = select(WBCabinet).join(WBUserCabinet)\
+           .where(WBCabinet.id == wb_user_cabinet.wb_cabinet_id)
         result = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = result.scalars().first()
-        user = wb_user_cabinet.user
-        tokens = user.wb_tokens
-        wb_cabinet = wb_user_cabinet.wb_cabinet
-        access = WBCabinetAccess(tokens = tokens,
-                                 wb_user_cabinet = wb_user_cabinet,
-                                 wb_cabinet = wb_cabinet)
+        wb_cabinet: WBCabinet = result.scalars().first()
+        stmt = select(WBToken)
+        result = await session.execute(stmt)
+        tokens: list[WBToken] = result.scalars().all()
+    checked_tokens = []
+    for token in tokens:
+        try:
+            if token.shop_id == wb_cabinet.shop_id:
+                await check_token(token)
+                checked_tokens.append(token)
+            else:
+                continue
+        except:
+            logger.error('Токен не прошел проверку')
+            continue
 
-        return access
+    access = WBCabinetAccess(tokens = checked_tokens,
+                             wb_user_cabinet = None,
+                             wb_cabinet = wb_cabinet)
+    return access
+
 
 
 async def get_super_user_access():
