@@ -12,7 +12,7 @@ sm = get_session_maker()
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
 
-shop_id = '1a45dee9-6f73-4439-baa0-264a878ee957'.strip()
+shop_id = '9f089e31-dd37-4456-8304-2dbf398b774d'.strip()
 
 
 if __name__ == '__main__':
@@ -24,8 +24,8 @@ if __name__ == '__main__':
          expiration_time = wb_cabinet.expiration_time
          if expiration_time < datetime.datetime.now():
               expiration_time = datetime.datetime.now()
-         wb_cabinet.expiration_time = expiration_time + timedelta(days=1)
-         wb_cabinet.demo = True
+         wb_cabinet.expiration_time = expiration_time + timedelta(days=33)
+         wb_cabinet.demo = False
          wb_cabinet.active = True
          session.commit()
 
