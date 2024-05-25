@@ -1,28 +1,32 @@
-import logging
+import asyncio
 from operator import and_
 from typing import Union
-
 import aiogram
 from aiogram import Router, types
-from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
-from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload, selectinload
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, WBToken
+from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError, ApiForbiddenError
+from sqlalchemy.future import select
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.utils.db.models import RefLink
+from app.utils.db.session_maker import get_async_session_maker
+from   .. import states
+from ..views import messages
+from aiogram.filters import StateFilter, CommandStart
+from aiogram.types import Message
 
+from ..views.callbacks import Action
+from ...redis_manager import RedisManager
+import logging
+from ..views import callbacks
+from app.utils.db.models import User
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from app.modules.common_slaves.wildberries import models as wb_models
-from app.modules.common_slaves.wildberries.exceptions import ApiForbiddenError, NotValidTokenError
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBToken, WBUserCabinet
+from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
-from app.utils.db.models import RefLink, User
-from app.utils.db.session_maker import get_async_session_maker
 
-from ...redis_manager import RedisManager
-from .. import states
-from ..views import callbacks, messages
-from ..views.callbacks import Action
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +34,12 @@ sm = get_async_session_maker
 
 router = Router()
 
+
 redis_manager = RedisManager()
 
 
 async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
-
     await state.clear()
-
     if isinstance(message, types.CallbackQuery):
         await message.answer()
     referral_link  = None
@@ -51,35 +54,33 @@ async def start_registration(message: types.Message, bot: aiogram.Bot, state: FS
                     .where(RefLink.id == referral_link_id)
                 referral_link = (await session.execute(stmt)).scalar()
 
-        stmt = select(User).options(
-            joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
-        ).where(User.user_telegram_id == user_id)
-
+        stmt = select(User)\
+            .options(joinedload(User.wb_user_cabinets).joinedload(
+            WBUserCabinet.wb_cabinet)) \
+            .where(User.user_telegram_id == user_id)
         result = await session.execute(stmt)
         user = result.scalar()
-
         if not user:
-            user = User(
-                user_telegram_id=user_id,
-                username=message.from_user.username,
-                adv_updater_user_chat_id=message.chat.id,
-                wb_tokens=[],
-            )
+            user = User(user_telegram_id=user_id,
+                        username=message.from_user.username,
+                        adv_updater_user_chat_id = message.chat.id,
+                        wb_tokens=[])
             session.add(user)
-
             if referral_link:
                 referral_link.referred_users.append(user)
-
             await session.commit()
             await session.refresh(user)
             wb_user_cabinets = []
         else:
             wb_user_cabinets = user.wb_user_cabinets
+        if isinstance(message, types.Message):
+            chat_id = message.chat.id
+        else:
+            chat_id = message.message.chat.id
 
-        chat_id = message.chat.id if isinstance(message, types.Message) else message.message.chat.id
-
-        await messages.ShopChoice(bot, chat_id, wb_user_cabinets)()
-
+        await messages. \
+                ShopChoice(bot, chat_id, wb_user_cabinets)()
+    return
 
 @router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(callback_query: types.CallbackQuery,
@@ -88,6 +89,7 @@ async def add_shop(callback_query: types.CallbackQuery,
     await state.set_state(states.CabinetRegistration.cabinet_name)
     chat_id: int = callback_query.message.chat.id
     await messages.ShopNameGet(bot, chat_id)()
+
 
 
 @router.message(StateFilter(states.CabinetRegistration.cabinet_name))
@@ -316,6 +318,7 @@ async def select_shop(callback_query: types.CallbackQuery,
     message = callback_query.message
 
     chat_id = message.chat.id
+    # await state.update_data(chat_id = chat_id)
 
 
     await messages.AdvCompanyChoicing \
@@ -336,7 +339,5 @@ async def shop_menu_process(
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await messages.ShopMenu(bot, callback.message.chat.id, state, wb_user_cabinet_original_id)()
 
-
 router.callback_query.register(start_registration, callbacks.Start.filter())
 router.message.register(start_registration, CommandStart())
-

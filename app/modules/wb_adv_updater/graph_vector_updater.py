@@ -4,16 +4,17 @@ import hashlib
 import logging
 import os
 
-from neo4j import exceptions
+from neo4j.exceptions import Neo4jError
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.utils.db.session_maker import get_async_session_maker
-from app.utils.NeoDataScience.driver import DataScience
 
+from app.utils.NeoDataScience.driver import DataScience
 from .ABC_manager import AbcManager
 from .data_manager import DataGetter
 from .models import ItemFeature, KeywordFeature
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class GraphUpdater:
             try:
                 await self._gds.update_fastrp(leingth)
                 break
-            except exceptions.Neo4jError as e:
+            except Neo4jError as e:
                if "a job running with jobId 'fastrp'" in e.message:
                     while True:
                         try:

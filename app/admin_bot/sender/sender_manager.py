@@ -4,16 +4,16 @@ from hashlib import sha256
 
 import aiogram
 from aiogram.exceptions import TelegramForbiddenError
-
-from app.admin_bot.sender import redis_manager
+from .utils import utils
 from app.client_bot.bot import bot
 from app.client_bot.utils import data_manager
 from python_modules.logger import setup_logging
 
-from ...modules.common_slaves.wildberries.models import WBUserCabinet
-from ...utils.db.models import User
+from python_modules.logger import setup_logging
 from . import messages
-from .utils import utils
+from ...modules.common_slaves.wildberries.models import WBUserCabinet
+from ...utils import redis_manager
+from ...utils.db.models import User
 
 setup_logging()
 
@@ -57,7 +57,7 @@ async def send_to_users_out_channel():
                     await http_session.close()
 
 
-async def send_message_to_admin(text: str, off = True):
+async def send_message_to_admin(text: str, off = False):
     if off:
         return
     try:

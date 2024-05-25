@@ -1,13 +1,12 @@
-from typing import Union
-
 import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from sqlalchemy import and_
-from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+
+from sqlalchemy.future import select
 
 from app.client_bot import utils
 from app.modules.common_slaves.wildberries.models import (
@@ -25,7 +24,6 @@ from app.utils.db.session_maker import get_async_session_maker
 from .start import start_registration
 from ..views import callbacks, messages
 from app.client_bot.user_interface import states
-
 
 
 router = Router()
@@ -190,23 +188,10 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
     wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
     wb_user_cabinet_original_id = wb_user_cabinet.id
     nmids = adv_setting.nmids
-    chat_id = callback.message.chat.id
-
     if nmids:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     else:
-        main_photos = None
-    if not main_photos:
-        await messages.NoMainPhotos(
-            bot,
-            chat_id,
-            keywords,
-            adv_setting,
-            wb_user_cabinet_original_id,
-            adv_choice_last_page,
-            page,
-        )()
-        await redis_manager.set_check_last_24_hours(adv_original_id)
+        await messages.NoMainPhotos(bot, callback.message.chat.id)()
         return
 
     chat_id = callback.message.chat.id

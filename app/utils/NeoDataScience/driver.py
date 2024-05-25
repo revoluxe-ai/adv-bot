@@ -1,12 +1,11 @@
 import asyncio
 import logging
 import typing
-from collections import defaultdict
-
 import neo4j
 import yaml
-from neo4j import AsyncGraphDatabase
 
+from collections import defaultdict
+from neo4j import AsyncGraphDatabase
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordPhrase
 from app.modules.common_slaves.wildberries.models import WBCard, WBCategory
@@ -15,7 +14,6 @@ from python_modules.path_setting_funcs import get_setting_path
 logger = logging.getLogger(__name__)
 
 from functools import wraps
-
 
 def async_semaphore_wrapper(semaphore):
     def decorator(func):

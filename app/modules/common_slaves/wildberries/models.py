@@ -1,37 +1,23 @@
-import datetime
 import json
-from typing import TYPE_CHECKING
-
-import jwt
-from sqlalchemy import (
-    BIGINT,
-    Boolean,
-    Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-    text,
-)
-from sqlalchemy.dialects.postgresql import JSONB
+import datetime
+from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import (Column, Integer, String, ForeignKey,
+                        BIGINT, Boolean, Float, DateTime, text)
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.schema import UniqueConstraint
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+import jwt
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.utils.db.base import BaseTable
-
 from . import exceptions
 from ...wb_adv_updater.models import AdvPayment
-
 
 from app.utils.db.models import User
 
 from app.utils.db.session_maker import get_async_session_maker
 
-_sm = get_async_session_maker
 
+_sm = get_async_session_maker
 
 class WBUserCabinet(BaseTable):
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
@@ -84,6 +70,9 @@ class WBToken(BaseTable):
             raise exceptions.NotValidTokenError
     def get_payload(self, key, default=0):
         payload = self.__payload
+        expire = payload.get('exp', default)
+        if expire < datetime.datetime.now().timestamp():
+            raise exceptions.TokenExpiredError
         return payload.get(key)
 
 
@@ -237,7 +226,6 @@ class KeywordSetting(BaseTable):
     2 - white list
 
     """
-
     text = Column(String, nullable=False)
     adv_setting_id: Mapped[int] = mapped_column(ForeignKey('advsetting.id'))
     adv_setting: Mapped[AdvSetting] = relationship('AdvSetting',

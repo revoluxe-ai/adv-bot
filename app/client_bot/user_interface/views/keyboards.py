@@ -1,29 +1,17 @@
 import asyncio
 import datetime
-from typing import TYPE_CHECKING
-
-from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
-    WBCabinet,
-    WBUserCabinet,
-)
 from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
 from app.utils import redis_manager
-from app.utils.db.session_maker import get_async_session_maker
-
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
 from ...user_interface.views import callbacks
 from ...user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot
 from .callbacks import Action
-
-if TYPE_CHECKING:
-    from ...utils import KeywordForKeyboard
+from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
 
@@ -35,18 +23,14 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet]):
     for wb_user_cabinet in all_shops:
         shop_name = wb_user_cabinet.name
         wb_user_cabinet_original_id = wb_user_cabinet.id
-        button = InlineKeyboardButton(
-            text=shop_name,
-            callback_data=callbacks.Shop(
-                action=Action.select,
-                wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack()
-        )
+        button = InlineKeyboardButton(text=shop_name, callback_data=callbacks \
+                                      .Shop(action=Action.select,
+                                            wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack())
         # Добавляем кнопку в список строк кнопок
         keyboard_buttons.append([button])  # Каждая кнопка в своем списке, т.е. каждая в новой строке
     button = InlineKeyboardButton(text='Добавить магазин', callback_data=callbacks.ShopNew().pack())
 
     keyboard_buttons.append([button])
-    # Создаем InlineKeyboardMarkup с переданным списком кнопок
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     return keyboard
 
@@ -61,18 +45,6 @@ def get_budget_type_keyboard(balances):
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     return keyboard
-
-
-
-
-
-
-
-
-
-
-
-
 
 def get_adv_list_keyboard(advs: list[Adv]):
     buttons = []
@@ -194,16 +166,18 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
                                                           wb_user_cabinet_original_id=wb_user_cabinet_original_id,
                                                           page=next_page).pack())])
 
-    button = InlineKeyboardButton(
-        text='Вернуться к меню магазина',
-        callback_data=callbacks.Shop(
-            action=Action.select,
-            wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack(),
-    )
+    button = InlineKeyboardButton(text='Вернуться к меню магазина',
+                                    callback_data=callbacks.Shop(
+                                        action=Action.select,
+                                        wb_user_cabinet_original_id = wb_user_cabinet_original_id).pack())
 
     keyboard_buttons.append([button])
 
-    return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+
+
+
+    return keyboard
 
 
 
@@ -358,10 +332,6 @@ def get_keyword_setting_keyboard(
                                            new_hard_status=AUTO_MODE,
                                            keyword_setting_original_id=keyword.id).pack())]
         buttons.append(button)
-
-
-
-
     if keyword.hard_status in [AUTO_MODE, WHITE_LIST]  or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
 
         bottom = [InlineKeyboardButton(text='Отключить (релевантная фраза)',
@@ -458,11 +428,8 @@ def get_shop_menu_keyboard(
             callback_data=callbacks.TurnBot(action='off_all',
                                             wb_user_cabinet_original_id=wb_user_cabinet.id).pack())
         builder.row(button)
-
-    button = InlineKeyboardButton(
-        text='Вернуться к списку магазинов',
-        callback_data=callbacks.Start().pack(),
-    )
+    button = InlineKeyboardButton(text='Вернуться к списку магазинов',
+                                    callback_data=callbacks.Start().pack())
     builder.row(button)
     return builder.as_markup()
 
@@ -477,7 +444,9 @@ def get_payment_keyboard(wb_cabinet_original_id):
     )
     builder.row(button)
 
-    button = InlineKeyboardButton(text='К списку магазинов', callback_data=callbacks.Start().pack())
+
+    button = InlineKeyboardButton(text='К списку магазинов',
+                                  callback_data=callbacks.Start().pack())
 
     builder.row(button)
 
@@ -528,4 +497,25 @@ def get_return_to_adv_setting_keyboard(adv_original_id):
                                      callback_data=callbacks.Adv(
                                          adv_original_id=adv_original_id).pack()))
 
+def get_call_me_keyboard():
+    builder = InlineKeyboardBuilder()
+    button = InlineKeyboardButton(text='Получить консультацию и тест-драйв бота',
+                                 url='https://t.me/skyline360_1')
+    builder.row(button)
+    return builder.as_markup()
+
+
+def get_call_me_keyboard0():
+    builder = InlineKeyboardBuilder()
+    button = InlineKeyboardButton(text='Связаться с разработчиком бота для консультации',
+                                  url='https://t.me/skyline360_1')
+    builder.row(button)
+    return builder.as_markup()
+
+
+def get_call_me_keyboard1():
+    builder = InlineKeyboardBuilder()
+    button = InlineKeyboardButton(text='Заказать демо-доступ к боту',
+                                  url='https://t.me/skyline360_1')
+    builder.row(button)
     return builder.as_markup()

@@ -1,26 +1,38 @@
-import logging
-import traceback
 import typing
-
-
 from app.exc import CardNotFoundInDB
-import aiogram
 from aiogram import Router
 from aiogram.exceptions import TelegramForbiddenError
 from aiogram.filters.exception import ExceptionTypeFilter
-from aiogram.fsm.context import FSMContext
 from aiogram.types.error_event import ErrorEvent
-
+import app
+import aiogram
+import traceback
+from aiogram.fsm.context import FSMContext
+import logging
 from app import client_bot as tb
 from app.client_bot import const
 
 logger = logging.getLogger(__name__)
 
 
-
 admin_telegram_id = 373435337
 
 user_router = Router()
+
+
+#
+#
+# @user_router.errors(ExceptionTypeFilter(my_exc.ApiForbiddenError))
+# async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+#     await state.clear()
+#     logger.debug( 'Текущее состояние: %s', await state.get_state())
+#     chat_id = error_event.update.message.chat.id
+#
+#     wb_user_cabinet: app.my_types.WBUserCabinet = error_event.exception.__dict__['wb_user_cabinet']
+#     await errors_message.AddNewToken(bot, chat_id, wb_user_cabinet)()
+#     return
+#
+
 admin_router = Router()
 
 
@@ -46,9 +58,6 @@ async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMCon
                            text='Ошибка получения карточки, обратитесь к администратору бота @skyline360_1')
     await bot.send_message(admin_telegram_id, str(exception))
     return
-
-
-
 
 @admin_router.errors(ExceptionTypeFilter(Exception))
 async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
@@ -94,6 +103,8 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
         await bot.send_message(admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены.")
 
     await bot.send_message(admin_telegram_id, 'Ник пользователя: %s' % user_name )
+
+
 
 
 

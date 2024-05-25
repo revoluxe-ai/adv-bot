@@ -1,16 +1,18 @@
 import io
-import logging
 from abc import abstractmethod
 from functools import wraps
 from typing import Union
 
-import aiogram
 from aiogram import types
-from aiogram.types import BufferedInputFile
+import aiogram
+import logging
 
-from app import file_handler
+from aiogram.types import FSInputFile, InputFile, BufferedInputFile
 
 from .base import Base
+from app import file_handler
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +107,8 @@ class Text(Base):
     async def __call__(self)-> (LastMessage, str):
         # Отправка нового сообщения без попытки редактирования существующего
         last_message = await self.bot.send_message(chat_id=self.chat_id,
-                                                 text=self.text)
+                                                 text=self.text,
+                                                 parse_mode= getattr(self, 'parse_mode', None))
         return last_message
 
 
@@ -130,7 +133,8 @@ class TextWithKeyboardPagination(Base):
 
         last_message = await self.bot.send_message(chat_id=self.chat_id,
                                                         text=self.text,
-                                                        reply_markup=self.keyboard)
+                                                        reply_markup=self.keyboard,
+                                                   parse_mode= getattr(self, 'parse_mode', None))
         return last_message, self.get_content_type()
 
 

@@ -1,14 +1,15 @@
-import json
-import logging
-import os
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Union
+import os
+from typing import Union
 
+from . import exceptions
+import json
 import aiohttp
-
-from . import exceptions, models
+import logging
+from . import models
+import app
 from .models import WBToken, WBUserCabinet
-
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .super_cabinet_manager import WBCabinetAccess
 
@@ -32,7 +33,7 @@ class WbRequestApiMixin(ABC):
                 text = await response.text()
                 response.raise_for_status()
             except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
-                if e.status in (401, 403):
+                if e.status == 401:
                     raise exceptions.ApiForbiddenError('Неверный API ключ', wb_user_cabinet=self._wb_user_cabinet) from e
                 if e.status == 429:
                     logger.debug(f'Превышен лимит запросов к API: {url}')
@@ -91,12 +92,11 @@ class ABC_WB_API(WbRequestApiMixin):
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
 
         self._wb_user_cabinet = wb_user_cabinet
-        for _ in range(len(tokens)):
-            token = tokens.pop()
+        for token in tokens:
             if  self._rights.issubset(token.categories) \
                     and self._only_read == token.read_only:
                 current_token = token
-                self._free_tokens: set = set(tokens) - {current_token}
+                self._free_tokens = set(tokens) - {current_token}
                 break
 
         else:
@@ -106,15 +106,6 @@ class ABC_WB_API(WbRequestApiMixin):
                     ))
         self.headers = Headers(current_token)
         self._shop_id = current_token.shop_id
-
-
-    def set_next_token(self):
-        if self._free_tokens:
-            token = self._free_tokens.pop()
-            self.headers = Headers(token)
-        else:
-            raise exceptions.ApiForbiddenError('Нет свободных токенов',
-                                               wb_user_cabinet=self._wb_user_cabinet)
 
 
     @property

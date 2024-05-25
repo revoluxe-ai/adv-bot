@@ -1,18 +1,16 @@
-import logging
-import os
-from typing import List
-
 import faiss
+import os
 import numpy as np
-from PIL import Image as PilImg
-from tqdm import tqdm
-
-from app.utils.faiss_manager.faiss_index import Index
-from app.utils.faiss_manager.faiss_index_manager import FaissManager
-from app.utils.image_master import image_tools
-from app.utils.image_master.database.model import Image
-
 from .database import model
+from typing import List
+import logging
+from PIL import Image as PilImg
+from app.utils.faiss_manager.faiss_index_manager  import FaissManager
+from app.utils.image_master.database.model import Image
+from tqdm import tqdm
+from app.utils.image_master import image_tools
+from app.utils.faiss_manager.faiss_index import Index
+
 
 
 def ensure_used_with_with(func):
@@ -57,8 +55,9 @@ class ImageMaster:
             img = img.convert('RGB')
 
 
-        from keras.applications.vgg19 import VGG19, preprocess_input
         from keras.preprocessing.image import img_to_array
+        from keras.applications.vgg19 import preprocess_input
+        from keras.applications.vgg19 import VGG19
         self._model = VGG19(include_top=False)
         # Ensure the tensor has three channels
         img = img.resize((224, 224))

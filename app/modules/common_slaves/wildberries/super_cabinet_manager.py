@@ -3,7 +3,6 @@ import datetime
 import logging
 import typing
 from dataclasses import dataclass
-from typing import Union, AsyncGenerator
 
 import aiohttp
 from sqlalchemy import select, or_
@@ -11,14 +10,19 @@ from sqlalchemy.orm import selectinload
 
 from app.client_bot.const import MAX_TOKENS
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
-from app.utils.db.models import User
-from app.utils.db.session_maker import get_async_session_maker
-
-from . import api_rights, exceptions
+from . import exceptions
+from . import api_rights
 from .api_rights import check_token
 from .exceptions import ApiForbiddenError, UnknownApiRequestError
 from .models import WBToken
+from sqlalchemy.orm import selectinload
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.utils.db.session_maker import get_async_session_maker
+from sqlalchemy import select
+from app.utils.db.models import User
+import logging
+import aiohttp
+
 
 sm = get_async_session_maker
 
@@ -30,11 +34,11 @@ class WBCabinetAccess:
         return  f'ShopId: {self.wb_cabinet.shop_id}'
 
     tokens: list[WBToken]
-    wb_user_cabinet: Union[WBUserCabinet | None]
-    wb_cabinet: Union[WBCabinet | None]
+    wb_user_cabinet: typing.Union[WBUserCabinet | None]
+    wb_cabinet: typing.Union[WBCabinet | None]
 
 
-async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> AsyncGenerator[WBCabinetAccess, None]:
+async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> typing.AsyncGenerator[WBCabinetAccess, None]:
     async with sm(semaphore) as session:
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
@@ -92,12 +96,17 @@ async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> As
 
 
 
-
-
 async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCabinetAccess:
     async with sm() as session:
-        stmt = select(WBCabinet).join(WBUserCabinet)\
-           .where(WBCabinet.id == wb_user_cabinet.wb_cabinet_id)
+        stmt = (
+            select(WBUserCabinet)\
+            .options(
+                selectinload(WBUserCabinet.wb_cabinet),
+                selectinload(WBUserCabinet.user)
+                .selectinload(User.wb_tokens)  # Загружаем информацию о пользователе
+            )
+            .where(WBUserCabinet.id == wb_user_cabinet.id)  # Условие должно быть скорректировано
+        )
         result = await session.execute(stmt)
         wb_cabinet: WBCabinet = result.scalars().first()
         stmt = select(WBToken)
@@ -124,31 +133,27 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCab
     return access
 
 
-
 async def get_super_user_access():
-
+    accesses = await get_accesses_for_wb_cabinets()
+    tokens = [token for access in accesses for token in access.tokens]
     leave_tokens = []
-    access_generator = get_accesses_for_wb_cabinets()
-
-    async for access in access_generator:
-        for token in access.tokens:
+    for token in tokens:
             try:
                 await CabinetManager.check_access(token)
                 leave_tokens.append(token)
-                if len(leave_tokens) >= MAX_TOKENS:
-                    break
             except Exception as exc:
                 logger.debug(f'Токен не прошел проверку: {exc}')
                 await asyncio.sleep(0)
 
-        if len(leave_tokens) >= MAX_TOKENS:
-            await access_generator.aclose()
-            break
 
-    return WBCabinetAccess(tokens=leave_tokens, wb_user_cabinet=None, wb_cabinet=None)
+    super_user_access = WBCabinetAccess(tokens = leave_tokens,
+                                        wb_user_cabinet = None,
+                                        wb_cabinet = None)
+
+    return super_user_access
 
 
-async def get_access_for_wb_cabinet(wb_cabinet_id: int) -> Union[WBCabinetAccess, None]:
+async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
     async with sm() as session:
         stmt = (
             select(WBCabinet)
@@ -174,6 +179,7 @@ async def get_access_for_wb_cabinet(wb_cabinet_id: int) -> Union[WBCabinetAccess
                 logger.error(f'Токен не прошел проверку: {exc}')
                 continue
 
-        return WBCabinetAccess(
-            tokens=live_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
-        ) if live_tokens else None
+        access = WBCabinetAccess(tokens = live_tokens,
+                                 wb_user_cabinet = None,
+                                 wb_cabinet = wb_cabinet)
+        return access

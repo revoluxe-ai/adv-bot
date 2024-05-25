@@ -1,56 +1,59 @@
-import asyncio
 import datetime
-import logging
-from io import BytesIO
-from typing import TYPE_CHECKING
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from aiogram import Bot
-from aiogram.fsm.context import FSMContext
-from aiogram.utils import deep_linking
-from sqlalchemy import select, and_, func, desc, or_
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.orm import selectinload, joinedload
-from app.client_bot import const
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
-    WBCabinet,
-    WBUserCabinet, AdvKeyword, WBItemPosition, CommonKeyword
+ CommonKeyword
 )
 from app.modules.wb_adv_updater import data_manager
-from app.payments.db.models import Payment
+from aiogram.enums import ParseMode
+from aiogram.utils import deep_linking
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
-from app.utils.suffixes import get_day_suffix
-
-from ..message_templates.templates import (
-    Text,
-    TextWithImage,
-    TextWithKeyboard,
-    TextWithKeyboardAndImage,
-    TextWithKeyboardPagination,
-)
-from . import  keyboards
+from aiogram.fsm.context import FSMContext
+from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
+                                                          AdvSetting,
+                                                          KeywordSetting, WBCabinet)
 from app.utils import redis_manager
+from ..message_templates.templates import (TextWithKeyboard,
+                                           Text,
+                                           TextWithImage,
+                                           TextWithKeyboardPagination,
+                                           TextWithKeyboardAndImage)
 
+from . import keyboards
+from aiogram import Bot
+
+import logging
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard
+from .import texts
 logger = logging.getLogger(__name__)
 
 
 
 _sm = get_async_session_maker
 
-
 class MainMenu(TextWithKeyboard):
 
     def __init__(self, bot: Bot, chat_id: int, user_original_id: int):
         super().__init__(bot, chat_id)
         self.__user_original_id = user_original_id
+
+
+    @property
+    def text(self):
+        return texts.get_main_menu_text(self.__user_original_id)
+
+
+
+
+
 
 
 class ShopChoice(TextWithKeyboard):
@@ -116,37 +119,30 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         last_wb_user_cabinet_page = data.get('last_wb_user_cabinet_page')
         return last_wb_user_cabinet_original_id, last_wb_user_cabinet_page
 
-    def __init__(
-        self, bot: Bot,
-        state: FSMContext,
-        chat_id: int,
-        wb_user_cabinet_original_id: int,
-        page: int = 1,
-    ):
+
+    def __init__(self, bot: Bot,
+                  state: FSMContext,
+                  chat_id: int,
+                  wb_user_cabinet_original_id: int,
+                  page: int = 1):
         super().__init__(bot, chat_id)
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._page = page
         self._state = state
+
 
     async def __call__(self):
         async with _sm() as session:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
                 .join(WBCabinet.wb_user_cabinets) \
-                .where(
-                and_(
-                    WBUserCabinet.id == self._wb_user_cabinet_original_id,
-                    AdvSetting.type == 8,
-                    AdvSetting.active_status.in_(['started', 'pause', 'ready_for_start'])
-                )
-            ).order_by(AdvSetting.name)
+                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id) \
+                .order_by(AdvSetting.name)
             result = await session.execute(stmt)
             self._adv_settings = result.scalars().all()
-            stmt = (
-                select(WBCabinet.id)
-                .where(WBCabinet.wb_user_cabinets
+            stmt = select(WBCabinet.id)\
+                .where(WBCabinet.wb_user_cabinets\
                        .any(WBUserCabinet == self._wb_user_cabinet_original_id))
-            )
             result = await session.execute(stmt)
             wb_cabinet_original_id = result.scalar()
             await self._state.update_data(
@@ -364,7 +360,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
     @property
     def text(self):
-
         total_page = len(self._keywords) // self._on_page
 
         text = (
@@ -441,12 +436,7 @@ class KeywordSettingMessage(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        return keyboards.get_keyword_setting_keyboard(
-            self._keyword_setting,
-            self._adv_setting,
-            self._auto_block_status,
-            self._page,
-        )
+        return keyboards.get_keyword_setting_keyboard(self._keyword_setting, self._adv_setting, self._page)
 
 
 class GetNameOfNewAdvCompany(Text):
@@ -476,6 +466,16 @@ class NotFoundNmidOfNewAdvCompany(Text):
 
 class LongTimeOperation(Text):
     text = 'Операция может занять некоторые время, пожалуйста, подождите...'
+
+
+
+class NeedSubscribe(TextWithKeyboard):
+    text = ('Для использования функций вы должны быть подписаны на канал службы поддержки')
+
+
+    @property
+    def keyboard(self):
+        return keyboards.get_subscribe_keyboard()
 
 
 class RefProgram(TextWithKeyboard):
@@ -607,7 +607,7 @@ class ShopMenu(TextWithKeyboard):
         self.bonus_days = self.days_left * 2
         await self._state.update_data(
             last_wb_user_cabinet_original_id=self._wb_user_cabinet.id,
-            last_wb_cabinet_original_id=self._wb_cabinet.id,
+            last_wb_cabinet_original_id=self._wb_cabinet.id
         )
         self.is_active_adv = await self._is_active_adv()
         if not (balance := self._wb_cabinet.balance):
@@ -617,6 +617,7 @@ class ShopMenu(TextWithKeyboard):
         self._balance = balance
         self._bonus = bonus
         await super().__call__()
+
 
     @property
     def text(self):
@@ -656,8 +657,6 @@ class OrderSubscribe(Text):
 
 
 class NoMainPhotos(Text):
-
-
     def __init__(self,
                  bot: Bot,
                  chat_id,
@@ -703,19 +702,19 @@ class NoMainPhotos(Text):
 class ExpiredSubscription(TextWithKeyboard):
 
     def __init__(self, bot: Bot, chat_id: int, wb_cabinet_original_id: int):
-        self._wb_cabinet_original_id = wb_cabinet_original_id
-        super().__init__(bot, chat_id)
+            self._wb_cabinet_original_id = wb_cabinet_original_id
+            super().__init__(bot, chat_id)
 
     async def __call__(self):
-        async with _sm() as session:
-            stmt = select(WBCabinet).where(WBCabinet.id == self._wb_cabinet_original_id)
-            result = await session.execute(stmt)
-            self._wb_cabinet = result.scalar()
-        await super().__call__()
+            async with _sm() as session:
+                stmt = select(WBCabinet).where(WBCabinet.id == self._wb_cabinet_original_id)
+                result = await session.execute(stmt)
+                self._wb_cabinet = result.scalar()
+            await super().__call__()
 
     @property
     def text(self):
-        return (
+           return (
             """
             У вас отрицательный баланс. Пополните баланс для продолжения работы бота.
             """
@@ -998,3 +997,289 @@ class NotEnoughMoneyForParsing(TextWithKeyboard):
     def keyboard(self):
         return keyboards.get_payment_keyboard(self._wb_cabinet_original_id)
 
+
+
+class SubscribeOnMyNewChannel(Text):
+    text = ("""
+**Привет!** Я создатель этого бота. Меня часто спрашивают: могу ли я автоматизировать те или иные вещи для Wildberries или Ozon?
+Отвечаю: _95% задач вы можете автоматизировать сами,_ используя ChatGPT, даже если вы полный ноль в программировании.
+Для этого я открыл специальный канал, на котором расскажу как создавать крутые программы,
+с помощью нейросетей за один день с самого нуля - [перейти на канал](https://t.me/selfscript)""" )
+
+    parse_mode = ParseMode.MARKDOWN
+
+
+class StatTelegramTranslation(Text):
+    text = ('Привет! На связи разработчик данного бота, и когда я помогаю пользователям его настроить, '
+            'то мне часто задают вопросы, напрямую к нему не относящиеся: как успешно продвигать товары, '
+            'какую выбрать стратегию, как минимизировать расходы, повысить прибыль и т.д. \n Я не считаю себя '
+            'супер-экспертом по маркетплейсам, но и свой бизнес запустить и раскрутить как-то смог. '
+            'Поэтому сегодня в 15:00 по Москве я проведу трансляцию на канале поддержки бота @auto_wb_master, на '
+            'которой поделюсь своим опытом и отвечу на самые частые вопросы. \n\n'
+            'Сразу скажу, что я сторонник математического подхода к бизнесу, когда мы все считаем и проверяем заранее,'
+            'а не делаем что-то наугад. Если вы разделяете такой подход, то прошу присоединиться к трансляции - @auto_wb_master_bot \n\n'
+            'Все, до встречи на трансляции и удачи в вашем бизнесе!')
+
+
+class WrongLinkMessage(Text):
+    text = ('Пардон, ошибся во второй ссылке на канал, вот правильная: @auto_wb_master')
+
+
+class TranslatinSoon(Text):
+    text = ('Напоминаю: через 15 минут начнется трансляция на канале поддержки бота @auto_wb_master. ')
+
+
+class Tranlation_15_00(Text):
+
+    text = ('Ура! Починили возможность  добавления новых кампаний в бота  - /start \n\n'
+            'Поэтому сегодня в 15:00 по Москве я проведу трансляцию на канале поддержки бота @auto_wb_master, на '
+            'которой расскажу подробнее о том, как наш бот работает и как с его помощью экономить 70-80 % '
+            'от рекламного бюджета при тех же результатах. Трансляция пройдет на канале поддержки бота @auto_wb_master\n'
+            'До встречи!')
+
+
+class Tranlation_14_45(Text):
+
+    text = ('Решил напомнить: через 15 минут в трансляции на канале @auto_wb_master я расскажу о том, '
+            'как наш бот работает и как с его помощью экономить 70-80 % от рекламного бюджета при тех же результатах.'
+            ' Трансляция пройдет на канале поддержки бота @auto_wb_master\n'
+            'Жду Вас!')
+
+
+class BotPriceMessage(Text):
+    text = ("""Приветствую, на связи разработчик данного бота.\n
+Продвижение на маркетплейсах - это сложный процесс, и у каждого селлера возникают с этим проблемы в той или иной степени.
+Наш бот отчасти решает эти проблемы, но нет предела совершенству, и нам нельзя стоять на месте - нужно двигаться дальше, делая его работу более качественной.
+В рамках этого у нас план такой:
+1. Мы сократим демо-период для новых магазинов до 2 дней (если добавить второй магазин - демка будет работать для него отдельно) - практика показывает, что этого времени для большинства достаточно чтобы оценить полезность бота для себя в том виде, в котором он есть сейчас + это сильно сократит нагрузку на сервер и навигация по боту станет быстрее.
+2. Для обладателей платной подписки мы сделаем отдельную закрытую группу с целью совместного обсуждения и выработки плана развития бота, как в доработке текущего функционала, так и 
+развития нового. Так мы сконцентрируемся на решении наиболее актуальных задач.
+3. Сокращение демо-периода компенсируем резким снижением цены бота до 1000 р. в месяц за один магазин
+4. Если вы хотите попасть в группу и принять активное участие в дальнейшей разработке и совершенствовании бота, то можете не дожидаться окончания демо-периода и заранее оплатить подписку. При этом, оставшиеся демо-дни буду компенсированы в двойном размере. \n\n
+
+Если вы еще не успели оценить работу бота и его выгоду для вашего бизнеса, то жмите на /start и следуйте инструкциям \n
+
+Канал поддержки бота - https://t.me/auto_wb_master
+""")
+
+
+
+class CallMe1(TextWithKeyboard):
+    text = """
+Вдогонку к предыдущему сообщению:
+Если я не прочитал ваше сообщение, то значит очередь до вас еще не дошла - я специально не просматриваю и не отвечаю, чтобы никого случайно не пропустить.
+Чтобы полноценно рассказать про использование бота для максимально эффективного продвижения на WB и ответить на ваши вопросы нужно в среднем 40-50 минут, поэтому обещанные 10 консультаций я смогу провести только в течении 2-3 дней.
+Прошу набраться терпения - оно того стоит!
+Если успели написать до момента отправки этого сообщения - то вы точно успели и не переживайте: дойду и до вас!
+Если не успели: осталась буквально пара мест, так что скорее напишите мне,чтобы занять место и получить тест-драйв бота!    
+
+"""
+
+    keyboard = keyboards.get_call_me_keyboard()
+
+
+class CallMe2(Text):
+    text = """
+Оборот или прибыль?
+
+Привет! К сожалению, мест для личной консультации уже нет, и часть тех, кто оставил заявку, я не смогу проконсультировать. Но не переживайте: у большинства селлеров вопросы пересекаются, и я могу обобщать их и давать ответы прямо здесь, в боте.
+
+Итак, поехали!
+
+Когда я разрабатывал бота, то думал именно в контексте того, как бот должен влиять именно на прибыль. И то, что самый частый отзыв о боте заключается в экономии денег на рекламу и личного времени - так это так изначально и задумывалось.
+Дело в том, что я вдоволь насмотрелся на бизнесы, которые делают заоблачные обороты, но если заглянуть в их бухгалтерию, то там дырка от бублика.
+    """
+
+class CallWithManager(TextWithKeyboard):
+
+
+    text = ("""Мы с программистами провели исследование и вот что выяснилось:
+
+1. Те, кто смогли подключиться к боту и самостоятельно в нем разобраться, 
+повысили эффективность своих кампаний на 70 % по сравнению с кампаниями, которые к боту не подключены.\n
+2. Тех, кого мы консультировали лично по работе с ботом, помогли в нем разобраться и объяснили на примере их товаров как использовать его максимально эффективно, увеличили эффективность
+кампаний в пересчете на продажи в среднем в 2 раза.\n
+\n
+Как разработчик данного бота скажу, что потенциал увеличения продаж с помощью бота x4 - x5,
+поэтому если у вас пока нет такого роста, значит вы все еще что-то делаете не так или не до
+конца понимаете как работает бот и как работает Wildberries с его системой продвижения в топ.
+Поэтому предлагаю следующую схему: свяжитесь со мной по кнопке ниже, 
+мы с вами созвонимся в телеграмме, и я лично помогу вам настроить правильно 
+бота и запустить эффективный процесс продвижения. \n
+Вы получите сразу эффект: экономия бюджета на рекламу в 3-5 раз 
++ поймете как можно экономить несколько часов времени в день, которые обычно нужно тратить на настройку эффективной рекламы.\n\n
+
+Не ждите когда у Wildberries все снова поменяются, используйте эффективный инструмент, пока он работает и дает результат! \n\n
+
+
+
+""")
+
+
+class Single_message0(TextWithKeyboard):
+
+    text = """
+Внимание: WB массово блокирует кабинеты!    
+
+Извиняюсь, что беспокою столь рано, но у нас вопрос, не терпящий отлагательств.
+
+Возможно, вы уже слышали, что Wildberries массово блокирует кабинеты селлеров, и, вероятно, ваш кабинет тоже под угрозой.
+Дело в том, что многие рекламные биддеры используют ВНУТРЕННЕЕ API  WB, что ПРЯМО запрещено оффертой, в которой прописано,
+что за использование внутреннего API кабинеты будут блокироваться. 
+Сразу скажу, что наш бот автоматизации вывода товаров в топ использует только официальное API, которое никак не нарушает офферту WB, даже наоборот: маркетплейс прямо рекомендует использовать именно его.
+Поэтому, если вы пользуетесь нашим ботом, то вам нечего бояться (К слову, наш бот вообще действует строго по правилам WB и его рекомендациям).
+Однако, если вы используете другие биддеры, основанные на внутреннем API, то ваш кабинет в ближайшее время будет заблокирован.
+
+Как этого избежать:
+
+1. Прямо сейчас зайдите в кабинет WB и отключите все расширения, которые вы используете. Сделайте это прямо сейчас, иначе ваш кабинет 100 % заблокируют
+2. Используйте только те средства автоматизации, которые используют специальный API WB согласно документации (https://openapi.wb.ru/)
+3. Если у вас возникнут вопросы, то пишите мне, я вам помогу.
+Берегите себя и свой кабинет!
+
+    """
+
+
+    keyboard = keyboards.get_call_me_keyboard0()
+
+
+class Single_message1(TextWithKeyboardAndImage):
+
+    text = """
+Разъясняю по поводу блокировок:
+
+Официальный API - это когда вы делаете API-ключ и используете его в сервисе, например, в нашем боте - это разрешено и поощряется Wildberries.
+Внутреннее API - это когда вы используете внутренние методы, которые не предоставлены официально, например, через расширения в браузере - это запрещено оффертой WB и ведет к блокировке кабинета.    
+
+Что делать:
+1. Заходите в браузер и от греха по-дальше сносите все расширения, связанные с маркетплейсом. Потом будете разбираться что можно ставить - что нельзя. Сейчас главное - предотвратить блокировку.
+2. Официальное API не трогайте - оно тут не при чем!
+
+На долго ли это:
+Пункт о блокировке за использование внутреннего API появился в офферте год назад где-то, но случаев блокировок не было.
+
+Сейчас WB взялся за этот вопрос, значит уже не отстанет.
+
+Если будут еще вопросы - не стесняйтесь, пишите мне. Это помогает понять проблемы моих клиентов и выкатить уже развернутое решение или ответ.     
+    """
+
+    image = 'app/client_bot/images/block_api.png'
+
+    keyboard = keyboards.get_call_me_keyboard0()
+
+
+class Single_message2(TextWithKeyboard):
+
+    text = """
+Провел 10 обещанных бесплатных консультаций по эффективному автоматизированному продвижению в поиске на WB с помощью нашего с вами бота.
+Многие клиенты просят показать кейсы, но я не готов демонстрировать магазины клиентов без их согласия, да и доступов у меня к ним нет.
+
+Поэтому хочу предложить такую схему:
+
+Вы мне даете свой магазин для кейса, а я вам даю 2 недели использования бота бесплатно.
+
+В первую очередь интересуют кейсы новых товаров в новых магазинов, чтобы показать какие результаты дает бот с нуля.
+
+Если вам интересно - свяжитесь со мной по кнопке ниже, спасибо!
+    
+    """
+
+
+    keyboard = keyboards.get_call_me_keyboard1()
+
+
+class Single_message3(TextWithKeyboard):
+
+    text = """
+Во-первых, поздравляю с прошедшими праздниками!
+
+Во-вторых, держите видео-запись консультации клиента по использованию нашего бота для продвижения на WB - https://t.me/auto_wb_master/97
+
+Если вы тоже хотите получить консультацию по продвижению на WB с помощью нашего бота, то я готов провести ее под запись с дальнейшей выкладкой на канале.
+
+Сразу хочу сказать, что в данном видео мы не раскрыли и 20 % возможностей бота, не смотря на 40-минутное видео, поэтому наверняка вопросы еще будут.
+
+Сейчас в приоритете те, кто вообще еще не подключал бота - хотел бы проконсультировать под запись именно весь процесс от начала регистрации магазина в боте. Если ваш случай именно такой - буду рад помочь!
+
+Бесплатное использование бота за кейс под запись еще актуально!
+
+    
+    """
+
+    keyboard = keyboards.get_call_me_keyboard1()
+
+
+class Single_message4(Text):
+    text = """
+    Для тех, кто только начинает бизнес на маркетплейсах, я выкладываю статьи на своем канале и делюсь своим опытом по старту с нуля.
+
+В очередной статье рассказываю, почему наценка в товаре должна быть не меньше 500-600 % прибыли, иначе с большой вероятностью дело не взлетит - https://t.me/auto_wb_master/99
+    """
+
+
+class Single_message5(TextWithKeyboard):
+    text = """
+Привет! Последнюю неделю все, кому я помог внедрить бота в бизнес, оценили его работу на отлично. Поэтому пока приторможу внедрение новых функций и попробую помочь максимальному количеству людей внедрить то, что уже есть сейчас в бизнес на WB и получить прирост от x3-x5 к продажам.
+На период внедрения вы можете пользоваться ботом бесплатно, если все устраивает - дальше цена 2 300 р. в месяц. 
+Внедрять буду в порядке живой очереди, кнопка для связи ниже.
+
+
+    """
+
+    keyboard = keyboards.get_call_me_keyboard1()
+
+
+class Single_message6(Text):
+
+    text = """Написал подробную инструкцию по использованию бота для продвиженя товаров в топ на WB. 
+Данный бот является самым эффективным инструментом для продвижения на WB и признан многими экспертами. 
+Поэтому разобраться в его работе просто необходимо - https://telegra.ph/Instrukciya-prodvizheniyu-tovarov-na-Wildberries-po-klyuchevym-slovam-s-pomoshchyu-bota-wb-adv-master-bot-05-14"""
+
+
+class Single_message7(TextWithKeyboard):
+    text = """Добрый день! Внес изменение в инструкцию по продвижению товаров на WB с помощью бота.
+    
+Основные изменения:
+
+1. Изменился порядок подключения кампаний к боту: он стал проще и теперь не нужно включать рекламу на WB для настройки бота. Теперь вы можете сначала подключить бота к АРК, сделать все настройки с ключами, а затем включать кампанию на WB. 
+2. Появился новый раздел "Управление ставкой": из каких принципов нужно исходить при работе с ботом
+
+Полный текст инструкции - https://telegra.ph/Instrukciya-prodvizheniyu-tovarov-na-Wildberries-po-klyuchevym-slovam-s-pomoshchyu-bota-wb-adv-master-bot-05-14
+
+Заказать демо-доступ вы можете, связавшись с разработчиком бота, т.е. со мной, по ссылке ниже    
+    """
+
+
+    keyboard = keyboards.get_call_me_keyboard1()
+
+
+class Single_message8(TextWithKeyboard):
+
+    text = """Привет! Очень частый вопрос: может ли наш бот управлять рекламой «Поиск-каталог»?
+
+Ответ:
+
+У нас действительно были планы по подключению рекламы типа «Поиск-каталог» к боту, однако бот показал настолько выдающиеся результаты в продвижении товаров в топ, что мы все-таки решили отложить эту задачу, чтобы сконцентрироваться на том, что у бота уже получается очень хорошо - продвигать товары в топ.
+
+Поэтому сейчас мы занимаемся совершенствованием пользовательского опыта вокруг его основной функции.
+
+Если вас интересует продвижение в топ с минимальными затратами, то наш бот является наилучшим и единственным в своем роде инструментом из доступных.
+
+Ни один сотрудник или сервис не сможет так эффективно накручивать показатель CTR товаров для повышения рейтинга карточки и роста позиций, при этом, вы можете отслеживать результаты в реальном времени.
+
+Однако, для получения выдающихся результатов за минимальный срок нужно ВНИМАТЕЛЬНО изучить инструкцию по продвижению на WB — https://telegra.ph/Instrukciya-prodvizheniyu-tovarov-na-Wildberries-po-klyuchevym-slovam-s-pomoshchyu-bota-wb-adv-master-bot-05-14.
+
+Стоимость использования бота составляет 2 300 рублей в месяц. Если вас интересует демо-доступ, то свяжитесь со мной по кнопке ниже.
+
+"""
+
+
+    keyboard  = keyboards.get_call_me_keyboard1()
+
+
+class Single_message9(TextWithKeyboard):
+    text = """
+Привет! На VC появилась очень хорошая статья-инструкция по продвижению товаров на WB. В ней также упомянули нашего бота. Статья хорошая, объясняет нюансы продвижения в топ - https://vc.ru/trade/1182445-podrobnyy-gayd-po-prodvizheniyu-tovarov-v-top-wildberries   
+    """
+
+    keyboard = keyboards.get_call_me_keyboard1()

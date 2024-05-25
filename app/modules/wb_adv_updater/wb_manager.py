@@ -1,67 +1,62 @@
-import asyncio
-import datetime
 import logging
 import re
-import traceback
 import typing
+import aiohttp
 from io import BytesIO
 from itertools import product
-
 import dask.dataframe as dd
 import faiss
 import joblib
 import numpy as np
-import pandas as pd
-import pymystem3
-from aiogram.client.session import aiohttp
 from PIL import Image as PilImage
 from sqlalchemy import and_, not_
-from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload, selectinload
-
-from app.admin_bot.sender import messages, sender_manager
-from app.admin_bot.sender import sender_manager as admin_sender
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
-from app.modules.common_slaves.wildberries.data_classes.namedtuples import (
-    KeywordPhrase,
-    KeywordStatForNeo,
-)
-from app.modules.common_slaves.wildberries.models import (
-    AdvKeyword,
-    AdvSetting,
-    KeywordSetting,
-    WBCabinet,
-    WBCard, WBUserCabinet,
-)
-from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_adv_updater.models import GlobalCategorySetting, AdvPayment
-from app.my_types import KeywordStat
-from app.utils.db.session_maker import get_async_session_maker
+from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.faiss_manager.faiss_index_manager import FaissManager
-from app.utils.image_master import image_tools
-from app.utils.image_master.image_master2 import ImageMaster
-from app.utils.NeoDataScience.driver import DataScience
 from app.utils.text_master.Transformers import Word2Vec
-
-from ..common_slaves.wildberries import super_cabinet_manager
-from ..common_slaves.wildberries.exceptions import ApiForbiddenError
-from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .ABC_manager import AbcManager
 from .data_manager import DataGetter, DataSetter
 from .graph_vector_updater import GraphUpdater
-from .ML import Fitter, Predictor
+from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordStatForNeo, KeywordPhrase
+from ..common_slaves.wildberries import super_cabinet_manager
+from .ML import Fitter
+from app.my_types import KeywordStat
+from app.utils.NeoDataScience.driver import DataScience
+from app.modules.common_slaves.wildberries.models import WBCard, WBCabinet
+
+from app.utils.image_master.image_master2 import ImageMaster
+import pymystem3
+from app.utils.image_master import image_tools
+import asyncio
+from app.admin_bot.sender import messages
+import pandas as pd
+from sqlalchemy import and_
+from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.future import select
+from .ML import Predictor
+import datetime
+from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
+                                                          AdvSetting,
+                                                          AdvKeyword,
+                                                          KeywordSetting)
+from app.modules.wb_adv_updater.models import GlobalCategorySetting
+from app.utils.db.session_maker import get_async_session_maker
+from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
+from ..common_slaves.wildberries.exceptions import ApiForbiddenError
+from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
 from ...client_bot import const
 from ...utils.redis_manager import RedisEvent
 
 predictor = Predictor()
 
+
 logger = logging.getLogger(__name__)
 
-sm = get_async_session_maker
 
+sm = get_async_session_maker
 
 class MessageCounter:
     _last_time_send = None
@@ -77,9 +72,7 @@ class MessageCounter:
         if now - self._last_time_send > self._period:
             return True
 
-
 message_counter = MessageCounter()
-
 
 class Manager(AbcManager):
     _fitter = Fitter()
@@ -100,7 +93,6 @@ class Manager(AbcManager):
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
 
-
     async def update_keyword_stat(self, access: WBCabinetAccess,
                                   need_update_model: asyncio.Event,
                                   adv_update_tasks: dict[int, asyncio.Task],
@@ -116,10 +108,17 @@ class Manager(AbcManager):
                 AdvSetting.bot_active == True,
 
             ))
-
             result = (await session.execute(stmt)).unique()
             adv_settings = result.scalars().all()
-            logger.debug(f"Найдено {len(adv_settings)} настроек рекламы для обновления")
+            for adv_setting in adv_settings:
+                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+                logger.debug(f'Ключевые слова для {adv_setting.name} получены')
+                for keyword in keywords:
+                    stmt = select(AdvKeyword)\
+                    .options(joinedload(AdvKeyword.keyword_setting))\
+                    .where(and_(AdvKeyword.text == keyword.text,
+                                                    AdvKeyword.date == keyword.date,
+                                                    AdvKeyword.adv_setting_id == adv_setting.id))
 
         for adv_setting in adv_settings:
             if adv_setting not in adv_update_tasks:
@@ -235,17 +234,18 @@ class Manager(AbcManager):
         return
 
 
-
     async def graph_vector_update(self) -> None:
         length = 2**4
         await self.graph_updater.update_graph_run(length)
         await asyncio.sleep(1)
+        return
 
 
     def save_full_predict(self):
         # Загрузка данных с помощью Dask
         nmids_vectors = dd.read_csv(self.nmids_vectors_path)
         keyword_vectors = dd.read_csv(self.keywords_vectors_path)
+        # nmid_offer_id_df = dd.read_csv(self.nmid_offer_id_shop_name_df_path)
 
         # Получение уникальных значений
         nmids = nmids_vectors['nmid'].unique().compute()
@@ -284,6 +284,7 @@ class Manager(AbcManager):
             # Сохранение результатов
             result_batch = pd.concat([df_batch.reset_index(drop=True), pd.Series(y_batch, name='prediction')], axis=1)
             final_result = pd.concat([final_result, result_batch], ignore_index=True)
+
 
         # Вывод итогового DataFrame
         print(final_result)
@@ -324,6 +325,8 @@ class Manager(AbcManager):
             await asyncio.sleep(0)
 
 
+
+
     async def update_model(self, update_model_on_new_features):
         logger.debug('Старт обучения и сохранения модели')
         await self.fit_and_save_model(update_model_on_new_features)
@@ -333,9 +336,9 @@ class Manager(AbcManager):
     def __save_model( model, model_path):
         joblib.dump(model, model_path)
 
+
     async def fit_and_save_model(self, update_model_on_new_features):
         await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
-
 
     async def update_vectors_exec_mode(self):
              try:
@@ -344,10 +347,11 @@ class Manager(AbcManager):
              except Exception as exc:
                     logger.error(f'Ошибка обновления векторов {exc}')
 
-
     def __get_keyword_stat(self):
         kw_df = pd.read_csv(self.keyword_stat_df_path)
         return kw_df
+
+
 
     async def update_wb_adv_phrase_in_db(self, need_update_model):
         """update_model_on_new_features.set()"""
@@ -429,12 +433,15 @@ class Manager(AbcManager):
             surrogate_phrase_dict[phrase] = surrogate_keyword
         return surrogate_phrase_dict
 
+
+
     async def __find_most_similar(self, phrase, index):
         vector = await self._word2vec.average_vector_from_sentence(phrase)
         vector = np.array(vector).reshape(1, -1).astype(np.float32)
         faiss.normalize_L2(vector)
         distances, indices = index.search(vector, 1)  # Ищем наиболее похожий вектор
         return indices[0, 0]
+
 
     def _get_phrase_index(self):
        index = self._faiss_manager.get_keyword_phrases_index()
@@ -473,7 +480,6 @@ class Manager(AbcManager):
 
 
 
-
     async def update_cards_in_graph(self):
         await self.update_cards_in_graph_for_shops()
 
@@ -481,18 +487,18 @@ class Manager(AbcManager):
         product_data = wbcard.card_json
         # Обработка характеристик
         characteristics_words = {}
-        if "characteristics" in product_data:
-            for characteristic in product_data["characteristics"]:
-                char_name = characteristic['name'].lower()
-                char_value = characteristic['value']
-                if not isinstance(char_value, list) or all(
-                        self.is_number(x) for x in char_value):
-                    continue
-                characteristics_words[char_name]: tuple(str, list[float]) = await self.__get_words_from_char_value(char_value)
+        for characteristic in product_data["characteristics"]:
+            char_name = characteristic['name'].lower()
+            char_value = characteristic['value']
+            if not isinstance(char_value, list) or all(
+                    self.is_number(x) for x in char_value):
+                continue
+            characteristics_words[char_name]: tuple(str, list[float]) = await self.__get_words_from_char_value(char_value)
         characteristics_words['name']: tuple(str, list[float])  = await self.__get_words_from_char_value(wbcard.name)
         if 'description' in characteristics_words:
             characteristics_words['description']: tuple(str, list[float]) = await self.__get_words_from_char_value(wbcard.description)
         return characteristics_words
+
 
     async def __get_words_from_char_value(self, char_value):
         if isinstance(char_value, list):
@@ -506,6 +512,7 @@ class Manager(AbcManager):
             groups.append((word, word2vec,))
 
         return groups
+
 
     @staticmethod
     def is_number(s):
@@ -560,6 +567,9 @@ class Manager(AbcManager):
                         final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
         async with sm() as session:
             for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
+                # if message_counter.check_last_time():
+                #      await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
+
 
                 stmt = select(GlobalCategorySetting) \
                     .where(GlobalCategorySetting.category_name == wb_category_name)
@@ -573,7 +583,7 @@ class Manager(AbcManager):
                 await session.execute(stmt)
             await session.commit()
             message_counter.add_send()
-        return
+
 
     async def update_all_data_in_db_run(self, tasks):
          wb_accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
@@ -603,7 +613,9 @@ class Manager(AbcManager):
 
 
     async def check_accesses(self):
-        await rights_control.check_all()
+       await rights_control.check_all()
+
+
 
     async def shop_subscribe_control(self):
         while True:
@@ -613,7 +625,8 @@ class Manager(AbcManager):
                     selectinload(WBCabinet.wb_user_cabinets)\
                     .selectinload(WBUserCabinet.user),
                     selectinload(WBCabinet.adv_settings)
-                ).where(
+                ) \
+                    .where(
                     and_(
                         WBCabinet.expiration_time < datetime.datetime.now(),
                         WBCabinet.active == True,
@@ -621,31 +634,20 @@ class Manager(AbcManager):
                         WBCabinet.balance < 50
                     )
                 )
-                wb_cabinets_expirated_and_active = await session.execute(stmt)
-                wb_cabinets_expirated_and_active = wb_cabinets_expirated_and_active.scalars().all()
-
+                result = await session.execute(stmt)
+                wb_cabinets_expirated_and_active = result.scalars().all()
                 for wb_cabinet in wb_cabinets_expirated_and_active:
                     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
-                    if not access:
-                        wb_cabinet.active = False
-                        logger.error('Нет активных токенов для кабинета')
-                        await session.commit()
-                        continue
-                    try:
-                        wb_api = WBApi(access)
-                    except ApiForbiddenError:
-                        logger.error(f'Нет нужных прав у токена')
-                        continue
+                    wb_api = WBApi(access)
                     adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
-
                     for adv_setting in adv_settings:
-                        if adv_setting.bot_active is True:
+                        if adv_setting.bot_active is True and adv_setting.active_status == 'started':
                             try:
-                                adv_setting.bot_active = False
                                 await wb_api.advert.pause_company(adv_setting.adv_id)
                             except:
                                 logger.error(f'Ошибка при попытке остановить кампанию {adv_setting.adv_id}')
                                 continue
+                            adv_setting.bot_active = False
                     wb_cabinet.active = False
                     await session.commit()
                     wb_user_cabinets = wb_cabinet.wb_user_cabinets
@@ -653,16 +655,13 @@ class Manager(AbcManager):
                         user = wb_user_cabinet.user
                         try:
                             await messages.ShopExpiredSubscriptionMessage(
-                                bot,
-                                wb_user_cabinet.user.user_telegram_id,
-                                wb_user_cabinet,
-                            )()
+                                                                   bot,
+                                                                   wb_user_cabinet.user.user_telegram_id,
+                                                                   wb_user_cabinet)()
                             logger.debug(f'Сообщение о просроченной подписке отправлено для юзера {user.username}')
                         except Exception as exc:
-                            logger.error(
-                                f'Ошибка при отправке сообщения о просроченной подписке '
-                                f'для юзера {user.username}: {exc}'
-                            )
+                            logger.error(f'Ошибка при отправке сообщения о просроченной подписке '
+                                         f'для юзера {user.username}: {exc}')
                             await asyncio.sleep(1)
             await asyncio.sleep(60*60)
 
@@ -750,14 +749,3 @@ class Manager(AbcManager):
                     adv_setting.payments.append(payment)
                     wb_cabinet.balance -= const.PARSING_PRICE
                 await session.commit()
-
-
-
-
-
-
-
-
-
-
-

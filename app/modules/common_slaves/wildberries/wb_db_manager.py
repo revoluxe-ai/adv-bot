@@ -1,11 +1,11 @@
 import json
+import logging
 
 from sqlalchemy import select
-
 from app import my_types
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
-from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
-from app.modules.common_slaves.wildberries.models import WBCabinet
+from app.modules.common_slaves.wildberries.data_classes.card_from_wb import WBCard, CardFromWB
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
@@ -71,5 +71,4 @@ async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet):
                     session.add(category)
 
                 db_card.wb_category = category
-
             await session.commit()

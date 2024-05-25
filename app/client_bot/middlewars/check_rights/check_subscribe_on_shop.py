@@ -12,7 +12,7 @@ from app.client_bot.user_interface.views import messages
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
-sm = get_async_session_maker
+sm = get_async_session_maker()
 
 
 class CheckSubscribeOnShop(BaseMiddleware):
@@ -38,9 +38,7 @@ class CheckSubscribeOnShop(BaseMiddleware):
                 result = await session.execute(stmt)
                 wb_cabinet: WBCabinet = result.scalar()
             if wb_cabinet:
-                if not(balance := wb_cabinet.balance):
-                    balance = 0
-                if balance < 0:
+                if wb_cabinet.expiration_time < datetime.datetime.now():
                     await messages.ExpiredSubscription(bot,
                                                        event.message.chat.id,
                                                        wb_cabinet.id)()

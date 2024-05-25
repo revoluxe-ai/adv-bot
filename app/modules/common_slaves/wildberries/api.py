@@ -1,20 +1,15 @@
+from .data_classes.card_from_wb import CardFromWB
 import asyncio
 import datetime
 import json
 import logging
 import time
 from typing import Union
-
 from aiohttp import ClientOSError, ServerDisconnectedError
-
-from app.exc import CardNotFoundInDB
-from app.modules.common_slaves.wildberries import exceptions
 import aiohttp
-
-from . import api_rights
 from .ABC_WB_API import ABC_WB_API
 from .data_classes.adv import Adv
-from .data_classes.card_from_wb import CardFromWB
+import json
 from .data_classes.keywordstat import KeywordStat
 from .data_classes.subcategories import Subcategory
 from .exceptions import (ApiForbiddenError,
@@ -24,7 +19,9 @@ from .exceptions import (ApiForbiddenError,
                          NotValidDataError,
                          CardNotFoundInWB)
 from .models import AdvSetting
+from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +46,10 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                 current_time = time.time()
                 time_since_last_query = current_time - state['_last_query_time']
                 time_to_wait = max(state['_current_pause'] - time_since_last_query, 0)
-                if not state['_first_request']:
+                if state['_first_request']:
                     logger.debug(f'Пауза между запросами: {time_to_wait} секунд')
                     await asyncio.sleep(time_to_wait)
-                state['_first_request'] = False
+                    state['_first_request'] = False
 
                 try:
                     result = await func(instance, *args, **kwargs)
@@ -112,6 +109,9 @@ class AdvertApi(ABC_WB_API):
         keywords.sort(key=lambda x: x.date)
         return keywords
 
+
+
+
     @try_except_decorator(1, 3)
     async def get_advertIds(self) -> list[int]:
         advertIds = []
@@ -121,7 +121,7 @@ class AdvertApi(ABC_WB_API):
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             # Используем json.loads для преобразования текста ответа в JSON
-            adverts: list = answer['adverts']
+            adverts:list = answer['adverts']
             if not adverts:
                 return []
             for advert in adverts:
@@ -131,16 +131,6 @@ class AdvertApi(ABC_WB_API):
                         advertIds.append(advertId)
 
         return advertIds
-
-
-
-    async def get_advs(self, adv_ids: list[int]) -> list[Adv]:
-        advs = []
-        for chunk in self.chunks(adv_ids, 50):
-            advs.extend(await self._get_advs(chunk))
-        return advs
-
-
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list)->list[Adv]:
         advs = []
@@ -286,7 +276,7 @@ class ContentApi(ABC_WB_API):
         cards = []
         for text in texts:
             try:
-                cards.append(await self._get_cards_by_text(text))
+                cards.append(await self._get_card_by_text(text))
             except CardNotFoundInWB:
                 logger.debug('Карточка с текстом %s не найдена на Wildberries, возможно, карточка не существует',
                              text)
@@ -295,9 +285,8 @@ class ContentApi(ABC_WB_API):
 
 
     @try_except_decorator(1, 2)
-    async def _get_cards_by_text(self, text: Union[str, int]):
+    async def get_card_by_text(self, text: Union[str, int]):
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
-
         text = str(text)
         data_for_req = {
             "settings": {
@@ -356,28 +345,7 @@ class ContentApi(ABC_WB_API):
         async with aiohttp.ClientSession() as session:
             response = await self.requests(session, 'POST', url=url, data=data, headers=self.headers.standart)
             return json.loads(response)
-        # return self.request('POST', '/content/v2/get/cards/list', data=data)
 
-
-    # async def get_uploaded_products(
-    #     self,
-    #     updated_at: str | None = None,
-    #     nm_id: int | None = None,
-    # ) -> dict:
-    #     """Возвращает словарь выгруженных товаров на Wildberries. """
-    #
-    #     limit = 100
-    #
-    #     product_info = await self.get_product_list(updated_at, nm_id)
-    #     uploaded_products = product_info['cards']
-    #
-    #     cursor = product_info['cursor']
-    #     if cursor['total'] >= limit:
-    #         uploaded_products.update(
-    #             await self.get_uploaded_products(cursor['updatedAt'], cursor['nmID']),
-    #         )
-    #
-    #     return uploaded_products
 
 
 class WBApi:

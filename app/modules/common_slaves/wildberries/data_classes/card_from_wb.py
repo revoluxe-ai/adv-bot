@@ -1,11 +1,26 @@
 from .abc_card import WBCard
+from .card_statistic import CardStatistic
+
+
+# class Size:
+#     def __init__(self, data):
+#         self._size = data['dimensions']
+#
+#     @property
+#     def height(self):
+#         return self._size['height']
+#
+#     @property
+#     def leigth(self):
+#         return self._size['length']
+#
+#     @property
+#     def width(self):
+#         return self._size['width']
+
 
 
 class CardFromWB(WBCard):
-
-    @property
-    def data(self):
-        return self._data
 
     @property
     def shop_name(self):
@@ -29,61 +44,74 @@ class CardFromWB(WBCard):
         self._data = data
 
     @property
+    def data(self):
+        return self._data
+
+    @property
     def name(self):
-        return self._data['title']
+        return self.data['title']
 
 
     @property
     def techSize(self):
-        return self._data['sizes'][0]['techSize']
+        return self.data['sizes'][0]['techSize']
 
     @property
     def wb_mediaFiles(self):
-        media =  [image['big'] for image in self._data.get('photos', [])]
+        media =  [image['big'] for image in self.data.get('photos', [])]
         return media
 
     @property
     def subjectID(self):
-        return self._data['subjectID']
+        return self.data['subjectID']
 
     @property
     def wb_barcode(self):
-        return self._data['sizes'][0]['skus'][0]
+        return self.data['sizes'][0]['skus'][0]
 
 
     @property
     def offer_id(self):
-        return self._data['vendorCode']
+        return self.data['vendorCode']
 
     @property
     def brand(self):
-        return self._data['brand']
+        return self.data['brand']
+
+    # def item_size(self):
+    #     size = Size(self.data)
+    #     return size
 
     @property
     def characterisics(self):
-        return self._data['characteristics']
+        return self.data['characteristics']
 
 
     def createdAt(self):
-        return self._data['createdAt']
+        return self.data['createdAt']
 
 
     def updatedAt(self):
-        return self._data['updatedAt']
+        return self.data['updatedAt']
 
 
     @property
     def wb_category_name(self):
-        return self._data['subjectName']
+        return self.data['subjectName']
 
     @property
     def nmid(self)-> int:
-        return int(self._data['nmID'])
+        return int(self.data['nmID'])
+
+
+    @property
+    def _id(self):
+        return self.nmid
 
 
     @property
     def imtID(self):
-        return self._data['imtID']
+        return self.data['imtID']
 
 
 

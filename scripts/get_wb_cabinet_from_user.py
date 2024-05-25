@@ -1,5 +1,5 @@
-from app.utils.db.models import User, WBCabinet, WBUserCabinet
 from app.utils.db.session_maker import get_session_maker
+from app.utils.db.models import User, WBCabinet, WBUserCabinet, WBToken
 
 sm = get_session_maker()
 
@@ -9,8 +9,9 @@ if __name__ == '__main__':
         wb_cabinets = session.query(WBCabinet)\
             .join(WBCabinet.wb_user_cabinets)\
             .join(WBUserCabinet.user)\
-            .filter(User.username == 'IrinaShackaya').all()
-        pass
+            .filter(User.username == 'Chappas').all()
+        for wb_cabinet in wb_cabinets:
+            print(wb_cabinet.shop_id)
 
 
 

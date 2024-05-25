@@ -1,18 +1,14 @@
+
 import asyncio
-import logging
-
 from sqlalchemy import select
-
-from app import exc
-from app.modules.common_slaves.wildberries.api import WBApi
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from . import models
 from app.utils.db.session_maker import get_async_session_maker
-
-from . import models, wb_db_manager
+import logging
+from . import wb_db_manager
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.common_slaves.wildberries.api import WBApi
 from .data_classes.adv import Adv
-from .exceptions import NotValidDataError
 from .models import WBCabinet
-
 sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
@@ -57,7 +53,7 @@ class ShopDataUpdater:
     async def __quick_update_advs(self):
         wb_api  = self.wb_api
         advert_api = wb_api.advert
-        adv_ids: list[Adv] = await advert_api.get_advertIds()
+        adv_ids: list[Adv] = await advert_api.get_advertIds(advert_api.live_company_status, advert_api.auto_adv_types)
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()
@@ -85,7 +81,6 @@ class ShopDataUpdater:
             await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
         func = update_cards()
         await _coroutine_parallel_run_queue.put(func)
-
     async def update_all_data(self):
         wb_api: WBApi = self.wb_api
         advert_api = wb_api.advert
@@ -101,3 +96,13 @@ class ShopDataUpdater:
                 nmids.update(adv.nmids)
         cards = await wb_api.content.get_cards_by_text(nmids)
         await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+
+
+
+
+
+
+
+
+
+

@@ -1,11 +1,8 @@
 import asyncio
-from asyncio import Lock
 import datetime
-
 from app.utils import redis_manager
-from .models import WBToken
-
-
+from aiocache import cached_stampede
+from asyncio import Lock
 class OnlyRead:
     TRUE = True
     FALSE = False
@@ -27,12 +24,10 @@ class Rights:
 
 
 
-import logging
-
 import aiohttp
-
-from .ABC_WB_API import Headers, WbRequestApiMixin
-from .exceptions import ApiForbiddenError, TooManyRequests, UnknownApiRequestError, BadRequestError
+import logging
+from .exceptions import ApiForbiddenError, UnknownApiRequestError, TooManyRequests, BadRequestError
+from .ABC_WB_API import ABC_WB_API, WbRequestApiMixin, Headers
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +88,7 @@ class TokenRightChecker(WbRequestApiMixin):
 
 
 
-async def check_token(token: WBToken):
+async def check_token(token):
     hash_token = hash(token)
     logger.debug('Проверка прав на токен')
     check = await redis_manager.get_token_rights(hash_token)

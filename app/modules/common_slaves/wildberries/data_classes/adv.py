@@ -1,7 +1,8 @@
 import re
-from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from .adv_stat_classes import SimpleStat
+from pydantic import BaseModel, Field, validator
+from typing import Optional, List, Union, Dict
 
 
 class Subject(BaseModel):
@@ -13,13 +14,15 @@ class Menu(BaseModel):
     name: str
 
 class UnitedParams(BaseModel):
+    # catalogCPM: int
     searchCPM: int
     subject: Subject
+    # menus: List[Menu]
     nms: List[int]
 
 class AutoParams(BaseModel):
-    active: Dict[str, bool]
-    nms: List[int]
+    active: Dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
+    # Добавьте другие поля, которые ожидаются в `autoParams`
 
 class AdvData(BaseModel):
     endTime: str
@@ -52,9 +55,9 @@ class Adv:
 
     def __repr__(self):
         return f'Name: {self.name}, Advert ID: {self.advertId},  Status: {self.status_native_ru}, Type: {self.adv_type}'
-
     def __init__(self, data):
-        self._data = data
+        self._data_model = AdvData(**data)  # Используйте Pydantic для валидации
+        self._data = self._data_model.model_dump()  # Преобразуйте обратно в словарь, если нужно
 
     @property
     def category_name(self):
@@ -79,8 +82,6 @@ class Adv:
             return 'started'
         elif self.status == 7:
             return 'done'
-        elif self.status == 8:
-            return 'refused'
         else:
             raise Exception(f'Статус {str(self.status)} не реализован')
 
@@ -177,6 +178,11 @@ class Adv:
     @adv_type.setter
     def adv_type(self, value):
         self._type = value
+
+
+
+
+
 
 
 class Statistic:

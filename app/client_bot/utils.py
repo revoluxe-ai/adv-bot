@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-from dataclasses import dataclass
 from io import BytesIO
 import random
 from typing import Union
@@ -15,11 +14,16 @@ import seaborn as sns
 from sqlalchemy.orm import joinedload
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
-from app.modules.common_slaves.wildberries.models import KeywordSetting, WBCategory, AdvKeyword, CommonKeyword, \
+from app.modules.common_slaves.wildberries.models import AdvKeyword, CommonKeyword, \
     WBItemPosition
 from app.modules.wb_adv_updater import data_manager
+
 from app.my_types import AdvSetting
+from dataclasses import dataclass
+
+from app.modules.common_slaves.wildberries.models import  KeywordSetting
 from app.utils.db.models import RefLink, User
+
 from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker

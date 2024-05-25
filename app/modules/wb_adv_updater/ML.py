@@ -3,26 +3,24 @@ import logging
 import os.path
 import typing
 from ast import literal_eval
-from app.modules.common_slaves.wildberries import exceptions as wb_exceptions
 import joblib
-import numpy as np
-import pandas as pd
 import xgboost
-from sklearn.model_selection import KFold, cross_validate
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sqlalchemy import and_, select
-from sqlalchemy.orm import selectinload
-from xgboost import XGBRegressor
 
 from ..common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from ... import settings
 from app.admin_bot.sender import sender_manager
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
-from app.modules.wb_adv_updater.models import ItemFeature, KeywordFeature, GlobalCategorySetting
 from app.utils.db.session_maker import get_async_session_maker
-
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import  cross_validate, KFold
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sqlalchemy.orm import selectinload
+from xgboost import XGBRegressor
+from sqlalchemy import select, and_
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, KeywordSetting
+from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
 from . import data_manager
 from .data_manager import DataGetter
 from ...exc import CardNotFoundInDB
@@ -46,7 +44,8 @@ def save_model(model: xgboost.XGBModel, time_stamp = None):
 
 def load_model():
     model = joblib.load(os.path.join(path, 'model.json'))
-
+    # with open(f'{path}/time_stamp.txt', 'r') as file:
+    #     time_stamp = file.read()
     return model
 
 
@@ -102,8 +101,6 @@ class Fitter(AbcManager):
     def _get_enough_views(self, ctr):
          return int(1/ctr)
 
-
-
     async def _bayesian_apply(self, df: pd.DataFrame):
 
         adv_ids = df['adv_id'].unique()
@@ -111,7 +108,6 @@ class Fitter(AbcManager):
         adv_id_keyword_text_to_status: dict[(int, 'str'), int] = await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
 
         adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(adv_ids)
-
         def calculate_ctr(row):
             clicks = row['clicks']
             views = row['views']
