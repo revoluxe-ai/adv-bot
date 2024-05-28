@@ -3,7 +3,7 @@ import logging
 import os.path
 import typing
 from ast import literal_eval
-
+from app.modules.common_slaves.wildberries import exceptions as wb_exceptions
 import joblib
 import numpy as np
 import pandas as pd
@@ -183,9 +183,11 @@ class Fitter(AbcManager):
                 keyword_to_features = await self.__fetch_keyword_features(session, list(keywords_batch))
 
         for adv in adv_settings:
-            wb_category = await data_managers.get_wb_category(adv)
-            if not wb_category:
-                logger.error(f'Не найдена категория для кампании {adv.adv_id}')
+            try:
+                wb_category = await data_managers.get_wb_category(adv)
+            except wb_exceptions.CardNotFoundInWB:
+                logger.debug(f'Категория не найдена для кампании {adv.name}')
+                continue
             keyword_stats = await data_managers.get_keywords_statistic(adv, None)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
 
