@@ -178,7 +178,7 @@ def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_sett
                                   adv_choice_last_page,
                                   wb_user_cabinet_original_id: int,
                                    page):
-    on_page = 5
+    on_page = 12
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
 
