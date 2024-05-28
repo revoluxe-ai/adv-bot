@@ -1,4 +1,0 @@
-
-
-class NotFoundWBCard(Exception):
-    pass

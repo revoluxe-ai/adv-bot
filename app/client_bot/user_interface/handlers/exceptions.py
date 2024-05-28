@@ -2,7 +2,7 @@ import logging
 import traceback
 import typing
 
-from app.modules.wb_adv_updater.exceptions import NotFoundWBCard
+from app.modules.common_slaves.wildberries import exceptions as wb_exc
 import aiogram
 from aiogram import Router
 from aiogram.exceptions import TelegramForbiddenError
@@ -30,11 +30,11 @@ async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bo
     return
 
 
-@admin_router.errors(ExceptionTypeFilter(NotFoundWBCard))
+@admin_router.errors(ExceptionTypeFilter(wb_exc.CardNotFoundInWB))
 async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
     message = error_event.update.message
     exception = error_event.exception
-    exception = typing.cast(NotFoundWBCard, exception)
+    exception = typing.cast(wb_exc.CardNotFoundInWB, exception)
 
 
     if message is None:
