@@ -5,7 +5,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Union
-from app.modules.wb_adv_updater import exceptions
+from app.modules.common_slaves.wildberries import exceptions as wb_exc
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select
@@ -360,7 +360,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
         wb_category = wb_card.wb_category
     else:
         logger.error('Не найдена карточка товара')
-        raise exceptions.NotFoundWBCard(f"Не найдена WBCard {nmid}")
+        raise wb_exc.CardNotFoundInWB('Не найдена карточка товара')
     return wb_category
 
 class DataSetter:
