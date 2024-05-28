@@ -25,6 +25,8 @@ from app.utils.db.session_maker import get_async_session_maker
 from . import data_managers
 from .data_managers import DataGetter
 
+
+
 sm = get_async_session_maker()
 
 logger = logging.getLogger(__name__)
@@ -187,6 +189,7 @@ class Fitter(AbcManager):
                 wb_category = await data_managers.get_wb_category(adv)
             except wb_exceptions.CardNotFoundInWB:
                 logger.debug(f'Категория не найдена для кампании {adv.name}')
+
                 continue
             keyword_stats = await data_managers.get_keywords_statistic(adv, None)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
