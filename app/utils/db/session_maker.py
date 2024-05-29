@@ -18,7 +18,7 @@ thread_local.connect_opened = False
 
 conn_counter = 0
 
-def get_async_session_maker(pool_size=100, max_overflow=200)-> sessionmaker:
+def get_async_session_maker(pool_size=700, max_overflow=300)-> sessionmaker:
     def log_checkout(dbapi_con, con_record, con_proxy):
         logger.debug("Соединение взято из пула")
         global conn_counter
