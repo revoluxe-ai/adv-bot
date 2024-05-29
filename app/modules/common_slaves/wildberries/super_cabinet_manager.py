@@ -103,17 +103,18 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
         tokens: list[WBToken] = result.scalars().all()
     checked_tokens = []
     for token in tokens:
-        try:
-            if token.shop_id == wb_cabinet.shop_id:
+        if token.shop_id == wb_cabinet.shop_id:
+            try:
                 await check_token(token)
-                checked_tokens.append(token)
-            else:
+            except exceptions.ApiForbiddenError:
+                logger.debug('ApiForbiddenError')
                 token.active = False
                 await session.commit()
                 continue
-        except:
-            logger.error('Токен не прошел проверку')
+            checked_tokens.append(token)
+        else:
             continue
+
 
     access = WBCabinetAccess(tokens = checked_tokens,
                              wb_user_cabinet = None,
