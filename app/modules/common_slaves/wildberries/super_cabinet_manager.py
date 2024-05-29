@@ -108,6 +108,8 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
                 await check_token(token)
                 checked_tokens.append(token)
             else:
+                token.active = False
+                await session.commit()
                 continue
         except:
             logger.error('Токен не прошел проверку')
