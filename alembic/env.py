@@ -5,13 +5,13 @@ from sqlalchemy import pool
 from alembic import context
 from sqlalchemy.orm import configure_mappers
 
-from app.modules.wb_adv_updater.models import *
-from app.modules.common_slaves.wildberries.models import *
-from app.utils.db.models import *
-from app.admin_bot.sender.utils.db.models import *
-from app.payments.db.models import *
-from app.utils.alchemy_row import row
-from app.utils.db.base import BaseTable as Base
+from auto_adv_master.modules.wb_adv_updater.models import *
+from auto_adv_master.modules.common_slaves.wildberries.models import *
+from auto_adv_master.utils.db.models import *
+from auto_adv_master.admin_bot.sender.utils.db.models import *
+from auto_adv_master.payments.db.models import *
+from auto_adv_master.utils.alchemy_row import row
+from auto_adv_master.utils.db.base import BaseTable as Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

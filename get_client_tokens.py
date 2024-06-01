@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
-from app.utils.db.models import User
-from app.utils.db.session_maker import get_session_maker
+from auto_adv_master.utils.db.models import User
+from auto_adv_master.utils.db.session_maker import get_session_maker
 
 sm = get_session_maker()
 

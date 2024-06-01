@@ -1,0 +1,97 @@
+from auto_adv_master.client_bot import const
+from auto_adv_master.client_bot.user_interface import message_templates
+from auto_adv_master.client_bot.user_interface.views import keyboards
+from auto_adv_master.modules.common_slaves.wildberries.models import WBUserCabinet
+
+
+class NewFeaturesInBot(message_templates.TextWithImage):
+
+    @property
+    def text(self):
+        return ('Привет! Наш бот остается лучшим инструментом '
+                'для рекламы на Wildberries, предоставляя вам неоспоримое преимущество '
+                'в продвижении. Однако, совершенству нет предела: недавно мы добавили несколько новых функций, которые '
+                'сделают вашу работу еще эффективнее. Одна из них - это автоматическая отметка кампаний, которые проверялись '
+                'пользователем кабинета (вами или вашими сотрудниками) за последние сутки. Теперь вам не нужно тратить время, '
+                'заходя по нескольку раз в день в одни и те же кампании для контроля работы бота. \n\n'
+                'Также выложили на канал инструкцию по автоматизации рекламы на WB с помощью нашего бота - @auto_wb_master '
+                'и рекомендации по работе с ним. Подписывайтесь и следите за новостями! \n\n')
+
+
+    @property
+    def image(self):
+        if hasattr(self, '_image'):
+            return self._image
+        else:
+            return 'app/admin_bot/sender/images/advs_with_checking.png'
+
+
+    @image.setter
+    def image(self, value):
+        self._image = value
+
+
+
+
+
+
+
+
+
+
+
+
+class AddImageOnApi(message_templates.TextWithKeyboard):
+    def __init__(self, bot, chat_id, all_shops):
+        super().__init__(bot, chat_id)
+        self.__all_shops = all_shops
+
+
+
+    @property
+    def text(self):
+        return ('Привет 👋\n Установили подсказку с указанием какие права нужно выставить'
+                ' в API для корректной работы бота. Теперь добавить новый магазин стало проще! \n'
+                'Также создали канал и выложили на нем инструкцию по автоматизации рекламы на WB с помощью'
+                ' нашего бота - @auto_wb_master')
+
+    @property
+    def keyboard(self):
+        return keyboards.get_shop_keyboard(self.__all_shops)
+
+
+class BetaTestIsDone(message_templates.Text):
+
+    text = ('Добрый день! Завершаем бета-тестирование бота и благодарим вас за участие в нем. '
+            'Сейчас вы переведены на демо-тариф и в течении недели использование бота станет платным. '
+            'Также обратите внимание на новый пункт в командах: Реферальная программа (/ref_program), '
+            'благодаря которой вы можете рекомендовать наш бот своим друзьям и знакомым и получать '
+            'вознаграждение за это. Как и все остальное в нашем боте, реферальная программа тоже продвинутая: '
+            'вы можете создавать неограниченное число реферальный ссылок и отслеживать статистику по каждой из них. '
+            'Если вы еще не успели оценить преимущество данного бота для продвижения на Wildberries, '
+            'рекомендуем это сделать прямо '
+            'сейчас, ведь он радикально меняет правила игры на этом рынке - /start')
+
+
+class ShopExpiredSubscriptionMessage(message_templates.TextWithKeyboard):
+
+    def __init__(self, bot, chat_id, wb_user_cabinet: WBUserCabinet):
+        super().__init__(bot, chat_id)
+        self._wb_user_cabinet = wb_user_cabinet
+
+    @property
+    def text(self):
+        return (
+            f"Ваша подписка на магазин {self._wb_user_cabinet.name} истекла, "
+            f"бот деактивирован, а во избежание расходования средств все "
+            f"кампании, для которых бот был активирован, поставлены на паузу. "
+        )
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard(
+            const.PRICE_PER_MONTH,
+            period_days=30,
+            bonus_days=0,
+            wb_cabinet_original_id=self._wb_user_cabinet.id,
+        )

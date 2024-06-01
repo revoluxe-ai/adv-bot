@@ -19,7 +19,7 @@ dist/
 .idea/
 __pycache__
 wb/keyword_async_ml_updater/data/*
-app/utils/faiss_manager/indexes/*
+auto_adv_master/utils/faiss_manager/indexes/*
 *.pickle
 *.zip
 *.rar
@@ -64,10 +64,10 @@ venv
 *.csv#
 *.spec
 *.log
-app/utils/text_master/w2v_cc_300d_ru/*
+auto_adv_master/utils/text_master/w2v_cc_300d_ru/*
 *.txt
-app/keword_async_ml_updater/model/*
+auto_adv_master/keword_async_ml_updater/model/*
 *.index
 git ls-tree
-app/utils/text_master/w2v_cc_300d_ru
+auto_adv_master/utils/text_master/w2v_cc_300d_ru
 logs
