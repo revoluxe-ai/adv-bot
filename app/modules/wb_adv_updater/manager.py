@@ -141,7 +141,6 @@ class Manager(AbcManager):
                     need_update_model.set()
                     logger.debug(f"Обновление статистики завершено")
             await asyncio.sleep(0)
-
         return
 
     @staticmethod
@@ -209,6 +208,7 @@ class Manager(AbcManager):
                     f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}'
                 )
             await asyncio.sleep(0)
+        await asyncio.sleep(60*15)
         return
 
 
@@ -305,6 +305,8 @@ class Manager(AbcManager):
                         if update_tasks[wb_cabinet_id].exception():
                             logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}')
                         del update_tasks[wb_cabinet_id]
+            await asyncio.sleep(60*15)
+
 
     async def update_model(self, update_model_on_new_features):
         logger.debug('Старт обучения и сохранения модели')
@@ -644,3 +646,4 @@ class Manager(AbcManager):
                                 f'для юзера {user.username}: {exc}'
                             )
                             await asyncio.sleep(1)
+            await asyncio.sleep(60*60)
