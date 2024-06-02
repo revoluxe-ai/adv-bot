@@ -1,7 +1,7 @@
 
 import asyncio
 
-from auto_adv_master.admin_bot.sender import sender_manager
+from app.admin_bot.sender import sender_manager
 
 
 async def send_message_to_users():

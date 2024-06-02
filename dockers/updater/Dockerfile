@@ -2,7 +2,7 @@ FROM python:3.11
 
 WORKDIR /app
 
-COPY ../.. /app
+COPY ../../ /app
 
 # Установка зависимостей
 RUN pip install -r requirements.txt

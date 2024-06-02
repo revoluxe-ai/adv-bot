@@ -1,6 +1,6 @@
 import logging
 
-from auto_adv_master.modules.wb_adv_updater.runner import Runner
+from app.modules.wb_adv_updater.runner import Runner
 from python_modules.logger import setup_logging
 
 r = Runner()

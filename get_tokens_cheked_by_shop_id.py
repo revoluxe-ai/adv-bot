@@ -1,10 +1,10 @@
 import asyncio
 
 from sqlalchemy import select
-from auto_adv_master.modules.common_slaves.wildberries.api_rights import check_token
-from auto_adv_master.modules.common_slaves.wildberries.models import WBToken
-from auto_adv_master.utils.db.models import User
-from auto_adv_master.utils.db.session_maker import get_async_session_maker
+from app.modules.common_slaves.wildberries.api_rights import check_token
+from app.modules.common_slaves.wildberries.models import WBToken
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker()
 

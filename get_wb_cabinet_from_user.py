@@ -1,5 +1,5 @@
-from auto_adv_master.utils.db.models import User, WBCabinet, WBUserCabinet
-from auto_adv_master.utils.db.session_maker import get_session_maker
+from app.utils.db.models import User, WBCabinet, WBUserCabinet
+from app.utils.db.session_maker import get_session_maker
 
 sm = get_session_maker()
 

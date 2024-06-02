@@ -3,8 +3,8 @@ from aiogram_tests import MockedBot
 from aiogram_tests.handler import CallbackQueryHandler, MessageHandler
 from aiogram_tests.types.dataset import MESSAGE
 
-from auto_adv_master.client_bot.user_interface.handlers.start import add_app_token
-from auto_adv_master.client_bot.user_interface.views import callbacks
+from app.client_bot.user_interface.handlers.start import add_app_token
+from app.client_bot.user_interface.views import callbacks
 
 wb_user_cabinet_original_id = 36
 

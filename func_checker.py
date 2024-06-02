@@ -2,10 +2,10 @@ import asyncio
 
 from sqlalchemy import select
 
-from auto_adv_master.modules.common_slaves.wildberries import super_cabinet_manager
-from auto_adv_master.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
-from auto_adv_master.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
-from auto_adv_master.utils.db.session_maker import get_async_session_maker
+from app.modules.common_slaves.wildberries import super_cabinet_manager
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
+from app.utils.db.session_maker import get_async_session_maker
 import logging
 
 logger = logging.getLogger(__name__)

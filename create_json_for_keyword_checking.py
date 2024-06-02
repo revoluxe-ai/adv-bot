@@ -3,7 +3,7 @@ import aiofiles
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 import asyncio
-from auto_adv_master.utils.db.models import AdvKeyword, AdvSetting
+from app.utils.db.models import AdvKeyword, AdvSetting
 from get_keyword_statistic import async_session_maker
 from sqlalchemy.sql.expression import FunctionElement
 from sqlalchemy.ext.compiler import compiles
