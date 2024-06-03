@@ -12,7 +12,7 @@ sm = get_session_maker()
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
 
-shop_id = '69b113be-2867-4c44-80b3-3066f28a94df'.strip()
+shop_id = '56738107-17c8-4114-81f2-42be5a73f6d2'.strip()
 
 
 if __name__ == '__main__':
