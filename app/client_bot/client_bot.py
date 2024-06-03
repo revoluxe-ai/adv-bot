@@ -38,7 +38,7 @@ PORT = 8090
 WEB_SERVER_PORT = PORT
 
 
-BASE_WEBHOOK_URL = 'https://tiriel.ru'
+BASE_WEBHOOK_URL = settings.WEBHOOK_URL
 
 WEBHOOK_PATH = "/telegram_webhook"
 
