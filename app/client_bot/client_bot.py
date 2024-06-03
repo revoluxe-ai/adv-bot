@@ -66,15 +66,13 @@ try:
 except:
     test_mode = False
 
-try:
-    polling_mode = path_setting_funcs.get_document_by_key_name(path_setting,
-                                                        'polling_mode')
-except:
-    polling_mode = False
+
+polling_mode = settings.polling_mode
 
 
 
-if not test_mode or polling_mode:
+
+if not test_mode and not polling_mode:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
@@ -116,8 +114,11 @@ async def run_shop_updater():
 
 
 async def run():
-    if test_mode:
-        await bot.delete_webhook()
+    if test_mode or polling_mode:
+        try:
+            await bot.delete_webhook()
+        except:
+            pass
         # Запускаем бота с пулингом вместо вебхука
         await dp.storage.close()  # Закрываем хранилище перед запуском, чтобы избежать конфликтов
         await asyncio.gather(
@@ -126,14 +127,7 @@ async def run():
         )
 
     else:
-        if polling_mode:
-            await asyncio.gather(
-                run_shop_updater(),
-                dp.start_polling(bot, on_startup=on_startup, on_shutdown=on_shutdown)
-            )
-
-        else:
-        # Оригинальная логика запуска с вебхуком и дополнительными задачами
-            await asyncio.gather(start_web_server(), run_shop_updater())
+    # Оригинальная логика запуска с вебхуком и дополнительными задачами
+        await asyncio.gather(start_web_server(), run_shop_updater())
 
 

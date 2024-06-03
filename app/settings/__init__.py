@@ -6,3 +6,6 @@ cv = settings.cv
 
 
 WEBHOOK_URL = settings.WEBHOOK_URL
+
+
+polling_mode = settings.polling_mode
