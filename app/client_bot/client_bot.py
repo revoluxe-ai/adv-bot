@@ -11,7 +11,7 @@ from ..utils import redis_func_cache
 redis_func_cache.set_config()
 import nest_asyncio
 from aiohttp import web
-
+from app import settings
 nest_asyncio.apply()
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
@@ -66,7 +66,15 @@ try:
 except:
     test_mode = False
 
-if not test_mode:
+try:
+    polling_mode = path_setting_funcs.get_document_by_key_name(path_setting,
+                                                        'polling_mode')
+except:
+    polling_mode = False
+
+
+
+if not test_mode or polling_mode:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
