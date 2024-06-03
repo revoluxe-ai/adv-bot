@@ -126,7 +126,14 @@ async def run():
         )
 
     else:
+        if polling_mode:
+            await asyncio.gather(
+                run_shop_updater(),
+                dp.start_polling(bot, on_startup=on_startup, on_shutdown=on_shutdown)
+            )
+
+        else:
         # Оригинальная логика запуска с вебхуком и дополнительными задачами
-        await asyncio.gather(start_web_server(), run_shop_updater())
+            await asyncio.gather(start_web_server(), run_shop_updater())
 
 
