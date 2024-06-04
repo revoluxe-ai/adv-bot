@@ -165,7 +165,10 @@ class Adv:
                  return self._data['unitedParams'][0]['nms']
             else:
                 nmids = self._data['autoParams']['nms']
-                return nmids if nmids else []
+                if nmids:
+                    return nmids
+                else:
+                    raise Exception('NMID не найден')
         except:
             nmids = re.findall('\d{8,9}', self.name)
             nmids = [int(nmid) for nmid in nmids]

@@ -138,8 +138,8 @@ class AdvertApi(ABC_WB_API):
             answer = json.loads(response_text)
             for advert in answer:
                 adv = Adv(advert)
-                if not adv.nmids:
-                    raise exceptions.NotValidDataError('Нет данных об карточках в РК')
+                # if not adv.nmids:
+                #     raise exceptions.NotValidDataError('Нет данных об карточках в РК')
                 advs.append(adv)
         return advs
 
