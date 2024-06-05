@@ -14,7 +14,7 @@ from ... import manager
 from .. import states
 from ..views import callbacks, messages
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 router = Router()
 

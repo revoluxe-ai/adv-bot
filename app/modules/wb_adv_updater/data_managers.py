@@ -35,7 +35,7 @@ from app.utils import redis_manager
 logger = logging.getLogger(__name__)
 
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 
@@ -360,7 +360,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
         wb_category = wb_card.wb_category
     else:
         logger.error('Не найдена карточка товара')
-        raise wb_exc.CardNotFoundInWB('Не найдена карточка товара')
+        raise wb_exc.CardNotFoundInWB('Не найдена карточка товара: ' + str(nmid))
     return wb_category
 
 class DataSetter:

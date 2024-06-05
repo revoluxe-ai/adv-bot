@@ -56,7 +56,7 @@ predictor = Predictor()
 
 logger = logging.getLogger(__name__)
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 
 class MessageCounter:
@@ -92,7 +92,7 @@ class Manager(AbcManager):
         self._phrase_index = None
         self._gds = DataScience()
         self._word2vec = Word2Vec()
-        self._aiosm = get_async_session_maker()
+        self._aiosm = get_async_session_maker
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
 

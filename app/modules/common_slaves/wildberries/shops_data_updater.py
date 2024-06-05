@@ -12,7 +12,7 @@ from . import models, wb_db_manager
 from .data_classes.adv import Adv
 from .exceptions import NotValidDataError
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
 

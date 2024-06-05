@@ -27,7 +27,7 @@ from .data_managers import DataGetter
 
 
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
 

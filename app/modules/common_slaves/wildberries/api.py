@@ -279,33 +279,35 @@ class ContentApi(ABC_WB_API):
     @try_except_decorator(1, 2)
     async def _get_cards_by_text(self, text: Union[str, int]):
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
-        async with aiohttp.ClientSession() as session:
-            text = str(text)
-            data_for_req = {
-                "settings": {
-                    "sort": {
-                        "ascending": False
-                    },
-                    "cursor": {
-                        "limit": 1
-                    },
-                    "filter": {
-                        "withPhoto": -1,
-                        'textSearch': text
 
-                    }
+        text = str(text)
+        data_for_req = {
+            "settings": {
+                "sort": {
+                    "ascending": False
+                },
+                "cursor": {
+                    "limit": 1
+                },
+                "filter": {
+                    "withPhoto": -1,
+                    'textSearch': text
+
                 }
             }
-            async with session.post(url, json=data_for_req, headers=self.headers.standart) as response:
-                answer = await self.requests(session, 'POST', url,
-                                             json_data=data_for_req,
-                                             headers=self.headers.standart)
-                answer = json.loads(answer)
-            cards = answer['cards']
-            if not cards:
-                raise exceptions.CardNotFoundInWB(f'Карточка с текстом {text} не найдена на Wildberries')
-            card_json = answer['cards'][0]
-            card = CardFromWB(card_json)
+        }
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                response = await self.requests(session, 'POST', url=url, data=data_for_req, headers=self.headers.standart)
+            except Exception as e:
+                raise e
+            answer = json.loads(response)
+        cards = answer['cards']
+        if not cards:
+            raise exceptions.CardNotFoundInWB(f'Карточка с текстом {text} не найдена на Wildberries')
+        card_json = answer['cards'][0]
+        card = CardFromWB(card_json)
         return card
 
 
