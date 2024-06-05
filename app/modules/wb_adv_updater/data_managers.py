@@ -460,7 +460,7 @@ async def get_adv_keyword_text_in_white_list():
     async with _sm() as session:
         stmt = select(KeywordSetting) \
             .options(selectinload(KeywordSetting.adv_setting)) \
-            .where(KeywordSetting.hard_status.in_(2, 3))
+            .where(KeywordSetting.hard_status.in_([2, 3]))
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
     adv_keyword_text_in_white_list = []
