@@ -7,6 +7,7 @@ from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.settings import settings
 from python_modules import path_setting_funcs
 
 logger = logging.getLogger(__name__)
@@ -18,8 +19,8 @@ conn_counter = 0
 pool_size = 700
 max_overflow = 300
 
-
-semaphore = asyncio.Semaphore(1)
+count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
+semaphore = asyncio.Semaphore(count_sem)
 
 def log_checkout(dbapi_con, con_record, con_proxy):
     logger.debug("Соединение взято из пула")
