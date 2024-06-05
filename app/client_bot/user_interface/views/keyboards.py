@@ -23,7 +23,7 @@ from .callbacks import Action
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 
 def get_shop_keyboard(all_shops: list[WBUserCabinet]):

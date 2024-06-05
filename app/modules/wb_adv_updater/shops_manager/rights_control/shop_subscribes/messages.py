@@ -9,7 +9,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.suffixes import get_day_suffix
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 class TestPeriodExpire(templates.TextWithKeyboard):

@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 class MainMenu(TextWithKeyboard):

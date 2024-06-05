@@ -20,7 +20,7 @@ from app.settings import settings
 
 TEST_SUBSCRIBE_COST = 99
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 router = Router()
 

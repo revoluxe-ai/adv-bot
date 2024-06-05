@@ -26,7 +26,7 @@ from ..views.callbacks import Action
 
 logger = logging.getLogger(__name__)
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 router = Router()
 

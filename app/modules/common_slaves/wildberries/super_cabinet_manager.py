@@ -19,7 +19,7 @@ from .api_rights import check_token
 from .exceptions import ApiForbiddenError, UnknownApiRequestError
 from .models import WBToken
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
 

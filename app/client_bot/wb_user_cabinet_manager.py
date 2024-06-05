@@ -14,7 +14,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 class CabinetManager:

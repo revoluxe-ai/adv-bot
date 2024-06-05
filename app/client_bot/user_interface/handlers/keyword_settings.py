@@ -24,7 +24,7 @@ from ..views import callbacks, messages
 router = Router()
 
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'by_adv'))

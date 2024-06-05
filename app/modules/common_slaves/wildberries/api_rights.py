@@ -64,7 +64,7 @@ class TokenRightChecker(WbRequestApiMixin):
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
 
         async with aiohttp.ClientSession() as session:
-                await self.requests(session, 'GET', url, headers=self.headers.standart)
+             await self.requests(session, 'GET', url, headers=self.headers.standart)
 
 
      async def content(self):

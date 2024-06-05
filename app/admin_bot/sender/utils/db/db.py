@@ -4,7 +4,7 @@ from sqlalchemy import and_, select
 from app.admin_bot.sender.utils.db.models import TelegramFile
 from app.utils.db.session_maker import get_async_session_maker
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 async def add_file(telegram_file_id: str, dhash: str, bot_id: int):
