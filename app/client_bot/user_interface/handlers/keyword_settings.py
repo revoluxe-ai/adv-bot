@@ -133,7 +133,7 @@ async def setting_keyword(callback: types.CallbackQuery,
 
 
 
-@router.callback_query(callbacks.ChangeKeywordHardStatus.filter())
+@router.callback_query(callbacks.ChangeKeywordHardStatus.filter(3 > F.new_hard_status >= -1))
 async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
                                      bot: aiogram.Bot, state: FSMContext):
@@ -187,3 +187,9 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
 
     return
 
+@router.callback_query(callbacks.ChangeKeywordHardStatus.filter(F.new_hard_status == 3))
+async def change_keyword_hard_status_to_turn_off(callback: types.CallbackQuery,
+                                     callback_data: callbacks.ChangeKeywordHardStatus,
+                                     bot: aiogram.Bot, state: FSMContext):
+    await callback.answer()
+    pass
