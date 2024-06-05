@@ -277,13 +277,6 @@ def get_keyword_setting_keyboard(
                                            keyword_setting_original_id=keyword.id).pack())]
         buttons.append(button)
 
-    if keyword.hard_status == TURN_OFF:
-        button = [InlineKeyboardButton(text='В список не релевантных фраз',
-                                       callback_data=callbacks.ChangeKeywordHardStatus(
-                                           new_hard_status=BLACK_LIST,
-                                           keyword_setting_original_id=keyword.id).pack())]
-        buttons.append(button)
-
 
     buttons.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
                                              callback_data=callbacks.SettingKeywords(
