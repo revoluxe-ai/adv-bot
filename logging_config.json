@@ -8,6 +8,10 @@
     }
   },
   "handlers": {
+    "my_log_handler": {
+      "class": "my_log_handler.ScriptHandler",
+      "level": "ERROR"
+    },
     "console": {
       "class": "logging.StreamHandler",
       "level": "DEBUG",
@@ -47,6 +51,14 @@
     }
   },
   "loggers": {
+    "app.utils.db.session_maker": {
+      "level": "DEBUG",
+      "handlers": [
+        "sql_handler"
+      ],
+      "propagate": false
+    },
+
     "neo4j": {
       "level": "WARNING",
       "handlers": [
@@ -81,8 +93,8 @@
 
   "root": {
     "level": "DEBUG",
-    "handlers": ["console", "error_to_file", "common_file"]
-  }
+    "handlers": ["console", "error_to_file", "common_file", "my_log_handler"]
+  }g
 }
 
 
