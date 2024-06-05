@@ -483,7 +483,8 @@ class Manager(AbcManager):
                     continue
                 characteristics_words[char_name]: tuple(str, list[float]) = await self.__get_words_from_char_value(char_value)
         characteristics_words['name']: tuple(str, list[float])  = await self.__get_words_from_char_value(wbcard.name)
-        characteristics_words['description']: tuple(str, list[float]) = await self.__get_words_from_char_value(wbcard.description)
+        if 'description' in characteristics_words:
+            characteristics_words['description']: tuple(str, list[float]) = await self.__get_words_from_char_value(wbcard.description)
         return characteristics_words
 
     async def __get_words_from_char_value(self, char_value):
