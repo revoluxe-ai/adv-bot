@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import typing
 from dataclasses import dataclass
 from typing import Union, AsyncGenerator
 
@@ -63,8 +64,8 @@ async def get_accesses_for_wb_cabinets()-> AsyncGenerator[WBCabinetAccess, None]
                     try:
                         await api_rights.check_token(token)
                         users_live_tokens.append(token)
-                    except ApiForbiddenError:
-                        logger.error('Токен отозван')
+                    except ApiForbiddenError as exc:
+                        logger.debug(exc)
                         token.active = False
                         await session.commit()
                         continue
