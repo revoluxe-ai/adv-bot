@@ -66,7 +66,7 @@ async def get_accesses_for_wb_cabinets()-> AsyncGenerator[WBCabinetAccess, None]
                     except ApiForbiddenError:
                         logger.error('Токен отозван')
                         token.active = False
-                        session.commit()
+                        await session.commit()
                         continue
 
                     except UnknownApiRequestError as e:
