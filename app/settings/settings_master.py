@@ -22,4 +22,10 @@ class Settings:
     def WEBHOOK_URL(self):
         return get_document_by_key_name(setting_path, 'WEBHOOK_URL')
 
+    @property
+    def COUNT_SEMAPHORE_TO_POSTGRES(self):
+        return get_document_by_key_name(setting_path, 'COUNT_SEMAPHORE_TO_POSTGRES')
+
+
+
 settings = Settings()
