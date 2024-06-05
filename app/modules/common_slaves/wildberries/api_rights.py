@@ -108,9 +108,9 @@ async def check_token(token: WBToken):
             checker = TokenRightChecker(token)
             await asyncio.gather(checker.adverts(), checker.content())
         await redis_manager.set_token_rights(hash_token, timeout=60*60)
-    except ApiForbiddenError:
+    except ApiForbiddenError as exc:
         logger.debug(f'Токен отозван')
-        raise ApiForbiddenError
+        raise exc
     except UnknownApiRequestError:
         logger.debug('Ошибка проверки токена (пропущено)')
     except TooManyRequests:
