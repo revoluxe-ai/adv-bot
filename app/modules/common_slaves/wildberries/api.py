@@ -5,6 +5,8 @@ import logging
 import time
 from typing import Union
 
+from aiohttp import ClientOSError
+
 from app.exc import CardNotFoundInDB
 from app.modules.common_slaves.wildberries import exceptions
 import aiohttp
@@ -63,7 +65,8 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                 except (TooManyRequests,
                         UnknownApiRequestError,
                         BadRequestError,
-                        NotValidDataError) as e:
+                        NotValidDataError,
+                        ClientOSError) as e:
                     state['_attempts'] += 1
                     state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:
