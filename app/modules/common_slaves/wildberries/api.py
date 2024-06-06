@@ -95,7 +95,7 @@ class AdvertApi(ABC_WB_API):
             answer = json.loads(response_text)
             update_timestamp = datetime.datetime.now()
             if not answer:
-                logger.error('Нет данных по ключевым словам: %s', adv_setting.name)
+                logger.debug('Нет данных по ключевым словам: %s', adv_setting.name)
                 return  []
             for data in answer:
                 wb_timestamp = datetime.datetime.fromisoformat(data['date']).date()
