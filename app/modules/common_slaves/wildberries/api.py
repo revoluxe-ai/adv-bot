@@ -13,7 +13,12 @@ from .data_classes.adv import Adv
 from .data_classes.card_from_wb import CardFromWB
 from .data_classes.keywordstat import KeywordStat
 from .data_classes.subcategories import Subcategory
-from .exceptions import ApiForbiddenError, TooManyRequests, UnknownApiRequestError, BadRequestError, NotValidDataError
+from .exceptions import (ApiForbiddenError,
+                         TooManyRequests,
+                         UnknownApiRequestError,
+                         BadRequestError,
+                         NotValidDataError,
+                         CardNotFoundInWB)
 from .models import AdvSetting
 from .super_cabinet_manager import WBCabinetAccess
 
@@ -100,7 +105,7 @@ class AdvertApi(ABC_WB_API):
         return keywords
 
     @try_except_decorator(1, 3)
-    async def get_advertIds(self) -> list[Adv]:
+    async def get_advertIds(self) -> list[int]:
         advertIds = []
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
         async with aiohttp.ClientSession() as session:
@@ -129,7 +134,7 @@ class AdvertApi(ABC_WB_API):
 
 
     @try_except_decorator(1, 2)
-    async def _get_advs(self, adv_ids: list):
+    async def _get_advs(self, adv_ids: list)->list[Adv]:
         advs = []
         url = f'https://advert-api.wb.ru/adv/v1/promotion/adverts'
         async with aiohttp.ClientSession() as session:
@@ -145,7 +150,7 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 1)
     async def get_live_advs(self):
-        adv_ids: list[Adv] = await self.get_advertIds()
+        adv_ids: list[int] = await self.get_advertIds()
         advs = await self.get_advs(adv_ids)
         return advs
 
@@ -309,7 +314,7 @@ class ContentApi(ABC_WB_API):
             answer = json.loads(response)
         cards = answer['cards']
         if not cards:
-            raise exceptions.CardNotFoundInWB(f'Карточка с текстом {text} не найдена на Wildberries')
+            raise CardNotFoundInWB(f'Карточка с текстом {text} не найдена на Wildberries')
         card_json = answer['cards'][0]
         card = CardFromWB(card_json)
         return card

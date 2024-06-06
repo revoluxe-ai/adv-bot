@@ -5,6 +5,8 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Union
+
+from app.exc import CardNotFoundInDB
 from app.modules.common_slaves.wildberries import exceptions as wb_exc
 import pandas as pd
 from PIL import Image
@@ -16,6 +18,7 @@ from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
 from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
+from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
     AdvKeyword,
     KeywordSetting,
@@ -166,8 +169,10 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
     wb_category_to_keywordstat_list = defaultdict(list)
     for adv_setting in adv_settings:
         logger.info(f'Обрабатываю {adv_setting.name} для расчета min_ctr')
-        wb_category: Union[WBCategory, None] = await get_wb_category(adv_setting)
-        if not wb_category:
+        try:
+            wb_category: Union[WBCategory, None] = await get_wb_category(adv_setting)
+        except (NotItemsInAdvSetting, CardNotFoundInDB) as e:
+            logger.debug(f'У кампании {adv_setting.name} нет товаров {e}')
             continue
         wb_category_name = wb_category.wb_category_name
         keyword_stats = await get_keywords_statistic(adv_setting, None, [1, 2])
@@ -354,8 +359,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     try:
          nmid = adv_setting.nmids[0]
     except:
-        logger.error(f'У {adv_setting.name} нет товаров')
-        return None
+        raise wb_exc.NotItemsInAdvSetting('У кампании в базе нет товаров')
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
@@ -363,8 +367,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     if wb_card:
         wb_category = wb_card.wb_category
     else:
-        logger.error('Не найдена карточка товара')
-        raise wb_exc.CardNotFoundInWB('Не найдена карточка товара: ' + str(nmid))
+        raise CardNotFoundInDB('В базе не найдена карточка товара: ' + str(nmid))
     return wb_category
 
 class DataSetter:
@@ -375,8 +378,10 @@ class DataSetter:
 
     async def update_minus_keywords(self, adv_settings, category_name_to_min_ctr):
         for adv_setting in adv_settings:
-            category:WBCategory = await get_wb_category(adv_setting)
-            if not category:
+            try:
+                category:WBCategory = await get_wb_category(adv_setting)
+            except (CardNotFoundInDB, NotItemsInAdvSetting):
+                logger.debug('Не удалось получить категорию РК')
                 continue
             min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
             good_phrases, bad_phrases = await get_good_bad_phrases(adv_setting, min_ctr)
