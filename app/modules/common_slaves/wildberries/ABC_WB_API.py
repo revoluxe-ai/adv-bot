@@ -29,14 +29,16 @@ class WbRequestApiMixin(ABC):
         async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
             try:
                 logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
+                text = await response.text()
                 response.raise_for_status()
             except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
                 if e.status in (401, 403):
                     raise exceptions.ApiForbiddenError('Неверный API ключ', wb_user_cabinet=self._wb_user_cabinet) from e
                 if e.status == 429:
-                    logger.error(f'Превышен лимит запросов к API. Ошибка: {url}')
+                    logger.debug(f'Превышен лимит запросов к API: {url}')
                     raise exceptions.TooManyRequests from e
                 else:
+                    logger.error(f'Ошибка при запросе к {url}: {text}')
                     raise exceptions.BadRequestError(e) from e
             except exceptions.NotValidDataError as e:
                 raise exceptions.NotValidDataError(e) from e

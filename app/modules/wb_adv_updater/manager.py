@@ -56,7 +56,7 @@ predictor = Predictor()
 
 logger = logging.getLogger(__name__)
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 
 class MessageCounter:
@@ -92,7 +92,7 @@ class Manager(AbcManager):
         self._phrase_index = None
         self._gds = DataScience()
         self._word2vec = Word2Vec()
-        self._aiosm = get_async_session_maker()
+        self._aiosm = get_async_session_maker
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
 
@@ -141,7 +141,6 @@ class Manager(AbcManager):
                     need_update_model.set()
                     logger.debug(f"Обновление статистики завершено")
             await asyncio.sleep(0)
-
         return
 
     @staticmethod
@@ -209,6 +208,7 @@ class Manager(AbcManager):
                     f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}'
                 )
             await asyncio.sleep(0)
+        await asyncio.sleep(60*15)
         return
 
 
@@ -305,6 +305,8 @@ class Manager(AbcManager):
                         if update_tasks[wb_cabinet_id].exception():
                             logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}')
                         del update_tasks[wb_cabinet_id]
+            await asyncio.sleep(60*15)
+
 
     async def update_model(self, update_model_on_new_features):
         logger.debug('Старт обучения и сохранения модели')
@@ -441,29 +443,32 @@ class Manager(AbcManager):
     async def __update_cards_in_graph_for_shops(self):
         async with sm() as db_session:
             stmt = select(WBCard).where(WBCard.updated == False)
-            result = await db_session.stream(stmt)
+            result: list[WBCard] = await db_session.stream(stmt)
             async for wbcard in result.scalars():
-                main_image_url: str = wbcard.photos[0]
-                async with aiohttp.ClientSession() as http_session:
-                    async with http_session.get(main_image_url) as response:
-                        image_bytes = await response.read()
-                        pil_image = PilImage.open(BytesIO(image_bytes))
-
-                vector = await asyncio.to_thread(self._image_master.get_vector, pil_image)
-                dhash = await asyncio.to_thread(self._image_tools.dhash, pil_image)
-
-                logger.debug(f"Обновляем карточку: {wbcard.name}")
                 try:
+                    main_image_url: str = wbcard.photos[0]
+                    async with aiohttp.ClientSession() as http_session:
+                        async with http_session.get(main_image_url) as response:
+                            image_bytes = await response.read()
+                            pil_image = PilImage.open(BytesIO(image_bytes))
+
+                    vector = await asyncio.to_thread(self._image_master.get_vector, pil_image)
+                    dhash = await asyncio.to_thread(self._image_tools.dhash, pil_image)
+
+                    logger.debug(f"Обновляем карточку: {wbcard.name}")
                     characteristics_word = await self._process_product_data(wbcard)
-                except Exception as exc:
-                    logger.error(f"Ошибка при обработке данных для карточки с именем: {wbcard.nmid}, {exc}")
-                    continue
+                    await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)
+                    wbcard.updated = True  # Обновляем статус
+                    await db_session.commit()  # Подтверждение изменений в базе данных
+                    logger.debug(f"Статус 'updated' установлен в true для карточки с именем: {wbcard.name}")
+                except KeyError as exc:
+                    if exc.args[0] == 'photos':
+                        logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
+                    else:
+                        logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
 
-                await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)
 
-                wbcard.updated = True  # Обновляем статус
-                await db_session.commit()  # Подтверждение изменений в базе данных
-                logger.debug(f"Статус 'updated' установлен в true для карточки с именем: {wbcard.name}")
+
 
     async def update_cards_in_graph(self):
         await self.__update_cards_in_graph_for_shops()
@@ -481,7 +486,8 @@ class Manager(AbcManager):
                     continue
                 characteristics_words[char_name]: tuple(str, list[float]) = await self.__get_words_from_char_value(char_value)
         characteristics_words['name']: tuple(str, list[float])  = await self.__get_words_from_char_value(wbcard.name)
-        characteristics_words['description']: tuple(str, list[float]) = await self.__get_words_from_char_value(wbcard.description)
+        if 'description' in characteristics_words:
+            characteristics_words['description']: tuple(str, list[float]) = await self.__get_words_from_char_value(wbcard.description)
         return characteristics_words
 
     async def __get_words_from_char_value(self, char_value):
@@ -644,3 +650,4 @@ class Manager(AbcManager):
                                 f'для юзера {user.username}: {exc}'
                             )
                             await asyncio.sleep(1)
+            await asyncio.sleep(60*60)

@@ -17,7 +17,7 @@ from .models import ItemFeature, KeywordFeature
 
 logger = logging.getLogger(__name__)
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 
 class GraphUpdater:

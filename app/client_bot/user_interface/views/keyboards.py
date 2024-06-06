@@ -12,7 +12,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBUserCabinet,
 )
-from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST
+from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -23,7 +23,7 @@ from .callbacks import Action
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 
 def get_shop_keyboard(all_shops: list[WBUserCabinet]):
@@ -188,9 +188,11 @@ def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_sett
         views = keyword.statistic.views
         ctr = keyword.statistic.ctr
         if keyword.keyword_settings.hard_status == BLACK_LIST:
-            hard_status = 'ЧС'
+            hard_status = 'Не рел.фраза'
         elif keyword.keyword_settings.hard_status == AUTO_MODE:
             hard_status = 'Авто'
+        elif keyword.keyword_settings.hard_status == TURN_OFF:
+            hard_status = 'Откл.'
         else:
             hard_status = 'БС'
 
@@ -235,7 +237,7 @@ def get_keyword_setting_keyboard(
     return_to: str = 'by_adv',
 ):
     buttons = []
-    if keyword.hard_status in [BLACK_LIST, AUTO_MODE]:
+    if keyword.hard_status in [BLACK_LIST, AUTO_MODE, TURN_OFF]:
         button = [InlineKeyboardButton(text='В белый список',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=WHITE_LIST,
@@ -250,19 +252,38 @@ def get_keyword_setting_keyboard(
 
         buttons.append(button)
 
-    if keyword.hard_status in [BLACK_LIST, WHITE_LIST]:
+    if keyword.hard_status in [BLACK_LIST, WHITE_LIST, TURN_OFF]:
         button = [InlineKeyboardButton(text='В авто',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=AUTO_MODE,
                                            keyword_setting_original_id=keyword.id).pack())]
         buttons.append(button)
 
+
+
+
     if keyword.hard_status in [AUTO_MODE, WHITE_LIST]:
-        button = [InlineKeyboardButton(text='В черный список',
+
+        bottom = [InlineKeyboardButton(text='Отключить (релевантная фраза)',
+                                        callback_data=callbacks.ChangeKeywordHardStatus(
+                                            new_hard_status=TURN_OFF,
+                                            keyword_setting_original_id=keyword.id).pack())]
+        buttons.append(bottom)
+
+
+        button = [InlineKeyboardButton(text='В список не релевантных фраз',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=BLACK_LIST,
                                            keyword_setting_original_id=keyword.id).pack())]
         buttons.append(button)
+
+    if keyword.hard_status == TURN_OFF:
+        button = [InlineKeyboardButton(text='В список не релевантных фраз',
+                                       callback_data=callbacks.ChangeKeywordHardStatus(
+                                           new_hard_status=BLACK_LIST,
+                                           keyword_setting_original_id=keyword.id).pack())]
+        buttons.append(button)
+
 
     buttons.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
                                              callback_data=callbacks.SettingKeywords(

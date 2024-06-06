@@ -8,6 +8,10 @@
     }
   },
   "handlers": {
+    "my_log_handler": {
+      "class": "my_log_handler.ScriptHandler",
+      "level": "ERROR"
+    },
     "console": {
       "class": "logging.StreamHandler",
       "level": "DEBUG",
@@ -47,102 +51,49 @@
     }
   },
   "loggers": {
+    "app.utils.db.session_maker": {
+      "level": "DEBUG",
+      "handlers": [
+        "sql_handler"
+      ],
+      "propagate": false
+    },
+
     "neo4j": {
       "level": "WARNING",
-      "handlers": ["console"],
+      "handlers": [
+        "console"
+      ],
       "propagate": false
     },
     "asyncio": {
       "level": "WARNING",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "fit_logger": {
-      "level": "DEBUG",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "wb.keyword_async_ml_updater.data_managers": {
-      "level": "DEBUG",
-      "handlers": ["console"],
+      "handlers": [
+        "console"
+      ],
       "propagate": false
     },
 
+
     "gensim.models.keyedvectors": {
       "level": "CRITICAL",
-      "handlers": ["console"],
+      "handlers": [
+        "console"
+      ],
       "propagate": false
     },
     "sqlalchemy.engine.Engine": {
       "level": "WARNING",
-      "handlers": ["console"],
+      "handlers": [
+        "console"
+      ],
       "propagate": false
-    },
-    "app.wildberries.ABC_WB_API": {
-      "level": "DEBUG",
-      "handlers": ["console"],
-      "propagate": false
-    },
-
-    "app.utils.db.session_maker": {
-        "level": "DEBUG",
-        "handlers": ["console"],
-        "propagate": false
-    },
-
-    "NeoDataScience.driver": {
-      "level": "DEBUG",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "app.modules.common.slaves.wildberries.api": {
-        "level": "ERROR",
-        "handlers": ["console"],
-        "propagate": false
-        },
-
-    "app.modules.wb_adv_updater.manager": {
-      "level": "ERROR",
-        "handlers": ["console"],
-        "propagate": false
-
-
+    }
   },
-    "app.modules.wb_adv_updater.data_managers ": {
-       "level": "CRITICAL",
-        "handlers": ["console"],
-        "propagate": false
-    },
-
-    "app.modules.common_slaves.wildberries.api": {
-       "level": "ERROR",
-        "handlers": ["console"],
-        "propagate": false
-        }
-  },
-
-
-    "app.modules.common_slaves.wildberries.api_rights":{
-
-        "level": "CRITICAL",
-        "handlers": ["console"],
-        "propagate": false
-        },
-    "app.modules.wb_adv_updater.runner": {
-        "level": "CRITICAL",
-        "handlers": ["console"],
-        "propagate": false
-    },
-    "app.modules.common_slaves.wildberries.ABC_WB_API":  {
-        "level": "CRITICAL",
-        "handlers": ["console"],
-        "propagate": false
-    },
-
 
   "root": {
     "level": "DEBUG",
-    "handlers": ["console", "error_to_file", "common_file"]
+    "handlers": ["console", "error_to_file", "common_file", "my_log_handler"]
   }
 }
 

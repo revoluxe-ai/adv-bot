@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 class MainMenu(TextWithKeyboard):
@@ -341,15 +341,25 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
 class KeywordSettingMessage(TextWithKeyboard):
     def __init__(self, bot: Bot, chat_id: int,
-                 keyword_setting: KeywordSetting, adv_setting: AdvSetting, last_page: int):
+                 keyword_setting_id,
+                 last_page: int):
         super().__init__(bot, chat_id)
-        self._keyword_setting = keyword_setting
-        self._adv_setting = adv_setting
+        self._keyword_original_id = keyword_setting_id
         self._page = last_page
 
     async def __call__(self):
-        auto_block_status = await redis_manager.get_auto_block_status(self._keyword_setting.id)
+        auto_block_status = await redis_manager.get_auto_block_status(self._keyword_original_id)
         self._auto_block_status = auto_block_status
+        async with _sm() as session:
+            stmt = select(KeywordSetting)\
+                          .options(selectinload(KeywordSetting.adv_setting))\
+                          .where(KeywordSetting.id == self._keyword_original_id)
+            result = await session.execute(stmt)
+            keyword_setting: KeywordSetting = result.scalars().one()
+        adv_setting: AdvSetting = keyword_setting.adv_setting
+        self._keyword_setting = keyword_setting
+        self._adv_setting = adv_setting
+
         return await super().__call__()
 
     @property

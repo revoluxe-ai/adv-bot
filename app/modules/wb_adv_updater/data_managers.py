@@ -35,7 +35,7 @@ from app.utils import redis_manager
 logger = logging.getLogger(__name__)
 
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 
@@ -215,6 +215,10 @@ async def get_good_bad_phrases(adv_setting: AdvSetting,
         keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
 
         for keyword_setting in keyword_settings:
+            if keyword_setting.hard_status == 3:
+                bad_keywords.append(keyword_setting.text)
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                continue
             if keyword_setting.hard_status == 2:
                good_keywords.append(keyword_setting.text)
                keyword_setting.auto_block = False
@@ -360,7 +364,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
         wb_category = wb_card.wb_category
     else:
         logger.error('Не найдена карточка товара')
-        raise wb_exc.CardNotFoundInWB('Не найдена карточка товара')
+        raise wb_exc.CardNotFoundInWB('Не найдена карточка товара: ' + str(nmid))
     return wb_category
 
 class DataSetter:
@@ -456,7 +460,7 @@ async def get_adv_keyword_text_in_white_list():
     async with _sm() as session:
         stmt = select(KeywordSetting) \
             .options(selectinload(KeywordSetting.adv_setting)) \
-            .where(KeywordSetting.hard_status == 2)
+            .where(KeywordSetting.hard_status.in_([2, 3]))
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
     adv_keyword_text_in_white_list = []

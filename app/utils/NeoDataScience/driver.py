@@ -10,6 +10,7 @@ from neo4j import AsyncGraphDatabase
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordPhrase
 from app.modules.common_slaves.wildberries.models import WBCard, WBCategory
+from python_modules.path_setting_funcs import get_setting_path
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,8 @@ class AsyncMeta(type):
 class DataScience(metaclass=AsyncMeta):
     def __init__(self):
         self.MAIN_GRAPH_NAME = 'main'
-        with open('setting.yaml', 'r', encoding='utf-8') as file:
+        setting_path = get_setting_path()
+        with open(setting_path, 'r', encoding='utf-8') as file:
             setting  = yaml.safe_load(file)
         name = setting['neo4j']['name']
         password = setting['neo4j']['password']

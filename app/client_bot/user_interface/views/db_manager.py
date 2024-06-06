@@ -5,7 +5,7 @@ from app.payments.db.models import Payment
 from app.utils.db.models import RefLink, User, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 

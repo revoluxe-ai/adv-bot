@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import typing
 from dataclasses import dataclass
 from typing import Union, AsyncGenerator
 
@@ -18,7 +19,7 @@ from .api_rights import check_token
 from .exceptions import ApiForbiddenError, UnknownApiRequestError
 from .models import WBToken
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +64,10 @@ async def get_accesses_for_wb_cabinets()-> AsyncGenerator[WBCabinetAccess, None]
                     try:
                         await api_rights.check_token(token)
                         users_live_tokens.append(token)
-                    except ApiForbiddenError:
-                        logger.error('Токен отозван')
+                    except ApiForbiddenError as exc:
+                        logger.debug(exc)
                         token.active = False
-                        session.commit()
+                        await session.commit()
                         continue
 
                     except UnknownApiRequestError as e:
@@ -103,17 +104,18 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
         tokens: list[WBToken] = result.scalars().all()
     checked_tokens = []
     for token in tokens:
-        try:
-            if token.shop_id == wb_cabinet.shop_id:
+        if token.shop_id == wb_cabinet.shop_id:
+            try:
                 await check_token(token)
-                checked_tokens.append(token)
-            else:
+            except exceptions.ApiForbiddenError:
+                logger.debug('ApiForbiddenError')
                 token.active = False
                 await session.commit()
                 continue
-        except:
-            logger.error('Токен не прошел проверку')
+            checked_tokens.append(token)
+        else:
             continue
+
 
     access = WBCabinetAccess(tokens = checked_tokens,
                              wb_user_cabinet = None,
@@ -135,7 +137,7 @@ async def get_super_user_access():
                 if len(leave_tokens) >= MAX_TOKENS:
                     break
             except Exception as exc:
-                logger.error(exc)
+                logger.debug(f'Токен не прошел проверку: {exc}')
                 await asyncio.sleep(0)
 
         if len(leave_tokens) >= MAX_TOKENS:

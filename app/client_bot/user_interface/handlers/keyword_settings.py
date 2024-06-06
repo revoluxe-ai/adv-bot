@@ -24,7 +24,7 @@ from ..views import callbacks, messages
 router = Router()
 
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'by_adv'))
@@ -103,19 +103,12 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
 async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,
                            state: FSMContext):
     keyword_original_id: int = callback_data.keyword_original_id
-    async with _sm() as session:
-       stmt = select(KeywordSetting
-                     .options(selectinload(KeywordSetting.adv_setting))
-                     ).where(KeywordSetting.id == keyword_original_id)
-       result = await session.execute(stmt)
-       keyword_setting: KeywordSetting = result.scalars().one()
-    adv_setting: AdvSetting = keyword_setting.adv_setting
+
     chat_id = callback.message.chat.id
 
     data = await state.get_data()
     page = data.get('last_keyword_setting_page', 1)
-    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting,
-     adv_setting, page)()
+    await messages.KeywordSettingMessage(bot, chat_id, keyword_original_id, page)()
 
     return
 
@@ -129,26 +122,18 @@ async def setting_keyword(callback: types.CallbackQuery,
 
     keyword_setting_original_id: int = callback_data.keyword_setting_original_id
 
-    async with _sm() as session:
-        keyword_setting = await session.execute(select(KeywordSetting)
-         .options(selectinload(KeywordSetting.adv_setting))
-                                               .where(KeywordSetting.id == keyword_setting_original_id))
-        keyword_setting = keyword_setting.scalar()
-
     data = await state.get_data()
     page = data.get('last_keyword_setting_page', 1)
 
-    adv_setting = keyword_setting.adv_setting
     chat_id = callback.message.chat.id
-    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting,
-                                                                      adv_setting, page)()
+    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
 
     return
 
 
 
 
-@router.callback_query(callbacks.ChangeKeywordHardStatus.filter())
+@router.callback_query(callbacks.ChangeKeywordHardStatus.filter(3 > F.new_hard_status >= -1))
 async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
                                      bot: aiogram.Bot, state: FSMContext):
@@ -198,7 +183,13 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
     page = data.get('last_keyword_setting_page', 1)
 
     chat_id = callback.message.chat.id
-    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting, adv_setting, page)()
+    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
 
     return
 
+@router.callback_query(callbacks.ChangeKeywordHardStatus.filter(F.new_hard_status == 3))
+async def change_keyword_hard_status_to_turn_off(callback: types.CallbackQuery,
+                                     callback_data: callbacks.ChangeKeywordHardStatus,
+                                     bot: aiogram.Bot, state: FSMContext):
+    await callback.answer()
+    pass

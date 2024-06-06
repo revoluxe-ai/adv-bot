@@ -8,7 +8,7 @@ from app.modules.common_slaves.wildberries.data_classes.card_from_wb import Card
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 async def update_advs_in_db(advs: list[Adv], wb_cabinet: WBCabinet):

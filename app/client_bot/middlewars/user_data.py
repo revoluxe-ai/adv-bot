@@ -15,7 +15,7 @@ _redis_manager = __redis_manager.RedisManager()
 
 
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 
 class UserDataMiddleware(BaseMiddleware):

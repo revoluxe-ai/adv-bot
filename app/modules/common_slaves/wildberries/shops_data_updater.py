@@ -12,7 +12,7 @@ from . import models, wb_db_manager
 from .data_classes.adv import Adv
 from .exceptions import NotValidDataError
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
@@ -88,14 +88,8 @@ class ShopDataUpdater:
         wb_api = self.__wb_api
         advert_api = wb_api.advert
         adv_ids = await advert_api.get_advertIds()
-        try:
-            advs: list[Adv] = await advert_api.get_advs(adv_ids)
-            await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
-        except exc.ApiForbiddenError:
-            logger.error('Попытка получить данные с отозванным токеном')
-            return
-        except NotValidDataError:
-            logger.error('Получены невалидные данные в РК')
+        advs: list[Adv] = await advert_api.get_advs(adv_ids)
+        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
 
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))

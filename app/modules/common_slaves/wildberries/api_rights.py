@@ -1,9 +1,10 @@
 import asyncio
 from asyncio import Lock
 import datetime
+
 from app.utils import redis_manager
 from .models import WBToken
-from app.modules.common_slaves.wildberries import exceptions
+
 
 class OnlyRead:
     TRUE = True
@@ -63,7 +64,7 @@ class TokenRightChecker(WbRequestApiMixin):
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
 
         async with aiohttp.ClientSession() as session:
-                await self.requests(session, 'GET', url, headers=self.headers.standart)
+             await self.requests(session, 'GET', url, headers=self.headers.standart)
 
 
      async def content(self):
@@ -102,16 +103,17 @@ async def check_token(token: WBToken):
     try:
         expire = token.expires
         if expire < datetime.datetime.now():
-            raise exceptions.TokenExpiredError('Token expired')
+            raise ApiForbiddenError
         async with locker:
             checker = TokenRightChecker(token)
             await asyncio.gather(checker.adverts(), checker.content())
         await redis_manager.set_token_rights(hash_token, timeout=60*60)
-    except ApiForbiddenError:
-        logger.error(f'Токен отозван')
+    except ApiForbiddenError as exc:
+        logger.debug(f'Токен отозван')
+        raise exc
     except UnknownApiRequestError:
-        logger.error('Ошибка проверки токена (пропущено)')
+        logger.debug('Ошибка проверки токена (пропущено)')
     except TooManyRequests:
-        logger.error('Превышен лимит запросов')
+        logger.debug('Превышен лимит запросов')
     except BadRequestError:
-        logger.error('Ошибка запроса')
+        logger.debug('Ошибка запроса')

@@ -11,11 +11,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
-test_shop_id = '4a843047-429f-5a00-b659-156f6c81b70f'
+test_shop_id = '93d70b23-32b4-4f1c-a431-985386197cfd'
 
-async def getting_cards():
+async def update_data():
     wb_access = await get_access()
     shop_data_updater = ShopDataUpdater(wb_access)
     await shop_data_updater.update_all_data()
@@ -35,4 +35,4 @@ async def get_access():
     return access
 
 if __name__ == '__main__':
-    asyncio.run(getting_cards())
+    asyncio.run(update_data())

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "custom": {
+      "format": "%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s",
+      "datefmt": "%Y-%m-%d %H:%M:%S"
+    }
+  },
+  "handlers": {
+    "console": {
+      "class": "logging.StreamHandler",
+      "level": "DEBUG",
+      "formatter": "custom",
+      "stream": "ext://sys.stdout"
+    }
+
+  },
+
+  "root": {
+    "level": "DEBUG",
+    "handlers": ["console"]
+  }
+}
+
+

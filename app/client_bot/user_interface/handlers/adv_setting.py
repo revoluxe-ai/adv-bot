@@ -11,7 +11,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from ..views import callbacks, messages
 from ..views.callbacks import Action
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 router = Router()
 

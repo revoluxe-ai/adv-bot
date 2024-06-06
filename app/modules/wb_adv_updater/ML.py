@@ -15,7 +15,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
 
-import settings
+from ... import settings
 from app.admin_bot.sender import sender_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
@@ -27,17 +27,13 @@ from .data_managers import DataGetter
 
 
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
-
-model_folder = 'app/keyword_async_ml_updater/model'
-
-
 global_model: typing.Union[xgboost.XGBModel, None] = None
 
-path = 'app/modules/wb_adv_updater/model'
+path = 'model'
 
 def save_model(model: xgboost.XGBModel, time_stamp = None):
     model_path = os.path.join(path, 'model.json')

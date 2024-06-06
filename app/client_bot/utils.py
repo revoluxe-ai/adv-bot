@@ -11,7 +11,7 @@ from app.my_types import AdvSetting
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
 
-_sm = get_async_session_maker()
+_sm = get_async_session_maker
 
 @dataclass
 class KeywordForKeyboard:

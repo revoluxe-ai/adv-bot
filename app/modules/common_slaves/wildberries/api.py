@@ -138,8 +138,8 @@ class AdvertApi(ABC_WB_API):
             answer = json.loads(response_text)
             for advert in answer:
                 adv = Adv(advert)
-                if not adv.nmids:
-                    raise exceptions.NotValidDataError('Нет данных об карточках в РК')
+                # if not adv.nmids:
+                #     raise exceptions.NotValidDataError('Нет данных об карточках в РК')
                 advs.append(adv)
         return advs
 
@@ -152,6 +152,10 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 6)
     async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
+        if len(phrases) > 1000:
+            phrases.sort(key=lambda x: len(x), reverse=True)
+            phrases = phrases[:1000]
+            logger.debug('Больше 1000 минус-фраз, обрезаем до 1000')
         url = f'https://advert-api.wb.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}'
         data = {
             "excluded": phrases
@@ -271,7 +275,8 @@ class ContentApi(ABC_WB_API):
             try:
                 cards.append(await self._get_cards_by_text(text))
             except exceptions.CardNotFoundInWB:
-                logger.error('Карточка с текстом %s не найдена на Wildberries', text)
+                logger.debug('Карточка с текстом %s не найдена на Wildberries, возможно, карточка не существует',
+                             text)
                 continue
         return cards
 
@@ -279,33 +284,34 @@ class ContentApi(ABC_WB_API):
     @try_except_decorator(1, 2)
     async def _get_cards_by_text(self, text: Union[str, int]):
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
-        async with aiohttp.ClientSession() as session:
-            text = str(text)
-            data_for_req = {
-                "settings": {
-                    "sort": {
-                        "ascending": False
-                    },
-                    "cursor": {
-                        "limit": 1
-                    },
-                    "filter": {
-                        "withPhoto": -1,
-                        'textSearch': text
 
-                    }
+        text = str(text)
+        data_for_req = {
+            "settings": {
+                "sort": {
+                    "ascending": False
+                },
+                "cursor": {
+                    "limit": 1
+                },
+                "filter": {
+                    "withPhoto": -1,
+                    'textSearch': str(text)
+
                 }
             }
-            async with session.post(url, json=data_for_req, headers=self.headers.standart) as response:
-                answer = await self.requests(session, 'POST', url,
-                                             json_data=data_for_req,
-                                             headers=self.headers.standart)
-                answer = json.loads(answer)
-            cards = answer['cards']
-            if not cards:
-                raise exceptions.CardNotFoundInWB(f'Карточка с текстом {text} не найдена на Wildberries')
-            card_json = answer['cards'][0]
-            card = CardFromWB(card_json)
+        }
+
+        async with aiohttp.ClientSession() as session:
+            response = await self.requests(session, 'POST', url=url,
+                                               json_data=data_for_req,
+                                               headers=self.headers.standart)
+            answer = json.loads(response)
+        cards = answer['cards']
+        if not cards:
+            raise exceptions.CardNotFoundInWB(f'Карточка с текстом {text} не найдена на Wildberries')
+        card_json = answer['cards'][0]
+        card = CardFromWB(card_json)
         return card
 
 

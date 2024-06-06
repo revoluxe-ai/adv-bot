@@ -11,7 +11,7 @@ from ..utils import redis_func_cache
 redis_func_cache.set_config()
 import nest_asyncio
 from aiohttp import web
-
+from app import settings
 nest_asyncio.apply()
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
@@ -38,7 +38,7 @@ PORT = 8090
 WEB_SERVER_PORT = PORT
 
 
-BASE_WEBHOOK_URL = 'https://tiriel.ru'
+BASE_WEBHOOK_URL = settings.WEBHOOK_URL
 
 WEBHOOK_PATH = "/telegram_webhook"
 
@@ -66,7 +66,13 @@ try:
 except:
     test_mode = False
 
-if not test_mode:
+
+polling_mode = settings.polling_mode
+
+
+
+
+if not test_mode and not polling_mode:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
@@ -108,8 +114,11 @@ async def run_shop_updater():
 
 
 async def run():
-    if test_mode:
-        await bot.delete_webhook()
+    if test_mode or polling_mode:
+        try:
+            await bot.delete_webhook()
+        except:
+            pass
         # Запускаем бота с пулингом вместо вебхука
         await dp.storage.close()  # Закрываем хранилище перед запуском, чтобы избежать конфликтов
         await asyncio.gather(
@@ -118,7 +127,7 @@ async def run():
         )
 
     else:
-        # Оригинальная логика запуска с вебхуком и дополнительными задачами
+    # Оригинальная логика запуска с вебхуком и дополнительными задачами
         await asyncio.gather(start_web_server(), run_shop_updater())
 
 

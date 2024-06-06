@@ -12,7 +12,7 @@ from app.client_bot.user_interface.views import messages
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 
 class CheckSubscribeOnShop(BaseMiddleware):

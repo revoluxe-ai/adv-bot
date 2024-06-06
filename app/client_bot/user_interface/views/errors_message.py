@@ -12,7 +12,7 @@ class UnknownInnerError(mt.Text):
 class AddNewToken(mt.TextWithKeyboard):
     def __init__(self, bot, chat_id: int,
                  wb_user_cabinet: app.my_types.WBUserCabinet,
-):
+                 ):
         super().__init__(bot, chat_id)
         self.wb_user_cabinet = wb_user_cabinet
 
