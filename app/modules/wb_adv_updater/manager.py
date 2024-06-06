@@ -443,29 +443,32 @@ class Manager(AbcManager):
     async def __update_cards_in_graph_for_shops(self):
         async with sm() as db_session:
             stmt = select(WBCard).where(WBCard.updated == False)
-            result = await db_session.stream(stmt)
+            result: list[WBCard] = await db_session.stream(stmt)
             async for wbcard in result.scalars():
-                main_image_url: str = wbcard.photos[0]
-                async with aiohttp.ClientSession() as http_session:
-                    async with http_session.get(main_image_url) as response:
-                        image_bytes = await response.read()
-                        pil_image = PilImage.open(BytesIO(image_bytes))
-
-                vector = await asyncio.to_thread(self._image_master.get_vector, pil_image)
-                dhash = await asyncio.to_thread(self._image_tools.dhash, pil_image)
-
-                logger.debug(f"Обновляем карточку: {wbcard.name}")
                 try:
+                    main_image_url: str = wbcard.photos[0]
+                    async with aiohttp.ClientSession() as http_session:
+                        async with http_session.get(main_image_url) as response:
+                            image_bytes = await response.read()
+                            pil_image = PilImage.open(BytesIO(image_bytes))
+
+                    vector = await asyncio.to_thread(self._image_master.get_vector, pil_image)
+                    dhash = await asyncio.to_thread(self._image_tools.dhash, pil_image)
+
+                    logger.debug(f"Обновляем карточку: {wbcard.name}")
                     characteristics_word = await self._process_product_data(wbcard)
-                except Exception as exc:
-                    logger.error(f"Ошибка при обработке данных для карточки с именем: {wbcard.nmid}, {exc}")
-                    continue
+                    await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)
+                    wbcard.updated = True  # Обновляем статус
+                    await db_session.commit()  # Подтверждение изменений в базе данных
+                    logger.debug(f"Статус 'updated' установлен в true для карточки с именем: {wbcard.name}")
+                except KeyError as exc:
+                    if exc.args[0] == 'photos':
+                        logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
+                    else:
+                        logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
 
-                await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)
 
-                wbcard.updated = True  # Обновляем статус
-                await db_session.commit()  # Подтверждение изменений в базе данных
-                logger.debug(f"Статус 'updated' установлен в true для карточки с именем: {wbcard.name}")
+
 
     async def update_cards_in_graph(self):
         await self.__update_cards_in_graph_for_shops()
