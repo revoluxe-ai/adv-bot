@@ -279,7 +279,7 @@ class ContentApi(ABC_WB_API):
         for text in texts:
             try:
                 cards.append(await self._get_cards_by_text(text))
-            except exceptions.CardNotFoundInWB:
+            except exceptions.CardNotFoundInDB:
                 logger.debug('Карточка с текстом %s не найдена на Wildberries, возможно, карточка не существует',
                              text)
                 continue
