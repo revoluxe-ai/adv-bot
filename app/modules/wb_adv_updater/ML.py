@@ -15,6 +15,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
 
+from ..common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from ... import settings
 from app.admin_bot.sender import sender_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
@@ -24,8 +25,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 from . import data_managers
 from .data_managers import DataGetter
-
-
+from ...exc import CardNotFoundInDB
 
 sm = get_async_session_maker
 
@@ -183,9 +183,8 @@ class Fitter(AbcManager):
         for adv in adv_settings:
             try:
                 wb_category = await data_managers.get_wb_category(adv)
-            except wb_exceptions.CardNotFoundInWB:
-                logger.debug(f'Категория не найдена для кампании {adv.name}')
-
+            except (CardNotFoundInDB, NotItemsInAdvSetting) as exc:
+                logger.debug(f"Не удалось получить категорию РК {exc}")
                 continue
             keyword_stats = await data_managers.get_keywords_statistic(adv, None)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}

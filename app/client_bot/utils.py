@@ -25,8 +25,6 @@ class KeywordForKeyboard:
 
 async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[KeywordForKeyboard]:
     category: Union[WBCategory, None] = await data_managers.get_wb_category(adv_setting)
-    if not category:
-        return []
     category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
     min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
     good_phrases, bad_phrases = await data_managers.get_good_bad_phrases(adv_setting, min_ctr)
