@@ -32,6 +32,7 @@ async def send_message_to_users():
             hash = sha256((str(message)) \
                           .encode()).hexdigest()
             if await redis_manager.check_message_send(hash, user_id):
+                send_count += 1
                 continue
 
             try:
