@@ -59,3 +59,7 @@ class NotValidDataError(Exception):
 
 class CardNotFoundInWB(Exception):
     pass
+
+
+class NotItemsInAdvSetting(Exception):
+    pass
