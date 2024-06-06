@@ -137,7 +137,7 @@ async def get_super_user_access():
                 if len(leave_tokens) >= MAX_TOKENS:
                     break
             except Exception as exc:
-                logger.error(exc)
+                logger.debug(f'Токен не прошел проверку: {exc}')
                 await asyncio.sleep(0)
 
         if len(leave_tokens) >= MAX_TOKENS:
