@@ -93,7 +93,7 @@ async def get_accesses_for_wb_cabinets()-> AsyncGenerator[WBCabinetAccess, None]
 
 
 
-async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
+async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCabinetAccess:
     async with sm() as session:
         stmt = select(WBCabinet).join(WBUserCabinet)\
            .where(WBCabinet.id == wb_user_cabinet.wb_cabinet_id)
