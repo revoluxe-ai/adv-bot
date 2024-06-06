@@ -155,7 +155,7 @@ class Manager(AbcManager):
             keyword_setting.text = keyword_stat.text
             keyword_setting.adv_setting_id = adv_setting_original_id
             async with sm() as session:
-                session.add(keyword_setting)
+                session.merge(keyword_setting)
                 await session.commit()
 
         stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting))\
