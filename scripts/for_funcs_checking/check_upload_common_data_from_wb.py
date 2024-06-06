@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 test_shop_id = '93d70b23-32b4-4f1c-a431-985386197cfd'
 
