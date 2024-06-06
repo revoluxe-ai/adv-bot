@@ -11,7 +11,6 @@ sm = get_async_session_maker
 
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
-
 shop_id = '3cc7270d-232b-4f5d-9cbb-978b6f6e4470'.strip()
 
 period = 38
