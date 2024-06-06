@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "custom": {
+      "format": "%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s",
+      "datefmt": "%Y-%m-%d %H:%M:%S"
+    }
+  },
+  "handlers": {
+    "my_log_handler": {
+      "class": "my_log_handler.ScriptHandler",
+      "level": "ERROR"
+    },
+    "console": {
+      "class": "logging.StreamHandler",
+      "level": "DEBUG",
+      "formatter": "custom",
+      "stream": "ext://sys.stdout"
+    },
+    "common_file":{
+        "class": "logging.handlers.RotatingFileHandler",
+        "level": "DEBUG",
+        "formatter": "custom",
+        "filename": "logs/common.log",
+        "mode": "a",
+        "encoding": "utf-8",
+        "maxBytes": 10485760,
+        "backupCount": 5
+    },
+    "sql_handler": {
+        "class": "logging.handlers.RotatingFileHandler",
+        "level": "DEBUG",
+        "formatter": "custom",
+        "filename": "logs/sql.log",
+        "mode": "a",
+        "encoding": "utf-8",
+        "maxBytes": 10485760,
+        "backupCount": 5
+    },
+
+   "error_to_file": {
+        "class": "logging.handlers.RotatingFileHandler",
+        "level": "ERROR",
+        "formatter": "custom",
+        "filename": "logs/errors.log",
+        "mode": "a",
+        "encoding": "utf-8",
+        "maxBytes": 10485760,
+        "backupCount": 5
+    }
+  },
+  "loggers": {
+    "app.utils.db.session_maker": {
+      "level": "DEBUG",
+      "handlers": [
+        "sql_handler"
+      ],
+      "propagate": false
+    },
+
+    "neo4j": {
+      "level": "WARNING",
+      "handlers": [
+        "console"
+      ],
+      "propagate": false
+    },
+    "asyncio": {
+      "level": "WARNING",
+      "handlers": [
+        "console"
+      ],
+      "propagate": false
+    },
+
+
+    "gensim.models.keyedvectors": {
+      "level": "CRITICAL",
+      "handlers": [
+        "console"
+      ],
+      "propagate": false
+    },
+    "sqlalchemy.engine.Engine": {
+      "level": "WARNING",
+      "handlers": [
+        "console"
+      ],
+      "propagate": false
+    }
+  },
+
+  "root": {
+    "level": "DEBUG",
+    "handlers": ["console", "error_to_file", "common_file", "my_log_handler"]
+  }
+}
+
+
