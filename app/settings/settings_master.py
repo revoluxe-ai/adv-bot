@@ -1,6 +1,6 @@
-from python_modules.path_setting_funcs import get_document_by_key_name
+from python_modules.path_setting_funcs import get_document_by_key_name, get_setting_path
 
-setting_path = 'setting.yaml'
+setting_path = get_setting_path()
 
 
 class Settings:
