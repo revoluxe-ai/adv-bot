@@ -585,7 +585,8 @@ class Manager(AbcManager):
                  else:
                      if tasks[wb_access.wb_cabinet.id].done():
                          if tasks[wb_access.wb_cabinet.id].exception():
-                             logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}')
+                             logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}, '
+                                          f'{tasks[wb_access.wb_cabinet.id].exception().__class__}')
                          del tasks[wb_access.wb_cabinet.id]
 
              await asyncio.sleep(30)
