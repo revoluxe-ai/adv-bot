@@ -291,17 +291,16 @@ class ContentApi(ABC_WB_API):
                 },
                 "filter": {
                     "withPhoto": -1,
-                    'textSearch': text
+                    'textSearch': str(text)
 
                 }
             }
         }
 
         async with aiohttp.ClientSession() as session:
-            try:
-                response = await self.requests(session, 'POST', url=url, data=data_for_req, headers=self.headers.standart)
-            except Exception as e:
-                raise e
+            response = await self.requests(session, 'POST', url=url,
+                                               json_data=data_for_req,
+                                               headers=self.headers.standart)
             answer = json.loads(response)
         cards = answer['cards']
         if not cards:

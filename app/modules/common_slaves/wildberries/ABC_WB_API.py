@@ -29,6 +29,7 @@ class WbRequestApiMixin(ABC):
         async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
             try:
                 logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
+                text = await response.text()
                 response.raise_for_status()
             except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
                 if e.status in (401, 403):
@@ -37,6 +38,7 @@ class WbRequestApiMixin(ABC):
                     logger.debug(f'Превышен лимит запросов к API: {url}')
                     raise exceptions.TooManyRequests from e
                 else:
+                    logger.error(f'Ошибка при запросе к {url}: {text}')
                     raise exceptions.BadRequestError(e) from e
             except exceptions.NotValidDataError as e:
                 raise exceptions.NotValidDataError(e) from e
