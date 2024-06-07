@@ -20,7 +20,7 @@ from ... import settings
 from app.admin_bot.sender import sender_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
-from app.modules.wb_adv_updater.models import ItemFeature, KeywordFeature
+from app.modules.wb_adv_updater.models import ItemFeature, KeywordFeature, GlobalCategorySetting
 from app.utils.db.session_maker import get_async_session_maker
 
 from . import data_managers
@@ -103,30 +103,36 @@ class Fitter(AbcManager):
 
 
 
-    async def _bayesian_apply(self, df: pd.DataFrame, adv_keyword_text_in_white_list,
-                              adv_keyword_text_in_black_list: list[tuple[int, str]]):
-        category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
+    async def _bayesian_apply(self, df: pd.DataFrame):
+
+        adv_ids = df['adv_id'].unique()
+
+        adv_id_keyword_text_to_status: dict[(int, 'str'), int] = await data_managers.get_adv_id_keyword_text_to_status(adv_ids)
+
+        adv_id_to_min_ctr: dict[int, float] = await data_managers.get_adv_id_to_min_ctr(adv_ids)
+
         def calculate_ctr(row):
             clicks = row['clicks']
             views = row['views']
             adv_id = row['adv_id']
-            if (adv_id, row['keyword']) in adv_keyword_text_in_black_list:
+            status = adv_id_keyword_text_to_status[(adv_id, row['keyword'])]
+            if status == 0:
                 return 0
-            if (adv_id, row['keyword']) in adv_keyword_text_in_white_list:
+            elif status in [2, 3]:
                 return 1
-            wb_category_name = row['wb_category_name']
-            min_ctr = category_name_to_min_ctr.get(wb_category_name, 0)
-            if min_ctr > 0:
-                 enough_views = self._get_enough_views(min_ctr)
-            else:
-                if views > 0:
-                    return clicks / views
+            elif status == 1:
+                min_ctr = adv_id_to_min_ctr[adv_id]
+                if min_ctr > 0:
+                     enough_views = self._get_enough_views(min_ctr)
                 else:
-                    return 0
-            clicks = clicks + 1
-            views = views + enough_views
-            ctr = clicks / views
-            return ctr
+                    if views > 0:
+                        return clicks / views
+                    else:
+                        return 0
+                clicks = clicks + 1
+                views = views + enough_views
+                ctr = clicks / views
+                return ctr
         # Предположим, что adv_id_to_min_ctr - это ваш словарь с минимальными CTR для каждого adv_id
         df['ctr'] = df.apply(calculate_ctr, axis=1)
         return df
@@ -249,9 +255,7 @@ class Fitter(AbcManager):
             logger.info('Нет данных для обучения')
             return
         await sender_manager.send_message_to_admin('Подготовка данных и обучение')
-        adv_keyword_text_in_black_list: list[tuple[int, str]] = await data_managers.get_adv_keyword_text_in_black_list()
-        adv_keyword_text_in_white_list: list[tuple[int, str]] = await data_managers.get_adv_keyword_text_in_white_list()
-        df:pd.DataFrame = await self._bayesian_apply(df, adv_keyword_text_in_white_list, adv_keyword_text_in_black_list)
+        df:pd.DataFrame = await self._bayesian_apply(df)
         await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
         y = df['ctr']
         X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
