@@ -11,7 +11,7 @@ async def main():
         async with session.begin():  # Start a transaction
             # Asynchronous query execution
             result = await session.execute(
-                select(AdvSetting).filter(AdvSetting.adv_id == 15010746)
+                select(AdvSetting).filter(AdvSetting.adv_id == 15717264)
             )
             adv_setting = result.scalar_one_or_none()  # Use scalar_one_or_none to avoid exceptions if no rows are found
 

@@ -6,11 +6,11 @@ from app.modules.common_slaves.wildberries.models import WBToken
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
-shop_id = '8a2acf65-1b2c-4061-9ae5-fed8ffb04371'
+shop_id = 'f85fd21e-fef2-497f-b307-5678c9ea0d16'
 
 
 async def get_tokens():
