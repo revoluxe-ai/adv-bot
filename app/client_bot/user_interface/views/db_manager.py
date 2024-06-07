@@ -1,6 +1,9 @@
 import aiogram
 from aiogram.utils import deep_linking
 
+from app.modules.common_slaves.wildberries.models import AdvSetting, AdvKeyword
+from app.modules.wb_adv_updater import data_managers
+from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.payments.db.models import Payment
 from app.utils.db.models import RefLink, User, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
@@ -13,7 +16,7 @@ _sm = get_async_session_maker
 from dataclasses import dataclass
 from typing import List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, cast, Float, case, and_
 from sqlalchemy.future import select
 
 
@@ -76,9 +79,24 @@ async def get_ref_names_and_links(user_telegram_id: int, bot:aiogram.Bot):
     return ref_links
 
 
-
-
-
-
-
-
+async def get_mean_ctr(adv: AdvSetting):
+    wb_category = await data_managers.get_wb_category(adv)
+    stmt = select(GlobalCategorySetting.min_ctr).where(GlobalCategorySetting.category_name == wb_category.wb_category_name)
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        min_ctr = result.scalar_one()
+        min_ctr = min_ctr * adv.boost
+    goods, _ = await data_managers.get_good_bad_phrases(adv, min_ctr)
+    async with _sm() as session:
+        stmt = (
+            select(
+                case(
+                    (func.sum(AdvKeyword.views) == 0, 0),  # Условие, если показов нет, возвращаем 0
+                    else_=cast(func.sum(AdvKeyword.clicks) / func.sum(AdvKeyword.views), Float)  # Иначе вычисляем CTR
+                ).label("average_ctr")
+            )
+        ).where(and_(AdvKeyword.adv_setting_id == adv.id,
+                     AdvKeyword.text.in_(goods)))
+        result = await session.execute(stmt)
+        mean_ctr = result.scalar_one()
+        return mean_ctr  # Возвращаем значение mean_ctr вместо pass
