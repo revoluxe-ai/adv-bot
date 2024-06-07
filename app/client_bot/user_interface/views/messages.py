@@ -6,6 +6,7 @@ from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.utils import deep_linking
 from sqlalchemy import select, and_
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import joinedload, selectinload
 
 import app
@@ -194,7 +195,10 @@ class AdvSettingMenu(TextWithKeyboard):
         self.wb_user_cabinet = wb_user_cabinet
 
     async def __call__(self):
-        self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+        try:
+             self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+        except NoResultFound:
+            self._mean_ctr = 'Средний CTR не определен'
         self._min_ctr = await db_manager.get_min_ctr(self.adv)
         await super().__call__()
 
