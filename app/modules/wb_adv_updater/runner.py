@@ -11,7 +11,7 @@ from app.modules.wb_adv_updater.data_managers import DataGetter
 from app.utils.db.session_maker import get_async_session_maker
 
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
-from .manager import Manager
+from .wb_manager import Manager
 
 sm = get_async_session_maker
 
@@ -38,7 +38,7 @@ class Runner:
         await asyncio.gather(
             self.shop_subscribe_control(),
             self.demo_subscribe(),
-            self.run_update_keywords_on_wb(),
+            # self.run_update_keywords_on_wb(),
             self.update_cards_in_graph(),
             self.update_all_data_in_db(),
             self.update_min_ctr_in_global_wb_category_settings(),
