@@ -108,6 +108,7 @@ class AdvertApi(ABC_WB_API):
                     keyword_stat['spend'] = keyword_stat.pop('sum')
                     keyword = KeywordStat(**keyword_stat)
                     keywords.append(keyword)
+        keywords.sort(key=lambda x: x.date)
         return keywords
 
     @try_except_decorator(1, 3)
