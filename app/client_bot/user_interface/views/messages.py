@@ -193,11 +193,21 @@ class AdvSettingMenu(TextWithKeyboard):
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
 
+    async def __call__(self):
+        self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+        self._min_ctr = await db_manager.get_min_ctr(self.adv)
+        await super().__call__()
+
+
+
+
     @property
     def text(self):
         return (f'Кампания: {self.adv.name}\n'
                 f'ID кампании: {self.adv.adv_id}\n'
-                f'Статус: {self.adv.active_status}')
+                f'Статус: {self.adv.active_status}\n'
+                f'Минимальный CTR для кампании: {round(self._min_ctr, 2)}\n'
+                f'Средний CTR по активным ключам за весь период: {round(self._mean_ctr, 2)} %\n')
 
     @property
     def keyboard(self):

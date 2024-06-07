@@ -7,6 +7,8 @@ class UnknownApiRequestError(BaseException):
    pass
 
 
+
+
 class ApiErrorWithCode(BaseException):
     def __init__(self, code, message, rejection):
         self.code = code

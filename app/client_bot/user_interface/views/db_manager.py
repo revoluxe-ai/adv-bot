@@ -100,3 +100,14 @@ async def get_mean_ctr(adv: AdvSetting):
         result = await session.execute(stmt)
         mean_ctr = result.scalar_one()
         return mean_ctr  # Возвращаем значение mean_ctr вместо pass
+
+
+async def get_min_ctr(adv: AdvSetting):
+    category = await data_managers.get_wb_category(adv)
+    category_name = category.wb_category_name
+    async with _sm() as session:
+        stmt = select(GlobalCategorySetting.min_ctr).where(GlobalCategorySetting.category_name == category_name)
+        result = await session.execute(stmt)
+        min_ctr = result.scalar_one()
+    min_ctr *= adv.boost
+    return min_ctr
