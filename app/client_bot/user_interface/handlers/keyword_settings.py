@@ -1,5 +1,6 @@
 import aiogram
 from aiogram import F, Router, types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import and_
 from sqlalchemy.future import select
@@ -36,7 +37,7 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
                                   state: FSMContext,):
     await callback.answer()
     await callback.message.answer("Пожалуйста подождите, эта операция займет немного времени")
-
+    await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
     adv_original_id: int = callback_data.adv_original_id
 
     async with _sm() as session:
@@ -135,7 +136,7 @@ async def setting_keyword(callback: types.CallbackQuery,
 
 
 
-@router.callback_query(callbacks.ChangeKeywordHardStatus.filter(3 > F.new_hard_status >= -1))
+@router.callback_query(callbacks.ChangeKeywordHardStatus.filter(F.new_hard_status))
 async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
                                      bot: aiogram.Bot, state: FSMContext):
@@ -189,9 +190,6 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
 
     return
 
-@router.callback_query(callbacks.ChangeKeywordHardStatus.filter(F.new_hard_status == 3))
-async def change_keyword_hard_status_to_turn_off(callback: types.CallbackQuery,
-                                     callback_data: callbacks.ChangeKeywordHardStatus,
-                                     bot: aiogram.Bot, state: FSMContext):
-    await callback.answer()
-    pass
+
+
+
