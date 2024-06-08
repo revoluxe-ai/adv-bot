@@ -62,6 +62,7 @@ class SettingKeywords(CallbackData, prefix="setting_keywords"):
     adv_original_id: int
     type: str
     page: int = 1
+    reset_filter: bool = False
 
 
 class SettingKeyword(CallbackData, prefix="setting_keyword"):

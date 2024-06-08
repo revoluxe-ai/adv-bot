@@ -1,5 +1,8 @@
+from typing import Union
+
 import aiogram
 from aiogram import F, Router, types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import and_
 from sqlalchemy.future import select
@@ -18,6 +21,7 @@ from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils import redis_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+from .. import states
 
 from ..views import callbacks, messages
 
@@ -27,15 +31,32 @@ router = Router()
 _sm = get_async_session_maker
 
 
+
+
+
+
+@router.message(StateFilter(states.AdvSetting.waiting_for_filter_keywords))
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'by_adv'))
-async def setting_keywords_by_adv(callback: types.CallbackQuery,
+async def setting_keywords_by_adv(callback: Union[callbacks.SettingKeywords, types.Message],
                                   callback_data: callbacks.SettingKeywords,
                                   bot: aiogram.Bot,
-                                  state: FSMContext,):
-    await callback.answer()
-    await callback.message.answer("Пожалуйста подождите, эта операция займет немного времени")
 
+                                  state: FSMContext):
+    if isinstance(callback, types.Message):
+        text = callback.text
+        filter_keywords = text.splitlines()
+        filter_keywords = [keyword.strip().lower() for keyword in filter_keywords]
+        await state.update_data(keywords_filter=filter_keywords)
+        message = callback.message
+    else:
+        message = callback.message
+        await callback.answer()
+        if callback.reset_filter is True:
+            await state.update_data(keywords_filter=None)
+    await message.answer("Пожалуйста подождите, эта операция займет немного времени")
+    await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
     adv_original_id: int = callback_data.adv_original_id
+
 
     async with _sm() as session:
         stmt = select(AdvSetting) \
@@ -91,13 +112,10 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
         adv_choice_last_page,
         main_photos[0],
         page,
-    )()
+    )(state, callback)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
     return
-
-
-
 
 @router.callback_query(callbacks.SettingKeywords.filter())
 async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,

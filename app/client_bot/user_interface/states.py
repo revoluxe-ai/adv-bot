@@ -25,3 +25,8 @@ class CreateNewAdvCompany(StatesGroup):
 
 class RefProgram(StatesGroup):
     getting_name = State()
+
+
+
+class AdvSetting(StatesGroup):
+   waiting_for_filter_keywords = State()

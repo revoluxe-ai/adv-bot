@@ -2,6 +2,7 @@ import asyncio
 import datetime
 from typing import TYPE_CHECKING
 
+from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -177,7 +178,8 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  WBUserCabinet):
 def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_setting: AdvSetting,
                                   adv_choice_last_page,
                                   wb_user_cabinet_original_id: int,
-                                   page):
+                                   page,
+                                  return_from_filter_bottom: bool):
     on_page = 12
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
@@ -205,6 +207,17 @@ def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_sett
                                                 keyword_setting_original_id = keyword.keyword_settings.id,
                                                 ).pack())]
         bottoms.append(inline_keyboard)
+
+    if   return_from_filter_bottom:
+        bottom = [InlineKeyboardButton(text='Сбросить фильтр',
+                                         callback_data=callbacks.SettingKeywords(
+                                             adv_original_id=adv_setting.id,
+                                             type='by_adv',
+                                             page=page,
+                                             reset_filter = True).pack())]
+        bottoms.append(bottom)
+
+
     if page > 1:
         prev_page = page - 1
         bottoms.append([InlineKeyboardButton(text="⬅️",
