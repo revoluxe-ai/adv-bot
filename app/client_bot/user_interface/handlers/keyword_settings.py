@@ -18,8 +18,10 @@ from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils import redis_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-
 from ..views import callbacks, messages
+from app.client_bot.user_interface import states
+
+
 
 router = Router()
 
@@ -102,8 +104,8 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
 @router.callback_query(callbacks.SettingKeywords.filter())
 async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,
                            state: FSMContext):
+    await callback.answer()
     keyword_original_id: int = callback_data.keyword_original_id
-
     chat_id = callback.message.chat.id
 
     data = await state.get_data()
