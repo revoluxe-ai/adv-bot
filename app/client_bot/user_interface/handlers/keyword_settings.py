@@ -39,7 +39,7 @@ async def setting_keywords_by_adv(message: types.Message,
 
     text = message.text
     filter_keywords = text.splitlines()
-    filter_keywords = [keyword.strip().lower() for keyword in filter_keywords]
+    filter_keywords = [keyword.strip().lower() for keyword in filter_keywords if keyword]
     await state.update_data(keywords_filter=filter_keywords)
     await message.answer("Пожалуйста подождите, эта операция займет немного времени")
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
