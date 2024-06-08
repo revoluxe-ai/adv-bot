@@ -7,12 +7,12 @@ from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabine
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
-sm = get_session_maker
+sm = get_async_session_maker
 
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
 
-shop_id = '15283c1b-ba9b-4638-bbec-f6020609c00f'.strip()
+shop_id = '45c8c933-d7b2-4ef2-bcd3-1a6a7f1155d1'.strip()
 
 
 
