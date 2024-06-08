@@ -197,11 +197,13 @@ class AdvSettingMenu(TextWithKeyboard):
     async def __call__(self):
         try:
              self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+             self._mean_ctr = round(self._mean_ctr, 2)
         except NoResultFound:
             self._mean_ctr = 'Средний CTR не определен'
 
         try:
             self._min_ctr = await db_manager.get_min_ctr(self.adv)
+            self._min_ctr = round(self._min_ctr, 2)
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
 
@@ -215,8 +217,8 @@ class AdvSettingMenu(TextWithKeyboard):
         return (f'Кампания: {self.adv.name}\n'
                 f'ID кампании: {self.adv.adv_id}\n'
                 f'Статус: {self.adv.active_status}\n'
-                f'Минимальный CTR для кампании: {round(self._min_ctr, 2)}\n'
-                f'Средний CTR по активным ключам за весь период: {round(self._mean_ctr, 2)} %\n')
+                f'Минимальный CTR для кампании: {self._min_ctr}\n'
+                f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n')
 
     @property
     def keyboard(self):
