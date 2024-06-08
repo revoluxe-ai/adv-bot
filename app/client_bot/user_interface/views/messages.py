@@ -199,7 +199,13 @@ class AdvSettingMenu(TextWithKeyboard):
              self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
         except NoResultFound:
             self._mean_ctr = 'Средний CTR не определен'
-        self._min_ctr = await db_manager.get_min_ctr(self.adv)
+        try:
+            self._min_ctr = await db_manager.get_min_ctr(self.adv)
+        except NoResultFound:
+            self._min_ctr = 'Минимальный CTR не определен'
+        if not self._min_ctr:
+            self._min_ctr = 'Минимальный CTR не определен'
+
         await super().__call__()
 
 
