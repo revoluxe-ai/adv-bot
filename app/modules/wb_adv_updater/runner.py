@@ -11,7 +11,7 @@ from app.modules.wb_adv_updater.data_managers import DataGetter
 from app.utils.db.session_maker import get_async_session_maker
 
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
-from .manager import Manager
+from .wb_manager import Manager
 
 sm = get_async_session_maker
 

@@ -6,6 +6,7 @@ from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.utils import deep_linking
 from sqlalchemy import select, and_
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import joinedload, selectinload
 
 import app
@@ -193,11 +194,24 @@ class AdvSettingMenu(TextWithKeyboard):
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
 
+    async def __call__(self):
+        try:
+             self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+        except NoResultFound:
+            self._mean_ctr = 'Средний CTR не определен'
+        self._min_ctr = await db_manager.get_min_ctr(self.adv)
+        await super().__call__()
+
+
+
+
     @property
     def text(self):
         return (f'Кампания: {self.adv.name}\n'
                 f'ID кампании: {self.adv.adv_id}\n'
-                f'Статус: {self.adv.active_status}')
+                f'Статус: {self.adv.active_status}\n'
+                f'Минимальный CTR для кампании: {round(self._min_ctr, 2)}\n'
+                f'Средний CTR по активным ключам за весь период: {round(self._mean_ctr, 2)} %\n')
 
     @property
     def keyboard(self):

@@ -5,17 +5,20 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Union
+
+from app.exc import CardNotFoundInDB
 from app.modules.common_slaves.wildberries import exceptions as wb_exc
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import selectinload
-
+import app
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
 from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
+from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
     AdvKeyword,
     KeywordSetting,
@@ -31,6 +34,9 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
 from app.utils import redis_manager
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -166,8 +172,10 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
     wb_category_to_keywordstat_list = defaultdict(list)
     for adv_setting in adv_settings:
         logger.info(f'Обрабатываю {adv_setting.name} для расчета min_ctr')
-        wb_category: Union[WBCategory, None] = await get_wb_category(adv_setting)
-        if not wb_category:
+        try:
+            wb_category: Union[WBCategory, None] = await get_wb_category(adv_setting)
+        except (NotItemsInAdvSetting, CardNotFoundInDB) as e:
+            logger.debug(f'У кампании {adv_setting.name} нет товаров {e}')
             continue
         wb_category_name = wb_category.wb_category_name
         keyword_stats = await get_keywords_statistic(adv_setting, None, [1, 2])
@@ -202,9 +210,7 @@ async def get_category_name_min_ctr_final_data() -> dict[int, float]:
 
 
 
-async def get_good_bad_phrases(adv_setting: AdvSetting,
-                               min_ctr: float)->tuple[list[str], list[str]]:
-
+async def get_good_bad_phrases(adv_setting: AdvSetting, min_ctr)->tuple[list[str], list[str]]:
     async with _sm() as session:
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
@@ -354,8 +360,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     try:
          nmid = adv_setting.nmids[0]
     except:
-        logger.error(f'У {adv_setting.name} нет товаров')
-        return None
+        raise wb_exc.NotItemsInAdvSetting('У кампании в базе нет товаров')
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
@@ -363,8 +368,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     if wb_card:
         wb_category = wb_card.wb_category
     else:
-        logger.error('Не найдена карточка товара')
-        raise wb_exc.CardNotFoundInWB('Не найдена карточка товара: ' + str(nmid))
+        raise CardNotFoundInDB('В базе не найдена карточка товара: ' + str(nmid))
     return wb_category
 
 class DataSetter:
@@ -375,8 +379,10 @@ class DataSetter:
 
     async def update_minus_keywords(self, adv_settings, category_name_to_min_ctr):
         for adv_setting in adv_settings:
-            category:WBCategory = await get_wb_category(adv_setting)
-            if not category:
+            try:
+                category:WBCategory = await get_wb_category(adv_setting)
+            except (CardNotFoundInDB, NotItemsInAdvSetting):
+                logger.debug('Не удалось получить категорию РК')
                 continue
             min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
             good_phrases, bad_phrases = await get_good_bad_phrases(adv_setting, min_ctr)
@@ -490,5 +496,41 @@ async def get_all_shops_for_user(user:User):
             return  wb_user_cabinets.all()
         else:
             return []
+
+
+async def get_adv_id_to_min_ctr(adv_ids: list[int])-> dict[int, float]:
+    async with _sm() as session:
+        stmt = select(GlobalCategorySetting.category_name, GlobalCategorySetting.min_ctr)
+        result = await session.execute(stmt)
+        category_name_to_min_ctr = dict(result.all())
+    async with _sm() as session:
+        stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(adv_ids))
+        result = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = result.unique().scalars()
+    adv_id_to_min_ctr = {}
+
+    for adv_setting in adv_settings:
+        wb_category = await get_wb_category(adv_setting)
+        wb_category_name = wb_category.wb_category_name
+        min_ctr = category_name_to_min_ctr.get(wb_category_name, 0)
+        min_ctr = min_ctr * adv_setting.boost
+        adv_id_to_min_ctr[adv_setting.adv_id] = min_ctr
+    return adv_id_to_min_ctr
+
+
+async def get_adv_id_keyword_text_to_status(adv_ids: int):
+    async with _sm() as session:
+        stmt = select(AdvSetting.adv_id, KeywordSetting.text, KeywordSetting.hard_status)\
+            .join(KeywordSetting, AdvSetting.id == KeywordSetting.adv_setting_id)\
+        .where(AdvSetting.adv_id.in_(adv_ids))
+        result = await session.execute(stmt)
+        result = result.all()
+    adv_id_keyword_text_to_status = {}
+    for row in result:
+        adv_id = row[0]
+        text = row[1]
+        status = row[2]
+        adv_id_keyword_text_to_status[(adv_id, text)] = status
+    return adv_id_keyword_text_to_status
 
 

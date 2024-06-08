@@ -155,13 +155,14 @@ class Manager(AbcManager):
             keyword_setting.text = keyword_stat.text
             keyword_setting.adv_setting_id = adv_setting_original_id
             async with sm() as session:
-                session.add(keyword_setting)
+                session.merge(keyword_setting)
                 await session.commit()
 
         stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting))\
             .filter(and_(AdvKeyword.text == keyword_stat.text,
                                                   AdvKeyword.date == keyword_stat.date,
-                                                  AdvKeyword.adv_setting_id == adv_setting_original_id))
+                                                  AdvKeyword.adv_setting_id == adv_setting_original_id))\
+        .order_by(AdvKeyword.date.desc())
         async with sm() as session:
             result = await session.execute(stmt)
             keyword_db = result.scalar()
@@ -585,7 +586,8 @@ class Manager(AbcManager):
                  else:
                      if tasks[wb_access.wb_cabinet.id].done():
                          if tasks[wb_access.wb_cabinet.id].exception():
-                             logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}')
+                             logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}, '
+                                          f'{tasks[wb_access.wb_cabinet.id].exception().__class__}')
                          del tasks[wb_access.wb_cabinet.id]
 
              await asyncio.sleep(30)

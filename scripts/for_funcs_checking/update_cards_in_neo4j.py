@@ -1,6 +1,6 @@
 import asyncio
 
-from app.modules.wb_adv_updater.manager import Manager
+from app.modules.wb_adv_updater.wb_manager import Manager
 
 
 manager = Manager()
