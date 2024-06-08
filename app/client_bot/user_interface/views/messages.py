@@ -197,12 +197,16 @@ class AdvSettingMenu(TextWithKeyboard):
     async def __call__(self):
         try:
              self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+             if not self._mean_ctr:
+                 raise NoResultFound
              self._mean_ctr = round(self._mean_ctr, 2)
         except NoResultFound:
             self._mean_ctr = 'Средний CTR не определен'
 
         try:
             self._min_ctr = await db_manager.get_min_ctr(self.adv)
+            if not self._min_ctr:
+                raise NoResultFound
             self._min_ctr = round(self._min_ctr, 2)
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
@@ -218,11 +222,8 @@ class AdvSettingMenu(TextWithKeyboard):
                 f'ID кампании: {self.adv.adv_id}\n'
                 f'Статус: {self.adv.active_status}\n'
                 f'Минимальный CTR для кампании: {self._min_ctr}\n'
-<<<<<<< HEAD
                 f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n')
-=======
-                f'Средний CTR по активным ключам за весь период: {round(self._mean_ctr, 2)} %\n')
->>>>>>> c6b8e5f (Implement keyword-search-in-advsetting)
+
 
     @property
     def keyboard(self):
@@ -333,22 +334,19 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._image = image
         self._filter: bool = False
 
-    async def __call__(self, state: FSMContext, callback: callbacks.SettingKeywords):
-
-        if callback.reset_filter == True:
-            await state.update_data(keywords_filter=None)
-        else:
-            self._state = state
-            data = await state.get_data()
-            keywords_filter: list[list[str]] = data.get('keywords_filter')
-            clear_keywords = []
-            if keywords_filter:
-                self._filter = True
-                for keyword in self._keywords:
-                    if keyword.text in keywords_filter:
+    async def __call__(self, state: FSMContext):
+        self._state = state
+        data = await state.get_data()
+        keywords_filter: list[list[str]] = data.get('keywords_filter')
+        clear_keywords = []
+        if keywords_filter:
+            self._filter = True
+            for keyword in self._keywords:
+                for keyword_filter in keywords_filter:
+                    if keyword_filter in keyword.text:
                         clear_keywords.append(keyword)
 
-                self._keywords = clear_keywords
+            self._keywords = clear_keywords
 
         await super().__call__()
 
