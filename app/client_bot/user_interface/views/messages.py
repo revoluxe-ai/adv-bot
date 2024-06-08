@@ -1319,3 +1319,11 @@ class Single_message11(Text):
     
     
     """
+
+class Single_message12(Text):
+
+    text = """
+Добрый день! Добавил функцию фильтрации фраз в боте для более удобной навигации.
+Подробности - https://t.me/auto_wb_master/139    
+    
+    """
