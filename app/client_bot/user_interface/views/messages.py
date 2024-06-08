@@ -28,7 +28,7 @@ from ..message_templates.templates import (
     TextWithKeyboardAndImage,
     TextWithKeyboardPagination,
 )
-from . import db_manager, keyboards
+from . import db_manager, keyboards, callbacks
 from app.utils import redis_manager
 
 
@@ -197,15 +197,18 @@ class AdvSettingMenu(TextWithKeyboard):
     async def __call__(self):
         try:
              self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+             if not self._mean_ctr:
+                 raise NoResultFound
+             self._mean_ctr = round(self._mean_ctr, 2)
         except NoResultFound:
             self._mean_ctr = 'Средний CTR не определен'
         try:
             self._min_ctr = await db_manager.get_min_ctr(self.adv)
+            if not self._min_ctr:
+                raise NoResultFound
+            self._min_ctr = round(self._min_ctr, 2)
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
-        if not self._min_ctr:
-            self._min_ctr = 'Минимальный CTR не определен'
-
         await super().__call__()
 
 
@@ -216,8 +219,9 @@ class AdvSettingMenu(TextWithKeyboard):
         return (f'Кампания: {self.adv.name}\n'
                 f'ID кампании: {self.adv.adv_id}\n'
                 f'Статус: {self.adv.active_status}\n'
-                f'Минимальный CTR для кампании: {round(self._min_ctr, 2)}\n'
-                f'Средний CTR по активным ключам за весь период: {round(self._mean_ctr, 2)} %\n')
+                f'Минимальный CTR для кампании: {self._min_ctr}\n'
+                f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n')
+
 
     @property
     def keyboard(self):
@@ -326,6 +330,23 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._adv_choice_last_page = adv_choice_last_page
         self._image = image
+        self._filter: bool = False
+
+    async def __call__(self, state: FSMContext):
+        self._state = state
+        data = await state.get_data()
+        keywords_filter: list[list[str]] = data.get('keywords_filter')
+        clear_keywords = []
+        if keywords_filter:
+            self._filter = True
+            for keyword in self._keywords:
+                for keyword_filter in keywords_filter:
+                    if keyword_filter in keyword.text:
+                        clear_keywords.append(keyword)
+
+            self._keywords = clear_keywords
+
+        await super().__call__()
 
     @property
     def text(self):
@@ -356,7 +377,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
                                                        self._adv_choice_last_page,
                                                        self._wb_user_cabinet_original_id,
-                                                       self._page)
+                                                       self._page,
+                                                       self._filter)
 
 
 class KeywordSettingMessage(TextWithKeyboard):

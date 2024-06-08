@@ -1,3 +1,5 @@
+from typing import Union
+
 import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
@@ -30,15 +32,93 @@ router = Router()
 _sm = get_async_session_maker
 
 
+
+@router.message(StateFilter(states.AdvSetting.waiting_for_filter_keywords))
+async def setting_keywords_by_adv(message: types.Message,
+                                  bot: aiogram.Bot,
+                                  state: FSMContext):
+
+    text = message.text
+    filter_keywords = text.splitlines()
+    filter_keywords = [keyword.strip().lower() for keyword in filter_keywords if keyword]
+    await state.update_data(keywords_filter=filter_keywords)
+    await message.answer("Пожалуйста подождите, эта операция займет немного времени")
+    await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
+    state_data = await state.get_data()
+    adv_original_id = state_data.get('last_adv_original_id')
+
+    async with _sm() as session:
+        stmt = select(AdvSetting) \
+            .where(AdvSetting.id == adv_original_id)
+        result = await session.execute(stmt)
+        adv_setting: AdvSetting = result.scalar()
+    adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
+    keywords = await utils.get_keywords_for_keyboard(adv_setting)
+    state_data = await state.get_data()
+    state_data.update(adv_choice_last_page=1)
+    async with _sm() as session:
+        stmt = select(WBUserCabinet) \
+            .join(User, User.id == WBUserCabinet.user_id) \
+            .join(WBCabinet,
+                  WBCabinet.id == WBUserCabinet.wb_cabinet_id) \
+            .options(selectinload(WBUserCabinet.user),
+                     selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings)) \
+            .where(and_(User.user_telegram_id == message.from_user.id,
+                        WBCabinet.id == adv_setting.wb_cabinet_id))
+        wb_user_cabinet = await session.execute(stmt)
+    wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
+    wb_user_cabinet_original_id = wb_user_cabinet.id
+    nmids = adv_setting.nmids
+    chat_id = message.chat.id
+
+    if nmids:
+        main_photos = await data_managers.get_main_photos(nmids[:1])
+    else:
+        main_photos = None
+    if not main_photos:
+        await messages.NoMainPhotos(
+            bot,
+            chat_id,
+            keywords,
+            adv_setting,
+            wb_user_cabinet_original_id,
+            adv_choice_last_page,
+            page=1,
+        )()
+        await redis_manager.set_check_last_24_hours(adv_original_id)
+        return
+
+    chat_id = message.chat.id
+    await redis_manager.set_check_last_24_hours(adv_original_id)
+    await messages.AdvKeywordsSetting(
+        bot,
+        chat_id,
+        keywords,
+        adv_setting,
+        wb_user_cabinet_original_id,
+        adv_choice_last_page,
+        main_photos[0],
+        page=1,
+    )(state)
+
+    await redis_manager.set_check_last_24_hours(adv_original_id)
+    return
+
+
+
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'by_adv'))
-async def setting_keywords_by_adv(callback: types.CallbackQuery,
+async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
                                   callback_data: callbacks.SettingKeywords,
                                   bot: aiogram.Bot,
-                                  state: FSMContext,):
-    await callback.answer()
+                                  state: FSMContext):
+    if callback_data.reset_filter == True:
+        await state.update_data(keywords_filter=None)
+
     await callback.message.answer("Пожалуйста подождите, эта операция займет немного времени")
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
     adv_original_id: int = callback_data.adv_original_id
+    await state.update_data(last_adv_original_id=adv_original_id,
+                            last_adv_page=callback_data.page)
 
     async with _sm() as session:
         stmt = select(AdvSetting) \
@@ -94,13 +174,10 @@ async def setting_keywords_by_adv(callback: types.CallbackQuery,
         adv_choice_last_page,
         main_photos[0],
         page,
-    )()
+    )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
     return
-
-
-
 
 @router.callback_query(callbacks.SettingKeywords.filter())
 async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,
@@ -136,7 +213,7 @@ async def setting_keyword(callback: types.CallbackQuery,
 
 
 
-@router.callback_query(callbacks.ChangeKeywordHardStatus.filter(F.new_hard_status))
+@router.callback_query(callbacks.ChangeKeywordHardStatus.filter())
 async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
                                      bot: aiogram.Bot, state: FSMContext):
@@ -189,7 +266,4 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
     await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
 
     return
-
-
-
 

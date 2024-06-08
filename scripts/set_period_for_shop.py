@@ -9,11 +9,11 @@ from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
 
-
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
 
-shop_id = 'e4c7631a-fc60-4020-b06a-44dc0f3eef84'.strip()
+
+shop_id = '45c8c933-d7b2-4ef2-bcd3-1a6a7f1155d1'.strip()
 
 period = 33
 

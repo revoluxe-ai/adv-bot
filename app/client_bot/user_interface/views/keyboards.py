@@ -2,6 +2,7 @@ import asyncio
 import datetime
 from typing import TYPE_CHECKING
 
+from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -124,6 +125,7 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
         check_last_24_hours = loop.run_until_complete(redis_manager.check_last_24_hours(adv.id))
         check_text = '✅' if check_last_24_hours else '❓'
         button_text = f'{check_text} {adv.name} (Бот включен)' if adv.bot_active else f'{adv.name} (Бот отключен)'
+        button_text += f'({adv.adv_id})'
         button_text += f' Статус: {adv.active_status}'
         callback_data = callbacks.Adv(action='select', adv_original_id=adv.id,
                                       wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack()
@@ -177,7 +179,8 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  WBUserCabinet):
 def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_setting: AdvSetting,
                                   adv_choice_last_page,
                                   wb_user_cabinet_original_id: int,
-                                   page):
+                                   page,
+                                  return_from_filter_bottom: bool):
     on_page = 12
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
@@ -205,6 +208,17 @@ def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_sett
                                                 keyword_setting_original_id = keyword.keyword_settings.id,
                                                 ).pack())]
         bottoms.append(inline_keyboard)
+
+    if   return_from_filter_bottom:
+        bottom = [InlineKeyboardButton(text='Сбросить фильтр',
+                                         callback_data=callbacks.SettingKeywords(
+                                             adv_original_id=adv_setting.id,
+                                             type='by_adv',
+                                             page=page,
+                                             reset_filter = True).pack())]
+        bottoms.append(bottom)
+
+
     if page > 1:
         prev_page = page - 1
         bottoms.append([InlineKeyboardButton(text="⬅️",
