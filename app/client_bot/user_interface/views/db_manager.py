@@ -86,7 +86,9 @@ async def get_mean_ctr(adv: AdvSetting):
         result = await session.execute(stmt)
         min_ctr = result.scalar_one()
         min_ctr = min_ctr * adv.boost
-    goods, _ = await data_managers.get_good_bad_phrases(adv, min_ctr)
+    keywords = await data_managers.get_good_bad_phrases(adv, min_ctr)
+    goods = [kw for kw in keywords if kw.status == 'good']
+    goods = [kw.text for  kw in goods]
     async with _sm() as session:
         stmt = (
             select(

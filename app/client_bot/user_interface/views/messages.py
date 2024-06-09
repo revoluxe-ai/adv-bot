@@ -197,20 +197,23 @@ class AdvSettingMenu(TextWithKeyboard):
         self.wb_user_cabinet = wb_user_cabinet
 
     async def __call__(self):
-        try:
-             self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
-             if not self._mean_ctr:
-                 raise NoResultFound
-             self._mean_ctr = round(self._mean_ctr, 2)*100
-        except NoResultFound:
-            self._mean_ctr = 'Средний CTR не определен'
-        try:
-            self._min_ctr = await db_manager.get_min_ctr(self.adv)
-            if not self._min_ctr:
-                raise NoResultFound
-            self._min_ctr = round(self._min_ctr, 2)*100
-        except NoResultFound:
-            self._min_ctr = 'Минимальный CTR не определен'
+        if self.adv.hard_min_ctr:
+            self._min_ctr = round(self.adv.hard_min_ctr, 2)*100
+        else:
+            try:
+                 self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+                 if not self._mean_ctr:
+                     raise NoResultFound
+                 self._mean_ctr = round(self._mean_ctr, 2)*100
+            except NoResultFound:
+                self._mean_ctr = 'Средний CTR не определен'
+            try:
+                self._min_ctr = await db_manager.get_min_ctr(self.adv)
+                if not self._min_ctr:
+                    raise NoResultFound
+                self._min_ctr = round(self._min_ctr*100, 1)
+            except NoResultFound:
+                self._min_ctr = 'Минимальный CTR не определен'
         await super().__call__()
 
 
@@ -221,7 +224,7 @@ class AdvSettingMenu(TextWithKeyboard):
         return (f'Кампания: {self.adv.name}\n'
                 f'ID кампании: {self.adv.adv_id}\n'
                 f'Статус: {self.adv.active_status}\n'
-                f'Минимальный CTR для кампании: {self._min_ctr}\n'
+                f'Минимальный CTR для кампании: {self._min_ctr} %\n'
                 f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n')
 
 
@@ -682,7 +685,7 @@ class ExpiredSubscription(TextWithKeyboard):
         )
 
 
-class SettingMinCTR(Text):
+class SettingMinCTR(TextWithKeyboard):
     def __init__(self, bot: Bot, state, chat_id: int):
         super().__init__(bot, chat_id)
         self._min_ctr = None
@@ -703,12 +706,17 @@ class SettingMinCTR(Text):
             self._min_ctr_type = 'direct'
 
         keywords: list[KeywordStatFromDB] = await data_managers.get_good_bad_phrases(adv, self._min_ctr)
-        keywords.sort(key=lambda x: x.ctr, reverse=True)
-        goods = [kw for kw in keywords if kw.status == 'good']
-        bads = [kw for kw in keywords if kw.status == 'bad']
+        keywords.sort(key=lambda x: x.keyword_setting.predict_ctr, reverse=True)
+        goods = []
+        bads = []
+        for kw in keywords:
+            if kw.keyword_setting.predict_ctr >= self._min_ctr:
+                goods.append(kw)
+            else:
+                bads.append(kw)
 
-        goods = goods[:5]
-        bads = bads[5:]
+        goods = goods[-10:]
+        bads = bads[:10]
         self._goods = goods
         self._bads = bads
         await super().__call__()
@@ -717,16 +725,18 @@ class SettingMinCTR(Text):
     @property
     def text(self):
         text = (f'Минимальный CTR для кампании {self._adv.name}'
-                f' равен {self._min_ctr} %,'
-                f' тип минимального CTR: {"Задан в ручную"  if self._min_ctr_type else "Определен автоматически"}\n')
+                f' равен {round(self._min_ctr*100, 1)} %,'
+                f"""тип минимального CTR: {"Задан в ручную"  if self._min_ctr_type == 'direct' else "Определен автоматически"}\n""")
         for good in self._goods:
-               text += f'{good.text} - {good.ctr}  % ✅\n'
-        text += f'================== {self._min_ctr}\n'
+               text += f'{good.text} - {round(good.keyword_setting.predict_ctr*100, 1)}  % ✅\n'
+        text += f'================== {round(self._min_ctr*100, 1)}\n'
         for bad in self._bads:
-            text += f'{bad.text} - {bad.ctr}  % ❌\n'
+            text += f'{bad.text} - {round(bad.keyword_setting.predict_ctr*100, 1)}  % ❌\n'
 
+        text += '\n\n'
+        text += 'Введите новый CTR:'
         return text
 
-
+    @property
     def keyboard(self):
         return keyboards.get_setting_min_ctr_keyboard(self._adv)

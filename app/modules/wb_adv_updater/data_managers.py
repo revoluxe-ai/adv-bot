@@ -210,39 +210,18 @@ async def get_category_name_min_ctr_final_data() -> dict[int, float]:
 
 
 
-async def get_good_bad_phrases(adv_setting: AdvSetting, min_ctr)->tuple[list[str], list[str]]:
+async def get_good_bad_phrases(adv_setting: AdvSetting, min_ctr)->list[KeywordStatFromDB]:
     async with _sm() as session:
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
-        good_keywords: list[KeywordSetting] = []
-        bad_keywords: list[KeywordSetting] = []
+        # good_keywords: list[KeywordSetting] = []
+        # bad_keywords: list[KeywordSetting] = []
         keyword_stats = await get_keywords_statistic(adv_setting, None)
-        keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
-
-        for keyword_setting in keyword_settings:
-            if keyword_setting.hard_status == 3:
-                bad_keywords.append(keyword_setting.text)
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                continue
-            if keyword_setting.hard_status == 2:
-               good_keywords.append(keyword_setting.text)
-               keyword_setting.auto_block = False
-               await redis_manager.set_auto_block_status(keyword_setting.id, False)
-               continue
-            elif keyword_setting.hard_status == 0:
-                bad_keywords.append(keyword_setting.text)
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                continue
-            keyword_stat = keyword_text_to_keyword_stat.get(keyword_setting.text, None)
-            if not keyword_stat:
-                continue
-            if not keyword_stat.views:
-                continue
-            if min_ctr == 0:
-                good_keywords.append(keyword_setting.text)
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                continue
+        keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
+        for keyword_stat in keyword_stats:
+            keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
+            keyword_stat.keyword_setting = keyword_setting
             added_views = keyword_setting.added_views
             if not added_views:
                 added_views = 0
@@ -256,18 +235,46 @@ async def get_good_bad_phrases(adv_setting: AdvSetting, min_ctr)->tuple[list[str
             predict_ctr = keyword_setting.predict_ctr
             if not predict_ctr:
                 predict_ctr = fact_ctr
+                keyword_setting.predict_ctr = predict_ctr
             elif fact_ctr > predict_ctr:
                 predict_ctr = fact_ctr
             boost = adv_setting.boost
             predict_ctr *= boost
+            if keyword_setting.hard_status == 3:
+                keyword_stat.status = 'bad'
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                continue
+            if keyword_setting.hard_status == 2:
+               keyword_stat.status = 'good'
+               keyword_setting.auto_block = False
+               await redis_manager.set_auto_block_status(keyword_setting.id, False)
+               continue
+            elif keyword_setting.hard_status == 0:
+                keyword_stat.status = 'bad'
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                continue
+            if min_ctr == 0:
+                keyword_stat.status = 'good'
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                continue
             if predict_ctr >= min_ctr:
-                good_keywords.append(keyword_setting.text)
+                keyword_stat.status = 'good'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
-                bad_keywords.append(keyword_setting.text)
+                keyword_stat.status = 'bad'
                 await redis_manager.set_auto_block_status(keyword_setting.id, True)
 
-    return good_keywords, bad_keywords
+    # good_phrase_objs = []
+    # for phrase in good_keywords:
+    #     keyword_stat = keyword_text_to_keyword_stat[phrase]
+    #     good_phrase_objs.append(keyword_stat)
+    # bad_phrase_objs = []
+    # for phrase in bad_keywords:
+    #     keyword_stat = keyword_text_to_keyword_stat[phrase]
+    #     bad_phrase_objs.append(keyword_stat)
+    return keyword_stats
+
+
 
 
 
@@ -385,7 +392,14 @@ class DataSetter:
                 logger.debug('Не удалось получить категорию РК')
                 continue
             min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
-            good_phrases, bad_phrases = await get_good_bad_phrases(adv_setting, min_ctr)
+            keywords: list[KeywordStatFromDB] = await get_good_bad_phrases(adv_setting, min_ctr)
+            good_phrases = []
+            bad_phrases = []
+            for keyword in keywords:
+                if keyword.status == 'good':
+                    good_phrases.append(keyword)
+                else:
+                    bad_phrases.append(keyword)
             if bad_phrases:
                 await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
                 logger.info(f'Обновил минус слова {adv_setting.name} {bad_phrases}')

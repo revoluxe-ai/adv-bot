@@ -84,34 +84,45 @@ def get_adv_list_keyboard(advs: list[Adv]):
 
 
 def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting):
-
-    buttons = []
-    buttons.append([InlineKeyboardButton(text='Контроль ключевых слов по кампании',
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
-                                                                      type='by_adv').pack())])
+                                                                      type='by_adv').pack()))
+    if adv_setting.hard_min_ctr:
+         builder.row(InlineKeyboardButton(text='Изменить минимальный CTR',
+                                         callback_data=callbacks.ChangeMinCTR(
+                                             action='change_min_ctr',
+                                             adv_original_id=adv_setting.id).pack()))
+
+    else:
+        builder.row(InlineKeyboardButton(text='Ручной режим управления CTR',
+                                             callback_data=callbacks.ChangeMinCTR(
+                                                 action='change_min_ctr',
+                                                 adv_original_id=adv_setting.id).pack()))
+
+
     if adv_setting.bot_active:
-        buttons.append(
-        [InlineKeyboardButton(text='Отключить бота', callback_data=TurnAdv(action='off',
+        builder.row(
+        InlineKeyboardButton(text='Отключить бота', callback_data=TurnAdv(action='off',
          adv_original_id=adv_setting.id,
-        wb_user_cabinet_original_id =wb_user_cabinet.id).pack())])
+        wb_user_cabinet_original_id =wb_user_cabinet.id).pack()))
 
 
     else:
-        buttons.append(
-            [InlineKeyboardButton(text='Включить бота',
+        builder.row(
+            InlineKeyboardButton(text='Включить бота',
                                   callback_data=TurnAdv(action='on',
                                    adv_original_id=adv_setting.id,
-                                   wb_user_cabinet_original_id=wb_user_cabinet.id).pack())])
+                                   wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
 
     wb_user_cabinet_original_id = wb_user_cabinet.id
-    buttons.append([InlineKeyboardButton(text='Вернуться к списку кампаний',
+    builder.row(InlineKeyboardButton(text='Вернуться к списку кампаний',
                                          callback_data=\
                         callbacks.ChoiceAdvPaginator(wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                                                                                    page=1).pack())])
+                                                                                    page=1).pack()))
 
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    return keyboard
+    return builder.as_markup()
 
 
 def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
@@ -402,3 +413,24 @@ def get_payment_keyboard(price_for_month: int, period_days, bonus_days: int, wb_
     builder.row(button)
 
     return builder.as_markup()
+
+
+def get_setting_min_ctr_keyboard(adv: AdvSetting):
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text='Назад',
+                                             callback_data=callbacks.ChangeMinCTR(
+                                                 action = 'return',
+                                                 adv_original_id=adv.id).pack()))
+    if adv.hard_min_ctr:
+        button = InlineKeyboardButton(text=f'Включить автоматическое управление CTR',
+                                      callback_data=callbacks.ChangeMinCTR(
+                                          action='turn_on_auto_min_ctr',
+                                          adv_original_id=adv.id).pack())
+        builder.row(button)
+
+    return builder.as_markup()
+
+
+
+
+

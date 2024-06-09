@@ -93,3 +93,8 @@ class OrderSubscribe(CallbackData, prefix="order_subscribe"):
 
 class Start(CallbackData, prefix="start"):
     pass
+
+
+class ChangeMinCTR(CallbackData, prefix="change_min_ctr"):
+    action: str
+    adv_original_id: int
