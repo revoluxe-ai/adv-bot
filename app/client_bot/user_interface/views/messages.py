@@ -1327,3 +1327,8 @@ class Single_message12(Text):
 Подробности - https://t.me/auto_wb_master/139    
     
     """
+class Single_message13(Text):
+    text = """
+Добрый день! Добавил ручное управление CTR кампаний. Подробности - https://t.me/auto_wb_master/145?single    
+    
+    """

@@ -28,7 +28,7 @@ async def send_message_to_users():
         print('Всего пользователей для отправки сообщений: ', len(users))
         for user in users:
             user_id =  user.user_telegram_id
-            message = messages.Single_message12
+            message = messages.Single_message13
             hash = sha256((str(message)) \
                           .encode()).hexdigest()
             if await redis_manager.check_message_send(hash, user_id):
