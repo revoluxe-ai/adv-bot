@@ -11,12 +11,14 @@ from sqlalchemy.orm import joinedload, selectinload
 
 import app
 from app.client_bot import const
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBCabinet,
     WBUserCabinet,
 )
+from app.modules.wb_adv_updater import data_managers
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.suffixes import get_day_suffix
@@ -199,14 +201,14 @@ class AdvSettingMenu(TextWithKeyboard):
              self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
              if not self._mean_ctr:
                  raise NoResultFound
-             self._mean_ctr = round(self._mean_ctr, 2)
+             self._mean_ctr = round(self._mean_ctr, 2)*100
         except NoResultFound:
             self._mean_ctr = 'Средний CTR не определен'
         try:
             self._min_ctr = await db_manager.get_min_ctr(self.adv)
             if not self._min_ctr:
                 raise NoResultFound
-            self._min_ctr = round(self._min_ctr, 2)
+            self._min_ctr = round(self._min_ctr, 2)*100
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
         await super().__call__()
@@ -678,3 +680,53 @@ class ExpiredSubscription(TextWithKeyboard):
             bonus_days=0,
             wb_cabinet_original_id=self._wb_cabinet.id,
         )
+
+
+class SettingMinCTR(Text):
+    def __init__(self, bot: Bot, state, chat_id: int):
+        super().__init__(bot, chat_id)
+        self._min_ctr = None
+        self._min_ctr_type = None
+        self._adv = None
+
+
+    async def __call__(self,  adv_original_id):
+        async with _sm() as session:
+            adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+            adv = adv.scalar()
+        self._adv = adv
+        if not adv.hard_min_ctr:
+            self._min_ctr = await db_manager.get_min_ctr(adv)
+            self._min_ctr_type = "auto"
+        else:
+            self._min_ctr = adv.hard_min_ctr
+            self._min_ctr_type = 'direct'
+
+        keywords: list[KeywordStatFromDB] = await data_managers.get_good_bad_phrases(adv, self._min_ctr)
+        keywords.sort(key=lambda x: x.ctr, reverse=True)
+        goods = [kw for kw in keywords if kw.status == 'good']
+        bads = [kw for kw in keywords if kw.status == 'bad']
+
+        goods = goods[:5]
+        bads = bads[5:]
+        self._goods = goods
+        self._bads = bads
+        await super().__call__()
+
+
+    @property
+    def text(self):
+        text = (f'Минимальный CTR для кампании {self._adv.name}'
+                f' равен {self._min_ctr} %,'
+                f' тип минимального CTR: {"Задан в ручную"  if self._min_ctr_type else "Определен автоматически"}\n')
+        for good in self._goods:
+               text += f'{good.text} - {good.ctr}  % ✅\n'
+        text += f'================== {self._min_ctr}\n'
+        for bad in self._bads:
+            text += f'{bad.text} - {bad.ctr}  % ❌\n'
+
+        return text
+
+
+    def keyboard(self):
+        return keyboards.get_setting_min_ctr_keyboard(self._adv)
