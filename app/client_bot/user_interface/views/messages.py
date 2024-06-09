@@ -200,7 +200,6 @@ class AdvSettingMenu(TextWithKeyboard):
         if self.adv.hard_min_ctr:
             self._min_ctr = round(self.adv.hard_min_ctr, 2)*100
         else:
-
             try:
                 self._min_ctr = await db_manager.get_min_ctr(self.adv)
                 if not self._min_ctr:
@@ -208,6 +207,7 @@ class AdvSettingMenu(TextWithKeyboard):
                 self._min_ctr = round(self._min_ctr*100, 1)
             except NoResultFound:
                 self._min_ctr = 'Минимальный CTR не определен'
+
         try:
             self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
             if not self._mean_ctr:
