@@ -36,17 +36,17 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
-            # self.shop_subscribe_control(),
-            # self.demo_subscribe(),
-            # self.run_update_keywords_on_wb(),
-            # self.update_cards_in_graph(),
-            # self.update_all_data_in_db(),
-            # self.update_min_ctr_in_global_wb_category_settings(),
+            self.shop_subscribe_control(),
+            self.demo_subscribe(),
+            self.run_update_keywords_on_wb(),
+            self.update_cards_in_graph(),
+            self.update_all_data_in_db(),
+            self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_keyword_stat(need_update_model),
-            # self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
-            # self.run_update_model(update_model_on_new_features, need_update_model),
-            # self.run_update_predict_ctr(update_model_on_new_features, predicted),
-            # return_exceptions=False
+            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            self.run_update_model(update_model_on_new_features, need_update_model),
+            self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            return_exceptions=False
             )
 
     async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
