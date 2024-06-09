@@ -228,10 +228,16 @@ async def get_good_bad_phrases(adv_setting: AdvSetting, min_ctr)->list[KeywordSt
             added_clicks = keyword_setting.added_clicks
             if not added_clicks:
                 added_clicks = 0
-            enough_views = int(1 / min_ctr)
+            if min_ctr == 0:
+                enough_views = 1000
+            else:
+                enough_views = int(1 / min_ctr)
             views = keyword_stat.views + enough_views + added_views
             clicks = keyword_stat.clicks + 1 + added_clicks
-            fact_ctr = clicks / views
+            if views == 0:
+                fact_ctr = 0
+            else:
+                fact_ctr = clicks / views
             predict_ctr = keyword_setting.predict_ctr
             if not predict_ctr:
                 predict_ctr = fact_ctr
@@ -383,15 +389,17 @@ class DataSetter:
         self._wb_api = WBApi(access)
         self._wb_cabinet = access.wb_cabinet
 
-
-    async def update_minus_keywords(self, adv_settings, category_name_to_min_ctr):
+    async def update_minus_keywords(self, adv_settings: list[AdvSetting], category_name_to_min_ctr):
         for adv_setting in adv_settings:
             try:
-                category:WBCategory = await get_wb_category(adv_setting)
+                category: WBCategory = await get_wb_category(adv_setting)
             except (CardNotFoundInDB, NotItemsInAdvSetting):
                 logger.debug('Не удалось получить категорию РК')
                 continue
-            min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
+            if adv_setting.hard_min_ctr:
+                min_ctr = adv_setting.hard_min_ctr
+            else:
+                min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
             keywords: list[KeywordStatFromDB] = await get_good_bad_phrases(adv_setting, min_ctr)
             good_phrases = []
             bad_phrases = []
