@@ -3,7 +3,7 @@ from aiogram import Router
 from python_modules import path_setting_funcs
 
 from .middlewars.check_rights import check_subscribe_on_shop
-from .user_interface.handlers import adv_setting, exceptions, keyword_settings
+from .user_interface.handlers import adv_setting, exceptions, keyword_settings, setting_min_ctr
 
 common_router = Router()
 
@@ -14,5 +14,6 @@ common_router.include_routers(exceptions.user_router)
 common_router.include_routers(exceptions.admin_router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(keyword_settings.router)
+common_router.include_routers(setting_min_ctr.router)
 
 common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())

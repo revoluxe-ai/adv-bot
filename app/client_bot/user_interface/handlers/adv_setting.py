@@ -44,15 +44,17 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
 
     return
 
-
+@router.callback_query(callbacks.ChangeMinCTR.filter(F.action == 'return'))
 @router.callback_query(callbacks.Adv.filter())
 async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
               bot: aiogram.Bot, state: FSMContext):
+    await callback.answer()
+    await state.set_state(state = None)
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     await bot.answer_callback_query(callback.id)
     adv_original_id = callback_data.adv_original_id
-
-    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    data = await state.get_data()
+    wb_user_cabinet_original_id = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()

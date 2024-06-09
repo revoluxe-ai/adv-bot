@@ -33,15 +33,10 @@ router = Router()
 redis_manager = RedisManager()
 
 
-@router.callback_query(callbacks.Start.filter())
-@router.message(CommandStart())
 async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
-
-    await state.clear()
-
+    await state.set_state(state = None)
     if isinstance(message, types.CallbackQuery):
         await message.answer()
-
     async with sm() as session:
         user_id = message.from_user.id
 
@@ -315,7 +310,13 @@ async def shop_menu_process(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
+    await state.update_data(last_wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id)
+    logger.debug('Текущее состояние: %s', await state.get_data())
     await callback.answer()
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await messages.ShopMenu(bot, callback.message.chat.id, state, wb_user_cabinet_original_id)()
+
+
+router.callback_query.register(start_registration, callbacks.Start.filter())
+router.message.register(start_registration, CommandStart())
+

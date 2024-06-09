@@ -11,7 +11,7 @@ class CabinetRegistration(StatesGroup):
 
 
 class ChangeMinCTR(StatesGroup):
-    min_ctr = State()
+    waiting_for_new_min_ctr = State()
 
 
 class AddNewToken(StatesGroup):
