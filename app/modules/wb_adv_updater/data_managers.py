@@ -397,9 +397,9 @@ class DataSetter:
             bad_phrases = []
             for keyword in keywords:
                 if keyword.status == 'good':
-                    good_phrases.append(keyword)
+                    good_phrases.append(keyword.text)
                 else:
-                    bad_phrases.append(keyword)
+                    bad_phrases.append(keyword.text)
             if bad_phrases:
                 await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
                 logger.info(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
