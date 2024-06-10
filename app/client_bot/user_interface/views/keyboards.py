@@ -7,6 +7,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -187,7 +188,7 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  WBUserCabinet):
     return keyboard
 
 
-def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_setting: AdvSetting,
+def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword], adv_setting: AdvSetting,
                                   adv_choice_last_page,
                                   wb_user_cabinet_original_id: int,
                                    page,
@@ -198,25 +199,27 @@ def get_keywords_setting_keyboard(keywords: list['KeywordForKeyboard'], adv_sett
 
     bottoms = []
     for keyword in keywords[start_index:end_index]:
-        clicks = keyword.statistic.clicks
-        views = keyword.statistic.views
-        ctr = keyword.statistic.ctr
-        if keyword.keyword_settings.hard_status == BLACK_LIST:
+        clicks = keyword.clicks
+        views = keyword.views
+        ctr = keyword.ctr
+        if keyword.hard_status == BLACK_LIST:
             hard_status = 'Не рел.фраза'
-        elif keyword.keyword_settings.hard_status == AUTO_MODE:
+        elif keyword.hard_status == AUTO_MODE:
             hard_status = 'Авто'
-        elif keyword.keyword_settings.hard_status == TURN_OFF:
+        elif keyword.hard_status == TURN_OFF:
             hard_status = 'Откл.'
-        else:
+        elif keyword.hard_status == WHITE_LIST:
             hard_status = 'БС'
+        else:
+            raise ValueError(f'Unknown hard_status: {keyword.hard_status}')
 
-        turn_on = '✅' if keyword.turn_on else '❌'
+        turn_on = '✅' if keyword.status == KeywordStatus.GOOD else '❌'
         text = f'{keyword.text} {turn_on}({hard_status}){clicks}/{views}/{round(ctr *100, 0)}% '
 
 
         inline_keyboard = [InlineKeyboardButton(text= text,
                                                 callback_data=callbacks.SettingKeyword(
-                                                keyword_setting_original_id = keyword.keyword_settings.id,
+                                                keyword_setting_original_id = keyword.keyword_setting.id,
                                                 ).pack())]
         bottoms.append(inline_keyboard)
 

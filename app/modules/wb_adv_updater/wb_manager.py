@@ -281,7 +281,6 @@ class Manager(AbcManager):
     async def update_keywords_in_advs() -> list[typing.Awaitable]:
         update_tasks: dict[int, asyncio.Task] = {}
         while True:
-            category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
             accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
             async for access in accesses:
                 wb_cabinet_id = access.wb_cabinet.id
@@ -299,8 +298,7 @@ class Manager(AbcManager):
                         result = await session.execute(stmt)
                         adv_settings: list[AdvSetting] = result.scalars().all()
                     if adv_settings:
-                        task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings,
-                                                                                     category_name_to_min_ctr))
+                        task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings))
                         update_tasks[wb_cabinet_id] = task
                 else:
                     if update_tasks[wb_cabinet_id].done():

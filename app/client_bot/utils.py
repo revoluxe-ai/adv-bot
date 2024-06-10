@@ -4,7 +4,7 @@ from typing import Union
 
 from sqlalchemy import and_, select
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import KeywordSetting, WBCategory
 from app.modules.wb_adv_updater import data_managers
 from app.my_types import AdvSetting
@@ -17,35 +17,18 @@ _sm = get_async_session_maker
 class KeywordForKeyboard:
     text: str
     good: bool
-    statistic: KeywordStatFromDB
+    statistic: CalculatedKeyword
     keyword_settings: KeywordSetting
     adv_setting: AdvSetting
     turn_on: bool
 
 
-async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[KeywordForKeyboard]:
-    category: Union[WBCategory, None] = await data_managers.get_wb_category(adv_setting)
-    category_name_to_min_ctr = await data_managers.get_category_name_min_ctr_final_data()
-    min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
-    all_phrases: list[KeywordStatFromDB] = await data_managers.get_good_bad_phrases(adv_setting, min_ctr)
-    # keyword_stats:list[KeywordStatFromDB] = await data_managers.get_keywords_statistic(adv_setting,
-    #                                                                                    None)
-    # keyword_text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
+async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[CalculatedKeyword]:
+    all_phrases: list[CalculatedKeyword] = await data_managers.get_good_bad_phrases(adv_setting)
 
-    keywords = []
+    all_phrases.sort(key=lambda keyword: keyword.ctr, reverse=True)
 
-    for keyword_stat in all_phrases:
-        keyword = KeywordForKeyboard(text=keyword_stat.text,
-                                     good=True if keyword_stat.status == 'good' else False,
-                                     statistic=keyword_stat,
-                                     keyword_settings=keyword_stat.keyword_setting,
-                                     adv_setting=adv_setting,
-                                     turn_on=True if keyword_stat.status == 'good' else False)
-        keywords.append(keyword)
-
-    keywords.sort(key=lambda keyword: keyword.statistic.ctr, reverse=True)
-
-    return keywords
+    return all_phrases
 
 
 async def create_ref_link(ref_link_name, user_telegram_id):
