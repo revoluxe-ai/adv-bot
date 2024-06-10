@@ -3,20 +3,23 @@ import io
 import logging
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Union
+from typing import Any, Union, Optional
+
+import aiogram
+from aiogram.utils import deep_linking
 
 from app.exc import CardNotFoundInDB
 from app.modules.common_slaves.wildberries import exceptions as wb_exc
 import pandas as pd
 from PIL import Image
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, case, cast, Float
 from sqlalchemy.orm import selectinload
-import app
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
@@ -30,13 +33,12 @@ from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabine
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.my_types import AdvSetting, WBUserCabinet
-from app.utils.db.models import User
+from app.payments.db.models import Payment
+from app.settings import settings
+from app.utils.db.models import User, RefLink, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
 from app.utils import redis_manager
-
-
-
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +46,12 @@ logger = logging.getLogger(__name__)
 _sm = get_async_session_maker
 
 
-
-async def measure_time(func):
+async def measure_time(function):
     async def wrapper(*args, **kwargs):
         start_time = time.time()
-        result = await func(*args, **kwargs)  # Используйте await для асинхронного вызова
+        result = await function(*args, **kwargs)  # Используйте await для асинхронного вызова
         end_time = time.time()
-        print(f"{func.__name__} выполнена за {end_time - start_time} секунд.")
+        print(f"{function.__name__} выполнена за {end_time - start_time} секунд.")
         return result
     return wrapper
 
@@ -58,7 +59,7 @@ async def measure_time(func):
 async def get_keywords_statistic(adv_setting: AdvSetting,
                                  pass_time: Union[timedelta, None],
                                  hard_statuses: list[int] = None,
-                                 )->list[KeywordStatFromDB]:
+                                 ) -> list[CalculatedKeyword]:
 
     base_stmt = (
         select(
@@ -70,9 +71,9 @@ async def get_keywords_statistic(adv_setting: AdvSetting,
         )
         .join(KeywordSetting, AdvKeyword.keyword_setting_id == KeywordSetting.id)
     )
-    if  pass_time:
-         today = datetime.today()
-         base_stmt = base_stmt\
+    if pass_time:
+        today = datetime.today()
+        base_stmt = base_stmt\
         .where(AdvKeyword.date >= today - pass_time)
 
 
@@ -98,7 +99,7 @@ async def get_keywords_statistic(adv_setting: AdvSetting,
     for row in rows:
         text = row.keyword_text
         if text:
-            keyword_stat = KeywordStatFromDB(
+            keyword_stat = CalculatedKeyword(
                 row.keyword_text,
                 min(row.total_clicks, row.total_views) if row.total_clicks and row.total_views else 0,
                 row.total_views or 0,
@@ -158,7 +159,7 @@ async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
 
 
 
-async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[KeywordStatFromDB]]:
+async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[CalculatedKeyword]]:
     logger.debug('Начинаю получать статистику ключевых слов для расчета min_ctr')
     stmt = select(AdvSetting).options(
         selectinload(AdvSetting.adv_keywords),
@@ -210,17 +211,17 @@ async def get_category_name_min_ctr_final_data() -> dict[int, float]:
 
 
 
-async def get_good_bad_phrases(adv_setting: AdvSetting, min_ctr)->list[KeywordStatFromDB]:
+async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]:
     async with _sm() as session:
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
-        # good_keywords: list[KeywordSetting] = []
-        # bad_keywords: list[KeywordSetting] = []
+        min_ctr = await get_min_ctr(adv_setting)
         keyword_stats = await get_keywords_statistic(adv_setting, None)
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
         for keyword_stat in keyword_stats:
             keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
+            keyword_stat.hard_status = keyword_setting.hard_status
             keyword_stat.keyword_setting = keyword_setting
             added_views = keyword_setting.added_views
             if not added_views:
@@ -247,27 +248,27 @@ async def get_good_bad_phrases(adv_setting: AdvSetting, min_ctr)->list[KeywordSt
             boost = adv_setting.boost
             predict_ctr *= boost
             if keyword_setting.hard_status == 3:
-                keyword_stat.status = 'bad'
+                keyword_stat.status = KeywordStatus.BAD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             if keyword_setting.hard_status == 2:
-               keyword_stat.status = 'good'
+               keyword_stat.status = KeywordStatus.GOOD
                keyword_setting.auto_block = False
                await redis_manager.set_auto_block_status(keyword_setting.id, False)
                continue
             elif keyword_setting.hard_status == 0:
-                keyword_stat.status = 'bad'
+                keyword_stat.status = KeywordStatus.BAD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             if min_ctr == 0:
-                keyword_stat.status = 'good'
+                keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             if predict_ctr >= min_ctr:
-                keyword_stat.status = 'good'
+                keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
-                keyword_stat.status = 'bad'
+                keyword_stat.status = KeywordStatus.BAD
                 await redis_manager.set_auto_block_status(keyword_setting.id, True)
 
     # good_phrase_objs = []
@@ -377,7 +378,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
-    wb_card : WBCategory = wb_card.unique().scalar()
+    wb_card: WBCategory = wb_card.unique().scalar()
     if wb_card:
         wb_category = wb_card.wb_category
     else:
@@ -389,34 +390,23 @@ class DataSetter:
         self._wb_api = WBApi(access)
         self._wb_cabinet = access.wb_cabinet
 
-    async def update_minus_keywords(self, adv_settings: list[AdvSetting], category_name_to_min_ctr):
+    async def update_minus_keywords(self, adv_settings: list[AdvSetting]):
         for adv_setting in adv_settings:
-            try:
-                category: WBCategory = await get_wb_category(adv_setting)
-            except (CardNotFoundInDB, NotItemsInAdvSetting):
-                logger.debug('Не удалось получить категорию РК')
-                continue
-            if adv_setting.hard_min_ctr:
-                min_ctr = adv_setting.hard_min_ctr
-            else:
-                min_ctr = category_name_to_min_ctr.get(category.wb_category_name, 0)
-            keywords: list[KeywordStatFromDB] = await get_good_bad_phrases(adv_setting, min_ctr)
+            keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv_setting)
             good_phrases = []
             bad_phrases = []
             for keyword in keywords:
-                if keyword.status == 'good':
+                if keyword.status == KeywordStatus.GOOD:
                     good_phrases.append(keyword.text)
                 else:
                     bad_phrases.append(keyword.text)
-            if bad_phrases:
+            if bad_phrases and not settings.test_mode:
                 await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
                 logger.info(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
                 logger.info(f'Позитивные слова {good_phrases}')
             else:
                 logger.info(f'Нет минус слов для {adv_setting.name}')
         return
-
-
 
 
     def _print_keywords(self, df: pd.DataFrame, df_fact: pd.DataFrame, nmid, min_ctr: float):
@@ -556,3 +546,91 @@ async def get_adv_id_keyword_text_to_status(adv_ids: int):
     return adv_id_keyword_text_to_status
 
 
+
+@dataclass
+class ReferralStatistic:
+    name: str
+    referrals_count: int
+    total_payments: float
+
+async def get_ref_statistic(user_telegram_id: int) -> Optional[list[ReferralStatistic]]:
+    """Получить статистику по рефералам пользователя: количество приведенных пользователей и сумму их платежей."""
+    async with _sm() as session:
+        # Сначала найдем пользователя по telegram_id
+        user_query = select(User.id).where(User.user_telegram_id == user_telegram_id)
+        result = await session.execute(user_query)
+        user_id = result.scalar() # Используйте scalar_one_or_none для обработки случая, когда пользователь не найден
+
+        # Теперь получим статистику по реферальным ссылкам
+        statistics_query = select(
+            RefLink.name,
+            func.count(user_reflink_association.c.user_id).label("referrals_count"),
+            func.coalesce(func.sum(Payment.amount), 0).label("total_payments")
+        ).select_from(RefLink) \
+         .outerjoin(user_reflink_association, RefLink.id == user_reflink_association.c.reflink_id) \
+         .outerjoin(User, user_reflink_association.c.user_id == User.id) \
+         .outerjoin(Payment, Payment.user_id == User.id) \
+         .where(RefLink.referrer_id == user_id) \
+         .group_by(RefLink.name)
+
+        result = await session.execute(statistics_query)
+        stats = result.fetchall()
+
+        if not stats:
+            return None
+
+        # Возвращаем результаты в удобном для использования виде
+        return [ReferralStatistic(name=row[0], referrals_count=row[1], total_payments=row[2]) for row in stats]
+
+
+@dataclass
+class ReferralLink:
+    name: str
+    link: str
+
+
+
+async def get_ref_names_and_links(user_telegram_id: int, bot:aiogram.Bot):
+    async with _sm() as session:
+        stmt = select(User.id).where(User.user_telegram_id == user_telegram_id)
+        result = await session.execute(stmt)
+        user_id = result.scalar()
+        stmt = select(RefLink.name, RefLink.id).where(RefLink.referrer_id == user_id)
+        result = await session.execute(stmt)
+        refs = result.fetchall()
+
+    ref_links = []
+    for ref in refs:
+        link = await deep_linking.create_start_link(bot, ref[1])
+        ref_links.append(ReferralLink(name=ref[0], link= link))
+    return ref_links
+
+
+async def get_mean_ctr(adv: AdvSetting):
+    keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv)
+    goods = [kw for kw in keywords if kw.status == 'good']
+    goods = [kw.text for  kw in goods]
+    async with _sm() as session:
+        stmt = (
+            select(
+                case(
+                    (func.sum(AdvKeyword.views) == 0, 0),  # Условие, если показов нет, возвращаем 0
+                    else_=cast(func.sum(AdvKeyword.clicks) / func.sum(AdvKeyword.views), Float)  # Иначе вычисляем CTR
+                ).label("average_ctr")
+            )
+        ).where(and_(AdvKeyword.adv_setting_id == adv.id,
+                     AdvKeyword.text.in_(goods)))
+        result = await session.execute(stmt)
+        mean_ctr = result.scalar_one()
+        return mean_ctr  # Возвращаем значение mean_ctr вместо pass
+
+
+async def get_min_ctr(adv: AdvSetting):
+    category = await get_wb_category(adv)
+    category_name = category.wb_category_name
+    async with _sm() as session:
+        stmt = select(GlobalCategorySetting.min_ctr).where(GlobalCategorySetting.category_name == category_name)
+        result = await session.execute(stmt)
+        min_ctr = result.scalar_one()
+    min_ctr *= adv.boost
+    return min_ctr

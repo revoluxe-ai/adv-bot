@@ -7,11 +7,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils import deep_linking
 from sqlalchemy import select, and_
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.orm import joinedload, selectinload
-
-import app
+from sqlalchemy.orm import selectinload
 from app.client_bot import const
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatFromDB
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -30,7 +28,7 @@ from ..message_templates.templates import (
     TextWithKeyboardAndImage,
     TextWithKeyboardPagination,
 )
-from . import db_manager, keyboards, callbacks
+from . import  keyboards
 from app.utils import redis_manager
 
 
@@ -201,7 +199,7 @@ class AdvSettingMenu(TextWithKeyboard):
             self._min_ctr = round(self.adv.hard_min_ctr, 2)*100
         else:
             try:
-                self._min_ctr = await db_manager.get_min_ctr(self.adv)
+                self._min_ctr = await data_managers.get_min_ctr(self.adv)
                 if not self._min_ctr:
                     raise NoResultFound
                 self._min_ctr = round(self._min_ctr*100, 1)
@@ -209,7 +207,7 @@ class AdvSettingMenu(TextWithKeyboard):
                 self._min_ctr = 'Минимальный CTR не определен'
 
         try:
-            self._mean_ctr = await db_manager.get_mean_ctr(self.adv)
+            self._mean_ctr = await data_managers.get_mean_ctr(self.adv)
             if not self._mean_ctr:
                 raise NoResultFound
             self._mean_ctr = round(self._mean_ctr, 2) * 100
@@ -323,7 +321,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self,
         bot: Bot,
         chat_id,
-        keywords: list['KeywordForKeyboard'],
+        keywords: list[CalculatedKeyword],
         adv_setting: AdvSetting,
         wb_user_cabinet_original_id,
         adv_choice_last_page,
@@ -461,7 +459,7 @@ class RefProgram(TextWithKeyboard):
         super().__init__(bot, chat_id)
 
     async def __call__(self):
-        ref_statistic = await db_manager.get_ref_statistic(self._user_telegram_id)
+        ref_statistic = await data_managers.get_ref_statistic(self._user_telegram_id)
         self._ref_statistic = ref_statistic
         await super().__call__()
 
@@ -529,7 +527,7 @@ class RefProgramSelect(TextWithKeyboard):
 
 
     async def __call__(self):
-        ref_links = await db_manager.get_ref_names_and_links(self._user_telegram_id, self.bot)
+        ref_links = await data_managers.get_ref_names_and_links(self._user_telegram_id, self.bot)
         self._ref_links = ref_links
         await super().__call__()
 
@@ -688,7 +686,7 @@ class ExpiredSubscription(TextWithKeyboard):
 
 
 class SettingMinCTR(TextWithKeyboard):
-    def __init__(self, bot: Bot, state, chat_id: int):
+    def __init__(self, bot: Bot,  chat_id: int):
         super().__init__(bot, chat_id)
         self._min_ctr = None
         self._min_ctr_type = None
@@ -701,13 +699,13 @@ class SettingMinCTR(TextWithKeyboard):
             adv = adv.scalar()
         self._adv = adv
         if not adv.hard_min_ctr:
-            self._min_ctr = await db_manager.get_min_ctr(adv)
+            self._min_ctr = await data_managers.get_min_ctr(adv)
             self._min_ctr_type = "auto"
         else:
             self._min_ctr = adv.hard_min_ctr
             self._min_ctr_type = 'direct'
 
-        keywords: list[KeywordStatFromDB] = await data_managers.get_good_bad_phrases(adv, self._min_ctr)
+        keywords: list[CalculatedKeyword] = await data_managers.get_good_bad_phrases(adv)
         keywords.sort(key=lambda x: x.keyword_setting.predict_ctr, reverse=True)
         goods = []
         bads = []
