@@ -90,7 +90,6 @@ class ShopDataUpdater:
         adv_ids = await advert_api.get_advertIds()
         advs: list[Adv] = await advert_api.get_advs(adv_ids)
         await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
-
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()

@@ -35,9 +35,11 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet: WBCabinet):
                 adv_in_db.nmids = adv.nmids
                 adv_in_db.active_status = adv.status_native
                 adv_in_db.type = adv.type
-                session.add(adv_in_db)
                 adv_in_db.wb_cabinet = wb_cabinet
+                session.merge(adv_in_db)
             await session.commit()
+    return
+
 
 
 async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet):
