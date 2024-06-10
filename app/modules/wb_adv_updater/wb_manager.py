@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import traceback
 import typing
 from io import BytesIO
 from itertools import product
@@ -304,7 +305,8 @@ class Manager(AbcManager):
                 else:
                     if update_tasks[wb_cabinet_id].done():
                         if update_tasks[wb_cabinet_id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}')
+                            logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()},'
+                                         f' {traceback.format_exc()}')
                         del update_tasks[wb_cabinet_id]
             await asyncio.sleep(60*15)
 
