@@ -45,7 +45,7 @@ async def ref_program_getting_name(message: types.Message, bot: aiogram.Bot, sta
     if not ref_link:
         await messages.RefLinkNameAlreadyExists(bot, message.chat.id)()
         return
-    await state.clear()
+    await state.set_state(state=None)
     await messages.RefLinkCreated(bot, message.chat.id, ref_link)()
 
 

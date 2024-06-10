@@ -245,10 +245,18 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                 keyword_setting.predict_ctr = predict_ctr
             elif fact_ctr > predict_ctr:
                 predict_ctr = fact_ctr
+            if adv_setting.max_cpc:
+                if keyword_stat.cpc > adv_setting.max_cpc:
+                    keyword_stat.status = 'bad'
+                    keyword_stat.bad_reason = 'max_cpc'
+                    await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                    continue
+
             boost = adv_setting.boost
             predict_ctr *= boost
             if keyword_setting.hard_status == 3:
                 keyword_stat.status = KeywordStatus.BAD
+                keyword_stat.bad_reason = 'turn_off'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             if keyword_setting.hard_status == 2:
@@ -258,27 +266,38 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                continue
             elif keyword_setting.hard_status == 0:
                 keyword_stat.status = KeywordStatus.BAD
+                keyword_stat.bad_reason = 'black_list'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             if min_ctr == 0:
                 keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
+            if adv_setting.max_cpc:
+                max_cpc = adv_setting.max_cpc
+                if keyword_stat.cpc > max_cpc:
+                    keyword_stat.status = KeywordStatus.BAD
+                    keyword_stat.bad_reason = KeywordStatus.MAX_CPC
+                    await redis_manager.set_auto_block_status(keyword_setting.id, True)
+                    continue
+
             if predict_ctr >= min_ctr:
                 keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
                 keyword_stat.status = KeywordStatus.BAD
+                keyword_stat.bad_reason = 'min_ctr'
                 await redis_manager.set_auto_block_status(keyword_setting.id, True)
 
-    # good_phrase_objs = []
-    # for phrase in good_keywords:
-    #     keyword_stat = keyword_text_to_keyword_stat[phrase]
-    #     good_phrase_objs.append(keyword_stat)
-    # bad_phrase_objs = []
-    # for phrase in bad_keywords:
-    #     keyword_stat = keyword_text_to_keyword_stat[phrase]
-    #     bad_phrase_objs.append(keyword_stat)
+    for keyword_stat in keyword_stats:
+        assert keyword_stat.status
+        assert keyword_stat.status in ['good', 'bad']
+        if keyword_stat.status == 'bad':
+            assert keyword_stat.bad_reason
+            assert keyword_stat.bad_reason in ['max_cpc', 'turn_off', 'black_list', 'min_ctr']
+        else:
+            assert not keyword_stat.bad_reason
+
     return keyword_stats
 
 

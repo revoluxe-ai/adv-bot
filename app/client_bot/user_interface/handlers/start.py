@@ -96,7 +96,7 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
             catch_cab: WBUserCabinet = cabinet
             break
     if catch_cab:
-        await state.clear()
+        await state.set_state(state=None)
         await state.set_state(states.CabinetRegistration.cabinet_name)
         await messages. \
             CabinetNameExists(bot, chat_id)()
@@ -282,7 +282,7 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
         all_shops = wb_user_cabinet.user.wb_user_cabinets
         await messages. \
             ShopChoice(bot, chat_id, all_shops)()
-        await state.clear()
+        await state.set_state(state=None)
         return
 
 

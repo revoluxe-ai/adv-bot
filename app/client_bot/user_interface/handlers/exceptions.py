@@ -52,7 +52,7 @@ async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMCon
 
 @admin_router.errors(ExceptionTypeFilter(Exception))
 async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-    await state.clear()
+    await state.set_state(state=None)
     message = error_event.update.message
     exception = error_event.exception
     if isinstance(exception, KeyboardInterrupt):

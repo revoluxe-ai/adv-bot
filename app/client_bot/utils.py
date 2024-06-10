@@ -21,6 +21,7 @@ class KeywordForKeyboard:
     keyword_settings: KeywordSetting
     adv_setting: AdvSetting
     turn_on: bool
+    bad_reason: Union[str, None] = None
 
 
 async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[CalculatedKeyword]:
@@ -29,6 +30,7 @@ async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[CalculatedK
     all_phrases.sort(key=lambda keyword: keyword.ctr, reverse=True)
 
     return all_phrases
+
 
 
 async def create_ref_link(ref_link_name, user_telegram_id):

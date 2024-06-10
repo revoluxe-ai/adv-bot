@@ -36,7 +36,7 @@ async def process_adv_new(callback: types.CallbackQuery, callback_data: callback
 async def process_adv_new_name(message: types.Message, state: FSMContext):
     text = message.text.strip()
     if len(text) > 120:
-        await state.clear()
+        await state.set_state(state=None)
         await state.set_state(states.CreateNewAdvCompany.waiting_for_name)
         await messages.TooLongNameOfNewAdvCompany(message.bot, message.chat.id)()
         return
@@ -79,7 +79,7 @@ async def process_adv_new_nmids(message: types.Message, state: FSMContext):
     else:
         data = await state.get_data()
         adv_company_name = data['adv_company_name']
-        await state.clear()
+        await state.set_state(state=None)
         access = scm.get_access_for_wb_user_cabinet()
         await manager.create_new_adv_company(adv_company_name, founded_nmids, access)
 

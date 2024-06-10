@@ -44,6 +44,7 @@ async def choice_adv_paginator(callback: types.CallbackQuery,
 
     return
 
+@router.callback_query(callbacks.ChangeMaxCPC.filter(F.action == 'return'))
 @router.callback_query(callbacks.ChangeMinCTR.filter(F.action == 'return'))
 @router.callback_query(callbacks.Adv.filter())
 async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,

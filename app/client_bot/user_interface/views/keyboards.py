@@ -101,6 +101,12 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                                  action='change_min_ctr',
                                                  adv_original_id=adv_setting.id).pack()))
 
+    button = InlineKeyboardButton(text='Задать/Изменить максимальную ставку',
+                                     callback_data=callbacks.ChangeMaxCPC(
+                                      action='to_max_cpc_change_page',
+                                      adv_original_id = adv_setting.id).pack())
+
+    builder.row(button)
 
     if adv_setting.bot_active:
         builder.row(
@@ -204,12 +210,14 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword], adv_setting
         ctr = keyword.ctr
         if keyword.hard_status == BLACK_LIST:
             hard_status = 'Не рел.фраза'
-        elif keyword.hard_status == AUTO_MODE:
-            hard_status = 'Авто'
+        elif keyword.bad_reason == 'max_cpc':
+            hard_status = 'Макс. ставка'
         elif keyword.hard_status == TURN_OFF:
             hard_status = 'Откл.'
         elif keyword.hard_status == WHITE_LIST:
             hard_status = 'БС'
+        elif keyword.hard_status == AUTO_MODE:
+            hard_status = 'Авто'
         else:
             raise ValueError(f'Unknown hard_status: {keyword.hard_status}')
 
@@ -434,6 +442,16 @@ def get_setting_min_ctr_keyboard(adv: AdvSetting):
     return builder.as_markup()
 
 
+def get_setting_max_cpc_keyboard(adv: AdvSetting):
+    adv_original_id = adv.id
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text='Назад',
+                                             callback_data=callbacks.ChangeMaxCPC(
+                                                 action = 'return',
+                                                 adv_original_id=adv_original_id).pack()))
 
-
-
+    builder.row(InlineKeyboardButton(text='Отключить максимальную ставку',
+                                                callback_data=callbacks.ChangeMaxCPC(
+                                                    action = 'turn_off_max_cpc',
+                                                    adv_original_id=adv_original_id).pack()))
+    return builder.as_markup()
