@@ -30,3 +30,7 @@ class RefProgram(StatesGroup):
 
 class AdvSetting(StatesGroup):
    waiting_for_filter_keywords = State()
+
+
+class ChangeMaxCPC(StatesGroup):
+    waiting_for_new_max_cpc = State()

@@ -5,6 +5,7 @@ from app.modules.common_slaves.wildberries.models import KeywordSetting
 
 @dataclass
 class KeywordStatus:
+    MAX_CPC = 'max_cpc'
     GOOD = 'good'
     BAD = 'bad'
 
@@ -18,6 +19,7 @@ class CalculatedKeyword:
     status: Union[str, None] = None
     keyword_setting: Union[KeywordSetting, None] = None
     hard_status: Union[str, None] = None
+    bad_reason: Union[str, None] = None
 
     def __repr__(self):
         text = (f'text: {self.text}'
@@ -34,3 +36,8 @@ class CalculatedKeyword:
         if self.views:
             return self.clicks / self.views
         return 0
+
+    @property
+    def cpc(self):
+        clicks = self.clicks + 1
+        return self.spend / clicks

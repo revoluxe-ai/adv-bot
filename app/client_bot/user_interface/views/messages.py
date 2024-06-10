@@ -9,7 +9,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 from app.client_bot import const
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -214,19 +214,26 @@ class AdvSettingMenu(TextWithKeyboard):
         except NoResultFound:
             self._mean_ctr = 'Средний CTR не определен'
 
+
         await super().__call__()
-
-
 
 
     @property
     def text(self):
-        return (f'Кампания: {self.adv.name}\n'
+        max_cpc = self.adv.max_cpc
+        if not max_cpc:
+            max_cpc_text = 'Максимальная ставка не установлена'
+        else:
+            max_cpc_text = f'Максимальная ставка: {max_cpc} р.'
+
+        text = (f'Кампания: {self.adv.name}\n'
                 f'ID кампании: {self.adv.adv_id}\n'
                 f'Статус: {self.adv.active_status}\n'
                 f'Минимальный CTR для кампании: {self._min_ctr} %\n'
-                f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n')
-
+                f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n'
+                )
+        text += f'{max_cpc_text}'
+        return text
 
     @property
     def keyboard(self):
@@ -740,3 +747,51 @@ class SettingMinCTR(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_setting_min_ctr_keyboard(self._adv)
+
+
+class MaxCPCSetting(TextWithKeyboard):
+
+    async def __call__(self, adv_original_id):
+        async with _sm() as session:
+            adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+            adv = adv.scalar()
+        self._adv = adv
+
+        keywords: list[CalculatedKeyword] = await data_managers.get_good_bad_phrases(adv)
+        keywords  = [kw for kw in keywords if kw.status == KeywordStatus.GOOD or kw.bad_reason == KeywordStatus.MAX_CPC]
+        keywords.sort(key=lambda x: x.cpc, reverse=True)
+        if not self._adv.max_cpc:
+            top_kw_list = []
+            down_kw_list = keywords
+        else:
+            top_kw_list = []
+            down_kw_list = []
+            for keyword in keywords:
+                if keyword.cpc > self._adv.max_cpc:
+                    top_kw_list.append(keyword)
+                else:
+                    down_kw_list.append(keyword)
+        self._top_kw_list = top_kw_list[-10:]
+        self._down_kw_list = down_kw_list[:10]
+        await super().__call__()
+
+
+    @property
+    def text(self):
+        text = f"""Максимальная цена клика {'для кампании ' + self._adv.name + ' равна ' + str(round(self._adv.max_cpc, 2)) + ' р.'  if self._adv.max_cpc  else 'не задана'}\n"""
+        for keyword in self._top_kw_list:
+            print(keyword)
+            text += f"""{keyword.text} - {round(keyword.cpc, 2)} р. ❌\n"""
+
+        text += f'================== {round(self._adv.max_cpc, 2) if self._adv.max_cpc else ""}\n'
+        print('============')
+        for keyword in self._down_kw_list:
+            print(keyword)
+            text += f"""{keyword.text} - {round(keyword.cpc, 2)} р. ✅\n"""
+
+        text += 'Введите новую максимальную цену клика для кампании:'
+        return text
+
+    @property
+    def keyboard(self):
+        return keyboards.get_setting_max_cpc_keyboard(self._adv)

@@ -207,6 +207,7 @@ class AdvSetting(BaseTable):
     boost = Column(Float, server_default=text('1'))
     type: Mapped[int] = Column(Integer, nullable=True)
     hard_min_ctr = Column(Float, nullable=True)
+    max_cpc = Column(Float, nullable=True)
 
 
 
