@@ -9,7 +9,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 from app.client_bot import const
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -758,7 +758,7 @@ class MaxCPCSetting(TextWithKeyboard):
         self._adv = adv
 
         keywords: list[CalculatedKeyword] = await data_managers.get_good_bad_phrases(adv)
-        keywords  = [kw for kw in keywords if kw.status == 'good' or kw.bad_reason == 'max_cpc']
+        keywords  = [kw for kw in keywords if kw.status == KeywordStatus.GOOD or kw.bad_reason == KeywordStatus.MAX_CPC]
         keywords.sort(key=lambda x: x.cpc, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
