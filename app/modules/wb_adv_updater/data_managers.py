@@ -59,7 +59,12 @@ async def measure_time(function):
 async def get_keywords_statistic(adv_setting: AdvSetting,
                                  pass_time: Union[timedelta, None],
                                  hard_statuses: list[int] = None,
+                                 cache_timeout = 60*15
                                  ) -> list[CalculatedKeyword]:
+
+    keyword_stats = await redis_manager.get_keyword_statistics(adv_setting, pass_time = pass_time)
+    if keyword_stats:
+        return keyword_stats
 
     base_stmt = (
         select(
@@ -107,7 +112,7 @@ async def get_keywords_statistic(adv_setting: AdvSetting,
             )
             keyword_stats.append(keyword_stat)
 
-
+    await redis_manager.set_keyword_statistics(adv_setting, keyword_stats, pass_time, cache_timeout)
     return keyword_stats
 
 

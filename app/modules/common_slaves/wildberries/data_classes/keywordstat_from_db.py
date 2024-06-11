@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from typing import Union
 from app.modules.common_slaves.wildberries.models import KeywordSetting
@@ -45,3 +46,9 @@ class CalculatedKeyword:
         clicks = self.clicks + 1
         return self.spend / clicks
 
+    def to_json(self):
+        return json.dumps(self.__dict__)
+
+    @classmethod
+    def from_json(cls, json_str):
+        return cls(**json.loads(json_str))

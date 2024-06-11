@@ -1,12 +1,12 @@
 import datetime
+import json
+from typing import Union
 
 import redis
 
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+from app.modules.common_slaves.wildberries.models import AdvSetting
 redis_client = redis.asyncio.Redis(host='localhost', port=6379, db=0)
-
-
-
-
 
 
 
@@ -55,3 +55,43 @@ async def get_auto_block_status(keywordsetting_original_id: int) -> bool:
     else:
         auto_block_status = True
     return auto_block_status
+
+async def set_keyword_statistics(adv_setting: AdvSetting,
+                                 keywords: list[CalculatedKeyword],
+                                 pass_time: Union[int, None],
+                                 cache_timeout: int):
+    if not pass_time:
+        pass_time = 0
+    key = 'adv_keyword_statistics:' + str(adv_setting.id) + ':' + str(pass_time)
+
+    json_data = []
+
+    for keyword in keywords:
+        data = keyword.to_json()
+        json_data.append(data)
+    json_data = json.dumps(json_data)
+    await redis_client.set(key, json_data, ex=cache_timeout)
+
+
+
+async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, None]) -> Union[list[CalculatedKeyword], None]:
+    if not pass_time:
+        pass_time = 0
+    key = 'adv_keyword_statistics:' + str(adv_setting.id) + ':' + str(pass_time)
+
+    json_data = await redis_client.get(key)
+    if not json_data:
+        return None
+    json_data = json.loads(json_data)
+
+    keywords = []
+    for row in json_data:
+        keyword: CalculatedKeyword = CalculatedKeyword.from_json(row)
+        keywords.append(keyword)
+
+    return keywords
+
+
+
+
+
