@@ -34,7 +34,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCard, WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
-from app.modules.wb_adv_updater import data_managers
+from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.my_types import KeywordStat
 from app.utils.db.session_maker import get_async_session_maker
@@ -48,7 +48,7 @@ from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .ABC_manager import AbcManager
-from .data_managers import DataGetter, DataSetter
+from .data_manager import DataGetter, DataSetter
 from .graph_vector_updater import GraphUpdater
 from .ML import Fitter, Predictor
 from .shops_manager import rights_control
@@ -375,7 +375,7 @@ class Manager(AbcManager):
             adv_setting_keyword_stats = {}
         for adv_setting in adv_settings:
             await sender_manager.send_message_to_admin(f'Получаем статистику ключей для {adv_setting.name}')
-            keyword_stats = await data_managers.get_keywords_statistic(adv_setting, None)
+            keyword_stats = await data_manager.get_keywords_statistic(adv_setting, None)
             await sender_manager.send_message_to_admin(f'Статистика ключей для {adv_setting.name} получена')
             adv_setting_keyword_stats[adv_setting] = keyword_stats
         total_min_ctr = 0
@@ -527,13 +527,13 @@ class Manager(AbcManager):
 
     @staticmethod
     async def update_min_ctr_in_global_wb_category_settings():
-        parent_categories_to_subcategories_name_list = await data_managers.get_parent_id_categories_subcategories_name_list()
+        parent_categories_to_subcategories_name_list = await data_manager.get_parent_id_categories_subcategories_name_list()
         category_name_to_parent_id = {}
         for parent_id, subcategories in parent_categories_to_subcategories_name_list.items():
             for subcategory in subcategories:
                 category_name_to_parent_id[subcategory] = parent_id
         logger.debug('Родительские категории для расчета  min_ctr получены')
-        wb_category_to_keywordstat_list = await data_managers.get_wb_category_to_keywordstat_list()
+        wb_category_to_keywordstat_list = await data_manager.get_wb_category_to_keywordstat_list()
         parent_category_to_keywordstat_list = {}
         for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
             parentId = category_name_to_parent_id[wb_category_name]
@@ -664,4 +664,32 @@ class Manager(AbcManager):
                                 f'для юзера {user.username}: {exc}'
                             )
                             await asyncio.sleep(1)
+            await asyncio.sleep(60*60)
+
+    async def clear_expired_data(self):
+        while True:
+            async with sm() as session:
+                expired_cabinets: list[WBCabinet] = await data_manager.get_expired_cabinets(session)
+                for wb_cabinet in expired_cabinets:
+                    adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
+                    for adv_setting in adv_settings:
+                        session.delete(adv_setting)
+                await session.commit()
+            nmids = await data_manager.get_all_nmids()
+
+
+
+
+
+            # need_nmids = []
+            # await data_manager.clear_data_for_expired_cabinets(expired_cabinets)
+            #
+            #
+            #
+            # all_nmids_in_active_cabinets = await data_manager.get_all_nmids_in_active_advs()
+            # await self._gds.clear_cards_in_neo4j(need_nmids=all_nmids_in_active_cabinets)
+            # await data_manager.clear_cards(need_nmids=all_nmids_in_active_cabinets)
+            # all_keywords = await data_manager.get_all_keywords_in_active_advs()
+            # await self._gds.clear_keywords_in_neo4j(need_keywords=all_keywords)
+            # await data_manager.clear_keywords(need_keywords=all_keywords)
             await asyncio.sleep(60*60)

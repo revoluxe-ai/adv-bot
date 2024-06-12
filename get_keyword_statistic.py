@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.wb_adv_updater.data_managers import get_keywords_statistic
+from app.modules.wb_adv_updater.data_manager import get_keywords_statistic
 from app.utils.db.session_maker import get_async_session_maker
 
 async_session_maker = get_async_session_maker

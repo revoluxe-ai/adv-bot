@@ -16,7 +16,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBUserCabinet,
 )
-from app.modules.wb_adv_updater import data_managers
+from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.suffixes import get_day_suffix
@@ -199,7 +199,7 @@ class AdvSettingMenu(TextWithKeyboard):
             self._min_ctr = round(self.adv.hard_min_ctr, 2)*100
         else:
             try:
-                self._min_ctr = await data_managers.get_min_ctr(self.adv)
+                self._min_ctr = await data_manager.get_min_ctr(self.adv)
                 if not self._min_ctr:
                     raise NoResultFound
                 self._min_ctr = round(self._min_ctr*100, 1)
@@ -207,7 +207,7 @@ class AdvSettingMenu(TextWithKeyboard):
                 self._min_ctr = 'Минимальный CTR не определен'
 
         try:
-            self._mean_ctr = await data_managers.get_mean_ctr(self.adv)
+            self._mean_ctr = await data_manager.get_mean_ctr(self.adv)
             if not self._mean_ctr:
                 raise NoResultFound
             self._mean_ctr = round(self._mean_ctr, 2) * 100
@@ -466,7 +466,7 @@ class RefProgram(TextWithKeyboard):
         super().__init__(bot, chat_id)
 
     async def __call__(self):
-        ref_statistic = await data_managers.get_ref_statistic(self._user_telegram_id)
+        ref_statistic = await data_manager.get_ref_statistic(self._user_telegram_id)
         self._ref_statistic = ref_statistic
         await super().__call__()
 
@@ -534,7 +534,7 @@ class RefProgramSelect(TextWithKeyboard):
 
 
     async def __call__(self):
-        ref_links = await data_managers.get_ref_names_and_links(self._user_telegram_id, self.bot)
+        ref_links = await data_manager.get_ref_names_and_links(self._user_telegram_id, self.bot)
         self._ref_links = ref_links
         await super().__call__()
 
@@ -706,13 +706,13 @@ class SettingMinCTR(TextWithKeyboard):
             adv = adv.scalar()
         self._adv = adv
         if not adv.hard_min_ctr:
-            self._min_ctr = await data_managers.get_min_ctr(adv)
+            self._min_ctr = await data_manager.get_min_ctr(adv)
             self._min_ctr_type = "auto"
         else:
             self._min_ctr = adv.hard_min_ctr
             self._min_ctr_type = 'direct'
 
-        keywords: list[CalculatedKeyword] = await data_managers.get_good_bad_phrases(adv)
+        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
         keywords.sort(key=lambda x: x.keyword_setting.predict_ctr, reverse=True)
         goods = []
         bads = []
@@ -757,7 +757,7 @@ class MaxCPCSetting(TextWithKeyboard):
             adv = adv.scalar()
         self._adv = adv
 
-        keywords: list[CalculatedKeyword] = await data_managers.get_good_bad_phrases(adv)
+        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
         keywords  = [kw for kw in keywords if kw.status == KeywordStatus.GOOD or kw.bad_reason == KeywordStatus.MAX_CPC]
         keywords.sort(key=lambda x: x.cpc, reverse=True)
         if not self._adv.max_cpc:

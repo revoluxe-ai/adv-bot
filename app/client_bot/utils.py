@@ -6,7 +6,7 @@ from sqlalchemy import and_, select
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import KeywordSetting, WBCategory
-from app.modules.wb_adv_updater import data_managers
+from app.modules.wb_adv_updater import data_manager
 from app.my_types import AdvSetting
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
@@ -25,7 +25,7 @@ class KeywordForKeyboard:
 
 
 async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[CalculatedKeyword]:
-    all_phrases: list[CalculatedKeyword] = await data_managers.get_good_bad_phrases(adv_setting)
+    all_phrases: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
 
     all_phrases.sort(key=lambda keyword: keyword.ctr, reverse=True)
 

@@ -23,8 +23,8 @@ from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import ItemFeature, KeywordFeature, GlobalCategorySetting
 from app.utils.db.session_maker import get_async_session_maker
 
-from . import data_managers
-from .data_managers import DataGetter
+from . import data_manager
+from .data_manager import DataGetter
 from ...exc import CardNotFoundInDB
 
 sm = get_async_session_maker
@@ -107,9 +107,9 @@ class Fitter(AbcManager):
 
         adv_ids = df['adv_id'].unique()
 
-        adv_id_keyword_text_to_status: dict[(int, 'str'), int] = await data_managers.get_adv_id_keyword_text_to_status(adv_ids)
+        adv_id_keyword_text_to_status: dict[(int, 'str'), int] = await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
 
-        adv_id_to_min_ctr: dict[int, float] = await data_managers.get_adv_id_to_min_ctr(adv_ids)
+        adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(adv_ids)
 
         def calculate_ctr(row):
             clicks = row['clicks']
@@ -188,11 +188,11 @@ class Fitter(AbcManager):
 
         for adv in adv_settings:
             try:
-                wb_category = await data_managers.get_wb_category(adv)
+                wb_category = await data_manager.get_wb_category(adv)
             except (CardNotFoundInDB, NotItemsInAdvSetting) as exc:
                 logger.debug(f"Не удалось получить категорию РК {exc}")
                 continue
-            keyword_stats = await data_managers.get_keywords_statistic(adv, None)
+            keyword_stats = await data_manager.get_keywords_statistic(adv, None)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
 
             if not adv.nmids:

@@ -12,7 +12,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
 
 from .ABC_manager import AbcManager
-from .data_managers import DataGetter
+from .data_manager import DataGetter
 from .models import ItemFeature, KeywordFeature
 
 logger = logging.getLogger(__name__)

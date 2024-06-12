@@ -16,7 +16,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCategory,
     WBUserCabinet,
 )
-from app.modules.wb_adv_updater import data_managers
+from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils import redis_manager
 from app.utils.db.models import User
@@ -72,7 +72,7 @@ async def setting_keywords_by_adv(message: types.Message,
     chat_id = message.chat.id
 
     if nmids:
-        main_photos = await data_managers.get_main_photos(nmids[:1])
+        main_photos = await data_manager.get_main_photos(nmids[:1])
     else:
         main_photos = None
     if not main_photos:
@@ -147,7 +147,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
     chat_id = callback.message.chat.id
 
     if nmids:
-        main_photos = await data_managers.get_main_photos(nmids[:1])
+        main_photos = await data_manager.get_main_photos(nmids[:1])
     else:
         main_photos = None
     if not main_photos:
@@ -232,12 +232,12 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
            keyword_setting.hard_status = new_hard_status
 
         elif new_hard_status == -1:
-            category: WBCategory = await data_managers.get_wb_category(adv_setting)
+            category: WBCategory = await data_manager.get_wb_category(adv_setting)
             smtp = select(GlobalCategorySetting.min_ctr) \
                 .where(GlobalCategorySetting.category_name == category.wb_category_name)
             min_ctr = await session.execute(smtp)
             min_ctr = min_ctr.scalar()
-            clicks, views, _ = await data_managers.get_keyword_statistic(keyword_setting)
+            clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
             if keyword_setting.added_clicks:
                 clicks += keyword_setting.added_clicks
             if keyword_setting.added_views:
