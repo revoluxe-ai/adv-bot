@@ -59,31 +59,9 @@
       "propagate": false
     },
 
-    "neo4j": {
-      "level": "WARNING",
-      "handlers": [
-        "console"
-      ],
-      "propagate": false
-    },
-    "asyncio": {
-      "level": "WARNING",
-      "handlers": [
-        "console"
-      ],
-      "propagate": false
-    },
 
-
-    "gensim.models.keyedvectors": {
-      "level": "CRITICAL",
-      "handlers": [
-        "console"
-      ],
-      "propagate": false
-    },
     "sqlalchemy.engine.Engine": {
-      "level": "WARNING",
+      "level": "DEBUG",
       "handlers": [
         "console"
       ],
