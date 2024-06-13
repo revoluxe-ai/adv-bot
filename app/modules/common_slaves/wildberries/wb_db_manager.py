@@ -36,7 +36,7 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet: WBCabinet):
                 adv_in_db.active_status = adv.status_native
                 adv_in_db.type = adv.type
                 adv_in_db.wb_cabinet = wb_cabinet
-                session.merge(adv_in_db)
+                await session.merge(adv_in_db)
             await session.commit()
     return
 
