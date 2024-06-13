@@ -172,7 +172,6 @@ class Manager(AbcManager):
                 keyword_db.text = keyword_stat.text
                 keyword_db.date = keyword_stat.date
                 keyword_db.adv_setting_id = adv_setting_original_id
-                keyword_db.keyword_setting = keyword_setting
                 keyword_db.views = keyword_stat.views
                 keyword_db.clicks = keyword_stat.clicks
                 keyword_db.spend = keyword_stat.spend
