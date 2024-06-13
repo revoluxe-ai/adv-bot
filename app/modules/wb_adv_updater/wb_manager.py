@@ -207,7 +207,8 @@ class Manager(AbcManager):
                 await self.update_keyword_stat_in_db(keyword, adv_setting.id)
             except Exception as exc:
                 logger.error(
-                    f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}'
+                    f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
+                    exc_info=True
                 )
             await asyncio.sleep(0)
         await asyncio.sleep(60*15)
