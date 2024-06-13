@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     import new
@@ -40,7 +40,7 @@ class TokensFromDifferentShopsError(BaseException):
 
 
 class ApiForbiddenError(Exception):
-   def __init__(self, text, wb_user_cabinet: 'new.types.WBUserCabinet'):
+   def __init__(self, text, wb_user_cabinet: Union['new.types.WBUserCabinet', None] = None):
        self.text = text
        self.wb_user_cabinet = wb_user_cabinet
        m = 'API доступ запрещен'

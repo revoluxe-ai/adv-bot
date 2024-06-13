@@ -103,7 +103,7 @@ async def check_token(token: WBToken):
     try:
         expire = token.expires
         if expire < datetime.datetime.now():
-            raise ApiForbiddenError
+            raise ApiForbiddenError('Токен просрочен')
         async with locker:
             checker = TokenRightChecker(token)
             await asyncio.gather(checker.adverts(), checker.content())
