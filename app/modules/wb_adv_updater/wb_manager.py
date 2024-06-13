@@ -176,7 +176,7 @@ class Manager(AbcManager):
                 keyword_db.views = keyword_stat.views
                 keyword_db.clicks = keyword_stat.clicks
                 keyword_db.spend = keyword_stat.spend
-                session.add(keyword_db)
+                await session.merge(keyword_db)
                 await session.commit()
             else:
                 if not keyword_db.keyword_setting:
