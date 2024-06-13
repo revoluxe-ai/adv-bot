@@ -315,8 +315,8 @@ class Manager(AbcManager):
                 else:
                     if update_tasks[wb_cabinet_id].done():
                         if update_tasks[wb_cabinet_id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()},'
-                                         f' {traceback.format_exc()}')
+                            logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}',
+                                         exc_info=True)
                         del update_tasks[wb_cabinet_id]
             await asyncio.sleep(60*15)
 
