@@ -1055,18 +1055,49 @@ RETURN graphName
 
         return data
 
+    async def clear_cards_in_neo4j(self, need_nmids: list[int]):
+        query = """
+    CALL apoc.periodic.iterate(
+    "MATCH (item:Item) WHERE NOT item.nmid IN $need_nmids RETURN item",
+    "DETACH DELETE item",
+    {batchSize: 100, params: {need_nmids: $need_nmids}}
+)
+        """
+        async def clear_cards(tx, query, need_nmids):
+            await tx.run(query, need_nmids=need_nmids)
 
 
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                await session.write_transaction(clear_cards, query, need_nmids)
 
+        return
 
+    async def clear_keywords_in_neo4j(self, need_keywords: list[str]):
+        query = """
+    CALL apoc.periodic.iterate(
+    "MATCH (keyword:KeywordPhrase) WHERE NOT keyword.text IN $need_keywords RETURN keyword",
+    "DETACH DELETE keyword",
+    {batchSize: 100, params: {need_keywords: $need_keywords}}
+)
+        """
+        async def clear_keywords(tx, query, need_keywords):
+            await tx.run(query, need_keywords=need_keywords)
 
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                await session.write_transaction(clear_keywords, query, need_keywords)
+        return
 
+    async def clear_dead_nodes(self):
+        query = """
+        MATCH (n) WHERE NOT EXISTS ((n)--(:KeywordPhrase))
+        AND NOT EXISTS ((n)--(:Item))
+        DETACH DELETE n 
+        """
+        async def clear_dead_nodes(tx, query):
+            await tx.run(query)
 
-
-
-
-
-
-
-
-
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                await session.write_transaction(clear_dead_nodes, query)

@@ -193,16 +193,25 @@ class AdvSetting(BaseTable):
     adv_id = Column(BIGINT(), unique=True)
     name = Column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
-    wb_cabinet: Mapped[WBCabinet] = relationship('WBCabinet', back_populates='adv_settings',
-                              lazy='joined')
-    wb_cards = relationship('WBCard', back_populates='adv_setting', uselist=True)  # Изменено на множественное число
+    wb_cabinet: Mapped[WBCabinet] = relationship('WBCabinet',
+                                                 back_populates='adv_settings',
+                                                 lazy='joined')
+    wb_cards = relationship('WBCard',
+                            back_populates='adv_setting',
+                            cascade="all,"
+                            "delete-orphan",
+                            uselist=True)  # Изменено на множественное число
     active_status = Column(String, default=False)
-    adv_keywords = relationship('AdvKeyword', back_populates='adv_setting',
+    adv_keywords = relationship('AdvKeyword',
+                                cascade="all, delete-orphan",
+                                back_populates='adv_setting',
                                 uselist=True)
     bot_active = Column(Boolean, default=False)
     nmids = Column(JSONB, default=[])
-    keyword_settings: Mapped[list['KeywordSetting']] = relationship('KeywordSetting', back_populates='adv_setting',
-                                    uselist=True)
+    keyword_settings: Mapped[list['KeywordSetting']] = relationship('KeywordSetting',
+                                                                    cascade="all, delete-orphan",
+                                                                    back_populates='adv_setting',
+                                                                    uselist=True)
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text('1'))
     type: Mapped[int] = Column(Integer, nullable=True)
@@ -225,9 +234,14 @@ class KeywordSetting(BaseTable):
 
     text = Column(String, nullable=False)
     adv_setting_id: Mapped[int] = mapped_column(ForeignKey('advsetting.id'))
-    adv_setting: Mapped[AdvSetting] = relationship('AdvSetting', back_populates='keyword_settings', uselist=False)
+    adv_setting: Mapped[AdvSetting] = relationship('AdvSetting',
+                                                   back_populates='keyword_settings',
+                                                   uselist=False)
     predict_ctr = Column(Float, nullable=True)
-    adv_keywords = relationship('AdvKeyword', back_populates='keyword_setting', uselist=True)
+    adv_keywords = relationship('AdvKeyword',
+                                back_populates='keyword_setting',
+                                cascade='all, delete-orphan',
+                                uselist=True)
     hard_status = Column(Integer, default=1)
     added_clicks = Column(Integer)
     added_views = Column(Integer)
