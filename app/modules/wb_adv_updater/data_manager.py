@@ -710,23 +710,6 @@ async def get_expired_cabinets(session):
     return wb_cabinets
 
 
-async def clear_dat(expired_cabinets: list[WBCabinet]):
-    async with _sm() as session:
-        for cabinet in expired_cabinets:
-            stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == cabinet.id)
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.unique().scalars().all()
-            nmids = []
-            keywords = []
-            for adv_setting in adv_settings:
-                nmids.extend(adv_setting.nmids)
-                stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
-                result = await session.execute(stmt)
-                keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
-                for keyword_setting in keyword_settings:
-                    keywords.append(keyword_setting.text)
-
-
 async def clear_cards_in_db(nmids: list[int]):
     async with _sm() as session:
         stmt = select(WBCard).where(WBCard.nmid.notin_(nmids))

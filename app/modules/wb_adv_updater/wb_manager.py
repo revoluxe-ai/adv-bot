@@ -675,8 +675,12 @@ class Manager(AbcManager):
                     for adv_setting in adv_settings:
                         await session.delete(adv_setting)
                         await session.commit()
+<<<<<<< HEAD
             nmids = await data_manager.get_needs_nmids()
             await data_manager.clear_cards_in_db(nmids=nmids)
+=======
+            nmids = await data_manager.get_all_nmids()
+>>>>>>> 733d4b0 (Implement data cleaner)
             await self._gds.clear_cards_in_neo4j(need_nmids=nmids)
             keywords = await data_manager.get_all_keywords()
             await self._gds.clear_keywords_in_neo4j(need_keywords=keywords)
