@@ -7,7 +7,7 @@ set_config()
 import asyncio
 import logging
 
-from app.modules.wb_adv_updater.data_managers import DataGetter
+from app.modules.wb_adv_updater.data_manager import DataGetter
 from app.utils.db.session_maker import get_async_session_maker
 
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
@@ -36,6 +36,7 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
+            self.clear_data_for_expired_wb_cabinets(),
             self.shop_subscribe_control(),
             self.demo_subscribe(),
             self.run_update_keywords_on_wb(),
@@ -150,5 +151,8 @@ class Runner:
 
     async def shop_subscribe_control(self):
         await self._manager.shop_subscribe_control()
+
+    async def clear_data_for_expired_wb_cabinets(self):
+        await self._manager.clear_expired_data()
 
 

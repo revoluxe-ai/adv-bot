@@ -673,23 +673,12 @@ class Manager(AbcManager):
                 for wb_cabinet in expired_cabinets:
                     adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
                     for adv_setting in adv_settings:
-                        session.delete(adv_setting)
-                await session.commit()
-            nmids = await data_manager.get_all_nmids()
-
-
-
-
-
-            # need_nmids = []
-            # await data_manager.clear_data_for_expired_cabinets(expired_cabinets)
-            #
-            #
-            #
-            # all_nmids_in_active_cabinets = await data_manager.get_all_nmids_in_active_advs()
-            # await self._gds.clear_cards_in_neo4j(need_nmids=all_nmids_in_active_cabinets)
-            # await data_manager.clear_cards(need_nmids=all_nmids_in_active_cabinets)
-            # all_keywords = await data_manager.get_all_keywords_in_active_advs()
-            # await self._gds.clear_keywords_in_neo4j(need_keywords=all_keywords)
-            # await data_manager.clear_keywords(need_keywords=all_keywords)
+                        await session.delete(adv_setting)
+                        await session.commit()
+            nmids = await data_manager.get_needs_nmids()
+            await data_manager.clear_cards_in_db(nmids=nmids)
+            await self._gds.clear_cards_in_neo4j(need_nmids=nmids)
+            keywords = await data_manager.get_all_keywords()
+            await self._gds.clear_keywords_in_neo4j(need_keywords=keywords)
+            await self._gds.clear_dead_nodes()
             await asyncio.sleep(60*60)
