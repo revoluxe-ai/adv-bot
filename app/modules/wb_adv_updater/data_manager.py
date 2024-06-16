@@ -659,7 +659,7 @@ async def get_min_ctr(adv: AdvSetting):
     return min_ctr
 
 
-async def get_all_nmids():
+async def get_needs_nmids():
     async with _sm() as session:
         stmt = select(AdvSetting)
         result = await session.execute(stmt)
@@ -703,25 +703,17 @@ async def clear_keywords(need_keywords):
 async def get_expired_cabinets(session):
     delete_expired_time = datetime.now() - timedelta(days=30)
     stmt = select(WBCabinet).options(
-        selectinload(WBCabinet.adv_settings).selectinload(AdvSetting.keyword_settings)
+        selectinload(WBCabinet.adv_settings)
     ).where(WBCabinet.expiration_time < delete_expired_time)
     result = await session.execute(stmt)
     wb_cabinets: list[WBCabinet] = result.unique().scalars().all()
     return wb_cabinets
 
-
-async def clear_dat(expired_cabinets: list[WBCabinet]):
+async def clear_cards_in_db(nmids: list[int]):
     async with _sm() as session:
-        for cabinet in expired_cabinets:
-            stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == cabinet.id)
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.unique().scalars().all()
-            nmids = []
-            keywords = []
-            for adv_setting in adv_settings:
-                nmids.extend(adv_setting.nmids)
-                stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
-                result = await session.execute(stmt)
-                keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
-                for keyword_setting in keyword_settings:
-                    keywords.append(keyword_setting.text)
+        stmt = select(WBCard).where(WBCard.nmid.notin_(nmids))
+        result = await session.execute(stmt)
+        wb_cards: list[WBCard] = result.unique().scalars().all()
+        await session.delete(wb_cards)
+        await session.commit()
+
