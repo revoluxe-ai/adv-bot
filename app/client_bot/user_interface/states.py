@@ -34,3 +34,7 @@ class AdvSetting(StatesGroup):
 
 class ChangeMaxCPC(StatesGroup):
     waiting_for_new_max_cpc = State()
+
+
+class ChangeMinViewsForPredictCTR(StatesGroup):
+    waiting_for_new_min_views = State()

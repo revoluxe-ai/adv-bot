@@ -7,7 +7,8 @@ from .user_interface.handlers import (adv_setting,
                                       exceptions,
                                       keyword_settings,
                                       setting_min_ctr,
-                                      change_max_cpc)
+                                      change_max_cpc,
+                                      min_views_for_ml_predict_ctr,)
 
 common_router = Router()
 
@@ -20,5 +21,6 @@ common_router.include_routers(adv_setting.router)
 common_router.include_routers(keyword_settings.router)
 common_router.include_routers(setting_min_ctr.router)
 common_router.include_routers(change_max_cpc.router)
+common_router.include_routers(min_views_for_ml_predict_ctr.router)
 
 common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())

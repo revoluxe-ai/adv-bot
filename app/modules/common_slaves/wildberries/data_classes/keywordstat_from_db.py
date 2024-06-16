@@ -6,6 +6,7 @@ from app.modules.common_slaves.wildberries.models import KeywordSetting
 
 @dataclass
 class KeywordStatus:
+    VIEWS_IS_NOT_ENOUGH = "views_is_not_enough"
     MAX_CPC = 'max_cpc'
     GOOD = 'good'
     BAD = 'bad'
@@ -20,7 +21,7 @@ class CalculatedKeyword:
     status: Union[str, None] = None
     keyword_setting: Union[KeywordSetting, None] = None
     hard_status: Union[str, None] = None
-    bad_reason: Union[str, None] = None
+    reason: Union[str, None] = None
 
     def __repr__(self):
         text = (f'text: {self.text}'

@@ -106,6 +106,13 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                       action='to_max_cpc_change_page',
                                       adv_original_id = adv_setting.id).pack())
 
+
+    button = InlineKeyboardButton(text='Изменить мин. кол-во просмотров CTR',
+                                        callback_data=callbacks.ChangeMinViewsForPredictCTR(
+                                            action='to_min_views_for_predict_ctr_change_page',
+                                            adv_original_id=adv_setting.id).pack())
+
+
     builder.row(button)
 
     if adv_setting.bot_active:
@@ -208,9 +215,11 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword], adv_setting
         clicks = keyword.clicks
         views = keyword.views
         ctr = keyword.ctr
-        if keyword.hard_status == BLACK_LIST:
+        if keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
+            hard_status = 'Мало показов'
+        elif keyword.hard_status == BLACK_LIST:
             hard_status = 'Не рел.фраза'
-        elif keyword.bad_reason == 'max_cpc':
+        elif keyword.reason == 'max_cpc':
             hard_status = 'Макс. ставка'
         elif keyword.hard_status == TURN_OFF:
             hard_status = 'Откл.'
@@ -231,7 +240,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword], adv_setting
                                                 ).pack())]
         bottoms.append(inline_keyboard)
 
-    if   return_from_filter_bottom:
+    if return_from_filter_bottom:
         bottom = [InlineKeyboardButton(text='Сбросить фильтр',
                                          callback_data=callbacks.SettingKeywords(
                                              adv_original_id=adv_setting.id,
@@ -446,12 +455,20 @@ def get_setting_max_cpc_keyboard(adv: AdvSetting):
     adv_original_id = adv.id
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text='Назад',
-                                             callback_data=callbacks.ChangeMaxCPC(
-                                                 action = 'return',
+                                             callback_data=callbacks.Adv(
                                                  adv_original_id=adv_original_id).pack()))
 
     builder.row(InlineKeyboardButton(text='Отключить максимальную ставку',
                                                 callback_data=callbacks.ChangeMaxCPC(
                                                     action = 'turn_off_max_cpc',
                                                     adv_original_id=adv_original_id).pack()))
+    return builder.as_markup()
+
+
+def get_setting_min_views_for_predict_ctr_keyboard(adv: AdvSetting):
+    adv_original_id = adv.id
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text='Назад',
+                                    callback_data=callbacks.Adv(
+                                    adv_original_id=adv_original_id).pack()))
     return builder.as_markup()

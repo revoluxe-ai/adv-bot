@@ -231,6 +231,7 @@ class AdvSettingMenu(TextWithKeyboard):
                 f'Статус: {self.adv.active_status}\n'
                 f'Минимальный CTR для кампании: {self._min_ctr} %\n'
                 f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n'
+                f'Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n'
                 )
         text += f'{max_cpc_text}'
         return text
@@ -758,7 +759,7 @@ class MaxCPCSetting(TextWithKeyboard):
         self._adv = adv
 
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
-        keywords  = [kw for kw in keywords if kw.status == KeywordStatus.GOOD or kw.bad_reason == KeywordStatus.MAX_CPC]
+        keywords  = [kw for kw in keywords if kw.status == KeywordStatus.GOOD or kw.reason == KeywordStatus.MAX_CPC]
         keywords.sort(key=lambda x: x.cpc, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
@@ -793,3 +794,36 @@ class MaxCPCSetting(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_setting_max_cpc_keyboard(self._adv)
+
+
+class SettingMinViewsForPredictCTR(TextWithKeyboard):
+        async def __call__(self, adv_original_id):
+            async with _sm() as session:
+                adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+                adv = adv.scalar()
+            self._adv = adv
+            await super().__call__()
+
+        @property
+        def text(self):
+            return (f'Введите минимальное количество показов для прогноза CTR роботом для кампании {self._adv.name}.\n'
+                    f'Текущее значение: {self._adv.min_views_for_ml_predict}.\n')
+
+
+        @property
+        def keyboard(self):
+            return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
+
+
+class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id, adv: AdvSetting):
+        super().__init__(bot, chat_id)
+        self._adv = adv
+
+
+    text = 'Минимальное количество показов должно быть целым числом от 0 и больше. Попробуйте снова:'
+
+    @property
+    def keyboard(self):
+        return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)

@@ -217,6 +217,7 @@ class AdvSetting(BaseTable):
     type: Mapped[int] = Column(Integer, nullable=True)
     hard_min_ctr = Column(Float, nullable=True)
     max_cpc = Column(Float, nullable=True)
+    min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text('0'))
 
 
 
