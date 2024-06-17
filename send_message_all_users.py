@@ -28,15 +28,14 @@ async def send_message_to_users():
         print('Всего пользователей для отправки сообщений: ', len(users))
         for user in users:
             user_id =  user.user_telegram_id
-            message = messages.Single_message14
+            message = messages.Single_message23
             hash = sha256((str(message)) \
                           .encode()).hexdigest()
             if await redis_manager.check_message_send(hash, user_id):
-                send_count += 1
                 continue
 
             try:
-                # if user.user_telegram_id not in [373435337, 1058013578, 352225040]:
+                # if user.user_telegram_id not in [373435337]:
                 #     continue
                 await message(bot, user_id)()
                 await redis_manager.set_message_send(hash, user_id)
