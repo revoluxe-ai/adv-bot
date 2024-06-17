@@ -675,10 +675,10 @@ class Manager(AbcManager):
                     for adv_setting in adv_settings:
                         await session.delete(adv_setting)
                         await session.commit()
-            nmids = await data_manager.get_needs_nmids()
+            nmids = list(set(await data_manager.get_needs_nmids()))
             await data_manager.clear_cards_in_db(nmids=nmids)
             await self._gds.clear_cards_in_neo4j(need_nmids=nmids)
-            keywords = await data_manager.get_all_keywords()
+            keywords = list(set(await data_manager.get_all_keywords()))
             await self._gds.clear_keywords_in_neo4j(need_keywords=keywords)
             await self._gds.clear_dead_nodes()
             await asyncio.sleep(60*60)

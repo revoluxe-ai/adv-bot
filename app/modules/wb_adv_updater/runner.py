@@ -156,6 +156,10 @@ class Runner:
         await self._manager.shop_subscribe_control()
 
     async def clear_data_for_expired_wb_cabinets(self):
-        await self._manager.clear_expired_data()
-
+        while True:
+            try:
+                await self._manager.clear_expired_data()
+            except Exception as e:
+                logger.error(f'Ошибка очистки данных для просроченных кабинетов {e}', exc_info=True)
+                await asyncio.sleep(0)
 

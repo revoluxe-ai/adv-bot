@@ -725,5 +725,8 @@ async def clear_cards_in_db(nmids: list[int]):
         stmt = select(WBCard).where(WBCard.nmid.notin_(nmids))
         result = await session.execute(stmt)
         wb_cards: list[WBCard] = result.unique().scalars().all()
-        await session.delete(wb_cards)
-        await session.commit()
+        for card in wb_cards:
+             await session.delete(card)
+             await session.commit()
+             await asyncio.sleep(0)
+
