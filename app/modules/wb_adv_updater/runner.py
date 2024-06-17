@@ -139,9 +139,12 @@ class Runner:
             await asyncio.sleep(60)
 
     async def update_all_data_in_db(self):
-        await self._manager.update_all_data_in_db_run()
-
-
+        while True:
+            try:
+                await self._manager.update_all_data_in_db_run()
+            except Exception as exc:
+                logger.error(f'Ошибка обновления данных в базе {exc}', exc_info=True)
+                await asyncio.sleep(0)
 
 
     async def demo_subscribe(self):
