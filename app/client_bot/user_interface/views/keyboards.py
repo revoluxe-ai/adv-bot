@@ -438,8 +438,7 @@ def get_payment_keyboard(price_for_month: int, period_days, bonus_days: int, wb_
 def get_setting_min_ctr_keyboard(adv: AdvSetting):
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text='Назад',
-                                             callback_data=callbacks.ChangeMinCTR(
-                                                 action = 'return',
+                                             callback_data=callbacks.Adv(
                                                  adv_original_id=adv.id).pack()))
     if adv.hard_min_ctr:
         button = InlineKeyboardButton(text=f'Включить автоматическое управление CTR',
