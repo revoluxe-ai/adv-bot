@@ -60,7 +60,7 @@ async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet):
                 db_card.json = json.dumps(card.data)
                 db_card.wb_cabinet = wb_cabinet
                 db_card.nmid = card.nmid
-                session.add(db_card)
+                session.merge(db_card)
                 stmt = select(my_types.WBCategory) \
                     .where(my_types.WBCategory.wb_category_name == card.wb_category_name)
                 result = await session.execute(stmt)
@@ -69,6 +69,6 @@ async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet):
                     category = my_types.WBCategory()
                     category.wb_category_name = card.wb_category_name
                     category.wb_cabinet = wb_cabinet
-                    session.add(category)
+                    session.merge(category)
                 db_card.wb_category = category
             await session.commit()
