@@ -201,12 +201,14 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet:  WBUserCabinet):
     return keyboard
 
 
-def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword], adv_setting: AdvSetting,
+def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
+                                  adv_setting: AdvSetting,
                                   adv_choice_last_page,
                                   wb_user_cabinet_original_id: int,
                                    page,
-                                  return_from_filter_bottom: bool):
-    on_page = 12
+                                  return_from_filter_bottom: bool,
+                                  on_page):
+
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
 

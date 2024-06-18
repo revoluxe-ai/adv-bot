@@ -344,6 +344,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._adv_choice_last_page = adv_choice_last_page
         self._image = image
         self._filter: bool = False
+        self._on_page = 12
+
 
     async def __call__(self, state: FSMContext):
         self._state = state
@@ -363,6 +365,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
     @property
     def text(self):
+
+        total_page = len(self._keywords) // self._on_page
+
         text = (
                  'Название кампании: ' + str(self._adv_setting.name) + '\n'
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
@@ -372,8 +377,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  '❌  - ключевое слово не активно \n'
                  ' БС - ключевое слово в белом списке \n'
                  'ЧС   - ключевое слово в черном списке \n'
-                 'Авто  - ключевое слово на автоуправлении \n'
+                 'Авто  - ключевое слово на автоуправлении \n'                                                   
                  'Информация перед ключевым словом: клики/показы/CTR \n'
+                 f'Cтраница: {self._page}/{total_page}\n'
         )
         return text
 
@@ -391,7 +397,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                        self._adv_choice_last_page,
                                                        self._wb_user_cabinet_original_id,
                                                        self._page,
-                                                       self._filter)
+                                                       self._filter,
+                                                       self._on_page)
 
 
 class KeywordSettingMessage(TextWithKeyboard):
@@ -622,6 +629,7 @@ class OrderSubscribe(Text):
 
 class NoMainPhotos(Text):
 
+
     def __init__(self,
                  bot: Bot,
                  chat_id,
@@ -636,6 +644,7 @@ class NoMainPhotos(Text):
         self._page = page
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._adv_choice_last_page = adv_choice_last_page
+        self._on_page = 12
 
     @property
     def text(self):
@@ -660,7 +669,7 @@ class NoMainPhotos(Text):
         return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
                                                        self._adv_choice_last_page,
                                                        self._wb_user_cabinet_original_id,
-                                                       self._page)
+                                                       self._page, self._on_page)
 
 
 class ExpiredSubscription(TextWithKeyboard):
