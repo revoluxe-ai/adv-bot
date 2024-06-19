@@ -111,6 +111,10 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 
 @router.message(StateFilter(states.CabinetRegistration.api))
 async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMContext):
+    text = message.text
+    if '/start' in text:
+        await start_registration(message, bot, state)
+        return
     api = message.text
     api = api.strip()
     user_telegram_id = message.from_user.id
