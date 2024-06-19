@@ -43,32 +43,33 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet: WBCabinet):
 
 
 async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet):
-    async with _sm() as session:
+    async with _sm() as session:  # Assuming _sm() is a function that returns an AsyncSession
         for card in cards:
             stmt = select(my_types.WBCard).where(my_types.WBCard.nmid == card.nmid)
             result = await session.execute(stmt)
-            existing_card = result.scalars().first()
+            existing_card: my_types.WBCard = result.scalars().first()
             if existing_card:
                 # Если карточка уже существует, обновляем ее
                 existing_card.json = json.dumps(card.data)
+                existing_card.name = card.name
             else:
                 # Если карточка новая, добавляем ее в список для последующего добавления в базу
                 db_card = my_types.WBCard()
-                db_card.offer_id = card.offer_id
-                db_card.name = card.name
-                db_card.wb_category_name = card.wb_category_name
-                db_card.json = json.dumps(card.data)
-                db_card.wb_cabinet = wb_cabinet
                 db_card.nmid = card.nmid
-                session.merge(db_card)
-                stmt = select(my_types.WBCategory) \
-                    .where(my_types.WBCategory.wb_category_name == card.wb_category_name)
+                db_card.name = card.name
+                db_card.json = json.dumps(card.data)
+                session.add(db_card)  # Используем add вместо merge
+                # Проверяем существование категории и добавляем ее, если необходимо
+                stmt = select(my_types.WBCategory).where(my_types.WBCategory.wb_category_name == card.wb_category_name)
                 result = await session.execute(stmt)
                 category = result.scalars().first()
                 if not category:
-                    category = my_types.WBCategory()
-                    category.wb_category_name = card.wb_category_name
-                    category.wb_cabinet = wb_cabinet
-                    session.merge(category)
+                    category = my_types.WBCategory(
+                        wb_category_name=card.wb_category_name,
+                        wb_cabinet=wb_cabinet
+                    )
+                    session.add(category)
+
                 db_card.wb_category = category
+
             await session.commit()
