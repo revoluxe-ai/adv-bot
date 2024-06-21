@@ -107,3 +107,7 @@ class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
 
 class ChangeMinViewsForPredictCTR(CallbackData, prefix="change_min_views_for_predict_ctr"):
     pass
+
+
+class AddBalance(CallbackData, prefix="add_balance"):
+    wb_cabinet_original_id: int

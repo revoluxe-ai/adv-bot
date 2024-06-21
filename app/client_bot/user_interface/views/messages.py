@@ -587,10 +587,11 @@ class ShopMenu(TextWithKeyboard):
 
     @property
     def text(self):
-
+        balance = self._wb_cabinet.balance if self._wb_cabinet.balance else 0
         text = (
             f'Магазин: {self._wb_user_cabinet.name}\n'
             f'Shop ID: {self._wb_cabinet.shop_id}\n'
+            f'Баланс магазина: {balance} рублей\n'
         )
 
         if self._wb_cabinet.demo and self._expiration_time> self._now:
@@ -836,3 +837,18 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
+
+
+
+
+class WaitingForAmount(Text):
+    text = 'Введите сумму платежа (от 100 рублей):'
+
+
+class BalanceUpdated(Text):
+    def __init__(self, bot: Bot, chat_id, added_balance: float):
+        super().__init__(bot, chat_id)
+        self.__balance = added_balance
+    @property
+    def text(self):
+        return f'Баланс успешно пополнен на {self.__balance} рублей'

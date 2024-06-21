@@ -412,6 +412,13 @@ def get_shop_menu_keyboard(
         builder.row(button)
 
     button = InlineKeyboardButton(
+        text='Пополнить баланс',
+        callback_data=callbacks.AddBalance(wb_cabinet_original_id=wb_cabinet_original_id).pack(),
+    )
+
+    builder.row(button)
+
+    button = InlineKeyboardButton(
         text='Вернуться к списку магазинов',
         callback_data=callbacks.Start().pack(),
     )

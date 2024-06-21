@@ -58,6 +58,7 @@ class WBCabinet(BaseTable):
     expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
+    balance = Column(Float, server_default=text('0'))
 
 
 
@@ -188,8 +189,6 @@ class WBCard(BaseTable): # Изменено название таблицы
 class AdvSetting(BaseTable):
     def __repr__(self):
         return f'name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}'
-
-
     adv_id = Column(BIGINT(), unique=True)
     name = Column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
@@ -218,6 +217,8 @@ class AdvSetting(BaseTable):
     hard_min_ctr = Column(Float, nullable=True)
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text('0'))
+    payments = relationship('AdvPayment', back_populates='adv_setting', uselist=True)
+
 
 
 
