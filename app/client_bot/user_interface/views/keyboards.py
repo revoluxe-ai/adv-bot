@@ -106,6 +106,7 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                       action='to_max_cpc_change_page',
                                       adv_original_id = adv_setting.id).pack())
 
+    builder.row(button)
 
     button = InlineKeyboardButton(text='Изменить мин. кол-во просмотров CTR',
                                         callback_data=callbacks.ChangeMinViewsForPredictCTR(
