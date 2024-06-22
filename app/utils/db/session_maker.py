@@ -44,7 +44,7 @@ async def get_async_session_maker() -> AsyncSession:
             async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
             engine = create_async_engine(
                 async_db_connector,
-                echo=False,
+                echo=True,
                 pool_size=pool_size,
                 max_overflow=max_overflow,
             )
