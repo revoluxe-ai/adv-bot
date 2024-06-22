@@ -36,7 +36,7 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
-            self.clear_data_for_expired_wb_cabinets(),
+            # self.clear_data_for_expired_wb_cabinets(),
             self.shop_subscribe_control(),
             self.demo_subscribe(),
             self.run_update_keywords_on_wb(),
