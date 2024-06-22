@@ -383,4 +383,4 @@ class WBApi:
     def __init__(self, wb_access: WBCabinetAccess):
         self.advert = AdvertApi(wb_access)
         self.content = ContentApi(wb_access)
-        self._wb_access = wb_access
+        self.wb_access = wb_access
