@@ -13,9 +13,10 @@ sm = get_async_session_maker
 
 
 
-shop_id = '45c8c933-d7b2-4ef2-bcd3-1a6a7f1155d1'.strip()
+shop_id = '3cc7270d-232b-4f5d-9cbb-978b6f6e4470'.strip()
 
-period = 33
+period = 38
+
 
 
 async def set_period_for_shop(shop_id: str, period: int):
@@ -28,7 +29,7 @@ async def set_period_for_shop(shop_id: str, period: int):
           if expiration_time < datetime.datetime.now():
                expiration_time = datetime.datetime.now()
           wb_cabinet.expiration_time = expiration_time + timedelta(days=period)
-          wb_cabinet.demo = False
+          wb_cabinet.demo = True
           wb_cabinet.active = True
           await session.commit()
 

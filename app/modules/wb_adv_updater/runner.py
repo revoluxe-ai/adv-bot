@@ -1,3 +1,4 @@
+import datetime
 
 from app.utils.redis_func_cache import set_config
 
@@ -37,6 +38,7 @@ class Runner:
 
         await asyncio.gather(
             # self.clear_data_for_expired_wb_cabinets(),
+            self.process_payment_for_advs(),
             self.shop_subscribe_control(),
             self.demo_subscribe(),
             self.run_update_keywords_on_wb(),
@@ -163,3 +165,12 @@ class Runner:
                 logger.error(f'Ошибка очистки данных для просроченных кабинетов {e}', exc_info=True)
                 await asyncio.sleep(0)
 
+    async def process_payment_for_advs(self):
+        while True:
+            hours = datetime.datetime.now().hour
+            if 12 < hours < 18:
+                try:
+                    await self._manager.process_payment_for_advs()
+                except Exception as e:
+                    logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
+            await asyncio.sleep(60*60)

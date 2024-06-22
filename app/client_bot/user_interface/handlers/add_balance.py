@@ -111,6 +111,29 @@ async def pre_checkout_query_handler(pre_checkout_query: types.PreCheckoutQuery,
 async def successful_payment_handler(message: types.Message, state: FSMContext, bot: aiogram.Bot):
     successful_payment = message.successful_payment
     cost = successful_payment.total_amount / 100
+    """
+    Бонусы за пополнение:\n\n
+        - oт 3 000 р. + 10 %\n
+        - oт 5 000 р. + 15 % \n
+        - oт 10 000 р. + 50 %\n
+        - oт 30 000 р. + 80 %\n
+        - oт 50 000 р. + 100 %\n\n
+        Введите сумму пополнения (от 100 р.)\n
+    
+    """
+    if cost >= 3000:
+        bonus = cost * 0.1
+    elif cost >= 5000:
+        bonus = cost * 0.15
+    elif cost >= 10000:
+        bonus = cost * 0.5
+    elif cost >= 30000:
+        bonus = cost * 0.8
+    elif cost >= 50000:
+        bonus = cost
+    else:
+        bonus = 0
+
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
 
@@ -121,10 +144,12 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
             wb_cabinet = wb_cabinet.scalars().first()
             if wb_cabinet.balance is None:
                 wb_cabinet.balance = 0
+            if wb_cabinet.bonus is None:
+                wb_cabinet.bonus = 0
             wb_cabinet.balance += cost
+            wb_cabinet.bonus += bonus
             await session.commit()
-    user_telegram_id = message.chat.id
-    await messages.BalanceUpdated(bot, message.chat.id, cost)()
+    await messages.BalanceUpdated(bot, message.chat.id, cost, bonus)()
     async with sm() as session:
         stmt = select(WBUserCabinet.id)\
         .join(WBUserCabinet.wb_cabinet)\
@@ -133,5 +158,4 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
         wb_user_cabinet_id = wb_user_cabinet_id.scalars().first()
     logger.debug(f'wb_user_cabinet_id: {wb_user_cabinet_id}')
     await asyncio.sleep(1)
-    await sender_manager.send_message_to_admin(f'wb_user_cabinet_id: {wb_user_cabinet_id}', off = False)
     await messages.ShopMenu(bot, message.chat.id, state, wb_user_cabinet_id)()

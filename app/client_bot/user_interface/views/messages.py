@@ -566,6 +566,21 @@ class ShopMenu(TextWithKeyboard):
        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
        super().__init__(bot, chat_id)
 
+
+    async def _is_active_adv(self):
+        async with _sm() as session:
+            stmt = select(AdvSetting)\
+                .where(
+                AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
+                AdvSetting.bot_active == True
+            )
+            result = await session.execute(stmt)
+            adv = result.scalar_one_or_none()
+        if adv:
+            return True
+        else:
+            return False
+
     async def __call__(self):
         async with _sm() as session:
             stmt = select(WBUserCabinet)\
@@ -583,6 +598,7 @@ class ShopMenu(TextWithKeyboard):
             last_wb_user_cabinet_original_id=self._wb_user_cabinet.id,
             last_wb_cabinet_original_id=self._wb_cabinet.id,
         )
+        self.is_active_adv = await self._is_active_adv()
         await super().__call__()
 
     @property
@@ -594,22 +610,16 @@ class ShopMenu(TextWithKeyboard):
             f'Баланс магазина: {balance} рублей\n'
         )
 
-        if self._wb_cabinet.demo and self._expiration_time> self._now:
-            text += ('Для этого магазина включен демо-режим. Вам доступны все опции и сервисы до '
-                         f"""{self._expiration_time_str} \n"""
-                     "После этого дальнейшее использование бота для данного магазина станет платным. \n"
-                     f'Стоимость месячной подписки составляет {const.PRICE_PER_MONTH} рублей для одного магазина.\n'
-                     'После оплаты услуга считается оказанной, возврат средств не производится. '
-                     'Если вы оплатите подписку до конца демо-периода, то мы компенсируем оставшееся'
-                     f' время демо-периода в двойном размере ( итого + {get_day_suffix(self.bonus_days)}) ')
-        elif not self._wb_cabinet.demo and self._expiration_time > self._now:
+        if self._expiration_time > self._now:
             text += (f'Тариф магазина оплачен до  {self._expiration_time_str}\n'
-                     f'Стоимость месячной подписки составляет {const.PRICE_PER_MONTH} рублей для одного магазина.\n'
-                     'После оплаты услуга считается оказанной, возврат средств не производится. ')
+                     f'для доступа далее необходимо будет пополнить баланс')
 
 
-        elif self._expiration_time < self._now:
-            text += 'Тариф магазина не оплачен\n'
+        elif self._wb_cabinet.balance < 0:
+            text += (f'Доступ в магазин заблокирован из-за отрицательного баланса\n')
+            if self.is_active_adv:
+                text += 'Есть кампании, которым бот подключен'
+
 
         return text
 
@@ -618,8 +628,7 @@ class ShopMenu(TextWithKeyboard):
         return keyboards.get_shop_menu_keyboard(
             self._wb_user_cabinet,
             self._wb_cabinet.id,
-            price_for_month=const.PRICE_PER_MONTH,
-            bonus_days=self.bonus_days,
+            self.is_active_adv
         )
 
 
@@ -689,16 +698,14 @@ class ExpiredSubscription(TextWithKeyboard):
     @property
     def text(self):
         return (
-            f'Подписка на этот магазин истекла.'
-            f' Для продолжения работы с магазином оплатите подписку.'
+            """
+            У вас отрицательный баланс. Пополните баланс для продолжения работы бота.
+            """
         )
 
     @property
     def keyboard(self):
         return keyboards.get_payment_keyboard(
-            self._wb_cabinet.id,
-            period_days=30,
-            bonus_days=0,
             wb_cabinet_original_id=self._wb_cabinet.id,
         )
 
@@ -825,6 +832,11 @@ class SettingMinViewsForPredictCTR(TextWithKeyboard):
             return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
 
 
+class NotItemsInAdvSetting(TextWithKeyboard):
+    text = "Не смогли получить информацию о товарах в кампании через API. Вы можете указать артикул товара (цифровой артикул WB) в названии РК в кабинете Wildberries, либо ввести артикул прямо сейчас:"
+
+    # keyword = keyboards.get_return_to_adv_setting_keyboard()
+
 class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
 
     def __init__(self, bot: Bot, chat_id, adv: AdvSetting):
@@ -842,13 +854,28 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
 
 
 class WaitingForAmount(Text):
-    text = 'Введите сумму платежа (от 100 рублей):'
+
+    @property
+    def text(self):
+
+        text = """Минимальная сумма пополнения - 100 рублей\n
+        Бонусы за пополнение:\n
+        - oт 3 000 р. + 10 %\n
+        - oт 5 000 р. + 15 % \n
+        - oт 10 000 р. + 50 %\n
+        - oт 30 000 р. + 80 %\n
+        - oт 50 000 р. + 100 %\n\n
+        Введите сумму пополнения (от 100 р.)\n
+        
+        """
+        return text
 
 
 class BalanceUpdated(Text):
-    def __init__(self, bot: Bot, chat_id, added_balance: float):
+    def __init__(self, bot: Bot, chat_id, added_balance: float, bonus: float):
         super().__init__(bot, chat_id)
         self.__balance = added_balance
+        self.__bonus = bonus
     @property
     def text(self):
-        return f'Баланс успешно пополнен на {self.__balance} рублей'
+        return f'Баланс успешно пополнен на {self.__balance} рублей + бонус {self.__bonus} рублей'

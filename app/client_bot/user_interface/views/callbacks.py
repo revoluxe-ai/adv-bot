@@ -34,9 +34,10 @@ class Adv(CallbackData, prefix="adv"):
     wb_user_cabinet_original_id: Optional[int] = None
 
 
-class TurnAdv(CallbackData, prefix="turn_adv"):
+
+class TurnBot(CallbackData, prefix="turn_bot"):
     action: str
-    adv_original_id: int
+    adv_original_id: Optional[int] = None
     wb_user_cabinet_original_id: int
 
 

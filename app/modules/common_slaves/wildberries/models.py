@@ -23,6 +23,7 @@ from sqlalchemy.schema import UniqueConstraint
 from app.utils.db.base import BaseTable
 
 from . import exceptions
+from ...wb_adv_updater.models import AdvPayment
 
 if TYPE_CHECKING:
     from app.utils.db.models import User
@@ -59,6 +60,7 @@ class WBCabinet(BaseTable):
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
     balance = Column(Float, server_default=text('0'))
+    bonus = Column(Float, default=0)
 
 
 
@@ -217,7 +219,7 @@ class AdvSetting(BaseTable):
     hard_min_ctr = Column(Float, nullable=True)
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text('0'))
-    payments = relationship('AdvPayment', back_populates='adv_setting', uselist=True)
+    payments = relationship(AdvPayment, back_populates='adv_setting', uselist=True)
 
 
 
