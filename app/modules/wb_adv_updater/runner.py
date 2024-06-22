@@ -139,9 +139,12 @@ class Runner:
             await asyncio.sleep(60)
 
     async def update_all_data_in_db(self):
-        await self._manager.update_all_data_in_db_run()
-
-
+        while True:
+            try:
+                await self._manager.update_all_data_in_db_run()
+            except Exception as exc:
+                logger.error(f'Ошибка обновления данных в базе {exc}', exc_info=True)
+                await asyncio.sleep(0)
 
 
     async def demo_subscribe(self):
@@ -153,6 +156,10 @@ class Runner:
         await self._manager.shop_subscribe_control()
 
     async def clear_data_for_expired_wb_cabinets(self):
-        await self._manager.clear_expired_data()
-
+        while True:
+            try:
+                await self._manager.clear_expired_data()
+            except Exception as e:
+                logger.error(f'Ошибка очистки данных для просроченных кабинетов {e}', exc_info=True)
+                await asyncio.sleep(0)
 

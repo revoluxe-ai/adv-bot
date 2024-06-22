@@ -1075,12 +1075,13 @@ RETURN graphName
 
     async def clear_keywords_in_neo4j(self, need_keywords: list[str]):
         query = """
-    CALL apoc.periodic.iterate(
-    "MATCH (keyword:KeywordPhrase) WHERE NOT keyword.text IN $need_keywords RETURN keyword",
-    "DETACH DELETE keyword",
-    {batchSize: 100, params: {need_keywords: $need_keywords}}
-)
+        CALL apoc.periodic.iterate(
+            "MATCH (keyword:KeywordPhrase) WHERE NOT keyword.text IN $need_keywords RETURN keyword",
+            "DETACH DELETE keyword",
+            {batchSize: 100, params: {need_keywords: $need_keywords}}
+        )
         """
+
         async def clear_keywords(tx, query, need_keywords):
             await tx.run(query, need_keywords=need_keywords)
 

@@ -231,6 +231,7 @@ class AdvSettingMenu(TextWithKeyboard):
                 f'Статус: {self.adv.active_status}\n'
                 f'Минимальный CTR для кампании: {self._min_ctr} %\n'
                 f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n'
+                f'Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n'
                 )
         text += f'{max_cpc_text}'
         return text
@@ -343,6 +344,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._adv_choice_last_page = adv_choice_last_page
         self._image = image
         self._filter: bool = False
+        self._on_page = 12
+
 
     async def __call__(self, state: FSMContext):
         self._state = state
@@ -362,6 +365,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
     @property
     def text(self):
+
+        total_page = len(self._keywords) // self._on_page
+
         text = (
                  'Название кампании: ' + str(self._adv_setting.name) + '\n'
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
@@ -371,8 +377,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  '❌  - ключевое слово не активно \n'
                  ' БС - ключевое слово в белом списке \n'
                  'ЧС   - ключевое слово в черном списке \n'
-                 'Авто  - ключевое слово на автоуправлении \n'
+                 'Авто  - ключевое слово на автоуправлении \n'                                                   
                  'Информация перед ключевым словом: клики/показы/CTR \n'
+                 f'Cтраница: {self._page}/{total_page}\n'
         )
         return text
 
@@ -390,7 +397,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                        self._adv_choice_last_page,
                                                        self._wb_user_cabinet_original_id,
                                                        self._page,
-                                                       self._filter)
+                                                       self._filter,
+                                                       self._on_page)
 
 
 class KeywordSettingMessage(TextWithKeyboard):
@@ -621,6 +629,7 @@ class OrderSubscribe(Text):
 
 class NoMainPhotos(Text):
 
+
     def __init__(self,
                  bot: Bot,
                  chat_id,
@@ -635,6 +644,7 @@ class NoMainPhotos(Text):
         self._page = page
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._adv_choice_last_page = adv_choice_last_page
+        self._on_page = 12
 
     @property
     def text(self):
@@ -659,7 +669,7 @@ class NoMainPhotos(Text):
         return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
                                                        self._adv_choice_last_page,
                                                        self._wb_user_cabinet_original_id,
-                                                       self._page)
+                                                       self._page, self._on_page)
 
 
 class ExpiredSubscription(TextWithKeyboard):
@@ -758,7 +768,7 @@ class MaxCPCSetting(TextWithKeyboard):
         self._adv = adv
 
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
-        keywords  = [kw for kw in keywords if kw.status == KeywordStatus.GOOD or kw.bad_reason == KeywordStatus.MAX_CPC]
+        keywords  = [kw for kw in keywords if kw.status == KeywordStatus.GOOD or kw.reason == KeywordStatus.MAX_CPC]
         keywords.sort(key=lambda x: x.cpc, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
@@ -793,3 +803,36 @@ class MaxCPCSetting(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_setting_max_cpc_keyboard(self._adv)
+
+
+class SettingMinViewsForPredictCTR(TextWithKeyboard):
+        async def __call__(self, adv_original_id):
+            async with _sm() as session:
+                adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+                adv = adv.scalar()
+            self._adv = adv
+            await super().__call__()
+
+        @property
+        def text(self):
+            return (f'Введите минимальное количество показов для прогноза CTR роботом для кампании {self._adv.name}.\n'
+                    f'Текущее значение: {self._adv.min_views_for_ml_predict}.\n')
+
+
+        @property
+        def keyboard(self):
+            return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
+
+
+class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id, adv: AdvSetting):
+        super().__init__(bot, chat_id)
+        self._adv = adv
+
+
+    text = 'Минимальное количество показов должно быть целым числом от 0 и больше. Попробуйте снова:'
+
+    @property
+    def keyboard(self):
+        return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)

@@ -61,8 +61,13 @@ async def get_keywords_statistic(adv_setting: AdvSetting,
                                  hard_statuses: list[int] = None,
                                  cache_timeout = 60*15
                                  ) -> list[CalculatedKeyword]:
+    keyword_stats = None
+    try:
+        keyword_stats = await redis_manager.get_keyword_statistics(adv_setting, pass_time = pass_time)
+    except Exception:
+        logger.error(f'Ошибка при получении статистики ключевых слов из кэша\n',
+                     exc_info=True)
 
-    keyword_stats = await redis_manager.get_keyword_statistics(adv_setting, pass_time = pass_time)
     if keyword_stats:
         return keyword_stats
 
@@ -253,7 +258,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             if adv_setting.max_cpc:
                 if keyword_stat.cpc > adv_setting.max_cpc:
                     keyword_stat.status = 'bad'
-                    keyword_stat.bad_reason = 'max_cpc'
+                    keyword_stat.reason = 'max_cpc'
                     await redis_manager.set_auto_block_status(keyword_setting.id, False)
                     continue
 
@@ -261,7 +266,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             predict_ctr *= boost
             if keyword_setting.hard_status == 3:
                 keyword_stat.status = KeywordStatus.BAD
-                keyword_stat.bad_reason = 'turn_off'
+                keyword_stat.reason = 'turn_off'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             if keyword_setting.hard_status == 2:
@@ -271,7 +276,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                continue
             elif keyword_setting.hard_status == 0:
                 keyword_stat.status = KeywordStatus.BAD
-                keyword_stat.bad_reason = 'black_list'
+                keyword_stat.reason = 'black_list'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
             if min_ctr == 0:
@@ -282,25 +287,30 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                 max_cpc = adv_setting.max_cpc
                 if keyword_stat.cpc > max_cpc:
                     keyword_stat.status = KeywordStatus.BAD
-                    keyword_stat.bad_reason = KeywordStatus.MAX_CPC
+                    keyword_stat.reason = KeywordStatus.MAX_CPC
                     await redis_manager.set_auto_block_status(keyword_setting.id, True)
                     continue
             if predict_ctr >= min_ctr:
                 keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
-                keyword_stat.status = KeywordStatus.BAD
-                keyword_stat.bad_reason = 'min_ctr'
-                await redis_manager.set_auto_block_status(keyword_setting.id, True)
+                if keyword_stat.views < adv_setting.min_views_for_ml_predict:
+                    keyword_stat.status = KeywordStatus.GOOD
+                    keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
+                    await redis_manager.set_auto_block_status(keyword_setting.id, True)
+                else:
+                    keyword_stat.status = KeywordStatus.BAD
+                    keyword_stat.reason = 'min_ctr'
+                    await redis_manager.set_auto_block_status(keyword_setting.id, True)
 
     for keyword_stat in keyword_stats:
         assert keyword_stat.status
         assert keyword_stat.status in ['good', 'bad']
-        if keyword_stat.status == 'bad':
-            assert keyword_stat.bad_reason
-            assert keyword_stat.bad_reason in ['max_cpc', 'turn_off', 'black_list', 'min_ctr']
-        else:
-            assert not keyword_stat.bad_reason
+        # assert keyword_stat.reason in ['max_cpc',
+        #                                'turn_off',
+        #                                'black_list',
+        #                                'min_ctr',
+        #                                KeywordStatus.VIEWS_IS_NOT_ENOUGH]
 
     return keyword_stats
 
@@ -714,6 +724,8 @@ async def clear_cards_in_db(nmids: list[int]):
         stmt = select(WBCard).where(WBCard.nmid.notin_(nmids))
         result = await session.execute(stmt)
         wb_cards: list[WBCard] = result.unique().scalars().all()
-        await session.delete(wb_cards)
-        await session.commit()
+        for card in wb_cards:
+             await session.delete(card)
+             await session.commit()
+             await asyncio.sleep(0)
 
