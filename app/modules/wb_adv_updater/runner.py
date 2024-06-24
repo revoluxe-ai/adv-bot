@@ -36,17 +36,17 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
-            self.clear_data_for_expired_wb_cabinets(),
-            self.shop_subscribe_control(),
-            self.demo_subscribe(),
-            self.run_update_keywords_on_wb(),
-            self.update_cards_in_graph(),
+            # self.clear_data_for_expired_wb_cabinets(),
+            # self.shop_subscribe_control(),
+            # self.demo_subscribe(),
+            # self.run_update_keywords_on_wb(),
+            # self.update_cards_in_graph(),
             self.update_all_data_in_db(),
-            self.update_min_ctr_in_global_wb_category_settings(),
-            self.run_update_keyword_stat(need_update_model),
-            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
-            self.run_update_model(update_model_on_new_features, need_update_model),
-            self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            # self.update_min_ctr_in_global_wb_category_settings(),
+            # self.run_update_keyword_stat(need_update_model),
+            # self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            # self.run_update_model(update_model_on_new_features, need_update_model),
+            # self.run_update_predict_ctr(update_model_on_new_features, predicted),
             return_exceptions=False
             )
 
@@ -139,9 +139,10 @@ class Runner:
             await asyncio.sleep(60)
 
     async def update_all_data_in_db(self):
+        tasks = {}
         while True:
             try:
-                await self._manager.update_all_data_in_db_run()
+                await self._manager.update_all_data_in_db_run(tasks=tasks)
             except Exception as exc:
                 logger.error(f'Ошибка обновления данных в базе {exc}', exc_info=True)
                 await asyncio.sleep(0)

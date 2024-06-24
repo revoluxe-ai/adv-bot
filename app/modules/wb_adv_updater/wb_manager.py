@@ -582,27 +582,23 @@ class Manager(AbcManager):
             message_counter.add_send()
         return
 
-    async def update_all_data_in_db_run(self):
-        tasks = {}
-        while True:
-             wb_accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
-             async for wb_access in wb_accesses:
-                 if wb_access.wb_cabinet.id not in tasks:
-                     try:
-                          shop_data_updater = ShopDataUpdater(wb_access)
-                     except ApiForbiddenError:
-                         logger.error(f'Нет нужных прав у токена')
-                         continue
-                     task = asyncio.create_task(shop_data_updater.update_all_data())
-                     tasks[wb_access.wb_cabinet.id] = task
-                 else:
-                     if tasks[wb_access.wb_cabinet.id].done():
-                         if tasks[wb_access.wb_cabinet.id].exception():
-                             logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}, '
-                                          f'{tasks[wb_access.wb_cabinet.id].exception().__class__}')
-                         del tasks[wb_access.wb_cabinet.id]
-
-             await asyncio.sleep(30)
+    async def update_all_data_in_db_run(self, tasks):
+         wb_accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
+         async for wb_access in wb_accesses:
+             if wb_access.wb_cabinet.id not in tasks:
+                 try:
+                      shop_data_updater = ShopDataUpdater(wb_access)
+                 except ApiForbiddenError:
+                     logger.error(f'Нет нужных прав у токена')
+                     continue
+                 task = asyncio.create_task(shop_data_updater.update_all_data())
+                 tasks[wb_access.wb_cabinet.id] = task
+             else:
+                 if tasks[wb_access.wb_cabinet.id].done():
+                     if tasks[wb_access.wb_cabinet.id].exception():
+                         logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}, '
+                                      f'{tasks[wb_access.wb_cabinet.id].exception()}')
+                     del tasks[wb_access.wb_cabinet.id]
 
     async def check_accesses(self):
         await rights_control.check_all()

@@ -11,6 +11,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from . import models, wb_db_manager
 from .data_classes.adv import Adv
 from .exceptions import NotValidDataError
+from .models import WBCabinet
 
 sm = get_async_session_maker
 
@@ -41,8 +42,9 @@ class ShopDataUpdater:
         return f'{self._wb_cabinet.shop_id}'
 
     def __init__(self, wb_access:  WBCabinetAccess):
-        self.__wb_api = WBApi(wb_access)
-        self._wb_cabinet = wb_access.wb_cabinet
+        self.wb_api = WBApi(wb_access)
+        self._wb_cabinet: WBCabinet = wb_access.wb_cabinet
+        pass
 
 
 
@@ -53,7 +55,7 @@ class ShopDataUpdater:
 
 
     async def __quick_update_advs(self):
-        wb_api  = self.__wb_api
+        wb_api  = self.wb_api
         advert_api = wb_api.advert
         adv_ids: list[Adv] = await advert_api.get_advertIds()
         async with sm() as session:
@@ -69,7 +71,7 @@ class ShopDataUpdater:
 
 
     async def __quick_update_advs_in_db(self, adv_ids:set[int]):
-        wb_api = self.__wb_api
+        wb_api = self.wb_api
         advs = await wb_api.advert.get_advs(list(adv_ids))
         nmids_collection = set()
         await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
@@ -85,7 +87,7 @@ class ShopDataUpdater:
         await _coroutine_parallel_run_queue.put(func)
 
     async def update_all_data(self):
-        wb_api = self.__wb_api
+        wb_api: WBApi = self.wb_api
         advert_api = wb_api.advert
         adv_ids = await advert_api.get_advertIds()
         advs: list[Adv] = await advert_api.get_advs(adv_ids)
