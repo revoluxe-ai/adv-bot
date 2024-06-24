@@ -38,3 +38,7 @@ class ChangeMaxCPC(StatesGroup):
 
 class ChangeMinViewsForPredictCTR(StatesGroup):
     waiting_for_new_min_views = State()
+
+
+class AddBalance(StatesGroup):
+    awaiting_amount = State()

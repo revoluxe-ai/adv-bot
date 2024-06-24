@@ -14,7 +14,7 @@ import pandas as pd
 import pymystem3
 from aiogram.client.session import aiohttp
 from PIL import Image as PilImage
-from sqlalchemy import and_
+from sqlalchemy import and_, not_
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -35,7 +35,7 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_adv_updater.models import GlobalCategorySetting
+from app.modules.wb_adv_updater.models import GlobalCategorySetting, AdvPayment
 from app.my_types import KeywordStat
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.faiss_manager.faiss_index_manager import FaissManager
@@ -600,6 +600,7 @@ class Manager(AbcManager):
                                       f'{tasks[wb_access.wb_cabinet.id].exception()}')
                      del tasks[wb_access.wb_cabinet.id]
 
+
     async def check_accesses(self):
         await rights_control.check_all()
 
@@ -614,7 +615,9 @@ class Manager(AbcManager):
                 ).where(
                     and_(
                         WBCabinet.expiration_time < datetime.datetime.now(),
-                        WBCabinet.active == True
+                        WBCabinet.active == True,
+                        WBCabinet.bonus < 50,
+                        WBCabinet.balance < 50
                     )
                 )
                 wb_cabinets_expirated_and_active = await session.execute(stmt)
@@ -677,3 +680,48 @@ class Manager(AbcManager):
         await self._gds.clear_keywords_in_neo4j(need_keywords=keywords)
         await self._gds.clear_dead_nodes()
         await asyncio.sleep(60*60)
+
+    async def process_payment_for_advs(self):
+        current_date = datetime.datetime.now().date()
+        async with sm() as session:
+            stmt = select(AdvSetting).options(
+                joinedload(AdvSetting.payments),
+                selectinload(AdvSetting.wb_cabinet)
+            ).filter(
+                and_(
+                    AdvSetting.bot_active == True,
+                    not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
+                    AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
+                    # условие на истекший срок действия
+                )
+            )
+
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = result.unique().scalars().all()
+
+            for adv_setting in adv_settings:
+                wb_cabinet = adv_setting.wb_cabinet
+                if not (bonus := wb_cabinet.bonus):
+                    bonus = 0
+                if not (balance := wb_cabinet.balance):
+                    balance = 0
+                if bonus >= 50:
+                    payment = AdvPayment(date=current_date)
+                    adv_setting.payments.append(payment)
+                    wb_cabinet.bonus -= 50
+                elif balance > 0:
+                    payment = AdvPayment(date=current_date)
+                    adv_setting.payments.append(payment)
+                    wb_cabinet.balance -= 50
+                await session.commit()
+
+
+
+
+
+
+
+
+
+
+

@@ -19,7 +19,7 @@ from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker
 
 from ...user_interface.views import callbacks
-from ...user_interface.views.callbacks import BudgetForCreatingAdv, TurnAdv
+from ...user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot
 from .callbacks import Action
 
 if TYPE_CHECKING:
@@ -118,17 +118,17 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
 
     if adv_setting.bot_active:
         builder.row(
-        InlineKeyboardButton(text='Отключить бота', callback_data=TurnAdv(action='off',
-         adv_original_id=adv_setting.id,
-        wb_user_cabinet_original_id =wb_user_cabinet.id).pack()))
+        InlineKeyboardButton(text='Отключить бота', callback_data=TurnBot(action='off',
+                                                                          adv_original_id=adv_setting.id,
+                                                                          wb_user_cabinet_original_id =wb_user_cabinet.id).pack()))
 
 
     else:
         builder.row(
             InlineKeyboardButton(text='Включить бота',
-                                  callback_data=TurnAdv(action='on',
-                                   adv_original_id=adv_setting.id,
-                                   wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
+                                  callback_data=TurnBot(action='on',
+                                                        adv_original_id=adv_setting.id,
+                                                        wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
 
     wb_user_cabinet_original_id = wb_user_cabinet.id
     builder.row(InlineKeyboardButton(text='Вернуться к списку кампаний',
@@ -374,42 +374,37 @@ def get_return_for_your_ref_links():
 def get_shop_menu_keyboard(
     wb_user_cabinet:  WBUserCabinet,
     wb_cabinet_original_id: int,
-    price_for_month: int,
-    bonus_days: int,
+    is_active_adv: True
 ):
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     expiration_time: datetime.datetime = wb_cabinet.expiration_time
-    demo: bool = wb_cabinet.demo
     now = datetime.datetime.now()
-
+    if not (balance:= wb_cabinet.balance):
+        balance = 0
+    if not (bonus:= wb_cabinet.bonus):
+        bonus = 0
     builder = InlineKeyboardBuilder()
 
-    if expiration_time > now:
+    if any([expiration_time > now, balance > 0, bonus > 0]):
         button = InlineKeyboardButton(
             text='Настройка рекламы',
             callback_data=callbacks.ChoiceAdvPaginator(
                 wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
         builder.row(button)
-    if demo:
+
+    button = InlineKeyboardButton(
+        text='Пополнить баланс',
+        callback_data=callbacks.AddBalance(wb_cabinet_original_id=wb_cabinet_original_id).pack(),
+    )
+
+    builder.row(button)
+
+    if is_active_adv:
         button = InlineKeyboardButton(
-            text='Продлить и получить бонус',
-            callback_data=callbacks.OrderSubscribe(
-                period_days=30 + bonus_days,
-                price=price_for_month,
-                wb_cabinet_original_id=wb_cabinet_original_id
-            ).pack()
-        )
-        builder.row(button)
-    else:
-        button = InlineKeyboardButton(
-            text='Продлить подписку',
-            callback_data=callbacks.OrderSubscribe(
-                period_days=30,
-                price=price_for_month,
-                wb_cabinet_original_id=wb_cabinet_original_id
-            ).pack()
-        )
+            text='Отключить все кампании',
+            callback_data=callbacks.TurnBot(action='off_all',
+                                            wb_user_cabinet_original_id=wb_user_cabinet.id).pack())
         builder.row(button)
 
     button = InlineKeyboardButton(
@@ -420,14 +415,13 @@ def get_shop_menu_keyboard(
     return builder.as_markup()
 
 
-def get_payment_keyboard(price_for_month: int, period_days, bonus_days: int, wb_cabinet_original_id):
+def get_payment_keyboard(wb_cabinet_original_id):
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(
-        text='Продлить подписку',
-        callback_data=callbacks.OrderSubscribe(
-            period_days=period_days + bonus_days,
-            price=price_for_month,
-            wb_cabinet_original_id=wb_cabinet_original_id).pack(),
+        text='Пополнить баланс',
+        callback_data=callbacks.AddBalance(
+            wb_cabinet_original_id = wb_cabinet_original_id
+        ).pack(),
     )
     builder.row(button)
 

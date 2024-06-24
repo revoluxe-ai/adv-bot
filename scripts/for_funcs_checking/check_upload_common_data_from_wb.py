@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 sm = get_async_session_maker
 
-test_shop_id = '93d70b23-32b4-4f1c-a431-985386197cfd'
+test_shop_id = '6e0ed430-b0a3-4caf-8d09-04b7ce9f0b2c'
 
 async def update_data():
     wb_access = await get_access()
