@@ -659,6 +659,8 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 async def get_min_ctr(adv: AdvSetting):
+    if adv.hard_min_ctr:
+        return adv.hard_min_ctr
     category = await get_wb_category(adv)
     category_name = category.wb_category_name
     async with _sm() as session:
