@@ -379,7 +379,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  'ЧС   - ключевое слово в черном списке \n'
                  'Авто  - ключевое слово на автоуправлении \n'                                                   
                  'Информация перед ключевым словом: клики/показы/CTR \n'
-                 f'Cтраница: {self._page}/{total_page}\n'
+                 f'Cтраница: {self._page}/{total_page+1}\n'
         )
         return text
 
