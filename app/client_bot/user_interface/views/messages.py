@@ -14,7 +14,7 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBCabinet,
-    WBUserCabinet,
+    WBUserCabinet
 )
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import RefLink

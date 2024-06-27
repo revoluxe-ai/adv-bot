@@ -5,7 +5,8 @@ from typing import Union
 import redis
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
-from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
+
 redis_client = redis.asyncio.Redis(host='localhost', port=6379, db=0)
 
 
@@ -92,6 +93,48 @@ async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, 
     return keywords
 
 
+async def add_positions_to_redis(positions: list[WBItemPosition]):
+    base_key = 'adv_positions'
+    for position in positions:
+       key = f'{base_key}:{position.keyword.text}:{position.nmid}'
+       # real_position = position.real_position
+       # promo_position =  position.promo_position
+       # base_position = position.base_position
+       # text = position.keyword.text
+       # cpm = position.cpm
+       # adv_id = position.adv_id
+       # nmid = position.nmid
+       position_dict = position.to_dict()
+       await redis_client.set(key, json.dumps(position_dict))
+
+async def read_position_from_redis(keyword: str, nmid: int):
+    base_key = f'adv_positions:{keyword}:{nmid}'
+    json_data = await redis_client.get(base_key)
+    if not json_data:
+        return None
+    position = WBItemPosition.from_dict(json.loads(json_data))
+    return position
 
 
+async def get_keywords_positions(adv_setting, texts):
+    positions = []
+    for text in texts:
+        key = 'adv_positions:' + text + ':' + str(adv_setting.nmids[0])
+        json_data = await redis_client.get(key)
+        if not json_data:
+            continue
+        position = WBItemPosition.from_dict(json.loads(json_data))
+        positions.append(position)
+    return positions
 
+
+async def set_position_to_out_index(position):
+    position_out_index = WBItemPosition()
+    position_out_index.real_position = 0
+    position_out_index.base_position = 0
+    position_out_index.promo_position = 0
+    position_out_index.keyword = position.keyword
+    position_out_index.adv_id = position.adv_id
+    position_out_index.nmid = position.nmid
+    position_out_index.cpm = None
+    await add_positions_to_redis([position_out_index])

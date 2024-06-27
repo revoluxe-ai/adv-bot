@@ -25,8 +25,8 @@ from app.utils.db.base import BaseTable
 from . import exceptions
 from ...wb_adv_updater.models import AdvPayment
 
-if TYPE_CHECKING:
-    from app.utils.db.models import User
+
+from app.utils.db.models import User
 
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -37,7 +37,7 @@ class WBUserCabinet(BaseTable):
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
     user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
-    user: Mapped['User']  = relationship("User", back_populates="wb_user_cabinets",
+    user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
     __table_args__ = (UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),)
@@ -194,7 +194,7 @@ class AdvSetting(BaseTable):
     adv_id = Column(BIGINT(), unique=True)
     name = Column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
-    wb_cabinet: Mapped[WBCabinet] = relationship('WBCabinet',
+    wb_cabinet: Mapped[WBCabinet] =  relationship('WBCabinet',
                                                  back_populates='adv_settings',
                                                  lazy='joined')
     wb_cards = relationship('WBCard',
@@ -254,3 +254,46 @@ class KeywordSetting(BaseTable):
                       Index('ix_text_adv_setting_id', 'text', 'adv_setting_id'))
 
 
+
+class CommonKeyword(BaseTable):
+    wb_item_positions = relationship('WBItemPosition', back_populates='keyword')
+    text = mapped_column(String)
+    last_full_update = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+
+class WBItemPosition(BaseTable):
+    keyword_id = mapped_column(ForeignKey('commonkeyword.id'))
+    keyword = relationship(CommonKeyword, back_populates='wb_item_positions')
+    nmid = mapped_column(Integer)
+    base_position: Mapped[int] = mapped_column(Integer)
+    real_position: Mapped[int] = mapped_column(Integer)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    promo_position: Mapped[int] = mapped_column(Integer, nullable=True)
+    cpm: Mapped[int] = mapped_column(Integer, nullable=True)
+    adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
+
+
+    def to_dict(self):
+        return {
+            'real_position': self.real_position,
+            'promo_position': self.promo_position,
+            'base_position': self.base_position,
+            'text': self.keyword.text,
+            'cpm': self.cpm,
+            'adv_id': self.adv_id,
+            'nmid': self.nmid
+        }
+
+    @staticmethod
+    def from_dict(data):
+        position = WBItemPosition()
+        position.real_position = data['real_position']
+        position.promo_position = data['promo_position']
+        position.base_position = data['base_position']
+        position.cpm = data['cpm']
+        position.adv_id = data['adv_id']
+        position.nmid = data['nmid']
+        keyword = CommonKeyword()
+        keyword.text = data['text']
+        position.keyword = keyword
+        return position
