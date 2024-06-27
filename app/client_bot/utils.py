@@ -26,9 +26,17 @@ class KeywordForKeyboard:
 
 async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[CalculatedKeyword]:
     all_phrases: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
-
+    texts = [phrase.text for phrase in all_phrases]
+    keywords_positions_dict = await data_manager.get_keywords_positions(adv_setting, texts)
+    for phrase in all_phrases:
+        position = keywords_positions_dict.get(phrase.text)
+        if position:
+            phrase.real_position = position.real_position
+            phrase.base_position = position.base_position
+            phrase.promo_position = position.promo_position
+            phrase.position_update = position.timestamp
+            phrase.cpm = position.cpm
     all_phrases.sort(key=lambda keyword: keyword.ctr, reverse=True)
-
     return all_phrases
 
 

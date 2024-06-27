@@ -56,6 +56,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
 
                 try:
                     result = await func(instance, *args, **kwargs)
+                    logger.debug(f'Запрос {method_name} выполнен успешно')
                     state['_last_query_time'] = time.time()
                     state['_current_pause'] = (interval_seconds / requests_per_interval + state['_current_pause']) / 2
                     state['_attempts'] = 0  # Сброс попыток после успешного выполнения

@@ -1,6 +1,9 @@
 import json
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, Optional
+
+from sqlalchemy import DateTime
+
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 
 
@@ -21,7 +24,13 @@ class CalculatedKeyword:
     status: Union[str, None] = None
     keyword_setting: Union[KeywordSetting, None] = None
     hard_status: Union[str, None] = None
-    reason: Union[str, None] = None
+    reason: Optional[str] = None
+    cpm: Optional[int] = None
+    real_position: Optional[int] = None
+    base_position: Optional[int] = None
+    promo_position: Optional[int] = None
+    position_update: Optional[DateTime] = None
+
 
     def __repr__(self):
         text = (f'text: {self.text}'

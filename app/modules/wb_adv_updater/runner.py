@@ -1,6 +1,7 @@
 import datetime
 
 from app.utils.redis_func_cache import set_config
+from ..wb_keywords_parser import parser
 
 from ...admin_bot.sender import sender_manager
 
@@ -37,6 +38,9 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
+            self.reset_out_positions_in_redis(),
+            self. parser_all_white_phrase(),
+            self.write_positions_to_db(),
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             self.shop_subscribe_control(),
@@ -175,3 +179,23 @@ class Runner:
                 except Exception as e:
                     logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
             await asyncio.sleep(60*60)
+
+    async def write_positions_to_db(self):
+        while True:
+            try:
+                await parser.add_wb_positions_from_queue_to_db()
+            except Exception as e:
+                logger.error(f'Ошибка добавления позиций в базу {e}', exc_info=True)
+            await asyncio.sleep(0)
+
+    async def parser_all_white_phrase(self):
+       await parser.parser_all_white_phrase()
+
+    async def reset_out_positions_in_redis(self):
+        while True:
+            try:
+                await parser.reset_from_redis_positions_of_out_index()
+            except Exception as e:
+                logger.error(f'Ошибка сброса позиций в redis {e}', exc_info=True)
+
+            await asyncio.sleep(10)

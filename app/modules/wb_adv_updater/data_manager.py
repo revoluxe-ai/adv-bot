@@ -9,12 +9,13 @@ from typing import Any, Union, Optional
 
 import aiogram
 from aiogram.utils import deep_linking
+from sqlalchemy.exc import NoResultFound
 
 from app.exc import CardNotFoundInDB
 from app.modules.common_slaves.wildberries import exceptions as wb_exc
 import pandas as pd
 from PIL import Image
-from sqlalchemy import and_, func, select, case, cast, Float
+from sqlalchemy import and_, func, select, case, cast, Float, desc, asc
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
@@ -28,6 +29,8 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBCard,
     WBCategory,
+    CommonKeyword,
+    WBItemPosition,
 )
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
@@ -666,9 +669,15 @@ async def get_min_ctr(adv: AdvSetting):
     async with _sm() as session:
         stmt = select(GlobalCategorySetting.min_ctr).where(GlobalCategorySetting.category_name == category_name)
         result = await session.execute(stmt)
-        min_ctr = result.scalar_one()
+        try:
+             min_ctr = result.scalar_one()
+        except NoResultFound:
+            logger.error('Не найден CTR для категории', exc_info=True)
+            min_ctr = 0
+            return min_ctr
     min_ctr *= adv.boost
     return min_ctr
+
 
 
 async def get_needs_nmids():
@@ -731,3 +740,96 @@ async def clear_cards_in_db(nmids: list[int]):
              await session.commit()
              await asyncio.sleep(0)
 
+
+async def get_all_white_phrases():
+    pass_text = set()
+    async with _sm() as session:
+        stmt = select(AdvSetting).where(and_(
+            AdvSetting.bot_active == True, AdvSetting.active_status == 'started'))
+        adv_settings = await session.execute(stmt)
+        adv_settings = adv_settings.unique().scalars().all()
+        nmids = [nmid for adv in adv_settings for nmid in adv.nmids]
+        stmt = select(
+            WBItemPosition.nmid,
+            func.to_timestamp(func.avg(func.extract('epoch', WBItemPosition.timestamp))).label('avg_updated_at')
+        ).where(
+            WBItemPosition.nmid.in_(nmids)
+        ).group_by(
+            WBItemPosition.nmid
+        ).order_by(
+            asc('avg_updated_at')
+        )
+        result = await session.execute(stmt)
+        nmids_datetime_rows = result.all()
+        sort_dict = {row[0]: place for place, row in enumerate(nmids_datetime_rows)}
+        adv_settings = sorted(adv_settings, key=lambda adv: sort_dict.get(adv.nmids[0], 0))
+
+        for adv in adv_settings:
+            keywords_for_parsing = []
+            keywords = await get_good_bad_phrases(adv)
+            for keyword in keywords:
+                if keyword.status == 'good':
+                   text = keyword.text
+                   if text in pass_text:
+                       continue
+                   else:
+                       pass_text.add(text)
+                       keywords_for_parsing.append(text)
+            if keywords_for_parsing:
+                stmt = select(
+                    CommonKeyword.text,
+                    func.to_timestamp(
+                        func.avg(
+                            func.extract('epoch', WBItemPosition.timestamp))
+                    ).label('avg_updated_at')
+                ).join(
+                    CommonKeyword.wb_item_positions
+                ).where(
+                    CommonKeyword.text.in_(keywords_for_parsing)
+                ).group_by(
+                    CommonKeyword.text
+                ).order_by(
+                    desc('avg_updated_at')
+                )
+                result = await session.stream(stmt)
+                send_to_parsing = set()
+                async for row in result:
+                    text = row[0]
+                    if text not in pass_text:
+                        stmt = select(CommonKeyword).where(CommonKeyword.text == text)
+                        result = await session.execute(stmt)
+                        common_keyword = result.scalar()
+                        yield text
+                        send_to_parsing.add(text)
+                leftover = set(keywords_for_parsing) - send_to_parsing
+                for text in leftover:
+                    yield text
+
+async def get_last_updated_phrases(all_white_phrases):
+    async with _sm() as session:
+        stmt = select(CommonKeyword.text)\
+            .where(CommonKeyword.text.in_(all_white_phrases))\
+            .order_by(CommonKeyword.updated_at)
+        result = await session.execute(stmt)
+        last_updated_phrases = result.scalars().all()
+        return last_updated_phrases
+
+
+async def get_keywords_positions(adv_setting: AdvSetting, texts: list[str]) -> dict[str, WBItemPosition]:
+    positions =  await redis_manager.get_keywords_positions(adv_setting, texts)
+    #код для подгрузки позиций из базы, может пригодится
+    is_texts_in_positions = set([position.keyword.text for position in positions])
+    # text_is_not_in_positions = set(texts) - is_texts_in_positions
+    # async with _sm() as session:
+    #     stmt = select(WBItemPosition)\
+    #         .join(WBItemPosition.keyword)\
+    #       .options(joinedload(WBItemPosition.keyword))\
+    #         .where(and_(
+    #         WBItemPosition.nmid == adv_setting.nmids[0],
+    #         CommonKeyword.text.in_(text_is_not_in_positions),
+    #        CommonKeyword.last_full_update <= WBItemPosition.timestamp))
+    #     positions_in_db = await session.execute(stmt)
+    #     positions_in_db = positions_in_db.unique().scalars().all()
+    # positions.extend(positions_in_db)
+    positions = {position.keyword.text: position for position in positions}
+    return positions
