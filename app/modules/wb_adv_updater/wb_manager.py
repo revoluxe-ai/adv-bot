@@ -222,7 +222,6 @@ class Manager(AbcManager):
                     exc_info=True
                 )
             await asyncio.sleep(0)
-        await asyncio.sleep(60*15)
         return
 
 
