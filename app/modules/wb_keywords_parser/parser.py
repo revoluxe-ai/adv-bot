@@ -11,6 +11,7 @@ from typing import AsyncGenerator
 from sqlalchemy.orm import joinedload
 
 from app.modules.wb_adv_updater import data_manager
+from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select, and_, not_
@@ -280,8 +281,9 @@ async def add_wb_positions(text:str):
         #                  logger.debug(f'Ошибка при выполнении задачи: {task.exception()}')
 
 
+max_thread_for_proxy = settings.MAX_THREAD_FOR_PROXY
 
-sem = asyncio.Semaphore(50)
+sem = asyncio.Semaphore(max_thread_for_proxy)
 
 async def limited_add_wb_positions(text:str):
     async with sem:
