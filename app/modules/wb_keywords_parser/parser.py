@@ -215,7 +215,6 @@ queue_position_dict = {}
 
 async def add_wb_positions_from_queue_to_db():
     position: WBItemPosition = await write_to_db_queue.get()
-
     key = f'{position.keyword.text}:{position.nmid}'
     queue_position_dict[key] = position
     last_key = list(queue_position_dict.keys())[-1]
@@ -239,7 +238,7 @@ async def add_wb_positions_from_queue_to_db():
                     pos_in_db.cpm != position.cpm,
                     pos_in_db.adv_id != position.adv_id,
                     pos_in_db.real_position != position.real_position]):
-                session.add(position)
+                await session.merge(position)
                 await session.commit()
             else:
                 pos_in_db.timestamp = position.timestamp
