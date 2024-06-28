@@ -39,7 +39,6 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
-            self.keywords_parsing_process(),
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             self.shop_subscribe_control(),
