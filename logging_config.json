@@ -63,9 +63,13 @@
     "sqlalchemy.engine.Engine": {
       "level": "DEBUG",
       "handlers": [
-        "console"
+        "my_log_handler"
       ],
       "propagate": false
+    },
+    "app.modules.wb_keywords_parser.parser": {
+      "level": "DEBUG",
+      "handlers": ["console"]
     }
   },
 
