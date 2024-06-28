@@ -260,6 +260,7 @@ async def add_wb_positions(text:str):
         for page in range(1, 100):
             positions = await parser.parse_keywords_from_wb(keyword, page)
             await redis_manager.add_positions_to_redis(positions)
+            logger.debug('Записали позиции в Редис')
             for position in positions:
                 write_to_db_queue.put_nowait(position)
         keyword.last_full_update = update_time
