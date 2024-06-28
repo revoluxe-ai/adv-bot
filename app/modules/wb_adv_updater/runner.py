@@ -4,7 +4,8 @@ from app.utils.redis_func_cache import set_config
 from ..wb_keywords_parser import parser
 
 from ...admin_bot.sender import sender_manager
-
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
 set_config()
 import asyncio
 import logging
@@ -38,9 +39,6 @@ class Runner:
         predicted.set()
 
         await asyncio.gather(
-            self.reset_out_positions_in_redis(),
-            self. parser_all_white_phrase(),
-            self.write_positions_to_db(),
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             self.shop_subscribe_control(),
@@ -191,6 +189,7 @@ class Runner:
     async def parser_all_white_phrase(self):
        await parser.parser_all_white_phrase()
 
+
     async def reset_out_positions_in_redis(self):
         while True:
             try:
@@ -199,3 +198,24 @@ class Runner:
                 logger.error(f'Ошибка сброса позиций в redis {e}', exc_info=True)
 
             await asyncio.sleep(10)
+
+
+    async def keywords_parsing_process(self):
+        while True:
+            try:
+                await self.__keywords_parsing_process()
+            except:
+                logger.error('Ошибка процесса парсинга ключей', exc_info=True)
+                await asyncio.sleep(0)
+
+    async def __keywords_parsing_process(self):
+        await asyncio.gather(
+                   self.reset_out_positions_in_redis(),
+                   self. parser_all_white_phrase(),
+                   self.write_positions_to_db(),
+               return_exceptions=True)
+
+
+
+
+

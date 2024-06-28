@@ -212,7 +212,6 @@ write_to_db_queue = asyncio.Queue(10000)
 
 queue_position_dict = {}
 
-
 async def add_wb_positions_from_queue_to_db():
     position: WBItemPosition = await write_to_db_queue.get()
     key = f'{position.keyword.text}:{position.nmid}'
