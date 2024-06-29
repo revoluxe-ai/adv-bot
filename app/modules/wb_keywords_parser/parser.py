@@ -230,7 +230,7 @@ async def add_wb_positions_from_queue_to_db():
         if not pos_in_db:
             keyword = position.keyword
             await session.merge(keyword)
-            await session.merge(position)
+            session.add(position)
             await session.commit()
         else:
             if any([pos_in_db.base_position != position.base_position,
@@ -244,7 +244,9 @@ async def add_wb_positions_from_queue_to_db():
                 pos_in_db.timestamp = position.timestamp
                 await session.commit()
     del queue_position_dict[last_key]
-    await asyncio.sleep(0)
+
+
+
 
 async def add_wb_positions(text:str, need_nmids: set[int]):
     assert need_nmids
@@ -285,9 +287,6 @@ async def add_wb_positions(text:str, need_nmids: set[int]):
 
         keyword.last_full_update = update_time
         await session.commit()
-
-
-
         # for position in positions:
         #     text = position.keyword.text
         #     if text not in text_to_task:

@@ -112,3 +112,8 @@ class ChangeMinViewsForPredictCTR(CallbackData, prefix="change_min_views_for_pre
 
 class AddBalance(CallbackData, prefix="add_balance"):
     wb_cabinet_original_id: int
+
+
+class KeywordPositionHistory(CallbackData, prefix="keyword_position_history"):
+    adv_original_id: int
+

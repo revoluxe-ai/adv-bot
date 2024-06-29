@@ -1,20 +1,24 @@
+import asyncio
 import datetime
 import logging
+from io import BytesIO
 from typing import TYPE_CHECKING
-
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.utils import deep_linking
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func, desc
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from app.client_bot import const
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBCabinet,
-    WBUserCabinet
+    WBUserCabinet, AdvKeyword, WBItemPosition, CommonKeyword
 )
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import RefLink
@@ -886,3 +890,68 @@ class BalanceUpdated(Text):
     @property
     def text(self):
         return f'Баланс успешно пополнен на {self.__balance} рублей + бонус {self.__bonus} рублей'
+
+
+class Top10ByViewsKeywordsGraphic(TextWithKeyboardAndImage):
+    async def __call__(self, adv_original_id: int):
+
+            await super().__call__()
+
+    @property
+    def image(self):
+        return self._image
+
+
+    @image.setter
+    def image(self, value):
+        self._image = value
+
+    text = None
+    keyboard = None
+
+
+class KeywordGraphicPart_1(TextWithImage):
+
+    def __init__(self, bot, chat_id, image, adv_original_id):
+        self._image = image
+        self._adv_original_id = adv_original_id
+        super().__init__(bot, chat_id)
+
+
+
+    text = ''
+
+
+    @property
+    def image(self):
+        return self._image
+
+
+    @image.setter
+    def image(self, value):
+        self._image = value
+
+
+class KeywordGraphicPart_2(TextWithKeyboardAndImage):
+    def __init__(self, bot, chat_id, image, adv_original_id):
+        self._image = image
+        self._adv_original_id = adv_original_id
+        super().__init__(bot, chat_id)
+
+    text = ''
+
+    @property
+    def image(self):
+        return self._image
+
+    @image.setter
+    def image(self, value):
+        self._image = value
+
+    @property
+    def keyboard(self):
+        return keyboards.get_return_to_adv_setting_keyboard(self._adv_original_id)
+
+
+class NotKeywordHistoryPositions(Text):
+    text = 'Не удалось получить историю позиций ключевых слов для этой кампании'

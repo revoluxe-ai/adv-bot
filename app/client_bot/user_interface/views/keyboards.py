@@ -89,6 +89,12 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
     builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
                                                                       type='by_adv').pack()))
+
+    button = InlineKeyboardButton(text='История позиций ключевых слов',
+                                    callback_data=callbacks.KeywordPositionHistory(
+                                        adv_original_id=adv_setting.id).pack())
+    builder.row(button)
+
     if adv_setting.hard_min_ctr:
          builder.row(InlineKeyboardButton(text='Изменить минимальный CTR',
                                          callback_data=callbacks.ChangeMinCTR(
@@ -479,4 +485,12 @@ def get_setting_min_views_for_predict_ctr_keyboard(adv: AdvSetting):
     builder.row(InlineKeyboardButton(text='Назад',
                                     callback_data=callbacks.Adv(
                                     adv_original_id=adv_original_id).pack()))
+    return builder.as_markup()
+
+
+def get_return_to_adv_setting_keyboard(adv_original_id):
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text='Назад',
+                                     callback_data=callbacks.Adv(
+                                         adv_original_id=adv_original_id).pack()))
     return builder.as_markup()
