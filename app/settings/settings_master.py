@@ -26,6 +26,8 @@ class Settings:
     def COUNT_SEMAPHORE_TO_POSTGRES(self):
         return get_document_by_key_name(setting_path, 'COUNT_SEMAPHORE_TO_POSTGRES')
 
-
+    @property
+    def MAX_THREAD_FOR_PROXY(self):
+        return get_document_by_key_name(setting_path, 'MAX_THREAD_FOR_PROXY')
 
 settings = Settings()

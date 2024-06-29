@@ -791,19 +791,35 @@ async def get_all_white_phrases():
                 ).order_by(
                     desc('avg_updated_at')
                 )
-                result = await session.stream(stmt)
+                result = await session.execute(stmt)
+                result = result.all()
                 send_to_parsing = set()
-                async for row in result:
+                for row in result:
                     text = row[0]
-                    if text not in pass_text:
-                        stmt = select(CommonKeyword).where(CommonKeyword.text == text)
-                        result = await session.execute(stmt)
-                        common_keyword = result.scalar()
-                        yield text
-                        send_to_parsing.add(text)
+                    stmt = select(AdvSetting)\
+                    .join(AdvSetting.keyword_settings)\
+                    .where(AdvSetting.keyword_settings.any(KeywordSetting.text == text),
+                           AdvSetting.active_status   == 'started',
+                           AdvSetting.bot_active == True)
+                    result = await session.execute(stmt)
+                    adv_settings = result.scalars().all()
+                    need_nmids = {nmid for adv in adv_settings for nmid in adv.nmids}
+                    # stmt = select(CommonKeyword).where(CommonKeyword.text == text)
+                    # result = await session.execute(stmt)
+                    # common_keyword = result.scalar()
+                    yield text, need_nmids
+                    send_to_parsing.add(text)
                 leftover = set(keywords_for_parsing) - send_to_parsing
                 for text in leftover:
-                    yield text
+                    stmt = select(AdvSetting) \
+                        .join(AdvSetting.keyword_settings) \
+                        .where(AdvSetting.keyword_settings.any(KeywordSetting.text == text),
+                               AdvSetting.active_status == 'started',
+                               AdvSetting.bot_active == True)
+                    result = await session.execute(stmt)
+                    adv_settings = result.scalars().all()
+                    need_nmids = {nmid for adv in adv_settings for nmid in adv.nmids}
+                    yield text, need_nmids
 
 async def get_last_updated_phrases(all_white_phrases):
     async with _sm() as session:
@@ -817,19 +833,5 @@ async def get_last_updated_phrases(all_white_phrases):
 
 async def get_keywords_positions(adv_setting: AdvSetting, texts: list[str]) -> dict[str, WBItemPosition]:
     positions =  await redis_manager.get_keywords_positions(adv_setting, texts)
-    #код для подгрузки позиций из базы, может пригодится
-    is_texts_in_positions = set([position.keyword.text for position in positions])
-    # text_is_not_in_positions = set(texts) - is_texts_in_positions
-    # async with _sm() as session:
-    #     stmt = select(WBItemPosition)\
-    #         .join(WBItemPosition.keyword)\
-    #       .options(joinedload(WBItemPosition.keyword))\
-    #         .where(and_(
-    #         WBItemPosition.nmid == adv_setting.nmids[0],
-    #         CommonKeyword.text.in_(text_is_not_in_positions),
-    #        CommonKeyword.last_full_update <= WBItemPosition.timestamp))
-    #     positions_in_db = await session.execute(stmt)
-    #     positions_in_db = positions_in_db.unique().scalars().all()
-    # positions.extend(positions_in_db)
     positions = {position.keyword.text: position for position in positions}
     return positions

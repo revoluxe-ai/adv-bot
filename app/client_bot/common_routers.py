@@ -8,19 +8,22 @@ from .user_interface.handlers import (adv_setting,
                                       keyword_settings,
                                       setting_min_ctr,
                                       change_max_cpc,
-                                      min_views_for_ml_predict_ctr,)
+                                      min_views_for_ml_predict_ctr,
+                                      keywords_positions_history)
+from ..settings import settings
 
 common_router = Router()
 
 setting_path = path_setting_funcs.get_setting_path()
 
 admin_bot_api = path_setting_funcs.get_document_by_key_name(setting_path, 'admin_telegram_bot_api')
-common_router.include_routers(exceptions.user_router)
-common_router.include_routers(exceptions.admin_router)
+common_router.include_routers(keywords_positions_history.handlers.router)
+if not settings.test_mode:
+    common_router.include_routers(exceptions.user_router)
+    common_router.include_routers(exceptions.admin_router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(keyword_settings.router)
 common_router.include_routers(setting_min_ctr.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
-
 common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())

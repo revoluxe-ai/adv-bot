@@ -210,7 +210,6 @@ class Runner:
 
     async def __keywords_parsing_process(self):
         await asyncio.gather(
-                   self.reset_out_positions_in_redis(),
                    self. parser_all_white_phrase(),
                    self.write_positions_to_db(),
                return_exceptions=True)

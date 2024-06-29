@@ -11,6 +11,7 @@ from typing import AsyncGenerator
 from sqlalchemy.orm import joinedload
 
 from app.modules.wb_adv_updater import data_manager
+from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select, and_, not_
@@ -229,7 +230,7 @@ async def add_wb_positions_from_queue_to_db():
         if not pos_in_db:
             keyword = position.keyword
             await session.merge(keyword)
-            await session.merge(position)
+            session.add(position)
             await session.commit()
         else:
             if any([pos_in_db.base_position != position.base_position,
@@ -243,9 +244,12 @@ async def add_wb_positions_from_queue_to_db():
                 pos_in_db.timestamp = position.timestamp
                 await session.commit()
     del queue_position_dict[last_key]
-    await asyncio.sleep(0)
 
-async def add_wb_positions(text:str):
+
+
+
+async def add_wb_positions(text:str, need_nmids: set[int]):
+    assert need_nmids
     global done_count
     update_time = datetime.datetime.now()
     async with sm() as session:
@@ -261,12 +265,28 @@ async def add_wb_positions(text:str):
             await redis_manager.add_positions_to_redis(positions)
             logger.debug('Записали позиции в Редис')
             for position in positions:
+                need_nmids.discard(position.nmid)
                 write_to_db_queue.put_nowait(position)
+            if not need_nmids:
+                break
+        else:
+            not_found_positions = []
+            for nmid in need_nmids:
+                position = WBItemPosition()
+                position.real_position = 0
+                position.base_position = 0
+                position.promo_position = 0
+                position.keyword = keyword
+                position.timestamp = datetime.datetime.now()
+                position.nmid = nmid
+                position.cpm = 0
+                not_found_positions.append(position)
+            await redis_manager.add_positions_to_redis(not_found_positions)
+            for position in not_found_positions:
+                write_to_db_queue.put_nowait(position)
+
         keyword.last_full_update = update_time
         await session.commit()
-
-
-
         # for position in positions:
         #     text = position.keyword.text
         #     if text not in text_to_task:
@@ -280,21 +300,22 @@ async def add_wb_positions(text:str):
         #                  logger.debug(f'Ошибка при выполнении задачи: {task.exception()}')
 
 
+max_thread_for_proxy = settings.MAX_THREAD_FOR_PROXY
 
-sem = asyncio.Semaphore(50)
+sem = asyncio.Semaphore(max_thread_for_proxy)
 
-async def limited_add_wb_positions(text:str):
+async def limited_add_wb_positions(text:str, need_nmids: set[int]):
     async with sem:
-        await add_wb_positions(text)
+        await add_wb_positions(text, need_nmids)
 
 
 async def parser_all_white_phrase():
     tasks_by_text = {}
     while True:
         all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases()
-        async for text in all_white_phrases_generator:
+        async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
-                task = asyncio.create_task(limited_add_wb_positions(text))
+                task = asyncio.create_task(limited_add_wb_positions(text, need_nmids))
                 tasks_by_text[text] = task
                 await asyncio.sleep(0)
         for key in list(tasks_by_text.keys()):

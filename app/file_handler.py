@@ -22,6 +22,8 @@ async def get_telegram_image(image_path: str, bot: aiogram.Bot) -> Union[InputFi
 
 
 async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[str, InputFile]:
+    if isinstance(image_path, BytesIO):
+        return BufferedInputFile(image_path.getvalue(), filename='wbgram.png')
     if  image_path.startswith('http'):
         # Загрузка изображения по HTTP
         async with aiohttp.ClientSession() as session:
