@@ -230,7 +230,7 @@ async def add_wb_positions_from_queue_to_db():
         if not pos_in_db:
             keyword = position.keyword
             await session.merge(keyword)
-            session.add(position)
+            await session.merge(position)
             await session.commit()
         else:
             if any([pos_in_db.base_position != position.base_position,
@@ -262,6 +262,7 @@ async def add_wb_positions(text:str, need_nmids: set[int]):
             await session.commit()
         for page in range(1, 100):
             positions = await parser.parse_keywords_from_wb(keyword, page)
+            positions = [position for position in positions if position.nmid in need_nmids]
             await redis_manager.add_positions_to_redis(positions)
             logger.debug('Записали позиции в Редис')
             for position in positions:
@@ -287,17 +288,6 @@ async def add_wb_positions(text:str, need_nmids: set[int]):
 
         keyword.last_full_update = update_time
         await session.commit()
-        # for position in positions:
-        #     text = position.keyword.text
-        #     if text not in text_to_task:
-        #         task = asyncio.create_task(__add_wb_positions_to_db(positions))
-        #         text_to_task[text] = task
-        #     else:
-        #         task = text_to_task[text]
-        #         if task.done():
-        #             del text_to_task[text]
-        #             if task.exception():
-        #                  logger.debug(f'Ошибка при выполнении задачи: {task.exception()}')
 
 
 max_thread_for_proxy = settings.MAX_THREAD_FOR_PROXY

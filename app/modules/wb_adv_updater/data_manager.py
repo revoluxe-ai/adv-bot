@@ -744,8 +744,8 @@ async def clear_cards_in_db(nmids: list[int]):
 async def get_all_white_phrases():
     pass_text = set()
     async with _sm() as session:
-        stmt = select(AdvSetting).where(and_(
-            AdvSetting.bot_active == True, AdvSetting.active_status == 'started'))
+        stmt = select(AdvSetting).where(
+            AdvSetting.parsing_active == True)
         adv_settings = await session.execute(stmt)
         adv_settings = adv_settings.unique().scalars().all()
         nmids = [nmid for adv in adv_settings for nmid in adv.nmids]
@@ -804,9 +804,6 @@ async def get_all_white_phrases():
                     result = await session.execute(stmt)
                     adv_settings = result.scalars().all()
                     need_nmids = {nmid for adv in adv_settings for nmid in adv.nmids}
-                    # stmt = select(CommonKeyword).where(CommonKeyword.text == text)
-                    # result = await session.execute(stmt)
-                    # common_keyword = result.scalar()
                     yield text, need_nmids
                     send_to_parsing.add(text)
                 leftover = set(keywords_for_parsing) - send_to_parsing
@@ -814,8 +811,7 @@ async def get_all_white_phrases():
                     stmt = select(AdvSetting) \
                         .join(AdvSetting.keyword_settings) \
                         .where(AdvSetting.keyword_settings.any(KeywordSetting.text == text),
-                               AdvSetting.active_status == 'started',
-                               AdvSetting.bot_active == True)
+                               AdvSetting.parsing_active == True)
                     result = await session.execute(stmt)
                     adv_settings = result.scalars().all()
                     need_nmids = {nmid for adv in adv_settings for nmid in adv.nmids}

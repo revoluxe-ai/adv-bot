@@ -52,6 +52,7 @@ from .data_manager import DataGetter, DataSetter
 from .graph_vector_updater import GraphUpdater
 from .ML import Fitter, Predictor
 from .shops_manager import rights_control
+from ...client_bot import const
 
 predictor = Predictor()
 
@@ -704,14 +705,49 @@ class Manager(AbcManager):
                     bonus = 0
                 if not (balance := wb_cabinet.balance):
                     balance = 0
-                if bonus >= 50:
+                if bonus >= const.PRICE_FOR_ADV_FOR_DAY:
                     payment = AdvPayment(date=current_date)
                     adv_setting.payments.append(payment)
-                    wb_cabinet.bonus -= 50
+                    wb_cabinet.bonus -= const.PRICE_FOR_ADV_FOR_DAY
                 elif balance > 0:
                     payment = AdvPayment(date=current_date)
                     adv_setting.payments.append(payment)
-                    wb_cabinet.balance -= 50
+                    wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
+                await session.commit()
+
+    async def process_payment_for_parsing(self):
+        current_date = datetime.datetime.now().date()
+        async with sm() as session:
+            stmt = select(AdvSetting).options(
+                joinedload(AdvSetting.payments),
+                selectinload(AdvSetting.wb_cabinet)
+            ).filter(
+                and_(
+                    AdvSetting.parsing_active == True,
+                    not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
+                                                      AdvPayment.type == 'parsing')))
+
+                )
+            )
+
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = result.unique().scalars().all()
+
+            for adv_setting in adv_settings:
+                wb_cabinet = adv_setting.wb_cabinet
+                if not (bonus := wb_cabinet.bonus):
+                    bonus = 0
+                if not (balance := wb_cabinet.balance):
+                    balance = 0
+                if bonus >= const.PARSING_PRICE:
+                    payment = AdvPayment(date=current_date)
+                    adv_setting.payments.append(payment)
+                    wb_cabinet.bonus -= const.PARSING_PRICE
+                elif balance > 0:
+                    payment = AdvPayment(date=current_date,
+                                         type='parsing')
+                    adv_setting.payments.append(payment)
+                    wb_cabinet.balance -= const.PARSING_PRICE
                 await session.commit()
 
 

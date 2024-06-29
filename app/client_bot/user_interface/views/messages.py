@@ -217,8 +217,6 @@ class AdvSettingMenu(TextWithKeyboard):
             self._mean_ctr = round(self._mean_ctr, 2) * 100
         except NoResultFound:
             self._mean_ctr = 'Средний CTR не определен'
-
-
         await super().__call__()
 
 
@@ -955,3 +953,18 @@ class KeywordGraphicPart_2(TextWithKeyboardAndImage):
 
 class NotKeywordHistoryPositions(Text):
     text = 'Не удалось получить историю позиций ключевых слов для этой кампании'
+
+
+class NotEnoughMoneyForParsing(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id, wb_cabinet_original_id):
+        super().__init__(bot, chat_id)
+        self._wb_cabinet_original_id = wb_cabinet_original_id
+
+
+
+    text = """Не достаточный баланс для парсинга ключевых слов. Пополните баланс и попробуйте снова"""
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard(self._wb_cabinet_original_id)

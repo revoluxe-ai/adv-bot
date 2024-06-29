@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Float, Integer, String, DateTime, ForeignKey, UniqueConstraint, Date
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, mapped_column
 
 from app.utils.db.base import BaseTable
 
@@ -34,5 +34,6 @@ class AdvPayment(BaseTable):
     adv_setting_id = Column(Integer, ForeignKey('advsetting.id'), nullable=False)
     adv_setting = relationship('AdvSetting', back_populates='payments')
     __table_args__ = (
-        UniqueConstraint('date', 'adv_setting_id', name='uix_date_adv_setting_id'),
+        UniqueConstraint('date', 'adv_setting_id', 'type', name='uix_date_adv_setting_id_type'),
     )
+    type = mapped_column(String, nullable=True)

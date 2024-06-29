@@ -212,7 +212,18 @@ class Runner:
         await asyncio.gather(
                    self. parser_all_white_phrase(),
                    self.write_positions_to_db(),
+                   self.payment_for_parsing_keyword(),
                return_exceptions=True)
+
+    async def payment_for_parsing_keyword(self):
+        while True:
+            hours = datetime.datetime.now().hour
+            if 12 < hours < 18:
+                try:
+                    await self._manager.process_payment_for_parsing()
+                except Exception as e:
+                    logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
+            await asyncio.sleep(60 * 60)
 
 
 
