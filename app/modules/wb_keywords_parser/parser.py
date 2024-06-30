@@ -221,8 +221,8 @@ async def add_wb_positions_from_queue_to_db():
     position = list(queue_position_dict.values())[-1]
     async with sm() as session:
         stmt = select(WBItemPosition) \
-            .where(and_(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
-                        WBItemPosition.keyword_id == CommonKeyword.id),
+            .where(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
+                        WBItemPosition.keyword_id == CommonKeyword.id,
                    WBItemPosition.timestamp > datetime.datetime.now() - datetime.timedelta(hours=8)) \
             .order_by(WBItemPosition.timestamp.desc()) \
             .limit(1)
