@@ -79,15 +79,15 @@ async def get_keyword_history_graphic(adv_original_id):
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
         adv = await session.execute(stmt)
         adv = adv.scalar()
+        limit = int(7*24/8) + 1
         nmid = adv.nmids[0]
         stmt = select(CommonKeyword) \
             .join(CommonKeyword.wb_item_positions) \
             .options(joinedload(CommonKeyword.wb_item_positions)) \
             .where(and_(
             WBItemPosition.nmid == nmid,
-            WBItemPosition.timestamp < datetime.datetime.now() - datetime.timedelta(days=7),
                         CommonKeyword.text.in_(texts)
-                        ))
+                        )).limit(limit)
         result = await session.execute(stmt)
         common_keywords: list[CommonKeyword] = result.unique().scalars().all()
 
