@@ -228,11 +228,12 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                   wb_user_cabinet_original_id: int,
                                    page,
                                   return_from_filter_bottom: bool,
-                                  on_page):
+                                  on_page,
+                                  min_ctr):
 
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
-    keywords.sort(key=lambda x: x.views, reverse=True)
+    keywords.sort(key=lambda x: abs(x.keyword_setting.predict_ctr - min_ctr), reverse=True)
     bottoms = []
     for keyword in keywords[start_index:end_index]:
         clicks = keyword.clicks

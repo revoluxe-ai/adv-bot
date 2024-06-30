@@ -362,7 +362,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                         clear_keywords.append(keyword)
 
             self._keywords = clear_keywords
-
+        self.min_ctr = await data_manager.get_min_ctr(self._adv_setting)
         await super().__call__()
 
     @property
@@ -400,7 +400,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                        self._wb_user_cabinet_original_id,
                                                        self._page,
                                                        self._filter,
-                                                       self._on_page)
+                                                       self._on_page,
+                                                       self.min_ctr)
 
 
 class KeywordSettingMessage(TextWithKeyboard):
