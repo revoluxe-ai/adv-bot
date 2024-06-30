@@ -71,6 +71,7 @@ async def turn_parsing_on(callback: types.CallbackQuery,
             today = datetime.datetime.now().date()
             if today in payment_dates:
                 adv_setting.parsing_active = True
+                await messages.AdvSettingMenu(bot, callback.message.chat.id, wb_user_cabinet, adv_setting)()
                 await session.commit()
                 return
             else:
