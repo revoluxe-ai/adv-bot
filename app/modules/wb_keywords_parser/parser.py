@@ -222,7 +222,8 @@ async def add_wb_positions_from_queue_to_db():
     async with sm() as session:
         stmt = select(WBItemPosition) \
             .where(and_(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
-                        WBItemPosition.keyword_id == CommonKeyword.id)) \
+                        WBItemPosition.keyword_id == CommonKeyword.id),
+                   WBItemPosition.timestamp > datetime.datetime.now() - datetime.timedelta(hours=8)) \
             .order_by(WBItemPosition.timestamp.desc()) \
             .limit(1)
         pos_in_db = await session.execute(stmt)
@@ -232,17 +233,6 @@ async def add_wb_positions_from_queue_to_db():
             await session.merge(keyword)
             await session.merge(position)
             await session.commit()
-        else:
-            if any([pos_in_db.base_position != position.base_position,
-                    pos_in_db.promo_position != position.promo_position,
-                    pos_in_db.cpm != position.cpm,
-                    pos_in_db.adv_id != position.adv_id,
-                    pos_in_db.real_position != position.real_position]):
-                await session.merge(position)
-                await session.commit()
-            else:
-                pos_in_db.timestamp = position.timestamp
-                await session.commit()
     del queue_position_dict[last_key]
 
 
