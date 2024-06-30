@@ -277,7 +277,7 @@ class AddNewTokenGet(TextWithImage):
         self.__cabinet_name  = cabinet_name
         super().__init__(bot, chat_id)
 
-        self._image = 'app/client_bot/images/api_setting.png'
+        self._image = 'app/client_bot/images/static/api_setting.png'
 
     @property
     def text(self):
