@@ -73,7 +73,7 @@ async def get_keyword_history_graphic(adv_original_id):
         stmt = select(AdvKeyword.text, func.sum(AdvKeyword.views).label('views')) \
             .where(AdvKeyword.adv_setting_id == adv_original_id) \
             .group_by(AdvKeyword.text) \
-            .order_by(desc('views'))
+            .order_by(desc('views')).limit(5)
         result = await session.execute(stmt)
         texts = result.scalars().all()
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
@@ -85,6 +85,7 @@ async def get_keyword_history_graphic(adv_original_id):
             .options(joinedload(CommonKeyword.wb_item_positions)) \
             .where(and_(
             WBItemPosition.nmid == nmid,
+            WBItemPosition.timestamp < datetime.datetime.now() - datetime.timedelta(days=7),
                         CommonKeyword.text.in_(texts)
                         ))
         result = await session.execute(stmt)
@@ -92,7 +93,7 @@ async def get_keyword_history_graphic(adv_original_id):
 
         # Подготовка дат за последние 7 дней
         end_date = datetime.datetime.now()
-        start_date = end_date - datetime.timedelta(days=30-1)
+        start_date = end_date - datetime.timedelta(days=7)
         date_range = pd.date_range(start=start_date, end=end_date)
         frames = []
         # Создание DataFrame
