@@ -33,4 +33,5 @@ class RefLink(BaseTable):
         backref='referred_by_links'
     )
     created_at = Column(DateTime, server_default=func.now())
+    bonus_code = Column(String, nullable=True)
 
