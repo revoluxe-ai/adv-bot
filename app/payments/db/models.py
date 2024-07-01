@@ -1,4 +1,4 @@
-from sqlalchemy import BIGINT, Column, ForeignKey, String
+from sqlalchemy import BIGINT, Column, ForeignKey, String, func, DateTime
 from sqlalchemy.orm import relationship
 
 from app.utils.db.base import BaseTable
@@ -9,3 +9,4 @@ class Payment(BaseTable):
     user_id = Column(BIGINT, ForeignKey('user.id'))
     amount = Column(BIGINT, nullable=False)
     target = Column(String, nullable=False)
+    timestamp = Column(DateTime, nullable=True, server_default=func.now())

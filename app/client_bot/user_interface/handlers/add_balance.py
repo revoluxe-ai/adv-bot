@@ -1,13 +1,13 @@
 import asyncio
 import json
 from datetime import timedelta
-
+import datetime
 import aiogram
 from aiogram import Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 import logging
 from app.admin_bot.sender import sender_manager
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
@@ -39,7 +39,18 @@ async def add_balance(callback: types.CallbackQuery,
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
     await state.update_data(wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id)
     await state.set_state(states.AddBalance.awaiting_amount)
-    await messages.WaitingForAmount(bot, callback.message.chat.id)()
+    time_from = '2024-07-01 00:00:00'
+    time_from_datetime = datetime.datetime.strptime(time_from, '%Y-%m-%d %H:%M:%S')
+    async with sm() as session:
+        stmt = select(func.max(Payment.amount)) \
+            .where(Payment.timestamp > time_from_datetime)
+        result = await session.execute(stmt)
+        max_amount = result.scalar()
+        if not max_amount:
+            max_amount = 50
+        master_sum = max_amount * 2
+    await state.update_data(master_sum=master_sum)
+    await messages.WaitingForAmount(bot, callback.message.chat.id, master_sum)()
 
 @router.message(StateFilter(states.AddBalance.awaiting_amount))
 async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot):
@@ -112,27 +123,33 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
     successful_payment = message.successful_payment
     cost = successful_payment.total_amount / 100
     """
-    Бонусы за пополнение:\n\n
-        - oт 3 000 р. + 10 %\n
-        - oт 5 000 р. + 15 % \n
-        - oт 10 000 р. + 50 %\n
-        - oт 30 000 р. + 80 %\n
-        - oт 50 000 р. + 100 %\n\n
-        Введите сумму пополнения (от 100 р.)\n
+    Внимание! Только до 05.07.2024: \n
+    Бонус 200 % от суммы пополнения! \n
+    Если пополняете на 1000 рублей, то вам добавляется на бонусный счет еще 2000 рублей! \n\n
+    
+    Таким образом, если у вас 2 кампании, то мы можете за эти деньги использовать полный функционал бота за эти деньги целый месяц, 
+    а если одна, то бот вам обойдется всего 500 рублей,
+    что делает его не только лучшим, но и самым выгодным решением для автоматизации рекламы WB на рынке!
     
     """
-    if cost >= 3000:
-        bonus = cost * 0.1
-    elif cost >= 5000:
-        bonus = cost * 0.15
-    elif cost >= 10000:
-        bonus = cost * 0.5
-    elif cost >= 30000:
-        bonus = cost * 0.8
-    elif cost >= 50000:
-        bonus = cost
-    else:
-        bonus = 0
+    bonus = cost * 2
+    state_data = await state.get_data()
+    master_sum = state_data['master_sum']
+    if cost >= master_sum:
+        bonus = cost * 4
+
+    # if cost >= 3000:
+    #     bonus = cost * 0.1
+    # elif cost >= 5000:
+    #     bonus = cost * 0.15
+    # elif cost >= 10000:git
+    #     bonus = cost * 0.5
+    # elif cost >= 30000:
+    #     bonus = cost * 0.8
+    # elif cost >= 50000:
+    #     bonus = cost
+    # else:
+    #     bonus = 0
 
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']

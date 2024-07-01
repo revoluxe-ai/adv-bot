@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.utils import deep_linking
-from sqlalchemy import select, and_, func, desc
+from sqlalchemy import select, and_, func, desc, or_
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload, joinedload
 from app.client_bot import const
@@ -21,6 +21,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet, AdvKeyword, WBItemPosition, CommonKeyword
 )
 from app.modules.wb_adv_updater import data_manager
+from app.payments.db.models import Payment
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.suffixes import get_day_suffix
@@ -861,19 +862,39 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
 
 class WaitingForAmount(Text):
 
+    def __init__(self, bot: Bot, chat_id, master_sum: float):
+        super().__init__(bot, chat_id)
+        self.master_sum = master_sum
+
+
+
     @property
     def text(self):
 
-        text = """Минимальная сумма пополнения - 100 рублей\n
-        Бонусы за пополнение:\n
-        - oт 3 000 р. + 10 %\n
-        - oт 5 000 р. + 15 % \n
-        - oт 10 000 р. + 50 %\n
-        - oт 30 000 р. + 80 %\n
-        - oт 50 000 р. + 100 %\n\n
-        Введите сумму пополнения (от 100 р.)\n
-        
-        """
+        text = f"""
+        🔥 Внимание! Только до 05.07.2024:
+
+💰 Бонус 200% от суммы пополнения!
+
+👉 Если пополняете на 1,000 рублей, на ваш бонусный счет добавляется еще 2,000 рублей.
+👉 На 100,000 рублей — 200,000 рублей!
+
+🚀 При пополнении счета свыше мастер-суммы: бонус 400% от суммы пополнения!
+
+💡 Если у вас 2 кампании, используйте полный функционал бота за эти деньги целый месяц.
+🔹 Если одна кампания, бот обойдется всего в 500 рублей.
+
+🎉 Если пополняете на сумму больше мастер-суммы:
+🔹 Будете платить всего 250 руб. в месяц за кампанию!
+
+👍 Это делает его не только лучшим, но и самым выгодным решением для автоматизации рекламы на WB!
+
+💼 Мастер-сумма (бонус 400%): 100 рублей.
+
+📩 Подробности у администратора бота: @skyline360_1 \n
+
+Укажите сумму пополнения (не менее 100 рублей):"""
+
         return text
 
 
