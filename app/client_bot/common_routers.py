@@ -21,6 +21,7 @@ common_router.include_routers(keywords_positions_history.handlers.router)
 if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
     common_router.include_routers(exceptions.admin_router)
+
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(keyword_settings.router)
 common_router.include_routers(setting_min_ctr.router)

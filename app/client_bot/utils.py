@@ -73,12 +73,13 @@ async def get_keyword_history_graphic(adv_original_id):
         stmt = select(AdvKeyword.text, func.sum(AdvKeyword.views).label('views')) \
             .where(AdvKeyword.adv_setting_id == adv_original_id) \
             .group_by(AdvKeyword.text) \
-            .order_by(desc('views'))
+            .order_by(desc('views')).limit(5)
         result = await session.execute(stmt)
         texts = result.scalars().all()
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
         adv = await session.execute(stmt)
         adv = adv.scalar()
+        limit = int(7*24/8) + 1
         nmid = adv.nmids[0]
         stmt = select(CommonKeyword) \
             .join(CommonKeyword.wb_item_positions) \
@@ -86,13 +87,13 @@ async def get_keyword_history_graphic(adv_original_id):
             .where(and_(
             WBItemPosition.nmid == nmid,
                         CommonKeyword.text.in_(texts)
-                        ))
+                        )).limit(limit)
         result = await session.execute(stmt)
         common_keywords: list[CommonKeyword] = result.unique().scalars().all()
 
         # Подготовка дат за последние 7 дней
         end_date = datetime.datetime.now()
-        start_date = end_date - datetime.timedelta(days=6)
+        start_date = end_date - datetime.timedelta(days=7)
         date_range = pd.date_range(start=start_date, end=end_date)
         frames = []
         # Создание DataFrame
@@ -113,7 +114,8 @@ async def get_keyword_history_graphic(adv_original_id):
                 beutify_position = close_position - 0.5 +  random.randint(1, 9)*0.1
                 data["Позиция"].append(beutify_position)
             frames.append(pd.DataFrame(data))
-
+        if not frames:
+            return None
         df = pd.concat(frames, ignore_index=True)
         # Построение графика без легенды
         plt.figure(figsize=(10, 6))
@@ -124,6 +126,8 @@ async def get_keyword_history_graphic(adv_original_id):
                 plt.title("Позиции за последние 7 дней")
                 plt.tight_layout()
                 plt.gca().invert_yaxis()
+                ax = plt.gca()  # Получение текущего осевого объекта
+                ax.yaxis.set_major_locator(MaxNLocator(integer=True))
                 image_stream = BytesIO()
                 plt.savefig(image_stream, format='jpg')
                 image_stream.seek(0)

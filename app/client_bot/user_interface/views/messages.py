@@ -217,8 +217,6 @@ class AdvSettingMenu(TextWithKeyboard):
             self._mean_ctr = round(self._mean_ctr, 2) * 100
         except NoResultFound:
             self._mean_ctr = 'Средний CTR не определен'
-
-
         await super().__call__()
 
 
@@ -279,7 +277,7 @@ class AddNewTokenGet(TextWithImage):
         self.__cabinet_name  = cabinet_name
         super().__init__(bot, chat_id)
 
-        self._image = 'app/client_bot/images/api_setting.png'
+        self._image = 'app/client_bot/images/static/api_setting.png'
 
     @property
     def text(self):
@@ -364,7 +362,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                         clear_keywords.append(keyword)
 
             self._keywords = clear_keywords
-
+        self.min_ctr = await data_manager.get_min_ctr(self._adv_setting)
         await super().__call__()
 
     @property
@@ -402,7 +400,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                        self._wb_user_cabinet_original_id,
                                                        self._page,
                                                        self._filter,
-                                                       self._on_page)
+                                                       self._on_page,
+                                                       self.min_ctr)
 
 
 class KeywordSettingMessage(TextWithKeyboard):
@@ -955,3 +954,18 @@ class KeywordGraphicPart_2(TextWithKeyboardAndImage):
 
 class NotKeywordHistoryPositions(Text):
     text = 'Не удалось получить историю позиций ключевых слов для этой кампании'
+
+
+class NotEnoughMoneyForParsing(TextWithKeyboard):
+
+    def __init__(self, bot: Bot, chat_id, wb_cabinet_original_id):
+        super().__init__(bot, chat_id)
+        self._wb_cabinet_original_id = wb_cabinet_original_id
+
+
+
+    text = """Не достаточный баланс для парсинга ключевых слов. Пополните баланс и попробуйте снова"""
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard(self._wb_cabinet_original_id)

@@ -95,6 +95,20 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                         adv_original_id=adv_setting.id).pack())
     builder.row(button)
 
+
+    if adv_setting.parsing_active:
+        button = InlineKeyboardButton(text='Отключить сбор позиций',
+                                        callback_data=callbacks.TurnParsing(action='off',
+                                                                            adv_original_id=adv_setting.id,
+                                                                            wb_user_cabinet_original_id = wb_user_cabinet.id).pack())
+    else:
+        button = InlineKeyboardButton(text='Включить сбор позиций',
+                                        callback_data=callbacks.TurnParsing(action='on',
+                                                                            adv_original_id=adv_setting.id,
+                                                                            wb_user_cabinet_original_id=wb_user_cabinet.id
+                                                                            ).pack())
+    builder.row(button)
+
     if adv_setting.hard_min_ctr:
          builder.row(InlineKeyboardButton(text='Изменить минимальный CTR',
                                          callback_data=callbacks.ChangeMinCTR(
@@ -214,11 +228,12 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                   wb_user_cabinet_original_id: int,
                                    page,
                                   return_from_filter_bottom: bool,
-                                  on_page):
+                                  on_page,
+                                  min_ctr):
 
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
-
+    keywords.sort(key=lambda x: abs(x.keyword_setting.predict_ctr - min_ctr), reverse=True)
     bottoms = []
     for keyword in keywords[start_index:end_index]:
         clicks = keyword.clicks
@@ -240,20 +255,22 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
             raise ValueError(f'Unknown hard_status: {keyword.hard_status}')
 
         turn_on = '✅' if keyword.status == KeywordStatus.GOOD else '❌'
-        text = f'{clicks}/{views}/{round(ctr *100, 0)}|'
-        if keyword.cpm:
-            first_position = keyword.base_position
-            second_position = keyword.promo_position
-            text += f'{first_position}>{second_position}'
-        elif keyword.real_position:
-            first_position = keyword.real_position
-            text += f'{first_position}'
-        elif keyword.real_position == 0:
-            first_position = ">i"
-            text += f'{first_position}'
-        else:
-            first_position = '?'
-            text += f'{first_position}'
+        text = f'{clicks}/{views}/{round(ctr *100, 0)}'
+        if adv_setting.parsing_active:
+            text = text + '|'
+            if keyword.cpm:
+                first_position = keyword.base_position
+                second_position = keyword.promo_position
+                text += f'{first_position}>{second_position}'
+            elif keyword.real_position:
+                first_position = keyword.real_position
+                text += f'{first_position}'
+            elif keyword.real_position == 0:
+                first_position = ">i"
+                text += f'{first_position}'
+            else:
+                first_position = '?'
+                text += f'{first_position}'
         text += f'{turn_on}({hard_status}) {keyword.text}'
         inline_keyboard = [InlineKeyboardButton(text= text,
                                                 callback_data=callbacks.SettingKeyword(

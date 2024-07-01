@@ -117,3 +117,8 @@ class AddBalance(CallbackData, prefix="add_balance"):
 class KeywordPositionHistory(CallbackData, prefix="keyword_position_history"):
     adv_original_id: int
 
+
+class TurnParsing(CallbackData, prefix="turn_parsing"):
+    action: str
+    adv_original_id: int
+    wb_user_cabinet_original_id: int

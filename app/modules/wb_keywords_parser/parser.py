@@ -221,8 +221,9 @@ async def add_wb_positions_from_queue_to_db():
     position = list(queue_position_dict.values())[-1]
     async with sm() as session:
         stmt = select(WBItemPosition) \
-            .where(and_(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
-                        WBItemPosition.keyword_id == CommonKeyword.id)) \
+            .where(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
+                        WBItemPosition.keyword_id == CommonKeyword.id,
+                   WBItemPosition.timestamp > datetime.datetime.now() - datetime.timedelta(hours=8)) \
             .order_by(WBItemPosition.timestamp.desc()) \
             .limit(1)
         pos_in_db = await session.execute(stmt)
@@ -230,19 +231,8 @@ async def add_wb_positions_from_queue_to_db():
         if not pos_in_db:
             keyword = position.keyword
             await session.merge(keyword)
-            session.add(position)
+            await session.merge(position)
             await session.commit()
-        else:
-            if any([pos_in_db.base_position != position.base_position,
-                    pos_in_db.promo_position != position.promo_position,
-                    pos_in_db.cpm != position.cpm,
-                    pos_in_db.adv_id != position.adv_id,
-                    pos_in_db.real_position != position.real_position]):
-                await session.merge(position)
-                await session.commit()
-            else:
-                pos_in_db.timestamp = position.timestamp
-                await session.commit()
     del queue_position_dict[last_key]
 
 
@@ -262,6 +252,7 @@ async def add_wb_positions(text:str, need_nmids: set[int]):
             await session.commit()
         for page in range(1, 100):
             positions = await parser.parse_keywords_from_wb(keyword, page)
+            positions = [position for position in positions if position.nmid in need_nmids]
             await redis_manager.add_positions_to_redis(positions)
             logger.debug('Записали позиции в Редис')
             for position in positions:
@@ -287,17 +278,6 @@ async def add_wb_positions(text:str, need_nmids: set[int]):
 
         keyword.last_full_update = update_time
         await session.commit()
-        # for position in positions:
-        #     text = position.keyword.text
-        #     if text not in text_to_task:
-        #         task = asyncio.create_task(__add_wb_positions_to_db(positions))
-        #         text_to_task[text] = task
-        #     else:
-        #         task = text_to_task[text]
-        #         if task.done():
-        #             del text_to_task[text]
-        #             if task.exception():
-        #                  logger.debug(f'Ошибка при выполнении задачи: {task.exception()}')
 
 
 max_thread_for_proxy = settings.MAX_THREAD_FOR_PROXY
