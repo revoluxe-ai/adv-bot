@@ -139,6 +139,9 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
 
     async with sm() as session:
         async with session.begin():
+            stmt = select(User).where(User.user_telegram_id == message.chat.id)
+            user = await session.execute(stmt)
+            user = user.scalars().first()
             wb_cabinet = await session.execute(select(WBCabinet)\
                                                .filter(WBCabinet.id == wb_cabinet_original_id))
             wb_cabinet = wb_cabinet.scalars().first()
@@ -148,6 +151,12 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
                 wb_cabinet.bonus = 0
             wb_cabinet.balance += cost
             wb_cabinet.bonus += bonus
+            payment = Payment(
+                user_id=wb_cabinet.user_id,
+                amount=cost,
+                target='balance',
+            )
+            user.payments.append(payment)
             await session.commit()
     await messages.BalanceUpdated(bot, message.chat.id, cost, bonus)()
     async with sm() as session:
