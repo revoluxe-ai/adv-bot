@@ -12,6 +12,7 @@ import logging
 from app.admin_bot.sender import sender_manager
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
 from app.client_bot.user_interface import states
+from app.client_bot.user_interface.handlers import start
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.payments.db.models import Payment
@@ -54,6 +55,10 @@ async def add_balance(callback: types.CallbackQuery,
 
 @router.message(StateFilter(states.AddBalance.awaiting_amount))
 async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot):
+    text = message.text
+    if '/start' in text:
+        await start.start_registration(message, bot, state)
+        return
     amount = message.text
     if not amount.isdigit():
         await message.answer("Введите сумму (число) от 100 рублей")
