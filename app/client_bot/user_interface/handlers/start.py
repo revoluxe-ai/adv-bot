@@ -34,11 +34,22 @@ redis_manager = RedisManager()
 
 
 async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
-    await state.set_state(state = None)
+
+    await state.clear()
+
     if isinstance(message, types.CallbackQuery):
         await message.answer()
+
     async with sm() as session:
         user_id = message.from_user.id
+        if isinstance(message, types.Message) and message.text:
+            text = message.text.split(' ')
+            if len(text) > 1 and text[1].isdigit():
+                referral_link_id = int(text[1])
+                stmt = select(RefLink) \
+                    .options(selectinload(RefLink.referred_users)) \
+                    .where(RefLink.id == referral_link_id)
+                referral_link = (await session.execute(stmt)).scalar()
 
         stmt = select(User).options(
             joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
@@ -55,6 +66,9 @@ async def start_registration(message: types.Message, bot: aiogram.Bot, state: FS
                 wb_tokens=[],
             )
             session.add(user)
+
+            if referral_link:
+                referral_link.referred_users.append(user)
 
             await session.commit()
             await session.refresh(user)

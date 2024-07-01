@@ -616,7 +616,8 @@ async def get_ref_statistic(user_telegram_id: int) -> Optional[list[ReferralStat
             return None
 
         # Возвращаем результаты в удобном для использования виде
-        return [ReferralStatistic(name=row[0], referrals_count=row[1], total_payments=row[2]) for row in stats]
+
+        return [ReferralStatistic(name=row[0], referrals_count=row[1], total_payments= min([row[2], 500])) for row in stats]
 
 
 @dataclass
