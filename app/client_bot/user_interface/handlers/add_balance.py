@@ -174,7 +174,7 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
             wb_cabinet.balance += cost
             wb_cabinet.bonus += bonus
             payment = Payment(
-                user_id=wb_cabinet.user_id,
+                user=user,
                 amount=cost,
                 target='balance',
             )
