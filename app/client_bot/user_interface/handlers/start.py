@@ -39,7 +39,7 @@ async def start_registration(message: types.Message, bot: aiogram.Bot, state: FS
 
     if isinstance(message, types.CallbackQuery):
         await message.answer()
-
+    referral_link  = None
     async with sm() as session:
         user_id = message.from_user.id
         if isinstance(message, types.Message) and message.text:
