@@ -178,7 +178,6 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
                 amount=cost,
                 target='balance',
             )
-            user.payments.append(payment)
             await session.commit()
     await messages.BalanceUpdated(bot, message.chat.id, cost, bonus)()
     async with sm() as session:
