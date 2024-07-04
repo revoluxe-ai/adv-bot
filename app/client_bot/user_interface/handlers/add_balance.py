@@ -139,7 +139,19 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
     """
     bonus = cost * 2
     state_data = await state.get_data()
-    master_sum = state_data['master_sum']
+    try:
+        master_sum = state_data['master_sum']
+    except:
+        async with sm() as session:
+            time_from = '2024-07-01 00:00:00'
+            time_from_datetime = datetime.datetime.strptime(time_from, '%Y-%m-%d %H:%M:%S')
+            stmt = select(func.max(Payment.amount)) \
+                .where(Payment.timestamp > time_from_datetime)
+            result = await session.execute(stmt)
+            max_amount = result.scalar()
+            if not max_amount:
+                max_amount = 50
+            master_sum = max_amount * 2
     if cost >= master_sum:
         bonus = cost * 4
 
