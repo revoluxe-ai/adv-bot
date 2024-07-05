@@ -1,5 +1,5 @@
 import datetime
-
+from app.utils.redis_manager import RedisEvent
 from app.utils.redis_func_cache import set_config
 from ..wb_keywords_parser import parser
 
@@ -35,8 +35,8 @@ class Runner:
         update_model_on_new_features = asyncio.Event()
         need_update_model = asyncio.Event()
         need_update_model.set()
-        predicted = asyncio.Event()
-        predicted.set()
+        predicted = RedisEvent(key='predicted')
+        await predicted.set()
 
         await asyncio.gather(
             # self.clear_data_for_expired_wb_cabinets(),
@@ -47,21 +47,20 @@ class Runner:
             self.update_cards_in_graph(),
             self.update_all_data_in_db(),
             self.update_min_ctr_in_global_wb_category_settings(),
-            self.run_update_keyword_stat(need_update_model),
-            self.run_update_vectors(need_update_model, update_model_on_new_features, predicted),
+            self.run_update_vectors(need_update_model, update_model_on_new_features),
             self.run_update_model(update_model_on_new_features, need_update_model),
             self.run_update_predict_ctr(update_model_on_new_features, predicted),
             return_exceptions=False
             )
 
-    async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: asyncio.Event):
+    async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: RedisEvent):
         while True:
              logger.debug('Ожидание разрешения обновления ключей')
              await sender_manager.send_message_to_admin('Ожидание разрешения обновления ключей')
              await update_model_on_new_features.wait()
              logger.debug('Блокировка снята')
              await sender_manager.send_message_to_admin('Блокировка на обновление ключей снята')
-             await self._manager.update_predict_ctr( predicted)
+             await self._manager.update_predict_ctr(predicted)
              await sender_manager.send_message_to_admin('Обновление ctr ключей завершено')
              await asyncio.sleep(1)
 
@@ -97,7 +96,7 @@ class Runner:
 
 
     async def run_update_vectors(self, need_update_model:asyncio.Event,
-                                 update_model_on_new_features:asyncio.Event, predicted:asyncio.Event):
+                                 update_model_on_new_features:asyncio.Event):
 
         await asyncio.gather(self._manager.update_wb_adv_phrase_in_db(need_update_model),
         self._manager.update_vectors_exec_mode(update_model_on_new_features, need_update_model))

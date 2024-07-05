@@ -53,6 +53,7 @@ from .graph_vector_updater import GraphUpdater
 from .ML import Fitter, Predictor
 from .shops_manager import rights_control
 from ...client_bot import const
+from ...utils.redis_manager import RedisEvent
 
 predictor = Predictor()
 
@@ -522,7 +523,7 @@ class Manager(AbcManager):
         except ValueError:
             return False
 
-    async def update_predict_ctr(self, predicted: asyncio.Event):
+    async def update_predict_ctr(self, predicted: RedisEvent):
         await self._predictor.predict_ctr_for_keywords(predicted)
 
     @staticmethod

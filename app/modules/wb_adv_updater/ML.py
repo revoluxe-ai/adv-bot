@@ -26,6 +26,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from . import data_manager
 from .data_manager import DataGetter
 from ...exc import CardNotFoundInDB
+from ...utils.redis_manager import RedisEvent
 
 sm = get_async_session_maker
 
@@ -302,7 +303,7 @@ class Predictor:
         df['predicted_ctr'] = y
         return df
 
-    async def predict_ctr_for_keywords(self,  predicted: asyncio.Event):
+    async def predict_ctr_for_keywords(self,  predicted: RedisEvent):
 
         async with sm() as session:
             stmt = select(AdvSetting).options(
@@ -312,7 +313,7 @@ class Predictor:
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
 
-        predicted.clear()
+        await predicted.clear()
 
         df_for_predict = await self._get_df_for_predict(all_adv_settings)
         predict_df = await asyncio.to_thread(self._predict, df_for_predict)

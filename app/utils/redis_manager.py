@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 from typing import Union
@@ -8,6 +9,45 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 
 redis_client = redis.asyncio.Redis(host='localhost', port=6379, db=0)
+
+
+class RedisEvent(asyncio.Event):
+    def __init__(self, key=None):
+        if key:
+            self.key = key
+        else:
+            self.key = 'event:' + str(id(self))
+        super().__init__()
+
+    async def _get_redis(self):
+           return redis_client
+
+    async def set(self):
+        redis = await self._get_redis()
+        await redis.set(self.key, 1)
+        super().set()
+
+    async def clear(self):
+        redis = await self._get_redis()
+        await redis.delete(self.key)
+        super().clear()
+
+    async def wait(self):
+        redis = await self._get_redis()
+        while True:
+            result = await redis.get(self.key)
+            if result:
+                break
+            await asyncio.sleep(0.1)
+        await super().wait()
+
+    async def is_set(self):
+        redis = await self._get_redis()
+        result = await redis.get(self.key)
+        return result is not None
+
+
+
 
 
 
