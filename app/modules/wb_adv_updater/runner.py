@@ -43,7 +43,6 @@ class Runner:
             self.process_payment_for_advs(),
             self.shop_subscribe_control(),
             self.demo_subscribe(),
-            self.run_update_keywords_on_wb(),
             self.update_cards_in_graph(),
             self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_vectors(need_update_model, update_model_on_new_features),
