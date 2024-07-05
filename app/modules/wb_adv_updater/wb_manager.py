@@ -599,7 +599,10 @@ class Manager(AbcManager):
                      if tasks[wb_access.wb_cabinet.id].exception():
                          logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}, '
                                       f'{tasks[wb_access.wb_cabinet.id].exception()}')
+                     else:
+                         logger.info('Задача обновления успешно выполнена')
                      del tasks[wb_access.wb_cabinet.id]
+
 
 
     async def check_accesses(self):
