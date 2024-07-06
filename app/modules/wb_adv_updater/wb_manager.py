@@ -319,7 +319,7 @@ class Manager(AbcManager):
                             logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}',
                                          exc_info=True)
                         del update_tasks[wb_cabinet_id]
-            await asyncio.sleep(60*15)
+            await asyncio.sleep(0)
 
 
     async def update_model(self, update_model_on_new_features):
