@@ -690,9 +690,15 @@ async def get_min_ctr(adv: AdvSetting):
     min_ctr_getter = MinCTRGetter(adv)
     # text_to_predict_ctr = {kw.text: kw.predict_ctr for kw in keyword_settings}
     async with _sm() as session:
-        stmt = select(AdvKeyword.text, (func.sum(AdvKeyword.clicks) / func.sum(AdvKeyword.views)).label('ctr'))\
-        .group_by(AdvKeyword.text)\
-            .where(AdvKeyword.adv_setting_id == adv.id)
+        stmt = select(
+            AdvKeyword.text,
+            (func.sum(AdvKeyword.clicks) /
+             case(
+                 (func.sum(AdvKeyword.views) == 0, 1),
+                 else_=func.sum(AdvKeyword.views)
+             )).label('ctr')
+        ).group_by(AdvKeyword.text).where(AdvKeyword.adv_setting_id == adv.id)
+
         result = await session.execute(stmt)
         adv_keywords_rows = result.all()
     text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}

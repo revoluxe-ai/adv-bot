@@ -1,11 +1,12 @@
 import asyncio
+import datetime
 import logging
 import typing
 from dataclasses import dataclass
 from typing import Union, AsyncGenerator
 
 import aiohttp
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
 from app.client_bot.const import MAX_TOKENS
@@ -39,7 +40,8 @@ async def get_accesses_for_wb_cabinets()-> AsyncGenerator[WBCabinetAccess, None]
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
                                           .selectinload(User.wb_tokens))\
-        .where(WBCabinet.active == True)
+        .where(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
+                   WBCabinet.balance > 0))
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
