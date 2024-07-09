@@ -664,17 +664,48 @@ async def get_mean_ctr(adv: AdvSetting):
         return mean_ctr  # Возвращаем значение mean_ctr вместо pass
 
 
+class MinCTRGetter:
+    def __init__(self, adv: AdvSetting):
+        self._adv = adv
+        self._min_ctr = None
+
+    async def get_min_ctr(self):
+        if not (min_ctr := self._min_ctr is None):
+           min_ctr = await get_min_ctr(self._adv)
+           self._min_ctr = min_ctr
+        return min_ctr
+
+
 async def get_min_ctr(adv: AdvSetting):
     if adv.hard_min_ctr:
-        return adv.hard_min_ctr
+        return float(adv.hard_min_ctr)
     async with _sm() as session:
-        stmt = select(func.min(KeywordSetting.predict_ctr))\
-        .where(KeywordSetting.hard_status == 2,
-               KeywordSetting.adv_setting_id == adv.id)
+        stmt = select(KeywordSetting)\
+        .where(
+            KeywordSetting.hard_status == 2,
+               KeywordSetting.adv_setting_id == adv.id,
+            )
         result = await session.execute(stmt)
-        min_ctr = result.scalar_one_or_none()
+        keyword_settings = result.unique().scalars().all()
+    min_ctr_getter = MinCTRGetter(adv)
+    # text_to_predict_ctr = {kw.text: kw.predict_ctr for kw in keyword_settings}
+    async with _sm() as session:
+        stmt = select(AdvKeyword.text, (func.sum(AdvKeyword.clicks) / func.sum(AdvKeyword.views)).label('ctr'))\
+        .group_by(AdvKeyword.text)\
+            .where(AdvKeyword.adv_setting_id == adv.id)
+        result = await session.execute(stmt)
+        adv_keywords_rows = result.all()
+    text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
+    ctrs  = []
+    for kw in keyword_settings:
+        ctr = text_to_real_ctr.get(kw.text, await min_ctr_getter.get_min_ctr())
+        ctrs.append(ctr)
+    if ctrs:
+         min_ctr = min(ctrs)
+    else:
+        return 0.03
     if min_ctr:
-        return min_ctr
+        return float(min_ctr)
     category = await get_wb_category(adv)
     category_name = category.wb_category_name
     async with _sm() as session:
@@ -687,7 +718,7 @@ async def get_min_ctr(adv: AdvSetting):
             min_ctr = 0
             return min_ctr
     min_ctr *= adv.boost
-    return min_ctr
+    return float(min_ctr)
 
 
 
