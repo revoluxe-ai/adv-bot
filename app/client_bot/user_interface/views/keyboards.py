@@ -128,7 +128,7 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
 
     builder.row(button)
 
-    button = InlineKeyboardButton(text='Изменить мин. кол-во просмотров CTR',
+    button = InlineKeyboardButton(text='Изменить мин. кол-во просмотров для ИИ-прогноза CTR',
                                         callback_data=callbacks.ChangeMinViewsForPredictCTR(
                                             action='to_min_views_for_predict_ctr_change_page',
                                             adv_original_id=adv_setting.id).pack())
