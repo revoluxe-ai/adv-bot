@@ -255,7 +255,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
             raise ValueError(f'Unknown hard_status: {keyword.hard_status}')
 
         turn_on = '✅' if keyword.status == KeywordStatus.GOOD else '❌'
-        text = f'{clicks}/{views}/{round(ctr *100, 0)}'
+        text = f'{clicks}/{views}/{round(ctr *100,2)}%'
         if adv_setting.parsing_active:
             text = text + '|'
             if keyword.cpm:
@@ -272,6 +272,11 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                 first_position = '?'
                 text += f'{first_position}'
         text += f'{turn_on}({hard_status}) {keyword.text}'
+
+        text += f'({round(keyword.keyword_setting.predict_ctr*100, 2)}%)'
+
+        text += f"""{"(" + str(keyword.keyword_setting.added_clicks) + ")" if keyword.keyword_setting.added_clicks  else ''}"""
+
         inline_keyboard = [InlineKeyboardButton(text= text,
                                                 callback_data=callbacks.SettingKeyword(
                                                 keyword_setting_original_id = keyword.keyword_setting.id,
