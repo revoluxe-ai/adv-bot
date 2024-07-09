@@ -423,11 +423,21 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._keyword_setting = keyword_setting
         self._adv_setting = adv_setting
 
+        async with _sm() as session:
+            stmt = select(CommonKeyword.last_full_update)\
+                .where(CommonKeyword.text == keyword_setting.text)
+            result = await session.execute(stmt)
+            last_full_update = result.scalar()
+
+        self.last_full_update = last_full_update
+
         return await super().__call__()
 
     @property
     def text(self):
-        return f'Статистика и настройка ключевого слова: {self._keyword_setting.text}'
+        text = (f'Статистика и настройка ключевого слова: {self._keyword_setting.text}\n'
+                f'Последнее обновление: {self.last_full_update}\n')
+        return text
 
     @property
     def keyboard(self):
