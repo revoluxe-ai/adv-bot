@@ -371,6 +371,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  'Название кампании: ' + str(self._adv_setting.name) + '\n'
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
                  'Статистика и настройка ключевых слов \n'
+                 f'Минимальный CRT для кампании: {round(self.min_ctr*100, 2)}%\n'
                  'Расшифровка: \n'
                  '✅  - ключевое слово активно \n'
                  '❌  - ключевое слово не активно \n'

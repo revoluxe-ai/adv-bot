@@ -590,12 +590,15 @@ class ReferralStatistic:
     total_payments: float
 
 async def get_ref_statistic(user_telegram_id: int) -> Optional[list[ReferralStatistic]]:
-    """Получить статистику по рефералам пользователя: количество приведенных пользователей и сумму их платежей."""
+    """НУЖНО ЧИНИТЬ,ПОКА НЕ РАБОТАЕТ ПАРТНЕРКА"""
     async with _sm() as session:
         # Сначала найдем пользователя по telegram_id
         user_query = select(User.id).where(User.user_telegram_id == user_telegram_id)
         result = await session.execute(user_query)
-        user_id = result.scalar() # Используйте scalar_one_or_none для обработки случая, когда пользователь не найден
+        user_id = result.scalar()
+
+        if user_id is None:
+            return None
 
         # Теперь получим статистику по реферальным ссылкам
         statistics_query = select(
@@ -605,19 +608,18 @@ async def get_ref_statistic(user_telegram_id: int) -> Optional[list[ReferralStat
         ).select_from(RefLink) \
          .outerjoin(user_reflink_association, RefLink.id == user_reflink_association.c.reflink_id) \
          .outerjoin(User, user_reflink_association.c.user_id == User.id) \
-         .outerjoin(Payment, Payment.user_id == User.id) \
+         .outerjoin(WBUserCabinet, WBUserCabinet.user_id == User.id) \
+         .outerjoin(WBCabinet, WBCabinet.id == WBUserCabinet.wbcabinet_id) \
+         .outerjoin(Payment, Payment  == WBCabinet.id) \
          .where(RefLink.referrer_id == user_id) \
          .group_by(RefLink.name)
 
         result = await session.execute(statistics_query)
         stats = result.fetchall()
 
-        if not stats:
-            return None
-
         # Возвращаем результаты в удобном для использования виде
+        return [ReferralStatistic(name=row[0], referrals_count=row[1], total_payments=min(row[2], 500)) for row in stats]
 
-        return [ReferralStatistic(name=row[0], referrals_count=row[1], total_payments= min([row[2], 500])) for row in stats]
 
 
 @dataclass
@@ -665,6 +667,14 @@ async def get_mean_ctr(adv: AdvSetting):
 async def get_min_ctr(adv: AdvSetting):
     if adv.hard_min_ctr:
         return adv.hard_min_ctr
+    async with _sm() as session:
+        stmt = select(func.min(KeywordSetting.predict_ctr))\
+        .where(KeywordSetting.hard_status == 2,
+               KeywordSetting.adv_setting_id == adv.id)
+        result = await session.execute(stmt)
+        min_ctr = result.scalar_one_or_none()
+    if min_ctr:
+        return min_ctr
     category = await get_wb_category(adv)
     category_name = category.wb_category_name
     async with _sm() as session:
