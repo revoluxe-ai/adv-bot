@@ -119,8 +119,6 @@ class Fitter(AbcManager):
             status = adv_id_keyword_text_to_status[(adv_id, row['keyword'])]
             if status == 0:
                 return 0
-            elif status in [2, 3]:
-                return 1
             elif status == 1:
                 min_ctr = adv_id_to_min_ctr[adv_id]
                 if min_ctr > 0:
@@ -157,7 +155,8 @@ class Fitter(AbcManager):
         async with sm() as session:
             stmt = select(AdvSetting) \
                 .options(selectinload(AdvSetting.keyword_settings))\
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active == True,
+                   AdvSetting.active_status == 'started')
             result = await session.execute(stmt)
             adv_settings = result.scalars().all()
 
