@@ -548,20 +548,13 @@ async def get_all_shops_for_user(user:User):
 
 async def get_adv_id_to_min_ctr(adv_ids: list[int])-> dict[int, float]:
     async with _sm() as session:
-        stmt = select(GlobalCategorySetting.category_name, GlobalCategorySetting.min_ctr)
-        result = await session.execute(stmt)
-        category_name_to_min_ctr = dict(result.all())
-    async with _sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(adv_ids))
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.unique().scalars()
     adv_id_to_min_ctr = {}
 
     for adv_setting in adv_settings:
-        wb_category = await get_wb_category(adv_setting)
-        wb_category_name = wb_category.wb_category_name
-        min_ctr = category_name_to_min_ctr.get(wb_category_name, 0)
-        min_ctr = min_ctr * adv_setting.boost
+        min_ctr = await get_min_ctr(adv_setting)
         adv_id_to_min_ctr[adv_setting.adv_id] = min_ctr
     return adv_id_to_min_ctr
 
