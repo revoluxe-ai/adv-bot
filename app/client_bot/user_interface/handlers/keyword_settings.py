@@ -21,6 +21,7 @@ from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils import redis_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+from .start import start_registration
 from ..views import callbacks, messages
 from app.client_bot.user_interface import states
 
@@ -39,6 +40,10 @@ async def setting_keywords_by_adv(message: types.Message,
                                   state: FSMContext):
 
     text = message.text
+    if '/start' in text:
+        await state.clear()
+        await start_registration(message, bot, state)
+        return
     filter_keywords = text.splitlines()
     filter_keywords = [keyword.strip().lower() for keyword in filter_keywords if keyword]
     await state.update_data(keywords_filter=filter_keywords)
