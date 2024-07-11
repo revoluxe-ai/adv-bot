@@ -253,9 +253,17 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             else:
                 fact_ctr = clicks / views
             predict_ctr = keyword_setting.predict_ctr
-            if not predict_ctr:
+            if keyword_stat.hard_status == 0:
+                keyword_stat.keyword_setting.predict_ctr = 0
+            elif not predict_ctr:
                 predict_ctr = fact_ctr
                 keyword_setting.predict_ctr = predict_ctr
+                if enough_views > keyword_stat.views and not adv_setting.min_views_for_ml_predict:
+                    keyword_stat.status = KeywordStatus.GOOD
+                    keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
+                    keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
+                    await redis_manager.set_auto_block_status(keyword_setting.id, True)
+                    continue
             elif fact_ctr > predict_ctr:
                 predict_ctr = fact_ctr
             if adv_setting.max_cpc:
@@ -265,8 +273,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     await redis_manager.set_auto_block_status(keyword_setting.id, False)
                     continue
 
-            boost = adv_setting.boost
-            predict_ctr *= boost
+
             if keyword_setting.hard_status == 3:
                 keyword_stat.status = KeywordStatus.BAD
                 keyword_stat.reason = 'turn_off'
