@@ -233,7 +233,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
-    keywords.sort(key=lambda x: abs(x.keyword_setting.predict_ctr - min_ctr), reverse=True)
+    keywords.sort(key=lambda x: abs(x.keyword_setting.predict_ctr - min_ctr))
     bottoms = []
     for keyword in keywords[start_index:end_index]:
         clicks = keyword.clicks
@@ -308,6 +308,15 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                                 adv_original_id=adv_setting.id,
                                                 type='by_adv',
                                                 page=next_page).pack())])
+    bottom = [InlineKeyboardButton(text='Показать белый список',
+                                   callback_data=callbacks.SettingKeywords(
+                                       adv_original_id=adv_setting.id,
+                                       type='white_list',
+                                       page=page).pack())]
+    bottoms.append(bottom)
+
+
+
 
     bottoms.append([InlineKeyboardButton(text='Вернуться к списку кампаний',
                                          callback_data=callbacks.ChoiceAdvPaginator(
@@ -331,7 +340,10 @@ def get_keyword_setting_keyboard(
                                            new_hard_status=WHITE_LIST,
                                            keyword_setting_original_id=keyword.id).pack())]
         buttons.append(button)
-
+    if hasattr(keyword, 'reason'):
+        reason = keyword.reason
+    else:
+        reason = None
     if auto_block_status and keyword.hard_status == AUTO_MODE:
         button = [InlineKeyboardButton(text='Тестировать дальше',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
@@ -350,7 +362,7 @@ def get_keyword_setting_keyboard(
 
 
 
-    if keyword.hard_status in [AUTO_MODE, WHITE_LIST]:
+    if keyword.hard_status in [AUTO_MODE, WHITE_LIST]  or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
 
         bottom = [InlineKeyboardButton(text='Отключить (релевантная фраза)',
                                         callback_data=callbacks.ChangeKeywordHardStatus(
