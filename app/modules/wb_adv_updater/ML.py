@@ -303,12 +303,12 @@ class Predictor:
         return df
 
     async def predict_ctr_for_keywords(self,  predicted: RedisEvent):
-
         async with sm() as session:
             stmt = select(AdvSetting).options(
                 selectinload(AdvSetting.adv_keywords),
                 selectinload(AdvSetting.keyword_settings)
-            )
+            ).where(AdvSetting.bot_active == True,
+                    AdvSetting.active_status == 'started')
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
 
