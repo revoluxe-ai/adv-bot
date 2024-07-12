@@ -527,4 +527,5 @@ def get_return_to_adv_setting_keyboard(adv_original_id):
     builder.row(InlineKeyboardButton(text='Назад',
                                      callback_data=callbacks.Adv(
                                          adv_original_id=adv_original_id).pack()))
+
     return builder.as_markup()
