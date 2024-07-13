@@ -816,7 +816,7 @@ async def get_all_white_phrases():
             keywords_for_parsing = []
             keywords = await get_good_bad_phrases(adv)
             for keyword in keywords:
-                if keyword.status == 'good':
+                if keyword.keyword_setting.hard_status in [1, 2, 3]:
                    text = keyword.text
                    if text in pass_text:
                        continue
