@@ -145,6 +145,8 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
         await messages. \
             GetApiForrbidenError(bot, chat_id)()
         return
+    except Exception as e:
+        logger.error('Ошибка при проверке токена, токен пропускаем: %s', e)
     await messages.ShopUpdateInfo(bot, chat_id)()
     data_state: dict = await state.get_data()
     cabinet_name = data_state['cabinet_name'].strip()
