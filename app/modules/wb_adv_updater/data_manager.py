@@ -236,24 +236,18 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
             keyword_stat.hard_status = keyword_setting.hard_status
             keyword_stat.keyword_setting = keyword_setting
-            added_views = keyword_setting.added_views
-            if not added_views:
-                added_views = 0
-            added_clicks = keyword_setting.added_clicks
-            if not added_clicks:
-                added_clicks = 0
-            if min_ctr == 0:
-                enough_views = 1000
-            else:
-                enough_views = int(1 / min_ctr)
-            views = keyword_stat.views + enough_views + added_views
-            clicks = keyword_stat.clicks + 1 + added_clicks
+            views = keyword_stat.views
+            clicks = keyword_stat.clicks
             if views == 0:
                 fact_ctr = 0
             else:
                 fact_ctr = clicks / views
             predict_ctr = keyword_setting.predict_ctr
             if not predict_ctr:
+                if min_ctr == 0:
+                    enough_views = 100
+                else:
+                    enough_views = int(1 / min_ctr)
                 predict_ctr = fact_ctr
                 keyword_setting.predict_ctr = predict_ctr
                 if enough_views > keyword_stat.views and not adv_setting.min_views_for_ml_predict:
@@ -296,6 +290,19 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     keyword_stat.reason = KeywordStatus.MAX_CPC
                     await redis_manager.set_auto_block_status(keyword_setting.id, True)
                     continue
+            added_views = keyword_setting.added_views
+            if not added_views:
+                added_views = 0
+            added_clicks = keyword_setting.added_clicks
+            if not added_clicks:
+                added_clicks = 0
+            if min_ctr == 0:
+                enough_views = 1000
+            else:
+                enough_views = int(1 / min_ctr)
+            views = keyword_stat.views + enough_views + added_views
+            clicks = keyword_stat.clicks + 1 + added_clicks
+            predict_ctr = clicks / views
             if predict_ctr >= min_ctr:
                 keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
