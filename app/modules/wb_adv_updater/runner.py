@@ -38,7 +38,7 @@ class Runner:
         predicted = RedisEvent(key='predicted')
         await predicted.set()
         await asyncio.gather(
-            self.clear_data_for_expired_wb_cabinets(),
+            # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             self.shop_subscribe_control(),
             self.demo_subscribe(),
