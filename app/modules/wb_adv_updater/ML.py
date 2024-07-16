@@ -210,7 +210,9 @@ class Fitter(AbcManager):
             avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
             for keyword_setting in adv.keyword_settings:
-                keyword_features = keyword_to_features.get(keyword_setting.text)
+                text = keyword_setting.text
+                text = text.replace('_', ' ')
+                keyword_features = keyword_to_features.get(text)
                 if not keyword_features:
                     logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
                     await asyncio.sleep(0)
@@ -364,11 +366,11 @@ class Predictor:
                if not avg_item_features:
                      logger.error('Нет item_features: %s', adv.name)
                      continue
-               keywords = [keyword.text for keyword in adv.keyword_settings]
+               clear_keywords = [keyword.text.replace('_', ' ') for keyword in adv.keyword_settings]
 
                # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
                keyword_features_result = await session.execute(
-                   select(KeywordFeature).where(KeywordFeature.keyword.in_(keywords))
+                   select(KeywordFeature).where(KeywordFeature.keyword.in_(clear_keywords))
                )
                keyword_features_list = keyword_features_result.scalars().all()
 
@@ -376,8 +378,8 @@ class Predictor:
                keyword_features_dict = {kf.keyword: kf.vector for kf in keyword_features_list}
 
                for keyword in adv.keyword_settings:
-                   # Получаем векторы для каждого ключевого слова
-                   keyword_features = keyword_features_dict.get(keyword.text)
+                   text = keyword.text.replace('_', ' ')
+                   keyword_features = keyword_features_dict.get(text)
                    if not keyword_features:
                        continue
 
