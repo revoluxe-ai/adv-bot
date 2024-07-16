@@ -38,14 +38,14 @@ class Runner:
         predicted = RedisEvent(key='predicted')
         await predicted.set()
         await asyncio.gather(
-            # self.clear_data_for_expired_wb_cabinets(),
-            # self.process_payment_for_advs(),
-            # self.shop_subscribe_control(),
-            # self.demo_subscribe(),
-            # self.update_min_ctr_in_global_wb_category_settings(),
+            self.clear_data_for_expired_wb_cabinets(),
+            self.process_payment_for_advs(),
+            self.shop_subscribe_control(),
+            self.demo_subscribe(),
+            self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_vectors(need_update_model, update_model_on_new_features),
-            # self.run_update_model(update_model_on_new_features, need_update_model),
-            # self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            self.run_update_model(update_model_on_new_features, need_update_model),
+            self.run_update_predict_ctr(update_model_on_new_features, predicted),
             return_exceptions=False
             )
 
@@ -99,8 +99,9 @@ class Runner:
                 self.update_cards_in_graph(),
                 self._manager.update_wb_adv_phrase_in_db(need_update_model),
             )
-            await self._manager.update_vectors_exec_mode(update_model_on_new_features, need_update_model)
+            await self._manager.update_vectors_exec_mode()
             update_model_on_new_features.set()
+            need_update_model.set()
             await asyncio.sleep(0)
 
 

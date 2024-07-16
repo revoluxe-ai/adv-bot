@@ -235,13 +235,11 @@ class Manager(AbcManager):
 
 
 
-    async def graph_vector_update(self, update_model_on_new_features: asyncio.Event) -> None:
+    async def graph_vector_update(self) -> None:
         length = 2**4
         await self.graph_updater.update_graph_run(length)
         await asyncio.sleep(1)
-        """Отключил для тестов"""
-        # await self.graph_updater.get_nmids_and_keyword_featers_for_ml() #отключил, чтобы случайно не обновить при тестах
-        update_model_on_new_features.set()
+
 
     def save_full_predict(self):
         # Загрузка данных с помощью Dask
@@ -338,16 +336,13 @@ class Manager(AbcManager):
         await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
 
 
-    async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, need_update_model):
-        while True:
+    async def update_vectors_exec_mode(self):
              try:
-                 await self.graph_vector_update(update_model_on_new_features)
+                 await self.graph_vector_update()
+                 await self.graph_updater.get_nmids_and_keyword_featers_for_ml()
              except Exception as exc:
                     logger.error(f'Ошибка обновления векторов {exc}')
-                    await asyncio.sleep(1)
-                    continue
-             need_update_model.set()
-             await asyncio.sleep(0)
+
 
     def __get_keyword_stat(self):
         kw_df = pd.read_csv(self.keyword_stat_df_path)
