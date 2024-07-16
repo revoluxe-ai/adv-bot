@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import re
 import traceback
 import typing
 from io import BytesIO
@@ -235,15 +236,11 @@ class Manager(AbcManager):
 
 
     async def graph_vector_update(self, update_model_on_new_features: asyncio.Event) -> None:
-
         length = 2**4
         await self.graph_updater.update_graph_run(length)
         await asyncio.sleep(1)
-        await sender_manager.send_message_to_admin('Вектора обновлены')
-        await sender_manager.send_message_to_admin('Ожидание предсказаний')
-        await sender_manager.send_message_to_admin('Ожидание предсказаний пройдено')
-        await self.graph_updater.get_nmids_and_keyword_featers_for_ml()
-        await sender_manager.send_message_to_admin('Вектора для ML обновлены')
+        """Отключил для тестов"""
+        # await self.graph_updater.get_nmids_and_keyword_featers_for_ml() #отключил, чтобы случайно не обновить при тестах
         update_model_on_new_features.set()
 
     def save_full_predict(self):
@@ -342,7 +339,6 @@ class Manager(AbcManager):
 
 
     async def update_vectors_exec_mode(self, update_model_on_new_features: asyncio.Event, need_update_model):
-
         while True:
              try:
                  await self.graph_vector_update(update_model_on_new_features)
@@ -359,73 +355,61 @@ class Manager(AbcManager):
 
     async def update_wb_adv_phrase_in_db(self, need_update_model):
         """update_model_on_new_features.set()"""
-        while True:
-            try:
-                await self._update_wb_adv_phrase_in_db_bot_active()
-            except Exception as exc:
-                logger.error(f'Ошибка обновления фраз в neo4j {exc}')
-                await asyncio.sleep(1)
-                continue
-            await sender_manager.send_message_to_admin('Все Фразы обновлены')
-            need_update_model.set()
-            await asyncio.sleep(0)
+        try:
+            await self.update_wb_adv_phrase_in_db_bot_active()
+        except Exception as exc:
+            logger.error(f'Ошибка обновления фраз в neo4j {exc}')
+        need_update_model.set()
 
-    async def _update_wb_adv_phrase_in_db_bot_active(self):
-        await sender_manager.send_message_to_admin('Обновление фраз в neo4j')
+    async def update_wb_adv_phrase_in_db_bot_active(self):
         async with sm() as session:
-            stmt = select(AdvSetting)\
+            stmt = select(KeywordSetting.text)\
+            .join(AdvSetting)\
             .filter(and_(AdvSetting.active_status == 'started',
-                         AdvSetting.bot_active == True))
+                            AdvSetting.bot_active == True))
             result = await session.execute(stmt)
-            adv_settings = result.unique().scalars().all()
-            await sender_manager.send_message_to_admin('Кампании для обновления фраз получены')
-            adv_setting_keyword_stats = {}
-        for adv_setting in adv_settings:
-            await sender_manager.send_message_to_admin(f'Получаем статистику ключей для {adv_setting.name}')
-            keyword_stats = await data_manager.get_keywords_statistic(adv_setting, None)
-            await sender_manager.send_message_to_admin(f'Статистика ключей для {adv_setting.name} получена')
-            adv_setting_keyword_stats[adv_setting] = keyword_stats
-        total_min_ctr = 0
-        total_max_ctr = 100
-
-        await sender_manager.send_message_to_admin('Получаем существующие фразы из neo')
-        keyword_phrases_in_db = await self._gds.get_keyword_phrases()
-        await sender_manager.send_message_to_admin('Существующие фразы из Neo получены')
-
-        for adv_setting, keyword_stats in adv_setting_keyword_stats.items():
-            phrase_data_list = []
-            for keyword_stat in keyword_stats:
-                if keyword_stat.text in keyword_phrases_in_db:
-                    logger.debug(f'Фраза {keyword_stat.text} уже есть в базе данных')
-                    await asyncio.sleep(0)
-                    continue
-                ctr = keyword_stat.ctr
-                # Расчет нормализованного CTR для каждой фразы
-                n_ctr = ((ctr - total_min_ctr) / (total_max_ctr - total_min_ctr)
-                         if total_max_ctr > total_min_ctr else 0)
-                words = keyword_stat.text.split()
-                keywords = []
-                for word in words:
-                    vector = await self._word2vec.average_vector_from_sentence(word)
-                    if vector is not None:
-                        vector = list(vector)
-                    keywords.append(KeywordStatForNeo(text=word, vector=vector))
-                    await asyncio.sleep(0)
-
-                phrase_data = KeywordPhrase(
-                    text=keyword_stat.text,
-                    ctr=n_ctr,
-                    target_nmids=adv_setting.nmids if n_ctr > 0 else [],
-                    words=keywords,
-                    word2vec=await self._word2vec.average_vector_from_sentence(keyword_stat.text)
-
-                )
-                phrase_data_list.append(phrase_data)
+            texts = result.unique().scalars().all()
+        texts = [text for text in texts if text]
+        new_texts = []
+        for text in texts:
+            text = text.replace('_', ' ')
+            text = text.replace(',', '.')
+            new_texts.append(text)
+        texts = new_texts
+        # keyword_phrases_in_neo = await self._gds.get_keyword_phrases()
+        phrase_data_list = []
+        added_to_base = set()
+        for text in texts:
+            if self._gds.check_phrase_in_neo(text):
+                logger.debug(f'Фраза {text} уже есть в базе данных')
+                await asyncio.sleep(0)
+                continue
+            if text in added_to_base:
+                logger.debug(f'Фраза {text} уже добавлена в список')
+                await asyncio.sleep(0)
+                continue
+            words = text.split()
+            keywords = []
+            for word in words:
+                vector = await self._word2vec.average_vector_from_sentence(word)
+                if vector is not None:
+                    vector = list(vector)
+                keywords.append(KeywordStatForNeo(text=word, vector=vector))
                 await asyncio.sleep(0)
 
-            await self._gds.add_keyword_phrase(phrase_data_list)
+            phrase_data = KeywordPhrase(
+                text=text,
+                words=keywords,
+                word2vec=await self._word2vec.average_vector_from_sentence(text)
+
+            )
+            phrase_data_list.append(phrase_data)
+            added_to_base.add(text)
+
+        batch = 100
+        for i in range(0, len(phrase_data_list), batch):
+            await self._gds.add_keyword_phrase(phrase_data_list[i:i+batch])
             await asyncio.sleep(0)
-            await admin_sender.send_message_to_admin(f'Фразы для {adv_setting.name} добавлены')
 
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):
         if self._phrase_index is None:
@@ -460,27 +444,31 @@ class Manager(AbcManager):
        index = self._faiss_manager.get_keyword_phrases_index()
        return index
 
-    async def __update_cards_in_graph_for_shops(self):
-        async with sm() as db_session:
-            stmt = select(WBCard).where(WBCard.updated == False)
-            result: list[WBCard] = await db_session.stream(stmt)
-            async for wbcard in result.scalars():
+    async def update_cards_in_graph_for_shops(self):
+        async with sm() as session:
+            stmt = select(AdvSetting).where(AdvSetting.bot_active == True,
+                                            AdvSetting.active_status == 'started')
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = result.scalars().all()
+            all_nmids = set()
+            for adv in adv_settings:
+                nmids = adv.nmids
+                for nmid in nmids:
+                    all_nmids.add(nmid)
+            stmt = select(WBCard).where(WBCard.nmid.in_(all_nmids))
+            wbcards: list[WBCard] = await session.stream(stmt)
+            async for wbcard in  wbcards.scalars():
                 try:
                     main_image_url: str = wbcard.photos[0]
                     async with aiohttp.ClientSession() as http_session:
                         async with http_session.get(main_image_url) as response:
                             image_bytes = await response.read()
                             pil_image = PilImage.open(BytesIO(image_bytes))
-
+                    characteristics_word = await self._process_product_data(wbcard)
                     vector = await asyncio.to_thread(self._image_master.get_vector, pil_image)
                     dhash = await asyncio.to_thread(self._image_tools.dhash, pil_image)
-
                     logger.debug(f"Обновляем карточку: {wbcard.name}")
-                    characteristics_word = await self._process_product_data(wbcard)
-                    await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)
-                    wbcard.updated = True  # Обновляем статус
-                    await db_session.commit()  # Подтверждение изменений в базе данных
-                    logger.debug(f"Статус 'updated' установлен в true для карточки с именем: {wbcard.name}")
+                    await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)# Подтверждение изменений в базе данных
                 except KeyError as exc:
                     if exc.args[0] == 'photos':
                         logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
@@ -491,7 +479,7 @@ class Manager(AbcManager):
 
 
     async def update_cards_in_graph(self):
-        await self.__update_cards_in_graph_for_shops()
+        await self.update_cards_in_graph_for_shops()
 
     async def _process_product_data(self, wbcard: WBCard):
         product_data = wbcard.card_json
@@ -513,9 +501,11 @@ class Manager(AbcManager):
     async def __get_words_from_char_value(self, char_value):
         if isinstance(char_value, list):
             char_value = " ".join(char_value)
-        words = char_value.split()
+        words = re.split(r'[ ,\.]+', char_value)
+        words = list(filter(None, words))
         groups = []
         for word in words:
+            word =  word.lower()
             word2vec = await self._word2vec.average_vector_from_sentence(word)
             groups.append((word, word2vec,))
 

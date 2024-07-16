@@ -246,22 +246,17 @@ class Fitter(AbcManager):
 
     async def _fit_modelGradientBoosting(self, update_model_on_new_features):
         logger.debug('Поток обучения запущен, получение данных')
-        await sender_manager.send_message_to_admin('Поток обучения запущен, получение данных')
         df = await self._get_df_for_fit()
-        await sender_manager.send_message_to_admin('Данные получены')
         logger.debug('Данные получены')
         if len(df) == 0:
-            await sender_manager.send_message_to_admin('Нет данных для обучения')
             logger.info('Нет данных для обучения')
             return
-        await sender_manager.send_message_to_admin('Подготовка данных и обучение')
         df:pd.DataFrame = await self._bayesian_apply(df)
         await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
         y = df['ctr']
         X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
                     axis=1)
         logger.debug('Данные подготовлены')
-        await sender_manager.send_message_to_admin('Данные для обучения подготовлены')
         # Создание модели градиентного бустинга
         model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
         if settings.cv:

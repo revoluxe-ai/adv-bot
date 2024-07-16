@@ -13,7 +13,6 @@ sm = get_async_session_maker
 
 shop_id = '89b37551-ff7f-4124-ac7e-cd7546af25cf'
 
-
 async def get_tokens():
     async with sm() as session:
         stmt = select(WBToken)
@@ -34,6 +33,5 @@ async def get_tokens():
 
 
 if __name__ == '__main__':
-
     asyncio.run(get_tokens())
 
