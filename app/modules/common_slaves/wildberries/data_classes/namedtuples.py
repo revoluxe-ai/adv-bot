@@ -8,9 +8,7 @@ class KeywordStatForNeo(NamedTuple):
 
 class KeywordPhrase(NamedTuple):
     text: str
-    ctr: Union[float, None]
     words: list[KeywordStatForNeo]
-    target_nmids: list[int]
     word2vec: list[float]
 
     @property

@@ -11,7 +11,7 @@ sm = get_async_session_maker
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
 
-shop_id = '72767c8f-382c-4423-b9c9-538001eebe2c'
+shop_id = '306aad58-5906-43aa-8468-ffc7d8f3a8ec'
 
 
 async def get_tokens():
@@ -34,6 +34,5 @@ async def get_tokens():
 
 
 if __name__ == '__main__':
-
     asyncio.run(get_tokens())
 

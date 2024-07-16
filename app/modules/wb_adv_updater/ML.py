@@ -246,9 +246,7 @@ class Fitter(AbcManager):
 
     async def _fit_modelGradientBoosting(self, update_model_on_new_features):
         logger.debug('Поток обучения запущен, получение данных')
-        await sender_manager.send_message_to_admin('Поток обучения запущен, получение данных')
         df = await self._get_df_for_fit()
-        await sender_manager.send_message_to_admin('Данные получены')
         logger.debug('Данные получены')
         if len(df) == 0:
             await sender_manager.send_message_to_admin('Нет данных для обучения')

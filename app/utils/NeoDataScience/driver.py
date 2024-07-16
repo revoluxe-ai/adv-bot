@@ -359,7 +359,7 @@ RETURN graphName
             print(f"""Граф  создан""")
 
     async def linking_images_and_keyword(self):
-       await self.linking_images()
+       # await self.linking_images()
        await self.linking_keywords()
 
 
@@ -405,30 +405,45 @@ RETURN graphName
                 result = await session.write_transaction(transaction, name)
                 logger.debug(result)
 
-
     async def _set_knn_on_images(self, name):
-        query = """
-        CALL gds.knn.write(
-        $name,
-        {
-        jobid: 'knn',
-        writeRelationshipType: 'LIKE',
-        writeProperty: 'dist',
-        nodeProperties: 
-        {vgg19: 'COSINE'}
-        
-        
-        }
-        )
-        
-        """
+
+        stream_query = """
+                CALL gds.knn.stream(
+                $name,
+                {
+                    jobid: 'knn',
+                    nodeProperties: 
+                    {vgg19: 'COSINE'}
+                }
+            )
+            YIELD node1, node2, similarity
+            MATCH (source) WHERE id(source) = node1
+            MATCH (target) WHERE id(target) = node2
+            MERGE (source)-[r:LIKE]->(target)
+            ON CREATE SET r.dist = similarity
+            ON MATCH SET r.dist = similarity
+                
+             """
+
+
+
+
+        async def execute_knn_process(tx, name):
+            # Выполняем mutate
+            # Записываем результаты в базу данных
+            stream_result = await tx.run(stream_query, name=name)
+            await stream_result.consume()
 
 
         async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                result = await session.write_transaction(
-                    lambda tx: tx.run(query, name = name))
-        logger.debug(result)
+                result = await session.write_transaction(execute_knn_process, name)
+                logger.debug(result)
+
+        return "KNN relationships for images updated successfully"
+
+
+
 
     async def linking_keywords(self):
         name = 'keywords'
@@ -458,30 +473,40 @@ RETURN graphName
                 result = s.run(query, name=name)
                 logger.debug(result)
 
-
-
     async def _set_knn_on_keywords(self, name):
-        query = """
-              CALL gds.knn.write(
-            $name,
+        stream_query = """
+            CALL gds.knn.stream(
+                $name,
                 {
-                jobid: 'knn',
-                writeRelationshipType: 'LIKE',
-                writeProperty: 'dist',
-                nodeProperties: 
-                {word2vec: 'COSINE'}
+                    jobid: 'knn',
+                    nodeProperties: 
+                    {word2vec: 'COSINE'}
                 }
-                )
+            )
+            YIELD node1, node2, similarity
+            MATCH (source) WHERE id(source) = node1
+            MATCH (target) WHERE id(target) = node2
+            MERGE (source)-[r:LIKE]->(target)
+            ON CREATE SET r.dist = similarity
+            ON MATCH SET r.dist = similarity
+            
 
-                """
-        async def set_knn_on_keywords(tx, name):
-            result = await tx.run(query, name=name)
-            return await result.single()
+        """
+
+        async def execute_knn_process(tx, name):
+            # Записываем результаты в базу данных
+            stream_result = await tx.run(stream_query, name=name)
+            await stream_result.consume()
+
 
         async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                result = await session.write_transaction(set_knn_on_keywords, name)
+                result = await session.write_transaction(execute_knn_process, name)
                 logger.debug(result)
+
+        return "KNN relationships for keywords updated successfully"
+
+
 
 
 
@@ -727,34 +752,25 @@ RETURN graphName
         for phrase_data in phrase_data_list:
             phrase_dict = {
                 'text': phrase_data.text,
-                'ctr': phrase_data.ctr,
                 'words': [{'text': kw.text, 'word2vec': kw.vector} for kw in phrase_data.words],
                 'dist_to_word': phrase_data.dist_to_word,
-                'target_nmids': phrase_data.target_nmids,
                 'word2vec': phrase_data.word2vec
             }
             data_list.append(phrase_dict)
 
         query = """
       UNWIND $data_list AS phrase
-        MERGE (keyword_phrase:KeywordPhrase {text: phrase.text})
-        ON CREATE SET keyword_phrase.dist = phrase.ctr, keyword_phrase.word2vec = phrase.word2vec
-        ON MATCH SET keyword_phrase.dist = phrase.ctr, keyword_phrase.word2vec = phrase.word2vec
-        WITH keyword_phrase, phrase
-        UNWIND phrase.words AS word
-            MERGE (keyword:Keyword {text: word.text})
-            ON CREATE SET keyword.vector = word.vector
-            ON MATCH SET keyword.vector = word.vector
-            MERGE (keyword_phrase)-[r:IS]->(keyword)
-            ON CREATE SET r.dist = phrase.dist_to_word
-            ON MATCH SET r.dist = phrase.dist_to_word
-        WITH keyword_phrase, phrase
-        UNWIND phrase.target_nmids AS target_nmid
-            MATCH (item:Item {nmid: target_nmid})
-            MERGE (keyword_phrase)-[r2:IS]->(item)
-            ON CREATE SET r2.dist = phrase.ctr
-            ON MATCH SET r2.dist = phrase.ctr
-
+MERGE (keyword_phrase:KeywordPhrase {text: phrase.text})
+ON CREATE SET keyword_phrase.word2vec = phrase.word2vec
+ON MATCH SET keyword_phrase.word2vec = phrase.word2vec
+WITH keyword_phrase, phrase
+UNWIND phrase.words AS word
+    MERGE (keyword:Keyword {text: word.text})
+    ON CREATE SET keyword.word2vec = word.word2vec
+    ON MATCH SET keyword.word2vec = word.word2vec
+    MERGE (keyword_phrase)-[r:IS]->(keyword)
+    ON CREATE SET r.dist = phrase.dist_to_word
+    ON MATCH SET r.dist = phrase.dist_to_word
         """
 
         async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
@@ -909,10 +925,9 @@ RETURN graphName
 
     async def _create_sub_graph_for_like_keyword(self, graph_name):
         query = """
-             MATCH (source:Keyword|KeywordPhrase)
-            WHERE NOT EXISTS((source)-[:LIKE]->())
-            AND source.word2vec IS NOT NULL
-      OPTIONAL MATCH (source)-->(target:None)
+             MATCH (source:Keyword)
+            WHERE source.word2vec IS NOT NULL
+          OPTIONAL MATCH (source)-->(target:None)
         WITH gds.graph.project(
         $graph_name,
         source,
@@ -1003,7 +1018,7 @@ RETURN graphName
         query = """
             MERGE (item:Item {nmid: $nmid})
             MERGE (image:Image {dhash: $dhash})
-            MERGE (item)-[:IS]->(image)
+            MERGE (item)-[:IN]->(image)
             SET image.vgg19 = $vector
             MERGE (category:WbCategory {name: $category_name})
             MERGE (item)-[:IS]->(category)
@@ -1102,3 +1117,9 @@ RETURN graphName
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 await session.write_transaction(clear_dead_nodes, query)
+
+    def check_phrase_in_neo(self, text: str):
+        query = """
+        MATCH (phrase:KeywordPhrase {text: $text}) 
+        
+        """
