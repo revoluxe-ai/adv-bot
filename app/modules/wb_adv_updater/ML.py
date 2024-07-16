@@ -170,6 +170,7 @@ class Fitter(AbcManager):
                 nmids_batch.update(adv.nmids)
                 if adv.keyword_settings:
                     keywords_batch.update([ks.text for ks in adv.keyword_settings])
+                    await asyncio.sleep(0)
 
         # Получаем все необходимые ItemFeature и KeywordFeature в одном запросе
         nmid_to_item_features = {}
@@ -191,15 +192,18 @@ class Fitter(AbcManager):
                 wb_category = await data_manager.get_wb_category(adv)
             except (CardNotFoundInDB, NotItemsInAdvSetting) as exc:
                 logger.debug(f"Не удалось получить категорию РК {exc}")
+                await asyncio.sleep(0)
                 continue
             keyword_stats = await data_manager.get_keywords_statistic(adv, None)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
 
             if not adv.nmids:
+                await asyncio.sleep(0)
                 continue
             item_features_list = [nmid_to_item_features.get(nmid) for nmid in adv.nmids if
                                   nmid in nmid_to_item_features]
             if not item_features_list:
+                await asyncio.sleep(0)
                 continue
 
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
