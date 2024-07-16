@@ -14,5 +14,5 @@ spec:
     spec:
       containers:
       - name: common-wb-data-updater
-        image: app:tag
-        command: ["python", "script1.py"]
+        image: adv_updater latest
+        command: ["python", "run_update_keyword_stat.py"]
