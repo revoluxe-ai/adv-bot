@@ -8,9 +8,9 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 
 
-shop_id = 'cbe90109-b3b3-43eb-a474-573686225017'
+shop_id = '89b37551-ff7f-4124-ac7e-cd7546af25cf'
 
-adv_id = 10930365
+adv_id = 18616947
 
 async def get_wb_user_cabinet():
     async with sm() as session:

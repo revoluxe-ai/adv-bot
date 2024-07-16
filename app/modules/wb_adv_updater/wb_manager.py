@@ -224,6 +224,12 @@ class Manager(AbcManager):
                     exc_info=True
                 )
             await asyncio.sleep(0)
+        async with sm() as session:
+            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting.id)
+            result = await session.execute(stmt)
+            adv_setting = result.scalar()
+            adv_setting.last_update = datetime.datetime.now()
+            await session.commit()
         return
 
 

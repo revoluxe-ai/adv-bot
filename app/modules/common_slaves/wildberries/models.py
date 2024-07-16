@@ -221,6 +221,7 @@ class AdvSetting(BaseTable):
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text('0'))
     payments = relationship(AdvPayment, back_populates='adv_setting', uselist=True)
     parsing_active =  mapped_column(Boolean, default=False)
+    last_update = mapped_column(DateTime, nullable=True)
 
 
 

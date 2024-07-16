@@ -11,7 +11,7 @@ sm = get_async_session_maker
 """Здесь нужно найти найти пользователя и создать wbusercabinet для админа"""
 
 
-shop_id = '72767c8f-382c-4423-b9c9-538001eebe2c'
+shop_id = '89b37551-ff7f-4124-ac7e-cd7546af25cf'
 
 
 async def get_tokens():
