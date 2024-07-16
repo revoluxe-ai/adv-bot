@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: common-wb-data-updater
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: common-wb-data-updater
+  template:
+    metadata:
+      labels:
+        app: common-wb-data-updater
+    spec:
+      containers:
+      - name: common-wb-data-updater
+        image: app:tag
+        command: ["python", "script1.py"]
