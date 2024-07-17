@@ -225,11 +225,9 @@ class Manager(AbcManager):
                     exc_info=True
                 )
             await asyncio.sleep(0)
+        adv_setting.last_update = datetime.datetime.now()
         async with sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting.id)
-            result = await session.execute(stmt)
-            adv_setting = result.scalar()
-            adv_setting.last_update = datetime.datetime.now()
+            await session.merge(adv_setting)
             await session.commit()
         return
 
