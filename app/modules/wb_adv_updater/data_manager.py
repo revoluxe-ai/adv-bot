@@ -250,7 +250,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                 predict_ctr = clicks / views
                 keyword_setting.predict_ctr = predict_ctr
             if not original_predict_ctr:
-                if enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict:
+                if enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and not keyword_setting.hard_status != 1:
                     keyword_stat.status = KeywordStatus.GOOD
                     keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
                     keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
