@@ -103,12 +103,13 @@ class Manager(AbcManager):
 
     async def update_keyword_stat(self, access: WBCabinetAccess,
                                   need_update_model: asyncio.Event,
-                                  adv_update_tasks: dict[int, asyncio.Task]):
+                                  adv_update_tasks: dict[int, asyncio.Task],
+                                  semaphore: asyncio.Semaphore):
         wb_api = WBApi(access)
         wb_cabinet = access.wb_cabinet
         logger.debug(f"Начало обновления статистики для кабинета {wb_cabinet.id}")
 
-        async with sm() as session:
+        async with sm(semaphore) as session:
             stmt = select(AdvSetting).where(and_(
                 AdvSetting.wb_cabinet_id == wb_cabinet.id,
                 AdvSetting.type == 8,
@@ -122,7 +123,7 @@ class Manager(AbcManager):
 
         for adv_setting in adv_settings:
             if adv_setting not in adv_update_tasks:
-                task = asyncio.create_task(self.keyword_stat_updater(adv_setting, wb_api))
+                task = asyncio.create_task(self.keyword_stat_updater(adv_setting, wb_api, semaphore))
                 adv_update_tasks[adv_setting.id] = task
             else:
                 if adv_update_tasks[adv_setting.id].done():
@@ -148,8 +149,10 @@ class Manager(AbcManager):
         return
 
     @staticmethod
-    async def update_keyword_stat_in_db(keyword_stat: KeywordStat, adv_setting_original_id: int):
-        async with sm() as session:
+    async def update_keyword_stat_in_db(keyword_stat: KeywordStat,
+                                        adv_setting_original_id: int,
+                                        semaphore: asyncio.Semaphore = None):
+        async with sm(semaphore) as session:
             # Проверяем наличие записи в KeywordSetting
             stmt = select(KeywordSetting).filter(
                 KeywordSetting.text == keyword_stat.text,
@@ -168,7 +171,7 @@ class Manager(AbcManager):
                 await session.commit()  # Коммит для получения ID новой записи
                 await session.refresh(keyword_setting)  # Обновляем объект, чтобы получить ID
 
-        async with sm() as session:
+        async with sm(semaphore) as session:
             # Проверяем наличие записи в AdvKeyword
             stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting)).filter(
                 and_(
@@ -207,7 +210,7 @@ class Manager(AbcManager):
 
 
 
-    async def keyword_stat_updater(self, adv_setting, wb_api):
+    async def keyword_stat_updater(self, adv_setting, wb_api, semaphore):
         logger.debug(f"Обработка настройки {adv_setting}")
         try:
             keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
@@ -218,7 +221,7 @@ class Manager(AbcManager):
         logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
         for keyword in keywords:
             try:
-                await self.update_keyword_stat_in_db(keyword, adv_setting.id)
+                await self.update_keyword_stat_in_db(keyword, adv_setting.id, semaphore)
             except Exception as exc:
                 logger.error(
                     f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
@@ -226,7 +229,7 @@ class Manager(AbcManager):
                 )
             await asyncio.sleep(0)
         adv_setting.last_update = datetime.datetime.now()
-        async with sm() as session:
+        async with sm(semaphore) as session:
             await session.merge(adv_setting)
             await session.commit()
         return
@@ -589,6 +592,11 @@ class Manager(AbcManager):
                          logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}, '
                                       f'{tasks[wb_access.wb_cabinet.id].exception()}')
                      else:
+                         async with sm() as session:
+                             wb_cabinet = wb_access.wb_cabinet
+                             await session.merge(wb_cabinet)
+                             wb_cabinet.last_update_all_data = datetime.datetime.now()
+                             await session.commit()
                          logger.info('Задача обновления успешно выполнена')
                      del tasks[wb_access.wb_cabinet.id]
 

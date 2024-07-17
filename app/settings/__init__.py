@@ -9,3 +9,6 @@ WEBHOOK_URL = settings.WEBHOOK_URL
 
 
 polling_mode = settings.polling_mode
+
+
+COUNT_THREAD_SQL_KW_STAT_LOAD = settings.COUNT_THREAD_SQL_KW_STAT_LOAD

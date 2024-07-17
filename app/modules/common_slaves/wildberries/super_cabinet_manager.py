@@ -35,8 +35,8 @@ class WBCabinetAccess:
 
 
 
-async def get_accesses_for_wb_cabinets()-> AsyncGenerator[WBCabinetAccess, None]:
-    async with sm() as session:
+async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore)-> AsyncGenerator[WBCabinetAccess, None]:
+    async with sm(semaphore) as session:
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
                                           .selectinload(User.wb_tokens))\
