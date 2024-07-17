@@ -30,4 +30,14 @@ class Settings:
     def MAX_THREAD_FOR_PROXY(self):
         return get_document_by_key_name(setting_path, 'MAX_THREAD_FOR_PROXY')
 
+
+    @property
+    def COUNT_THREAD_SQL_KW_STAT_LOAD(self):
+        try:
+            return get_document_by_key_name(setting_path, 'COUNT_THREAD_SQL_KW_STAT_LOAD')
+        except:
+            return 30
+
+
+
 settings = Settings()

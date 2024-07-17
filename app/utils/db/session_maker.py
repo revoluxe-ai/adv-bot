@@ -20,7 +20,7 @@ pool_size = 700
 max_overflow = 300
 
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
-semaphore = asyncio.Semaphore(count_sem)
+global_semaphore = asyncio.Semaphore(count_sem)
 
 def log_checkout(dbapi_con, con_record, con_proxy):
     logger.debug("Соединение взято из пула")
@@ -37,7 +37,9 @@ def log_checkin(dbapi_con, con_record):
     logger.debug(f"Количество соединений: {conn_counter}")
 
 @asynccontextmanager
-async def get_async_session_maker() -> AsyncSession:
+async def get_async_session_maker(semaphore = None) -> AsyncSession:
+    if semaphore is None:
+        semaphore = global_semaphore
     async with semaphore:
         if not hasattr(thread_local, "session_maker"):
             db_connector = path_setting_funcs.get_alchemy_row()

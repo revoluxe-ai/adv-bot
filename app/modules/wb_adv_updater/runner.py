@@ -56,12 +56,12 @@ class Runner:
              await asyncio.sleep(1)
 
 
-    async def run_update_keyword_stat(self, need_update_model: asyncio.Event):
+    async def run_update_keyword_stat(self, need_update_model: asyncio.Event, semaphore: asyncio.Semaphore):
         wb_cabinet_tasks = {}
         adv_update_tasks = {}
         # not_first_runs = set()
         while True:
-            accesses = users_manager.get_accesses_for_wb_cabinets()
+            accesses = users_manager.get_accesses_for_wb_cabinets(semaphore)
             async for access in accesses:
                 cabinet_id = access.wb_cabinet.id
 
@@ -69,7 +69,8 @@ class Runner:
                     task = asyncio.create_task(
                         self._manager.update_keyword_stat(access,
                                                           need_update_model,
-                                                          adv_update_tasks))
+                                                          adv_update_tasks,
+                                                          semaphore))
                     wb_cabinet_tasks[cabinet_id] = task
 
                 else:
