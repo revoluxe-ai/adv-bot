@@ -2,17 +2,12 @@ import datetime
 from app.utils.redis_manager import RedisEvent
 from app.utils.redis_func_cache import set_config
 from ..wb_keywords_parser import parser
-
 from ...admin_bot.sender import sender_manager
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor
 set_config()
 import asyncio
 import logging
-
 from app.modules.wb_adv_updater.data_manager import DataGetter
 from app.utils.db.session_maker import get_async_session_maker
-
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
 from .wb_manager import Manager
 
