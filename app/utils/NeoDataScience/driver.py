@@ -875,15 +875,14 @@ UNWIND phrase.words AS word
                 logger.debug(f'Вектор не найден для nmid: {nmid}')
         return data
 
-    async def get_keywords_vectors(self, texts: list[str]) -> typing.List[typing.Tuple[str, typing.List[float]]]:
+    async def get_keywords_vectors(self) -> typing.List[typing.Tuple[str, typing.List[float]]]:
         query = """
         MATCH (k:KeywordPhrase) WHERE k.fastrp IS NOT NULL
-        AND NOT k.text IN $texts
         RETURN k.text as keyword, k.fastrp as vector
         """
 
         async def get_keywords_vectors(tx, query):
-            result = await tx.run(query, texts = texts)
+            result = await tx.run(query)
             records = await result.data()
             data = []
             for record in records:
