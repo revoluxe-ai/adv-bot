@@ -240,7 +240,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         views = keyword.views
         ctr = keyword.ctr
         if keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
-            hard_status = 'Мало показов'
+            hard_status = 'МП'
         elif keyword.hard_status == BLACK_LIST:
             hard_status = 'Не рел.фраза'
         elif keyword.reason == 'max_cpc':
@@ -250,7 +250,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         elif keyword.hard_status == WHITE_LIST:
             hard_status = 'БС'
         elif keyword.hard_status == AUTO_MODE:
-            hard_status = 'Авто'
+            hard_status = 'А'
         else:
             raise ValueError(f'Unknown hard_status: {keyword.hard_status}')
 
