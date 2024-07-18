@@ -35,8 +35,6 @@ class Runner:
         await asyncio.gather(
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
-            self.shop_subscribe_control(),
-            self.demo_subscribe(),
             self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_vectors(need_update_model, update_model_on_new_features),
             self.run_update_model(update_model_on_new_features, need_update_model),
@@ -101,9 +99,9 @@ class Runner:
             await asyncio.sleep(0)
 
 
-    async def run_update_keywords_on_wb(self):
+    async def run_update_keywords_on_wb(self, semaphore: asyncio.Semaphore):
         await self._manager\
-            .update_keywords_in_advs()
+            .update_keywords_in_advs(semaphore)
 
 
     async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):
@@ -136,7 +134,7 @@ class Runner:
                 await self._manager.update_min_ctr_in_global_wb_category_settings()
             except Exception as e:
                 logger.error(f'Ошибка обновления минимальных цен {e}')
-            await asyncio.sleep(60)
+            # await asyncio.sleep(60)
 
     async def update_all_data_in_db(self):
         tasks = {}
