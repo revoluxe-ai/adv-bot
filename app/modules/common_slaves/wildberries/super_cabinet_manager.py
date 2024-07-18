@@ -135,17 +135,19 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCab
 
 
 async def get_super_user_access():
-    accesses = await get_accesses_for_wb_cabinets()
-    tokens = [token for access in accesses for token in access.tokens]
     leave_tokens = []
-    for token in tokens:
-            try:
-                await CabinetManager.check_access(token)
-                leave_tokens.append(token)
-            except Exception as exc:
-                logger.debug(f'Токен не прошел проверку: {exc}')
-                await asyncio.sleep(0)
-
+    accesses_gen = get_accesses_for_wb_cabinets()
+    async for access in accesses_gen:
+        tokens = access.tokens
+        for token in tokens:
+                try:
+                    await CabinetManager.check_access(token)
+                    leave_tokens.append(token)
+                    if len(leave_tokens) >= MAX_TOKENS:
+                        break
+                except Exception as exc:
+                    logger.debug(f'Токен не прошел проверку: {exc}')
+                    await asyncio.sleep(0)
 
     super_user_access = WBCabinetAccess(tokens = leave_tokens,
                                         wb_user_cabinet = None,
