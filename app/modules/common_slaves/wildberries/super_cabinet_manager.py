@@ -178,8 +178,8 @@ async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
             except Exception as exc:
                 logger.error(f'Токен не прошел проверку: {exc}')
                 continue
-
-        access = WBCabinetAccess(tokens = live_tokens,
-                                 wb_user_cabinet = None,
-                                 wb_cabinet = wb_cabinet)
-        return access
+        if live_tokens:
+            access = WBCabinetAccess(tokens = live_tokens,
+                                     wb_user_cabinet = None,
+                                     wb_cabinet = wb_cabinet)
+            return access

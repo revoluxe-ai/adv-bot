@@ -21,7 +21,7 @@ async def get_wb_user_cabinet():
 
 
 
-async def get_keywords_stat_from_wb():
+async def get_keywords_stat_from_wb(semaphore):
     async with sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.adv_id == adv_id)
         result = await session.execute(stmt)
@@ -31,7 +31,7 @@ async def get_keywords_stat_from_wb():
     access = await super_cabinet_manager.get_access_for_wb_user_cabinet(wb_user_cabinet)
     wb_api = WBApi(access)
     wb_manager = Manager()
-    await wb_manager.keyword_stat_updater(adv_setting, wb_api)
+    await wb_manager.keyword_stat_updater(adv_setting, wb_api, semaphore)
 
 
 
@@ -40,7 +40,7 @@ async def get_keywords_stat_from_wb():
 if __name__ == '__main__':
     import asyncio
     loop = asyncio.get_event_loop()
-    keyword_stat = loop.run_until_complete(get_keywords_stat_from_wb())
+    keyword_stat = loop.run_until_complete(get_keywords_stat_from_wb(None))
     print(keyword_stat)
 
 

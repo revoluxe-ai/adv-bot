@@ -1,5 +1,3 @@
-from .abc_card import WBCard
-from .card_statistic import CardStatistic
 
 
 # class Size:
@@ -20,7 +18,7 @@ from .card_statistic import CardStatistic
 
 
 
-class CardFromWB(WBCard):
+class CardFromWB:
 
     @property
     def shop_name(self):

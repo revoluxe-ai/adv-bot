@@ -139,11 +139,13 @@ class Manager(AbcManager):
 
     @staticmethod
     async def update_keyword_stat_in_db(keyword_stat: KeywordStat,
-                                        adv_setting_original_id: int,
+                                        adv_setting: AdvSetting,
                                         semaphore: asyncio.Semaphore = None):
+        adv_setting_original_id = adv_setting.id
         async with sm(semaphore) as session:
             # Проверяем наличие записи в KeywordSetting
-            stmt = select(KeywordSetting).filter(
+            stmt = select(KeywordSetting)\
+                .filter(
                 KeywordSetting.text == keyword_stat.text,
                 KeywordSetting.adv_setting_id == adv_setting_original_id
             )
@@ -195,6 +197,9 @@ class Manager(AbcManager):
                     keyword_db.clicks = keyword_stat.clicks
                     keyword_db.spend = keyword_stat.spend
                     await session.commit()
+            await session.refresh(adv_setting)
+            adv_setting.last_update = datetime.datetime.now()
+            await session.commit()
         return
 
 
@@ -210,7 +215,7 @@ class Manager(AbcManager):
         logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
         for keyword in keywords:
             try:
-                await self.update_keyword_stat_in_db(keyword, adv_setting.id, semaphore)
+                await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
             except Exception as exc:
                 logger.error(
                     f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
@@ -620,14 +625,15 @@ class Manager(AbcManager):
                     and_(
                         WBCabinet.expiration_time < datetime.datetime.now(),
                         WBCabinet.active == True,
-                        WBCabinet.bonus < 50,
-                        WBCabinet.balance < 50
+                        WBCabinet.balance < 0
                     )
                 )
                 result = await session.execute(stmt)
                 wb_cabinets_expirated_and_active = result.scalars().all()
                 for wb_cabinet in wb_cabinets_expirated_and_active:
                     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
+                    if not access:
+                        logger.error('Нет доступа для кабинета')
                     wb_api = WBApi(access)
                     adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
                     for adv_setting in adv_settings:
