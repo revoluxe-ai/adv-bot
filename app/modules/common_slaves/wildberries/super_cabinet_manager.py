@@ -34,8 +34,7 @@ class WBCabinetAccess:
     wb_cabinet: Union[WBCabinet | None]
 
 
-
-async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore)-> AsyncGenerator[WBCabinetAccess, None]:
+async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> AsyncGenerator[WBCabinetAccess, None]:
     async with sm(semaphore) as session:
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \

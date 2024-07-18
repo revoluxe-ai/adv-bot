@@ -103,20 +103,22 @@ class GraphUpdater:
 
     async def _update_keywords_vectors(self):
         timestamp = datetime.datetime.now()
-        async with sm() as session:
-            stmt = select(KeywordFeature.keyword)
-            result = await session.execute(stmt)
-            keywords_text = result.scalars().all()
-        keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors(keywords_text)
+        keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors()
         async with sm() as session:
             count = 0  # Счетчик для отслеживания количества обработанных записей
             BATCH_SIZE = 100 # Размер порции для коммита
-
             for keyword_text, vector in keywords_vectors:
-                logger.debug('Обновление вектора для ключа')
-                keyword = KeywordFeature(keyword=keyword_text, vector=vector)
+                stmt = select(KeywordFeature).where(KeywordFeature.keyword == keyword_text)
+                result = await session.execute(stmt)
+                existing_keyword = result.scalar()
+                if existing_keyword:
+                    existing_keyword.vector = vector
+                    existing_keyword.timestamp = timestamp
+                    keyword = existing_keyword
+                else:
+                    keyword = KeywordFeature(keyword=keyword_text, vector=vector, timestamp=timestamp)
+                    session.add(keyword)
                 keyword.timestamp = timestamp
-                session.add(keyword)
                 count += 1  # Увеличиваем счетчик на 1
                 if count % BATCH_SIZE == 0:  # Если достигнут размер порции
                     await session.commit()  # Выполняем коммит

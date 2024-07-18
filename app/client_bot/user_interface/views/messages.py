@@ -221,9 +221,9 @@ class AdvSettingMenu(TextWithKeyboard):
     def text(self):
         max_cpc = self.adv.max_cpc
         if not max_cpc:
-            max_cpc_text = 'Максимальная ставка не установлена'
+            max_cpc_text = 'Максимальная стоимость клика не установлена'
         else:
-            max_cpc_text = f'Максимальная ставка: {max_cpc} р.'
+            max_cpc_text = f'Максимальная стоимость клика: {max_cpc} р.'
 
         text = (f'Кампания: {self.adv.name}\n'
                 f'ID кампании: {self.adv.adv_id}\n'
