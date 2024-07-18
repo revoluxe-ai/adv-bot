@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import aiohttp
 from sqlalchemy import select, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.client_bot.const import MAX_TOKENS
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
@@ -101,17 +101,18 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCab
         stmt = (
             select(WBUserCabinet)\
             .options(
-                selectinload(WBUserCabinet.wb_cabinet),
+                joinedload(WBUserCabinet.wb_cabinet),
                 selectinload(WBUserCabinet.user)
                 .selectinload(User.wb_tokens)  # Загружаем информацию о пользователе
             )
             .where(WBUserCabinet.id == wb_user_cabinet.id)  # Условие должно быть скорректировано
         )
         result = await session.execute(stmt)
-        wb_cabinet: WBCabinet = result.scalars().first()
+        wb_user_cabinet: WBUserCabinet = result.scalars().first()
         stmt = select(WBToken)
         result = await session.execute(stmt)
         tokens: list[WBToken] = result.scalars().all()
+    wb_cabinet = wb_user_cabinet.wb_cabinet
     checked_tokens = []
     for token in tokens:
         if token.shop_id == wb_cabinet.shop_id:

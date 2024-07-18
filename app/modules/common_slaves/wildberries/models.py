@@ -70,9 +70,6 @@ class WBToken(BaseTable):
             raise exceptions.NotValidTokenError
     def get_payload(self, key, default=0):
         payload = self.__payload
-        expire = payload.get('exp', default)
-        if expire < datetime.datetime.now().timestamp():
-            raise exceptions.TokenExpiredError
         return payload.get(key)
 
 

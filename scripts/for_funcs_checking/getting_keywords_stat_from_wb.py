@@ -8,9 +8,9 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 
 
-shop_id = '89b37551-ff7f-4124-ac7e-cd7546af25cf'
+shop_id = 'dd4f127d-acb5-57e9-bed9-bd768d5f0db7'
 
-adv_id = 18616947
+adv_id = 18689991
 
 async def get_wb_user_cabinet():
     async with sm() as session:
@@ -19,9 +19,7 @@ async def get_wb_user_cabinet():
         wb_user_cabinet = result.scalar()
     return wb_user_cabinet
 
-
-
-async def get_keywords_stat_from_wb(semaphore):
+async def get_keywords_stat_from_wb(semaphore = None):
     async with sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.adv_id == adv_id)
         result = await session.execute(stmt)

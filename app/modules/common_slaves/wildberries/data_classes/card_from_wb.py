@@ -19,7 +19,6 @@
 
 
 class CardFromWB:
-
     @property
     def shop_name(self):
         return self._shop_name
