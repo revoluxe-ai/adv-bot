@@ -110,16 +110,6 @@ class Manager(AbcManager):
             ))
             result = (await session.execute(stmt)).unique()
             adv_settings = result.scalars().all()
-            for adv_setting in adv_settings:
-                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
-                logger.debug(f'Ключевые слова для {adv_setting.name} получены')
-                for keyword in keywords:
-                    stmt = select(AdvKeyword)\
-                    .options(joinedload(AdvKeyword.keyword_setting))\
-                    .where(and_(AdvKeyword.text == keyword.text,
-                                                    AdvKeyword.date == keyword.date,
-                                                    AdvKeyword.adv_setting_id == adv_setting.id))
-
         for adv_setting in adv_settings:
             if adv_setting not in adv_update_tasks:
                 task = asyncio.create_task(self.keyword_stat_updater(adv_setting, wb_api, semaphore))
