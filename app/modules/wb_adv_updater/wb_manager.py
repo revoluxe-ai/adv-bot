@@ -107,7 +107,7 @@ class Manager(AbcManager):
                 AdvSetting.type == 8,
                 AdvSetting.bot_active == True,
 
-            ))
+            )).order_by(AdvSetting.last_update.desc())
             result = (await session.execute(stmt)).unique()
             adv_settings = result.scalars().all()
         for adv_setting in adv_settings:
@@ -126,12 +126,6 @@ class Manager(AbcManager):
                             f'{adv_update_tasks[adv_setting.id].exception()},'
                             f' для кабинета {adv_setting.name}'
                         )
-                    else:
-                        adv_setting.last_update = datetime.datetime.now()
-                        async with sm(semaphore) as session:
-                            await session.refresh(adv_setting)
-                            await session.commit()
-
 
                     del adv_update_tasks[adv_setting.id]
                     logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
@@ -216,7 +210,15 @@ class Manager(AbcManager):
                 f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
             return
         logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
+        last_update = adv_setting.last_update
+        today_date = datetime.datetime.now().date()
+        pass_date_if_not_first_update = (today_date,
+                                         today_date - datetime.timedelta(days=1),
+                                         today_date - datetime.timedelta(days=2))
         for keyword in keywords:
+            date = keyword.date
+            if last_update and date not in pass_date_if_not_first_update:
+                 continue
             try:
                 await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
             except Exception as exc:
@@ -225,6 +227,10 @@ class Manager(AbcManager):
                     exc_info=True
                 )
             await asyncio.sleep(0)
+        adv_setting.last_update = datetime.datetime.now()
+        async with sm(semaphore) as session:
+            await session.merge(adv_setting)
+            await session.commit()
         return
 
 
