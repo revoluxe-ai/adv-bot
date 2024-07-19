@@ -1,6 +1,4 @@
 import json
-import logging
-
 from sqlalchemy import select
 from app import my_types
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
