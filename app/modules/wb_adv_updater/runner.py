@@ -45,12 +45,9 @@ class Runner:
     async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: RedisEvent):
         while True:
              logger.debug('Ожидание разрешения обновления ключей')
-             await sender_manager.send_message_to_admin('Ожидание разрешения обновления ключей')
              await update_model_on_new_features.wait()
              logger.debug('Блокировка снята')
-             await sender_manager.send_message_to_admin('Блокировка на обновление ключей снята')
              await self._manager.update_predict_ctr(predicted)
-             await sender_manager.send_message_to_admin('Обновление ctr ключей завершено')
              await asyncio.sleep(1)
 
 
@@ -62,7 +59,6 @@ class Runner:
             accesses = users_manager.get_accesses_for_wb_cabinets(semaphore)
             async for access in accesses:
                 cabinet_id = access.wb_cabinet.id
-
                 if cabinet_id not in wb_cabinet_tasks:
                     task = asyncio.create_task(
                         self._manager.update_keyword_stat(access,

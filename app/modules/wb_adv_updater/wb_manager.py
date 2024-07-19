@@ -126,6 +126,12 @@ class Manager(AbcManager):
                             f'{adv_update_tasks[adv_setting.id].exception()},'
                             f' для кабинета {adv_setting.name}'
                         )
+                    else:
+                        adv_setting.last_update = datetime.datetime.now()
+                        async with sm(semaphore) as session:
+                            await session.refresh(adv_setting)
+                            await session.commit()
+
 
                     del adv_update_tasks[adv_setting.id]
                     logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
@@ -197,9 +203,6 @@ class Manager(AbcManager):
                     keyword_db.clicks = keyword_stat.clicks
                     keyword_db.spend = keyword_stat.spend
                     await session.commit()
-            await session.refresh(adv_setting)
-            adv_setting.last_update = datetime.datetime.now()
-            await session.commit()
         return
 
 
@@ -222,10 +225,6 @@ class Manager(AbcManager):
                     exc_info=True
                 )
             await asyncio.sleep(0)
-        adv_setting.last_update = datetime.datetime.now()
-        async with sm(semaphore) as session:
-            await session.merge(adv_setting)
-            await session.commit()
         return
 
 
@@ -289,10 +288,10 @@ class Manager(AbcManager):
         return joblib.load(model_path)
 
     @staticmethod
-    async def update_keywords_in_advs() -> list[typing.Awaitable]:
+    async def update_keywords_in_advs(semaphore) -> list[typing.Awaitable]:
         update_tasks: dict[int, asyncio.Task] = {}
         while True:
-            accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
+            accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets(semaphore)
             async for access in accesses:
                 wb_cabinet_id = access.wb_cabinet.id
                 if wb_cabinet_id  not in update_tasks:
