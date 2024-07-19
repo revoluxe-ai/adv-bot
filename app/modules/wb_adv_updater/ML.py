@@ -272,13 +272,10 @@ class Fitter(AbcManager):
             std_dev_mse = mse_scores.std()
             max_difference = mse_scores.max() - mse_scores.min()
 
-            await sender_manager.send_message_to_admin(
-            f"CV MSE scores: {mse_scores}\n"
+            logger.info(f"CV MSE scores: {mse_scores}\n"
             f"Mean CV MSE: {mean_mse}\n"
             f"Standard Deviation of CV MSE: {std_dev_mse}\n"
-            f"Max difference between CV MSE scores: {max_difference}\n",
-                off = False
-
+            f"Max difference between CV MSE scores: {max_difference}\n"
             )
         logger.debug('Обучение модели на полных данных')
         model.fit(X, y)
