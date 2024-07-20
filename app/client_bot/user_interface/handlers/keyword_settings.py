@@ -278,11 +278,7 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
            keyword_setting.hard_status = new_hard_status
 
         elif new_hard_status == -1:
-            category: WBCategory = await data_manager.get_wb_category(adv_setting)
-            smtp = select(GlobalCategorySetting.min_ctr) \
-                .where(GlobalCategorySetting.category_name == category.wb_category_name)
-            min_ctr = await session.execute(smtp)
-            min_ctr = min_ctr.scalar()
+            min_ctr = await data_manager.get_min_ctr(adv_setting)
             clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
             if keyword_setting.added_clicks:
                 clicks += keyword_setting.added_clicks
