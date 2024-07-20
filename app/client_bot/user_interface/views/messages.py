@@ -436,7 +436,10 @@ class KeywordSettingMessage(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        return keyboards.get_keyword_setting_keyboard(self._keyword_setting, self._adv_setting, self._page)
+        return keyboards.get_keyword_setting_keyboard(self._keyword_setting,
+                                                      self._adv_setting,
+                                                      self._auto_block_status,
+                                                      self._page)
 
 
 class GetNameOfNewAdvCompany(Text):
