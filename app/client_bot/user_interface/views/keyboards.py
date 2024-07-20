@@ -347,7 +347,7 @@ def get_keyword_setting_keyboard(
     if auto_block_status and keyword.hard_status == AUTO_MODE:
         button = [InlineKeyboardButton(text='Тестировать дальше',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
-                                           new_hard_status=-AUTO_MODE,
+                                           new_hard_status=-1,
                                            keyword_setting_original_id=keyword.id).pack())]
 
         buttons.append(button)
