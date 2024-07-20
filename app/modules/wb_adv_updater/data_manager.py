@@ -282,13 +282,13 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                 keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
-            if adv_setting.max_cpc:
-                max_cpc = adv_setting.max_cpc
-                if keyword_stat.cpc > max_cpc:
-                    keyword_stat.status = KeywordStatus.BAD
-                    keyword_stat.reason = KeywordStatus.MAX_CPC
-                    await redis_manager.set_auto_block_status(keyword_setting.id, True)
-                    continue
+            # if adv_setting.max_cpc:
+            #     max_cpc = adv_setting.max_cpc
+            #     if keyword_stat.cpc > max_cpc:
+            #         keyword_stat.status = KeywordStatus.BAD
+            #         keyword_stat.reason = KeywordStatus.MAX_CPC
+            #         await redis_manager.set_auto_block_status(keyword_setting.id, True)
+            #         continue
             predict_ctr = keyword_setting.predict_ctr
             added_clicks = keyword_setting.added_clicks
             if added_clicks:
