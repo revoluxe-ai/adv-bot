@@ -292,18 +292,18 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             predict_ctr = keyword_setting.predict_ctr
             added_clicks = keyword_setting.added_clicks
             if added_clicks:
-                added_views = keyword_setting.added_views
-                if not added_views:
-                    added_views = 0
+                # added_views = keyword_setting.added_views
+                # if not added_views:
+                #     added_views = 0
                 added_clicks = keyword_setting.added_clicks
                 if not added_clicks:
                     added_clicks = 0
-                if min_ctr == 0:
-                    enough_views = 1000
-                else:
-                    enough_views = int(1/predict_ctr)
-                views = keyword_stat.views + enough_views + added_views
-                clicks = keyword_stat.clicks + 1 + added_clicks
+                # if min_ctr == 0:
+                #     enough_views = 1000
+                # else:
+                #     enough_views = int(1/predict_ctr)
+                views = keyword_stat.views
+                clicks = keyword_stat.clicks + added_clicks
                 predict_ctr = clicks / views
             if predict_ctr >= min_ctr:
                 keyword_stat.status = KeywordStatus.GOOD
