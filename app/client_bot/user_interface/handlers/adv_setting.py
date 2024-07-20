@@ -1,7 +1,11 @@
 import logging
+import typing
 from datetime import datetime
+from typing import Union
+
 import aiogram
-from aiogram import Router, types, F
+from aiogram import Router, types, F, Bot
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -9,9 +13,10 @@ from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSettin
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.session_maker import get_async_session_maker
+from .start import start_registration
+from .. import states
 from ..views import messages
 from ..views import callbacks
-from ..views.callbacks import Action
 from ... import const
 
 sm = get_async_session_maker
@@ -23,31 +28,65 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
+
+
+@router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter == True))
+async def reset_filter(callback: types.CallbackQuery, callback_data: callbacks.ChoiceAdvPaginator,
+                          bot: aiogram.Bot, state: FSMContext):
+     await callback.answer()
+     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+     await state.update_data(filter_advs=[])
+     page = 1
+     await messages.AdvCompanyChoicing(bot, state, callback.message.chat.id, wb_user_cabinet_original_id, page=page)()
+     return
+
+
+@router.message(StateFilter(states.AdvCompanyCatalog.waiting_for_keywords_for_filter))
+async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, state: FSMContext):
+    chat_id = message.chat.id
+    text = message.text
+    if '/start' in text:
+        await state.clear()
+        await start_registration(message, bot, state)
+        return
+    filter_advs = text.splitlines()
+    filter_advs = [keyword.strip().lower() for keyword in filter_advs if keyword]
+    await state.update_data(filter_advs=filter_advs)
+    state_data = await state.get_data()
+    wb_user_cabinet_original_id = state_data['wb_user_cabinet_original_id']
+    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    page = 1
+    check_data = await state.get_data()
+    logger.debug(f'check_data: {check_data}')
+    await messages.AdvCompanyChoicing \
+        (bot, state, chat_id, wb_user_cabinet_original_id, page=page)()
+    return
+
+
+
+
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
-async def choice_adv_paginator(callback: types.CallbackQuery,
+async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Message],
                                callback_data: callbacks.ChoiceAdvPaginator,
                                bot: aiogram.Bot,
                                state: FSMContext):
 
-    await bot.answer_callback_query(callback_query_id=callback.id)
+    chat_id = callback.message.chat.id
+    await bot.answer_callback_query(callback_query_id= callback.id)
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
+    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    await state.set_state(state=states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
     page = callback_data.page
     check_data = await state.get_data()
     logger.debug(f'check_data: {check_data}')
-
-    # if page == 1:
-    #     user_cabinet_manager = await get_cabinet_manager(wb_user_cabinet_original_id)
-    #     await user_cabinet_manager.update_all_data()
-
-
-
-    chat_id = callback.message.chat.id
-
     await messages.AdvCompanyChoicing \
         (bot, state, chat_id, wb_user_cabinet_original_id, page=page)()
-        # (bot, chat_id, state, wb_user_cabinet_original_id, page=page)()
-
     return
+
+
+
+
 
 @router.callback_query(callbacks.Adv.filter())
 async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,

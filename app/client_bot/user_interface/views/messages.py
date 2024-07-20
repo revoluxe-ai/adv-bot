@@ -131,15 +131,18 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         self._state = state
 
 
+
     async def __call__(self):
         async with _sm() as session:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
                 .join(WBCabinet.wb_user_cabinets) \
                 .where(WBUserCabinet.id == self._wb_user_cabinet_original_id) \
-                .order_by(AdvSetting.name)
+                .order_by(AdvSetting.bot_active.desc())
             result = await session.execute(stmt)
-            self._adv_settings = result.scalars().all()
+            adv_settings = result.scalars().all()
+            adv_settings = await self._filter_advs(adv_settings)
+            self._adv_settings = adv_settings
             stmt = select(WBCabinet.id)\
                 .where(WBCabinet.wb_user_cabinets\
                        .any(WBUserCabinet == self._wb_user_cabinet_original_id))
@@ -154,6 +157,28 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         await super().__call__()
 
 
+    async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
+        state_data = await self._state.get_data()
+        keywords_filter: list[list[str]] = state_data.get('filter_advs')
+        self._keywords_filter = keywords_filter
+        if keywords_filter:
+            clear_advs = []
+            for adv in adv_settings:
+                name = adv.name
+                nmids = adv.nmids
+                nmids = [str(nmid) for nmid in nmids]
+                nmids = ' '.join(nmids)
+                name = name + ' ' + nmids
+                name = name.lower()
+                for keyword_filter in keywords_filter:
+                    keyword_filter = keyword_filter.strip().lower()
+                    if keyword_filter in name:
+                        clear_advs.append(adv)
+            adv_settings = clear_advs
+        return adv_settings
+
+
+
     @property
     def text(self):
         return ('Выберите рекламную кампанию для настройки или проверки. \n'
@@ -165,7 +190,8 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         return keyboards.get_advs_keyboard_with_paginator(self._wb_user_cabinet_original_id,
                                                           self._adv_settings,
                                                           self._page,
-                                                          self.on_page)
+                                                          self.on_page,
+                                                          self._keywords_filter)
 
 
     @property

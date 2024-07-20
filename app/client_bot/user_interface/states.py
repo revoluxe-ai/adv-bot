@@ -42,3 +42,7 @@ class ChangeMinViewsForPredictCTR(StatesGroup):
 
 class AddBalance(StatesGroup):
     awaiting_amount = State()
+
+
+class AdvCompanyCatalog(StatesGroup):
+    waiting_for_keywords_for_filter = State()

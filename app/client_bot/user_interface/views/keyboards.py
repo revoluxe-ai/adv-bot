@@ -134,7 +134,10 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
 
 def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
                                      adv_settings: list[AdvSetting],
-                                     page: int, on_page: int):
+                                     page: int,
+                                     on_page: int,
+                                     keyword_filter):
+    assert page > 0
     keyboard_buttons = []
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
@@ -166,17 +169,23 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
                                                           wb_user_cabinet_original_id=wb_user_cabinet_original_id,
                                                           page=next_page).pack())])
 
+    if keyword_filter:
+        button = [InlineKeyboardButton(text='Сбросить фильтр',
+                                        callback_data=callbacks.ChoiceAdvPaginator(
+                                            wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                                            page=page,
+                                            reset_filter = True).pack())]
+
+
+        keyboard_buttons.append(button)
+
+
     button = InlineKeyboardButton(text='Вернуться к меню магазина',
                                     callback_data=callbacks.Shop(
                                         action=Action.select,
                                         wb_user_cabinet_original_id = wb_user_cabinet_original_id).pack())
-
     keyboard_buttons.append([button])
-
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-
-
-
     return keyboard
 
 

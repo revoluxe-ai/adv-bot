@@ -6,6 +6,7 @@ from aiogram.filters.callback_data import CallbackData
 class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
     wb_user_cabinet_original_id: int
     page: int
+    reset_filter: bool = False
 
 
 class Action:
