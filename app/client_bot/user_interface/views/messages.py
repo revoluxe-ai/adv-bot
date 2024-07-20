@@ -351,8 +351,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._filter = True
             for keyword in self._keywords:
                 for keyword_filter in keywords_filter:
-                    if keyword_filter in keyword.text:
-                        clear_keywords.append(keyword)
+                    if '"' in keyword_filter or "'" in keyword_filter:
+                        # Проверка на полное совпадение, если в фразе есть кавычки
+                        keyword_filter = keyword_filter.replace('"', '').replace("'", '')
+                        if keyword_filter == keyword.text:
+                            clear_keywords.append(keyword)
+                    else:
+                        # Стандартная проверка на вхождение
+                        if keyword_filter in keyword.text:
+                            clear_keywords.append(keyword)
 
             self._keywords = clear_keywords
         self.min_ctr = await data_manager.get_min_ctr(self._adv_setting)
