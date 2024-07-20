@@ -6,13 +6,11 @@ from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
-
-from app.client_bot.const import SUPPORT_CHANNEL_ID
 from app.client_bot.user_interface.views import messages
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 
-sm = get_async_session_maker()
+sm = get_async_session_maker
 
 
 class CheckSubscribeOnShop(BaseMiddleware):
@@ -38,7 +36,9 @@ class CheckSubscribeOnShop(BaseMiddleware):
                 result = await session.execute(stmt)
                 wb_cabinet: WBCabinet = result.scalar()
             if wb_cabinet:
-                if wb_cabinet.expiration_time < datetime.datetime.now():
+                if all([wb_cabinet.expiration_time < datetime.datetime.now(),
+                wb_cabinet.bonus <= 0,
+                wb_cabinet.balance <= 0]):
                     await messages.ExpiredSubscription(bot,
                                                        event.message.chat.id,
                                                        wb_cabinet.id)()
