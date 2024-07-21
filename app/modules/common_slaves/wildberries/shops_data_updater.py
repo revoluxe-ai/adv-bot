@@ -53,7 +53,7 @@ class ShopDataUpdater:
     async def __quick_update_advs(self):
         wb_api  = self.wb_api
         advert_api = wb_api.advert
-        adv_ids: list[Adv] = await advert_api.get_advertIds(advert_api.live_company_status, advert_api.auto_adv_types)
+        adv_ids: list[Adv] = await advert_api.get_advertIds()
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()
@@ -85,7 +85,7 @@ class ShopDataUpdater:
         wb_api: WBApi = self.wb_api
         advert_api = wb_api.advert
         adv_ids = await advert_api.get_advertIds()
-        advs: list[Adv] = await advert_api.get_advs(adv_ids)
+        advs: list[Adv] = await advert_api.get_advs()
         await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
