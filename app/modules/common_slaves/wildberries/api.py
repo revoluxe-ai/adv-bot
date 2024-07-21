@@ -141,16 +141,20 @@ class AdvertApi(ABC_WB_API):
             answer = json.loads(response_text)
             for advert in answer:
                 adv = Adv(advert)
-                # if not adv.nmids:
-                #     raise exceptions.NotValidDataError('Нет данных об карточках в РК')
                 advs.append(adv)
         return advs
 
     @try_except_decorator(1, 1)
-    async def get_live_advs(self):
-        adv_ids: list[int] = await self.get_advertIds()
-        advs = await self.get_advs(adv_ids)
-        return advs
+    async def get_advs(self, adv_ids: list[int] = None) -> list[Adv]:
+        if not adv_ids:
+            adv_ids: list[int] = await self.get_advertIds()
+        all_advs = []
+        part = 50
+        for i in range(0, len(adv_ids), part):
+            part_of_advs = adv_ids[i:i + part]
+            advs = await self._get_advs(part_of_advs)
+            all_advs.extend(advs)
+        return all_advs
 
 
     @try_except_decorator(1, 6)
