@@ -786,7 +786,7 @@ class SettingMinCTR(TextWithKeyboard):
             self._min_ctr_type = 'direct'
 
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
-        keywords.sort(key=lambda x: x.keyword_setting.predict_ctr, reverse=True)
+        keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
         goods = []
         bads = []
         for kw in keywords:
