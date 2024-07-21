@@ -95,7 +95,7 @@ class Runner:
             await asyncio.sleep(0)
 
 
-    async def run_update_keywords_on_wb(self, semaphore: asyncio.Semaphore):
+    async def run_update_minus_keywords_on_wb(self, semaphore: asyncio.Semaphore):
         await self._manager\
             .update_keywords_in_advs(semaphore)
 

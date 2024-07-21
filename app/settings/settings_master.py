@@ -39,5 +39,14 @@ class Settings:
             return 30
 
 
+    @property
+    def MAX_THREAD_PARSER(self):
+        return get_document_by_key_name(setting_path, 'MAX_THREAD_PARSER')
+
+
+    @property
+    def MAX_MINUS_KW_THREAD(self):
+        return get_document_by_key_name(setting_path, 'MAX_MINUS_KW_THREAD')
+
 
 settings = Settings()
