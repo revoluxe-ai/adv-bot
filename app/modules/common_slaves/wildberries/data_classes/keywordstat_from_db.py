@@ -21,6 +21,7 @@ class CalculatedKeyword:
     clicks: int
     views: int
     spend: float
+    predict_ctr: Optional[float] = None
     status: Union[str, None] = None
     keyword_setting: Union[KeywordSetting, None] = None
     hard_status: Union[str, None] = None
@@ -30,6 +31,7 @@ class CalculatedKeyword:
     base_position: Optional[int] = None
     promo_position: Optional[int] = None
     position_update: Optional[DateTime] = None
+
 
 
     def __repr__(self):
