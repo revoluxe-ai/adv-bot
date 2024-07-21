@@ -166,11 +166,6 @@ async def setting_keywords_by_adv(message: types.Message,
         await messages.NoMainPhotos(
             bot,
             chat_id,
-            keywords,
-            adv_setting,
-            wb_user_cabinet_original_id,
-            adv_choice_last_page,
-            page=1,
         )()
         await redis_manager.set_check_last_24_hours(adv_original_id)
         return

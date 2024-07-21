@@ -722,44 +722,15 @@ class OrderSubscribe(Text):
 class NoMainPhotos(Text):
     def __init__(self,
                  bot: Bot,
-                 chat_id,
-                 keywords: list['KeywordForKeyboard'],
-                 adv_setting: AdvSetting,
-                 wb_user_cabinet_original_id,
-                 adv_choice_last_page,
-                 page):
+                 chat_id):
         super().__init__(bot, chat_id)
-        self._keywords = keywords
-        self._adv_setting = adv_setting
-        self._page = page
-        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-        self._adv_choice_last_page = adv_choice_last_page
-        self._on_page = 12
+
 
     @property
     def text(self):
-        text = (
-            'Не удалось загрузить фотографию товара, участвующего в кампании, \
-            обратитесь в поддержку для решения этой проблемы'
-            'Название кампании: ' + str(self._adv_setting.name) + '\n'
-                                                                  'ID кампании: ' + str(
-            self._adv_setting.adv_id) + '\n'
-                                        'Статистика и настройка ключевых слов \n'
-                                        'Расшифровка: \n'
-                                        '✅  - ключевое слово активно \n'
-                                        '❌  - ключевое слово не активно \n'
-                                        ' БС - ключевое слово в белом списке \n'
-                                        'ЧС   - ключевое слово в черном списке \n'
-                                        'Авто  - ключевое слово на автоуправлении \n'
-                                        'Информация перед ключевым словом: клики/показы/CTR \n')
+        text = ('Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК')
         return text
 
-    @property
-    def keyboard(self):
-        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
-                                                       self._adv_choice_last_page,
-                                                       self._wb_user_cabinet_original_id,
-                                                       self._page, self._on_page)
 
 
 class ExpiredSubscription(TextWithKeyboard):
