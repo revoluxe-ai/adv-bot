@@ -225,11 +225,11 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         if keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
             hard_status = 'МП'
         elif keyword.hard_status == BLACK_LIST:
-            hard_status = 'Не рел.фраза'
+            hard_status = 'НРФ'
         elif keyword.reason == 'max_cpc':
-            hard_status = 'Макс. ставка'
+            hard_status = 'МС'
         elif keyword.hard_status == TURN_OFF:
-            hard_status = 'Откл.'
+            hard_status = 'О'
         elif keyword.hard_status == WHITE_LIST:
             hard_status = 'БС'
         elif keyword.hard_status == AUTO_MODE:
@@ -256,7 +256,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                 text += f'{first_position}'
         text += f'{turn_on}({hard_status}) {keyword.text}'
 
-        text += f'({round(keyword.keyword_setting.predict_ctr*100, 2)}%)'
+        text += f'({round(keyword.predict_ctr*100, 2)}%)'
 
         text += f"""{"(" + str(keyword.keyword_setting.added_clicks) + ")" if keyword.keyword_setting.added_clicks  else ''}"""
 
@@ -298,6 +298,12 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                        page=page).pack())]
     bottoms.append(bottom)
 
+    bottom = [InlineKeyboardButton(text='Показать активные ключи',
+                                   callback_data=callbacks.SettingKeywords(
+                                       adv_original_id=adv_setting.id,
+                                       type='active_keywords',
+                                       page=page).pack())]
+    bottoms.append(bottom)
 
 
 
@@ -418,7 +424,7 @@ def get_shop_menu_keyboard(
 
     if any([expiration_time > now, balance > 0, bonus > 0]):
         button = InlineKeyboardButton(
-            text='Настройка рекламы',
+            text='Автоматические рекламные кампании',
             callback_data=callbacks.ChoiceAdvPaginator(
                 wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
