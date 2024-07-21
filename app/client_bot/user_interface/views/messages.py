@@ -371,7 +371,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     async def __call__(self, state: FSMContext):
         self._state = state
         data = await state.get_data()
-        keywords_filter: list[list[str]] = data.get('keywords_filter')
+        keywords_filter: list[str] = data.get('keywords_filter')
         clear_keywords = []
         if keywords_filter:
             self._filter = True
@@ -381,11 +381,13 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                         # Проверка на полное совпадение, если в фразе есть кавычки
                         keyword_filter = keyword_filter.replace('"', '').replace("'", '')
                         if keyword_filter == keyword.text:
-                            clear_keywords.append(keyword)
+                            if keyword not in clear_keywords:
+                                clear_keywords.append(keyword)
                     else:
                         # Стандартная проверка на вхождение
                         if keyword_filter in keyword.text:
-                            clear_keywords.append(keyword)
+                            if keyword not in clear_keywords:
+                                clear_keywords.append(keyword)
 
             self._keywords = clear_keywords
         self.min_ctr = await data_manager.get_min_ctr(self._adv_setting)
