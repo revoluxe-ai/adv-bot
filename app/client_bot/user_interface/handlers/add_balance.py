@@ -127,23 +127,33 @@ async def pre_checkout_query_handler(pre_checkout_query: types.PreCheckoutQuery,
 async def successful_payment_handler(message: types.Message, state: FSMContext, bot: aiogram.Bot):
     successful_payment = message.successful_payment
     cost = successful_payment.total_amount / 100
+
     """
-    Внимание! Только до 05.07.2024: \n
-    Бонус 200 % от суммы пополнения! \n
-    Если пополняете на 1000 рублей, то вам добавляется на бонусный счет еще 2000 рублей! \n\n
-    
-    Таким образом, если у вас 2 кампании, то мы можете за эти деньги использовать полный функционал бота за эти деньги целый месяц, 
-    а если одна, то бот вам обойдется всего 500 рублей,
-    что делает его не только лучшим, но и самым выгодным решением для автоматизации рекламы WB на рынке!
-    
-    """
-    bonus = cost * 2
+Прайс:
+- Работа одной кампании, подключенной к боту: 35 р/сутки
+- Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
+
+        
+🔥 Внимание! Только до {date_to}(завтра):
+
+💰 Бонус 100 % от суммы пополнения!
+
+🚀 При пополнении счета свыше мастер-суммы: бонус 300 % от суммы пополнения!
+
+👍 Это делает его не только лучшим, но и самым выгодным решением для автоматизации рекламы на WB!
+
+💼 Мастер-сумма (бонус 300%): {self.master_sum} рублей.
+
+📩 Подробности у администратора бота: @skyline360_1 \n
+
+Укажите сумму пополнения (не менее 100 рублей):"""
+
     state_data = await state.get_data()
     try:
         master_sum = state_data['master_sum']
     except:
         async with sm() as session:
-            time_from = '2024-07-01 00:00:00'
+            time_from = '2024-07-22 00:00:00'
             time_from_datetime = datetime.datetime.strptime(time_from, '%Y-%m-%d %H:%M:%S')
             stmt = select(func.max(Payment.amount)) \
                 .where(Payment.timestamp > time_from_datetime)
@@ -153,20 +163,9 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
                 max_amount = 50
             master_sum = max_amount * 2
     if cost >= master_sum:
-        bonus = cost * 4
-
-    # if cost >= 3000:
-    #     bonus = cost * 0.1
-    # elif cost >= 5000:
-    #     bonus = cost * 0.15
-    # elif cost >= 10000:git
-    #     bonus = cost * 0.5
-    # elif cost >= 30000:
-    #     bonus = cost * 0.8
-    # elif cost >= 50000:
-    #     bonus = cost
-    # else:
-    #     bonus = 0
+        bonus = cost * 3
+    else:
+        bonus = cost
 
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
