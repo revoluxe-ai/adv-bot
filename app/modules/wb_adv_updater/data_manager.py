@@ -251,6 +251,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                 clicks += added_clicks
             views += enough_views
             real_baes_ctr = clicks / views
+            keyword_stat.baes_ctr = real_baes_ctr
             if not original_predict_ctr:
                 predict_ctr = real_baes_ctr
                 keyword_stat.predict_ctr = predict_ctr
@@ -263,7 +264,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
 
             if adv_setting.max_cpc:
                 if keyword_stat.cpc > adv_setting.max_cpc:
-                    keyword_stat.status = 'bad'
+                    keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = 'max_cpc'
                     await redis_manager.set_auto_block_status(keyword_setting.id, False)
                     continue
@@ -300,10 +301,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = 'min_ctr'
                     await redis_manager.set_auto_block_status(keyword_setting.id, True)
-            try:
-                assert keyword_stat.predict_ctr
-            except:
-                pass
+            assert keyword_stat.predict_ctr
 
 
 

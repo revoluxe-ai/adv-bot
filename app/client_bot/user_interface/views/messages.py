@@ -1,4 +1,6 @@
 import datetime
+
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (
@@ -65,12 +67,35 @@ class ShopChoice(TextWithKeyboard):
 
     @property
     def text(self):
-        return (
-                'Видеообзор-инструкция к боту - https://t.me/auto_wb_master/184\n'
-                'Канал с новостями - https://t.me/auto_wb_master\n'
-                'Группа поддержки - https://t.me/wbgram_disc\n'
-                'Стоимость управления РК: от 16.5 р. за кампанию/сутки\n'
-                'Стоимость парсинга белых ключей: от 6.5 р. за кампанию с сутки\n'
+        return ("""
+🤖 Я - специализированный бот для автоматизации АРК - базового инструмента продвижения товаров на Wildberries.
+
+Что я умею:
+📈 Управлять ключевыми словами в рекламных кампаниях с помощью искусственного интеллекта
+
+💰 Экономить до 90% рекламного бюджета на автоматические рекламные кампании
+
+🚀 Увеличивать конверсию и снижать стоимость клика
+
+🕒 Многократно экономить личное время и время менеджеров на чистку ключей в АРК
+
+🔍 Автоматически подбирать фразы-спутники для вывода основных ключей в топ
+
+📊 Продвигать товары с помощью АРК на полном автомате
+
+Настройки:
+⚙️ У меня достаточно настроек, чтобы тонко и под себя настроить управление АРК вплоть до полного отключения ИИ.
+
+Начало работы:
+🛒 Если у вас еще нет магазинов, то жмите "Добавить магазин" и следуйте инструкциям.
+
+Дополнительные ресурсы:
+📚 Инструкции, видео, справки, статьи - /helpCenter
+
+🆕 Самая актуальная информация о боте на канале - https://t.me/auto_wb_master
+
+👥 Группа поддержки и обсуждений бота - @wb_adv_master_bot
+"""
         )
 
     @property
@@ -790,7 +815,7 @@ class SettingMinCTR(TextWithKeyboard):
         goods = []
         bads = []
         for kw in keywords:
-            if kw.keyword_setting.predict_ctr >= self._min_ctr:
+            if kw.predict_ctr >= self._min_ctr or kw.baes_ctr >= self._min_ctr:
                 goods.append(kw)
             else:
                 bads.append(kw)
@@ -808,10 +833,16 @@ class SettingMinCTR(TextWithKeyboard):
                 f' равен {round(self._min_ctr*100, 1)} %,'
                 f"""тип минимального CTR: {"Задан в ручную"  if self._min_ctr_type == 'direct' else "Определен автоматически"}\n""")
         for good in self._goods:
-               text += f'{good.text} - {round(good.keyword_setting.predict_ctr*100, 1)}  % ✅\n'
+            predict_ctr = good .predict_ctr
+            baes_ctr = good .baes_ctr
+            ctr = predict_ctr if predict_ctr > baes_ctr else baes_ctr
+            text += f'{good.text} - {round(ctr * 100, 1)}  % ❌\n'
         text += f'================== {round(self._min_ctr*100, 1)}\n'
         for bad in self._bads:
-            text += f'{bad.text} - {round(bad.keyword_setting.predict_ctr*100, 1)}  % ❌\n'
+            predict_ctr = bad.predict_ctr
+            baes_ctr = bad.baes_ctr
+            ctr = predict_ctr if predict_ctr > baes_ctr else baes_ctr
+            text += f'{bad.text} - {round(ctr*100, 1)}  % ❌\n'
 
         text += '\n\n'
         text += 'Введите новый CTR:'
@@ -1478,3 +1509,23 @@ class Single_message105(Text):
 
 Обсудить в чате - https://t.me/wbgram_disc
     """
+
+
+class HelpCenterMainMenu(Text):
+    @property
+    def text(self):
+        text = """
+Самая свежая информация о боте - https://t.me/auto_wb_master
+Обсуждение и поддержка - https://t.me/wbgram_disc
+Связь с разработчиком - https://t.me/skyline360_1
+
+Подробную информацию смотрите в разделах
+        
+"""
+        return text
+
+
+    @property
+    def keyboard(self):
+        builder = InlineKeyboardBuilder()
+
