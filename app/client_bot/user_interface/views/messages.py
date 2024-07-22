@@ -1,5 +1,6 @@
 import datetime
 
+from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
@@ -25,7 +26,7 @@ from ..message_templates.templates import (TextWithKeyboard,
                                            TextWithKeyboardPagination,
                                            TextWithKeyboardAndImage)
 
-from . import keyboards
+from . import keyboards, callbacks
 from aiogram import Bot
 
 import logging
@@ -68,10 +69,10 @@ class ShopChoice(TextWithKeyboard):
     @property
     def text(self):
         return ("""
-🤖 Я - специализированный бот для автоматизации АРК - базового инструмента продвижения товаров на Wildberries.
+🤖 Я - специализированный бот для автоматизации АРК  (автоматические рекламы) - базового и самого выгодного инструмента продвижения товаров на Wildberries.
 
 Что я умею:
-📈 Управлять ключевыми словами в рекламных кампаниях с помощью искусственного интеллекта
+📈 Управлять ключевыми словами в автоматических рекламных кампаниях с помощью искусственного интеллекта
 
 💰 Экономить до 90% рекламного бюджета на автоматические рекламные кампании
 
@@ -686,6 +687,7 @@ class ShopMenu(TextWithKeyboard):
     def text(self):
         balance = self._balance
         text = (
+            '===========================================\n'
             f'Магазин: {self._wb_user_cabinet.name}\n'
             f'Shop ID: {self._wb_cabinet.shop_id}\n'
             f'Баланс магазина: {balance} рублей\n'
@@ -697,8 +699,8 @@ class ShopMenu(TextWithKeyboard):
                      f'для доступа далее необходимо будет пополнить баланс')
 
 
-        elif balance < 0:
-            text += (f'Доступ в магазин заблокирован из-за отрицательного баланса\n')
+        elif balance <= 0:
+            text += (f'Для продолжения работы необходимо пополнить баланс\n')
             if self.is_active_adv:
                 text += 'Есть кампании, которым бот подключен'
 
@@ -707,11 +709,63 @@ class ShopMenu(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        return keyboards.get_shop_menu_keyboard(
-            self._wb_user_cabinet,
-            self._wb_cabinet.id,
-            self.is_active_adv
+        wb_user_cabinet = self._wb_user_cabinet
+        wb_cabinet     =   self._wb_cabinet.id
+        is_active_adv = self.is_active_adv
+        wb_cabinet_original_id = wb_cabinet.id
+        is_active_adv: True
+
+        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
+        expiration_time: datetime.datetime = wb_cabinet.expiration_time
+        now = datetime.datetime.now()
+        if not (balance := wb_cabinet.balance):
+            balance = 0
+        if not (bonus := wb_cabinet.bonus):
+            bonus = 0
+        builder = InlineKeyboardBuilder()
+
+        if any([expiration_time > now, balance > 0, bonus > 0]):
+            button = InlineKeyboardButton(
+        text = 'Автоматические рекламные кампании',
+        callback_data = callbacks.ChoiceAdvPaginator(
+            wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
+            builder.row(button)
+
+        button = InlineKeyboardButton(
+        text = 'Пополнить баланс',
+        callback_data = callbacks.AddBalance(wb_cabinet_original_id=wb_cabinet_original_id).pack(),
+        )
+
+        builder.row(button)
+
+        if is_active_adv:
+            button = InlineKeyboardButton(
+        text = 'Отключить все кампании',
+        callback_data = callbacks.TurnBot(action='off_all',
+                                          wb_user_cabinet_original_id=wb_user_cabinet.id).pack())
+        builder.row(button)
+        button = InlineKeyboardButton(text='Вернуться к списку магазинов',
+        callback_data = callbacks.Start().pack())
+        builder.row(button)
+        return builder.as_markup()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class OrderSubscribe(Text):
