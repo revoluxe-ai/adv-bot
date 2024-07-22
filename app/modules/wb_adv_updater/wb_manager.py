@@ -210,15 +210,7 @@ class Manager(AbcManager):
                 f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
             return
         logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
-        last_update = adv_setting.last_update
-        today_date = datetime.datetime.now().date()
-        pass_date_if_not_first_update = (today_date,
-                                         today_date - datetime.timedelta(days=1),
-                                         today_date - datetime.timedelta(days=2))
         for keyword in keywords:
-            date = keyword.date
-            if last_update and date not in pass_date_if_not_first_update:
-                 continue
             try:
                 await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
             except Exception as exc:
