@@ -20,7 +20,7 @@ from app.modules.common_slaves.wildberries.models import WBItemPosition, CommonK
 from aiogram.client.session import aiohttp
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
-
+from app import settings
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +219,7 @@ async def add_wb_positions_from_queue_to_db():
     queue_position_dict[key] = position
     last_key = list(queue_position_dict.keys())[-1]
     position = list(queue_position_dict.values())[-1]
-    async with sm() as session:
+    async with sm(semaphore) as session:
         stmt = select(WBItemPosition) \
             .where(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
                         WBItemPosition.keyword_id == CommonKeyword.id,
@@ -230,72 +230,85 @@ async def add_wb_positions_from_queue_to_db():
         pos_in_db = pos_in_db.scalar_one_or_none()
         if not pos_in_db:
             keyword = position.keyword
-            await session.merge(keyword)
-            await session.merge(position)
+            session.add(keyword)  # Добавляем keyword в сессию
+            session.add(position)  # Добавляем position в сессию
             await session.commit()
     del queue_position_dict[last_key]
 
 
-
-
-async def add_wb_positions(text:str, need_nmids: set[int]):
+async def add_wb_positions(text: str, need_nmids: set[int]):
     assert need_nmids
     global done_count
     update_time = datetime.datetime.now()
-    async with sm() as session:
+
+    async with sm(semaphore) as session:
+        # Найти или создать keyword
         stmt = select(CommonKeyword).where(CommonKeyword.text == text)
         result = await session.execute(stmt)
         keyword = result.scalar()
+
         if not keyword:
             keyword = CommonKeyword(text=text)
             session.add(keyword)
-            await session.commit()
+            await session.commit()  # Сначала сохраняем keyword, чтобы он имел id
+
+        # Обработка позиций
+        positions_to_add = []  # Храним позиции, которые нужно добавить в базу данных
         for page in range(1, 100):
             positions = await parser.parse_keywords_from_wb(keyword, page)
             positions = [position for position in positions if position.nmid in need_nmids]
             await redis_manager.add_positions_to_redis(positions)
             logger.debug('Записали позиции в Редис')
+
             for position in positions:
                 need_nmids.discard(position.nmid)
-                write_to_db_queue.put_nowait(position)
+                position.keyword = keyword  # Устанавливаем связь с keyword
+                positions_to_add.append(position)
+
             if not need_nmids:
                 break
         else:
+            # Если какие-то nmids не найдены
             not_found_positions = []
             for nmid in need_nmids:
-                position = WBItemPosition()
-                position.real_position = 0
-                position.base_position = 0
-                position.promo_position = 0
-                position.keyword = keyword
-                position.timestamp = datetime.datetime.now()
-                position.nmid = nmid
-                position.cpm = 0
+                position = WBItemPosition(
+                    real_position=0,
+                    base_position=0,
+                    promo_position=0,
+                    keyword=keyword,
+                    timestamp=datetime.datetime.now(),
+                    nmid=nmid,
+                    cpm=0
+                )
+                session.add(position)
                 not_found_positions.append(position)
             await redis_manager.add_positions_to_redis(not_found_positions)
-            for position in not_found_positions:
-                write_to_db_queue.put_nowait(position)
+            positions_to_add.extend(not_found_positions)
 
-        keyword.last_full_update = update_time
-        await session.commit()
+        # Добавляем все позиции и обновляем keyword
+        if positions_to_add:
+            session.add_all(positions_to_add)  # Добавляем все позиции
+        keyword.last_full_update = update_time # Обновляем keyword
+        await session.commit()  # Фиксируем изменения
 
 
-max_thread_for_proxy = settings.MAX_THREAD_FOR_PROXY
 
-sem = asyncio.Semaphore(max_thread_for_proxy)
-
-async def limited_add_wb_positions(text:str, need_nmids: set[int]):
-    async with sem:
+async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
+    # async with sem:
         await add_wb_positions(text, need_nmids)
+
+
+count_semaphore = settings.MAX_THREAD_PARSER
+semaphore = asyncio.Semaphore(count_semaphore)
 
 
 async def parser_all_white_phrase():
     tasks_by_text = {}
     while True:
-        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases()
+        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases(semaphore)
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
-                task = asyncio.create_task(limited_add_wb_positions(text, need_nmids))
+                task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
                 tasks_by_text[text] = task
                 await asyncio.sleep(0)
         for key in list(tasks_by_text.keys()):
@@ -308,7 +321,7 @@ async def parser_all_white_phrase():
 
 
 async def reset_from_redis_positions_of_out_index():
-    async with sm() as session:
+    async with sm(semaphore) as session:
         # Выбираем позиции, для которых нет более новых позиций по этому ключевому слову
         stmt = (
             select(WBItemPosition)
