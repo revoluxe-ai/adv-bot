@@ -714,6 +714,8 @@ class Manager(AbcManager):
                     payment = AdvPayment(date=current_date)
                     adv_setting.payments.append(payment)
                     wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
+                else:
+                    wb_cabinet.bonus = 0
                 await session.commit()
 
     async def process_payment_for_parsing(self):
@@ -749,4 +751,6 @@ class Manager(AbcManager):
                                          type='parsing')
                     adv_setting.payments.append(payment)
                     wb_cabinet.balance -= const.PARSING_PRICE
+                else:
+                    wb_cabinet.bonus = 0
                 await session.commit()
