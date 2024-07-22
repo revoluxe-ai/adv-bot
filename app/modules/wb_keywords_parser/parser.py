@@ -302,7 +302,7 @@ count_semaphore = settings.MAX_THREAD_PARSER
 semaphore = asyncio.Semaphore(count_semaphore)
 
 
-async def parser_all_white_phrase():
+async def parser_all_white_phrase(semaphore):
     tasks_by_text = {}
     while True:
         all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases(semaphore)

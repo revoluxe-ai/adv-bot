@@ -674,7 +674,6 @@ async def get_min_ctr(adv: AdvSetting):
             )
         result = await session.execute(stmt)
         keyword_settings = result.unique().scalars().all()
-    min_ctr_getter = MinCTRGetter(adv)
     # text_to_predict_ctr = {kw.text: kw.predict_ctr for kw in keyword_settings}
     async with _sm() as session:
         stmt = select(
@@ -692,10 +691,12 @@ async def get_min_ctr(adv: AdvSetting):
     ctrs  = []
     for kw in keyword_settings:
         ctr = text_to_real_ctr.get(kw.text, 0)
-        if ctr > kw.predict_ctr:
+        if not (predict_ctr := kw.predict_ctr):
+            predict_ctr = 0
+        if ctr > predict_ctr:
             ctrs.append(ctr)
         else:
-            ctrs.append(kw.predict_ctr)
+            ctrs.append(predict_ctr)
     if ctrs:
          min_ctr = min(ctrs)
     else:
@@ -800,13 +801,14 @@ async def get_all_white_phrases(semaphore = None):
         result = await session.execute(stmt)
         nmids_datetime_rows = result.all()
         sort_dict = {row[0]: place for place, row in enumerate(nmids_datetime_rows)}
+        adv_settings = [adv for adv in adv_settings if adv.nmids and adv.parsing_active]
         adv_settings = sorted(adv_settings, key=lambda adv: sort_dict.get(adv.nmids[0], 0))
 
         for adv in adv_settings:
             keywords_for_parsing = []
             keywords = await get_good_bad_phrases(adv)
             for keyword in keywords:
-                if keyword.keyword_setting.hard_status in [1, 2, 3]:
+                if keyword.keyword_setting.hard_status in [1, 2, 3] or keyword.status == 'good':
                    text = keyword.text
                    if text in pass_text:
                        continue

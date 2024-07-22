@@ -176,8 +176,8 @@ class Runner:
                 logger.error(f'Ошибка добавления позиций в базу {e}', exc_info=True)
             await asyncio.sleep(0)
 
-    async def parser_all_white_phrase(self):
-       await parser.parser_all_white_phrase()
+    async def parser_all_white_phrase(self, semaphore: asyncio.Semaphore):
+       await parser.parser_all_white_phrase(semaphore)
 
 
     async def reset_out_positions_in_redis(self):
@@ -190,17 +190,17 @@ class Runner:
             await asyncio.sleep(10)
 
 
-    async def keywords_parsing_process(self):
+    async def keywords_parsing_process(self,semaphore: asyncio.Semaphore):
         while True:
             try:
-                await self.__keywords_parsing_process()
+                await self.__keywords_parsing_process(semaphore)
             except:
                 logger.error('Ошибка процесса парсинга ключей', exc_info=True)
                 await asyncio.sleep(0)
 
-    async def __keywords_parsing_process(self):
+    async def __keywords_parsing_process(self, semaphore: asyncio.Semaphore):
         await asyncio.gather(
-                   self. parser_all_white_phrase(),
+                   self. parser_all_white_phrase(semaphore),
                    self.write_positions_to_db(),
                    self.payment_for_parsing_keyword(),
                return_exceptions=True)
