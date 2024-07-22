@@ -843,6 +843,7 @@ class SettingMinCTR(TextWithKeyboard):
         goods = []
         bads = []
         for kw in keywords:
+            kw.real_ctr = kw.predict_ctr if kw.predict_ctr > kw.baes_ctr else kw.baes_ctr
             if kw.predict_ctr >= self._min_ctr or kw.baes_ctr >= self._min_ctr:
                 goods.append(kw)
             else:
@@ -860,11 +861,14 @@ class SettingMinCTR(TextWithKeyboard):
         text = (f'Минимальный CTR для кампании {self._adv.name}'
                 f' равен {round(self._min_ctr*100, 1)} %,'
                 f"""тип минимального CTR: {"Задан в ручную"  if self._min_ctr_type == 'direct' else "Определен автоматически"}\n""")
-        for good in self._goods:
-            predict_ctr = good .predict_ctr
-            baes_ctr = good .baes_ctr
-            ctr = predict_ctr if predict_ctr > baes_ctr else baes_ctr
-            text += f'{good.text} - {round(ctr * 100, 1)}  % ❌\n'
+
+        keywords = self._goods + self._bads
+        goods = self._goods
+        bads = self._bads
+        goods.sort(key=lambda x: x.real_ctr, reverse=True)
+        bads.sort(key=lambda x: x.real_ctr, reverse=True)
+        for good in goods:
+            text += f'{good.text} - {round(good.real_ctr * 100, 1)}  % ✅\n'
         text += f'================== {round(self._min_ctr*100, 1)}\n'
         for bad in self._bads:
             predict_ctr = bad.predict_ctr
