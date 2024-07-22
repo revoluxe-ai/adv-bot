@@ -691,8 +691,11 @@ async def get_min_ctr(adv: AdvSetting):
     text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
     ctrs  = []
     for kw in keyword_settings:
-        ctr = text_to_real_ctr.get(kw.text, await min_ctr_getter.get_min_ctr())
-        ctrs.append(ctr)
+        ctr = text_to_real_ctr.get(kw.text, 0)
+        if ctr > kw.predict_ctr:
+            ctrs.append(ctr)
+        else:
+            ctrs.append(kw.predict_ctr)
     if ctrs:
          min_ctr = min(ctrs)
     else:
