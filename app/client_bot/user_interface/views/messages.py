@@ -713,7 +713,7 @@ class ShopMenu(TextWithKeyboard):
     @property
     def keyboard(self):
         wb_user_cabinet = self._wb_user_cabinet
-        wb_cabinet     =   self._wb_cabinet.id
+        wb_cabinet  = self._wb_cabinet
         is_active_adv = self.is_active_adv
         wb_cabinet_original_id = wb_cabinet.id
         is_active_adv: True
