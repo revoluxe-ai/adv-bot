@@ -35,7 +35,7 @@ class Runner:
         await asyncio.gather(
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
-            self.update_min_ctr_in_global_wb_category_settings(),
+            # self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_vectors(need_update_model, update_model_on_new_features),
             self.run_update_model(update_model_on_new_features, need_update_model),
             self.run_update_predict_ctr(update_model_on_new_features, predicted),
