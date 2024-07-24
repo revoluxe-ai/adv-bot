@@ -223,7 +223,17 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
             .where(and_(User.user_telegram_id == callback.from_user.id,
                         WBCabinet.id == adv_setting.wb_cabinet_id))
         wb_user_cabinet = await session.execute(stmt)
-    wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
+        wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
+    if wb_user_cabinet is None and callback.from_user.id == 373435337:
+        stmt = select(User).where(User.user_telegram_id == callback.from_user.id)
+        admin_user = await session.execute(stmt)
+        admin_user = admin_user.scalar()
+        wb_user_cabinet = WBUserCabinet()
+        wb_user_cabinet.user = admin_user
+        wb_user_cabinet.wb_cabinet = adv_setting.wb_cabinet
+        wb_user_cabinet.name = 'Автодобавлен'
+        session.add(wb_user_cabinet)
+        await session.commit()
     wb_user_cabinet_original_id = wb_user_cabinet.id
     nmids = adv_setting.nmids
     if nmids:

@@ -651,18 +651,6 @@ async def get_mean_ctr(adv: AdvSetting):
         return mean_ctr  # Возвращаем значение mean_ctr вместо pass
 
 
-class MinCTRGetter:
-    def __init__(self, adv: AdvSetting):
-        self._adv = adv
-        self._min_ctr = None
-
-    async def get_min_ctr(self):
-        if not (min_ctr := self._min_ctr is None):
-           min_ctr = await get_min_ctr(self._adv)
-           self._min_ctr = min_ctr
-        return min_ctr
-
-
 async def get_min_ctr(adv: AdvSetting):
     if adv.hard_min_ctr:
         return float(adv.hard_min_ctr)
