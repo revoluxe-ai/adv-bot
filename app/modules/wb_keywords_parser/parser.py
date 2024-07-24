@@ -257,6 +257,7 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
         for page in range(1, 100):
             positions = await parser.parse_keywords_from_wb(keyword, page)
             positions = [position for position in positions if position.nmid in need_nmids]
+            assert positions
             await redis_manager.add_positions_to_redis(positions)
             logger.debug('Записали позиции в Редис')
 
@@ -270,6 +271,7 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
         else:
             # Если какие-то nmids не найдены
             not_found_positions = []
+            assert need_nmids
             for nmid in need_nmids:
                 position = WBItemPosition(
                     real_position=0,
