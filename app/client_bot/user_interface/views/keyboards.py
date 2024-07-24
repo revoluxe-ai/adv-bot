@@ -509,7 +509,7 @@ def get_setting_min_views_for_predict_ctr_keyboard(adv: AdvSetting):
 
 def get_return_to_adv_setting_keyboard(adv_original_id):
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text='Назад',
+    builder.row(InlineKeyboardButton(text='Назад в настройки кампании',
                                      callback_data=callbacks.Adv(
                                          adv_original_id=adv_original_id).pack()))
     return builder.as_markup()
