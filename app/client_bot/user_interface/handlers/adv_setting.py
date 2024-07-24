@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
 from app.modules.wb_adv_updater.models import AdvPayment
+from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from .start import start_registration
 from .. import states
@@ -98,7 +99,19 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     data = await state.get_data()
-    wb_user_cabinet_original_id = data['last_wb_user_cabinet_original_id']
+    try:
+        wb_user_cabinet_original_id = data['last_wb_user_cabinet_original_id']
+    except KeyError:
+        async with sm() as session:
+            stmt = select(WBUserCabinet) \
+                .join(WBUserCabinet.user) \
+                .options(selectinload(WBUserCabinet.wb_cabinet) \
+                         .selectinload(WBCabinet.adv_settings)) \
+                .filter(User.user_telegram_id == callback.from_user.id,
+                        AdvSetting.id == adv_original_id)
+            wb_user_cabinet = await session.execute(stmt)
+            wb_user_cabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet_original_id = wb_user_cabinet.id
     async with sm() as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
