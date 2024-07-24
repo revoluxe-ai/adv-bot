@@ -674,6 +674,7 @@ async def get_min_ctr(adv: AdvSetting):
             )
         result = await session.execute(stmt)
         keyword_settings = result.unique().scalars().all()
+    texts = [kw.text for kw in keyword_settings]
     # text_to_predict_ctr = {kw.text: kw.predict_ctr for kw in keyword_settings}
     async with _sm() as session:
         stmt = select(
@@ -682,27 +683,30 @@ async def get_min_ctr(adv: AdvSetting):
              case(
                  (func.sum(AdvKeyword.views) == 0, 1),
                  else_=func.sum(AdvKeyword.views)
-             )).label('ctr')
-        ).group_by(AdvKeyword.text).where(AdvKeyword.adv_setting_id == adv.id)
-
+             )).label('ctr'),
+            func.sum(AdvKeyword.views).label('views')
+        ).group_by(AdvKeyword.text)\
+            .having(func.sum(AdvKeyword.views) > 0)\
+            .where(AdvKeyword.adv_setting_id == adv.id,
+                   AdvKeyword.text.in_(texts)
+                   )
         result = await session.execute(stmt)
         adv_keywords_rows = result.all()
     text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
-    ctrs  = []
+    real_ctrs  = []
+    predict_ctrs = []
     for kw in keyword_settings:
-        ctr = text_to_real_ctr.get(kw.text, 0)
-        if not (predict_ctr := kw.predict_ctr):
-            predict_ctr = 0
-        if ctr > predict_ctr:
-            ctrs.append(ctr)
-        else:
-            ctrs.append(predict_ctr)
-    if ctrs:
-         min_ctr = min(ctrs)
-    else:
-        return 0.03
-    if min_ctr:
-        return float(min_ctr)
+        real_ctr = text_to_real_ctr.get(kw.text)
+        if real_ctr:
+            real_ctrs.append(text_to_real_ctr[kw.text])
+        predict_ctr = kw.predict_ctr
+        if predict_ctr:
+            predict_ctrs.append(kw.predict_ctr)
+    if real_ctrs:
+        return float(min(real_ctrs))
+
+    if predict_ctrs:
+        return float(min(predict_ctrs))
     category = await get_wb_category(adv)
     category_name = category.wb_category_name
     async with _sm() as session:
@@ -711,10 +715,7 @@ async def get_min_ctr(adv: AdvSetting):
         try:
              min_ctr = result.scalar_one()
         except NoResultFound:
-            logger.error('Не найден CTR для категории', exc_info=True)
-            min_ctr = 0
-            return min_ctr
-    min_ctr *= adv.boost
+            return 0.03
     return float(min_ctr)
 
 
