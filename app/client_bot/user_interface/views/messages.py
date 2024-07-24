@@ -1561,3 +1561,39 @@ class HelpCenterMainMenu(Text):
     def keyboard(self):
         builder = InlineKeyboardBuilder()
 
+class WaitingForWhitePhrases(TextWithKeyboard):
+
+    async def __call__(self, adv_setting_id):
+        self.adv_setting_id = adv_setting_id
+        await super().__call__()
+
+    @property
+    def text(self):
+        return """
+Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список.  
+Например:
+
+платье женское
+платье вечернее
+платье летнее
+
+Я автоматически добавлю эти ключи в белый список. Учитывается точное соответствие.
+
+    """
+
+    @property
+    def keyboard(self):
+        return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+
+
+
+class WhitePhrasesAdded(TextWithKeyboard):
+    async def __call__(self, adv_setting_id):
+        self.adv_setting_id = adv_setting_id
+        await super().__call__()
+
+    text = "Фразы добавлены в белый список, можете ввести еще фразы или вернуться в настройки РК"
+    @property
+    def keyboard(self):
+        return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)

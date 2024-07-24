@@ -31,7 +31,7 @@ class ShopNew(CallbackData, prefix="shop_new"):
 
 class Adv(CallbackData, prefix="adv"):
     adv_original_id: int
-    action: Optional[str] = None
+    action: Optional[str] = 'select'
     wb_user_cabinet_original_id: Optional[int] = None
 
 
@@ -117,6 +117,10 @@ class AddBalance(CallbackData, prefix="add_balance"):
 
 class KeywordPositionHistory(CallbackData, prefix="keyword_position_history"):
     adv_original_id: int
+
+class AddWhitePhrases(CallbackData, prefix="add_white_phrases"):
+    adv_setting_id: int
+
 
 
 class TurnParsing(CallbackData, prefix="turn_parsing"):
