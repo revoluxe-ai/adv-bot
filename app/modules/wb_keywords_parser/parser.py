@@ -219,7 +219,7 @@ async def add_wb_positions_from_queue_to_db():
     queue_position_dict[key] = position
     last_key = list(queue_position_dict.keys())[-1]
     position = list(queue_position_dict.values())[-1]
-    async with sm(semaphore) as session:
+    async with sm() as session:
         stmt = select(WBItemPosition) \
             .where(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
                         WBItemPosition.keyword_id == CommonKeyword.id,
@@ -240,7 +240,7 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
     global done_count
     update_time = datetime.datetime.now()
 
-    async with sm(semaphore) as session:
+    async with sm() as session:
         # Найти или создать keyword
         stmt = select(CommonKeyword).where(CommonKeyword.text == text)
         result = await session.execute(stmt)
@@ -292,21 +292,22 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
         keyword.last_full_update = update_time # Обновляем keyword
         await session.commit()  # Фиксируем изменения
 
-
+threads_count = 0
 
 async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
+    global threads_count
+    threads_count += 1
+    print(f'Количество потоков: {threads_count}')
     async with sem:
         await add_wb_positions(text, need_nmids)
+    threads_count -= 1
 
 
-count_semaphore = settings.MAX_THREAD_PARSER
-semaphore = asyncio.Semaphore(count_semaphore)
 
-
-async def parser_all_white_phrase(semaphore):
+async def parser_all_white_phrase():
     tasks_by_text = {}
     while True:
-        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases(semaphore)
+        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases()
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
                 if need_nmids:
@@ -323,7 +324,7 @@ async def parser_all_white_phrase(semaphore):
 
 
 async def reset_from_redis_positions_of_out_index():
-    async with sm(semaphore) as session:
+    async with sm() as session:
         # Выбираем позиции, для которых нет более новых позиций по этому ключевому слову
         stmt = (
             select(WBItemPosition)
@@ -339,6 +340,9 @@ async def reset_from_redis_positions_of_out_index():
             await asyncio.sleep(0)  # Чтобы предотвратить блокировку event loop
 
 
+count_semaphore = settings.MAX_THREAD_PARSER
+semaphore = asyncio.Semaphore(count_semaphore)
+
 
 if __name__ == '__main__':
-    asyncio.run(parser_all_white_phrase(semaphore))
+    asyncio.run(parser_all_white_phrase())
