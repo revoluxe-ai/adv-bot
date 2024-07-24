@@ -14,9 +14,6 @@ from python_modules import path_setting_funcs
 from .global_router import global_router
 
 logging.basicConfig(level=logging.DEBUG)
-from python_modules.logger import setup_logging
-
-setup_logging()
 
 
 # Создание хранилища с Redis
