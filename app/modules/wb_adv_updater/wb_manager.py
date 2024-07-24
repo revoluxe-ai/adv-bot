@@ -538,7 +538,7 @@ class Manager(AbcManager):
             global_keywordstats_list.extend(keywordstat_list)
         global_keywordstats_list = [keywordstat for keywordstat in global_keywordstats_list if keywordstat.ctr > 0]
         final_wb_category_name_to_min_ctr = {}
-        percentile = 27
+        percentile = 5
         for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
             ctrs = np.array([keywordstat.ctr for keywordstat in keywordstat_list if keywordstat.ctr > 0])
             if ctrs.size > 0:
@@ -597,13 +597,13 @@ class Manager(AbcManager):
                      else:
                          async with sm() as session:
                              wb_cabinet = wb_access.wb_cabinet
-                             await session.merge(wb_cabinet)
+                             stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet.id)
+                             result = session.execute(stmt)
+                             wb_cabinet = result.scalar()
                              wb_cabinet.last_update_all_data = datetime.datetime.now()
                              await session.commit()
                          logger.info('Задача обновления успешно выполнена')
                      del tasks[wb_access.wb_cabinet.id]
-
-
 
     async def check_accesses(self):
        await rights_control.check_all()
