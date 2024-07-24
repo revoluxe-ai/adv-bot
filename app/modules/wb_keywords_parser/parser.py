@@ -237,7 +237,6 @@ async def add_wb_positions_from_queue_to_db():
 
 
 async def add_wb_positions(text: str, need_nmids: set[int]):
-    assert need_nmids
     global done_count
     update_time = datetime.datetime.now()
 
@@ -296,7 +295,7 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
 
 
 async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
-    # async with sem:
+    async with sem:
         await add_wb_positions(text, need_nmids)
 
 
@@ -310,9 +309,10 @@ async def parser_all_white_phrase(semaphore):
         all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases(semaphore)
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
-                task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
-                tasks_by_text[text] = task
-                await asyncio.sleep(0)
+                if need_nmids:
+                    task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
+                    tasks_by_text[text] = task
+                    await asyncio.sleep(0)
         for key in list(tasks_by_text.keys()):
             task = tasks_by_text[key]
             if task.done():
