@@ -61,7 +61,8 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
     builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
                                                                       type='by_adv').pack()))
-
+    builder.row(InlineKeyboardButton(text='Добавить фразы в белый список',
+                                callback_data=callbacks.AddWhitePhrases(adv_setting_id=adv_setting.id).pack()))
     button = InlineKeyboardButton(text='История позиций ключевых слов',
                                     callback_data=callbacks.KeywordPositionHistory(
                                         adv_original_id=adv_setting.id).pack())
@@ -511,6 +512,7 @@ def get_return_to_adv_setting_keyboard(adv_original_id):
     builder.row(InlineKeyboardButton(text='Назад',
                                      callback_data=callbacks.Adv(
                                          adv_original_id=adv_original_id).pack()))
+    return builder.as_markup()
 
 def get_call_me_keyboard():
     builder = InlineKeyboardBuilder()
