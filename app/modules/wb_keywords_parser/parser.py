@@ -341,4 +341,4 @@ async def reset_from_redis_positions_of_out_index():
 
 
 if __name__ == '__main__':
-    asyncio.run(parser_all_white_phrase())
+    asyncio.run(parser_all_white_phrase(semaphore))
