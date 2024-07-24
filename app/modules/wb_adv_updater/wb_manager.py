@@ -112,7 +112,7 @@ class Manager(AbcManager):
             adv_settings = result.scalars().all()
         for adv_setting in adv_settings:
             if adv_setting not in adv_update_tasks:
-                task = asyncio.create_task(self.keyword_stat_updater(adv_setting, wb_api, semaphore))
+                task = asyncio.create_task(self.keyword_stat_updater(adv_setting.id, wb_api, semaphore))
                 adv_update_tasks[adv_setting.id] = task
             else:
                 if adv_update_tasks[adv_setting.id].done():
@@ -129,8 +129,6 @@ class Manager(AbcManager):
 
                     del adv_update_tasks[adv_setting.id]
                     logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
-                    await session.commit()
-                    logger.debug(f"Конечный коммит выполнен")
                     logger.debug(f'Установка set для need_update_model')
                     need_update_model.set()
                     logger.debug(f"Обновление статистики завершено")
@@ -201,27 +199,30 @@ class Manager(AbcManager):
 
 
 
-    async def keyword_stat_updater(self, adv_setting, wb_api, semaphore):
-        logger.debug(f"Обработка настройки {adv_setting}")
-        try:
-            keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
-        except Exception as exc:
-            logger.error(
-                f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
-            return
-        logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
-        for keyword in keywords:
+    async def keyword_stat_updater(self, adv_setting_id, wb_api, semaphore):
+        async with sm(semaphore) as session:
+            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+            adv_setting = await session.execute(stmt)
+            adv_setting = adv_setting.scalar()
             try:
-                await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
+                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
             except Exception as exc:
                 logger.error(
-                    f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
-                    exc_info=True
-                )
-            await asyncio.sleep(0)
-        adv_setting.last_update = datetime.datetime.now()
-        async with sm(semaphore) as session:
-            await session.merge(adv_setting)
+                    f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+                return
+            logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
+            for keyword in keywords:
+                try:
+                    await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
+                except Exception as exc:
+                    logger.error(
+                        f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
+                        exc_info=True
+                    )
+                await asyncio.sleep(0)
+
+
+            adv_setting.last_update = datetime.datetime.now()
             await session.commit()
         return
 
