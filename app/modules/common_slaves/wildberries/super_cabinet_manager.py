@@ -44,7 +44,8 @@ async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> ty
                                           .selectinload(WBUserCabinet.user) \
                                           .selectinload(User.wb_tokens))\
         .where(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
-                   WBCabinet.balance > 0))
+                   WBCabinet.balance > 0,
+                   WBCabinet.bonus > 0))
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
