@@ -8,6 +8,7 @@ import logging
 from statistics import mean
 from typing import AsyncGenerator
 
+from aiohttp import ServerDisconnectedError
 from sqlalchemy.orm import joinedload
 
 from app.modules.wb_adv_updater import data_manager
@@ -75,7 +76,6 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                 state['_last_pauses'].append(time_to_wait)
                 state['_last_pauses'] = state['_last_pauses'][-1000:]
                 state['_last_query_time'] = time.time()
-
                 try:
                     result = await func(instance, *args, **kwargs)
                     logger.debug(f'Запрос через {method_name} выполнен успешно')
@@ -98,7 +98,8 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                 #     pause = 0.5
                 #     state['_next_pause'] = pause
                 #     state['_attempts'] += 1
-                except DataError as e:
+                except (DataError,
+                        ServerDisconnectedError) as e:
                     logger.debug(f'Ошибка при выполнении запроса через {method_name}: {e}, '
                                  f'Пауза перед следующим запросом: {state["_next_pause"]} секунд')
                     state['_attempts'] += 1
@@ -114,7 +115,6 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                         state['_next_pause'] = 1
                     if state['_next_pause'] > max_delay:
                         state['_next_pause'] = max_delay
-
                     state['_attempts'] += 1
         return wrapper
     return decorator
@@ -123,10 +123,11 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
 
 
 class Parser:
-    async def parse_keywords_from_wb(self, keyword: CommonKeyword, page: int):
+    async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
-        text = keyword.text
         products = await self.__parse_keywords_from_wb(text, page)
+        if not products:
+            return []
         positions = []
         for place_on_page, product in enumerate(products):
             nmid = product['id']
@@ -152,7 +153,7 @@ class Parser:
                 cpm=cpm,
                 adv_id=adv_id,
                 real_position=real_position,
-                keyword = keyword,
+                keyword_text = text,
                 timestamp = datetime.datetime.now()
             )
             positions.append(position)
@@ -254,57 +255,40 @@ async def add_wb_positions_from_queue_to_db():
 
 async def add_wb_positions(text: str, need_nmids: set[int]):
     global done_count
-    update_time = datetime.datetime.now()
-
-    async with sm() as session:
-        # Найти или создать keyword
-        stmt = select(CommonKeyword).where(CommonKeyword.text == text)
-        result = await session.execute(stmt)
-        keyword = result.scalar()
-
-        if not keyword:
-            keyword = CommonKeyword(text=text)
-            session.add(keyword)
-            await session.commit()  # Сначала сохраняем keyword, чтобы он имел id
-
-        # Обработка позиций
-        positions_to_add = []  # Храним позиции, которые нужно добавить в базу данных
-        for page in range(1, 100):
-            positions = await parser.parse_keywords_from_wb(keyword, page)
-            positions = [position for position in positions if position.nmid in need_nmids]
-            if positions:
-                await redis_manager.add_positions_to_redis(positions)
-                logger.debug('Записали позиции в Редис')
-                for position in positions:
-                    need_nmids.discard(position.nmid)
-                    position.keyword = keyword  # Устанавливаем связь с keyword
-                    positions_to_add.append(position)
-            if not need_nmids:
-                break
+    for page in range(1, 100):
+        positions = await parser.parse_keywords_from_wb(text, page)
+        positions = [position for position in positions if position.nmid in need_nmids]
+        if positions:
+            await redis_manager.add_positions_to_redis(positions)
+            logger.debug('Записали позиции в Редис')
+            for position in positions:
+                need_nmids.discard(position.nmid)
         else:
-            # Если какие-то nmids не найдены
-            not_found_positions = []
-            for nmid in need_nmids:
-                position = WBItemPosition(
-                    real_position=0,
-                    base_position=0,
-                    promo_position=0,
-                    keyword=keyword,
-                    timestamp=datetime.datetime.now(),
-                    nmid=nmid,
-                    cpm=0
-                )
-                not_found_positions.append(position)
+            break
+        if not need_nmids:
+            break
+    else:
+        # Если какие-то nmids не найдены
+        not_found_positions = []
+        for nmid in need_nmids:
+            position = WBItemPosition(
+                real_position=0,
+                base_position=0,
+                promo_position=0,
+                keyword_text=text,
+                timestamp=datetime.datetime.now(),
+                nmid=nmid,
+                cpm=0
+            )
+            not_found_positions.append(position)
+            # session.add(position)
+            # keyword.wb_item_positions.append(position)
+            # await session.commit()
+
             await redis_manager.add_positions_to_redis(not_found_positions)
-            positions_to_add.extend(not_found_positions)
-
-        # Добавляем все позиции и обновляем keyword
-        if positions_to_add:
-            session.add_all(positions_to_add)  # Добавляем все позиции в сессию
-        keyword.last_full_update = update_time # Обновляем keyword
-        await session.commit()  # Фиксируем изменения
-
-    return
+        # Обновляем keyword
+        # keyword.last_full_update = update_time
+        # await session.commit()  # Фиксируем изменени
 
 threads_count = 0
 

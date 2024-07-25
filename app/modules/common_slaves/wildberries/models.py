@@ -258,6 +258,7 @@ class WBItemPosition(BaseTable):
     promo_position: Mapped[int] = mapped_column(Integer, nullable=True)
     cpm: Mapped[int] = mapped_column(Integer, nullable=True)
     adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    keyword_text = mapped_column(String, nullable=False)
 
 
     def to_dict(self):
@@ -265,7 +266,7 @@ class WBItemPosition(BaseTable):
             'real_position': self.real_position,
             'promo_position': self.promo_position,
             'base_position': self.base_position,
-            'text': self.keyword.text,
+            'keyword_text': self.keyword_text,
             'cpm': self.cpm,
             'adv_id': self.adv_id,
             'nmid': self.nmid
@@ -281,6 +282,8 @@ class WBItemPosition(BaseTable):
         position.adv_id = data['adv_id']
         position.nmid = data['nmid']
         keyword = CommonKeyword()
-        keyword.text = data['text']
-        position.keyword = keyword
+        try:
+            keyword.keyword_text = data['keyword_text']
+        except:
+            keyword.keyword_text = None
         return position

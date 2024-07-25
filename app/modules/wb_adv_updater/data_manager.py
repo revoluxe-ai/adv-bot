@@ -794,6 +794,8 @@ async def get_all_white_phrases(semaphore = None):
         adv_settings = sorted(adv_settings, key=lambda adv: sort_dict.get(adv.nmids[0], 0))
 
         for adv in adv_settings:
+            if adv.adv_id != 18818595:
+                continue
             keywords_for_parsing = []
             keywords = await get_good_bad_phrases(adv)
             for keyword in keywords:
@@ -858,7 +860,8 @@ async def get_last_updated_phrases(all_white_phrases):
 
 async def get_keywords_positions(adv_setting: AdvSetting, texts: list[str]) -> dict[str, WBItemPosition]:
     positions =  await redis_manager.get_keywords_positions(adv_setting, texts)
-    positions = {position.keyword.text: position for position in positions}
+    positions = [position for position in positions if position]
+    positions = {position.keyword_text: position for position in positions}
     return positions
 
 

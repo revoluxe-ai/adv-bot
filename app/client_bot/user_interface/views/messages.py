@@ -5,7 +5,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (
- CommonKeyword
+    CommonKeyword, WBItemPosition
 )
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
@@ -481,15 +481,12 @@ class KeywordSettingMessage(TextWithKeyboard):
         adv_setting: AdvSetting = keyword_setting.adv_setting
         self._keyword_setting = keyword_setting
         self._adv_setting = adv_setting
-
-        async with _sm() as session:
-            stmt = select(CommonKeyword.last_full_update)\
-                .where(CommonKeyword.text == keyword_setting.text)
-            result = await session.execute(stmt)
-            last_full_update = result.scalar()
-
-        self.last_full_update = last_full_update
-
+        nmid = adv_setting.nmids[0]
+        position: WBItemPosition = await redis_manager.get_keyword_position(keyword_setting.text, nmid)
+        if position:
+            self.last_full_update = position.timestamp
+        else:
+            self.last_full_update = None
         return await super().__call__()
 
     @property

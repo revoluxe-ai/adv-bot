@@ -201,7 +201,7 @@ class Runner:
     async def __keywords_parsing_process(self, semaphore: asyncio.Semaphore):
         await asyncio.gather(
                    self. parser_all_white_phrase(semaphore),
-                   self.write_positions_to_db(),
+                   # self.write_positions_to_db(),
                    self.payment_for_parsing_keyword(),
                return_exceptions=True)
 
