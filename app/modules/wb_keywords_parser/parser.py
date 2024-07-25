@@ -26,6 +26,20 @@ logger = logging.getLogger(__name__)
 
 
 
+import warnings
+from sqlalchemy import exc as sa_exc
+
+# Включение отображения всех предупреждений
+warnings.simplefilter("always", sa_exc.SAWarning)
+
+# Пример обработки SAWarning как исключение
+def handle_warnings_as_exceptions(message, category, filename, lineno, file=None, line=None):
+    raise category(message)
+
+# Назначаем обработчик
+warnings.showwarning = handle_warnings_as_exceptions
+
+
 class DataError(Exception):
     pass
 
@@ -152,6 +166,8 @@ class Parser:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 text = await response.text()
+        if not text:
+            raise DataError('Пустой ответ от сервера', text)
         data = json.loads(text)
         if data == {}:
             return []
@@ -256,21 +272,18 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
         for page in range(1, 100):
             positions = await parser.parse_keywords_from_wb(keyword, page)
             positions = [position for position in positions if position.nmid in need_nmids]
-            assert positions
-            await redis_manager.add_positions_to_redis(positions)
-            logger.debug('Записали позиции в Редис')
-
-            for position in positions:
-                need_nmids.discard(position.nmid)
-                position.keyword = keyword  # Устанавливаем связь с keyword
-                positions_to_add.append(position)
-
+            if positions:
+                await redis_manager.add_positions_to_redis(positions)
+                logger.debug('Записали позиции в Редис')
+                for position in positions:
+                    need_nmids.discard(position.nmid)
+                    position.keyword = keyword  # Устанавливаем связь с keyword
+                    positions_to_add.append(position)
             if not need_nmids:
                 break
         else:
             # Если какие-то nmids не найдены
             not_found_positions = []
-            assert need_nmids
             for nmid in need_nmids:
                 position = WBItemPosition(
                     real_position=0,
@@ -281,30 +294,34 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
                     nmid=nmid,
                     cpm=0
                 )
-                session.add(position)
                 not_found_positions.append(position)
             await redis_manager.add_positions_to_redis(not_found_positions)
             positions_to_add.extend(not_found_positions)
 
         # Добавляем все позиции и обновляем keyword
         if positions_to_add:
-            session.add_all(positions_to_add)  # Добавляем все позиции
+            session.add_all(positions_to_add)  # Добавляем все позиции в сессию
         keyword.last_full_update = update_time # Обновляем keyword
         await session.commit()  # Фиксируем изменения
+
+    return
 
 threads_count = 0
 
 async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
     global threads_count
     threads_count += 1
-    print(f'Количество потоков: {threads_count}')
+    logger.debug(f'Количество потоков: {threads_count}')
     async with sem:
-        await add_wb_positions(text, need_nmids)
+        try:
+            await add_wb_positions(text, need_nmids)
+        except Exception as e:
+            logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
     threads_count -= 1
 
 
 
-async def parser_all_white_phrase():
+async def parser_all_white_phrase(semaphore):
     tasks_by_text = {}
     while True:
         all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases()
@@ -344,5 +361,6 @@ count_semaphore = settings.MAX_THREAD_PARSER
 semaphore = asyncio.Semaphore(count_semaphore)
 
 
+
 if __name__ == '__main__':
-    asyncio.run(parser_all_white_phrase())
+    asyncio.run(parser_all_white_phrase(semaphore))
