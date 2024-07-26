@@ -213,11 +213,24 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                    page,
                                   return_from_filter_bottom: bool,
                                   on_page,
-                                  min_ctr):
+                                  min_ctr,
+                                  sort_mode = 'default'):
+
+    min_ctr = min_ctr
+    def sorting_keywords(keywords, sort_mode):
+        if sort_mode == 'default':
+            keywords.sort(key=lambda x: abs(x.predict_ctr - min_ctr))
+            return keywords
+        elif sort_mode == 'sort_by_ctr_desc':
+            return sorted(keywords, key=lambda x: x.ctr, reverse=True)
+        else:
+            raise ValueError(f'Unknown sort_mode: {sort_mode}')
 
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
-    keywords.sort(key=lambda x: abs(x.predict_ctr - min_ctr))
+
+    keywords = sorting_keywords(keywords, sort_mode)
+
     bottoms = []
     for keyword in keywords[start_index:end_index]:
         clicks = keyword.clicks
