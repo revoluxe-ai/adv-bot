@@ -220,8 +220,6 @@ class Manager(AbcManager):
                         exc_info=True
                     )
                 await asyncio.sleep(0)
-
-
             adv_setting.last_update = datetime.datetime.now()
             await session.commit()
         return

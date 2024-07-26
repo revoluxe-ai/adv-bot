@@ -397,7 +397,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 12
 
 
-    async def __call__(self, state: FSMContext):
+    async def __call__(self, state: FSMContext, sort_mode = 'default'):
+        self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
         keywords_filter: list[str] = data.get('keywords_filter')
@@ -458,7 +459,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                        self._page,
                                                        self._filter,
                                                        self._on_page,
-                                                       self.min_ctr)
+                                                       self.min_ctr,
+                                                       sort_mode=self.sort_mode)
 
 
 class KeywordSettingMessage(TextWithKeyboard):

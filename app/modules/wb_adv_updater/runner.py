@@ -78,7 +78,7 @@ class Runner:
                             )
 
                         del wb_cabinet_tasks[cabinet_id]
-            await asyncio.sleep(60*5)
+            await asyncio.sleep(0)
 
 
     async def run_update_vectors(self, need_update_model:asyncio.Event,

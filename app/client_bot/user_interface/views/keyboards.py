@@ -320,11 +320,24 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
     bottoms.append(bottom)
 
 
+    bottom = [InlineKeyboardButton(text='Показать отключенные фразы',
+              callback_data=callbacks.SettingKeywords(
+                  adv_original_id=adv_setting.id,
+                  type='show_keywords_is_hard',
+                  page=page).pack())]
 
-    bottoms.append([InlineKeyboardButton(text='Вернуться к списку кампаний',
-                                         callback_data=callbacks.ChoiceAdvPaginator(
-                                             wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                                             page=adv_choice_last_page).pack())])
+    bottoms.append(bottom)
+
+    bottom = [InlineKeyboardButton(text='Сортировать по ФАКТ CTR по Уб.',
+                                   callback_data=callbacks.SettingKeywords(
+                                       adv_original_id=adv_setting.id,
+                                       type='sort_by_ctr_desc',
+                                       page=page,).pack())]
+    bottoms.append(bottom)
+
+    bottoms.append([InlineKeyboardButton(text='К настройкам АРК',
+                                         callback_data=callbacks.Adv(
+                                                adv_original_id=adv_setting.id).pack())])
     keyboard = InlineKeyboardMarkup(inline_keyboard=bottoms)
     return keyboard
 

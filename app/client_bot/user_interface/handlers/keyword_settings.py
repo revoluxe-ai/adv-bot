@@ -110,8 +110,47 @@ async def setting_keywords_sort_by_ctr_desc(callback: CallbackQuery,
       'sort_by_ctr_desc')
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
+    return
 
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == 'show_keywords_is_hard'))
+async def setting_keywords_show_keywords_is_hard(callback: CallbackQuery,
+                                                    callback_data: callbacks.SettingKeywords,
+                                                    bot: aiogram.Bot,
+                                                    state: FSMContext):
+        await state.update_data(keywords_filter=None)
+        adv_original_id = callback_data.adv_original_id
+        async with _sm() as session:
+            stmt = select(AdvSetting) \
+                .where(AdvSetting.id == adv_original_id, )
+            result = await session.execute(stmt)
+            adv_setting: AdvSetting = result.scalar()
+        keywords = await utils.get_keywords_for_keyboard(adv_setting)
+        keywords = [keyword for keyword in keywords if keyword.keyword_setting.hard_status == 3]
+        keyword_texts = [keyword.text for keyword in keywords]
+        await state.update_data(keywords_filter=keyword_texts)
+        await state.update_data(adv_choice_last_page=1)
+        state_data = await state.get_data()
+        wb_user_cabinet_original_id = state_data.get('last_wb_user_cabinet_original_id')
+        nmids = adv_setting.nmids
+        chat_id = callback.message.chat.id
+        adv_choice_last_page = 1
 
+        main_photos = await data_manager.get_main_photos(nmids[:1])
+
+        await redis_manager.set_check_last_24_hours(adv_original_id)
+        await messages.AdvKeywordsSetting(
+            bot,
+            chat_id,
+            keywords,
+            adv_setting,
+            wb_user_cabinet_original_id,
+            adv_choice_last_page,
+            main_photos[0],
+            page=1,
+        )(state)
+
+        await redis_manager.set_check_last_24_hours(adv_original_id)
+        return
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'white_list'))
