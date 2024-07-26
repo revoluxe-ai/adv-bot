@@ -296,11 +296,11 @@ async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
     global threads_count
     threads_count += 1
     logger.debug(f'Количество потоков: {threads_count}')
-    async with sem:
-        try:
-            await add_wb_positions(text, need_nmids)
-        except Exception as e:
-            logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
+    # async with sem:
+    try:
+        await add_wb_positions(text, need_nmids)
+    except Exception as e:
+        logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
     threads_count -= 1
 
 
@@ -308,19 +308,19 @@ async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
 async def parser_all_white_phrase(semaphore):
     tasks_by_text = {}
     while True:
-        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases()
+        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
                 if need_nmids:
                     task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
                     tasks_by_text[text] = task
                     await asyncio.sleep(0)
-        for key in list(tasks_by_text.keys()):
-            task = tasks_by_text[key]
-            if task.done():
-                if task.exception():
-                    logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
-                del tasks_by_text[key]
+            else:
+                task = tasks_by_text[text]
+                if task.done():
+                    if task.exception():
+                        logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
+                    del tasks_by_text[text]
         await asyncio.sleep(0)
 
 

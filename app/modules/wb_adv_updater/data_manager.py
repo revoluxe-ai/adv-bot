@@ -1,6 +1,7 @@
 import asyncio
 import io
 import logging
+import random
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -769,84 +770,30 @@ async def clear_cards_in_db(nmids: list[int]):
              await asyncio.sleep(0)
 
 
-async def get_all_white_phrases(semaphore = None):
+async def get_phrases_for_parsing(semaphore = None):
     pass_text = set()
     async with _sm(semaphore) as session:
         stmt = select(AdvSetting).where(
             AdvSetting.parsing_active == True)
         adv_settings = await session.execute(stmt)
-        adv_settings = adv_settings.unique().scalars().all()
-        nmids = [nmid for adv in adv_settings for nmid in adv.nmids]
-        stmt = select(
-            WBItemPosition.nmid,
-            func.to_timestamp(func.avg(func.extract('epoch', WBItemPosition.timestamp))).label('avg_updated_at')
-        ).where(
-            WBItemPosition.nmid.in_(nmids)
-        ).group_by(
-            WBItemPosition.nmid
-        ).order_by(
-            asc('avg_updated_at')
-        )
-        result = await session.execute(stmt)
-        nmids_datetime_rows = result.all()
-        sort_dict = {row[0]: place for place, row in enumerate(nmids_datetime_rows)}
-        adv_settings = [adv for adv in adv_settings if adv.nmids and adv.parsing_active]
-        adv_settings = sorted(adv_settings, key=lambda adv: sort_dict.get(adv.nmids[0], 0))
-
+        adv_settings = adv_settings.scalars().all()
+        random.shuffle(adv_settings)
         for adv in adv_settings:
-            if adv.adv_id != 18818595:
-                continue
-            keywords_for_parsing = []
             keywords = await get_good_bad_phrases(adv)
             for keyword in keywords:
-                if keyword.keyword_setting.hard_status in [1, 2, 3] or keyword.status == 'good':
-                   text = keyword.text
-                   if text in pass_text:
-                       continue
-                   else:
-                       pass_text.add(text)
-                       keywords_for_parsing.append(text)
-            if keywords_for_parsing:
-                stmt = select(
-                    CommonKeyword.text,
-                    func.to_timestamp(
-                        func.avg(
-                            func.extract('epoch', WBItemPosition.timestamp))
-                    ).label('avg_updated_at')
-                ).join(
-                    CommonKeyword.wb_item_positions
-                ).where(
-                    CommonKeyword.text.in_(keywords_for_parsing)
-                ).group_by(
-                    CommonKeyword.text
-                ).order_by(
-                    desc('avg_updated_at')
-                )
+                if keyword.status == 'bad':
+                    continue
+                text = keyword.text
+                stmt = select(AdvSetting)\
+                .join(KeywordSetting)\
+                .where(KeywordSetting.text == text,
+                       AdvSetting.parsing_active == True)
                 result = await session.execute(stmt)
-                result = result.all()
-                send_to_parsing = set()
-                for row in result:
-                    text = row[0]
-                    stmt = select(AdvSetting)\
-                    .join(AdvSetting.keyword_settings)\
-                    .where(AdvSetting.keyword_settings.any(KeywordSetting.text == text),
-                           AdvSetting.active_status   == 'started',
-                           AdvSetting.bot_active == True)
-                    result = await session.execute(stmt)
-                    adv_settings = result.scalars().all()
-                    need_nmids = {nmid for adv in adv_settings for nmid in adv.nmids}
-                    yield text, need_nmids
-                    send_to_parsing.add(text)
-                leftover = set(keywords_for_parsing) - send_to_parsing
-                for text in leftover:
-                    stmt = select(AdvSetting) \
-                        .join(AdvSetting.keyword_settings) \
-                        .where(AdvSetting.keyword_settings.any(KeywordSetting.text == text),
-                               AdvSetting.parsing_active == True)
-                    result = await session.execute(stmt)
-                    adv_settings = result.scalars().all()
-                    need_nmids = {nmid for adv in adv_settings for nmid in adv.nmids}
-                    yield text, need_nmids
+                need_adv_settinds_for_this_phrase = result.unique().scalars().all()
+                need_nmids = set([nmid for adv in need_adv_settinds_for_this_phrase for nmid in adv.nmids])
+                yield text, need_nmids
+                pass_text.add(text)
+
 
 async def get_last_updated_phrases(all_white_phrases):
     async with _sm() as session:
