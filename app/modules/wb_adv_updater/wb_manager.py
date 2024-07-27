@@ -600,7 +600,7 @@ class Manager(AbcManager):
                          async with sm() as session:
                              wb_cabinet = wb_access.wb_cabinet
                              stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet.id)
-                             result = session.execute(stmt)
+                             result = await session.execute(stmt)
                              wb_cabinet = result.scalar()
                              wb_cabinet.last_update_all_data = datetime.datetime.now()
                              await session.commit()
