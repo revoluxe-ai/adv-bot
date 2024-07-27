@@ -24,6 +24,7 @@ from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
 from . import data_manager
 from .data_manager import DataGetter
 from ...exc import CardNotFoundInDB
+from ...utils import redis_manager
 from ...utils.redis_manager import RedisEvent
 
 sm = get_async_session_maker
@@ -312,25 +313,13 @@ class Predictor:
         predict_df = await asyncio.to_thread(self._predict, df_for_predict)
         predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
         await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
-        async with sm() as session:
-            for n, row in predict_df.iterrows():
-                adv_id = row['adv_id']
-                keyword = row['keyword']
-                predict_ctr = row['predicted_ctr']
-                stmt = select(KeywordSetting).join(
-                    AdvSetting, KeywordSetting.adv_setting
-                ).filter(
-                    and_(
-                        KeywordSetting.text == keyword,
-                        AdvSetting.adv_id == adv_id  # Используйте AdvSetting.adv_id напрямую
-                    )
-                )
-                result = await session.execute(stmt)
-                keyword_setting = result.scalar()
-                keyword_setting.predict_ctr = predict_ctr
-            await session.commit()
-            await  asyncio.sleep(1)
-            logger.debug('Предсказания обновлены')
+        for n, row in predict_df.iterrows():
+            adv_id = row['adv_id']
+            keyword = row['keyword']
+            predict_ctr = row['predicted_ctr']
+            await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+        await  asyncio.sleep(1)
+        logger.debug('Предсказания обновлены')
 
 
 
