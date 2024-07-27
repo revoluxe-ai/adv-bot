@@ -702,9 +702,11 @@ async def get_min_ctr(adv: AdvSetting):
         if predict_ctr:
             predict_ctrs.append(kw.predict_ctr)
     if real_ctrs:
+        logger.debug('Возвращаю min_ctr по реальным ctr')
         return float(min(real_ctrs))
 
     if predict_ctrs:
+        logger.debug('Возвращаю min ctr по прогнозируемым CTR')
         return float(min(predict_ctrs))
     category = await get_wb_category(adv)
     category_name = category.wb_category_name
@@ -714,7 +716,9 @@ async def get_min_ctr(adv: AdvSetting):
         try:
              min_ctr = result.scalar_one()
         except NoResultFound:
+            logger.error('Возвращаю ctr по умоланию')
             return 0.03
+    logger.error('Возвращаю ctr по категории')
     return float(min_ctr)
 
 
