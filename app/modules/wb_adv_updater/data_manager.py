@@ -229,11 +229,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
-        try:
-            min_ctr = await get_min_ctr(adv_setting)
-        except Exception as exc:
-            logger.debug(f'Ошибка получения минимального CTR: {exc.with_traceback()}')
-            raise exc
+        min_ctr = await get_min_ctr(adv_setting)
         logger.debug('Минимальный ctr получен')
         keyword_stats = await get_keywords_statistic(adv_setting, None)
         logger.debug('Статистика ключевых слов получена')
