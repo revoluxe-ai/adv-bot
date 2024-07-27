@@ -783,6 +783,7 @@ async def get_phrases_for_parsing(semaphore = None):
             for keyword in keywords:
                 if keyword.hard_status == 0:
                     continue
+                logger.debug(f'Новая фраза на парсинг {keyword.text}')
                 text = keyword.text
                 if text not in pass_text:
                     pass_text.add(text)
@@ -796,7 +797,8 @@ async def get_phrases_for_parsing(semaphore = None):
                 need_adv_settinds_for_this_phrase = result.unique().scalars().all()
                 need_nmids = set([nmid for adv in need_adv_settinds_for_this_phrase for nmid in adv.nmids])
                 yield text, need_nmids
-                pass_text.add(text)
+                logger.debug(f'Возврат в генератор фраз для парсинга')
+
 
 
 async def get_last_updated_phrases(all_white_phrases):

@@ -310,7 +310,11 @@ async def parser_all_white_phrase(semaphore):
     tasks_by_text = {}
     while True:
         logger.debug('Получаем фразы для парсинга')
-        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
+        try:
+            all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
+        except:
+            logger.error('Ошибка при получении фраз для парсинга', exc_info=True)
+            continue
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
                 logger.debug(f'Добавляем фразу {text} в список задач')
