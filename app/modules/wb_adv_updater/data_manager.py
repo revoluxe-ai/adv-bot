@@ -797,7 +797,11 @@ async def get_phrases_for_parsing(semaphore = None):
         adv_settings = adv_settings.scalars().all()
         random.shuffle(adv_settings)
         for adv in adv_settings:
-            keywords = await get_good_bad_phrases(adv)
+            try:
+                keywords = await get_good_bad_phrases(adv)
+            except NotItemsInAdvSetting('У кампании в базе нет товаров'):
+                logger.debug('У кампании в базе нет товаров')
+                continue
             logger.debug('Фразы из статистики получены')
             if not keywords:
                 logger.debug('Нет фраз для парсинга')
