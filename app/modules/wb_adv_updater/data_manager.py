@@ -781,7 +781,9 @@ async def get_phrases_for_parsing(semaphore = None):
         for adv in adv_settings:
             keywords = await get_good_bad_phrases(adv)
             for keyword in keywords:
+                logger.debug(f'Обработка фразы на парсинг {keyword.text}')
                 if keyword.hard_status == 0:
+                    logger.debug(f'Фраза на парсинг {keyword.text} в не релеватных фразах')
                     continue
                 logger.debug(f'Новая фраза на парсинг {keyword.text}')
                 text = keyword.text
@@ -796,6 +798,7 @@ async def get_phrases_for_parsing(semaphore = None):
                 result = await session.execute(stmt)
                 need_adv_settinds_for_this_phrase = result.unique().scalars().all()
                 need_nmids = set([nmid for adv in need_adv_settinds_for_this_phrase for nmid in adv.nmids])
+                logger.debug(f'Возврат данных на парсинг {text} найдена')
                 yield text, need_nmids
                 logger.debug(f'Возврат в генератор фраз для парсинга')
 
