@@ -718,7 +718,7 @@ async def get_min_ctr(adv: AdvSetting):
         except NoResultFound:
             logger.error('Возвращаю ctr по умоланию')
             return 0.03
-    logger.error('Возвращаю ctr по категории')
+    logger.debug('Возвращаю ctr по категории')
     return float(min_ctr)
 
 
