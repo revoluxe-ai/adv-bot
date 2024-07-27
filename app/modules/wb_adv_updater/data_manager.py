@@ -193,7 +193,7 @@ async def get_wb_category_to_keywordstat_list() -> defaultdict[WBCategory, list[
             logger.debug(f'У кампании {adv_setting.name} нет товаров {e}')
             continue
         wb_category_name = wb_category.wb_category_name
-        keyword_stats = await get_keywords_statistic(adv_setting, None, [1, 2])
+        keyword_stats = await get_keywords_statistic(adv_setting, None, [1, 2, 3])
         for keyword_stat in keyword_stats:
             if keyword_stat.views:
                 wb_category_to_keywordstat_list[wb_category_name].append(keyword_stat)
@@ -774,7 +774,8 @@ async def get_phrases_for_parsing(semaphore = None):
     pass_text = set()
     async with _sm(semaphore) as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.parsing_active == True)
+            AdvSetting.parsing_active == True,
+        AdvSetting.adv_id == 18818595)
         adv_settings = await session.execute(stmt)
         adv_settings = adv_settings.scalars().all()
         random.shuffle(adv_settings)

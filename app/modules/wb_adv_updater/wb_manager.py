@@ -204,23 +204,27 @@ class Manager(AbcManager):
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
             adv_setting = await session.execute(stmt)
             adv_setting = adv_setting.scalar()
+        try:
+            keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+        except Exception as exc:
+            logger.error(
+                f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+            return
+        logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
+        for keyword in keywords:
             try:
-                keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+                await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
+                logger.debug(f'Статистика для ключевого слова {keyword.text} обновлена')
             except Exception as exc:
                 logger.error(
-                    f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
-                return
-            logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
-            for keyword in keywords:
-                try:
-                    await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
-                    logger.debug(f'Статистика для ключевого слова {keyword.text} обновлена')
-                except Exception as exc:
-                    logger.error(
-                        f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
-                        exc_info=True
-                    )
-                await asyncio.sleep(0)
+                    f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
+                    exc_info=True
+                )
+            await asyncio.sleep(0)
+        async with sm(semaphore) as session:
+            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+            adv_setting = await session.execute(stmt)
+            adv_setting = adv_setting.scalar()
             adv_setting.last_update = datetime.datetime.now()
             await session.commit()
         return
