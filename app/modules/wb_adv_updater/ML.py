@@ -318,7 +318,7 @@ class Predictor:
             keyword = row['keyword']
             predict_ctr = row['predicted_ctr']
             await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
-        await  asyncio.sleep(1)
+        await  asyncio.sleep(0)
         logger.debug('Предсказания обновлены')
 
 
