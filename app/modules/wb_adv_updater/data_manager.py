@@ -792,7 +792,7 @@ async def get_phrases_for_parsing(semaphore = None):
         adv_settings = await session.execute(stmt)
         adv_settings = adv_settings.scalars().all()
         random.shuffle(adv_settings)
-        for adv in adv_settings[:1]:
+        for adv in adv_settings:
             keywords = await get_good_bad_phrases(adv)
             logger.debug('Фразы из статистики получены')
             if not keywords:
