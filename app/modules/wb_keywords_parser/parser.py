@@ -7,7 +7,6 @@ from functools import wraps
 import logging
 from statistics import mean
 from typing import AsyncGenerator
-
 from aiohttp import ServerDisconnectedError
 from sqlalchemy.orm import joinedload
 
@@ -16,6 +15,8 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select, and_, not_
+
+
 
 from app.modules.common_slaves.wildberries.models import WBItemPosition, CommonKeyword
 from aiogram.client.session import aiohttp
@@ -254,6 +255,7 @@ async def add_wb_positions_from_queue_to_db():
 
 
 async def add_wb_positions(text: str, need_nmids: set[int]):
+    pass
     global done_count
     for page in range(1, 100):
         positions = await parser.parse_keywords_from_wb(text, page)
@@ -281,41 +283,34 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
                 cpm=0
             )
             not_found_positions.append(position)
-            # session.add(position)
-            # keyword.wb_item_positions.append(position)
-            # await session.commit()
-
             await redis_manager.add_positions_to_redis(not_found_positions)
-        # Обновляем keyword
-        # keyword.last_full_update = update_time
-        # await session.commit()  # Фиксируем изменени
 
-threads_count = 0
-
-async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
-    global threads_count
-    threads_count += 1
-    logger.debug(f'Количество потоков: {threads_count}')
-    # async with sem:
-    try:
-        await add_wb_positions(text, need_nmids)
-    except Exception as e:
-        logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
-    threads_count -= 1
+async def limited_add_wb_positions(text:str, need_nmids: set[int], sem: asyncio.Semaphore):
+    async with sem:
+        try:
+            await add_wb_positions(text, need_nmids)
+        except Exception as e:
+            logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
 
 
 
 async def parser_all_white_phrase(semaphore):
     tasks_by_text = {}
     while True:
-        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
+        logger.debug('Получаем фразы для парсинга')
+        try:
+            all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
+        except:
+            logger.error('Ошибка при получении фраз для парсинга', exc_info=True)
+            continue
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
+                logger.debug(f'Добавляем фразу {text} в список задач')
                 if need_nmids:
                     task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
                     tasks_by_text[text] = task
-                    await asyncio.sleep(0)
             else:
+                logger.debug(f'Фраза {text} уже есть в списке задач')
                 task = tasks_by_text[text]
                 if task.done():
                     if task.exception():
@@ -341,10 +336,6 @@ async def reset_from_redis_positions_of_out_index():
             await asyncio.sleep(0)  # Чтобы предотвратить блокировку event loop
 
 
-count_semaphore = settings.MAX_THREAD_PARSER
+count_semaphore = 5
 semaphore = asyncio.Semaphore(count_semaphore)
 
-
-
-if __name__ == '__main__':
-    asyncio.run(parser_all_white_phrase(semaphore))

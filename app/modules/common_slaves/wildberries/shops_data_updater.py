@@ -70,7 +70,7 @@ class ShopDataUpdater:
         wb_api = self.wb_api
         advs = await wb_api.advert.get_advs(list(adv_ids))
         nmids_collection = set()
-        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
+        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet.id)
         for adv in advs:
             nmids = adv.nmids
             if nmids:
@@ -81,21 +81,24 @@ class ShopDataUpdater:
             await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
         func = update_cards()
         await _coroutine_parallel_run_queue.put(func)
+
+
     async def update_all_data(self):
         wb_api: WBApi = self.wb_api
         advert_api = wb_api.advert
         adv_ids = await advert_api.get_advertIds()
         advs: list[Adv] = await advert_api.get_advs()
-        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet)
+        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet.id)
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()
             existing_advs: list[models.AdvSetting] = result.scalars().all()
-            nmids = set()
-            for adv in existing_advs:
-                nmids.update(adv.nmids)
+        nmids = set()
+        for adv in existing_advs:
+            nmids.update(adv.nmids)
         cards = await wb_api.content.get_cards_by_text(nmids)
         await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+
 
 
 

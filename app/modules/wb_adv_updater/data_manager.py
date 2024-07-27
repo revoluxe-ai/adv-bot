@@ -13,7 +13,6 @@ from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
 
 from app.exc import CardNotFoundInDB
-from app.modules.common_slaves.wildberries import exceptions as wb_exc
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, desc, asc
@@ -231,9 +230,12 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
         min_ctr = await get_min_ctr(adv_setting)
+        logger.debug('Минимальный ctr получен')
         keyword_stats = await get_keywords_statistic(adv_setting, None)
+        logger.debug('Статистика ключевых слов получена')
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
         for keyword_stat in keyword_stats:
+            logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
             keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
             keyword_stat.keyword_setting = keyword_setting
             keyword_stat.predict_ctr = keyword_setting.predict_ctr
@@ -304,13 +306,13 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     await redis_manager.set_auto_block_status(keyword_setting.id, True)
             assert keyword_stat.predict_ctr
 
-
+    logger.debug('Проверяю статусы ключевых слов с assert')
 
     for keyword_stat in keyword_stats:
         assert keyword_stat.status
         assert keyword_stat.status in ['good', 'bad']
-
-
+    logger.debug('Слова по assert проверены')
+    logger.debug('Возвращаю итоговую статистику')
     return keyword_stats
 
 
@@ -405,7 +407,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     try:
          nmid = adv_setting.nmids[0]
     except:
-        raise wb_exc.NotItemsInAdvSetting('У кампании в базе нет товаров')
+        raise NotItemsInAdvSetting('У кампании в базе нет товаров')
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
@@ -653,49 +655,58 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 async def get_min_ctr(adv: AdvSetting):
+    logger.debug('Начинаю считать min_ctr')
     if adv.hard_min_ctr:
+        logger.debug('Возврат min ctr по hard min ctr')
         return float(adv.hard_min_ctr)
-    async with _sm() as session:
-        stmt = select(KeywordSetting)\
-        .where(
-            KeywordSetting.hard_status == 2,
-               KeywordSetting.adv_setting_id == adv.id,
-            )
-        result = await session.execute(stmt)
-        keyword_settings = result.unique().scalars().all()
-    texts = [kw.text for kw in keyword_settings]
-    # text_to_predict_ctr = {kw.text: kw.predict_ctr for kw in keyword_settings}
-    async with _sm() as session:
-        stmt = select(
-            AdvKeyword.text,
-            (func.sum(AdvKeyword.clicks) /
-             case(
-                 (func.sum(AdvKeyword.views) == 0, 1),
-                 else_=func.sum(AdvKeyword.views)
-             )).label('ctr'),
-            func.sum(AdvKeyword.views).label('views')
-        ).group_by(AdvKeyword.text)\
-            .having(func.sum(AdvKeyword.views) > 0)\
-            .where(AdvKeyword.adv_setting_id == adv.id,
-                   AdvKeyword.text.in_(texts)
-                   )
-        result = await session.execute(stmt)
-        adv_keywords_rows = result.all()
-    text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
-    real_ctrs  = []
-    predict_ctrs = []
-    for kw in keyword_settings:
-        real_ctr = text_to_real_ctr.get(kw.text)
-        if real_ctr:
-            real_ctrs.append(text_to_real_ctr[kw.text])
-        predict_ctr = kw.predict_ctr
-        if predict_ctr:
-            predict_ctrs.append(kw.predict_ctr)
-    if real_ctrs:
-        return float(min(real_ctrs))
+    try:
+        async with _sm() as session:
+            stmt = select(KeywordSetting)\
+            .where(
+                KeywordSetting.hard_status == 2,
+                   KeywordSetting.adv_setting_id == adv.id,
+                )
+            result = await session.execute(stmt)
+            keyword_settings = result.scalars().all()
+            texts = [kw.text for kw in keyword_settings]
+    except Exception as exc:
+        logger.error(f'Ошибка запроса keywordsetting with hard status = 2 {exc}')
+    if texts:
+        async with _sm() as session:
+            stmt = select(
+                AdvKeyword.text,
+                (func.sum(AdvKeyword.clicks) /
+                 case(
+                     (func.sum(AdvKeyword.views) == 0, 1),
+                     else_=func.sum(AdvKeyword.views)
+                 )).label('ctr'),
+                func.sum(AdvKeyword.views).label('views')
+            ).group_by(AdvKeyword.text)\
+                .having(func.sum(AdvKeyword.views) > 0)\
+                .where(AdvKeyword.adv_setting_id == adv.id,
+                       AdvKeyword.text.in_(texts)
+                       )
+            result = await session.execute(stmt)
+            logger.debug('Попытка получить данные для расчета min_ctr')
+            adv_keywords_rows = result.all()
+            logger.debug(f'Данные для мин стр получены, всего строк {len(adv_keywords_rows)}')
+        text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
+        real_ctrs  = []
+        predict_ctrs = []
+        for kw in keyword_settings:
+            real_ctr = text_to_real_ctr.get(kw.text)
+            if real_ctr:
+                real_ctrs.append(text_to_real_ctr[kw.text])
+            predict_ctr = kw.predict_ctr
+            if predict_ctr:
+                predict_ctrs.append(kw.predict_ctr)
+        if real_ctrs:
+            logger.debug('Возвращаю min_ctr по реальным ctr')
+            return float(min(real_ctrs))
 
-    if predict_ctrs:
-        return float(min(predict_ctrs))
+        if predict_ctrs:
+            logger.debug('Возвращаю min ctr по прогнозируемым CTR')
+            return float(min(predict_ctrs))
     category = await get_wb_category(adv)
     category_name = category.wb_category_name
     async with _sm() as session:
@@ -704,7 +715,9 @@ async def get_min_ctr(adv: AdvSetting):
         try:
              min_ctr = result.scalar_one()
         except NoResultFound:
+            logger.debug('Возвращаю ctr по умоланию')
             return 0.03
+    logger.debug('Возвращаю ctr по категории')
     return float(min_ctr)
 
 
@@ -774,17 +787,31 @@ async def get_phrases_for_parsing(semaphore = None):
     pass_text = set()
     async with _sm(semaphore) as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.parsing_active == True,
-        AdvSetting.adv_id == 18818595)
+            AdvSetting.parsing_active == True)
         adv_settings = await session.execute(stmt)
         adv_settings = adv_settings.scalars().all()
         random.shuffle(adv_settings)
         for adv in adv_settings:
-            keywords = await get_good_bad_phrases(adv)
+            try:
+                keywords = await get_good_bad_phrases(adv)
+            except NotItemsInAdvSetting:
+                logger.debug('У кампании в базе нет товаров')
+                continue
+            logger.debug('Фразы из статистики получены')
+            if not keywords:
+                logger.debug('Нет фраз для парсинга')
+                continue
             for keyword in keywords:
-                if keyword.status == 'bad':
+                logger.debug(f'Обработка фразы на парсинг {keyword.text}')
+                if keyword.hard_status == 0:
+                    logger.debug(f'Фраза на парсинг {keyword.text} в не релеватных фразах')
                     continue
+                logger.debug(f'Новая фраза на парсинг {keyword.text}')
                 text = keyword.text
+                if text not in pass_text:
+                    pass_text.add(text)
+                else:
+                    continue
                 stmt = select(AdvSetting)\
                 .join(KeywordSetting)\
                 .where(KeywordSetting.text == text,
@@ -792,8 +819,10 @@ async def get_phrases_for_parsing(semaphore = None):
                 result = await session.execute(stmt)
                 need_adv_settinds_for_this_phrase = result.unique().scalars().all()
                 need_nmids = set([nmid for adv in need_adv_settinds_for_this_phrase for nmid in adv.nmids])
+                logger.debug(f'Возврат данных на парсинг {text}')
                 yield text, need_nmids
-                pass_text.add(text)
+                logger.debug(f'Возврат в генератор фраз для парсинга')
+
 
 
 async def get_last_updated_phrases(all_white_phrases):
@@ -837,15 +866,3 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int):
                 session.add(keyword_setting)
             keyword_setting.hard_status = 2
         await session.commit()
-
-
-
-
-
-
-
-
-
-
-
-
