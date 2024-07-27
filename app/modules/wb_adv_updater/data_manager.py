@@ -780,6 +780,9 @@ async def get_phrases_for_parsing(semaphore = None):
         random.shuffle(adv_settings)
         for adv in adv_settings:
             keywords = await get_good_bad_phrases(adv)
+            if not keywords:
+                logger.debug('Нет фраз для парсинга')
+                continue
             for keyword in keywords:
                 logger.debug(f'Обработка фразы на парсинг {keyword.text}')
                 if keyword.hard_status == 0:
