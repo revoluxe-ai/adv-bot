@@ -213,11 +213,24 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                    page,
                                   return_from_filter_bottom: bool,
                                   on_page,
-                                  min_ctr):
+                                  min_ctr,
+                                  sort_mode = 'default'):
+
+    min_ctr = min_ctr
+    def sorting_keywords(keywords, sort_mode):
+        if sort_mode == 'default':
+            keywords.sort(key=lambda x: abs(x.predict_ctr - min_ctr))
+            return keywords
+        elif sort_mode == 'sort_by_ctr_desc':
+            return sorted(keywords, key=lambda x: x.ctr, reverse=True)
+        else:
+            raise ValueError(f'Unknown sort_mode: {sort_mode}')
 
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
-    keywords.sort(key=lambda x: abs(x.predict_ctr - min_ctr))
+
+    keywords = sorting_keywords(keywords, sort_mode)
+
     bottoms = []
     for keyword in keywords[start_index:end_index]:
         clicks = keyword.clicks
@@ -307,11 +320,24 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
     bottoms.append(bottom)
 
 
+    bottom = [InlineKeyboardButton(text='Показать отключенные фразы',
+              callback_data=callbacks.SettingKeywords(
+                  adv_original_id=adv_setting.id,
+                  type='show_keywords_is_hard',
+                  page=page).pack())]
 
-    bottoms.append([InlineKeyboardButton(text='Вернуться к списку кампаний',
-                                         callback_data=callbacks.ChoiceAdvPaginator(
-                                             wb_user_cabinet_original_id=wb_user_cabinet_original_id,
-                                             page=adv_choice_last_page).pack())])
+    bottoms.append(bottom)
+
+    bottom = [InlineKeyboardButton(text='Сортировать по ФАКТ CTR по Уб.',
+                                   callback_data=callbacks.SettingKeywords(
+                                       adv_original_id=adv_setting.id,
+                                       type='sort_by_ctr_desc',
+                                       page=page,).pack())]
+    bottoms.append(bottom)
+
+    bottoms.append([InlineKeyboardButton(text='К настройкам АРК',
+                                         callback_data=callbacks.Adv(
+                                                adv_original_id=adv_setting.id).pack())])
     keyboard = InlineKeyboardMarkup(inline_keyboard=bottoms)
     return keyboard
 

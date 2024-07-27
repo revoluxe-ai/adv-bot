@@ -8,6 +8,7 @@ import logging
 from statistics import mean
 from typing import AsyncGenerator
 
+from aiohttp import ServerDisconnectedError
 from sqlalchemy.orm import joinedload
 
 from app.modules.wb_adv_updater import data_manager
@@ -24,6 +25,20 @@ from app import settings
 
 logger = logging.getLogger(__name__)
 
+
+
+import warnings
+from sqlalchemy import exc as sa_exc
+
+# Включение отображения всех предупреждений
+warnings.simplefilter("always", sa_exc.SAWarning)
+
+# Пример обработки SAWarning как исключение
+def handle_warnings_as_exceptions(message, category, filename, lineno, file=None, line=None):
+    raise category(message)
+
+# Назначаем обработчик
+warnings.showwarning = handle_warnings_as_exceptions
 
 
 class DataError(Exception):
@@ -61,7 +76,6 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                 state['_last_pauses'].append(time_to_wait)
                 state['_last_pauses'] = state['_last_pauses'][-1000:]
                 state['_last_query_time'] = time.time()
-
                 try:
                     result = await func(instance, *args, **kwargs)
                     logger.debug(f'Запрос через {method_name} выполнен успешно')
@@ -84,7 +98,8 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                 #     pause = 0.5
                 #     state['_next_pause'] = pause
                 #     state['_attempts'] += 1
-                except DataError as e:
+                except (DataError,
+                        ServerDisconnectedError) as e:
                     logger.debug(f'Ошибка при выполнении запроса через {method_name}: {e}, '
                                  f'Пауза перед следующим запросом: {state["_next_pause"]} секунд')
                     state['_attempts'] += 1
@@ -100,7 +115,6 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                         state['_next_pause'] = 1
                     if state['_next_pause'] > max_delay:
                         state['_next_pause'] = max_delay
-
                     state['_attempts'] += 1
         return wrapper
     return decorator
@@ -109,10 +123,11 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
 
 
 class Parser:
-    async def parse_keywords_from_wb(self, keyword: CommonKeyword, page: int):
+    async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
-        text = keyword.text
         products = await self.__parse_keywords_from_wb(text, page)
+        if not products:
+            return []
         positions = []
         for place_on_page, product in enumerate(products):
             nmid = product['id']
@@ -138,7 +153,7 @@ class Parser:
                 cpm=cpm,
                 adv_id=adv_id,
                 real_position=real_position,
-                keyword = keyword,
+                keyword_text = text,
                 timestamp = datetime.datetime.now()
             )
             positions.append(position)
@@ -152,6 +167,8 @@ class Parser:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 text = await response.text()
+        if not text:
+            raise DataError('Пустой ответ от сервера', text)
         data = json.loads(text)
         if data == {}:
             return []
@@ -219,7 +236,7 @@ async def add_wb_positions_from_queue_to_db():
     queue_position_dict[key] = position
     last_key = list(queue_position_dict.keys())[-1]
     position = list(queue_position_dict.values())[-1]
-    async with sm(semaphore) as session:
+    async with sm() as session:
         stmt = select(WBItemPosition) \
             .where(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
                         WBItemPosition.keyword_id == CommonKeyword.id,
@@ -237,93 +254,78 @@ async def add_wb_positions_from_queue_to_db():
 
 
 async def add_wb_positions(text: str, need_nmids: set[int]):
-    assert need_nmids
     global done_count
-    update_time = datetime.datetime.now()
-
-    async with sm(semaphore) as session:
-        # Найти или создать keyword
-        stmt = select(CommonKeyword).where(CommonKeyword.text == text)
-        result = await session.execute(stmt)
-        keyword = result.scalar()
-
-        if not keyword:
-            keyword = CommonKeyword(text=text)
-            session.add(keyword)
-            await session.commit()  # Сначала сохраняем keyword, чтобы он имел id
-
-        # Обработка позиций
-        positions_to_add = []  # Храним позиции, которые нужно добавить в базу данных
-        for page in range(1, 100):
-            positions = await parser.parse_keywords_from_wb(keyword, page)
-            positions = [position for position in positions if position.nmid in need_nmids]
-            assert positions
+    for page in range(1, 100):
+        positions = await parser.parse_keywords_from_wb(text, page)
+        positions = [position for position in positions if position.nmid in need_nmids]
+        if positions:
             await redis_manager.add_positions_to_redis(positions)
             logger.debug('Записали позиции в Редис')
-
             for position in positions:
                 need_nmids.discard(position.nmid)
-                position.keyword = keyword  # Устанавливаем связь с keyword
-                positions_to_add.append(position)
-
-            if not need_nmids:
-                break
         else:
-            # Если какие-то nmids не найдены
-            not_found_positions = []
-            assert need_nmids
-            for nmid in need_nmids:
-                position = WBItemPosition(
-                    real_position=0,
-                    base_position=0,
-                    promo_position=0,
-                    keyword=keyword,
-                    timestamp=datetime.datetime.now(),
-                    nmid=nmid,
-                    cpm=0
-                )
-                session.add(position)
-                not_found_positions.append(position)
+            break
+        if not need_nmids:
+            break
+    else:
+        # Если какие-то nmids не найдены
+        not_found_positions = []
+        for nmid in need_nmids:
+            position = WBItemPosition(
+                real_position=0,
+                base_position=0,
+                promo_position=0,
+                keyword_text=text,
+                timestamp=datetime.datetime.now(),
+                nmid=nmid,
+                cpm=0
+            )
+            not_found_positions.append(position)
+            # session.add(position)
+            # keyword.wb_item_positions.append(position)
+            # await session.commit()
+
             await redis_manager.add_positions_to_redis(not_found_positions)
-            positions_to_add.extend(not_found_positions)
+        # Обновляем keyword
+        # keyword.last_full_update = update_time
+        # await session.commit()  # Фиксируем изменени
 
-        # Добавляем все позиции и обновляем keyword
-        if positions_to_add:
-            session.add_all(positions_to_add)  # Добавляем все позиции
-        keyword.last_full_update = update_time # Обновляем keyword
-        await session.commit()  # Фиксируем изменения
-
-
+threads_count = 0
 
 async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
+    global threads_count
+    threads_count += 1
+    logger.debug(f'Количество потоков: {threads_count}')
     # async with sem:
+    try:
         await add_wb_positions(text, need_nmids)
+    except Exception as e:
+        logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
+    threads_count -= 1
 
-
-count_semaphore = settings.MAX_THREAD_PARSER
-semaphore = asyncio.Semaphore(count_semaphore)
 
 
 async def parser_all_white_phrase(semaphore):
     tasks_by_text = {}
     while True:
-        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_all_white_phrases(semaphore)
+        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
-                task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
-                tasks_by_text[text] = task
-                await asyncio.sleep(0)
-        for key in list(tasks_by_text.keys()):
-            task = tasks_by_text[key]
-            if task.done():
-                if task.exception():
-                    logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
-                del tasks_by_text[key]
+                if need_nmids:
+                    task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
+                    tasks_by_text[text] = task
+                    await asyncio.sleep(0)
+            else:
+                task = tasks_by_text[text]
+                if task.done():
+                    if task.exception():
+                        logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
+                    del tasks_by_text[text]
         await asyncio.sleep(0)
 
 
 async def reset_from_redis_positions_of_out_index():
-    async with sm(semaphore) as session:
+    async with sm() as session:
         # Выбираем позиции, для которых нет более новых позиций по этому ключевому слову
         stmt = (
             select(WBItemPosition)
@@ -339,6 +341,10 @@ async def reset_from_redis_positions_of_out_index():
             await asyncio.sleep(0)  # Чтобы предотвратить блокировку event loop
 
 
+count_semaphore = settings.MAX_THREAD_PARSER
+semaphore = asyncio.Semaphore(count_semaphore)
+
+
 
 if __name__ == '__main__':
-    asyncio.run(parser_all_white_phrase())
+    asyncio.run(parser_all_white_phrase(semaphore))

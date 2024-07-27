@@ -78,7 +78,7 @@ class Runner:
                             )
 
                         del wb_cabinet_tasks[cabinet_id]
-            await asyncio.sleep(60*5)
+            await asyncio.sleep(0)
 
 
     async def run_update_vectors(self, need_update_model:asyncio.Event,
@@ -191,18 +191,14 @@ class Runner:
 
 
     async def keywords_parsing_process(self,semaphore: asyncio.Semaphore):
-        while True:
-            try:
-                await self.__keywords_parsing_process(semaphore)
-            except:
-                logger.error('Ошибка процесса парсинга ключей', exc_info=True)
-                await asyncio.sleep(0)
+        await self.__keywords_parsing_process(semaphore)
+
 
     async def __keywords_parsing_process(self, semaphore: asyncio.Semaphore):
         await asyncio.gather(
                    self. parser_all_white_phrase(semaphore),
-                   self.write_positions_to_db(),
-                   self.payment_for_parsing_keyword(),
+                   # self.write_positions_to_db(),
+                   # self.payment_for_parsing_keyword(),
                return_exceptions=True)
 
     async def payment_for_parsing_keyword(self):

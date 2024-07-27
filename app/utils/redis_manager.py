@@ -136,18 +136,11 @@ async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, 
 async def add_positions_to_redis(positions: list[WBItemPosition]):
     base_key = 'adv_positions'
     for position in positions:
-       key = f'{base_key}:{position.keyword.text}:{position.nmid}'
-       # real_position = position.real_position
-       # promo_position =  position.promo_position
-       # base_position = position.base_position
-       # text = position.keyword.text
-       # cpm = position.cpm
-       # adv_id = position.adv_id
-       # nmid = position.nmid
+       key = f'{base_key}:{position.keyword_text}:{position.nmid}'
        position_dict = position.to_dict()
        await redis_client.set(key, json.dumps(position_dict))
 
-async def read_position_from_redis(keyword: str, nmid: int):
+async def get_keyword_position(keyword: str, nmid: int)->Union[WBItemPosition, None]:
     base_key = f'adv_positions:{keyword}:{nmid}'
     json_data = await redis_client.get(base_key)
     if not json_data:
@@ -164,7 +157,9 @@ async def get_keywords_positions(adv_setting, texts):
         if not json_data:
             continue
         position = WBItemPosition.from_dict(json.loads(json_data))
-        positions.append(position)
+        if position:
+            position.keyword_text = text
+            positions.append(position)
     return positions
 
 

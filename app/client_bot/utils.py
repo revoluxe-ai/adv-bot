@@ -51,7 +51,6 @@ async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[CalculatedK
             phrase.promo_position = position.promo_position
             phrase.position_update = position.timestamp
             phrase.cpm = position.cpm
-    all_phrases.sort(key=lambda keyword: keyword.ctr, reverse=True)
     return all_phrases
 
 

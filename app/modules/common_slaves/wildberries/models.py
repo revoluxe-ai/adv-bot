@@ -7,7 +7,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 import jwt
 from sqlalchemy.dialects.postgresql import JSONB
-
+import datetime
 from app.utils.db.base import BaseTable
 from . import exceptions
 from ...wb_adv_updater.models import AdvPayment
@@ -258,17 +258,21 @@ class WBItemPosition(BaseTable):
     promo_position: Mapped[int] = mapped_column(Integer, nullable=True)
     cpm: Mapped[int] = mapped_column(Integer, nullable=True)
     adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    keyword_text = mapped_column(String, nullable=False)
 
 
     def to_dict(self):
+        timestamp: datetime = self.timestamp
+        str_timestamp = timestamp.isoformat()
         return {
             'real_position': self.real_position,
             'promo_position': self.promo_position,
             'base_position': self.base_position,
-            'text': self.keyword.text,
+            'keyword_text': self.keyword_text,
             'cpm': self.cpm,
             'adv_id': self.adv_id,
-            'nmid': self.nmid
+            'nmid': self.nmid,
+            'timestamp': str_timestamp
         }
 
     @staticmethod
@@ -280,7 +284,13 @@ class WBItemPosition(BaseTable):
         position.cpm = data['cpm']
         position.adv_id = data['adv_id']
         position.nmid = data['nmid']
-        keyword = CommonKeyword()
-        keyword.text = data['text']
-        position.keyword = keyword
+        try:
+           str_timestamp = data['timestamp']
+           position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
+        except:
+            position.timestamp = None
+        try:
+            position.keyword_text = data['keyword_text']
+        except:
+            return None
         return position
