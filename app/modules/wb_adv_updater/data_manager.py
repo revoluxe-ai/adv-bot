@@ -784,6 +784,10 @@ async def get_phrases_for_parsing(semaphore = None):
                 if keyword.hard_status == 0:
                     continue
                 text = keyword.text
+                if text not in pass_text:
+                    pass_text.add(text)
+                else:
+                    continue
                 stmt = select(AdvSetting)\
                 .join(KeywordSetting)\
                 .where(KeywordSetting.text == text,
