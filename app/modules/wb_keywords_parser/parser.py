@@ -255,6 +255,7 @@ async def add_wb_positions_from_queue_to_db():
 
 
 async def add_wb_positions(text: str, need_nmids: set[int]):
+    pass
     global done_count
     for page in range(1, 100):
         positions = await parser.parse_keywords_from_wb(text, page)
@@ -282,27 +283,14 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
                 cpm=0
             )
             not_found_positions.append(position)
-            # session.add(position)
-            # keyword.wb_item_positions.append(position)
-            # await session.commit()
-
             await redis_manager.add_positions_to_redis(not_found_positions)
-        # Обновляем keyword
-        # keyword.last_full_update = update_time
-        # await session.commit()  # Фиксируем изменени
 
-threads_count = 0
-
-async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
-    global threads_count
-    threads_count += 1
-    logger.debug(f'Количество потоков: {threads_count}')
+async def limited_add_wb_positions(text:str, need_nmids: set[int], sem: asyncio.Semaphore):
     async with sem:
         try:
             await add_wb_positions(text, need_nmids)
         except Exception as e:
             logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
-        threads_count -= 1
 
 
 
@@ -348,10 +336,6 @@ async def reset_from_redis_positions_of_out_index():
             await asyncio.sleep(0)  # Чтобы предотвратить блокировку event loop
 
 
-count_semaphore = settings.MAX_THREAD_PARSER
+count_semaphore = 5
 semaphore = asyncio.Semaphore(count_semaphore)
 
-
-
-if __name__ == '__main__':
-    asyncio.run(parser_all_white_phrase(semaphore))
