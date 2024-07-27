@@ -7,7 +7,6 @@ from functools import wraps
 import logging
 from statistics import mean
 from typing import AsyncGenerator
-
 from aiohttp import ServerDisconnectedError
 from sqlalchemy.orm import joinedload
 
@@ -16,6 +15,8 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select, and_, not_
+
+
 
 from app.modules.common_slaves.wildberries.models import WBItemPosition, CommonKeyword
 from aiogram.client.session import aiohttp
@@ -296,12 +297,12 @@ async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
     global threads_count
     threads_count += 1
     logger.debug(f'Количество потоков: {threads_count}')
-    # async with sem:
-    try:
-        await add_wb_positions(text, need_nmids)
-    except Exception as e:
-        logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
-    threads_count -= 1
+    async with sem:
+        try:
+            await add_wb_positions(text, need_nmids)
+        except Exception as e:
+            logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
+        threads_count -= 1
 
 
 
