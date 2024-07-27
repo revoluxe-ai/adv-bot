@@ -235,6 +235,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         except Exception as exc:
             logger.debug(f'Ошибка получения минимального CTR: {exc.with_traceback()}')
             raise exc
+        logger.debug('Минимальный ctr получен')
         keyword_stats = await get_keywords_statistic(adv_setting, None)
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
         for keyword_stat in keyword_stats:
@@ -314,7 +315,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         assert keyword_stat.status
         assert keyword_stat.status in ['good', 'bad']
 
-
+    logger.debug('Возвращаю итоговую статистику')
     return keyword_stats
 
 
@@ -785,7 +786,7 @@ async def get_phrases_for_parsing(semaphore = None):
         adv_settings = await session.execute(stmt)
         adv_settings = adv_settings.scalars().all()
         random.shuffle(adv_settings)
-        for adv in adv_settings:
+        for adv in adv_settings[:1]:
             keywords = await get_good_bad_phrases(adv)
             if not keywords:
                 logger.debug('Нет фраз для парсинга')
