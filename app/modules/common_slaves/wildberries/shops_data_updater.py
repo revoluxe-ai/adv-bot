@@ -91,11 +91,12 @@ class ShopDataUpdater:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()
             existing_advs: list[models.AdvSetting] = result.scalars().all()
-            nmids = set()
-            for adv in existing_advs:
-                nmids.update(adv.nmids)
+        nmids = set()
+        for adv in existing_advs:
+            nmids.update(adv.nmids)
         cards = await wb_api.content.get_cards_by_text(nmids)
         await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+
 
 
 
