@@ -653,6 +653,7 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 async def get_min_ctr(adv: AdvSetting):
+    logger.debug('Начинаю считать min_ctr')
     if adv.hard_min_ctr:
         return float(adv.hard_min_ctr)
     async with _sm() as session:
@@ -680,6 +681,7 @@ async def get_min_ctr(adv: AdvSetting):
                    AdvKeyword.text.in_(texts)
                    )
         result = await session.execute(stmt)
+        logger.debug('Попытка получить данные для расчета min_ctr')
         adv_keywords_rows = result.all()
     text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
     real_ctrs  = []
