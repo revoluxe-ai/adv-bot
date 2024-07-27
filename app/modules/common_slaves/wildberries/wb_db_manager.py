@@ -9,7 +9,7 @@ from app.utils.db.session_maker import get_async_session_maker
 _sm = get_async_session_maker
 
 
-async def update_advs_in_db(advs: list[Adv], wb_cabinet: WBCabinet):
+async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int):
     async with _sm() as session:
         for adv in advs:
             stmt = select(my_types.AdvSetting).where(my_types.AdvSetting.adv_id == adv.advertId)
@@ -24,17 +24,17 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet: WBCabinet):
                     existing_adv.nmids = adv.nmids
             else:
                 stmt = select(WBCabinet)\
-                .where(WBCabinet.id == wb_cabinet.id)
+                .where(WBCabinet.id ==  wb_cabinet_id)
                 wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
                 adv_in_db = my_types.AdvSetting()
                 adv_in_db.adv_id = adv.advertId
                 adv_in_db.name = adv.name
                 adv_in_db.wb_cabinet = wb_cabinet
+                session.add(wb_cabinet)
                 adv_in_db.nmids = adv.nmids
                 adv_in_db.active_status = adv.status_native
                 adv_in_db.type = adv.type
-                adv_in_db.wb_cabinet = wb_cabinet
-                await session.merge(adv_in_db)
+                session.add(adv_in_db)
             await session.commit()
     return
 
