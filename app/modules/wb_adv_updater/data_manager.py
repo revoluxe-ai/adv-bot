@@ -662,6 +662,7 @@ async def get_mean_ctr(adv: AdvSetting):
 async def get_min_ctr(adv: AdvSetting):
     logger.debug('Начинаю считать min_ctr')
     if adv.hard_min_ctr:
+        logger.debug('Возврат min ctr по hard min ctr')
         return float(adv.hard_min_ctr)
     async with _sm() as session:
         stmt = select(KeywordSetting)\
