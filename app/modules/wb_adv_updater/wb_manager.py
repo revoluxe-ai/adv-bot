@@ -138,63 +138,61 @@ class Manager(AbcManager):
     @staticmethod
     async def update_keyword_stat_in_db(keyword_stat: KeywordStat,
                                         adv_setting: AdvSetting,
-                                        semaphore: asyncio.Semaphore = None):
+                                        session):
         adv_setting_original_id = adv_setting.id
-        async with sm(semaphore) as session:
             # Проверяем наличие записи в KeywordSetting
-            stmt = select(KeywordSetting)\
-                .filter(
-                KeywordSetting.text == keyword_stat.text,
-                KeywordSetting.adv_setting_id == adv_setting_original_id
+        stmt = select(KeywordSetting)\
+            .filter(
+            KeywordSetting.text == keyword_stat.text,
+            KeywordSetting.adv_setting_id == adv_setting_original_id
+        )
+        result = await session.execute(stmt)
+        keyword_setting = result.scalar()
+
+        # Если запись отсутствует, создаем новую
+        if not keyword_setting:
+            keyword_setting = KeywordSetting(
+                text=keyword_stat.text,
+                adv_setting_id=adv_setting_original_id
             )
-            result = await session.execute(stmt)
-            keyword_setting = result.scalar()
+            session.add(keyword_setting)
+            await session.commit()  # Коммит для получения ID новой записи
+            await session.refresh(keyword_setting)  # Обновляем объект, чтобы получить ID
 
-            # Если запись отсутствует, создаем новую
-            if not keyword_setting:
-                keyword_setting = KeywordSetting(
-                    text=keyword_stat.text,
-                    adv_setting_id=adv_setting_original_id
-                )
-                session.add(keyword_setting)
-                await session.commit()  # Коммит для получения ID новой записи
-                await session.refresh(keyword_setting)  # Обновляем объект, чтобы получить ID
+        # Проверяем наличие записи в AdvKeyword
+        stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting)).filter(
+            and_(
+                AdvKeyword.text == keyword_stat.text,
+                AdvKeyword.date == keyword_stat.date,
+                AdvKeyword.adv_setting_id == adv_setting_original_id
+            )
+        ).order_by(AdvKeyword.date.desc())
+        result = await session.execute(stmt)
+        keyword_db = result.scalar()
 
-        async with sm(semaphore) as session:
-            # Проверяем наличие записи в AdvKeyword
-            stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting)).filter(
-                and_(
-                    AdvKeyword.text == keyword_stat.text,
-                    AdvKeyword.date == keyword_stat.date,
-                    AdvKeyword.adv_setting_id == adv_setting_original_id
-                )
-            ).order_by(AdvKeyword.date.desc())
-            result = await session.execute(stmt)
-            keyword_db = result.scalar()
-
-            # Если запись отсутствует, создаем новую
-            if not keyword_db:
-                keyword_db = AdvKeyword(
-                    text=keyword_stat.text,
-                    date=keyword_stat.date,
-                    adv_setting_id=adv_setting_original_id,
-                    keyword_setting_id=keyword_setting.id,  # Здесь мы устанавливаем значение keyword_setting_id
-                    views=keyword_stat.views,
-                    clicks=keyword_stat.clicks,
-                    spend=keyword_stat.spend
-                )
-                session.add(keyword_db)
+        # Если запись отсутствует, создаем новую
+        if not keyword_db:
+            keyword_db = AdvKeyword(
+                text=keyword_stat.text,
+                date=keyword_stat.date,
+                adv_setting_id=adv_setting_original_id,
+                keyword_setting_id=keyword_setting.id,  # Здесь мы устанавливаем значение keyword_setting_id
+                views=keyword_stat.views,
+                clicks=keyword_stat.clicks,
+                spend=keyword_stat.spend
+            )
+            session.add(keyword_db)
+            await session.commit()
+        else:
+            # Если запись существует, проверяем и обновляем данные
+            if not keyword_db.keyword_setting:
+                keyword_db.keyword_setting = keyword_setting
                 await session.commit()
-            else:
-                # Если запись существует, проверяем и обновляем данные
-                if not keyword_db.keyword_setting:
-                    keyword_db.keyword_setting = keyword_setting
-                    await session.commit()
-                if any([keyword_db.views != keyword_stat.views, keyword_db.clicks != keyword_stat.clicks]):
-                    keyword_db.views = keyword_stat.views
-                    keyword_db.clicks = keyword_stat.clicks
-                    keyword_db.spend = keyword_stat.spend
-                    await session.commit()
+            if any([keyword_db.views != keyword_stat.views, keyword_db.clicks != keyword_stat.clicks]):
+                keyword_db.views = keyword_stat.views
+                keyword_db.clicks = keyword_stat.clicks
+                keyword_db.spend = keyword_stat.spend
+                await session.commit()
         return
 
 
@@ -211,16 +209,17 @@ class Manager(AbcManager):
                 f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
             return
         logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
-        for keyword in keywords:
-            try:
-                await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
-                logger.debug(f'Статистика для ключевого слова {keyword.text} обновлена')
-            except Exception as exc:
-                logger.error(
-                    f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
-                    exc_info=True
-                )
-            await asyncio.sleep(0)
+        async with sm(semaphore) as session:
+            for keyword in keywords:
+                try:
+                    await self.update_keyword_stat_in_db(keyword, adv_setting,  session)
+                    logger.debug(f'Статистика для ключевого слова {keyword.text} обновлена')
+                except Exception as exc:
+                    logger.error(
+                        f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
+                        exc_info=True
+                    )
+                await asyncio.sleep(0)
         async with sm(semaphore) as session:
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
             adv_setting = await session.execute(stmt)
