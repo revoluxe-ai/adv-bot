@@ -237,8 +237,10 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             raise exc
         logger.debug('Минимальный ctr получен')
         keyword_stats = await get_keywords_statistic(adv_setting, None)
+        logger.debug('Статистика ключевых слов получена')
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
         for keyword_stat in keyword_stats:
+            logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
             keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
             keyword_stat.keyword_setting = keyword_setting
             keyword_stat.predict_ctr = keyword_setting.predict_ctr
@@ -309,12 +311,12 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     await redis_manager.set_auto_block_status(keyword_setting.id, True)
             assert keyword_stat.predict_ctr
 
-
+    logger.debug('Проверяю статусы ключевых слов с assert')
 
     for keyword_stat in keyword_stats:
         assert keyword_stat.status
         assert keyword_stat.status in ['good', 'bad']
-
+    logger.debug('Слова по assert проверены')
     logger.debug('Возвращаю итоговую статистику')
     return keyword_stats
 
@@ -688,7 +690,7 @@ async def get_min_ctr(adv: AdvSetting):
         result = await session.execute(stmt)
         logger.debug('Попытка получить данные для расчета min_ctr')
         adv_keywords_rows = result.all()
-        logger.debug('Данные для мин стр получены')
+        logger.debug(f'Данные для мин стр получены, всего строк {adv_keywords_rows}')
     text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
     real_ctrs  = []
     predict_ctrs = []
@@ -788,6 +790,7 @@ async def get_phrases_for_parsing(semaphore = None):
         random.shuffle(adv_settings)
         for adv in adv_settings[:1]:
             keywords = await get_good_bad_phrases(adv)
+            logger.debug('Фразы из статистики получены')
             if not keywords:
                 logger.debug('Нет фраз для парсинга')
                 continue
@@ -856,15 +859,3 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int):
                 session.add(keyword_setting)
             keyword_setting.hard_status = 2
         await session.commit()
-
-
-
-
-
-
-
-
-
-
-
-
