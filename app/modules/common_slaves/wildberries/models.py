@@ -284,8 +284,13 @@ class WBItemPosition(BaseTable):
         position.cpm = data['cpm']
         position.adv_id = data['adv_id']
         position.nmid = data['nmid']
-        str_timestamp = data['timestamp']
-        position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
-        keyword = CommonKeyword()
-        keyword.keyword_text = data['keyword_text']
+        try:
+           str_timestamp = data['timestamp']
+           position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
+        except:
+            position.timestamp = None
+        try:
+            position.keyword_text = data['keyword_text']
+        except:
+            return None
         return position
