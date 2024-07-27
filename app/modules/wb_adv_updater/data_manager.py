@@ -664,15 +664,18 @@ async def get_min_ctr(adv: AdvSetting):
     if adv.hard_min_ctr:
         logger.debug('Возврат min ctr по hard min ctr')
         return float(adv.hard_min_ctr)
-    async with _sm() as session:
-        stmt = select(KeywordSetting)\
-        .where(
-            KeywordSetting.hard_status == 2,
-               KeywordSetting.adv_setting_id == adv.id,
-            )
-        result = await session.execute(stmt)
-        keyword_settings = result.unique().scalars().all()
-    texts = [kw.text for kw in keyword_settings]
+    try:
+        async with _sm() as session:
+            stmt = select(KeywordSetting)\
+            .where(
+                KeywordSetting.hard_status == 2,
+                   KeywordSetting.adv_setting_id == adv.id,
+                )
+            result = await session.execute(stmt)
+            keyword_settings = result.scalars().all()
+            texts = [kw.text for kw in keyword_settings]
+    except Exception as exc:
+        logger.error(f'Ошибка запроса keywordsetting with hard status = 2 {exc}')
     if texts:
         async with _sm() as session:
             stmt = select(
