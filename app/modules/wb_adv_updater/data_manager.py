@@ -687,6 +687,7 @@ async def get_min_ctr(adv: AdvSetting):
         result = await session.execute(stmt)
         logger.debug('Попытка получить данные для расчета min_ctr')
         adv_keywords_rows = result.all()
+        logger.debug('Данные для мин стр получены')
     text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
     real_ctrs  = []
     predict_ctrs = []
@@ -807,7 +808,7 @@ async def get_phrases_for_parsing(semaphore = None):
                 result = await session.execute(stmt)
                 need_adv_settinds_for_this_phrase = result.unique().scalars().all()
                 need_nmids = set([nmid for adv in need_adv_settinds_for_this_phrase for nmid in adv.nmids])
-                logger.debug(f'Возврат данных на парсинг {text} найдена')
+                logger.debug(f'Возврат данных на парсинг {text}')
                 yield text, need_nmids
                 logger.debug(f'Возврат в генератор фраз для парсинга')
 
