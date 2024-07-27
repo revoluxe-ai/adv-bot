@@ -198,7 +198,7 @@ class Runner:
         await asyncio.gather(
                    self. parser_all_white_phrase(semaphore),
                    # self.write_positions_to_db(),
-                   self.payment_for_parsing_keyword(),
+                   # self.payment_for_parsing_keyword(),
                return_exceptions=True)
 
     async def payment_for_parsing_keyword(self):
