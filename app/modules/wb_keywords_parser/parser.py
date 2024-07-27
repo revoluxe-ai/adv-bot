@@ -309,14 +309,16 @@ async def limited_add_wb_positions(text:str, need_nmids: set[int], sem):
 async def parser_all_white_phrase(semaphore):
     tasks_by_text = {}
     while True:
+        logger.debug('Получаем фразы для парсинга')
         all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
+                logger.debug(f'Добавляем фразу {text} в список задач')
                 if need_nmids:
                     task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
                     tasks_by_text[text] = task
-                    await asyncio.sleep(0)
             else:
+                logger.debug(f'Фраза {text} уже есть в списке задач')
                 task = tasks_by_text[text]
                 if task.done():
                     if task.exception():
