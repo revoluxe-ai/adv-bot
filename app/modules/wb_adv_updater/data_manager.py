@@ -774,8 +774,7 @@ async def get_phrases_for_parsing(semaphore = None):
     pass_text = set()
     async with _sm(semaphore) as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.parsing_active == True,
-        AdvSetting.adv_id == 18818595)
+            AdvSetting.parsing_active == True)
         adv_settings = await session.execute(stmt)
         adv_settings = adv_settings.scalars().all()
         random.shuffle(adv_settings)
