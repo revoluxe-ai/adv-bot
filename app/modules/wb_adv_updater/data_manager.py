@@ -13,7 +13,6 @@ from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
 
 from app.exc import CardNotFoundInDB
-from app.modules.common_slaves.wildberries import exceptions as wb_exc
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, desc, asc
@@ -412,7 +411,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     try:
          nmid = adv_setting.nmids[0]
     except:
-        raise wb_exc.NotItemsInAdvSetting('У кампании в базе нет товаров')
+        raise NotItemsInAdvSetting('У кампании в базе нет товаров')
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
@@ -799,7 +798,7 @@ async def get_phrases_for_parsing(semaphore = None):
         for adv in adv_settings:
             try:
                 keywords = await get_good_bad_phrases(adv)
-            except NotItemsInAdvSetting('У кампании в базе нет товаров'):
+            except NotItemsInAdvSetting:
                 logger.debug('У кампании в базе нет товаров')
                 continue
             logger.debug('Фразы из статистики получены')
