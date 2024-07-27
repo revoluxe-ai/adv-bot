@@ -690,7 +690,7 @@ async def get_min_ctr(adv: AdvSetting):
         result = await session.execute(stmt)
         logger.debug('Попытка получить данные для расчета min_ctr')
         adv_keywords_rows = result.all()
-        logger.debug(f'Данные для мин стр получены, всего строк {adv_keywords_rows}')
+        logger.debug(f'Данные для мин стр получены, всего строк {len(adv_keywords_rows)}')
     text_to_real_ctr = {row[0]: row[1] for row in adv_keywords_rows}
     real_ctrs  = []
     predict_ctrs = []
