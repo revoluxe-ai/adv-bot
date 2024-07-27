@@ -286,8 +286,11 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
             await redis_manager.add_positions_to_redis(not_found_positions)
 
 async def limited_add_wb_positions(text:str, need_nmids: set[int], sem: asyncio.Semaphore):
-    await add_wb_positions(text, need_nmids)
-
+    async with sem:
+        try:
+            await add_wb_positions(text, need_nmids)
+        except Exception as e:
+            logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
 
 
 
