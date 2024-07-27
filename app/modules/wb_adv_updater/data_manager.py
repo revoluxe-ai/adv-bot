@@ -781,8 +781,8 @@ async def get_phrases_for_parsing(semaphore = None):
         for adv in adv_settings:
             keywords = await get_good_bad_phrases(adv)
             for keyword in keywords:
-                if keyword.status == 'bad':
-                    continue
+                # if keyword.status == 'bad':
+                #     continue
                 text = keyword.text
                 stmt = select(AdvSetting)\
                 .join(KeywordSetting)\
