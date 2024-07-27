@@ -191,12 +191,8 @@ class Runner:
 
 
     async def keywords_parsing_process(self,semaphore: asyncio.Semaphore):
-        while True:
-            try:
-                await self.__keywords_parsing_process(semaphore)
-            except:
-                logger.error('Ошибка процесса парсинга ключей', exc_info=True)
-                await asyncio.sleep(0)
+        await self.__keywords_parsing_process(semaphore)
+
 
     async def __keywords_parsing_process(self, semaphore: asyncio.Semaphore):
         await asyncio.gather(
