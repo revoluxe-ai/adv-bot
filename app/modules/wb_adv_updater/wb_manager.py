@@ -214,6 +214,7 @@ class Manager(AbcManager):
             for keyword in keywords:
                 try:
                     await self.update_keyword_stat_in_db(keyword, adv_setting, semaphore)
+                    logger.debug(f'Статистика для ключевого слова {keyword.text} обновлена')
                 except Exception as exc:
                     logger.error(
                         f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
@@ -745,3 +746,4 @@ class Manager(AbcManager):
                 else:
                     wb_cabinet.bonus = 0
                 await session.commit()
+                await asyncio.sleep(0)
