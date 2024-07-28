@@ -140,7 +140,7 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
                                                                adv,
                                                                )()
     except NotItemsInAdvSetting:
-        await messages.NotItemsInAdvSetting(bot, chat_id, wb_user_cabinet, adv)()
+        await messages.NoMainPhotos(bot, chat_id)()
 
     return
 

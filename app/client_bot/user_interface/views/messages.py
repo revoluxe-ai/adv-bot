@@ -787,11 +787,19 @@ class OrderSubscribe(Text):
     text = "В случае проблем с оплатой свяжитесь с администратором бота @skyline360_1"
 
 
-class NoMainPhotos(Text):
-    def __init__(self,
-                 bot: Bot,
-                 chat_id):
-        super().__init__(bot, chat_id)
+class NoMainPhotos(TextWithKeyboard):
+    parse_mode = None
+
+    @property
+    def keyboard(self):
+        button = InlineKeyboardButton(
+            text = 'Вернуться к списку магазинов',
+            callback_data = callbacks.Start().pack()
+        )
+        builder = InlineKeyboardBuilder()
+        builder.row(button)
+        return builder.as_markup()
+
 
 
     @property
