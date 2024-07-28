@@ -408,7 +408,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     try:
          nmid = adv_setting.nmids[0]
     except:
-        raise wb_exc.NotItemsInAdvSetting('У кампании в базе нет товаров')
+        raise NotItemsInAdvSetting('У кампании в базе нет товаров')
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
@@ -782,9 +782,12 @@ async def get_phrases_for_parsing(semaphore = None):
         adv_settings = adv_settings.scalars().all()
         random.shuffle(adv_settings)
         for adv in adv_settings:
-            keywords = await get_good_bad_phrases(adv)
+            try:
+                keywords = await get_good_bad_phrases(adv)
+            except NotItemsInAdvSetting:
+                continue
             for keyword in keywords:
-                if keyword.status == 'bad':
+                if keyword.hard_status == 0:
                     continue
                 text = keyword.text
                 stmt = select(AdvSetting)\
