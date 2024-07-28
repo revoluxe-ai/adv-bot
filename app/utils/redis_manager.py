@@ -157,9 +157,8 @@ async def get_keywords_positions(adv_setting, texts):
         if not json_data:
             continue
         position = WBItemPosition.from_dict(json.loads(json_data))
-        if position:
-            position.keyword_text = text
-            positions.append(position)
+        position.keyword_text = text
+        positions.append(position)
     return positions
 
 
