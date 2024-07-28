@@ -594,7 +594,7 @@ class Manager(AbcManager):
              else:
                  if tasks[wb_access.wb_cabinet.id].done():
                      if tasks[wb_access.wb_cabinet.id].exception():
-                         logger.error(f'Ошибка обновления данных: {tasks[wb_access.wb_cabinet.id].exception()}, '
+                         logger.error(f'Ошибка обновления данных для Shop id {wb_access.wb_cabinet.shop_id}: {tasks[wb_access.wb_cabinet.id].exception()}, '
                                       f'{tasks[wb_access.wb_cabinet.id].exception()}')
                      else:
                          async with sm() as session:
