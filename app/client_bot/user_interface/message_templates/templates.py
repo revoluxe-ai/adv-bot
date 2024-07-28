@@ -7,6 +7,7 @@ from aiogram import types
 import aiogram
 import logging
 
+from aiogram.enums import ParseMode
 from aiogram.types import FSInputFile, InputFile, BufferedInputFile
 
 from .base import Base
@@ -63,12 +64,12 @@ class TextWithKeyboard(Base):
         pass
 
 
-
     async def __call__(self):
-
+        parse_mode = getattr(self, 'parse_mode', ParseMode.MARKDOWN)
         last_message = await self.bot.send_message(chat_id=self.chat_id,
                                                     text=self.text,
-                                                    reply_markup=self.keyboard)
+                                                    reply_markup=self.keyboard,
+                                                    parse_mode = parse_mode)
         return last_message, self.get_content_type()
 
 
