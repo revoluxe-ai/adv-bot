@@ -231,9 +231,11 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
         min_ctr = await get_min_ctr(adv_setting)
+        logger.debug('Минимальный ctr получен')
         keyword_stats = await get_keywords_statistic(adv_setting, None)
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
         for keyword_stat in keyword_stats:
+            logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
             keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
             keyword_stat.keyword_setting = keyword_setting
             predict_ctr = await redis_manager.get_predict_ctr(adv_setting.id, keyword_stat.text)
@@ -307,13 +309,13 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     await redis_manager.set_auto_block_status(keyword_setting.id, True)
             assert keyword_stat.predict_ctr
 
-
+    logger.debug('Проверяю статусы ключевых слов с assert')
 
     for keyword_stat in keyword_stats:
         assert keyword_stat.status
         assert keyword_stat.status in ['good', 'bad']
-
-
+    logger.debug('Слова по assert проверены')
+    logger.debug('Возвращаю итоговую статистику')
     return keyword_stats
 
 
