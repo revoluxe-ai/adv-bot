@@ -748,5 +748,6 @@ class Manager(AbcManager):
                     wb_cabinet.balance -= const.PARSING_PRICE
                 else:
                     wb_cabinet.bonus = 0
+                    adv_setting.parsing_active = False
                 await session.commit()
                 await asyncio.sleep(0)

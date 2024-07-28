@@ -198,7 +198,7 @@ class Runner:
     async def payment_for_parsing_keyword(self):
         while True:
             hours = datetime.datetime.now().hour
-            if 12 < hours < 18:
+            if 12 < hours < 21:
                 try:
                     await self._manager.process_payment_for_parsing()
                 except Exception as e:
