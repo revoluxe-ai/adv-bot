@@ -421,6 +421,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
             self._keywords = clear_keywords
         self.min_ctr = await data_manager.get_min_ctr(self._adv_setting)
+        hide_keywords_is_not_relevant = data.get('hide_keywords_is_not_relevant')
+        self.hide_keywords_is_not_relevant = hide_keywords_is_not_relevant
+
+        if hide_keywords_is_not_relevant:
+            clear_keywords = []
+            for keyword in self._keywords:
+                if keyword.hard_status == 0:
+                    continue
+                clear_keywords.append(keyword)
+            self._keywords = clear_keywords
+
         await super().__call__()
 
     @property
@@ -460,6 +471,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                        self._filter,
                                                        self._on_page,
                                                        self.min_ctr,
+                                                       self.hide_keywords_is_not_relevant,
                                                        sort_mode=self.sort_mode)
 
 

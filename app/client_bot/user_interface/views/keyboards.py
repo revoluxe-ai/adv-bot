@@ -214,6 +214,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                   return_from_filter_bottom: bool,
                                   on_page,
                                   min_ctr,
+                                  hide_keywords_is_not_relevant,
                                   sort_mode = 'default'):
 
     min_ctr = min_ctr
@@ -317,6 +318,21 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                        adv_original_id=adv_setting.id,
                                        type='active_keywords',
                                        page=page).pack())]
+    bottoms.append(bottom)
+
+    if not hide_keywords_is_not_relevant:
+        bottom = [InlineKeyboardButton(text='Скрыть не релевантные фразы',
+                                          callback_data=callbacks.SettingKeywords(
+                                            adv_original_id=adv_setting.id,
+                                            type='hide_keywords_is_not_relevant',
+                                            page=page).pack())]
+    else:
+        bottom = [InlineKeyboardButton(text='Показывать не релевантные фразы',
+                                      callback_data=callbacks.SettingKeywords(
+                                          adv_original_id=adv_setting.id,
+                                          type='show_keywords_is_not_relevant',
+                                          page=page).pack())]
+
     bottoms.append(bottom)
 
 
