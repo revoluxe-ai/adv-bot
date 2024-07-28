@@ -440,6 +440,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         text = (
                  'Название кампании: ' + str(self._adv_setting.name) + '\n'
+                 f'Статус: {self._adv_setting.active_status}\n'
+                 f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""                                                      
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
                  'Статистика и настройка ключевых слов \n'
                  f'Минимальный CRT для кампании: {round(self.min_ctr*100, 2)}%\n'
@@ -476,6 +478,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
 
 class KeywordSettingMessage(TextWithKeyboard):
+    parse_mode = ParseMode.MARKDOWN
+
     def __init__(self, bot: Bot, chat_id: int,
                  keyword_setting_id,
                  last_page: int):
@@ -497,16 +501,35 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._adv_setting = adv_setting
         nmid = adv_setting.nmids[0]
         position: WBItemPosition = await redis_manager.get_keyword_position(keyword_setting.text, nmid)
+        self.position = position
         if position:
-            self.last_full_update = position.timestamp
+            self.last_full_update = position.timestamp.strftime('%d-%m-%Y %H:%M')
         else:
             self.last_full_update = None
+
+        total_clicks, total_views, total_spend = await data_manager.get_keyword_statistic(self._keyword_setting)
+
+        self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
+
+        self.spend = total_spend
+
         return await super().__call__()
 
     @property
     def text(self):
-        text = (f'Статистика и настройка ключевого слова: {self._keyword_setting.text}\n'
-                f'Последнее обновление: {self.last_full_update}\n')
+        text = (f'🔑 **Статистика и настройка ключевого слова:** {self._keyword_setting.text}\n'
+                f'📊 **Фактический CTR:** {self.fact_ctr}%\n'
+                f'💰 **Расход:** {round(self.spend, 2)} руб.\n')
+
+        if self.position:
+            text += (f'🏆 **Органическая позиция:** {self.position.base_position}\n'
+                     f'🚀 **Буст-позиция:** {self.position.promo_position if self.position.promo_position else "Нет"}\n'
+                     f'📈 **Фактическая позиция:** {self.position.real_position}\n'
+                     f'💰 **Ставка на момент сбора данных:** {self.position.cpm if self.position.cpm else "Нет"}\n'
+                     f'🕒 **Последнее обновление позиций:** {self.last_full_update if self.last_full_update else "Нет"}\n')
+        else:
+            text += '📉 **Позиция на Wildberries:** не определена\n'
+
         return text
 
     @property
