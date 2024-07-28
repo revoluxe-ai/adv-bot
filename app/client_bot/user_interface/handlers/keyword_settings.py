@@ -237,7 +237,7 @@ async def setting_keywords_by_adv(message: types.Message,
     chat_id = message.chat.id
 
     if nmids:
-        main_photos = await data_manager.get_main_photos(nmids[:1])
+        main_photos = await data_manager.get_main_photos(nmids[0])
     else:
         main_photos = None
     if not main_photos:
