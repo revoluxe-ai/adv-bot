@@ -332,6 +332,5 @@ async def reset_from_redis_positions_of_out_index():
             await asyncio.sleep(0)  # Чтобы предотвратить блокировку event loop
 
 
-count_semaphore = 5
+count_semaphore = settings.MAX_THREAD_PARSER
 semaphore = asyncio.Semaphore(count_semaphore)
-
