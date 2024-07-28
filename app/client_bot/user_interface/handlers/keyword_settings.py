@@ -53,8 +53,11 @@ async def setting_keywords_active_keywords(callback: CallbackQuery,
     nmids = adv_setting.nmids
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
-
-    main_photos = await data_manager.get_main_photos(nmids[:1])
+    try:
+         main_photos = await data_manager.get_main_photos(nmids[:1])
+    except:
+        await messages.NoMainPhotos(bot, callback.message.chat.id)()
+        return
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(
@@ -93,9 +96,11 @@ async def setting_keywords_sort_by_ctr_desc(callback: CallbackQuery,
     nmids = adv_setting.nmids
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
-
-    main_photos = await data_manager.get_main_photos(nmids[:1])
-
+    try:
+        main_photos = await data_manager.get_main_photos(nmids[:1])
+    except:
+        await messages.NoMainPhotos(bot, callback.message.chat.id)()
+        return
     await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(
         bot,
@@ -134,9 +139,11 @@ async def setting_keywords_show_keywords_is_hard(callback: CallbackQuery,
         nmids = adv_setting.nmids
         chat_id = callback.message.chat.id
         adv_choice_last_page = 1
-
-        main_photos = await data_manager.get_main_photos(nmids[:1])
-
+        try:
+            main_photos = await data_manager.get_main_photos(nmids[:1])
+        except:
+            await messages.NoMainPhotos(bot, callback.message.chat.id)()
+            return
         await redis_manager.set_check_last_24_hours(adv_original_id)
         await messages.AdvKeywordsSetting(
             bot,
@@ -177,8 +184,11 @@ async def setting_keywords_white_list(callback: CallbackQuery,
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
 
-    main_photos = await data_manager.get_main_photos(nmids[:1])
-
+    try:
+       main_photos = await data_manager.get_main_photos(nmids[:1])
+    except:
+        await messages.NoMainPhotos(bot, callback.message.chat.id)()
+        return
     await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(
         bot,
@@ -283,7 +293,11 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
         nmids = adv_setting.nmids
         chat_id = callback.message.chat.id
         adv_choice_last_page = 1
-        main_photos = await data_manager.get_main_photos(nmids[:1])
+        try:
+            main_photos = await data_manager.get_main_photos(nmids[:1])
+        except:
+            await messages.NoMainPhotos(bot, callback.message.chat.id)()
+            return
         await redis_manager.set_check_last_24_hours(adv_original_id)
         await messages.AdvKeywordsSetting(
             bot,
@@ -319,9 +333,11 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
         nmids = adv_setting.nmids
         chat_id = callback.message.chat.id
         adv_choice_last_page = 1
-
-        main_photos = await data_manager.get_main_photos(nmids[:1])
-
+        try:
+            main_photos = await data_manager.get_main_photos(nmids[:1])
+        except:
+            await messages.NoMainPhotos(bot, callback.message.chat.id)()
+            return
         await redis_manager.set_check_last_24_hours(adv_original_id)
         await messages.AdvKeywordsSetting(
             bot,
