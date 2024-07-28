@@ -33,6 +33,7 @@ class Runner:
         predicted = RedisEvent(key='predicted')
         await predicted.set()
         await asyncio.gather(
+            self.payment_for_parsing_keyword(),
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             # self.update_min_ctr_in_global_wb_category_settings(),
@@ -121,9 +122,6 @@ class Runner:
 
 
 
-
-
-
     async def update_min_ctr_in_global_wb_category_settings(self):
         while True:
             try:
@@ -195,11 +193,7 @@ class Runner:
 
 
     async def __keywords_parsing_process(self, semaphore: asyncio.Semaphore):
-        await asyncio.gather(
-                   self. parser_all_white_phrase(semaphore),
-                   # self.write_positions_to_db(),
-                   # self.payment_for_parsing_keyword(),
-               return_exceptions=True)
+        await self. parser_all_white_phrase(semaphore)
 
     async def payment_for_parsing_keyword(self):
         while True:
