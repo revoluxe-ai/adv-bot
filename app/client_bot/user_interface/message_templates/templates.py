@@ -65,10 +65,12 @@ class TextWithKeyboard(Base):
 
 
     async def __call__(self):
+        await super().__call__()
 
         last_message = await self.bot.send_message(chat_id=self.chat_id,
                                                     text=self.text,
-                                                    reply_markup=self.keyboard)
+                                                    reply_markup=self.keyboard,
+                                                    parse_mode=self.parse_mode)
         return last_message, self.get_content_type()
 
 

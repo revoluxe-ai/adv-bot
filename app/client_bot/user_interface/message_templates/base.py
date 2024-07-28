@@ -19,9 +19,9 @@ class Base(ABC):
 
 
 
-    @abstractmethod
     async def __call__(self)-> (str):
-        pass
+        parse_mode = getattr(self, 'parse_mode', None)
+        self.parse_mode = parse_mode
 
     def __get_parent_class_name(self):
         # Получаем первый родительский класс из кортежа __bases__
