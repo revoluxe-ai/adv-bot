@@ -31,6 +31,8 @@ class AdminsGetShopFilter(BaseFilter):
 
     async def __call__(self, message: Message) -> bool:
         text = message.text
+        if not text:
+            return False
         match_uuid = re.Pattern.match(UUID_REGEX, text)
         user_id = message.from_user.id
         if match_uuid and user_id in [373435337]:
