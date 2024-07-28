@@ -810,18 +810,19 @@ class ShopMenu(TextWithKeyboard):
 👥 Чат поддержки - https://t.me/wbgram_disc\n
 """)
         else:
-            if last_for_days > 7:
-                text += (f"""
+            if isinstance(last_for_days, int):
+                if last_for_days > 7:
+                    text += (f"""
 💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота. 💰
                 """)
-            elif last_for_days == 0:
-                text += (f"""
+                elif last_for_days == 0:
+                    text += (f"""
 ⚠️ Денег на продление кампаний больше нет! ⚠️
 
 💳 Срочно пополните баланс во избежание проблем с работой кампаний!
 """)
-            else:
-                text += (f"""
+                else:
+                    text += (f"""
 🚨 Внимание!!! 🚨
 
 💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота.
