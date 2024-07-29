@@ -789,7 +789,7 @@ async def get_phrases_for_parsing(semaphore = None):
             except NotItemsInAdvSetting:
                 continue
             for keyword in keywords:
-                if keyword.hard_status == 0:
+                if keyword.status == 'bad':
                     continue
                 text = keyword.text
                 stmt = select(AdvSetting)\
