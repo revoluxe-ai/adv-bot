@@ -119,18 +119,19 @@ class Fitter(AbcManager):
             elif status in [2, 3]:
                 return 1
             else:
-                min_ctr = adv_id_to_min_ctr[adv_id]
-                if min_ctr > 0:
-                     enough_views = self._get_enough_views(min_ctr)
-                else:
-                    if views > 0:
-                        return clicks / views
+                if clicks == 0:
+                    min_ctr = adv_id_to_min_ctr[adv_id]
+                    if min_ctr > 0:
+                         enough_views = self._get_enough_views(min_ctr)
                     else:
-                        return 0
-                clicks = clicks + 1
-                views = views + enough_views
-                ctr = clicks / views
-                return ctr
+                         return clicks / views
+
+                    clicks = clicks + 1
+                    views = views + enough_views/2
+                    ctr = clicks / views
+                    return ctr
+                else:
+                    return clicks / views
         # Предположим, что adv_id_to_min_ctr - это ваш словарь с минимальными CTR для каждого adv_id
         df['ctr'] = df.apply(calculate_ctr, axis=1)
         return df
