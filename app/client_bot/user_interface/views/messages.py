@@ -1,4 +1,5 @@
 import datetime
+import re
 
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -280,12 +281,12 @@ class AdvSettingMenu(TextWithKeyboard):
             max_cpc_text = f'Максимальная стоимость клика: {max_cpc} р.'
 
         text = (
-            f'📢 **Кампания:** {self.adv.name}\n'
-            f'🆔 **ID кампании:** {self.adv.adv_id}\n'
-            f'📌 **Статус:** {self.adv.active_status}\n'
-            f'🎯 **Минимальный CTR для кампании:** {self._min_ctr} %\n'
-            f'📈 **Средний CTR по активным ключам за весь период:** {self._mean_ctr} %\n'
-            f'🔢 **Минимальное количество показов для прогноза CTR:** {self.adv.min_views_for_ml_predict}\n'
+            f'📢 *Кампания:* {self.adv.name}\n'
+            f'🆔 *ID кампании:* {self.adv.adv_id}\n'
+            f'📌 *Статус:* {self.adv.active_status}\n'
+            f'🎯 *Минимальный CTR для кампании:* {self._min_ctr} %\n'
+            f'📈 *Средний CTR по активным ключам за весь период:* {self._mean_ctr} %\n'
+            f'🔢 *Минимальное количество показов для прогноза CTR:* {self.adv.min_views_for_ml_predict}\n'
         )
         text += f'{max_cpc_text}'
         return text
@@ -521,18 +522,20 @@ class KeywordSettingMessage(TextWithKeyboard):
 
     @property
     def text(self):
-        text = (f'🔑 **Статистика и настройка ключевого слова:** {self._keyword_setting.text}\n'
-                f'📊 **Фактический CTR:** {self.fact_ctr}%\n'
-                f'💰 **Расход:** {round(self.spend, 2)} руб.\n')
+        keyword_text = self._keyword_setting.text
+        keyword_text  = re.sub(r'([_*[\]()~>`#+\-=|{}.!])', r'\\\1', keyword_text)
+        text = (f'🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n'
+                f'📊 *Фактический CTR:* {self.fact_ctr}%\n'
+                f'💰 *Расход:* {round(self.spend, 2)} руб.\n')
 
         if self.position:
-            text += (f'🏆 **Органическая позиция:** {self.position.base_position}\n'
-                     f'🚀 **Буст-позиция:** {self.position.promo_position if self.position.promo_position else "Нет"}\n'
-                     f'📈 **Фактическая позиция:** {self.position.real_position}\n'
-                     f'💰 **Ставка на момент сбора данных:** {self.position.cpm if self.position.cpm else "Нет"}\n'
-                     f'🕒 **Последнее обновление позиций:** {self.last_full_update if self.last_full_update else "Нет"}\n')
+            text += (f'🏆 *Органическая позиция:* {self.position.base_position}\n'
+                     f"""🚀 *Буст-позиция:* {self.position.promo_position if self.position.promo_position else "Нет"}\n"""
+                     f'📈 *Фактическая позиция:* {self.position.real_position}\n'
+                     f"""💰 *Ставка на момент сбора данных:* {self.position.cpm if self.position.cpm else "Нет"}\n"""
+                     f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n""")
         else:
-            text += '📉 **Позиция на Wildberries:** не определена\n'
+            text += '📉 *Позиция на Wildberries:* не определена\n'
 
         return text
 
