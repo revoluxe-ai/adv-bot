@@ -238,7 +238,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
             keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
             keyword_stat.keyword_setting = keyword_setting
-            predict_ctr = await redis_manager.get_predict_ctr(adv_setting.id, keyword_stat.text)
+            predict_ctr = await redis_manager.get_predict_ctr(adv_setting.adv_id, keyword_stat.text)
             if not predict_ctr:
                 predict_ctr = keyword_setting.predict_ctr
             keyword_stat.predict_ctr = predict_ctr
