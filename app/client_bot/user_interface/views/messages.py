@@ -227,7 +227,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     @property
     def on_page(self):
-        return 5
+        return 20
 
 
 class ShopUpdateInfo(Text):
@@ -787,11 +787,12 @@ class ShopMenu(TextWithKeyboard):
         else:
             last_for_days = '∞'
         text = (
-            f'📊 **Подключенных к боту кампаний:** {count_active_advs}\n'
-            f'🔍 **Включен парсинг у кампаний:** {count_active_parsing}\n'
-            f'🔧 Включено автоуправление ставкой у кампаний: {count_auto_bidder}\n'
-            f'💸 **Расход в сутки:** {total_amount_for_day} рублей\n'
-            f'⏳ **Срок действия токена:** {self.expiration_time} Истечет через {self.last_days_for_token}\n'
+            f'📊 *Подключенных к боту кампаний*: {count_active_advs}\n'
+            f'🔍 *Включен парсинг у кампаний*: {count_active_parsing}\n'
+            f'🔧 *Включено автоуправление ставкой у кампаний*: {count_auto_bidder}\n'
+            f'💸 *Расход в сутки*: {total_amount_for_day} рублей\n'
+            f'⏳ *Срок действия токена*: {self.expiration_time}\n'
+            f'*Истечет через* {self.last_days_for_token}\n'
         )
 
 
@@ -807,8 +808,7 @@ class ShopMenu(TextWithKeyboard):
 Стоимость парсинга ключей кампании (опционально) - 15 р.
 📲 Нажмите на кнопку "Пополнить баланс" ниже.
 
-🔖 Если вам нужен купон для тестирования бота, то запросите у админа - @skyline360_1
-            """
+🔖 Если вам нужен купон для тестирования бота, то запросите у админа - @skyline360\_1"""
         elif balance < 0 and bonus == 0:
             text += ("""
 🚨 Внимание, у магазина отрицательный баланс. 🚨
@@ -844,7 +844,7 @@ class ShopMenu(TextWithKeyboard):
 🔔 Настоятельно рекомендую пополнить счет во избежание проблем с работой кампаний""")
 
             text += (
-'========================================================\n'
+'===================================\n'
                 f'🏬 Магазин: {self._wb_user_cabinet.name}\n'
                 f'🆔 Shop ID: {self._wb_cabinet.shop_id}\n'
                 f'💰 Баланс магазина: {balance} рублей\n'
