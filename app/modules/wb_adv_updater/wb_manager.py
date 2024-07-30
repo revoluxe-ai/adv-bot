@@ -808,7 +808,7 @@ class Manager(AbcManager):
         wb_cabinet_tasks = {}
         adv_tasks = {}
         while True:
-            accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
+            accesses = super_cabinet_manager.get_accesses_for_bidder()
             async for access in accesses:
                 cabinet_id = access.wb_cabinet.id
                 if cabinet_id not in wb_cabinet_tasks:
@@ -818,10 +818,10 @@ class Manager(AbcManager):
 
                 else:
                     if wb_cabinet_tasks[cabinet_id].done():
-                        logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
+                        logger.info(f'Задача обновления обновления ставок {cabinet_id}')
                         if wb_cabinet_tasks[cabinet_id].exception():
                             logger.error(
-                                f'Ошибка обновления статистики ключей: '
+                                f'Ошибка обновления ставок: '
                                 f'{wb_cabinet_tasks[cabinet_id].exception()},'
                                 f' для кабинета {cabinet_id}'
                             )
