@@ -208,6 +208,9 @@ class AdvSetting(BaseTable):
     payments = relationship(AdvPayment, back_populates='adv_setting', uselist=True)
     parsing_active =  mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
+    bidder_active = mapped_column(Boolean, default=False)
+    max_cpm = mapped_column(Integer, nullable=True)
+    max_place = mapped_column(Integer, nullable=True)
 
 
 

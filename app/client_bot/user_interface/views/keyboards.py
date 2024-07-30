@@ -61,10 +61,9 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
     builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
                                                                       type='by_adv').pack()))
-    builder.row(InlineKeyboardButton(text='Добавить фразы в белый список',
-                                callback_data=callbacks.AddWhitePhrases(adv_setting_id=adv_setting.id).pack()))
-    button = InlineKeyboardButton(text='История позиций ключевых слов',
-                                    callback_data=callbacks.KeywordPositionHistory(
+    button = InlineKeyboardButton(text='Управление ставкой',
+                                        callback_data=callbacks.CPMSettingMenu(
+                                        action='to_cpm_setting_page',
                                         adv_original_id=adv_setting.id).pack())
     builder.row(button)
 
@@ -270,6 +269,8 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                 first_position = '?'
                 text += f'{first_position}'
         text += f'{turn_on}({hard_status}) {keyword.text}'
+
+        text += f'({keyword.query})'
 
         text += f'({round(keyword.predict_ctr*100, 2)}%)'
 
