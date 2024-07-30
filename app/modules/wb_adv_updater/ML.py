@@ -127,7 +127,7 @@ class Fitter(AbcManager):
                          return clicks / views
 
                     clicks = clicks + 1
-                    views = views + enough_views/2
+                    views = views + enough_views
                     ctr = clicks / views
                     return ctr
                 else:
@@ -309,7 +309,7 @@ class Predictor:
                     AdvSetting.active_status == 'started')
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
-
+        adv_id_to_adv_setting = {adv.adv_id: adv for adv in all_adv_settings}
         await predicted.clear()
 
         df_for_predict = await self._get_df_for_predict(all_adv_settings)
@@ -320,6 +320,17 @@ class Predictor:
             adv_id = row['adv_id']
             keyword = row['keyword']
             predict_ctr = row['predicted_ctr']
+            adv = adv_id_to_adv_setting[adv_id]
+            min_ctr = await data_manager.get_min_ctr(adv)
+            enough_views = int(1/min_ctr)
+            async with sm() as session:
+                stmt = select(KeywordSetting).where(and_(KeywordSetting.adv_id == adv_id,
+                                                            KeywordSetting.text == keyword))
+                keyword_setting = await session.execute(stmt)
+                keyword_setting = keyword_setting.scalar()
+            clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
+            clicks = clicks + 1
+            views = views + enough_views
             await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
         await  asyncio.sleep(0)
         logger.debug('Предсказания обновлены')
