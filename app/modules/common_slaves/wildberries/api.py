@@ -109,7 +109,24 @@ class AdvertApi(ABC_WB_API):
         keywords.sort(key=lambda x: x.date)
         return keywords
 
+    @try_except_decorator(1, 1)
+    async def update_cpm(self, adv_id, new_cpm):
+        url = 'https://advert-api.wildberries.ru/adv/v0/cpm'
+        data = {
+            "advertId": adv_id,
+            "type": 8,
+            "cpm": int(new_cpm),
+            # "param": None
+        }
+        async with aiohttp.ClientSession() as session:
+            response_text = await self.requests(session,
+                                              'POST',
+                                                url,
+                                                json_data=data,
+                                                headers=self.headers.standart)
 
+            assert response_text == ''
+            pass
 
 
     @try_except_decorator(1, 3)

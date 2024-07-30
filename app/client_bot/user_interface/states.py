@@ -50,3 +50,10 @@ class AdvCompanyCatalog(StatesGroup):
 
 class AddWhitePhrases(StatesGroup):
     waiting_for_white_phrases = State()
+
+
+class CPMSetting(StatesGroup):
+    waiting_for_min_position = State()
+    waiting_for_max_cpm = State()
+    waiting_for_manual_cpm = State()
+    waiting_for_max_position = State()

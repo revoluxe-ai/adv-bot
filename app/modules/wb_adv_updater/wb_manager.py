@@ -1,6 +1,8 @@
 import logging
 import re
 import typing
+from typing import List
+
 import aiohttp
 from io import BytesIO
 from itertools import product
@@ -10,6 +12,8 @@ import joblib
 import numpy as np
 from PIL import Image as PilImage
 from sqlalchemy import and_, not_
+from sqlalchemy.orm.base import _T_co
+
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
@@ -33,7 +37,7 @@ import asyncio
 from app.admin_bot.sender import messages
 import pandas as pd
 from sqlalchemy import and_
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload, selectinload, InstrumentedAttribute
 from sqlalchemy.future import select
 from .ML import Predictor
 import datetime
@@ -48,7 +52,11 @@ from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
 from ...client_bot import const
+from ...utils import redis_manager
 from ...utils.redis_manager import RedisEvent
+from  app.modules.wb_keywords_parser import parser
+
+
 
 predictor = Predictor()
 
@@ -751,3 +759,160 @@ class Manager(AbcManager):
                     adv_setting.parsing_active = False
                 await session.commit()
                 await asyncio.sleep(0)
+
+    async def process_payment_for_auto_bidder(self):
+        current_date = datetime.datetime.now().date()
+        async with sm() as session:
+            stmt = select(AdvSetting).options(
+                joinedload(AdvSetting.payments),
+                selectinload(AdvSetting.wb_cabinet)
+            ).filter(
+                and_(
+                    AdvSetting.bidder_active == True,
+                    not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
+                                                      AdvPayment.type == 'auto_bidder')))
+
+                )
+            )
+
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = result.unique().scalars().all()
+
+            for adv_setting in adv_settings:
+                wb_cabinet = adv_setting.wb_cabinet
+                if not (bonus := wb_cabinet.bonus):
+                    bonus = 0
+                if not (balance := wb_cabinet.balance):
+                    balance = 0
+                if bonus >= const.AUTO_BIDDER_PRICE:
+                    payment = AdvPayment(date=current_date,
+                                         type='auto_bidder')
+                    session.add(payment)
+                    adv_setting.payments.append(payment)
+                    wb_cabinet.bonus -= const.AUTO_BIDDER_PRICE
+                elif balance > 0:
+                    payment = AdvPayment(date=current_date,
+                                         type='auto_bidder')
+                    session.add(payment)
+                    adv_setting.payments.append(payment)
+                    wb_cabinet.balance -= const.AUTO_BIDDER_PRICE
+                else:
+                    wb_cabinet.bonus = 0
+                    adv_setting.bidder_active = False
+                await session.commit()
+                await asyncio.sleep(0)
+
+
+
+    async def run_bidder_process(self):
+        wb_cabinet_tasks = {}
+        adv_tasks = {}
+        while True:
+            accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
+            async for access in accesses:
+                cabinet_id = access.wb_cabinet.id
+                if cabinet_id not in wb_cabinet_tasks:
+                    task = asyncio.create_task(self._run_bidder_process_for_wb_cabinet(access,
+                                                                                       adv_tasks = adv_tasks))
+                    wb_cabinet_tasks[cabinet_id] = task
+
+                else:
+                    if wb_cabinet_tasks[cabinet_id].done():
+                        logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
+                        if wb_cabinet_tasks[cabinet_id].exception():
+                            logger.error(
+                                f'Ошибка обновления статистики ключей: '
+                                f'{wb_cabinet_tasks[cabinet_id].exception()},'
+                                f' для кабинета {cabinet_id}'
+                            )
+
+                        del wb_cabinet_tasks[cabinet_id]
+            await asyncio.sleep(0)
+
+    async def _run_bidder_process_for_wb_cabinet(self, access: WBCabinetAccess, adv_tasks: dict):
+        wb_api = WBApi(access)
+        wb_cabinet = access.wb_cabinet
+        async with sm() as session:
+            stmt = select(AdvSetting)\
+                .join(AdvSetting.wb_cabinet)\
+                .where(WBCabinet.id == wb_cabinet.id,
+                       AdvSetting.bidder_active == True,
+                       AdvSetting.bot_active == True,
+                       AdvSetting.active_status == 'started')
+            result = (await session.execute(stmt)).unique()
+            adv_settings = result.scalars().all()
+        for adv_setting in adv_settings:
+            if adv_setting not in adv_tasks:
+                task = asyncio.create_task(self.run_bidder_process_for_adv(adv_setting.adv_id, wb_api))
+                adv_tasks[adv_setting.id] = task
+            else:
+                if adv_tasks[adv_setting.id].done():
+                    logger.info(
+                        f'Задача управления ставкой завершена для кабинета '
+                        f'{adv_setting.name}'
+                    )
+                    if adv_tasks[adv_setting.id].exception():
+                        logger.error(
+                            f'Ошибка обновления статистики ключей: '
+                            f'{adv_tasks[adv_setting.id].exception()},'
+                            f' для кабинета {adv_setting.name}'
+                        )
+
+                    del adv_tasks[adv_setting.id]
+                    logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
+                    logger.debug(f'Установка set для need_update_model')
+        return
+
+    async def run_bidder_process_for_adv(self, adv_id: int,
+                                         wb_api: WBApi):
+        async with sm() as session:
+            stmt = select(AdvSetting)\
+            .where(AdvSetting.adv_id == adv_id)
+            result = await session.execute(stmt)
+            adv_setting: AdvSetting = result.scalar()
+            stmt = select(KeywordSetting)\
+            .where(KeywordSetting.adv_setting_id == adv_setting.id,
+                   KeywordSetting.hard_status == 2)
+            result = await session.execute(stmt)
+            white_adv_keywords: list[KeywordSetting] = result.scalars().all()
+        max_position_for_adv = adv_setting.max_place
+        max_cpm = adv_setting.max_cpm
+        nmid_in_adv = adv_setting.nmids[0]
+        promo_positions = []
+        for keyword in white_adv_keywords:
+            await parser.add_wb_positions(keyword.text, {nmid_in_adv})
+            position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
+            if not position:
+                continue
+            cpm_from_parsing: int = position.cpm
+            promo_position = position.promo_position
+            if not promo_position:
+                continue
+            promo_positions.append(promo_position)
+        fact_max_position: int = max(promo_positions)
+        if fact_max_position < max_position_for_adv:
+            new_cpm = cpm_from_parsing - 1
+        elif fact_max_position > max_position_for_adv:
+            new_cpm = cpm_from_parsing + 1
+
+        if new_cpm > max_cpm:
+            new_cpm = max_cpm
+        elif new_cpm < 125:
+            new_cpm = 125
+        if new_cpm != cpm_from_parsing:
+           await wb_api.advert.update_cpm(adv_id, new_cpm)
+
+
+
+            
+            
+                
+            
+            
+
+
+
+
+
+
+

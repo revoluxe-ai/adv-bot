@@ -743,8 +743,17 @@ class ShopMenu(TextWithKeyboard):
             count_active_parsing = result.scalar()
             if count_active_parsing:
                 total_amount_for_day += count_active_parsing * const.PARSING_PRICE
+            stmt = select(func.count(AdvSetting.id)) \
+                .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
+                       AdvSetting.bidder_active == True, )
+            result = await session.execute(stmt)
+            count_auto_bidder = result.scalar()
+            if count_auto_bidder:
+                total_amount_for_day += count_auto_bidder * const.AUTO_BIDDER_PRICE
+
         self.count_active_advs = count_active_advs
         self.count_active_parsing = count_active_parsing
+        self.count_auto_bidder = count_auto_bidder
         self.total_amount_for_day = total_amount_for_day
         user: User = self._wb_user_cabinet.user
         tokens: list[WBToken] = user.wb_tokens
@@ -770,6 +779,7 @@ class ShopMenu(TextWithKeyboard):
         bonus = self._bonus
         count_active_advs = self.count_active_advs
         count_active_parsing = self.count_active_parsing
+        count_auto_bidder = self.count_auto_bidder
         total_money = balance + bonus
         total_amount_for_day = self.total_amount_for_day
         if self.total_amount_for_day:
@@ -779,6 +789,7 @@ class ShopMenu(TextWithKeyboard):
         text = (
             f'📊 **Подключенных к боту кампаний:** {count_active_advs}\n'
             f'🔍 **Включен парсинг у кампаний:** {count_active_parsing}\n'
+            f'🔧 Включено автоуправление ставкой у кампаний: {count_auto_bidder}\n'
             f'💸 **Расход в сутки:** {total_amount_for_day} рублей\n'
             f'⏳ **Срок действия токена:** {self.expiration_time} Истечет через {self.last_days_for_token}\n'
         )
@@ -1735,3 +1746,90 @@ class WhitePhrasesAdded(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+class CPMSetting(TextWithKeyboard):
+    async def __call__(self, adv_setting_id):
+        async with _sm() as session:
+            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+            result = await session.execute(stmt)
+            adv_setting = result.scalars().first()
+        self.adv_setting = adv_setting
+        await super().__call__()
+
+    @property
+    def text(self):
+        text = f"""
+Режим управления ставкой: {'Ручной'  if not self.adv_setting.bidder_active else 'Автоматический'}\n\n"""
+        if self.adv_setting.bidder_active:
+            text += f"""{'Целевое место место: ' + str(self.adv_setting.max_place) }\n
+Максимальная ставка: {str(self.adv_setting.max_cpm)}\n"""
+        return text
+
+    @property
+    def keyboard(self):
+        builder = InlineKeyboardBuilder()
+
+        if self.adv_setting.bidder_active:
+
+            bottom = InlineKeyboardButton(text="Установить фиксированную ставку CPM",
+                                          callback_data=callbacks.CPMSettingMenu(
+                                          action = "set_manual_cpm",
+                                          adv_original_id = self.adv_setting.id).pack())
+        else:
+            bottom = InlineKeyboardButton(text="Включить автоматическое управление CPM",
+                                      callback_data=callbacks.CPMSettingMenu(
+                                          action="set_auto_cpm",
+                                          adv_original_id=self.adv_setting.id).pack())
+
+        builder.row(bottom)
+
+        bottom = InlineKeyboardButton(text = 'Изменить ставку (Максимальную ставку)',
+                                      callback_data = callbacks.CPMSettingMenu(
+                                          action = 'set_manual_cpm',
+                                          adv_original_id = self.adv_setting.id).pack())
+
+        builder.row(bottom)
+
+
+        if self.adv_setting.bidder_active:
+            bottom = InlineKeyboardButton(text="Изменить целевую позицию",
+                                          callback_data=callbacks.CPMSettingMenu(
+                                          action = "set_max_position",
+                                          adv_original_id = self.adv_setting.id).pack())
+            builder.row(bottom)
+
+
+
+        bottom = InlineKeyboardButton(text='К настройкам АРК',
+                                         callback_data=callbacks.Adv(
+                                                adv_original_id=self.adv_setting.id).pack())
+        builder.row(bottom)
+
+
+        return builder.as_markup()
+
+
+class AutoCPMSettingGetMinPosition(Text):
+
+    async def __call__(self, adv_setting_id: int):
+        async with _sm() as session:
+            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+            result = await session.execute(stmt)
+            adv_setting = result.scalars().first()
+        self.adv_setting = adv_setting
+        await super().__call__()
+
+    @property
+    def text(self):
+        text = """
+Введите позицию, которую вы хотите занимать в топе:
+        """
+        return text
+
+
+class AutoCPMSettingGetMaxCPM(Text):
+    text = """Укажите максимальную ставку:"""
+
+
+class ManualCPMSetting(Text):
+    text = """Укажите ставку (целое число от 125):"""

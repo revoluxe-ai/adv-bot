@@ -11,7 +11,9 @@ from .user_interface.handlers import (adv_setting,
                                       min_views_for_ml_predict_ctr,
                                       keywords_positions_history,
                                       add_white_phrases,
-                                      get_shop_for_admin)
+                                      get_shop_for_admin,
+                                      cpm_builder,
+)
 from ..settings import settings
 
 common_router = Router()
@@ -25,6 +27,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 common_router.include_routers(adv_setting.router)
+common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)
 common_router.include_routers(keyword_settings.router)
 common_router.include_routers(add_white_phrases.router)
