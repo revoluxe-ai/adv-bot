@@ -140,6 +140,7 @@ async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, 
 async def add_positions_to_redis(positions: list[WBItemPosition]):
     base_key = 'adv_positions'
     for position in positions:
+       position.timestamp = datetime.datetime.now()
        key = f'{base_key}:{position.keyword_text}:{position.nmid}'
        position_dict = position.to_dict()
        await redis_client.set(key, json.dumps(position_dict))
