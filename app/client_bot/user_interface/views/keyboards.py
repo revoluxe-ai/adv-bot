@@ -68,6 +68,11 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
     builder.row(button)
 
 
+    builder.row(InlineKeyboardButton(text='Добавить фразы в продвижение (Белый список)',
+                                callback_data=callbacks.AddWhitePhrases(adv_setting_id=adv_setting.id).pack()))
+
+
+
     if adv_setting.parsing_active:
         button = InlineKeyboardButton(text='Отключить сбор позиций',
                                         callback_data=callbacks.TurnParsing(action='off',
@@ -307,7 +312,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                                 adv_original_id=adv_setting.id,
                                                 type='by_adv',
                                                 page=next_page).pack())])
-    bottom = [InlineKeyboardButton(text='Показать белый список',
+    bottom = [InlineKeyboardButton(text='Показать фразы для продвижения (белый список)',
                                    callback_data=callbacks.SettingKeywords(
                                        adv_original_id=adv_setting.id,
                                        type='white_list',
@@ -368,7 +373,7 @@ def get_keyword_setting_keyboard(
 ):
     buttons = []
     if keyword.hard_status in [BLACK_LIST, AUTO_MODE, TURN_OFF]:
-        button = [InlineKeyboardButton(text='В белый список',
+        button = [InlineKeyboardButton(text='В продвижение (белый список)',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=WHITE_LIST,
                                            keyword_setting_original_id=keyword.id).pack())]
