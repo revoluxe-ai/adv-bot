@@ -255,7 +255,6 @@ async def add_wb_positions_from_queue_to_db():
 
 
 async def add_wb_positions(text: str, need_nmids: set[int]):
-    pass
     global done_count
     for page in range(1, 100):
         positions = await parser.parse_keywords_from_wb(text, page)
@@ -265,8 +264,6 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
             logger.debug('Записали позиции в Редис')
             for position in positions:
                 need_nmids.discard(position.nmid)
-        else:
-            break
         if not need_nmids:
             break
     else:
