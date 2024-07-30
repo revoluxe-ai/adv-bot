@@ -45,6 +45,8 @@ class AdminsGetAdvByIdFilter(BaseFilter):
     async def __call__(self, message: Message) -> bool:
         user_id = message.from_user.id
         text = message.text
+        if not text:
+            return False
         if text.isdigit() and user_id in [373435337]:
             async with sm() as session:
                 stmt = select(AdvSetting)\
