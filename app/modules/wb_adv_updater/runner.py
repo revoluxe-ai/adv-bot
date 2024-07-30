@@ -35,7 +35,7 @@ class Runner:
         await asyncio.gather(
             self.payment_for_auto_bidder(),
             self.payment_for_parsing_keyword(),
-            self.run_bidder_process(),
+            # self.run_bidder_process(),
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             # self.update_min_ctr_in_global_wb_category_settings(),
