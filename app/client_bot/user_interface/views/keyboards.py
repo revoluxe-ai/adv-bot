@@ -271,6 +271,8 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                 text += f'{first_position}'
         text += f'{turn_on}({hard_status}) {keyword.text}'
 
+        text += f'({keyword.query})'
+
         text += f'({round(keyword.predict_ctr*100, 2)}%)'
 
         text += f"""{"(" + str(keyword.keyword_setting.added_clicks) + ")" if keyword.keyword_setting.added_clicks  else ''}"""
