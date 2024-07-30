@@ -33,7 +33,9 @@ class Runner:
         predicted = RedisEvent(key='predicted')
         await predicted.set()
         await asyncio.gather(
+            self.payment_for_auto_bidder(),
             self.payment_for_parsing_keyword(),
+            self.run_bidder_process(),
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             # self.update_min_ctr_in_global_wb_category_settings(),
@@ -205,7 +207,20 @@ class Runner:
                     logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
             await asyncio.sleep(60 * 60)
 
+    async def payment_for_auto_bidder(self):
+        while True:
+            hours = datetime.datetime.now().hour
+            if 11 < hours < 21:
+                try:
+                    await self._manager.process_payment_for_auto_bidder()
+                except Exception as e:
+                    logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
+            await asyncio.sleep(0)
 
 
 
+
+
+    async def run_bidder_process(self):
+        await self._manager.run_bidder_process()
 
