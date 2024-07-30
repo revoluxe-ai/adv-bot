@@ -329,10 +329,15 @@ class Predictor:
                 keyword_setting = await session.execute(stmt)
                 keyword_setting = keyword_setting.scalar()
             clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
-            clicks = clicks + 1
-            views = views + enough_views
-            baes_ctr = clicks / views
-            predict_ctr = (baes_ctr + predict_ctr) / 2
+            if clicks > 0:
+                real_ctr = clicks / views
+
+            else:
+                clicks = 1
+                views += enough_views
+            real_ctr = clicks / views
+            predict_ctr = (real_ctr + predict_ctr) / 2
+
             await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
         await  asyncio.sleep(0)
         logger.debug('Предсказания обновлены')
