@@ -98,7 +98,7 @@ class ShopChoice(TextWithKeyboard):
 Дополнительные ресурсы:
 🆕 Самая актуальная информация о боте на канале - https://t.me/auto_wb_master
 
-👥 Группа поддержки и обсуждений бота - @wb_adv_master_bot
+👥 Группа поддержки и обсуждений бота - https://t.me/wbgram_disc
 
 📩 Связь с админом: @skyline360_1
 """
