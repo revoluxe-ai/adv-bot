@@ -149,6 +149,8 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
     end_index = start_index + on_page
     loop = asyncio.get_event_loop()
     for adv in adv_settings[start_index:end_index]:
+        if adv.active_status not in ['started', 'pause']:
+            continue
         check_last_24_hours = loop.run_until_complete(redis_manager.check_last_24_hours(adv.id))
         check_text = '✅' if check_last_24_hours else '❓'
         button_text = f'{check_text} {adv.name} (Бот включен)' if adv.bot_active else f'{adv.name} (Бот отключен)'
