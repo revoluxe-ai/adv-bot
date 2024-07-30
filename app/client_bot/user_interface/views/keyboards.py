@@ -72,6 +72,12 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                 callback_data=callbacks.AddWhitePhrases(adv_setting_id=adv_setting.id).pack()))
 
 
+    # отключаю так как история толком не работает
+    # button = InlineKeyboardButton(text='История позиций ключевых слов',
+    #                                 callback_data=callbacks.KeywordPositionHistory(
+    #                                     adv_original_id=adv_setting.id).pack())
+    # builder.row(button)
+
 
     if adv_setting.parsing_active:
         button = InlineKeyboardButton(text='Отключить сбор позиций',
