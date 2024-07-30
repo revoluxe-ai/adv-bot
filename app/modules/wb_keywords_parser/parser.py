@@ -298,11 +298,7 @@ async def parser_all_white_phrase(semaphore):
     tasks_by_text = {}
     while True:
         logger.debug('Получаем фразы для парсинга')
-        try:
-            all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
-        except:
-            logger.error('Ошибка при получении фраз для парсинга', exc_info=True)
-            continue
+        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
                 logger.debug(f'Добавляем фразу {text} в список задач')
@@ -336,6 +332,5 @@ async def reset_from_redis_positions_of_out_index():
             await asyncio.sleep(0)  # Чтобы предотвратить блокировку event loop
 
 
-count_semaphore = 5
+count_semaphore = settings.MAX_THREAD_PARSER
 semaphore = asyncio.Semaphore(count_semaphore)
-

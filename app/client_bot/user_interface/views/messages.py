@@ -1,25 +1,25 @@
 import datetime
+import re
 
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
-from app.modules.common_slaves.wildberries.models import (
-    CommonKeyword, WBItemPosition
-)
+from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from app.utils.db.models import RefLink
+from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
 from aiogram.fsm.context import FSMContext
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
                                                           KeywordSetting, WBCabinet)
 from app.utils import redis_manager
+from app.utils.suffixes import get_day_suffix
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
                                            TextWithImage,
@@ -32,6 +32,8 @@ from aiogram import Bot
 import logging
 
 from typing import TYPE_CHECKING
+
+from ... import const
 
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard
@@ -96,7 +98,7 @@ class ShopChoice(TextWithKeyboard):
 Дополнительные ресурсы:
 🆕 Самая актуальная информация о боте на канале - https://t.me/auto_wb_master
 
-👥 Группа поддержки и обсуждений бота - @wb_adv_master_bot
+👥 Группа поддержки и обсуждений бота - https://t.me/wbgram_disc
 
 📩 Связь с админом: @skyline360_1
 """
@@ -238,6 +240,8 @@ class ShopUpdateInfo(Text):
 
 
 class AdvSettingMenu(TextWithKeyboard):
+    parse_mode = ParseMode.MARKDOWN
+
     def __init__(self, bot: Bot,
                  chat_id: int,
                  wb_user_cabinet: WBUserCabinet,
@@ -276,13 +280,14 @@ class AdvSettingMenu(TextWithKeyboard):
         else:
             max_cpc_text = f'Максимальная стоимость клика: {max_cpc} р.'
 
-        text = (f'Кампания: {self.adv.name}\n'
-                f'ID кампании: {self.adv.adv_id}\n'
-                f'Статус: {self.adv.active_status}\n'
-                f'Минимальный CTR для кампании: {self._min_ctr} %\n'
-                f'Средний CTR по активным ключам за весь период: {self._mean_ctr} %\n'
-                f'Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n'
-                )
+        text = (
+            f'📢 *Кампания:* {self.adv.name}\n'
+            f'🆔 *ID кампании:* {self.adv.adv_id}\n'
+            f'📌 *Статус:* {self.adv.active_status}\n'
+            f'🎯 *Минимальный CTR для кампании:* {self._min_ctr} %\n'
+            f'📈 *Средний CTR по активным ключам за весь период:* {self._mean_ctr} %\n'
+            f'🔢 *Минимальное количество показов для прогноза CTR:* {self.adv.min_views_for_ml_predict}\n'
+        )
         text += f'{max_cpc_text}'
         return text
 
@@ -421,6 +426,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
             self._keywords = clear_keywords
         self.min_ctr = await data_manager.get_min_ctr(self._adv_setting)
+        hide_keywords_is_not_relevant = data.get('hide_keywords_is_not_relevant')
+        self.hide_keywords_is_not_relevant = hide_keywords_is_not_relevant
+
+        if hide_keywords_is_not_relevant:
+            clear_keywords = []
+            for keyword in self._keywords:
+                if keyword.hard_status == 0:
+                    continue
+                clear_keywords.append(keyword)
+            self._keywords = clear_keywords
+
         await super().__call__()
 
     @property
@@ -429,6 +445,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         text = (
                  'Название кампании: ' + str(self._adv_setting.name) + '\n'
+                 f'Статус: {self._adv_setting.active_status}\n'
+                 f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""                                                      
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
                  'Статистика и настройка ключевых слов \n'
                  f'Минимальный CRT для кампании: {round(self.min_ctr*100, 2)}%\n'
@@ -460,10 +478,13 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                        self._filter,
                                                        self._on_page,
                                                        self.min_ctr,
+                                                       self.hide_keywords_is_not_relevant,
                                                        sort_mode=self.sort_mode)
 
 
 class KeywordSettingMessage(TextWithKeyboard):
+    parse_mode = ParseMode.MARKDOWN
+
     def __init__(self, bot: Bot, chat_id: int,
                  keyword_setting_id,
                  last_page: int):
@@ -485,16 +506,37 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._adv_setting = adv_setting
         nmid = adv_setting.nmids[0]
         position: WBItemPosition = await redis_manager.get_keyword_position(keyword_setting.text, nmid)
+        self.position = position
         if position:
-            self.last_full_update = position.timestamp
+            self.last_full_update = position.timestamp.strftime('%d-%m-%Y %H:%M')
         else:
             self.last_full_update = None
+
+        total_clicks, total_views, total_spend = await data_manager.get_keyword_statistic(self._keyword_setting)
+
+        self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
+
+        self.spend = total_spend
+
         return await super().__call__()
 
     @property
     def text(self):
-        text = (f'Статистика и настройка ключевого слова: {self._keyword_setting.text}\n'
-                f'Последнее обновление: {self.last_full_update}\n')
+        keyword_text = self._keyword_setting.text
+        keyword_text  = re.sub(r'([_*[\]()~>`#+\-=|{}.!])', r'\\\1', keyword_text)
+        text = (f'🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n'
+                f'📊 *Фактический CTR:* {self.fact_ctr}%\n'
+                f'💰 *Расход:* {round(self.spend, 2)} руб.\n')
+
+        if self.position:
+            text += (f'🏆 *Органическая позиция:* {self.position.base_position}\n'
+                     f"""🚀 *Буст-позиция:* {self.position.promo_position if self.position.promo_position else "Нет"}\n"""
+                     f'📈 *Фактическая позиция:* {self.position.real_position}\n'
+                     f"""💰 *Ставка на момент сбора данных:* {self.position.cpm if self.position.cpm else "Нет"}\n"""
+                     f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n""")
+        else:
+            text += '📉 *Позиция на Wildberries:* не определена\n'
+
         return text
 
     @property
@@ -637,14 +679,15 @@ class RefProgramSelect(TextWithKeyboard):
 
 
 class ShopMenu(TextWithKeyboard):
+     parse_mode = ParseMode.MARKDOWN
 
-    def __init__(self, bot: Bot, chat_id: int, state: FSMContext, wb_user_cabinet_original_id: int):
+     def __init__(self, bot: Bot, chat_id: int, state: FSMContext, wb_user_cabinet_original_id: int):
        self._state = state
        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
        super().__init__(bot, chat_id)
 
 
-    async def _is_active_adv(self):
+     async def _is_active_adv(self):
         async with _sm() as session:
             stmt = select(AdvSetting)\
                 .where(
@@ -658,10 +701,12 @@ class ShopMenu(TextWithKeyboard):
         else:
             return False
 
-    async def __call__(self):
+     async def __call__(self):
         async with _sm() as session:
             stmt = select(WBUserCabinet)\
-                .options(selectinload(WBUserCabinet.wb_cabinet)).where(
+                .options(selectinload(WBUserCabinet.wb_cabinet),
+                         selectinload(WBUserCabinet.user)\
+                         .selectinload(User.wb_tokens)).where(
                 WBUserCabinet.id == self._wb_user_cabinet_original_id)
             result = await session.execute(stmt)
             self._wb_user_cabinet: WBUserCabinet = result.scalar_one()
@@ -682,35 +727,134 @@ class ShopMenu(TextWithKeyboard):
             bonus = 0
         self._balance = balance
         self._bonus = bonus
+        total_amount_for_day = 0
+        async with _sm() as session:
+            stmt = select(func.count(AdvSetting.id))\
+                .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
+                       AdvSetting.bot_active == True)
+            result = await session.execute(stmt)
+            count_active_advs = result.scalar()
+            if count_active_advs:
+                total_amount_for_day += count_active_advs * const.PRICE_FOR_ADV_FOR_DAY
+            stmt = select(func.count(AdvSetting.id))\
+            .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
+                AdvSetting.parsing_active == True,)
+            result = await session.execute(stmt)
+            count_active_parsing = result.scalar()
+            if count_active_parsing:
+                total_amount_for_day += count_active_parsing * const.PARSING_PRICE
+            stmt = select(func.count(AdvSetting.id)) \
+                .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
+                       AdvSetting.bidder_active == True, )
+            result = await session.execute(stmt)
+            count_auto_bidder = result.scalar()
+            if count_auto_bidder:
+                total_amount_for_day += count_auto_bidder * const.AUTO_BIDDER_PRICE
+
+        self.count_active_advs = count_active_advs
+        self.count_active_parsing = count_active_parsing
+        self.count_auto_bidder = count_auto_bidder
+        self.total_amount_for_day = total_amount_for_day
+        user: User = self._wb_user_cabinet.user
+        tokens: list[WBToken] = user.wb_tokens
+        wb_cabinet: WBCabinet = self._wb_cabinet
+        shops_tokens = [token for token in tokens if token.shop_id == wb_cabinet.shop_id]
+        shops_tokens.sort(key=lambda token:  token.expires, reverse=True)
+        if user.user_telegram_id in [373435337]:
+            expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
+        else:
+            expiration_time = shops_tokens[0].expires
+        if expiration_time < datetime.datetime.now():
+            self.bot.send_message(self.chat_id, 'Срок действия токена истек. Пожалуйста, обновите токен.\n'
+                                                'Для этого добавьте магазин под другим именем с новым токеном')
+            return
+        self.expiration_time = expiration_time
+        self.last_days_for_token = (expiration_time - datetime.datetime.now()).days
         await super().__call__()
 
 
-    @property
-    def text(self):
+     @property
+     def text(self):
         balance = self._balance
+        bonus = self._bonus
+        count_active_advs = self.count_active_advs
+        count_active_parsing = self.count_active_parsing
+        count_auto_bidder = self.count_auto_bidder
+        total_money = balance + bonus
+        total_amount_for_day = self.total_amount_for_day
+        if self.total_amount_for_day:
+            last_for_days = int(total_money / self.total_amount_for_day)
+        else:
+            last_for_days = '∞'
         text = (
-            '===========================================\n'
-            f'Магазин: {self._wb_user_cabinet.name}\n'
-            f'Shop ID: {self._wb_cabinet.shop_id}\n'
-            f'Баланс магазина: {balance} рублей\n'
-            f'Бонусы: {self._bonus} рублей\n'
+            f'📊 **Подключенных к боту кампаний:** {count_active_advs}\n'
+            f'🔍 **Включен парсинг у кампаний:** {count_active_parsing}\n'
+            f'🔧 Включено автоуправление ставкой у кампаний: {count_auto_bidder}\n'
+            f'💸 **Расход в сутки:** {total_amount_for_day} рублей\n'
+            f'⏳ **Срок действия токена:** {self.expiration_time} Истечет через {self.last_days_for_token}\n'
         )
 
-        if self._expiration_time > self._now:
-            text += (f'Тариф магазина оплачен до  {self._expiration_time_str}\n'
-                     f'для доступа далее необходимо будет пополнить баланс')
 
+        if balance == 0 and bonus == 0:
+            text += """
+🎉 Отлично! Вы успешно добавили магазин в систему. 🎉
 
-        elif balance <= 0:
-            text += (f'Для продолжения работы необходимо пополнить баланс\n')
-            if self.is_active_adv:
-                text += 'Есть кампании, которым бот подключен'
+Дальнейшие шаги:
+💳 Теперь вам нужно пополнить баланс для продолжения работы.
 
+Минимальная сумма пополнения - 100 р.
+Стоимость работы 1 кампании в сутки - 35 р.
+Стоимость парсинга ключей кампании (опционально) - 15 р.
+📲 Нажмите на кнопку "Пополнить баланс" ниже.
+
+🔖 Если вам нужен купон для тестирования бота, то запросите у админа - @skyline360_1
+            """
+        elif balance < 0 and bonus == 0:
+            text += ("""
+🚨 Внимание, у магазина отрицательный баланс. 🚨
+
+🔴 Это значит, что все кампании были отключены от бота и не управляются им.
+
+💳 Если вы планируете продолжить работу с ботом, то пополните баланс в ближайшее время.
+
+❓ Если возникли проблемы, то обратитесь к администратору бота - @skyline360_1
+
+🆕 Канал с последними новостями - https://t.me/auto_wb_master
+
+👥 Чат поддержки - https://t.me/wbgram_disc\n
+""")
+        else:
+            if isinstance(last_for_days, int):
+                if last_for_days > 7:
+                    text += (f"""
+💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота. 💰
+                """)
+                elif last_for_days == 0:
+                    text += (f"""
+⚠️ Денег на продление кампаний больше нет! ⚠️
+
+💳 Срочно пополните баланс во избежание проблем с работой кампаний!
+""")
+                else:
+                    text += (f"""
+🚨 Внимание!!! 🚨
+
+💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота.
+
+🔔 Настоятельно рекомендую пополнить счет во избежание проблем с работой кампаний""")
+
+            text += (
+'========================================================\n'
+                f'🏬 Магазин: {self._wb_user_cabinet.name}\n'
+                f'🆔 Shop ID: {self._wb_cabinet.shop_id}\n'
+                f'💰 Баланс магазина: {balance} рублей\n'
+                f'🎁 Бонусы: {self._bonus} рублей\n'
+            )
 
         return text
 
-    @property
-    def keyboard(self):
+     @property
+     def keyboard(self):
         wb_user_cabinet = self._wb_user_cabinet
         wb_cabinet  = self._wb_cabinet
         is_active_adv = self.is_active_adv
@@ -755,36 +899,42 @@ class ShopMenu(TextWithKeyboard):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class OrderSubscribe(Text):
 
     text = "В случае проблем с оплатой свяжитесь с администратором бота @skyline360_1"
 
 
-class NoMainPhotos(Text):
-    def __init__(self,
-                 bot: Bot,
-                 chat_id):
-        super().__init__(bot, chat_id)
+class NoMainPhotos(TextWithKeyboard):
+    parse_mode = None
+
+    async def __call__(self, adv: AdvSetting):
+        self.adv = adv
+        await super().__call__()
+
+    @property
+    def keyboard(self):
+        button = InlineKeyboardButton(
+            text = 'Вернуться к списку магазинов',
+            callback_data = callbacks.Start().pack()
+        )
+        builder = InlineKeyboardBuilder()
+        builder.row(button)
+        return builder.as_markup()
+
 
 
     @property
     def text(self):
-        text = ('Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК')
+        text = ('Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК\n'
+                'Данные кампании: \n'
+                'Название кампании: ' + self.adv.name + '\n'
+                f'ID кампании: {self.adv.adv_id}\n'                                        
+                'Что конкретно нужно сделать:\n'
+                '1. Зайдите в рекламный кабинет на WB - https://cmp.wildberries.ru/\n'
+                '2. Найдите в кабинете эту кампанию\n'
+                '3. Укажите артикул WB (цифровой артикул товара WB - 123456789)\n'
+                '4. Подождите 20-30 минут, пока данные обновятся\n'
+                'Если возникнут проблемы, то напишите разработчику бота @skyline360_1')
         return text
 
 
@@ -1569,7 +1719,7 @@ class WaitingForWhitePhrases(TextWithKeyboard):
     @property
     def text(self):
         return """
-Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список.  
+Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список (фразы для продвижения).  
 Например:
 
 платье женское
@@ -1596,3 +1746,90 @@ class WhitePhrasesAdded(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+class CPMSetting(TextWithKeyboard):
+    async def __call__(self, adv_setting_id):
+        async with _sm() as session:
+            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+            result = await session.execute(stmt)
+            adv_setting = result.scalars().first()
+        self.adv_setting = adv_setting
+        await super().__call__()
+
+    @property
+    def text(self):
+        text = f"""
+Режим управления ставкой: {'Ручной'  if not self.adv_setting.bidder_active else 'Автоматический'}\n\n"""
+        if self.adv_setting.bidder_active:
+            text += f"""{'Целевое место место: ' + str(self.adv_setting.max_place) }\n
+Максимальная ставка: {str(self.adv_setting.max_cpm)}\n"""
+        return text
+
+    @property
+    def keyboard(self):
+        builder = InlineKeyboardBuilder()
+
+        if self.adv_setting.bidder_active:
+
+            bottom = InlineKeyboardButton(text="Установить фиксированную ставку CPM",
+                                          callback_data=callbacks.CPMSettingMenu(
+                                          action = "set_manual_cpm",
+                                          adv_original_id = self.adv_setting.id).pack())
+        else:
+            bottom = InlineKeyboardButton(text="Включить автоматическое управление CPM",
+                                      callback_data=callbacks.CPMSettingMenu(
+                                          action="set_auto_cpm",
+                                          adv_original_id=self.adv_setting.id).pack())
+
+        builder.row(bottom)
+
+        bottom = InlineKeyboardButton(text = 'Изменить ставку (Максимальную ставку)',
+                                      callback_data = callbacks.CPMSettingMenu(
+                                          action = 'set_manual_cpm',
+                                          adv_original_id = self.adv_setting.id).pack())
+
+        builder.row(bottom)
+
+
+        if self.adv_setting.bidder_active:
+            bottom = InlineKeyboardButton(text="Изменить целевую позицию",
+                                          callback_data=callbacks.CPMSettingMenu(
+                                          action = "set_max_position",
+                                          adv_original_id = self.adv_setting.id).pack())
+            builder.row(bottom)
+
+
+
+        bottom = InlineKeyboardButton(text='К настройкам АРК',
+                                         callback_data=callbacks.Adv(
+                                                adv_original_id=self.adv_setting.id).pack())
+        builder.row(bottom)
+
+
+        return builder.as_markup()
+
+
+class AutoCPMSettingGetMinPosition(Text):
+
+    async def __call__(self, adv_setting_id: int):
+        async with _sm() as session:
+            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+            result = await session.execute(stmt)
+            adv_setting = result.scalars().first()
+        self.adv_setting = adv_setting
+        await super().__call__()
+
+    @property
+    def text(self):
+        text = """
+Введите позицию, которую вы хотите занимать в топе:
+        """
+        return text
+
+
+class AutoCPMSettingGetMaxCPM(Text):
+    text = """Укажите максимальную ставку:"""
+
+
+class ManualCPMSetting(Text):
+    text = """Укажите ставку (целое число от 125):"""

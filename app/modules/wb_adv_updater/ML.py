@@ -24,6 +24,7 @@ from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
 from . import data_manager
 from .data_manager import DataGetter
 from ...exc import CardNotFoundInDB
+from ...utils import redis_manager
 from ...utils.redis_manager import RedisEvent
 
 sm = get_async_session_maker
@@ -115,19 +116,22 @@ class Fitter(AbcManager):
             status = adv_id_keyword_text_to_status[(adv_id, row['keyword'])]
             if status == 0:
                 return 0
+            elif status in [2, 3]:
+                return 1
             else:
-                min_ctr = adv_id_to_min_ctr[adv_id]
-                if min_ctr > 0:
-                     enough_views = self._get_enough_views(min_ctr)
-                else:
-                    if views > 0:
-                        return clicks / views
+                if clicks == 0:
+                    min_ctr = adv_id_to_min_ctr[adv_id]
+                    if min_ctr > 0:
+                         enough_views = self._get_enough_views(min_ctr)
                     else:
-                        return 0
-                clicks = clicks + 1
-                views = views + enough_views
-                ctr = clicks / views
-                return ctr
+                         return clicks / views
+
+                    clicks = clicks + 1
+                    views = views + enough_views
+                    ctr = clicks / views
+                    return ctr
+                else:
+                    return clicks / views
         # Предположим, что adv_id_to_min_ctr - это ваш словарь с минимальными CTR для каждого adv_id
         df['ctr'] = df.apply(calculate_ctr, axis=1)
         return df
@@ -305,32 +309,38 @@ class Predictor:
                     AdvSetting.active_status == 'started')
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
-
+        adv_id_to_adv_setting = {adv.adv_id: adv for adv in all_adv_settings}
         await predicted.clear()
 
         df_for_predict = await self._get_df_for_predict(all_adv_settings)
         predict_df = await asyncio.to_thread(self._predict, df_for_predict)
         predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
         await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
-        async with sm() as session:
-            for n, row in predict_df.iterrows():
-                adv_id = row['adv_id']
-                keyword = row['keyword']
-                predict_ctr = row['predicted_ctr']
-                stmt = select(KeywordSetting).join(
-                    AdvSetting, KeywordSetting.adv_setting
-                ).filter(
-                    and_(
-                        KeywordSetting.text == keyword,
-                        AdvSetting.adv_id == adv_id  # Используйте AdvSetting.adv_id напрямую
-                    )
-                )
-                result = await session.execute(stmt)
-                keyword_setting = result.scalar()
-                keyword_setting.predict_ctr = predict_ctr
-            await session.commit()
-            await  asyncio.sleep(1)
-            logger.debug('Предсказания обновлены')
+        for n, row in predict_df.iterrows():
+            adv_id = row['adv_id']
+            keyword = row['keyword']
+            predict_ctr = row['predicted_ctr']
+            adv = adv_id_to_adv_setting[adv_id]
+            min_ctr = await data_manager.get_min_ctr(adv)
+            enough_views = int(1/min_ctr)
+            async with sm() as session:
+                stmt = select(KeywordSetting).where(and_(KeywordSetting.adv_setting_id == adv.id,
+                                                            KeywordSetting.text == keyword))
+                keyword_setting = await session.execute(stmt)
+                keyword_setting = keyword_setting.scalar()
+            clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
+            if clicks > 0:
+                real_ctr = clicks / views
+
+            else:
+                clicks = 1
+                views += enough_views
+            real_ctr = clicks / views
+            predict_ctr = (real_ctr + predict_ctr) / 2
+
+            await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+        await  asyncio.sleep(0)
+        logger.debug('Предсказания обновлены')
 
 
 

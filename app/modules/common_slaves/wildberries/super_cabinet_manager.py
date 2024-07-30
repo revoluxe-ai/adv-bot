@@ -45,56 +45,56 @@ async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> ty
                                           .selectinload(User.wb_tokens))\
         .where(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
                    WBCabinet.balance > 0,
-                   WBCabinet.bonus > 0),)
+                   WBCabinet.bonus > 0))
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
-        for wb_cabinet in wb_cabinets:
-            wb_user_cabinets = wb_cabinet.wb_user_cabinets
-            shop_id = wb_cabinet.shop_id
-            tokens_for_wb_cabinet: list[WBToken] = []
-            for wb_user_cabinet in wb_user_cabinets:
-                user = wb_user_cabinet.user
-                tokens: list[WBToken] = user.wb_tokens
-                users_live_tokens = []
-                for token in tokens:
-                    if not token.active:
-                        continue
-                    try:
-                        token_shop_id = token.shop_id# Используйте total_clicks для суммы кликов
-                    except exceptions.TokenExpiredError:
-                        logger.error('Срок действия токена истек')
-                        continue
-                    if token_shop_id != shop_id:
-                        continue
-                    try:
-                        await api_rights.check_token(token)
-                        users_live_tokens.append(token)
-                    except ApiForbiddenError as exc:
-                        logger.debug(exc)
-                        token.active = False
-                        await session.commit()
-                        continue
+    for wb_cabinet in wb_cabinets:
+        wb_user_cabinets = wb_cabinet.wb_user_cabinets
+        shop_id = wb_cabinet.shop_id
+        tokens_for_wb_cabinet: list[WBToken] = []
+        for wb_user_cabinet in wb_user_cabinets:
+            user = wb_user_cabinet.user
+            tokens: list[WBToken] = user.wb_tokens
+            users_live_tokens = []
+            for token in tokens:
+                if not token.active:
+                    continue
+                try:
+                    token_shop_id = token.shop_id# Используйте total_clicks для суммы кликов
+                except exceptions.TokenExpiredError:
+                    logger.error('Срок действия токена истек')
+                    continue
+                if token_shop_id != shop_id:
+                    continue
+                try:
+                    await api_rights.check_token(token)
+                    users_live_tokens.append(token)
+                except ApiForbiddenError as exc:
+                    logger.debug(exc)
+                    token.active = False
+                    await session.commit()
+                    continue
 
-                    except UnknownApiRequestError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    except aiohttp.client_exceptions.ServerDisconnectedError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    except aiohttp.client_exceptions.ClientOSError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    finally:
-                        await asyncio.sleep(1)
-                tokens_for_wb_cabinet.extend(users_live_tokens)
+                except UnknownApiRequestError as e:
+                    logger.error(e)
+                    users_live_tokens.append(token)
+                except aiohttp.client_exceptions.ServerDisconnectedError as e:
+                    logger.error(e)
+                    users_live_tokens.append(token)
+                except aiohttp.client_exceptions.ClientOSError as e:
+                    logger.error(e)
+                    users_live_tokens.append(token)
+                finally:
+                    await asyncio.sleep(1)
+            tokens_for_wb_cabinet.extend(users_live_tokens)
 
-            if tokens_for_wb_cabinet:
-                access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
-                                     wb_user_cabinet = None,
-                                     wb_cabinet = wb_cabinet)
-                yield access
-
+        if tokens_for_wb_cabinet:
+            access = WBCabinetAccess(tokens = tokens_for_wb_cabinet,
+                                 wb_user_cabinet = None,
+                                 wb_cabinet = wb_cabinet)
+            yield access
+    return
 
 
 async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCabinetAccess:

@@ -127,3 +127,8 @@ class TurnParsing(CallbackData, prefix="turn_parsing"):
     action: str
     adv_original_id: int
     wb_user_cabinet_original_id: int
+
+
+class CPMSettingMenu(CallbackData, prefix="cpm_setting"):
+    action: str
+    adv_original_id: int

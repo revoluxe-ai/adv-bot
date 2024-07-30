@@ -173,3 +173,18 @@ async def set_position_to_out_index(position):
     position_out_index.nmid = position.nmid
     position_out_index.cpm = None
     await add_positions_to_redis([position_out_index])
+
+
+async def set_predict_ctr(adv_id, keyword, predict_ctr):
+    key = f'predict_ctr:{adv_id}:{keyword}'
+    await redis_client.set(key, predict_ctr)
+
+
+async def get_predict_ctr(adv_id, keyword):
+    key = f'predict_ctr:{adv_id}:{keyword}'
+    predict_ctr_bytes = await redis_client.get(key)
+    if predict_ctr_bytes is None:
+        return None
+    predict_ctr_str = predict_ctr_bytes.decode('utf-8')
+    predict_ctr = float(predict_ctr_str)
+    return predict_ctr

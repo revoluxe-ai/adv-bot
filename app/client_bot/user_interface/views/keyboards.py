@@ -61,12 +61,22 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
     builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
                                                                       type='by_adv').pack()))
-    builder.row(InlineKeyboardButton(text='Добавить фразы в белый список',
-                                callback_data=callbacks.AddWhitePhrases(adv_setting_id=adv_setting.id).pack()))
-    button = InlineKeyboardButton(text='История позиций ключевых слов',
-                                    callback_data=callbacks.KeywordPositionHistory(
+    button = InlineKeyboardButton(text='Управление ставкой',
+                                        callback_data=callbacks.CPMSettingMenu(
+                                        action='to_cpm_setting_page',
                                         adv_original_id=adv_setting.id).pack())
     builder.row(button)
+
+
+    builder.row(InlineKeyboardButton(text='Добавить фразы в продвижение (Белый список)',
+                                callback_data=callbacks.AddWhitePhrases(adv_setting_id=adv_setting.id).pack()))
+
+
+    # отключаю так как история толком не работает
+    # button = InlineKeyboardButton(text='История позиций ключевых слов',
+    #                                 callback_data=callbacks.KeywordPositionHistory(
+    #                                     adv_original_id=adv_setting.id).pack())
+    # builder.row(button)
 
 
     if adv_setting.parsing_active:
@@ -144,6 +154,8 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
     end_index = start_index + on_page
     loop = asyncio.get_event_loop()
     for adv in adv_settings[start_index:end_index]:
+        if adv.active_status not in ['started', 'pause']:
+            continue
         check_last_24_hours = loop.run_until_complete(redis_manager.check_last_24_hours(adv.id))
         check_text = '✅' if check_last_24_hours else '❓'
         button_text = f'{check_text} {adv.name} (Бот включен)' if adv.bot_active else f'{adv.name} (Бот отключен)'
@@ -214,6 +226,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                   return_from_filter_bottom: bool,
                                   on_page,
                                   min_ctr,
+                                  hide_keywords_is_not_relevant,
                                   sort_mode = 'default'):
 
     min_ctr = min_ctr
@@ -270,6 +283,8 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                 text += f'{first_position}'
         text += f'{turn_on}({hard_status}) {keyword.text}'
 
+        text += f'({keyword.query})'
+
         text += f'({round(keyword.predict_ctr*100, 2)}%)'
 
         text += f"""{"(" + str(keyword.keyword_setting.added_clicks) + ")" if keyword.keyword_setting.added_clicks  else ''}"""
@@ -305,7 +320,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                                 adv_original_id=adv_setting.id,
                                                 type='by_adv',
                                                 page=next_page).pack())])
-    bottom = [InlineKeyboardButton(text='Показать белый список',
+    bottom = [InlineKeyboardButton(text='Показать фразы для продвижения (белый список)',
                                    callback_data=callbacks.SettingKeywords(
                                        adv_original_id=adv_setting.id,
                                        type='white_list',
@@ -317,6 +332,21 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                        adv_original_id=adv_setting.id,
                                        type='active_keywords',
                                        page=page).pack())]
+    bottoms.append(bottom)
+
+    if not hide_keywords_is_not_relevant:
+        bottom = [InlineKeyboardButton(text='Скрыть не релевантные фразы',
+                                          callback_data=callbacks.SettingKeywords(
+                                            adv_original_id=adv_setting.id,
+                                            type='hide_keywords_is_not_relevant',
+                                            page=page).pack())]
+    else:
+        bottom = [InlineKeyboardButton(text='Показывать не релевантные фразы',
+                                      callback_data=callbacks.SettingKeywords(
+                                          adv_original_id=adv_setting.id,
+                                          type='show_keywords_is_not_relevant',
+                                          page=page).pack())]
+
     bottoms.append(bottom)
 
 
@@ -351,7 +381,7 @@ def get_keyword_setting_keyboard(
 ):
     buttons = []
     if keyword.hard_status in [BLACK_LIST, AUTO_MODE, TURN_OFF]:
-        button = [InlineKeyboardButton(text='В белый список',
+        button = [InlineKeyboardButton(text='В продвижение (белый список)',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=WHITE_LIST,
                                            keyword_setting_original_id=keyword.id).pack())]

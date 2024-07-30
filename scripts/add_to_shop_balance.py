@@ -3,9 +3,9 @@ from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-shop_id = 'ab71abdd-0295-46e0-800f-beab07958883'
-add_balance = 500
-add_bonus =  add_balance*2
+shop_id =
+add_balance =
+add_bonus =
 
 async def add_balance_and_bonus():
     async with sm() as session:
