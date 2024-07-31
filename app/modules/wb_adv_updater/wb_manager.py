@@ -148,9 +148,8 @@ class Manager(AbcManager):
                                         adv_setting: AdvSetting,
                                         session):
         adv_setting_original_id = adv_setting.id
-            # Проверяем наличие записи в KeywordSetting
-        stmt = select(KeywordSetting)\
-            .filter(
+        # Проверяем наличие записи в KeywordSetting
+        stmt = select(KeywordSetting).filter(
             KeywordSetting.text == keyword_stat.text,
             KeywordSetting.adv_setting_id == adv_setting_original_id
         )
@@ -164,16 +163,18 @@ class Manager(AbcManager):
                 adv_setting_id=adv_setting_original_id
             )
             session.add(keyword_setting)
-            await session.commit()  # Коммит для получения ID новой записи
-            await session.refresh(keyword_setting)  # Обновляем объект, чтобы получить ID
+            try:
+                await session.commit()  # Коммит для получения ID новой записи
+                await session.refresh(keyword_setting)  # Обновляем объект, чтобы получить ID
+            except Exception as e:
+                await session.rollback()
+                raise e  # Обработка исключения
 
         # Проверяем наличие записи в AdvKeyword
         stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting)).filter(
-            and_(
-                AdvKeyword.text == keyword_stat.text,
-                AdvKeyword.date == keyword_stat.date,
-                AdvKeyword.adv_setting_id == adv_setting_original_id
-            )
+            AdvKeyword.text == keyword_stat.text,
+            AdvKeyword.date == keyword_stat.date,
+            AdvKeyword.adv_setting_id == adv_setting_original_id
         ).order_by(AdvKeyword.date.desc())
         result = await session.execute(stmt)
         keyword_db = result.scalar()
@@ -190,20 +191,30 @@ class Manager(AbcManager):
                 spend=keyword_stat.spend
             )
             session.add(keyword_db)
-            await session.commit()
+            try:
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                raise e  # Обработка исключения
         else:
             # Если запись существует, проверяем и обновляем данные
+            updated = False
             if not keyword_db.keyword_setting:
                 keyword_db.keyword_setting = keyword_setting
-                await session.commit()
+                updated = True
             if any([keyword_db.views != keyword_stat.views, keyword_db.clicks != keyword_stat.clicks]):
                 keyword_db.views = keyword_stat.views
                 keyword_db.clicks = keyword_stat.clicks
                 keyword_db.spend = keyword_stat.spend
-                await session.commit()
+                updated = True
+
+            if updated:
+                try:
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    raise e  # Обработка исключения
         return
-
-
 
     async def keyword_stat_updater(self, adv_setting_id, wb_api, semaphore):
         async with sm(semaphore) as session:

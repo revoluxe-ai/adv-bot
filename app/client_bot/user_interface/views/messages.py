@@ -792,7 +792,7 @@ class ShopMenu(TextWithKeyboard):
             f'🔧 *Включено автоуправление ставкой у кампаний*: {count_auto_bidder}\n'
             f'💸 *Расход в сутки*: {total_amount_for_day} рублей\n'
             f'⏳ *Срок действия токена*: {self.expiration_time}\n'
-            f'*Истечет через* {self.last_days_for_token}\n'
+            f'*Истечет через* {get_day_suffix(self.last_days_for_token)}\n'
         )
 
 
