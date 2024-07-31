@@ -843,13 +843,13 @@ class ShopMenu(TextWithKeyboard):
 
 🔔 Настоятельно рекомендую пополнить счет во избежание проблем с работой кампаний""")
 
-            text += (
+        text += (
 '===================================\n'
-                f'🏬 Магазин: {self._wb_user_cabinet.name}\n'
-                f'🆔 Shop ID: {self._wb_cabinet.shop_id}\n'
-                f'💰 Баланс магазина: {balance} рублей\n'
-                f'🎁 Бонусы: {self._bonus} рублей\n'
-            )
+            f'🏬 Магазин: {self._wb_user_cabinet.name}\n'
+            f'🆔 Shop ID: {self._wb_cabinet.shop_id}\n'
+            f'💰 Баланс магазина: {balance} рублей\n'
+            f'🎁 Бонусы: {self._bonus} рублей\n'
+        )
 
         return text
 
