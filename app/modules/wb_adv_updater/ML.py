@@ -329,10 +329,7 @@ class Predictor:
                 keyword_setting = await session.execute(stmt)
                 keyword_setting = keyword_setting.scalar()
             clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
-            if clicks > 0:
-                real_ctr = clicks / views
-
-            else:
+            if clicks == 0:
                 clicks = 1
                 views += enough_views
             real_ctr = clicks / views
