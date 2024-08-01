@@ -896,22 +896,27 @@ class Manager(AbcManager):
             if not position:
                 continue
             cpm_from_parsing: int = position.cpm
+            if not cpm_from_parsing:
+                continue
             promo_position = position.promo_position
             if not promo_position:
                 continue
             promo_positions.append(promo_position)
-        fact_max_position: int = max(promo_positions)
-        if fact_max_position < max_position_for_adv:
-            new_cpm = cpm_from_parsing - 1
-        elif fact_max_position > max_position_for_adv:
-            new_cpm = cpm_from_parsing + 1
+        if promo_positions:
+            fact_max_position: int = max(promo_positions)
+            if fact_max_position == 1:
+                new_cpm = cpm_from_parsing - 1
+            elif fact_max_position < max_position_for_adv:
+                new_cpm = cpm_from_parsing - 1
+            elif fact_max_position > max_position_for_adv:
+                new_cpm = cpm_from_parsing + 1
 
-        if new_cpm > max_cpm:
-            new_cpm = max_cpm
-        elif new_cpm < 125:
-            new_cpm = 125
-        if new_cpm != cpm_from_parsing:
-           await wb_api.advert.update_cpm(adv_id, new_cpm)
+            if new_cpm > max_cpm:
+                new_cpm = max_cpm
+            elif new_cpm < 125:
+                new_cpm = 125
+            if new_cpm != cpm_from_parsing:
+               await wb_api.advert.update_cpm(adv_id, new_cpm)
 
 
 
