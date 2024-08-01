@@ -48,7 +48,7 @@ class Runner:
     async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: RedisEvent):
         while True:
              logger.debug('Ожидание разрешения обновления ключей')
-             await update_model_on_new_features.wait()
+             # await update_model_on_new_features.wait()
              logger.debug('Блокировка снята')
              await self._manager.update_predict_ctr(predicted)
              await asyncio.sleep(1)
