@@ -887,10 +887,10 @@ class ShopMenu(TextWithKeyboard):
 
         if is_active_adv:
             button = InlineKeyboardButton(
-        text = 'Отключить все кампании',
-        callback_data = callbacks.TurnBot(action='off_all',
-                                          wb_user_cabinet_original_id=wb_user_cabinet.id).pack())
-        builder.row(button)
+            text = 'Отключить все кампании',
+            callback_data = callbacks.TurnBot(action='off_all',
+                                              wb_user_cabinet_original_id=wb_user_cabinet.id).pack())
+            builder.row(button)
         button = InlineKeyboardButton(text='Вернуться к списку магазинов',
         callback_data = callbacks.Start().pack())
         builder.row(button)
