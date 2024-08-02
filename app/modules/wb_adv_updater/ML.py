@@ -6,6 +6,7 @@ from ast import literal_eval
 import joblib
 import xgboost
 
+from ..common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from ..common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from ... import settings
 from app.admin_bot.sender import sender_manager
@@ -194,7 +195,7 @@ class Fitter(AbcManager):
                 logger.debug(f"Не удалось получить категорию РК {exc}")
                 await asyncio.sleep(0)
                 continue
-            keyword_stats = await data_manager.get_keywords_statistic(adv, None)
+            keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
             keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
 
             if not adv.nmids:
@@ -300,7 +301,32 @@ class Predictor:
         df['predicted_ctr'] = y
         return df
 
-    async def predict_ctr_for_keywords(self,  predicted: RedisEvent):
+
+    @staticmethod
+    async def __update_predict_ctr(keyword_setting, predict_df, min_ctr):
+            adv_id = keyword_setting.adv_setting.adv_id
+            keyword = keyword_setting.text
+            if not keyword:
+                return
+            row = predict_df[(predict_df['adv_id'] == adv_id) & (predict_df['keyword'] == keyword)]
+            if row.empty:
+                return
+            predict_ctr = float(row['predicted_ctr'].values[0])
+            result = await data_manager.get_keyword_statistic_clickhouse(keyword_setting, adv_id)
+            clicks, views, _ = result
+            if clicks == 0:
+                clicks = 1
+                enough_views = int(1 / min_ctr)
+                views += enough_views
+            real_ctr = clicks / views
+            predict_ctr = (real_ctr + predict_ctr) / 2
+            # Создаем задачи для асинхронного обновления Redis
+            await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+
+
+
+
+    async def predict_ctr_for_keywords(self):
         async with sm() as session:
             stmt = select(AdvSetting).options(
                 selectinload(AdvSetting.adv_keywords),
@@ -309,38 +335,71 @@ class Predictor:
                     AdvSetting.active_status == 'started')
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
-        adv_id_to_adv_setting = {adv.adv_id: adv for adv in all_adv_settings}
-        await predicted.clear()
 
         df_for_predict = await self._get_df_for_predict(all_adv_settings)
         predict_df = await asyncio.to_thread(self._predict, df_for_predict)
         predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
         await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
-        for n, row in predict_df.iterrows():
-            adv_id = row['adv_id']
-            keyword = row['keyword']
-            predict_ctr = row['predicted_ctr']
-            adv = adv_id_to_adv_setting[adv_id]
-            min_ctr = await data_manager.get_min_ctr(adv)
-            enough_views = int(1/min_ctr)
-            async with sm() as session:
-                stmt = select(KeywordSetting).where(and_(KeywordSetting.adv_setting_id == adv.id,
-                                                            KeywordSetting.text == keyword))
-                keyword_setting = await session.execute(stmt)
-                keyword_setting = keyword_setting.scalar()
-            clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
-            if clicks == 0:
-                clicks = 1
-                views += enough_views
-            real_ctr = clicks / views
-            predict_ctr = (real_ctr + predict_ctr) / 2
+        # predict_df = pd.read_csv('work_folder/предсказания.csv')
+        async with sm() as session:
+            stmt = select(KeywordSetting)\
+                .join(KeywordSetting.adv_setting)\
+                .options(selectinload(KeywordSetting.adv_setting))\
+                .where(AdvSetting.bot_active == True,
+                       AdvSetting.active_status == 'started')
+            result = await session.execute(stmt)
+            keyword_settings = result.scalars().all()
 
-            await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
-        await  asyncio.sleep(0)
+        adv_ad_to_min_ctr = {}
+
+        tasks = []
+        for keyword_setting in keyword_settings:
+            adv = keyword_setting.adv_setting
+            adv_id = adv.adv_id
+            if not adv_id in adv_ad_to_min_ctr:
+                adv_ad_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
+            min_ctr = adv_ad_to_min_ctr[adv_id]
+            # try:
+            #     await update_predict_ctr(keyword_setting)
+            #     logger.debug(f'Предсказание для ключевого слова {keyword_setting.text} в кампании {keyword_setting.adv_setting.name} обновлено')
+            # except Exception as exc:
+            #     logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
+            #     pass
+            task = asyncio.create_task(self.__update_predict_ctr(keyword_setting, predict_df, min_ctr))
+            tasks.append(task)
+            await asyncio.sleep(0)
+
+        part = 100
+        for i in range(0, len(tasks), part):
+            excs = await asyncio.gather(*tasks[i:i + part], return_exceptions=True)
+            await asyncio.sleep(0)
+            for ecv in excs:
+                if ecv:
+                    logger.error(ecv)
+
+
         logger.debug('Предсказания обновлены')
 
 
 
+    # async def __write_predict_ctr_to_redis(self, adv, keyword, predict_ctr):
+    #     logger.debug(f'Обновление предсказания для ключевого слова {keyword} в кампании {adv.name}')
+    #     min_ctr = await data_manager.get_min_ctr(adv)
+    #     enough_views = int(1 / min_ctr)
+    #     async with sm() as session:
+    #         stmt = select(KeywordSetting).where(and_(KeywordSetting.adv_setting_id == adv.id,
+    #                                                  KeywordSetting.text == keyword))
+    #         keyword_setting = await session.execute(stmt)
+    #         keyword_setting = keyword_setting.scalar()
+    #     clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
+    #     if clicks == 0:
+    #         clicks = 1
+    #         views += enough_views
+    #     real_ctr = clicks / views
+    #     predict_ctr = (real_ctr + predict_ctr) / 2
+    #     adv_id = adv.adv_id
+    #     await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+    #     logger.debug(f'Предсказание для ключевого слова {keyword} в кампании {adv.name} обновлено')
 
 
 
