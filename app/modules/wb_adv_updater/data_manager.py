@@ -118,36 +118,33 @@ async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[Lis
 
 def _build_clickhouse_query(adv_id: int,  pass_time: Optional[timedelta]) -> tuple[str, list]:
     query = f"""
-           SELECT
-               text,
-               COALESCE(SUM(total_clicks), 0) AS total_clicks,
-               COALESCE(SUM(total_views), 0) AS total_views,
-               COALESCE(SUM(total_spend), 0) AS total_spend
-           FROM (
-               SELECT
-                   text,
-                   clicks AS total_clicks,
-                   views AS total_views,
-                   spend AS total_spend
-               FROM
-                   default_db.advkeyword
-               WHERE
-                   adv_id = {adv_id}
-                   AND (text, date, version) IN (
-                       SELECT
-                           text,
-                           date,
-                           MAX(version) AS version
-                       FROM
-                           default_db.advkeyword
-                       WHERE
-                           adv_id = {adv_id}
-                       GROUP BY
-                           text,
-                           date
-                   )
-           ) AS latest_records
-       """
+          SELECT
+              text,
+              COALESCE(SUM(total_clicks), 0) AS total_clicks,
+              COALESCE(SUM(total_views), 0) AS total_views,
+              COALESCE(SUM(total_spend), 0) AS total_spend
+          FROM (
+              SELECT
+                  text,
+                  clicks AS total_clicks,
+                  views AS total_views,
+                  spend AS total_spend
+              FROM
+                  default_db.advkeyword
+              WHERE
+                  adv_id = {adv_id}
+                  AND (text, date, version) IN (
+                      SELECT
+                          text, date, MAX(version) AS version
+                      FROM
+                          default_db.advkeyword
+                      WHERE
+                          adv_id = {adv_id}
+                      GROUP BY
+                          text, date
+                  )
+          ) AS latest_records
+      """
     if pass_time:
         start_time = datetime.now() - pass_time
         query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
@@ -161,10 +158,11 @@ def _build_clickhouse_query(adv_id: int,  pass_time: Optional[timedelta]) -> tup
 async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
                                            adv_id: int,
                                            pass_days: Union[int, None] = None) -> tuple[int, int, int]:
-    # Подключение к клиенту ClickHouse
+
     client = await get_clickhouse_client()
     today = datetime.now().date()
-    # Создание SQL-запроса
+    text = keyword_setting.text
+    text = text.replace("'", r"\'")
     query = f"""
         SELECT
             COALESCE(SUM(total_clicks), 0) AS total_clicks,
@@ -179,7 +177,7 @@ async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
                 default_db.advkeyword
             WHERE
                 adv_id = {adv_id}
-                AND text = '{keyword_setting.text}'
+                AND text = '{text}'
                 AND (text, date, version) IN (
                     SELECT
                         text,
