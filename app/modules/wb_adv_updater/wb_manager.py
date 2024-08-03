@@ -885,6 +885,9 @@ class Manager(AbcManager):
         nmid_in_adv = adv_setting.nmids[0]
         promo_positions = []
         for keyword in white_adv_keywords:
+            clicks, _, _= await data_manager.get_keyword_statistic_clickhouse(keyword, adv_id)
+            if clicks == 0:
+                continue
             await parser.add_wb_positions(keyword.text, {nmid_in_adv})
             position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
             if not position:
