@@ -67,12 +67,11 @@ async def get_keywords_statistic_clickhouse(
         hard_statuses: Optional[List[int]] = None,
         cache_timeout: int = 60 * 15
 ) -> List[CalculatedKeyword]:
-
+    ch_client = await get_clickhouse_client()
     try:
         keyword_settings = await _get_keyword_settings(adv_setting.id, hard_statuses)
         if not keyword_settings:
             return []
-        ch_client = await get_clickhouse_client()
         query = _build_clickhouse_query(adv_setting.adv_id, pass_time)
         result = await ch_client.query(query)
         rows = result.result_rows
@@ -112,6 +111,8 @@ async def get_keywords_statistic_clickhouse(
     except Exception as e:
         logger.error(f"Error in get_keywords_statistic_clickhouse: {e}")
         raise
+    finally:
+        ch_client.close()
 
 
 async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[List[int]]) -> List[KeywordSetting]:
@@ -167,61 +168,67 @@ async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
                                            pass_days: Union[int, None] = None) -> tuple[int, int, int]:
 
     client = await get_clickhouse_client()
-    today = datetime.now().date()
-    text = keyword_setting.text
-    text = text.replace("'", r"\'")
-    query = f"""
-        SELECT
-            COALESCE(SUM(total_clicks), 0) AS total_clicks,
-            COALESCE(SUM(total_views), 0) AS total_views,
-            COALESCE(SUM(total_spend), 0) AS total_spend
-        FROM (
+    try:
+        today = datetime.now().date()
+        text = keyword_setting.text
+        text = text.replace("'", r"\'")
+        query = f"""
             SELECT
-                clicks AS total_clicks,
-                views AS total_views,
-                spend AS total_spend
-            FROM
-                default_db.advkeyword
-            WHERE
-                adv_id = {adv_id}
-                AND text = '{text}'
-                AND (text, date, version) IN (
-                    SELECT
-                        text,
-                        date,
-                        MAX(version) AS version
-                    FROM
-                        default_db.advkeyword
-                    WHERE
-                        adv_id = {adv_id}
-                        AND text = '{keyword_setting.text}'
-                    GROUP BY
-                        text,
-                        date
-                )
-        ) AS latest_records
-    """
+                COALESCE(SUM(total_clicks), 0) AS total_clicks,
+                COALESCE(SUM(total_views), 0) AS total_views,
+                COALESCE(SUM(total_spend), 0) AS total_spend
+            FROM (
+                SELECT
+                    clicks AS total_clicks,
+                    views AS total_views,
+                    spend AS total_spend
+                FROM
+                    default_db.advkeyword
+                WHERE
+                    adv_id = {adv_id}
+                    AND text = '{text}'
+                    AND (text, date, version) IN (
+                        SELECT
+                            text,
+                            date,
+                            MAX(version) AS version
+                        FROM
+                            default_db.advkeyword
+                        WHERE
+                            adv_id = {adv_id}
+                            AND text = '{keyword_setting.text}'
+                        GROUP BY
+                            text,
+                            date
+                    )
+            ) AS latest_records
+        """
 
-    # Добавление условия для фильтрации по дате, если указано количество дней
-    if pass_days:
-        start_date = today - timedelta(days=pass_days)
-        query += f" AND date >= '{start_date}'"
+        # Добавление условия для фильтрации по дате, если указано количество дней
+        if pass_days:
+            start_date = today - timedelta(days=pass_days)
+            query += f" AND date >= '{start_date}'"
 
-    # Выполнение запроса
-    result = await client.query(query)
+        # Выполнение запроса
+        result = await client.query(query)
 
-    # Проверка наличия результатов
-    if not result.result_rows:
-        logger.warning("No results found for the query.")
-        return 0, 0, 0
+        # Проверка наличия результатов
+        if not result.result_rows:
+            logger.warning("No results found for the query.")
+            return 0, 0, 0
 
-    total_clicks, total_views, total_spend = result.result_rows[0]
+        total_clicks, total_views, total_spend = result.result_rows[0]
 
-    # Коррекция значений, если количество кликов больше количества просмотров
-    if total_clicks > total_views:
-        total_views = total_clicks
+        # Коррекция значений, если количество кликов больше количества просмотров
+        if total_clicks > total_views:
+            total_views = total_clicks
 
-    return total_clicks, total_views, total_spend
+        return total_clicks, total_views, total_spend
+    except Exception as exc:
+        logger.error(f"An error occurred while getting keyword statistic: {exc}")
+        raise
+    finally:
+        client.close()
 
 
 
@@ -803,9 +810,9 @@ async def get_min_ctr(adv: AdvSetting):
                 """
 
         client = await get_clickhouse_client()
-
         result = await client.query(query)
         rows = result.result_rows
+        client.close()
         text_to_real_ctr = {row[0]: row[1] for row in rows}
         real_ctrs  = []
         predict_ctrs = []
