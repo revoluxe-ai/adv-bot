@@ -886,22 +886,22 @@ class Manager(AbcManager):
         promo_positions = []
         cpm_from_parsing = None
         for keyword in white_adv_keywords:
-            clicks, _, _= await data_manager.get_keyword_statistic_clickhouse(keyword, adv_id)
-            if clicks == 0:
+            _, views, _= await data_manager.get_keyword_statistic_clickhouse(keyword, adv_id)
+            if views == 0:
                 continue
             await parser.add_wb_positions(keyword.text, {nmid_in_adv})
             position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
             if not position:
                 continue
-            cpm_from_parsing: int = position.cpm
-            if not cpm_from_parsing:
-                continue
             promo_position = position.promo_position
-            if not promo_position:
+            base_position = position.base_position
+            if not promo_position and base_position:
+                logger.debug('Нет буста')
                 continue
             promo_positions.append(promo_position)
-        if not cpm_from_parsing:
-            cpm_from_parsing = 125
+            cpm_from_parsing: int = position.cpm
+            if not cpm_from_parsing:
+                cpm_from_parsing = 125
         if promo_positions:
             fact_max_position: int = max(promo_positions)
             if fact_max_position == 1:
@@ -909,8 +909,6 @@ class Manager(AbcManager):
             elif fact_max_position < max_position_for_adv:
                 new_cpm = cpm_from_parsing - 1
             else:
-                if not cpm_from_parsing:
-                    cpm_from_parsing = 125
                 new_cpm = cpm_from_parsing + 1
 
             if new_cpm > max_cpm:
