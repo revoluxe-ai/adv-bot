@@ -304,6 +304,7 @@ class Predictor:
 
     @staticmethod
     async def __update_predict_ctr(keyword_setting, predict_df, min_ctr):
+        try:
             adv_id = keyword_setting.adv_setting.adv_id
             keyword = keyword_setting.text
             if not keyword:
@@ -322,6 +323,8 @@ class Predictor:
             predict_ctr = (real_ctr + predict_ctr) / 2
             # Создаем задачи для асинхронного обновления Redis
             await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+        except Exception as exc:
+            logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
 
 
 
