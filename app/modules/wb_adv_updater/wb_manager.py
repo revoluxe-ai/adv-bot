@@ -847,8 +847,6 @@ class Manager(AbcManager):
             result = (await session.execute(stmt)).unique()
             adv_settings = result.scalars().all()
         for adv_setting in adv_settings:
-            if adv_setting.adv_id != 18526317:
-                continue
             if adv_setting not in adv_tasks:
                 task = asyncio.create_task(self.run_bidder_process_for_adv(adv_setting.adv_id, wb_api))
                 adv_tasks[adv_setting.id] = task
