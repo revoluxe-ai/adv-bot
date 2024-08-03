@@ -903,6 +903,8 @@ class Manager(AbcManager):
             elif fact_max_position < max_position_for_adv:
                 new_cpm = cpm_from_parsing - 1
             elif fact_max_position > max_position_for_adv:
+                if not cpm_from_parsing:
+                    cpm_from_parsing = 125
                 new_cpm = cpm_from_parsing + 1
 
             if new_cpm > max_cpm:
