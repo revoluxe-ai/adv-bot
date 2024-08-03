@@ -884,6 +884,7 @@ class Manager(AbcManager):
         max_cpm = adv_setting.max_cpm
         nmid_in_adv = adv_setting.nmids[0]
         promo_positions = []
+        cpm_from_parsing = None
         for keyword in white_adv_keywords:
             clicks, _, _= await data_manager.get_keyword_statistic_clickhouse(keyword, adv_id)
             if clicks == 0:
@@ -899,13 +900,15 @@ class Manager(AbcManager):
             if not promo_position:
                 continue
             promo_positions.append(promo_position)
+        if not cpm_from_parsing:
+            cpm_from_parsing = 125
         if promo_positions:
             fact_max_position: int = max(promo_positions)
             if fact_max_position == 1:
                 new_cpm = cpm_from_parsing - 1
             elif fact_max_position < max_position_for_adv:
                 new_cpm = cpm_from_parsing - 1
-            elif fact_max_position > max_position_for_adv:
+            else:
                 if not cpm_from_parsing:
                     cpm_from_parsing = 125
                 new_cpm = cpm_from_parsing + 1
