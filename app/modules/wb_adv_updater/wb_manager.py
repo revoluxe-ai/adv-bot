@@ -910,13 +910,16 @@ class Manager(AbcManager):
                 new_cpm = cpm_from_parsing - 1
             elif fact_max_position < max_position_for_adv:
                 new_cpm = cpm_from_parsing - 1
-            else:
+            elif fact_max_position > max_position_for_adv:
                 new_cpm = cpm_from_parsing + 1
+            else:
+                new_cpm = cpm_from_parsing
 
             if new_cpm > max_cpm:
                 new_cpm = max_cpm
             elif new_cpm < 125:
                 new_cpm = 125
+
             if new_cpm != cpm_from_parsing:
                await wb_api.advert.update_cpm(adv_id, new_cpm)
 
