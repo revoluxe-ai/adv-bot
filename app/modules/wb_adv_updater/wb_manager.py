@@ -389,6 +389,7 @@ class Manager(AbcManager):
         added_to_base = set()
         for text in texts:
             if text in self._keywords_in_neo:
+                await asyncio.sleep(0)
                 continue
             if self._gds.check_phrase_in_neo(text):
                 logger.debug(f'Фраза {text} уже есть в базе данных')
