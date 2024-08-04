@@ -84,6 +84,9 @@ class Runner:
                 self._manager.update_wb_adv_phrase_in_db(),
                 self._manager.update_vectors_exec_mode()
             )
+            for exc in excs:
+                if exc:
+                    logger.error(f'Ошибка обновления векторов {exc}', exc_info=True)
 
 
 
