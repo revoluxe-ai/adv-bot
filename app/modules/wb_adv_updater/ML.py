@@ -354,7 +354,7 @@ class Predictor:
             raise exc
         predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
         await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
-        predict_df = pd.read_csv('work_folder/предсказания.csv')
+        # predict_df = pd.read_csv('work_folder/предсказания.csv')
         async with sm() as session:
             stmt = select(KeywordSetting)\
                 .join(KeywordSetting.adv_setting)\
