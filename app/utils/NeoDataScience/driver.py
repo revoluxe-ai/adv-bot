@@ -614,7 +614,8 @@ RETURN graphName
             normalizationStrength: -1,
             iterationWeights: [1, 0.8, 0.5, 0.2, 0.1],
             writeProperty: 'fastrp',
-            nodeSelfInfluence: 0.15
+            nodeSelfInfluence: 0.15,
+            randomSeed: 1
             
         }
     )
