@@ -351,18 +351,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             if not original_predict_ctr:
                 predict_ctr = real_baes_ctr
                 keyword_stat.predict_ctr = predict_ctr
-                if enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and not keyword_setting.hard_status != 1:
-                    keyword_stat.status = KeywordStatus.GOOD
-                    keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
-                    await redis_manager.set_auto_block_status(keyword_setting.id, True)
-                    continue
 
-            if adv_setting.max_cpc:
-                if keyword_stat.cpc > adv_setting.max_cpc:
-                    keyword_stat.status = KeywordStatus.BAD
-                    keyword_stat.reason = 'max_cpc'
-                    await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                    continue
             if max_position:
                 position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
                 if position:
@@ -372,6 +361,19 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                         keyword_stat.reason = 'max_position'
                         await redis_manager.set_auto_block_status(keyword_setting.id, False)
                         continue
+
+            if adv_setting.max_cpc:
+                if keyword_stat.cpc > adv_setting.max_cpc:
+                    keyword_stat.status = KeywordStatus.BAD
+                    keyword_stat.reason = 'max_cpc'
+                    await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                    continue
+
+            if enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and not keyword_setting.hard_status != 1:
+                keyword_stat.status = KeywordStatus.GOOD
+                keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
+                await redis_manager.set_auto_block_status(keyword_setting.id, True)
+                continue
 
             if keyword_setting.hard_status == 3:
                 keyword_stat.status = KeywordStatus.BAD
