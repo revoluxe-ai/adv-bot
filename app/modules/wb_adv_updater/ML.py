@@ -95,8 +95,8 @@ class Fitter(AbcManager):
 
 
 
-    async def getGradientBoostingFullFitModel(self, update_model_on_new_features):
-        await self._fit_modelGradientBoosting(update_model_on_new_features)
+    async def getGradientBoostingFullFitModel(self,):
+        await self._fit_modelGradientBoosting()
         logger.debug('Модель обучена')
 
 
@@ -137,19 +137,9 @@ class Fitter(AbcManager):
         df['ctr'] = df.apply(calculate_ctr, axis=1)
         return df
 
-    @staticmethod
-    async def __fetch_keyword_features(session, keywords):
-        keyword_to_features = {}
-        # Определение размера батча (например, 100 элементов)
-        batch_size = 100
-        for i in range(0, len(keywords), batch_size):
-            batch = keywords[i:i + batch_size]
-            result = await session.execute(
-                select(KeywordFeature).where(KeywordFeature.keyword.in_(batch))
-            )
-            for kf in result.scalars().all():
-                keyword_to_features[kf.keyword] = kf.vector
-        return keyword_to_features
+    async def __fetch_keyword_features(self, keywords: list[str]):
+        result = await self.get_keyword_features_from_neo(keywords)
+        return result
 
     async def _get_df_for_fit(self) -> pd.DataFrame:
         data_rows = []
@@ -174,19 +164,10 @@ class Fitter(AbcManager):
                     await asyncio.sleep(0)
 
         # Получаем все необходимые ItemFeature и KeywordFeature в одном запросе
-        nmid_to_item_features = {}
-        keyword_to_features = {}
         if nmids_batch:
-            async with sm() as session:
-                item_features_result = await session.execute(
-                    select(ItemFeature).where(ItemFeature.nmid.in_(nmids_batch))
-                )
-                nmid_to_item_features = {item_feature.nmid: item_feature.vector for item_feature in
-                                         item_features_result.scalars().all()}
-
+                nmid_to_item_features = await self.get_nmid_to_item_features(nmids_batch)
         if keywords_batch:
-            async with sm() as session:
-                keyword_to_features = await self.__fetch_keyword_features(session, list(keywords_batch))
+            keyword_to_features = await self.__fetch_keyword_features(list(keywords_batch))
 
         for adv in adv_settings:
             try:
@@ -195,25 +176,27 @@ class Fitter(AbcManager):
                 logger.debug(f"Не удалось получить категорию РК {exc}")
                 await asyncio.sleep(0)
                 continue
-            keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
-            keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
-
             if not adv.nmids:
                 await asyncio.sleep(0)
                 continue
-            item_features_list = [nmid_to_item_features.get(nmid) for nmid in adv.nmids if
-                                  nmid in nmid_to_item_features]
+            item_features_list = []
+            for nmid in adv.nmids:
+                vector = nmid_to_item_features.get(nmid)
+                if vector:
+                    item_features_list.append(vector)
             if not item_features_list:
                 await asyncio.sleep(0)
                 continue
-
+            keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
+            keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
             avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
             for keyword_setting in adv.keyword_settings:
                 text = keyword_setting.text
                 text = text.replace('_', ' ')
-                keyword_features = keyword_to_features.get(text)
+                keyword_features = keyword_to_features.get(text, [])
+                keyword_features = list(keyword_features)
                 if not keyword_features:
                     logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
                     await asyncio.sleep(0)
@@ -251,9 +234,13 @@ class Fitter(AbcManager):
 
 
 
-    async def _fit_modelGradientBoosting(self, update_model_on_new_features):
+    async def _fit_modelGradientBoosting(self):
         logger.debug('Поток обучения запущен, получение данных')
-        df = await self._get_df_for_fit()
+        try:
+             df = await self._get_df_for_fit()
+        except Exception as exc:
+            logger.error(f'Ошибка при получении данных для обучения: {exc}')
+            raise exc
         logger.debug('Данные получены')
         if len(df) == 0:
             logger.info('Нет данных для обучения')
@@ -287,8 +274,25 @@ class Fitter(AbcManager):
         logger.debug('Модель обучена')
         model = typing.cast(xgboost.XGBModel, model.named_steps['xgbregressor'])
         await asyncio.to_thread(save_model, model, time_stamp= None)
-        update_model_on_new_features.set()
 
+    async def get_nmid_to_item_features(self, nmids_batch: set[int]) -> dict[int, np.ndarray]:
+        result = await self.data_getter.get_item_features_from_neo(nmids_batch)
+        result_list = []
+        for row in result:
+            nmid = row[0]
+            vector = row[1]
+            result_list.append((nmid, vector))
+        return dict(result_list)
+
+    async def get_keyword_features_from_neo(self, keywords):
+         result = await self.data_getter.get_keyword_features_from_neo(keywords)
+         keyword_to_features = {}
+         for row in result:
+            keyword = row[0]
+            vector = row[1]
+            vector = np.array(vector)
+            keyword_to_features[keyword] = vector
+         return keyword_to_features
 
 
 
@@ -338,12 +342,19 @@ class Predictor:
                     AdvSetting.active_status == 'started')
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
-
-        df_for_predict = await self._get_df_for_predict(all_adv_settings)
-        predict_df = await asyncio.to_thread(self._predict, df_for_predict)
+        try:
+            df_for_predict = await self._get_df_for_predict(all_adv_settings)
+        except Exception as exc:
+            logger.error(f'Ошибка при получении данных для предсказания: {exc}')
+            raise exc
+        try:
+            predict_df = await asyncio.to_thread(self._predict, df_for_predict)
+        except Exception as exc:
+            logger.error(f'Ошибка при предсказании: {exc}')
+            raise exc
         predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
         await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
-        # predict_df = pd.read_csv('work_folder/предсказания.csv')
+        predict_df = pd.read_csv('work_folder/предсказания.csv')
         async with sm() as session:
             stmt = select(KeywordSetting)\
                 .join(KeywordSetting.adv_setting)\
@@ -359,6 +370,8 @@ class Predictor:
         for keyword_setting in keyword_settings:
             adv = keyword_setting.adv_setting
             adv_id = adv.adv_id
+            if adv_id != 19064176:
+                continue
             if not adv_id in adv_id_to_min_ctr:
                 adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
             min_ctr = adv_id_to_min_ctr[adv_id]
@@ -408,56 +421,54 @@ class Predictor:
 
     async def _get_df_for_predict(self, adv_settings: list[AdvSetting])-> pd.DataFrame:
        data_rows = []
-       async with sm() as session:
-           for adv in adv_settings:
-               logger.debug(f'Обработка кампании {adv.name}')
-               if not adv.nmids:
-                   logger.debug('Нет nmids: %s', adv.name)
+       for adv in adv_settings:
+           logger.debug(f'Обработка кампании {adv.name}')
+           if not adv.nmids:
+               logger.debug('Нет nmids: %s', adv.name)
+               continue
+           nmids = adv.nmids
+           item_features = await self.get_nmid_to_item_features(nmids)
+
+           item_features = [row[1] for row in item_features.items()]
+           avg_item_features = pd.DataFrame(item_features).mean().to_dict()
+           avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
+
+           if not avg_item_features:
+                 logger.error('Нет item_features: %s', adv.name)
+                 continue
+           clear_keywords = [keyword.text.replace('_', ' ') for keyword in adv.keyword_settings]
+           # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
+           keyword_features_result = await self.get_keyword_features_from_neo(clear_keywords)
+           for keyword in adv.keyword_settings:
+               text = keyword.text.replace('_', ' ')
+               keyword_features = keyword_features_result.get(text, [])
+               keyword_features = list(keyword_features)
+               if not keyword_features:
                    continue
-               nmids = adv.nmids
-               item_features = await session.execute(
-                   select(ItemFeature).where(ItemFeature.nmid.in_(nmids))
-               )
-               item_features = item_features.scalars().all()
 
-               item_features = [item_feature.vector for item_feature in item_features]
-
-               avg_item_features = pd.DataFrame(item_features).mean().to_dict()
-               avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
-
-               if not avg_item_features:
-                     logger.error('Нет item_features: %s', adv.name)
-                     continue
-               clear_keywords = [keyword.text.replace('_', ' ') for keyword in adv.keyword_settings]
-
-               # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
-               keyword_features_result = await session.execute(
-                   select(KeywordFeature).where(KeywordFeature.keyword.in_(clear_keywords))
-               )
-               keyword_features_list = keyword_features_result.scalars().all()
-
-               # Преобразуем список объектов KeywordFeature в словарь для быстрого доступа
-               keyword_features_dict = {kf.keyword: kf.vector for kf in keyword_features_list}
-
-               for keyword in adv.keyword_settings:
-                   text = keyword.text.replace('_', ' ')
-                   keyword_features = keyword_features_dict.get(text)
-                   if not keyword_features:
-                       continue
-
-                   # Собираем данные для строки
-                   row = {
-                       'adv_id': adv.adv_id,
-                       'adv_type': adv.type if adv.type else 0,
-                       'keyword': keyword.text,
-                       **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
-                       **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
-                   }
-                   data_rows.append(row)
+               # Собираем данные для строки
+               row = {
+                   'adv_id': adv.adv_id,
+                   'adv_type': adv.type if adv.type else 0,
+                   'keyword': keyword.text,
+                   **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
+                   **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
+               }
+               data_rows.append(row)
        logger.debug('Формирование df')
        df = pd.DataFrame(data_rows)
        logger.debug('Df готов')
        return df
+
+    async def get_nmid_to_item_features(self, nmids):
+        fitter = Fitter()
+        result = await fitter.get_nmid_to_item_features(nmids)
+        return result
+
+    async def get_keyword_features_from_neo(self, clear_keywords):
+        fitter = Fitter()
+        result = await fitter.get_keyword_features_from_neo(clear_keywords)
+        return result
 
 
 

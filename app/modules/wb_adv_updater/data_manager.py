@@ -507,6 +507,14 @@ class DataGetter(AbcManager):
         result = await self._gds.get_status_job(jobid)
         return result
 
+    async def get_item_features_from_neo(self, nmids_batch):
+        result = await self._gds.get_nmid_vectors(nmids_batch)
+        return result
+
+    async def get_keyword_features_from_neo(self, keywords):
+        result = await self._gds.get_keywords_vectors_by_keywords(keywords)
+        return result
+
 
 async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     try:
@@ -984,15 +992,3 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int):
                 session.add(keyword_setting)
             keyword_setting.hard_status = 2
         await session.commit()
-
-
-
-
-
-
-
-
-
-
-
-

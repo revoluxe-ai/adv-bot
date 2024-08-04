@@ -330,9 +330,9 @@ class Manager(AbcManager):
 
 
 
-    async def update_model(self, update_model_on_new_features):
+    async def update_model(self):
         logger.debug('Старт обучения и сохранения модели')
-        await self.fit_and_save_model(update_model_on_new_features)
+        await self.fit_and_save_model()
         logger.debug('Устанавливаю сет, разрешаю обновление ключей')
 
 
@@ -340,8 +340,8 @@ class Manager(AbcManager):
         joblib.dump(model, model_path)
 
 
-    async def fit_and_save_model(self, update_model_on_new_features):
-        await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
+    async def fit_and_save_model(self):
+        await self._fitter.getGradientBoostingFullFitModel()
 
     async def update_vectors_exec_mode(self):
         while True:
@@ -527,7 +527,7 @@ class Manager(AbcManager):
         except ValueError:
             return False
 
-    async def update_predict_ctr(self, predicted: RedisEvent):
+    async def update_predict_ctr(self):
         while True:
             try:
                 await self._predictor.predict_ctr_for_keywords()
