@@ -1139,3 +1139,16 @@ UNWIND phrase.words AS word
 
         return data
 
+    async def check_phrase_in_neo(self, text: str):
+        query = """
+         MATCH (phrase:KeywordPhrase {text: $text}) 
+         """
+
+        async def check_phrase(tx, query, text):
+            result = await tx.run(query, text=text)
+            return await result.single()
+
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                result = session.read_transaction(check_phrase, query, text)
+        return result
