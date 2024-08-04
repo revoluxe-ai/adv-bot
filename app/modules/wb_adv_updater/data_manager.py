@@ -103,6 +103,14 @@ async def get_keywords_statistic_clickhouse(
                                             views=0,
                                             spend=0,
                                             keyword_setting=keyword_setting)
+
+            position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
+            if position:
+                keyword.real_position = position.real_position
+                keyword.base_position = position.base_position
+                keyword.promo_position = position.promo_position
+                keyword.position_update = position.timestamp
+                keyword.cpm = position.cpm
             keyword.query = keywords_query.get_queries_of_keyword(text)
             new_calk_keywords.append(keyword)
 
@@ -941,7 +949,7 @@ async def get_last_updated_phrases(all_white_phrases):
         return last_updated_phrases
 
 
-async def get_keywords_positions(adv_setting: AdvSetting, texts: list[str]) -> dict[str, WBItemPosition]:
+async def get_keywords_positions_dict_by_text(adv_setting: AdvSetting, texts: list[str]) -> dict[str, WBItemPosition]:
     positions =  await redis_manager.get_keywords_positions(adv_setting, texts)
     positions = [position for position in positions if position]
     positions = {position.keyword_text: position for position in positions}
