@@ -344,11 +344,14 @@ class Manager(AbcManager):
         await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
 
     async def update_vectors_exec_mode(self):
+        while True:
              try:
                  await self.graph_vector_update()
                  await self.graph_updater.get_nmids_and_keyword_featers_for_ml()
              except Exception as exc:
                     logger.error(f'Ошибка обновления векторов {exc}')
+             await asyncio.sleep(0)
+
 
     def __get_keyword_stat(self):
         kw_df = pd.read_csv(self.keyword_stat_df_path)
@@ -356,13 +359,12 @@ class Manager(AbcManager):
 
 
 
-    async def update_wb_adv_phrase_in_db(self, need_update_model):
-        """update_model_on_new_features.set()"""
-        try:
-            await self.update_wb_adv_phrase_in_db_bot_active()
-        except Exception as exc:
-            logger.error(f'Ошибка обновления фраз в neo4j {exc}')
-        need_update_model.set()
+    async def update_wb_adv_phrase_in_db(self):
+        while True:
+            try:
+                await self.update_wb_adv_phrase_in_db_bot_active()
+            except Exception as exc:
+                logger.error(f'Ошибка обновления фраз в neo4j {exc}')
 
     async def update_wb_adv_phrase_in_db_bot_active(self):
         async with sm() as session:

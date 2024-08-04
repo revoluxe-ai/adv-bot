@@ -9,4 +9,4 @@ update_model_on_new_features:asyncio.Event = asyncio.Event()
 
 
 if __name__ == '__main__':
-    asyncio.run(runner.run_update_vectors(need_update_model, update_model_on_new_features))
+    asyncio.run(runner.run_update_vectors())

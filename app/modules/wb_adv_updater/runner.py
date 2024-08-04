@@ -79,18 +79,14 @@ class Runner:
             await asyncio.sleep(0)
 
 
-    async def run_update_vectors(self, need_update_model:asyncio.Event,
-                                 update_model_on_new_features:asyncio.Event):
+    async def run_update_vectors(self):
 
-        while True:
             await asyncio.gather(
                 self.update_cards_in_graph(),
-                self._manager.update_wb_adv_phrase_in_db(need_update_model),
+                self._manager.update_wb_adv_phrase_in_db(),
+                self._manager.update_vectors_exec_mode()
             )
-            await self._manager.update_vectors_exec_mode()
-            update_model_on_new_features.set()
-            need_update_model.set()
-            await asyncio.sleep(0)
+
 
 
     async def run_update_minus_keywords_on_wb(self, semaphore: asyncio.Semaphore):
@@ -111,11 +107,13 @@ class Runner:
             await asyncio.sleep(1)
 
     async def update_cards_in_graph(self):
-        try:
-            await self._manager.update_cards_in_graph()
-            logger.debug('Карточки обновлены')
-        except Exception as exc:
-            logger.error(f'Ошибка обновления карточек в neo4j {exc}')
+        while True:
+            try:
+                await self._manager.update_cards_in_graph()
+                logger.debug('Карточки обновлены')
+            except Exception as exc:
+                logger.error(f'Ошибка обновления карточек в neo4j {exc}')
+            await asyncio.sleep(0)
 
 
 
