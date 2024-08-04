@@ -104,7 +104,7 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                                  action='change_min_ctr',
                                                  adv_original_id=adv_setting.id).pack()))
 
-    button = InlineKeyboardButton(text='Задать/Изменить максимальную ставку',
+    button = InlineKeyboardButton(text='Задать/Изменить максимальную стоимость клика',
                                      callback_data=callbacks.ChangeMaxCPC(
                                       action='to_max_cpc_change_page',
                                       adv_original_id = adv_setting.id).pack())
