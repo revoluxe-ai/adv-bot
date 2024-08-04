@@ -353,15 +353,15 @@ class Predictor:
             result = await session.execute(stmt)
             keyword_settings = result.scalars().all()
 
-        adv_ad_to_min_ctr = {}
+        adv_id_to_min_ctr = {}
 
         tasks = []
         for keyword_setting in keyword_settings:
             adv = keyword_setting.adv_setting
             adv_id = adv.adv_id
-            if not adv_id in adv_ad_to_min_ctr:
-                adv_ad_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
-            min_ctr = adv_ad_to_min_ctr[adv_id]
+            if not adv_id in adv_id_to_min_ctr:
+                adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
+            min_ctr = adv_id_to_min_ctr[adv_id]
             # try:
             #     await update_predict_ctr(keyword_setting)
             #     logger.debug(f'Предсказание для ключевого слова {keyword_setting.text} в кампании {keyword_setting.adv_setting.name} обновлено')
