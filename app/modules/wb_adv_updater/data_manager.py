@@ -352,7 +352,8 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             if not original_predict_ctr:
                 predict_ctr = real_baes_ctr
                 keyword_stat.predict_ctr = predict_ctr
-
+            calculate_ctr = (real_baes_ctr + predict_ctr)/2
+            keyword_stat.predict_ctr = calculate_ctr
             if max_position:
                 position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
                 if position:
@@ -396,7 +397,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
 
-            if predict_ctr >= min_ctr or real_baes_ctr >= min_ctr:
+            if calculate_ctr >= min_ctr:
                 keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
