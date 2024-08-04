@@ -179,7 +179,6 @@ async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
     try:
         today = datetime.now().date()
         text = keyword_setting.text
-        text = text.replace("'", r"\'")
         query = f"""
             SELECT
                 COALESCE(SUM(total_clicks), 0) AS total_clicks,
@@ -194,7 +193,7 @@ async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
                     default_db.advkeyword
                 WHERE
                     adv_id = {adv_id}
-                    AND text = '{text}'
+                    AND text = %(text)s
                     AND (text, date, version) IN (
                         SELECT
                             text,
@@ -204,7 +203,7 @@ async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
                             default_db.advkeyword
                         WHERE
                             adv_id = {adv_id}
-                            AND text = '{keyword_setting.text}'
+                            AND text = %(text)s
                         GROUP BY
                             text,
                             date
@@ -218,7 +217,7 @@ async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
             query += f" AND date >= '{start_date}'"
 
         # Выполнение запроса
-        result = await client.query(query)
+        result = await client.query(query, {'text': text})
 
         # Проверка наличия результатов
         if not result.result_rows:
@@ -341,11 +340,13 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                 enough_views = int(1 / min_ctr)
             views = keyword_stat.views
             clicks = keyword_stat.clicks
-            clicks += 1
+            if clicks == 0:
+                 clicks += 1
+                 views += enough_views
             added_clicks = keyword_setting.added_clicks
             if added_clicks:
                 clicks += added_clicks
-            views += enough_views
+                views += enough_views
             real_baes_ctr = clicks / views
             keyword_stat.baes_ctr = real_baes_ctr
             if not original_predict_ctr:
@@ -536,7 +537,7 @@ class DataSetter:
                     good_phrases.append(keyword.text)
                 else:
                     bad_phrases.append(keyword.text)
-            if bad_phrases and not settings.test_mode:
+            if bad_phrases:
                 await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
                 logger.info(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
                 logger.info(f'Позитивные слова {good_phrases}')
