@@ -370,8 +370,6 @@ class Predictor:
         for keyword_setting in keyword_settings:
             adv = keyword_setting.adv_setting
             adv_id = adv.adv_id
-            if adv_id != 19064176:
-                continue
             if not adv_id in adv_id_to_min_ctr:
                 adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
             min_ctr = adv_id_to_min_ctr[adv_id]
