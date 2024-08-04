@@ -97,9 +97,8 @@ class GraphUpdater:
 
     async def get_nmids_and_keyword_featers_for_ml(self):
         await asyncio.gather(self._update_nmids_vectors(),
-                       self._update_keywords_vectors())
-
-
+                       self._update_keywords_vectors()
+                             )
 
 
     async def _update_keywords_vectors(self):
@@ -114,6 +113,7 @@ class GraphUpdater:
                 if existing_keyword:
                     existing_keyword.vector = vector
                     keyword = existing_keyword
+                    keyword.vector = vector
                 else:
                     keyword = KeywordFeature(keyword=keyword_text, vector=vector)
                     session.add(keyword)
