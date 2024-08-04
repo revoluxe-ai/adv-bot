@@ -97,6 +97,8 @@ class Manager(AbcManager):
         self._aiosm = get_async_session_maker
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
+        self._keywords_in_neo = set()
+
 
     async def update_keyword_stat(self, access: WBCabinetAccess,
                                   need_update_model: asyncio.Event,
@@ -366,6 +368,7 @@ class Manager(AbcManager):
             except Exception as exc:
                 logger.error(f'Ошибка обновления фраз в neo4j {exc}')
 
+
     async def update_wb_adv_phrase_in_db_bot_active(self):
         async with sm() as session:
             stmt = select(KeywordSetting.text)\
@@ -385,8 +388,11 @@ class Manager(AbcManager):
         phrase_data_list = []
         added_to_base = set()
         for text in texts:
+            if text in self._keywords_in_neo:
+                continue
             if self._gds.check_phrase_in_neo(text):
                 logger.debug(f'Фраза {text} уже есть в базе данных')
+                self._keywords_in_neo.add(text)
                 await asyncio.sleep(0)
                 continue
             if text in added_to_base:
@@ -410,6 +416,7 @@ class Manager(AbcManager):
             )
             phrase_data_list.append(phrase_data)
             added_to_base.add(text)
+            self._keywords_in_neo.add(text)
 
         batch = 100
         for i in range(0, len(phrase_data_list), batch):
@@ -919,21 +926,5 @@ class Manager(AbcManager):
                 new_cpm = max_cpm
             elif new_cpm < 125:
                 new_cpm = 125
-
             if new_cpm != cpm_from_parsing:
                await wb_api.advert.update_cpm(adv_id, new_cpm)
-
-
-
-            
-            
-                
-            
-            
-
-
-
-
-
-
-
