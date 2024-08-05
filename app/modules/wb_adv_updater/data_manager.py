@@ -397,7 +397,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 continue
 
-            if calculate_ctr >= min_ctr:
+            if calculate_ctr >= min_ctr or real_baes_ctr >= min_ctr:
                 keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
