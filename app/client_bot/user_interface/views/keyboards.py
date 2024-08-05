@@ -549,7 +549,7 @@ def get_setting_max_cpc_keyboard(adv: AdvSetting):
                                              callback_data=callbacks.Adv(
                                                  adv_original_id=adv_original_id).pack()))
 
-    builder.row(InlineKeyboardButton(text='Отключить максимальную ставку',
+    builder.row(InlineKeyboardButton(text='Отключить максимальную стоимость клика',
                                                 callback_data=callbacks.ChangeMaxCPC(
                                                     action = 'turn_off_max_cpc',
                                                     adv_original_id=adv_original_id).pack()))
