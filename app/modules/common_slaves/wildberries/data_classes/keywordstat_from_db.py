@@ -21,6 +21,7 @@ class CalculatedKeyword:
     clicks: int
     views: int
     spend: float
+    query: Union[int, str] = None
     baes_ctr: Optional[float] = None
     predict_ctr: Optional[float] = None
     status: Union[str, None] = None

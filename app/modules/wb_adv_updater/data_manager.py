@@ -34,6 +34,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBItemPosition,
 )
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.keywords_query import keywords_query
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.my_types import AdvSetting, WBUserCabinet
@@ -118,6 +119,7 @@ async def get_keywords_statistic(adv_setting: AdvSetting,
                 min(row.total_clicks, row.total_views) if row.total_clicks and row.total_views else 0,
                 row.total_views or 0,
                 row.total_spend or 0,
+                query=keywords_query.get_queries_of_keyword(row.keyword_text)
             )
             keyword_stats.append(keyword_stat)
 
@@ -231,6 +233,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
         min_ctr = await get_min_ctr(adv_setting)
+        max_position = adv_setting.max_place
         logger.debug('Минимальный ctr получен')
         keyword_stats = await get_keywords_statistic(adv_setting, None)
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
@@ -274,6 +277,15 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     keyword_stat.reason = 'max_cpc'
                     await redis_manager.set_auto_block_status(keyword_setting.id, False)
                     continue
+            if max_position:
+                position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
+                if position:
+                    organic_position = position.base_position
+                    if 0 < organic_position <= max_position:
+                        keyword_stat.status = KeywordStatus.BAD
+                        keyword_stat.reason = 'max_position'
+                        await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                        continue
 
             if keyword_setting.hard_status == 3:
                 keyword_stat.status = KeywordStatus.BAD

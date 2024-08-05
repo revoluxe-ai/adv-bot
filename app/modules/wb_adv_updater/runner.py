@@ -35,7 +35,7 @@ class Runner:
         await asyncio.gather(
             self.payment_for_auto_bidder(),
             self.payment_for_parsing_keyword(),
-            self.run_bidder_process(),
+            # self.run_bidder_process(),
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             # self.update_min_ctr_in_global_wb_category_settings(),
@@ -48,7 +48,7 @@ class Runner:
     async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: RedisEvent):
         while True:
              logger.debug('Ожидание разрешения обновления ключей')
-             await update_model_on_new_features.wait()
+             # await update_model_on_new_features.wait()
              logger.debug('Блокировка снята')
              await self._manager.update_predict_ctr(predicted)
              await asyncio.sleep(1)

@@ -148,9 +148,8 @@ class Manager(AbcManager):
                                         adv_setting: AdvSetting,
                                         session):
         adv_setting_original_id = adv_setting.id
-            # Проверяем наличие записи в KeywordSetting
-        stmt = select(KeywordSetting)\
-            .filter(
+        # Проверяем наличие записи в KeywordSetting
+        stmt = select(KeywordSetting).filter(
             KeywordSetting.text == keyword_stat.text,
             KeywordSetting.adv_setting_id == adv_setting_original_id
         )
@@ -164,16 +163,18 @@ class Manager(AbcManager):
                 adv_setting_id=adv_setting_original_id
             )
             session.add(keyword_setting)
-            await session.commit()  # Коммит для получения ID новой записи
-            await session.refresh(keyword_setting)  # Обновляем объект, чтобы получить ID
+            try:
+                await session.commit()  # Коммит для получения ID новой записи
+                await session.refresh(keyword_setting)  # Обновляем объект, чтобы получить ID
+            except Exception as e:
+                await session.rollback()
+                raise e  # Обработка исключения
 
         # Проверяем наличие записи в AdvKeyword
         stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting)).filter(
-            and_(
-                AdvKeyword.text == keyword_stat.text,
-                AdvKeyword.date == keyword_stat.date,
-                AdvKeyword.adv_setting_id == adv_setting_original_id
-            )
+            AdvKeyword.text == keyword_stat.text,
+            AdvKeyword.date == keyword_stat.date,
+            AdvKeyword.adv_setting_id == adv_setting_original_id
         ).order_by(AdvKeyword.date.desc())
         result = await session.execute(stmt)
         keyword_db = result.scalar()
@@ -190,20 +191,30 @@ class Manager(AbcManager):
                 spend=keyword_stat.spend
             )
             session.add(keyword_db)
-            await session.commit()
+            try:
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                raise e  # Обработка исключения
         else:
             # Если запись существует, проверяем и обновляем данные
+            updated = False
             if not keyword_db.keyword_setting:
                 keyword_db.keyword_setting = keyword_setting
-                await session.commit()
+                updated = True
             if any([keyword_db.views != keyword_stat.views, keyword_db.clicks != keyword_stat.clicks]):
                 keyword_db.views = keyword_stat.views
                 keyword_db.clicks = keyword_stat.clicks
                 keyword_db.spend = keyword_stat.spend
-                await session.commit()
+                updated = True
+
+            if updated:
+                try:
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    raise e  # Обработка исключения
         return
-
-
 
     async def keyword_stat_updater(self, adv_setting_id, wb_api, semaphore):
         async with sm(semaphore) as session:
@@ -808,7 +819,7 @@ class Manager(AbcManager):
         wb_cabinet_tasks = {}
         adv_tasks = {}
         while True:
-            accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
+            accesses = super_cabinet_manager.get_accesses_for_bidder()
             async for access in accesses:
                 cabinet_id = access.wb_cabinet.id
                 if cabinet_id not in wb_cabinet_tasks:
@@ -818,10 +829,10 @@ class Manager(AbcManager):
 
                 else:
                     if wb_cabinet_tasks[cabinet_id].done():
-                        logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
+                        logger.info(f'Задача обновления обновления ставок {cabinet_id}')
                         if wb_cabinet_tasks[cabinet_id].exception():
                             logger.error(
-                                f'Ошибка обновления статистики ключей: '
+                                f'Ошибка обновления ставок: '
                                 f'{wb_cabinet_tasks[cabinet_id].exception()},'
                                 f' для кабинета {cabinet_id}'
                             )
@@ -885,22 +896,27 @@ class Manager(AbcManager):
             if not position:
                 continue
             cpm_from_parsing: int = position.cpm
+            if not cpm_from_parsing:
+                continue
             promo_position = position.promo_position
             if not promo_position:
                 continue
             promo_positions.append(promo_position)
-        fact_max_position: int = max(promo_positions)
-        if fact_max_position < max_position_for_adv:
-            new_cpm = cpm_from_parsing - 1
-        elif fact_max_position > max_position_for_adv:
-            new_cpm = cpm_from_parsing + 1
+        if promo_positions:
+            fact_max_position: int = max(promo_positions)
+            if fact_max_position == 1:
+                new_cpm = cpm_from_parsing - 1
+            elif fact_max_position < max_position_for_adv:
+                new_cpm = cpm_from_parsing - 1
+            elif fact_max_position > max_position_for_adv:
+                new_cpm = cpm_from_parsing + 1
 
-        if new_cpm > max_cpm:
-            new_cpm = max_cpm
-        elif new_cpm < 125:
-            new_cpm = 125
-        if new_cpm != cpm_from_parsing:
-           await wb_api.advert.update_cpm(adv_id, new_cpm)
+            if new_cpm > max_cpm:
+                new_cpm = max_cpm
+            elif new_cpm < 125:
+                new_cpm = 125
+            if new_cpm != cpm_from_parsing:
+               await wb_api.advert.update_cpm(adv_id, new_cpm)
 
 
 

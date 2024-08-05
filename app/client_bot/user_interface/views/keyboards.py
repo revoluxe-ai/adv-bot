@@ -249,7 +249,9 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         clicks = keyword.clicks
         views = keyword.views
         ctr = keyword.ctr
-        if keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
+        if keyword.reason == 'max_position':
+            hard_status = 'ЦП'
+        elif keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
             hard_status = 'МП'
         elif keyword.hard_status == BLACK_LIST:
             hard_status = 'НРФ'

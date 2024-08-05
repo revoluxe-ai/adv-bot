@@ -5,6 +5,7 @@ from typing import Union
 
 import redis
 
+from app.modules.keywords_query import keywords_query
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 
@@ -128,6 +129,9 @@ async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, 
     keywords = []
     for row in json_data:
         keyword: CalculatedKeyword = CalculatedKeyword.from_json(row)
+        if not keyword.query:
+            query = keywords_query.get_queries_of_keyword(keyword.text)
+            keyword.query = query
         keywords.append(keyword)
 
     return keywords
@@ -136,6 +140,7 @@ async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, 
 async def add_positions_to_redis(positions: list[WBItemPosition]):
     base_key = 'adv_positions'
     for position in positions:
+       position.timestamp = datetime.datetime.now()
        key = f'{base_key}:{position.keyword_text}:{position.nmid}'
        position_dict = position.to_dict()
        await redis_client.set(key, json.dumps(position_dict))
