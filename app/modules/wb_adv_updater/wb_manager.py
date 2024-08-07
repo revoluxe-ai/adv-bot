@@ -112,8 +112,6 @@ class Manager(AbcManager):
             stmt = select(AdvSetting).where(and_(
                 AdvSetting.wb_cabinet_id == wb_cabinet.id,
                 AdvSetting.type == 8,
-                AdvSetting.bot_active == True,
-
             )).order_by(AdvSetting.last_update.desc())
             result = (await session.execute(stmt)).unique()
             adv_settings = result.scalars().all()

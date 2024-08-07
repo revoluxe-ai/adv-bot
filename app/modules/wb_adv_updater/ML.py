@@ -3,6 +3,8 @@ import logging
 import os.path
 import typing
 from ast import literal_eval
+from datetime import datetime
+
 import joblib
 import xgboost
 
@@ -19,8 +21,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
-from sqlalchemy import select, and_
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, KeywordSetting
+from sqlalchemy import select, and_, or_
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, KeywordSetting, WBCabinet
 from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
 from . import data_manager
 from .data_manager import DataGetter
@@ -143,11 +145,23 @@ class Fitter(AbcManager):
 
     async def _get_df_for_fit(self) -> pd.DataFrame:
         data_rows = []
+
         async with sm() as session:
-            stmt = select(AdvSetting) \
-                .options(selectinload(AdvSetting.keyword_settings))\
-            .where(AdvSetting.bot_active == True,
-                   AdvSetting.active_status == 'started')
+            # Подзапрос для проверки существования WBCabinet с условиями
+            subquery = select(WBCabinet.id).where(
+                    or_(
+                        WBCabinet.expiration_time > datetime.now(),
+                        WBCabinet.bonus > 0,
+                        WBCabinet.balance > 0,
+                    )
+            ).exists()
+
+            # Основной запрос
+            stmt = select(AdvSetting).options(
+                selectinload(AdvSetting.keyword_settings),
+                selectinload(AdvSetting.wb_cabinet)
+            ).where(subquery)
+
             result = await session.execute(stmt)
             adv_settings = result.scalars().all()
 
