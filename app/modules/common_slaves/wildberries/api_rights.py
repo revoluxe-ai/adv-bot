@@ -56,13 +56,15 @@ class TokenRightChecker(WbRequestApiMixin):
 
 
      async def adverts(self):
+        logger.debug('Проверка прав на рекламу')
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
 
         async with aiohttp.ClientSession() as session:
-             await self.requests(session, 'GET', url, headers=self.headers.standart)
-
+              await self.requests(session, 'GET', url, headers=self.headers.standart)
+        logger.debug('Проверка прав на рекламу завершена')
 
      async def content(self):
+        logger.debug('Проверка прав на контент')
         limit = 1
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
         data_for_req = {
@@ -83,9 +85,7 @@ class TokenRightChecker(WbRequestApiMixin):
             await self.requests(session, 'POST',  url, json_data=data_for_req,
                                         headers=self.headers.standart)
 
-
-
-
+        logger.debug('Проверка прав на контент завершена')
 
 
 async def check_token(token):
