@@ -211,6 +211,7 @@ class AdvSetting(BaseTable):
     bidder_active = mapped_column(Boolean, default=False)
     max_cpm = mapped_column(Integer, nullable=True)
     max_place = mapped_column(Integer, nullable=True)
+    min_block_position = mapped_column(Integer, nullable=True, default=0)
 
 
 
