@@ -22,13 +22,11 @@ from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
 from sqlalchemy import select, and_, or_
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, KeywordSetting, WBCabinet
-from app.modules.wb_adv_updater.models import KeywordFeature, ItemFeature
+from app.modules.common_slaves.wildberries.models import AdvSetting,  KeywordSetting, WBCabinet
 from . import data_manager
 from .data_manager import DataGetter
 from ...exc import CardNotFoundInDB
 from ...utils import redis_manager
-from ...utils.redis_manager import RedisEvent
 
 sm = get_async_session_maker
 
@@ -243,8 +241,6 @@ class Fitter(AbcManager):
         df = df[df.views > 0]
         df['ctr'] = df['clicks'] / df['views']
         return df
-
-
 
 
 

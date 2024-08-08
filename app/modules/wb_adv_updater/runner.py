@@ -82,7 +82,6 @@ class Runner:
             excs = await asyncio.gather(
                 self.update_cards_in_graph(),
                 self._manager.update_wb_adv_phrase_in_db(),
-                self._manager.update_vectors_exec_mode()
             )
             for exc in excs:
                 if exc:
