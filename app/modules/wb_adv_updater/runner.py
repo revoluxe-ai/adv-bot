@@ -39,7 +39,7 @@ class Runner:
             self.process_payment_for_advs(),
             # self.update_min_ctr_in_global_wb_category_settings(),
             self.run_update_vectors(),
-            self.run_update_model(),
+            # self.run_update_model(),
             self.run_update_predict_ctr(),
             return_exceptions=False
         )
