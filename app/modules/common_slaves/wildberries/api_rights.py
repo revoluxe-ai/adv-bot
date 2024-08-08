@@ -92,6 +92,7 @@ async def check_token(token):
     hash_token = hash(token)
     logger.debug('Проверка прав на токен')
     check = await redis_manager.get_token_rights(hash_token)
+    logger.debug(f'Данные о проверке из Redis: {check}')
     if check:
         logger.debug('Права на токен уже проверены')
         return
