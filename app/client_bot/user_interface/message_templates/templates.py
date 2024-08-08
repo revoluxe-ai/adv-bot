@@ -66,9 +66,12 @@ class TextWithKeyboard(Base):
 
     async def __call__(self):
         await super().__call__()
-
+        text = self.text
+        parse_mode = getattr(self, 'parse_mode', None)
+        if parse_mode == 'Markdown':
+            text = text.replace('_', '\_')
         last_message = await self.bot.send_message(chat_id=self.chat_id,
-                                                    text=self.text,
+                                                    text= text,
                                                     reply_markup=self.keyboard,
                                                     parse_mode=self.parse_mode)
         return last_message, self.get_content_type()
