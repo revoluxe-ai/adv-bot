@@ -26,20 +26,8 @@ from app import settings
 
 logger = logging.getLogger(__name__)
 
-
-
-import warnings
 from sqlalchemy import exc as sa_exc
 
-# Включение отображения всех предупреждений
-warnings.simplefilter("always", sa_exc.SAWarning)
-
-# Пример обработки SAWarning как исключение
-def handle_warnings_as_exceptions(message, category, filename, lineno, file=None, line=None):
-    raise category(message)
-
-# Назначаем обработчик
-warnings.showwarning = handle_warnings_as_exceptions
 
 
 class DataError(Exception):
