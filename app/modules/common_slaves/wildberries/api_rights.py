@@ -1,5 +1,8 @@
 import asyncio
 import datetime
+
+from aiohttp import ClientTimeout
+
 from app.utils import redis_manager
 from aiocache import cached_stampede
 from asyncio import Lock
@@ -31,7 +34,12 @@ from .ABC_WB_API import ABC_WB_API, WbRequestApiMixin, Headers
 
 logger = logging.getLogger(__name__)
 
-
+timeout = aiohttp.ClientTimeout(
+    total=3,  # Общий таймаут для запроса
+    connect=2,  # Таймаут для подключения
+    sock_read=2,  # Таймаут для чтения сокета
+    sock_connect=2  # Таймаут для соединения сокета
+)
 
 
 
@@ -59,7 +67,7 @@ class TokenRightChecker(WbRequestApiMixin):
         logger.debug('Проверка прав на рекламу')
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
               await self.requests(session, 'GET', url, headers=self.headers.standart)
         logger.debug('Проверка прав на рекламу завершена')
 
@@ -81,7 +89,7 @@ class TokenRightChecker(WbRequestApiMixin):
             }
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             await self.requests(session, 'POST',  url, json_data=data_for_req,
                                         headers=self.headers.standart)
 
