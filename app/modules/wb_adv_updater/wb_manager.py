@@ -370,9 +370,7 @@ class Manager(AbcManager):
     async def update_wb_adv_phrase_in_db_bot_active(self):
         async with sm() as session:
             stmt = select(KeywordSetting.text)\
-            .join(AdvSetting)\
-            .filter(and_(AdvSetting.active_status == 'started',
-                            AdvSetting.bot_active == True))
+            .join(AdvSetting)
             result = await session.execute(stmt)
             texts = result.unique().scalars().all()
         texts = [text for text in texts if text]
@@ -460,8 +458,7 @@ class Manager(AbcManager):
 
     async def update_cards_in_graph_for_shops(self):
         async with sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.bot_active == True,
-                                            AdvSetting.active_status == 'started')
+            stmt = select(AdvSetting)
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
             all_nmids = set()
