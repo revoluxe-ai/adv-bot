@@ -5,6 +5,7 @@ import typing
 from dataclasses import dataclass
 
 import aiohttp
+from aiohttp import ServerTimeoutError
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -151,7 +152,9 @@ async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> ty
                     token.active = False
                     await session.commit()
                     continue
-
+                except  ServerTimeoutError as e:
+                    logger.error(f'Ошибка соединения с сервером для кабинета id {wb_cabinet.id}: {e}')
+                    continue
                 except UnknownApiRequestError as e:
                     logger.error(e)
                     users_live_tokens.append(token)
