@@ -33,7 +33,7 @@ path_setting = path_setting_funcs.get_setting_path()
 WEB_SERVER_HOST = "127.0.0.1"
 # Port for incoming request from reverse proxy. Should be any available port
 
-PORT = 8090
+PORT = settings.TELEGRAM_WEB_PORT
 
 WEB_SERVER_PORT = PORT
 
