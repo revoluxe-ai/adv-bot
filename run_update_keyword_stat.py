@@ -19,6 +19,6 @@ if __name__ == '__main__':
         try:
             asyncio.run(runner.run_update_keyword_stat(predicted, semaphore))
         except Exception as e:
-            logger.error(f'Ошибка в run_update_keyword_stat: {e}')
+            logger.error(f'Ошибка в run_update_keyword_stat: {e}', exc_info=True)
             asyncio.sleep(60)
             continue
