@@ -220,6 +220,9 @@ class Manager(AbcManager):
             logger.error(
                 f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
             return
+        if not keywords:
+            logger.debug(f'Для {adv_setting.name} не получены ключевые слова')
+            return
         logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
         texts_for_adv_setting = {keyword.text for keyword in keywords}
         existing_keyword_settings = await self._get_existing_keyword_settings(adv_setting.id)
