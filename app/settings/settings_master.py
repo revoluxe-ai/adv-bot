@@ -49,4 +49,17 @@ class Settings:
         return get_document_by_key_name(setting_path, 'MAX_MINUS_KW_THREAD')
 
 
+    @property
+    def clickhouse_host(self):
+        return get_document_by_key_name(setting_path, 'click-house-host')
+    @property
+    def clickhouse_user(self):
+        return get_document_by_key_name(setting_path, 'click-house-user')
+
+    @property
+    def clickhouse_password(self):
+        return get_document_by_key_name(setting_path, 'click-house-password')
+
+
+
 settings = Settings()

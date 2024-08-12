@@ -27,7 +27,6 @@ class Runner:
                     debug=debug_mode)
 
     async def main_loop(self):
-        update_model_on_new_features = asyncio.Event()
         need_update_model = asyncio.Event()
         need_update_model.set()
         predicted = RedisEvent(key='predicted')
@@ -39,19 +38,14 @@ class Runner:
             # self.clear_data_for_expired_wb_cabinets(),
             self.process_payment_for_advs(),
             # self.update_min_ctr_in_global_wb_category_settings(),
-            self.run_update_vectors(need_update_model, update_model_on_new_features),
-            self.run_update_model(update_model_on_new_features, need_update_model),
-            self.run_update_predict_ctr(update_model_on_new_features, predicted),
+            self.run_update_vectors(),
+            self.run_update_model(),
+            self.run_update_predict_ctr(),
             return_exceptions=False
         )
 
-    async def run_update_predict_ctr(self,update_model_on_new_features: asyncio.Event, predicted: RedisEvent):
-        while True:
-             logger.debug('Ожидание разрешения обновления ключей')
-             # await update_model_on_new_features.wait()
-             logger.debug('Блокировка снята')
-             await self._manager.update_predict_ctr(predicted)
-             await asyncio.sleep(1)
+    async def run_update_predict_ctr(self,):
+         await self._manager.update_predict_ctr()
 
 
     async def run_update_keyword_stat(self, need_update_model: asyncio.Event, semaphore: asyncio.Semaphore):
@@ -84,18 +78,16 @@ class Runner:
             await asyncio.sleep(0)
 
 
-    async def run_update_vectors(self, need_update_model:asyncio.Event,
-                                 update_model_on_new_features:asyncio.Event):
-
-        while True:
-            await asyncio.gather(
+    async def run_update_vectors(self):
+            excs = await asyncio.gather(
                 self.update_cards_in_graph(),
-                self._manager.update_wb_adv_phrase_in_db(need_update_model),
+                self._manager.update_wb_adv_phrase_in_db(),
+                self._manager.update_vectors_exec_mode()
             )
-            await self._manager.update_vectors_exec_mode()
-            update_model_on_new_features.set()
-            need_update_model.set()
-            await asyncio.sleep(0)
+            for exc in excs:
+                if exc:
+                    logger.error(f'Ошибка обновления векторов {exc}', exc_info=True)
+
 
 
     async def run_update_minus_keywords_on_wb(self, semaphore: asyncio.Semaphore):
@@ -103,24 +95,20 @@ class Runner:
             .update_keywords_in_advs(semaphore)
 
 
-    async def run_update_model(self, update_model_on_new_features, need_update_model:asyncio.Event):
+    async def run_update_model(self):
         while True:
-            logger.debug('Старт цикла обновления модели')
-            # await need_update_model.wait()
-            logger.debug('need_update_model.wait пройден')
-            await self._manager.update_model(update_model_on_new_features)
-            logger.debug('Цикл обновления модели завершен')
-            await asyncio.sleep(1)
-            logger.debug('Установка clear для need_update_model')
-            need_update_model.clear()
-            await asyncio.sleep(1)
+            await self._manager.update_model()
+            await asyncio.sleep(0)
+
 
     async def update_cards_in_graph(self):
-        try:
-            await self._manager.update_cards_in_graph()
-            logger.debug('Карточки обновлены')
-        except Exception as exc:
-            logger.error(f'Ошибка обновления карточек в neo4j {exc}')
+        while True:
+            try:
+                await self._manager.update_cards_in_graph()
+                logger.debug('Карточки обновлены')
+            except Exception as exc:
+                logger.error(f'Ошибка обновления карточек в neo4j {exc}')
+            await asyncio.sleep(0)
 
 
 

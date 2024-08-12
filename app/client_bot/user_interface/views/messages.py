@@ -201,6 +201,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                 nmids = ' '.join(nmids)
                 name = name + ' ' + nmids
                 name = name.lower()
+                name += str(adv.adv_id)
                 for keyword_filter in keywords_filter:
                     keyword_filter = keyword_filter.strip().lower()
                     if keyword_filter in name:
@@ -446,7 +447,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text = (
                  'Название кампании: ' + str(self._adv_setting.name) + '\n'
                  f'Статус: {self._adv_setting.active_status}\n'
-                 f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""                                                      
+                 f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """                                                      
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
                  'Статистика и настройка ключевых слов \n'
                  f'Минимальный CRT для кампании: {round(self.min_ctr*100, 2)}%\n'
@@ -512,7 +513,8 @@ class KeywordSettingMessage(TextWithKeyboard):
         else:
             self.last_full_update = None
 
-        total_clicks, total_views, total_spend = await data_manager.get_keyword_statistic(self._keyword_setting)
+        total_clicks, total_views, total_spend = await data_manager.get_keyword_statistic_clickhouse(self._keyword_setting,
+                                                                                                     self._adv_setting.adv_id)
 
         self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
 
@@ -804,9 +806,11 @@ class ShopMenu(TextWithKeyboard):
 Дальнейшие шаги:
 💳 Теперь вам нужно пополнить баланс для продолжения работы.
 
-Минимальная сумма пополнения - 100 р.
+Минимальная сумма пополнения - 10 000 р.
+(Если нужно пополнить на меньшую сумму - пишите админу @skyline360\_1)
 Стоимость работы 1 кампании в сутки - 35 р.
 Стоимость парсинга ключей кампании (опционально) - 15 р.
+Стоимость автобиддера - 25 р. кампания в сутки
 📲 Нажмите на кнопку "Пополнить баланс" ниже.
 
 🔖 Если вам нужен купон для тестирования бота, то запросите у админа - @skyline360\_1"""
@@ -1138,21 +1142,22 @@ class WaitingForAmount(Text):
 Прайс:
 - Работа одной кампании, подключенной к боту: 35 р/сутки
 - Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
+- Биддер (управление ставками) - 25 р. в сутки за кампанию
 
         
 🔥 Внимание! Только до {date_to}(завтра):
 
-💰 Бонус 100 % от суммы пополнения!
+💰 Бонус 30 % от суммы пополнения!
 
-🚀 При пополнении счета свыше мастер-суммы: бонус 300 % от суммы пополнения!
+🚀 При пополнении счета свыше мастер-суммы: бонус 100 % от суммы пополнения!
 
 👍 Это делает его не только лучшим, но и самым выгодным решением для автоматизации рекламы на WB!
 
-💼 Мастер-сумма (бонус 300%): {self.master_sum} рублей.
+💼 Мастер-сумма (бонус 100%): {self.master_sum} рублей.
 
 📩 Подробности у администратора бота: @skyline360_1 \n
 
-Укажите сумму пополнения (не менее 100 рублей):"""
+Укажите сумму пополнения (от 10 000 рублей):"""
 
         return text
 

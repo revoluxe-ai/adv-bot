@@ -61,11 +61,11 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
         return
     amount = message.text
     if not amount.isdigit():
-        await message.answer("Введите сумму (число) от 100 рублей")
+        await message.answer("Введите сумму (число) от 10 000 рублей")
         return
     amount = int(amount)
-    if amount < 100:
-        await message.answer("Введите сумму (число) от 100 рублей")
+    if amount < 10000:
+        await message.answer("Введите сумму (число) от 10 000")
         return
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
@@ -132,6 +132,7 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
 Прайс:
 - Работа одной кампании, подключенной к боту: 35 р/сутки
 - Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
+- Автоуправление ставкой: 25 р./сутки
 
         
 🔥 Внимание! Только до {date_to}(завтра):
@@ -163,9 +164,9 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
                 max_amount = 50
             master_sum = max_amount * 2
     if cost >= master_sum:
-        bonus = cost * 3
-    else:
         bonus = cost
+    else:
+        bonus = round(cost*0.3, 2)
 
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']

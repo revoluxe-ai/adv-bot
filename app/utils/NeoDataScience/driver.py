@@ -614,7 +614,8 @@ RETURN graphName
             normalizationStrength: -1,
             iterationWeights: [1, 0.8, 0.5, 0.2, 0.1],
             writeProperty: 'fastrp',
-            nodeSelfInfluence: 0.15
+            nodeSelfInfluence: 0.15,
+            randomSeed: 1
             
         }
     )
@@ -849,7 +850,7 @@ UNWIND phrase.words AS word
 
     async def get_nmid_vectors(self,  nmids: list[int]) -> typing.List[typing.Tuple[int, typing.List[float]]]:
         query = """
-        MATCH (item:Item) WHERE NOT item.nmid  IN  $nmids 
+        MATCH (item:Item) WHERE  item.nmid  IN  $nmids 
         AND item.fastrp IS NOT NULL
         RETURN item.nmid as nmid, item.fastrp as vector
         """
@@ -861,7 +862,7 @@ UNWIND phrase.words AS word
 
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                records = await session.read_transaction(get_nmid_vectors, query, nmids)
+                records = await session.read_transaction(get_nmid_vectors, query, list(nmids))
 
         data = []
         for record in records:
@@ -1115,8 +1116,39 @@ UNWIND phrase.words AS word
             async with driver.session() as session:
                 await session.write_transaction(clear_dead_nodes, query)
 
-    def check_phrase_in_neo(self, text: str):
+    async def get_keywords_vectors_by_keywords(self, keywords: list[str]):
         query = """
-        MATCH (phrase:KeywordPhrase {text: $text}) 
-        
+        MATCH (k:KeywordPhrase) WHERE k.text IN $keywords
+        RETURN k.text as keyword, k.fastrp as vector
         """
+
+        async def get_keywords_vectors_by_keywords(tx, query, keywords):
+            result = await tx.run(query, keywords=keywords)
+            records = await result.data()
+            data = []
+            for record in records:
+                vector = record['vector']
+                keyword = record['keyword']
+                if vector:
+                    data.append((keyword, vector))
+            return data
+
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                data = await session.read_transaction(get_keywords_vectors_by_keywords, query, keywords)
+
+        return data
+
+    async def check_phrase_in_neo(self, text: str):
+        query = """
+         MATCH (phrase:KeywordPhrase {text: $text}) 
+         """
+
+        async def check_phrase(tx, query, text):
+            result = await tx.run(query, text=text)
+            return await result.single()
+
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                result = session.read_transaction(check_phrase, query, text)
+        return result

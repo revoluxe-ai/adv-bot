@@ -2,7 +2,6 @@ import logging
 import re
 import typing
 from typing import List
-
 import aiohttp
 from io import BytesIO
 from itertools import product
@@ -11,9 +10,7 @@ import faiss
 import joblib
 import numpy as np
 from PIL import Image as PilImage
-from sqlalchemy import and_, not_
-from sqlalchemy.orm.base import _T_co
-
+from sqlalchemy import not_
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
@@ -43,8 +40,8 @@ from .ML import Predictor
 import datetime
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
-                                                          AdvKeyword,
                                                           KeywordSetting)
+
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
@@ -55,7 +52,7 @@ from ...client_bot import const
 from ...utils import redis_manager
 from ...utils.redis_manager import RedisEvent
 from  app.modules.wb_keywords_parser import parser
-
+from app.utils.click_house.client import get_clickhouse_client
 
 
 predictor = Predictor()
@@ -100,6 +97,8 @@ class Manager(AbcManager):
         self._aiosm = get_async_session_maker
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
+        self._keywords_in_neo = set()
+
 
     async def update_keyword_stat(self, access: WBCabinetAccess,
                                   need_update_model: asyncio.Event,
@@ -143,78 +142,74 @@ class Manager(AbcManager):
             await asyncio.sleep(0)
         return
 
+    # async def insert_keyword_stats(self, client, keyword_stats, adv_setting):
+    #     try:
+    #         # Генерация новой версии на основе текущего времени
+    #         new_version = int(datetime.datetime.now().timestamp())
+    #
+    #         data_to_insert = [
+    #             [kw.text, kw.date, adv_setting.adv_id, kw.views, kw.clicks, kw.spend, new_version]
+    #             for kw in keyword_stats
+    #         ]
+    #
+    #         await self._insert_keyword_stats(client, data_to_insert)
+    #     except Exception as e:
+    #         logger.error(f"Error inserting data into ClickHouse: {e}")
+    #         raise
+    #
     @staticmethod
-    async def update_keyword_stat_in_db(keyword_stat: KeywordStat,
-                                        adv_setting: AdvSetting,
-                                        session):
-        adv_setting_original_id = adv_setting.id
-        # Проверяем наличие записи в KeywordSetting
-        stmt = select(KeywordSetting).filter(
-            KeywordSetting.text == keyword_stat.text,
-            KeywordSetting.adv_setting_id == adv_setting_original_id
-        )
-        result = await session.execute(stmt)
-        keyword_setting = result.scalar()
+    async def insert_or_update_keywords(client, keyword_stats, adv_setting):
+        try:
+            # Подготовка данных для вставки
+            new_version = int(datetime.datetime.now().timestamp())
+            data_to_insert = []
+            for kw in keyword_stats:
+                date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())
+                data_to_insert.append([kw.text,
+                                       date_time,
+                                       adv_setting.adv_id,
+                                       kw.views, kw.clicks,
+                                       kw.spend,
+                                       new_version])
 
-        # Если запись отсутствует, создаем новую
-        if not keyword_setting:
-            keyword_setting = KeywordSetting(
-                text=keyword_stat.text,
-                adv_setting_id=adv_setting_original_id
+
+            # Удаление существующих записей
+
+            # Вставка новых данных
+            await client.insert(table="default_db.advkeyword"
+                                , data=data_to_insert,
+                                column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
+
+        except Exception as e:
+            logger.error(f"Error handling data in ClickHouse: {e}")
+            raise
+
+
+    async def update_keywords_stat_in_click_house(self, keyword_stats: List[KeywordStat],
+                                                  adv_setting: AdvSetting):
+
+         client = await get_clickhouse_client()
+         try:
+             await self.insert_or_update_keywords(client, keyword_stats, adv_setting)
+         except Exception as e:
+             logger.error(f"Error inserting data into ClickHouse: {e}")
+             raise
+         finally:
+            client.close()
+
+
+
+    @staticmethod
+    async def _get_existing_keyword_settings(adv_setting_id)-> set[str]:
+        async with sm() as session:
+            stmt = select(KeywordSetting).where(
+                KeywordSetting.adv_setting_id == adv_setting_id
             )
-            session.add(keyword_setting)
-            try:
-                await session.commit()  # Коммит для получения ID новой записи
-                await session.refresh(keyword_setting)  # Обновляем объект, чтобы получить ID
-            except Exception as e:
-                await session.rollback()
-                raise e  # Обработка исключения
+            result = await session.execute(stmt)
+            existing_keyword_settings = result.scalars().all()
+        return {ks.text for ks in existing_keyword_settings}
 
-        # Проверяем наличие записи в AdvKeyword
-        stmt = select(AdvKeyword).options(selectinload(AdvKeyword.keyword_setting)).filter(
-            AdvKeyword.text == keyword_stat.text,
-            AdvKeyword.date == keyword_stat.date,
-            AdvKeyword.adv_setting_id == adv_setting_original_id
-        ).order_by(AdvKeyword.date.desc())
-        result = await session.execute(stmt)
-        keyword_db = result.scalar()
 
-        # Если запись отсутствует, создаем новую
-        if not keyword_db:
-            keyword_db = AdvKeyword(
-                text=keyword_stat.text,
-                date=keyword_stat.date,
-                adv_setting_id=adv_setting_original_id,
-                keyword_setting_id=keyword_setting.id,  # Здесь мы устанавливаем значение keyword_setting_id
-                views=keyword_stat.views,
-                clicks=keyword_stat.clicks,
-                spend=keyword_stat.spend
-            )
-            session.add(keyword_db)
-            try:
-                await session.commit()
-            except Exception as e:
-                await session.rollback()
-                raise e  # Обработка исключения
-        else:
-            # Если запись существует, проверяем и обновляем данные
-            updated = False
-            if not keyword_db.keyword_setting:
-                keyword_db.keyword_setting = keyword_setting
-                updated = True
-            if any([keyword_db.views != keyword_stat.views, keyword_db.clicks != keyword_stat.clicks]):
-                keyword_db.views = keyword_stat.views
-                keyword_db.clicks = keyword_stat.clicks
-                keyword_db.spend = keyword_stat.spend
-                updated = True
-
-            if updated:
-                try:
-                    await session.commit()
-                except Exception as e:
-                    await session.rollback()
-                    raise e  # Обработка исключения
-        return
 
     async def keyword_stat_updater(self, adv_setting_id, wb_api, semaphore):
         async with sm(semaphore) as session:
@@ -228,23 +223,19 @@ class Manager(AbcManager):
                 f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
             return
         logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
+        texts_for_adv_setting = {keyword.text for keyword in keywords}
+        existing_keyword_settings = await self._get_existing_keyword_settings(adv_setting.id)
+        new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
         async with sm(semaphore) as session:
-            for keyword in keywords:
-                try:
-                    await self.update_keyword_stat_in_db(keyword, adv_setting,  session)
-                    logger.debug(f'Статистика для ключевого слова {keyword.text} обновлена')
-                except Exception as exc:
-                    logger.error(
-                        f'Ошибка при обновлении статистики ключевых слов для {adv_setting.name}, {exc}',
-                        exc_info=True
-                    )
-                await asyncio.sleep(0)
-        async with sm(semaphore) as session:
-            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-            adv_setting = await session.execute(stmt)
-            adv_setting = adv_setting.scalar()
-            adv_setting.last_update = datetime.datetime.now()
+            for keyword in new_keywords:
+                keyword_setting = KeywordSetting(
+                    text=keyword,
+                    adv_setting_id=adv_setting.id,
+                )
+                session.add(keyword_setting)
+
             await session.commit()
+        await self.update_keywords_stat_in_click_house(keywords, adv_setting)
         return
 
 
@@ -341,9 +332,9 @@ class Manager(AbcManager):
 
 
 
-    async def update_model(self, update_model_on_new_features):
+    async def update_model(self):
         logger.debug('Старт обучения и сохранения модели')
-        await self.fit_and_save_model(update_model_on_new_features)
+        await self.fit_and_save_model()
         logger.debug('Устанавливаю сет, разрешаю обновление ключей')
 
 
@@ -351,15 +342,18 @@ class Manager(AbcManager):
         joblib.dump(model, model_path)
 
 
-    async def fit_and_save_model(self, update_model_on_new_features):
-        await self._fitter.getGradientBoostingFullFitModel(update_model_on_new_features)
+    async def fit_and_save_model(self):
+        await self._fitter.getGradientBoostingFullFitModel()
 
     async def update_vectors_exec_mode(self):
+        while True:
              try:
                  await self.graph_vector_update()
                  await self.graph_updater.get_nmids_and_keyword_featers_for_ml()
              except Exception as exc:
                     logger.error(f'Ошибка обновления векторов {exc}')
+             await asyncio.sleep(0)
+
 
     def __get_keyword_stat(self):
         kw_df = pd.read_csv(self.keyword_stat_df_path)
@@ -367,13 +361,13 @@ class Manager(AbcManager):
 
 
 
-    async def update_wb_adv_phrase_in_db(self, need_update_model):
-        """update_model_on_new_features.set()"""
-        try:
-            await self.update_wb_adv_phrase_in_db_bot_active()
-        except Exception as exc:
-            logger.error(f'Ошибка обновления фраз в neo4j {exc}')
-        need_update_model.set()
+    async def update_wb_adv_phrase_in_db(self):
+        while True:
+            try:
+                await self.update_wb_adv_phrase_in_db_bot_active()
+            except Exception as exc:
+                logger.error(f'Ошибка обновления фраз в neo4j {exc}')
+
 
     async def update_wb_adv_phrase_in_db_bot_active(self):
         async with sm() as session:
@@ -394,8 +388,12 @@ class Manager(AbcManager):
         phrase_data_list = []
         added_to_base = set()
         for text in texts:
+            if text in self._keywords_in_neo:
+                await asyncio.sleep(0)
+                continue
             if self._gds.check_phrase_in_neo(text):
                 logger.debug(f'Фраза {text} уже есть в базе данных')
+                self._keywords_in_neo.add(text)
                 await asyncio.sleep(0)
                 continue
             if text in added_to_base:
@@ -419,6 +417,7 @@ class Manager(AbcManager):
             )
             phrase_data_list.append(phrase_data)
             added_to_base.add(text)
+            self._keywords_in_neo.add(text)
 
         batch = 100
         for i in range(0, len(phrase_data_list), batch):
@@ -536,8 +535,13 @@ class Manager(AbcManager):
         except ValueError:
             return False
 
-    async def update_predict_ctr(self, predicted: RedisEvent):
-        await self._predictor.predict_ctr_for_keywords(predicted)
+    async def update_predict_ctr(self):
+        while True:
+            try:
+                await self._predictor.predict_ctr_for_keywords()
+            except Exception as exc:
+                logger.error(f'Ошибка предсказания CTR {exc}')
+            await asyncio.sleep(0)
 
     @staticmethod
     async def update_min_ctr_in_global_wb_category_settings():
@@ -890,18 +894,24 @@ class Manager(AbcManager):
         max_cpm = adv_setting.max_cpm
         nmid_in_adv = adv_setting.nmids[0]
         promo_positions = []
+        cpm_from_parsing = None
         for keyword in white_adv_keywords:
+            _, views, _= await data_manager.get_keyword_statistic_clickhouse(keyword, adv_id)
+            if views == 0:
+                continue
             await parser.add_wb_positions(keyword.text, {nmid_in_adv})
             position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
             if not position:
                 continue
-            cpm_from_parsing: int = position.cpm
-            if not cpm_from_parsing:
-                continue
             promo_position = position.promo_position
-            if not promo_position:
+            base_position = position.base_position
+            if not promo_position and base_position:
+                logger.debug('Нет буста')
                 continue
             promo_positions.append(promo_position)
+            cpm_from_parsing: int = position.cpm
+            if not cpm_from_parsing:
+                cpm_from_parsing = 125
         if promo_positions:
             fact_max_position: int = max(promo_positions)
             if fact_max_position == 1:
@@ -910,6 +920,8 @@ class Manager(AbcManager):
                 new_cpm = cpm_from_parsing - 1
             elif fact_max_position > max_position_for_adv:
                 new_cpm = cpm_from_parsing + 1
+            else:
+                new_cpm = cpm_from_parsing
 
             if new_cpm > max_cpm:
                 new_cpm = max_cpm
@@ -917,18 +929,3 @@ class Manager(AbcManager):
                 new_cpm = 125
             if new_cpm != cpm_from_parsing:
                await wb_api.advert.update_cpm(adv_id, new_cpm)
-
-
-
-            
-            
-                
-            
-            
-
-
-
-
-
-
-
