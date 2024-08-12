@@ -60,6 +60,8 @@ class Settings:
     def clickhouse_password(self):
         return get_document_by_key_name(setting_path, 'click-house-password')
 
-
+    @property
+    def WEBHOOK_PATH(self):
+        return get_document_by_key_name(setting_path, 'WEBHOOK_PATH')
 
 settings = Settings()

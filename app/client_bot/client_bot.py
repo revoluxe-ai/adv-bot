@@ -40,7 +40,7 @@ WEB_SERVER_PORT = PORT
 
 BASE_WEBHOOK_URL = settings.WEBHOOK_URL
 
-WEBHOOK_PATH = "/telegram_webhook"
+WEBHOOK_PATH = settings.WEBHOOK_PATH
 
 WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
 # WEBHOOK_SECRET = '89779uoiugkftyeoilyeligoyuv' #для нагрузочных тестов
