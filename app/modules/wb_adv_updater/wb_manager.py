@@ -467,8 +467,12 @@ class Manager(AbcManager):
             all_nmids = set()
             for adv in adv_settings:
                 nmids = adv.nmids
+                if not nmids:
+                    continue
                 for nmid in nmids:
                     all_nmids.add(nmid)
+            if not all_nmids:
+                return
             stmt = select(WBCard).where(WBCard.nmid.in_(all_nmids))
             wbcards: list[WBCard] = await session.stream(stmt)
             async for wbcard in  wbcards.scalars():
