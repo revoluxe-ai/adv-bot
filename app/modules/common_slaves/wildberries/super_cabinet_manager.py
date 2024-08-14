@@ -87,6 +87,9 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
                         await session.commit()
                         continue
 
+                    except  ServerTimeoutError as e:
+                        logger.error(f'Ошибка соединения с сервером для кабинета id {wb_cabinet.id}: {e}')
+                        continue
                     except UnknownApiRequestError as e:
                         logger.error(e)
                         users_live_tokens.append(token)
