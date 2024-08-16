@@ -41,6 +41,7 @@ class Runner:
             self.run_update_vectors(),
             # self.run_update_model(),
             self.run_update_predict_ctr(),
+            self.run_vector_update_in_neo4j(),
             return_exceptions=False
         )
 
@@ -210,4 +211,8 @@ class Runner:
 
     async def run_bidder_process(self):
         await self._manager.run_bidder_process()
+
+
+    async def run_vector_update_in_neo4j(self):
+        await self._manager.update_vectors_update_in_graph()
 
