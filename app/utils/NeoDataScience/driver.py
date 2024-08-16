@@ -9,6 +9,7 @@ from neo4j import AsyncGraphDatabase
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordPhrase
 from app.modules.common_slaves.wildberries.models import WBCard, WBCategory
+from app.utils import redis_manager
 from python_modules.path_setting_funcs import get_setting_path
 
 logger = logging.getLogger(__name__)
@@ -1152,3 +1153,51 @@ UNWIND phrase.words AS word
             async with driver.session() as session:
                 result = session.read_transaction(check_phrase, query, text)
         return result
+
+    async def update_vectors_in_redis(self):
+        await self._update_items_vectors_in_redis()
+        await self._update_keywords_vectors_in_redis()
+
+
+    async def _update_items_vectors_in_redis(self):
+        query = """
+        MATCH (item:Item)
+        WHERE item.fastrp IS NOT NULL
+        RETURN item.nmid as nmid, item.fastrp as vector
+        """
+
+        async def get_items_vectors(tx, query):
+            result = await tx.run(query)
+            records = await result.data()
+            return records
+
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                records = await session.read_transaction(get_items_vectors, query)
+
+        for record in records:
+            nmid = record['nmid']
+            vector = record['vector']
+            await redis_manager.set_item_vector(nmid, vector)
+
+
+    async def _update_keywords_vectors_in_redis(self):
+        query = """
+        MATCH (k:KeywordPhrase)
+        WHERE k.fastrp IS NOT NULL
+        RETURN k.text as keyword, k.fastrp as vector
+        """
+
+        async def get_keywords_vectors(tx, query):
+            result = await tx.run(query)
+            records = await result.data()
+            return records
+
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                records = await session.read_transaction(get_keywords_vectors, query)
+
+        for record in records:
+            keyword = record['keyword']
+            vector = record['vector']
+            await redis_manager.set_keyword_vector(keyword, vector)

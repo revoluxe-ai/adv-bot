@@ -930,9 +930,5 @@ class Manager(AbcManager):
             if new_cpm != cpm_from_parsing:
                await wb_api.advert.update_cpm(adv_id, new_cpm)
 
-    async def update_item_vectors_in_redis(self):
-        while  True:
-            try:
-                await self._update_item_vectors_in_redis()
-            except Exception as exc:
-                logger.error(f'Ошибка обновления векторов в redis {exc}')
+    async def update_vectors_in_redis(self):
+        await self._gds.update_vectors_in_redis()

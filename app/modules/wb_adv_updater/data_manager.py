@@ -511,8 +511,16 @@ class DataGetter(AbcManager):
         result = await self._gds.get_nmid_vectors(nmids_batch)
         return result
 
+    async def get_item_features_from_redis(self, nmids_batch):
+        result = await redis_manager.get_nmid_vectors(nmids_batch)
+        return result
+
     async def get_keyword_features_from_neo(self, keywords):
         result = await self._gds.get_keywords_vectors_by_keywords(keywords)
+        return result
+
+    async def get_keyword_features_from_redis(self, keywords):
+        result = await redis_manager.get_keywords_vectors(keywords)
         return result
 
 

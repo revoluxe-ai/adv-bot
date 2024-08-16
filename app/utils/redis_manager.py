@@ -217,3 +217,53 @@ async def get_block_position_status(keywordsetting_original_id: int) -> tuple[st
     timestamp = float(timestamp)
     timestamp = datetime.datetime.fromtimestamp(timestamp)
     return block_position_status, timestamp
+
+
+async def set_item_vector(nmid: int, vector: list[float]) -> None:
+    key = 'item_vector:' + str(nmid)
+    await redis_client.set(key, json.dumps(vector))
+
+
+async def get_item_vector(nmid: int) -> list[float]:
+    key = 'item_vector:' + str(nmid)
+    vector_bytes = await redis_client.get(key)
+    if vector_bytes is None:
+        return None
+    vector_str = vector_bytes.decode('utf-8')
+    vector = json.loads(vector_str)
+    return vector
+
+
+async def set_keyword_vector(keyword: str, vector: list[float]) -> None:
+    key = 'keyword_vector:' + keyword
+    await redis_client.set(key, json.dumps(vector))
+
+async def get_keyword_vector(keyword: str) -> list[float]:
+    key = 'keyword_vector:' + keyword
+    vector_bytes = await redis_client.get(key)
+    if vector_bytes is None:
+        return None
+    vector_str = vector_bytes.decode('utf-8')
+    vector = json.loads(vector_str)
+    return vector
+
+
+
+
+async def get_keywords_vectors(keywords)->list[tuple[str, list[float]]]:
+    vectors = []
+    for keyword in keywords:
+       vector = await get_keyword_vector(keyword)
+       if vector:
+              vectors.append((keyword, vector))
+    return vectors
+
+
+
+async def get_nmid_vectors(nmids_batch: list[int]) -> list[tuple[int, list[float]]]:
+    vectors = []
+    for nmid in nmids_batch:
+        vector = await get_item_vector(nmid)
+        if vector:
+            vectors.append((nmid, vector))
+    return vectors

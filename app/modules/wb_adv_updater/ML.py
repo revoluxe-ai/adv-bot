@@ -138,7 +138,7 @@ class Fitter(AbcManager):
         return df
 
     async def __fetch_keyword_features(self, keywords: list[str]):
-        result = await self.get_keyword_features_from_neo(keywords)
+        result = await self.data_getter.get_keyword_features_from_redis(keywords)
         return result
 
     async def _get_df_for_fit(self) -> pd.DataFrame:
@@ -286,7 +286,7 @@ class Fitter(AbcManager):
         await asyncio.to_thread(save_model, model, time_stamp= None)
 
     async def get_nmid_to_item_features(self, nmids_batch: set[int]) -> dict[int, np.ndarray]:
-        result = await self.data_getter.get_item_features_from_neo(nmids_batch)
+        result = await self.data_getter.get_item_features_from_redis(nmids_batch)
         result_list = []
         for row in result:
             nmid = row[0]
@@ -294,8 +294,8 @@ class Fitter(AbcManager):
             result_list.append((nmid, vector))
         return dict(result_list)
 
-    async def get_keyword_features_from_neo(self, keywords):
-         result = await self.data_getter.get_keyword_features_from_neo(keywords)
+    async def get_keyword_features(self, keywords):
+         result = await self.data_getter.get_keyword_features_from_redis(keywords)
          keyword_to_features = {}
          for row in result:
             keyword = row[0]
@@ -446,7 +446,7 @@ class Predictor:
                  continue
            clear_keywords = [keyword.text.replace('_', ' ') for keyword in adv.keyword_settings]
            # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
-           keyword_features_result = await self.get_keyword_features_from_neo(clear_keywords)
+           keyword_features_result = await self.get_keyword_features(clear_keywords)
            for keyword in adv.keyword_settings:
                text = keyword.text.replace('_', ' ')
                keyword_features = keyword_features_result.get(text, [])
@@ -473,9 +473,9 @@ class Predictor:
         result = await fitter.get_nmid_to_item_features(nmids)
         return result
 
-    async def get_keyword_features_from_neo(self, clear_keywords):
+    async def get_keyword_features(self, clear_keywords):
         fitter = Fitter()
-        result = await fitter.get_keyword_features_from_neo(clear_keywords)
+        result = await fitter.get_keyword_features(clear_keywords)
         return result
 
 
