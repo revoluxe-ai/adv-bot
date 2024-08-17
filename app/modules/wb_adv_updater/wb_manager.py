@@ -1,6 +1,7 @@
 import logging
 import re
 import typing
+from asyncio import Semaphore
 from typing import List
 import aiohttp
 from io import BytesIO
@@ -367,11 +368,10 @@ class Manager(AbcManager):
             except Exception as exc:
                 logger.error(f'Ошибка обновления фраз в neo4j {exc}')
 
-
     async def update_wb_adv_phrase_in_db_bot_active(self):
         async with sm() as session:
-            stmt = select(KeywordSetting.text)\
-            .join(AdvSetting)
+            stmt = select(KeywordSetting.text) \
+                .join(AdvSetting)
             result = await session.execute(stmt)
             texts = result.unique().scalars().all()
         texts = [text for text in texts if text]
@@ -381,9 +381,11 @@ class Manager(AbcManager):
             text = text.replace(',', '.')
             new_texts.append(text)
         texts = new_texts
-        # keyword_phrases_in_neo = await self._gds.get_keyword_phrases()
-        phrase_data_list = []
+
         added_to_base = set()
+        batch_size = 100
+        phrase_data_list = []
+
         for text in texts:
             if text in self._keywords_in_neo:
                 await asyncio.sleep(0)
@@ -397,6 +399,7 @@ class Manager(AbcManager):
                 logger.debug(f'Фраза {text} уже добавлена в список')
                 await asyncio.sleep(0)
                 continue
+
             words = text.split()
             keywords = []
             for word in words:
@@ -410,16 +413,23 @@ class Manager(AbcManager):
                 text=text,
                 words=keywords,
                 word2vec=await self._word2vec.average_vector_from_sentence(text)
-
             )
             phrase_data_list.append(phrase_data)
             added_to_base.add(text)
             self._keywords_in_neo.add(text)
 
-        batch = 100
-        for i in range(0, len(phrase_data_list), batch):
-            await self._gds.add_keyword_phrase(phrase_data_list[i:i+batch])
+            # Записываем, если набрался полный батч
+            if len(phrase_data_list) >= batch_size:
+                await self._gds.add_keyword_phrase(phrase_data_list)
+                phrase_data_list.clear()
+                await asyncio.sleep(0)
+
+        # Записываем оставшиеся данные, если они есть
+        if phrase_data_list:
+            await self._gds.add_keyword_phrase(phrase_data_list)
             await asyncio.sleep(0)
+
+
 
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):
         if self._phrase_index is None:
