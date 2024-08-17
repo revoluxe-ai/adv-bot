@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import re
 import typing
@@ -98,7 +99,7 @@ class Manager(AbcManager):
         self._aiosm = get_async_session_maker
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
-        self._keywords_in_neo = set()
+        self._keywords_in_neo_hashs = set()
 
 
     async def update_keyword_stat(self, access: WBCabinetAccess,
@@ -368,6 +369,12 @@ class Manager(AbcManager):
             except Exception as exc:
                 logger.error(f'Ошибка обновления фраз в neo4j {exc}')
 
+    @staticmethod
+    def hash_text(text):
+        """Хэширует текст для хранения в множестве."""
+        return hashlib.md5(text.encode('utf-8')).hexdigest()
+
+
     async def update_wb_adv_phrase_in_db_bot_active(self):
         async with sm() as session:
             stmt = select(KeywordSetting.text).join(AdvSetting)
@@ -376,21 +383,23 @@ class Manager(AbcManager):
 
         new_texts = [text.replace('_', ' ').replace(',', '.') for text in texts]
 
-        added_to_base = set()
+        added_to_base_hashs = set()
         batch_size = 100
 
         async def process_texts(texts):
             phrase_data_list = []
             for text in texts:
-                if text in self._keywords_in_neo:
+                hash_text = self.hash_text(text)
+                if hash_text in self._keywords_in_neo_hashs:
                     await asyncio.sleep(0)
                     continue
                 if await self._gds.check_phrase_in_neo(text):
                     logger.debug(f'Фраза {text} уже есть в базе данных')
-                    self._keywords_in_neo.add(text)
+                    self._keywords_in_neo_hashs.add(text)
                     await asyncio.sleep(0)
                     continue
-                if text in added_to_base:
+
+                if hash_text in added_to_base_hashs:
                     logger.debug(f'Фраза {text} уже добавлена в список')
                     await asyncio.sleep(0)
                     continue
@@ -410,8 +419,8 @@ class Manager(AbcManager):
                     word2vec=await self._word2vec.average_vector_from_sentence(text)
                 )
                 phrase_data_list.append(phrase_data)
-                added_to_base.add(text)
-                self._keywords_in_neo.add(text)
+                added_to_base_hashs.add(hash_text)
+                self._keywords_in_neo_hashs.add(hash_text)
 
                 if len(phrase_data_list) >= batch_size:
                     await self._gds.add_keyword_phrase(phrase_data_list)
