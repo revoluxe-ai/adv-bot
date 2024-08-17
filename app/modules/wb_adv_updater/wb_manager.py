@@ -1,6 +1,7 @@
 import logging
 import re
 import typing
+import tracemalloc
 from asyncio import Semaphore
 from typing import List
 import aiohttp
@@ -369,11 +370,13 @@ class Manager(AbcManager):
                 logger.error(f'Ошибка обновления фраз в neo4j {exc}')
 
     async def update_wb_adv_phrase_in_db_bot_active(self):
+        tracemalloc.start()
+
         async with sm() as session:
-            stmt = select(KeywordSetting.text) \
-                .join(AdvSetting)
+            stmt = select(KeywordSetting.text).join(AdvSetting)
             result = await session.execute(stmt)
             texts = result.unique().scalars().all()
+
         texts = [text for text in texts if text]
         new_texts = []
         for text in texts:
@@ -424,10 +427,22 @@ class Manager(AbcManager):
                 phrase_data_list.clear()
                 await asyncio.sleep(0)
 
+            # Снимок после обработки текста
+            snapshot = tracemalloc.take_snapshot()
+            top_stats = snapshot.statistics('lineno')
+
+            print("\n[ Top 10 ]")
+            for stat in top_stats[:10]:
+                print(stat)
+
+            await asyncio.sleep(1)  # Задержка 1 секунда
+
         # Записываем оставшиеся данные, если они есть
         if phrase_data_list:
             await self._gds.add_keyword_phrase(phrase_data_list)
             await asyncio.sleep(0)
+
+        tracemalloc.stop()
 
 
 
