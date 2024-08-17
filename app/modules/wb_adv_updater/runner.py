@@ -32,17 +32,17 @@ class Runner:
         predicted = RedisEvent(key='predicted')
         await predicted.set()
         await asyncio.gather(
-            self.payment_for_auto_bidder(),
-            self.payment_for_parsing_keyword(),
+            # self.payment_for_auto_bidder(),
+            # self.payment_for_parsing_keyword(),
             # self.run_bidder_process(),
             # self.clear_data_for_expired_wb_cabinets(),
-            self.process_payment_for_advs(),
+            # self.process_payment_for_advs(),
             # self.update_min_ctr_in_global_wb_category_settings(),
             # self.run_update_vectors(),
             # self.run_update_model(),
-            self.run_update_predict_ctr(),
+            # self.run_update_predict_ctr(),
             self.run_update_vectors_in_redis(),
-            self.run_vector_update_in_neo4j(),
+            # self.run_vector_update_in_neo4j(),
             return_exceptions=False
         )
 
