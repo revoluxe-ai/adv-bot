@@ -2,6 +2,8 @@ import hashlib
 import logging
 import re
 import typing
+from memory_profiler import profile
+
 import tracemalloc
 from asyncio import Semaphore
 from typing import List
@@ -941,3 +943,22 @@ class Manager(AbcManager):
 
     async def update_vectors_in_redis(self):
         await self._gds.update_vectors_in_redis()
+
+    @profile
+    async def _get_phrase_data(self, text):
+        words = text.split()
+        keywords = []
+        for word in words:
+            vector = await self._word2vec.average_vector_from_sentence(word)
+            if vector is not None:
+                vector = list(vector)
+            keywords.append(KeywordStatForNeo(text=word, vector=vector))
+            await asyncio.sleep(0)
+
+        phrase_data = KeywordPhrase(
+            text=text,
+            words=keywords,
+            word2vec=await self._word2vec.average_vector_from_sentence(text)
+        )
+
+        return  phrase_data

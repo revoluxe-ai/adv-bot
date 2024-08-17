@@ -40,8 +40,8 @@ class Runner:
             # self.update_min_ctr_in_global_wb_category_settings(),
             # self.run_update_vectors(),
             # self.run_update_model(),
-            # self.run_update_predict_ctr(),
-            self.run_update_vectors_in_redis(),
+            self.run_update_predict_ctr(),
+            # self.run_update_vectors_in_redis(),
             # self.run_vector_update_in_neo4j(),
             return_exceptions=False
         )
