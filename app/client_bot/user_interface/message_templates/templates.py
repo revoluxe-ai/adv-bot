@@ -23,10 +23,11 @@ class LastMessage(types.Message):
 def manage_file_id(func):
     @wraps(func)
     async def wrapper(self, *args, **kwargs):
-
+        logger.debug('Вызов обертки manage_file_id')
         # Получение и изменение file_id перед вызовом основной функции
         old_image = self.image
         if old_image:
+            logger.debug('Получение изображения')
             image: Union[io.BytesIO, str] = await file_handler.get_telegram_image(old_image, self.bot)
 
             if isinstance(image, io.BytesIO):
