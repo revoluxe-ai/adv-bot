@@ -26,9 +26,6 @@ async def get_telegram_image(image_path: str, bot: aiogram.Bot) -> Union[InputFi
     return result
 
 
-
-
-
 async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[str, InputFile]:
     logger.debug(f"Начало обработки файла: {image_path}")
 
@@ -39,7 +36,6 @@ async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[st
     try:
         if image_path.startswith('http'):
             logger.debug(f"Загрузка изображения по HTTP: {image_path}")
-            # Загрузка изображения по HTTP
             async with aiohttp.ClientSession() as session:
                 async with session.get(image_path) as response:
                     logger.debug(f"HTTP ответ: {response.status}")
@@ -47,8 +43,6 @@ async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[st
                         image_bytes = await response.read()
                         logger.debug("Изображение успешно загружено по HTTP")
                         buffered_image = BytesIO(image_bytes)
-                        pil_image = PilImage.open(buffered_image)
-                        logger.debug("Изображение открыто с помощью PIL")
                     else:
                         raise Exception(f"Ошибка загрузки изображения: HTTP {response.status}")
         else:
@@ -57,20 +51,18 @@ async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[st
                 content = await f.read()
                 logger.debug("Изображение успешно прочитано из файла")
                 buffered_image = io.BytesIO(content)
-            pil_image = PilImage.open(buffered_image)
-            logger.debug("Изображение открыто с помощью PIL")
+
+        pil_image = PilImage.open(buffered_image)
+        logger.debug(f"Изображение открыто с помощью PIL в формате: {pil_image.format}")
+
+        if pil_image.format == "WEBP":
+            logger.debug("Изображение в формате WebP")
+            pil_image = pil_image.convert("RGB")
+            logger.debug("Изображение WebP конвертировано в RGB")
+
     except Exception as e:
         logger.error(f"Ошибка загрузки изображения: {e}")
-        try:
-            async with aiofiles.open(image_path, 'rb') as f:
-                content = await f.read()
-                logger.debug("Повторное чтение изображения из файла после ошибки")
-                buffered_image = io.BytesIO(content)
-            pil_image = PilImage.open(buffered_image)
-            logger.debug("Изображение открыто с помощью PIL после ошибки")
-        except Exception as e_inner:
-            logger.error(f"Ошибка при повторной попытке: {e_inner}")
-            raise e_inner
+        raise e
 
     logger.debug("Начало вычисления хэша изображения")
     dhash = image_tools.dhash(pil_image)
@@ -84,6 +76,7 @@ async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[st
         return file_id
     else:
         logger.debug("Файл не найден, создание нового BufferedInputFile")
+        buffered_image.seek(0)
         return BufferedInputFile(buffered_image.getvalue(), filename='wbgram.png')
 
 
