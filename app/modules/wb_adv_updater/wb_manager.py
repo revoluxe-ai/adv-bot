@@ -423,23 +423,29 @@ class Manager(AbcManager):
 
             # Записываем, если набрался полный батч
             if len(phrase_data_list) >= batch_size:
+                logger.debug('Добавляем батч фраз в базу данных')
                 await self._gds.add_keyword_phrase(phrase_data_list)
+                logger.debug('Батч добавлен')
                 phrase_data_list.clear()
                 await asyncio.sleep(0)
 
-            # Снимок после обработки текста
+            logger.debug('Пытаемся сделать snap-shot')
             snapshot = tracemalloc.take_snapshot()
+            logger.debug('Сделали snap-shot')
             top_stats = snapshot.statistics('lineno')
+            logger.debug('Выводим статистику')
 
             print("\n[ Top 10 ]")
             for stat in top_stats[:10]:
                 print(stat)
-
+            logger.debug('Вывели статистику')
             await asyncio.sleep(1)  # Задержка 1 секунда
 
         # Записываем оставшиеся данные, если они есть
         if phrase_data_list:
+            logger.debug('Добавляем оставшиеся фразы в базу данных')
             await self._gds.add_keyword_phrase(phrase_data_list)
+            logger.debug('Оставшиеся фразы добавлены')
             await asyncio.sleep(0)
 
         tracemalloc.stop()
