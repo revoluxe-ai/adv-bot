@@ -1,7 +1,8 @@
+import hashlib
 import io
 from io import BytesIO
 from typing import Union
-
+import os
 import aiofiles
 import aiogram
 from aiogram import Bot
@@ -25,6 +26,30 @@ async def get_telegram_image(image_path: str, bot: aiogram.Bot) -> Union[InputFi
     result = await _get_telegram_file(image_path, bot)
     return result
 
+def get_image_from_disc_path(image_path: str) -> str:
+    home_path = os.path.expanduser("~")
+    wb_cards_image_folder = os.path.join(home_path, "wb_cards_images")
+    image_path_hash = hashlib.md5(image_path.encode()).hexdigest()
+    image_path = os.path.join(wb_cards_image_folder, f"{image_path_hash}.png")
+    return image_path
+
+async def get_image_from_disc(image_path: str) -> BytesIO:
+    image_path = get_image_from_disc_path(image_path)
+    if os.path.exists(image_path):
+        async with aiofiles.open(image_path, 'rb') as f:
+            content = await f.read()
+            return BytesIO(content)
+    return None
+
+
+async def save_image_to_disc(url: str, image: BytesIO):
+    image_path = get_image_from_disc_path(url)
+    image_path_dir = os.path.dirname(image_path)
+    if not os.path.exists(image_path_dir):
+        os.makedirs(image_path_dir)
+    async with aiofiles.open(image_path, 'wb') as f:
+        await f.write(image.getvalue())
+
 
 async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[str, InputFile]:
     logger.debug(f"Начало обработки файла: {image_path}")
@@ -35,6 +60,9 @@ async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[st
 
     try:
         if image_path.startswith('http'):
+            buffered_image = await get_image_from_disc(image_path)
+            if buffered_image:
+                return BufferedInputFile(buffered_image.getvalue(), filename='wbgram')
             logger.debug(f"Загрузка изображения по HTTP: {image_path}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(image_path) as response:
@@ -43,6 +71,7 @@ async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[st
                         image_bytes = await response.read()
                         logger.debug("Изображение успешно загружено по HTTP")
                         buffered_image = BytesIO(image_bytes)
+                        await save_image_to_disc(image_path, buffered_image)
                     else:
                         raise Exception(f"Ошибка загрузки изображения: HTTP {response.status}")
         else:
