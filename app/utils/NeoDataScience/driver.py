@@ -685,7 +685,8 @@ RETURN graphName
                 """
         async def create_base_graph(tx, graph_name):
             result = await tx.run(query, graph_name=graph_name)
-            return await result.single()
+            result = await result.data()
+            return result
 
         async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
@@ -1143,6 +1144,7 @@ UNWIND phrase.words AS word
     async def check_phrase_in_neo(self, text: str):
         query = """
          MATCH (phrase:KeywordPhrase {text: $text}) 
+         RETURN phrase.text as keyword
          """
 
         async def check_phrase(tx, query, text):
@@ -1151,7 +1153,7 @@ UNWIND phrase.words AS word
 
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                result = session.read_transaction(check_phrase, query, text)
+                result = await session.read_transaction(check_phrase, query, text)
         return result
 
     async def update_vectors_in_redis(self):
