@@ -72,7 +72,7 @@ class GraphUpdater:
                     break
 
                else:
-                    raise  # Перебросить исключение, если ошибка не связана с выполняющимся заданием
+                    raise  e # Перебросить исключение, если ошибка не связана с выполняющимся заданием
 
     async def _update_nmids_vectors(self):
         async with sm() as session:

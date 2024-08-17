@@ -519,7 +519,7 @@ class DataGetter(AbcManager):
         result = await self._gds.get_keywords_vectors_by_keywords(keywords)
         return result
 
-    async def get_keyword_features_from_redis(self, keywords):
+    async def get_keyword_features_from_redis(self, keywords)->list[tuple[str, list[float]]]:
         result = await redis_manager.get_keywords_vectors(keywords)
         return result
 

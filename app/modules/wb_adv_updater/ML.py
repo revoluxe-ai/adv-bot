@@ -137,8 +137,8 @@ class Fitter(AbcManager):
         df['ctr'] = df.apply(calculate_ctr, axis=1)
         return df
 
-    async def __fetch_keyword_features(self, keywords: list[str]):
-        result = await self.data_getter.get_keyword_features_from_redis(keywords)
+    async def __fetch_keyword_features(self, keywords: list[str])->list[tuple[str, list[float]]]:
+        result: list[tuple[str, list[float]]] = await self.data_getter.get_keyword_features_from_redis(keywords)
         return result
 
     async def _get_df_for_fit(self) -> pd.DataFrame:
@@ -180,6 +180,7 @@ class Fitter(AbcManager):
                 nmid_to_item_features = await self.get_nmid_to_item_features(nmids_batch)
         if keywords_batch:
             keyword_to_features = await self.__fetch_keyword_features(list(keywords_batch))
+            keyword_to_features = dict(keyword_to_features)
 
         for adv in adv_settings:
             try:
