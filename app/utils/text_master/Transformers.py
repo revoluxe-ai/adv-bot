@@ -6,6 +6,7 @@ from functools import partial
 
 from gensim.models.keyedvectors import KeyedVectors
 from huggingface_hub import hf_hub_download
+from memory_profiler import profile
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,8 @@ class Word2Vec:
     def _most_similar(self, word):
         return self._model.most_similar(word)
 
+
+    @profile
     async def average_vector_from_sentence(self, phrase):
         async with self._load_model_lock:
             if self._model is None:

@@ -23,6 +23,9 @@ from app.utils.db.session_maker import get_async_session_maker
 from .start import start_registration
 from ..views import callbacks, messages
 from app.client_bot.user_interface import states
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 router = Router()
@@ -410,6 +413,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
 
     chat_id = callback.message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
+    logger.debug('Обработка собщения')
     await messages.AdvKeywordsSetting(
         bot,
         chat_id,
@@ -420,7 +424,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
         main_photos[0],
         page,
     )(state)
-
+    logger.debug('Отправили сообщение')
     await redis_manager.set_check_last_24_hours(adv_original_id)
     return
 

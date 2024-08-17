@@ -2,6 +2,9 @@ import hashlib
 import logging
 import re
 import typing
+from memory_profiler import profile
+
+import tracemalloc
 from asyncio import Semaphore
 from typing import List
 import aiohttp
@@ -11,6 +14,7 @@ import dask.dataframe as dd
 import faiss
 import joblib
 import numpy as np
+import psutil
 from PIL import Image as PilImage
 from sqlalchemy import not_
 from app.client_bot.bot import bot
@@ -99,7 +103,8 @@ class Manager(AbcManager):
         self._aiosm = get_async_session_maker
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
-        self._keywords_in_neo_hashs = set()
+        self._keywords_hashs_in_neo = set()
+
 
 
     async def update_keyword_stat(self, access: WBCabinetAccess,
@@ -369,71 +374,57 @@ class Manager(AbcManager):
             except Exception as exc:
                 logger.error(f'Ошибка обновления фраз в neo4j {exc}')
 
-    @staticmethod
-    def hash_text(text):
-        """Хэширует текст для хранения в множестве."""
-        return hashlib.md5(text.encode('utf-8')).hexdigest()
-
 
     async def update_wb_adv_phrase_in_db_bot_active(self):
+        process = psutil.Process()  # Получаем процесс текущей программы
+
         async with sm() as session:
             stmt = select(KeywordSetting.text).join(AdvSetting)
             result = await session.execute(stmt)
-            texts = [text for text in result.unique().scalars() if text]
+            texts = result.unique().scalars().all()
 
-        new_texts = [text.replace('_', ' ').replace(',', '.') for text in texts]
+        texts = [text for text in texts if text]
+        new_texts = []
+        for text in texts:
+            text = text.replace('_', ' ')
+            text = text.replace(',', '.')
+            new_texts.append(text)
+        texts = new_texts
 
-        added_to_base_hashs = set()
         batch_size = 100
+        phrase_data_list = []
 
-        async def process_texts(texts):
-            phrase_data_list = []
-            for text in texts:
-                hash_text = self.hash_text(text)
-                if hash_text in self._keywords_in_neo_hashs:
-                    await asyncio.sleep(0)
-                    continue
-                if await self._gds.check_phrase_in_neo(text):
-                    logger.debug(f'Фраза {text} уже есть в базе данных')
-                    self._keywords_in_neo_hashs.add(text)
-                    await asyncio.sleep(0)
-                    continue
+        for text in texts:
+            hash_text = self.get_text_hash(text)
+            if hash_text in self._keywords_hashs_in_neo:
+                await asyncio.sleep(0)
+                return
+            if await self._gds.check_phrase_in_neo(text):
+                logger.debug(f'Фраза {text} уже есть в базе данных')
+                self._keywords_hashs_in_neo.add(hash_text)
+                await asyncio.sleep(0)
+                return
 
-                if hash_text in added_to_base_hashs:
-                    logger.debug(f'Фраза {text} уже добавлена в список')
-                    await asyncio.sleep(0)
-                    continue
+            phrase_data = await self._get_phrase_data(text)
+            phrase_data_list.append(phrase_data)
+            self._keywords_hashs_in_neo.add(hash_text)
 
-                words = text.split()
-                keywords = []
-                for word in words:
-                    vector = await self._word2vec.average_vector_from_sentence(word)
-                    if vector is not None:
-                        vector = list(vector)
-                    keywords.append(KeywordStatForNeo(text=word, vector=vector))
-                    await asyncio.sleep(0)
-
-                phrase_data = KeywordPhrase(
-                    text=text,
-                    words=keywords,
-                    word2vec=await self._word2vec.average_vector_from_sentence(text)
-                )
-                phrase_data_list.append(phrase_data)
-                added_to_base_hashs.add(hash_text)
-                self._keywords_in_neo_hashs.add(hash_text)
-
-                if len(phrase_data_list) >= batch_size:
-                    await self._gds.add_keyword_phrase(phrase_data_list)
-                    phrase_data_list.clear()
-                    await asyncio.sleep(0)
-
-            if phrase_data_list:
+            # Записываем, если набрался полный батч
+            if len(phrase_data_list) >= batch_size:
                 await self._gds.add_keyword_phrase(phrase_data_list)
+                phrase_data_list.clear()
                 await asyncio.sleep(0)
 
-        # Используйте генератор для обработки текстов
-        await process_texts(new_texts)
+            # Получение текущего использования памяти
+            mem_info = process.memory_info()
+            print(f"Memory usage: RSS={mem_info.rss / 1024 ** 2:.2f} MB, VMS={mem_info.vms / 1024 ** 2:.2f} MB")
 
+            await asyncio.sleep(1)  # Задержка 1 секунда
+
+        # Записываем оставшиеся данные, если они есть
+        if phrase_data_list:
+            await self._gds.add_keyword_phrase(phrase_data_list)
+            await asyncio.sleep(0)
 
 
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):
@@ -944,6 +935,31 @@ class Manager(AbcManager):
                 new_cpm = 125
             if new_cpm != cpm_from_parsing:
                await wb_api.advert.update_cpm(adv_id, new_cpm)
+    @staticmethod
+    def get_text_hash(text):
+        hash_text = hashlib.md5(text.encode()).hexdigest()
+        return hash_text
+
+
 
     async def update_vectors_in_redis(self):
         await self._gds.update_vectors_in_redis()
+
+    @profile
+    async def _get_phrase_data(self, text):
+        words = text.split()
+        keywords = []
+        for word in words:
+            vector = await self._word2vec.average_vector_from_sentence(word)
+            if vector is not None:
+                vector = list(vector)
+            keywords.append(KeywordStatForNeo(text=word, vector=vector))
+            await asyncio.sleep(0)
+
+        phrase_data = KeywordPhrase(
+            text=text,
+            words=keywords,
+            word2vec=await self._word2vec.average_vector_from_sentence(text)
+        )
+
+        return  phrase_data

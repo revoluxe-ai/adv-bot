@@ -311,7 +311,11 @@ class Predictor:
 
     def _predict(self, df: pd.DataFrame)-> typing.Union[pd.DataFrame, None]:
         model = load_model()
-        X = df.drop(['keyword', 'adv_id'], axis=1)
+        try:
+            X = df.drop(['keyword', 'adv_id'], axis=1)
+        except Exception as exc:
+            logger.error(f'Ошибка удаления столбцов, длина df: {len(df)}')
+            raise exc
         y = model.predict(X)
         df['predicted_ctr'] = y
         return df
@@ -359,10 +363,11 @@ class Predictor:
             logger.error(f'Ошибка при получении данных для предсказания: {exc}')
             raise exc
         try:
-            predict_df = await asyncio.to_thread(self._predict, df_for_predict)
+            predict_df: pd.DataFrame = await asyncio.to_thread(self._predict, df_for_predict)
         except Exception as exc:
-            logger.error(f'Ошибка при предсказании: {exc}')
+            logger.error(f'Ошибка при предсказании: {exc}', exc_info=True)
             raise exc
+
         predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
         await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
         # predict_df = pd.read_csv('work_folder/предсказания.csv')
