@@ -437,7 +437,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                     continue
                 clear_keywords.append(keyword)
             self._keywords = clear_keywords
-
+        logger.debug("Начинаю отправку сообщения")
         await super().__call__()
 
     @property
