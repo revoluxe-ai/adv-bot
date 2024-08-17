@@ -108,7 +108,7 @@ class Runner:
                 await self._manager.update_cards_in_graph()
                 logger.debug('Карточки обновлены')
             except Exception as exc:
-                logger.error(f'Ошибка обновления карточек в neo4j {exc}')
+                logger.error(f'Ошибка обновления карточек в neo4j {exc}', exc_info=True)
             await asyncio.sleep(0)
 
 
