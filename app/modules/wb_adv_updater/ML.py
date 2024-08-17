@@ -361,7 +361,7 @@ class Predictor:
         try:
             predict_df = await asyncio.to_thread(self._predict, df_for_predict)
         except Exception as exc:
-            logger.error(f'Ошибка при предсказании: {exc}')
+            logger.error(f'Ошибка при предсказании: {exc}', exc_info=True)
             raise exc
         predict_df['predicted_ctr'] = predict_df['predicted_ctr'].apply(lambda ctr: ctr if ctr >=0 else 0)
         await asyncio.to_thread(predict_df.to_csv, 'work_folder/предсказания.csv')
