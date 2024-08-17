@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import re
 import typing
@@ -100,7 +101,7 @@ class Manager(AbcManager):
         self._aiosm = get_async_session_maker
         self._pymystem = pymystem3.Mystem()
         self._image_tools = image_tools
-        self._keywords_in_neo = set()
+        self._keywords_hashs_in_neo = set()
 
 
     async def update_keyword_stat(self, access: WBCabinetAccess,
@@ -386,41 +387,23 @@ class Manager(AbcManager):
             new_texts.append(text)
         texts = new_texts
 
-        added_to_base = set()
         batch_size = 100
         phrase_data_list = []
 
         for text in texts:
-            if text in self._keywords_in_neo:
+            hash_text = self.get_text_hash(text)
+            if hash_text in self._keywords_hashs_in_neo:
                 await asyncio.sleep(0)
-                continue
+                return
             if await self._gds.check_phrase_in_neo(text):
                 logger.debug(f'Фраза {text} уже есть в базе данных')
-                self._keywords_in_neo.add(text)
+                self._keywords_hashs_in_neo.add(hash_text)
                 await asyncio.sleep(0)
-                continue
-            if text in added_to_base:
-                logger.debug(f'Фраза {text} уже добавлена в список')
-                await asyncio.sleep(0)
-                continue
+                return
 
-            words = text.split()
-            keywords = []
-            for word in words:
-                vector = await self._word2vec.average_vector_from_sentence(word)
-                if vector is not None:
-                    vector = list(vector)
-                keywords.append(KeywordStatForNeo(text=word, vector=vector))
-                await asyncio.sleep(0)
-
-            phrase_data = KeywordPhrase(
-                text=text,
-                words=keywords,
-                word2vec=await self._word2vec.average_vector_from_sentence(text)
-            )
+            phrase_data = await self._get_phrase_data(text)
             phrase_data_list.append(phrase_data)
-            added_to_base.add(text)
-            self._keywords_in_neo.add(text)
+            self._keywords_hashs_in_neo.add(hash_text)
 
             # Записываем, если набрался полный батч
             if len(phrase_data_list) >= batch_size:
@@ -949,6 +932,12 @@ class Manager(AbcManager):
                 new_cpm = 125
             if new_cpm != cpm_from_parsing:
                await wb_api.advert.update_cpm(adv_id, new_cpm)
+    @staticmethod
+    def get_text_hash(text):
+        hash_text = hashlib.md5(text.encode()).hexdigest()
+        return hash_text
+
+
 
     async def update_vectors_in_redis(self):
         await self._gds.update_vectors_in_redis()
