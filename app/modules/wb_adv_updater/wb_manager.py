@@ -370,64 +370,60 @@ class Manager(AbcManager):
 
     async def update_wb_adv_phrase_in_db_bot_active(self):
         async with sm() as session:
-            stmt = select(KeywordSetting.text) \
-                .join(AdvSetting)
+            stmt = select(KeywordSetting.text).join(AdvSetting)
             result = await session.execute(stmt)
-            texts = result.unique().scalars().all()
-        texts = [text for text in texts if text]
-        new_texts = []
-        for text in texts:
-            text = text.replace('_', ' ')
-            text = text.replace(',', '.')
-            new_texts.append(text)
-        texts = new_texts
+            texts = [text for text in result.unique().scalars() if text]
+
+        new_texts = [text.replace('_', ' ').replace(',', '.') for text in texts]
 
         added_to_base = set()
         batch_size = 100
-        phrase_data_list = []
 
-        for text in texts:
-            if text in self._keywords_in_neo:
-                await asyncio.sleep(0)
-                continue
-            if await self._gds.check_phrase_in_neo(text):
-                logger.debug(f'Фраза {text} уже есть в базе данных')
+        async def process_texts(texts):
+            phrase_data_list = []
+            for text in texts:
+                if text in self._keywords_in_neo:
+                    await asyncio.sleep(0)
+                    continue
+                if await self._gds.check_phrase_in_neo(text):
+                    logger.debug(f'Фраза {text} уже есть в базе данных')
+                    self._keywords_in_neo.add(text)
+                    await asyncio.sleep(0)
+                    continue
+                if text in added_to_base:
+                    logger.debug(f'Фраза {text} уже добавлена в список')
+                    await asyncio.sleep(0)
+                    continue
+
+                words = text.split()
+                keywords = []
+                for word in words:
+                    vector = await self._word2vec.average_vector_from_sentence(word)
+                    if vector is not None:
+                        vector = list(vector)
+                    keywords.append(KeywordStatForNeo(text=word, vector=vector))
+                    await asyncio.sleep(0)
+
+                phrase_data = KeywordPhrase(
+                    text=text,
+                    words=keywords,
+                    word2vec=await self._word2vec.average_vector_from_sentence(text)
+                )
+                phrase_data_list.append(phrase_data)
+                added_to_base.add(text)
                 self._keywords_in_neo.add(text)
-                await asyncio.sleep(0)
-                continue
-            if text in added_to_base:
-                logger.debug(f'Фраза {text} уже добавлена в список')
-                await asyncio.sleep(0)
-                continue
 
-            words = text.split()
-            keywords = []
-            for word in words:
-                vector = await self._word2vec.average_vector_from_sentence(word)
-                if vector is not None:
-                    vector = list(vector)
-                keywords.append(KeywordStatForNeo(text=word, vector=vector))
-                await asyncio.sleep(0)
+                if len(phrase_data_list) >= batch_size:
+                    await self._gds.add_keyword_phrase(phrase_data_list)
+                    phrase_data_list.clear()
+                    await asyncio.sleep(0)
 
-            phrase_data = KeywordPhrase(
-                text=text,
-                words=keywords,
-                word2vec=await self._word2vec.average_vector_from_sentence(text)
-            )
-            phrase_data_list.append(phrase_data)
-            added_to_base.add(text)
-            self._keywords_in_neo.add(text)
-
-            # Записываем, если набрался полный батч
-            if len(phrase_data_list) >= batch_size:
+            if phrase_data_list:
                 await self._gds.add_keyword_phrase(phrase_data_list)
-                phrase_data_list.clear()
                 await asyncio.sleep(0)
 
-        # Записываем оставшиеся данные, если они есть
-        if phrase_data_list:
-            await self._gds.add_keyword_phrase(phrase_data_list)
-            await asyncio.sleep(0)
+        # Используйте генератор для обработки текстов
+        await process_texts(new_texts)
 
 
 
