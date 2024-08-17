@@ -311,7 +311,11 @@ class Predictor:
 
     def _predict(self, df: pd.DataFrame)-> typing.Union[pd.DataFrame, None]:
         model = load_model()
-        X = df.drop(['keyword', 'adv_id'], axis=1)
+        try:
+            X = df.drop(['keyword', 'adv_id'], axis=1)
+        except Exception as exc:
+            logger.error(f'Ошибка удаления столбцов, длина df: {len(df)}')
+            raise exc
         y = model.predict(X)
         df['predicted_ctr'] = y
         return df
