@@ -270,16 +270,15 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
             not_found_positions.append(position)
             await redis_manager.add_positions_to_redis(not_found_positions)
 
-async def limited_add_wb_positions(text:str, need_nmids: set[int], sem: asyncio.Semaphore):
-    async with sem:
-        try:
-            await add_wb_positions(text, need_nmids)
-        except Exception as e:
-            logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
+async def limited_add_wb_positions(text:str, need_nmids: set[int]):
+    try:
+        await add_wb_positions(text, need_nmids)
+    except Exception as e:
+        logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
 
 
 
-async def parser_all_white_phrase(semaphore):
+async def parser_all_white_phrase():
     tasks_by_text = {}
     while True:
         logger.debug('Получаем фразы для парсинга')
@@ -288,7 +287,7 @@ async def parser_all_white_phrase(semaphore):
             if text not in tasks_by_text:
                 logger.debug(f'Добавляем фразу {text} в список задач')
                 if need_nmids:
-                    task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
+                    task = asyncio.create_task(limited_add_wb_positions(text, need_nmids))
                     tasks_by_text[text] = task
             else:
                 logger.debug(f'Фраза {text} уже есть в списке задач')

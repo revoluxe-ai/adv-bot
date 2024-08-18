@@ -32,38 +32,48 @@ class Runner:
         predicted = RedisEvent(key='predicted')
         await predicted.set()
         await asyncio.gather(
-            # self.payment_for_auto_bidder(),
-            # self.payment_for_parsing_keyword(),
-            # self.run_bidder_process(),
+            self.payment_for_auto_bidder(),
+            self.payment_for_parsing_keyword(),
+            self.run_bidder_process(),
             # self.clear_data_for_expired_wb_cabinets(),
-            # self.process_payment_for_advs(),
+            self.process_payment_for_advs(),
             # self.update_min_ctr_in_global_wb_category_settings(),
-            # self.run_update_vectors(),
-            # self.run_update_model(),
+            self.run_update_data_in_neo4j(),
+            self.run_update_model(),
             self.run_update_predict_ctr(),
-            # self.run_update_vectors_in_redis(),
-            # self.run_vector_update_in_neo4j(),
+            self.run_update_vectors_in_redis(),
+            self.run_vector_update_in_neo4j(),
+            self.update_all_data_in_db(),
+            self.run_update_minus_keywords_on_wb(),
+            self.keywords_parsing_process(),
+            self.run_update_keyword_stat(),
             return_exceptions=False
         )
 
     async def run_update_predict_ctr(self,):
          await self._manager.update_predict_ctr()
 
+    async def   run_update_keyword_stat(self):
+        while True:
+            try:
+                await self.__run_update_keyword_stat()
+            except Exception as e:
+                logger.error(f'Ошибка обновления статистики ключей {e}', exc_info=True)
+            await asyncio.sleep(0)
 
-    async def run_update_keyword_stat(self, need_update_model: asyncio.Event, semaphore: asyncio.Semaphore):
+
+    async def __run_update_keyword_stat(self):
         wb_cabinet_tasks = {}
         adv_update_tasks = {}
         # not_first_runs = set()
         while True:
-            accesses = users_manager.get_accesses_for_wb_cabinets(semaphore)
+            accesses = users_manager.get_accesses_for_wb_cabinets()
             async for access in accesses:
                 cabinet_id = access.wb_cabinet.id
                 if cabinet_id not in wb_cabinet_tasks:
                     task = asyncio.create_task(
                         self._manager.update_keyword_stat(access,
-                                                          need_update_model,
-                                                          adv_update_tasks,
-                                                          semaphore))
+                                                          adv_update_tasks,))
                     wb_cabinet_tasks[cabinet_id] = task
 
                 else:
@@ -80,25 +90,24 @@ class Runner:
             await asyncio.sleep(0)
 
 
-    async def run_update_vectors(self):
-            excs = await asyncio.gather(
+    async def run_update_data_in_neo4j(self):
+            await asyncio.gather(
                 self.update_cards_in_graph(),
                 self._manager.update_wb_adv_phrase_in_db(),
             )
-            for exc in excs:
-                if exc:
-                    logger.error(f'Ошибка обновления векторов {exc}', exc_info=True)
 
 
-
-    async def run_update_minus_keywords_on_wb(self, semaphore: asyncio.Semaphore):
+    async def run_update_minus_keywords_on_wb(self):
         await self._manager\
-            .update_keywords_in_advs(semaphore)
+            .update_keywords_in_advs()
 
 
     async def run_update_model(self):
         while True:
-            await self._manager.update_model()
+            try:
+                await self._manager.update_model()
+            except Exception as e:
+                logger.error(f'Ошибка обновления модели {e}', exc_info=True)
             await asyncio.sleep(0)
 
 
@@ -165,8 +174,8 @@ class Runner:
                 logger.error(f'Ошибка добавления позиций в базу {e}', exc_info=True)
             await asyncio.sleep(0)
 
-    async def parser_all_white_phrase(self, semaphore: asyncio.Semaphore):
-       await parser.parser_all_white_phrase(semaphore)
+    async def parser_all_white_phrase(self):
+       await parser.parser_all_white_phrase()
 
 
     async def reset_out_positions_in_redis(self):
@@ -179,12 +188,12 @@ class Runner:
             await asyncio.sleep(10)
 
 
-    async def keywords_parsing_process(self,semaphore: asyncio.Semaphore):
-        await self.__keywords_parsing_process(semaphore)
+    async def keywords_parsing_process(self):
+        await self.__keywords_parsing_process()
 
 
-    async def __keywords_parsing_process(self, semaphore: asyncio.Semaphore):
-        await self. parser_all_white_phrase(semaphore)
+    async def __keywords_parsing_process(self):
+        await self. parser_all_white_phrase()
 
     async def payment_for_parsing_keyword(self):
         while True:
@@ -211,7 +220,12 @@ class Runner:
 
 
     async def run_bidder_process(self):
-        await self._manager.run_bidder_process()
+        while True:
+            try:
+                await self._manager.run_bidder_process()
+            except Exception as e:
+                logger.error(f'Ошибка процесса управления ставками {e}', exc_info=True)
+            await asyncio.sleep(0)
 
     async def run_update_vectors_in_redis(self):
         while True:

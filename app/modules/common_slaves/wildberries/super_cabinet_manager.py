@@ -111,15 +111,8 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
     return
 
 
-
-
-
-
-
-
-
-async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> typing.AsyncGenerator[WBCabinetAccess, None]:
-    async with sm(semaphore) as session:
+async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess, None]:
+    async with sm() as session:
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
                                           .selectinload(User.wb_tokens))\

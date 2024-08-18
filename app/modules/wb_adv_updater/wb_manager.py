@@ -108,14 +108,12 @@ class Manager(AbcManager):
 
 
     async def update_keyword_stat(self, access: WBCabinetAccess,
-                                  need_update_model: asyncio.Event,
-                                  adv_update_tasks: dict[int, asyncio.Task],
-                                  semaphore: asyncio.Semaphore):
+                                  adv_update_tasks: dict[int, asyncio.Task]):
         wb_api = WBApi(access)
         wb_cabinet = access.wb_cabinet
         logger.debug(f"Начало обновления статистики для кабинета {wb_cabinet.id}")
 
-        async with sm(semaphore) as session:
+        async with sm() as session:
             stmt = select(AdvSetting).where(and_(
                 AdvSetting.wb_cabinet_id == wb_cabinet.id,
                 AdvSetting.type == 8,
@@ -124,7 +122,7 @@ class Manager(AbcManager):
             adv_settings = result.scalars().all()
         for adv_setting in adv_settings:
             if adv_setting not in adv_update_tasks:
-                task = asyncio.create_task(self.keyword_stat_updater(adv_setting.id, wb_api, semaphore))
+                task = asyncio.create_task(self.keyword_stat_updater(adv_setting.id, wb_api))
                 adv_update_tasks[adv_setting.id] = task
             else:
                 if adv_update_tasks[adv_setting.id].done():
@@ -142,7 +140,6 @@ class Manager(AbcManager):
                     del adv_update_tasks[adv_setting.id]
                     logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
                     logger.debug(f'Установка set для need_update_model')
-                    need_update_model.set()
                     logger.debug(f"Обновление статистики завершено")
             await asyncio.sleep(0)
         return
@@ -216,8 +213,8 @@ class Manager(AbcManager):
 
 
 
-    async def keyword_stat_updater(self, adv_setting_id, wb_api, semaphore):
-        async with sm(semaphore) as session:
+    async def keyword_stat_updater(self, adv_setting_id, wb_api):
+        async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
             adv_setting = await session.execute(stmt)
             adv_setting = adv_setting.scalar()
@@ -234,7 +231,7 @@ class Manager(AbcManager):
         texts_for_adv_setting = {keyword.text for keyword in keywords}
         existing_keyword_settings = await self._get_existing_keyword_settings(adv_setting.id)
         new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
-        async with sm(semaphore) as session:
+        async with sm() as session:
             for keyword in new_keywords:
                 keyword_setting = KeywordSetting(
                     text=keyword,
@@ -307,10 +304,10 @@ class Manager(AbcManager):
         return joblib.load(model_path)
 
     @staticmethod
-    async def update_keywords_in_advs(semaphore) -> list[typing.Awaitable]:
+    async def update_keywords_in_advs() -> list[typing.Awaitable]:
         update_tasks: dict[int, asyncio.Task] = {}
         while True:
-            accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets(semaphore)
+            accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
             async for access in accesses:
                 wb_cabinet_id = access.wb_cabinet.id
                 if wb_cabinet_id  not in update_tasks:
