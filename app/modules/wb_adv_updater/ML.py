@@ -322,13 +322,17 @@ class Fitter(AbcManager):
 class Predictor:
 
     def _predict(self, df: pd.DataFrame)-> typing.Union[pd.DataFrame, None]:
+        logger.debug('начинаю _predict')
         model = load_model()
+        logger.debug('Модель загружена')
         try:
             X = df.drop(['keyword', 'adv_id'], axis=1)
         except Exception as exc:
             logger.error(f'Ошибка удаления столбцов, длина df: {len(df)}')
             raise exc
+        logger.debug('Удаление столбцов прошло')
         y = model.predict(X)
+        logger.debug('Предсказание завершено')
         df['predicted_ctr'] = y
         return df
 
