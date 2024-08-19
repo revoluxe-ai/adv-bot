@@ -11,16 +11,16 @@ from python_modules.logger import setup_logging
 import logging
 import asyncio
 from multiprocessing import Process
-
+from functools import partial
 
 
 
 
 run_own_process_list = [
-    run_main_coroutines,
-    run_update_model,
-    run_update_data_in_neo4j,
-    keywords_parsing_process,
+     run_main_coroutines,
+     run_update_model,
+     run_update_data_in_neo4j,
+     keywords_parsing_process,
      run_update_vectors_in_redis,
      run_update_predict_ctr,
      run_update_minus_keywords_on_wb
@@ -28,10 +28,15 @@ run_own_process_list = [
 
 ]
 
+def run_coroutines(coroutine):
+    asyncio.run(coroutine())
+
+
 def main():
     processes = []
     for run_own_process in run_own_process_list:
-        process = Process(target=run_own_process)
+        func = partial(run_coroutines, run_own_process)
+        process = Process(target=func)
         process.start()
         processes.append(process)
     for process in processes:
