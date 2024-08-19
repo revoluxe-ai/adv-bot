@@ -27,8 +27,11 @@ from . import data_manager
 from .data_manager import DataGetter
 from ...exc import CardNotFoundInDB
 from ...utils import redis_manager
+from multiprocessing import Lock
+
 
 sm = get_async_session_maker
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +39,24 @@ global_model: typing.Union[xgboost.XGBModel, None] = None
 
 path = 'model'
 
-def save_model(model: xgboost.XGBModel, time_stamp = None):
-    model_path = os.path.join(path, 'model.json')
-    joblib.dump(model, model_path)
 
-    if time_stamp:
-        with open(f'{path}/time_stamp.txt', 'w') as file:
-            file.write(time_stamp)
+model_lock = Lock()
+
+def save_model(model: xgboost.XGBModel, time_stamp = None):
+    with model_lock:
+        model_path = os.path.join(path, 'model.json')
+        joblib.dump(model, model_path)
+
+        if time_stamp:
+            with open(f'{path}/time_stamp.txt', 'w') as file:
+                file.write(time_stamp)
 
 def load_model():
-    model = joblib.load(os.path.join(path, 'model.json'))
-    # with open(f'{path}/time_stamp.txt', 'r') as file:
-    #     time_stamp = file.read()
-    return model
+    with model_lock:
+        model = joblib.load(os.path.join(path, 'model.json'))
+        # with open(f'{path}/time_stamp.txt', 'r') as file:
+        #     time_stamp = file.read()
+        return model
 
 
 
