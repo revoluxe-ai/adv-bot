@@ -12,8 +12,6 @@ from sqlalchemy.orm import selectinload, joinedload
 from app.client_bot.const import MAX_TOKENS
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from . import exceptions
-from . import api_rights
-from .api_rights import check_token
 from .exceptions import ApiForbiddenError, UnknownApiRequestError
 from .models import WBToken, AdvSetting
 from sqlalchemy.orm import selectinload
@@ -78,29 +76,6 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
                         continue
                     if token_shop_id != shop_id:
                         continue
-                    try:
-                        await api_rights.check_token(token)
-                        users_live_tokens.append(token)
-                    except ApiForbiddenError as exc:
-                        logger.debug(exc)
-                        token.active = False
-                        await session.commit()
-                        continue
-
-                    except  ServerTimeoutError as e:
-                        logger.error(f'Ошибка соединения с сервером для кабинета id {wb_cabinet.id}: {e}')
-                        continue
-                    except UnknownApiRequestError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    except aiohttp.client_exceptions.ServerDisconnectedError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    except aiohttp.client_exceptions.ClientOSError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    finally:
-                        await asyncio.sleep(1)
                 tokens_for_wb_cabinet.extend(users_live_tokens)
 
             if tokens_for_wb_cabinet:
@@ -140,28 +115,6 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
                     continue
                 if token_shop_id != shop_id:
                     continue
-                try:
-                    await api_rights.check_token(token)
-                    users_live_tokens.append(token)
-                except ApiForbiddenError as exc:
-                    logger.debug(exc)
-                    token.active = False
-                    await session.commit()
-                    continue
-                except  ServerTimeoutError as e:
-                    logger.error(f'Ошибка соединения с сервером для кабинета id {wb_cabinet.id}: {e}')
-                    continue
-                except UnknownApiRequestError as e:
-                    logger.error(e)
-                    users_live_tokens.append(token)
-                except aiohttp.client_exceptions.ServerDisconnectedError as e:
-                    logger.error(e)
-                    users_live_tokens.append(token)
-                except aiohttp.client_exceptions.ClientOSError as e:
-                    logger.error(e)
-                    users_live_tokens.append(token)
-                finally:
-                    await asyncio.sleep(1)
             tokens_for_wb_cabinet.extend(users_live_tokens)
 
         if tokens_for_wb_cabinet:
@@ -192,13 +145,6 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCab
     checked_tokens = []
     for token in tokens:
         if token.shop_id == wb_cabinet.shop_id:
-            try:
-                await check_token(token)
-            except exceptions.ApiForbiddenError:
-                logger.debug('ApiForbiddenError')
-                token.active = False
-                await session.commit()
-                continue
             checked_tokens.append(token)
         else:
             continue
