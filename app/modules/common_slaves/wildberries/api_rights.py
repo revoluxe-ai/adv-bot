@@ -1,13 +1,12 @@
 import asyncio
 import datetime
-from app.modules.common_slaves.wildberries import api
+from .http_request import requests, try_except_decorator
 from aiohttp import ClientTimeout
 
 from app.utils import redis_manager
-from aiocache import cached_stampede
+
 from asyncio import Lock
 
-from .api import try_except_decorator
 
 
 class OnlyRead:
@@ -72,7 +71,7 @@ class TokenRightChecker(WbRequestApiMixin):
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
 
         async with aiohttp.ClientSession(timeout=timeout) as session:
-              await self.requests(session, 'GET', url, headers=self.headers.standart)
+              await requests(session, 'GET', url, headers=self.headers.standart)
         logger.debug('Проверка прав на рекламу завершена')
 
 
@@ -95,7 +94,7 @@ class TokenRightChecker(WbRequestApiMixin):
             }
         }
         async with aiohttp.ClientSession() as session:
-            await api.ABC_WB_API.requests(
+            await requests(
                 session,
                 'POST',
                 url,
