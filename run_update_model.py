@@ -1,11 +1,10 @@
 import asyncio
 from time import sleep
 
-from app.modules.wb_adv_updater.runner import Runner
+from app.modules.wb_adv_updater.runner import run_update_model
 import asyncio
 
 
-runner = Runner()
 
 update_model_on_new_features = asyncio.Event()
 update_model_on_new_features.set()
@@ -14,7 +13,7 @@ need_update_model.set()
 import logging
 
 async def run():
-    await runner.run_update_model()
+    await run_update_model()
 
 
 
