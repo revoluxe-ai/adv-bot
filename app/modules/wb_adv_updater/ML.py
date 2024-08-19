@@ -39,6 +39,7 @@ global_model: typing.Union[xgboost.XGBModel, None] = None
 
 path = 'model'
 
+update_predict_ctr_process_semaphore = asyncio.Semaphore(50)
 
 model_lock = Lock()
 
@@ -329,29 +330,31 @@ class Predictor:
         return df
 
 
+
     @staticmethod
     async def __update_predict_ctr(keyword_setting, predict_df, min_ctr):
-        try:
-            adv_id = keyword_setting.adv_setting.adv_id
-            keyword = keyword_setting.text
-            if not keyword:
-                return
-            row = predict_df[(predict_df['adv_id'] == adv_id) & (predict_df['keyword'] == keyword)]
-            if row.empty:
-                return
-            predict_ctr = float(row['predicted_ctr'].values[0])
-            result = await data_manager.get_keyword_statistic_clickhouse(keyword_setting, adv_id)
-            clicks, views, _ = result
-            if clicks == 0:
-                clicks = 1
-                enough_views = int(1 / min_ctr)
-                views += enough_views
-            real_ctr = clicks / views
-            predict_ctr = (real_ctr + predict_ctr) / 2
-            # Создаем задачи для асинхронного обновления Redis
-            await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
-        except Exception as exc:
-            logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
+        async with update_predict_ctr_process_semaphore:
+            try:
+                adv_id = keyword_setting.adv_setting.adv_id
+                keyword = keyword_setting.text
+                if not keyword:
+                    return
+                row = predict_df[(predict_df['adv_id'] == adv_id) & (predict_df['keyword'] == keyword)]
+                if row.empty:
+                    return
+                predict_ctr = float(row['predicted_ctr'].values[0])
+                result = await data_manager.get_keyword_statistic_clickhouse(keyword_setting, adv_id)
+                clicks, views, _ = result
+                if clicks == 0:
+                    clicks = 1
+                    enough_views = int(1 / min_ctr)
+                    views += enough_views
+                real_ctr = clicks / views
+                predict_ctr = (real_ctr + predict_ctr) / 2
+                # Создаем задачи для асинхронного обновления Redis
+                await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+            except Exception as exc:
+                logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
 
 
 
