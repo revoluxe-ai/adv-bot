@@ -4,6 +4,7 @@ from app.modules.wb_adv_updater.runner import (
                                                run_main_coroutines,
                                                   keywords_parsing_process,
                                                   run_update_vectors_in_redis,
+                                                    run_update_predict_ctr
 )
 from python_modules.logger import setup_logging
 import logging
@@ -20,6 +21,8 @@ run_own_process_list = [
     run_update_data_in_neo4j,
     keywords_parsing_process,
      run_update_vectors_in_redis,
+     run_update_predict_ctr,
+
 
 ]
 

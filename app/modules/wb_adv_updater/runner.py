@@ -239,7 +239,6 @@ async def main_loop():
         # .clear_data_for_expired_wb_cabinets(),
         process_payment_for_advs(),
         # .update_min_ctr_in_global_wb_category_settings(),
-        run_update_predict_ctr(),
         update_all_data_in_db(),
         run_update_minus_keywords_on_wb(),
         return_exceptions=False
