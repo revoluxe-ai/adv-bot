@@ -29,10 +29,14 @@ run_own_process_list = [
 ]
 
 def main():
+    processes = []
     for run_own_process in run_own_process_list:
         process = Process(target=run_own_process)
         process.start()
+        processes.append(process)
+    for process in processes:
         process.join()
+
     return None
 
 if __name__ == '__main__':
