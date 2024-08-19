@@ -240,9 +240,7 @@ async def main_loop():
         process_payment_for_advs(),
         # .update_min_ctr_in_global_wb_category_settings(),
         run_update_predict_ctr(),
-        run_update_vectors_in_redis(),
         update_all_data_in_db(),
         run_update_minus_keywords_on_wb(),
-        run_update_keyword_stat(),
         return_exceptions=False
     )
