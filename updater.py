@@ -1,15 +1,33 @@
-from app.modules.wb_adv_updater.runner import Runner
+from app.modules.wb_adv_updater.runner import run_main_process as main_loop, run_update_model
 from python_modules.logger import setup_logging
 import logging
+import asyncio
+from multiprocessing import Process
 
 
-r = Runner()
+def run_main_coroutines():
+    asyncio.run(main_loop())
+
+
+
+
+
+def main():
+    common_process = Process(target=run_main_coroutines)
+    common_process.start()
+    process_update_model = Process(target=run_update_model)
+    process_update_model.start()
+    common_process.join()
+    process_update_model.join()
+    return None
+
 if __name__ == '__main__':
+
     level = logging.INFO
     setup_logging()
     while True:
         try:
-            r.run(debug_mode=False)
+           main()
         except KeyboardInterrupt:
             print("Программа остановлена пользователем.")
             break  # Выход из цикла, завершение программы
