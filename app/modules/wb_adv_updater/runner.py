@@ -224,10 +224,6 @@ async def run_vector_update_in_neo4j():
 
 
 
-def  run_main_process():
-    asyncio.run(main_loop())
-
-
 def run_main_coroutines():
     asyncio.run(main_loop())
 
