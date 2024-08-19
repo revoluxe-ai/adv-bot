@@ -39,7 +39,7 @@ class WbRequestApiMixin(ABC):
                     logger.debug(f'Превышен лимит запросов к API: {url}')
                     raise exceptions.TooManyRequests from e
                 else:
-                    logger.error(f'Ошибка при запросе к {url}: {text}')
+                    logger.error(f'Ошибка при запросе к {url}: {text}', exc_info=True)
                     raise exceptions.BadRequestError(e) from e
             except exceptions.NotValidDataError as e:
                 raise exceptions.NotValidDataError(e) from e
