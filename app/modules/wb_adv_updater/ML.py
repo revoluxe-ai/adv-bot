@@ -53,8 +53,11 @@ def save_model(model: xgboost.XGBModel, time_stamp = None):
                 file.write(time_stamp)
 
 def load_model():
+    logger.debug('Загрузка модели')
     with model_lock:
+        logger.debug('Прошли lock')
         model = joblib.load(os.path.join(path, 'model.json'))
+        logger.debug('Модель загружена')
         # with open(f'{path}/time_stamp.txt', 'r') as file:
         #     time_stamp = file.read()
         return model
