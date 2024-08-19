@@ -1,11 +1,15 @@
 import asyncio
 import datetime
-
+from app.modules.common_slaves.wildberries import api
 from aiohttp import ClientTimeout
 
 from app.utils import redis_manager
 from aiocache import cached_stampede
 from asyncio import Lock
+
+from .api import try_except_decorator
+
+
 class OnlyRead:
     TRUE = True
     FALSE = False
@@ -62,7 +66,7 @@ class TokenRightChecker(WbRequestApiMixin):
      def _rights(self) -> set[str]:
          return {Rights.CONTENT, Rights.PROMOTION}
 
-
+     @try_except_decorator(1, 1, max_attempts=50, max_delay=120)
      async def adverts(self):
         logger.debug('Проверка прав на рекламу')
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
@@ -71,6 +75,8 @@ class TokenRightChecker(WbRequestApiMixin):
               await self.requests(session, 'GET', url, headers=self.headers.standart)
         logger.debug('Проверка прав на рекламу завершена')
 
+
+     @try_except_decorator(1, 1, max_attempts=50, max_delay=120)
      async def content(self):
         logger.debug('Проверка прав на контент')
         limit = 1
@@ -88,10 +94,14 @@ class TokenRightChecker(WbRequestApiMixin):
                 }
             }
         }
-
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            await self.requests(session, 'POST',  url, json_data=data_for_req,
-                                        headers=self.headers.standart)
+        async with aiohttp.ClientSession() as session:
+            await api.ABC_WB_API.requests(
+                session,
+                'POST',
+                url,
+                json_data=data_for_req,
+                headers=self.headers.standart
+            )
 
         logger.debug('Проверка прав на контент завершена')
 
