@@ -1,24 +1,29 @@
-from app.modules.wb_adv_updater.runner import run_main_process as main_loop, run_update_model
+from app.modules.wb_adv_updater.runner import (
+                                               run_update_model,
+                                               run_update_data_in_neo4j,
+                                               run_main_coroutines,
+)
 from python_modules.logger import setup_logging
 import logging
 import asyncio
 from multiprocessing import Process
 
 
-def run_main_coroutines():
-    asyncio.run(main_loop())
 
 
 
+run_own_process_list = [
+    run_main_coroutines,
+    run_update_model,
+    run_update_data_in_neo4j
 
+]
 
 def main():
-    common_process = Process(target=run_main_coroutines)
-    common_process.start()
-    process_update_model = Process(target=run_update_model)
-    process_update_model.start()
-    common_process.join()
-    process_update_model.join()
+    for run_own_process in run_own_process_list:
+        process = Process(target=run_own_process)
+        process.start()
+        process.join()
     return None
 
 if __name__ == '__main__':

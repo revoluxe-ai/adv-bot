@@ -228,6 +228,9 @@ def  run_main_process():
     asyncio.run(main_loop())
 
 
+def run_main_coroutines():
+    asyncio.run(main_loop())
+
 async def main_loop():
     await asyncio.gather(
         payment_for_auto_bidder(),
@@ -236,10 +239,8 @@ async def main_loop():
         # .clear_data_for_expired_wb_cabinets(),
         process_payment_for_advs(),
         # .update_min_ctr_in_global_wb_category_settings(),
-        run_update_data_in_neo4j(),
         run_update_predict_ctr(),
         run_update_vectors_in_redis(),
-        run_vector_update_in_neo4j(),
         update_all_data_in_db(),
         run_update_minus_keywords_on_wb(),
         keywords_parsing_process(),
