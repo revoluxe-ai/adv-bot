@@ -150,11 +150,11 @@ class Parser:
 
 
 
-    @try_except(2, 1)
+    @try_except(1, 1)
     async def __parse_keywords_from_wb(self, text: str, page: int):
         url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get(url) as response:
                 text = await response.text()
         if not text:
             raise DataError('Пустой ответ от сервера', text)
@@ -270,11 +270,14 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
             not_found_positions.append(position)
             await redis_manager.add_positions_to_redis(not_found_positions)
 
+semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
+
 async def limited_add_wb_positions(text:str, need_nmids: set[int]):
-    try:
-        await add_wb_positions(text, need_nmids)
-    except Exception as e:
-        logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
+    async with semaphore:
+        try:
+            await add_wb_positions(text, need_nmids)
+        except Exception as e:
+            logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
 
 
 
