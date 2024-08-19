@@ -456,7 +456,7 @@ class Predictor:
            avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
            if not avg_item_features:
-                 logger.error('Нет item_features: %s', adv.name)
+                 logger.debug('Нет item_features: %s', adv.name)
                  continue
            clear_keywords = [keyword.text.replace('_', ' ') for keyword in adv.keyword_settings]
            # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
