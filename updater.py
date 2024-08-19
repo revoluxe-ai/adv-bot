@@ -2,6 +2,7 @@ from app.modules.wb_adv_updater.runner import (
                                                run_update_model,
                                                run_update_data_in_neo4j,
                                                run_main_coroutines,
+                                                  keywords_parsing_process
 )
 from python_modules.logger import setup_logging
 import logging
@@ -15,7 +16,8 @@ from multiprocessing import Process
 run_own_process_list = [
     run_main_coroutines,
     run_update_model,
-    run_update_data_in_neo4j
+    run_update_data_in_neo4j,
+    keywords_parsing_process,
 
 ]
 

@@ -243,7 +243,6 @@ async def main_loop():
         run_update_vectors_in_redis(),
         update_all_data_in_db(),
         run_update_minus_keywords_on_wb(),
-        keywords_parsing_process(),
         run_update_keyword_stat(),
         return_exceptions=False
     )
