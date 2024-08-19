@@ -4,7 +4,8 @@ from app.modules.wb_adv_updater.runner import (
                                                run_main_coroutines,
                                                   keywords_parsing_process,
                                                   run_update_vectors_in_redis,
-                                                    run_update_predict_ctr
+                                                    run_update_predict_ctr,
+                                                     run_update_minus_keywords_on_wb
 )
 from python_modules.logger import setup_logging
 import logging
@@ -22,6 +23,7 @@ run_own_process_list = [
     keywords_parsing_process,
      run_update_vectors_in_redis,
      run_update_predict_ctr,
+     run_update_minus_keywords_on_wb
 
 
 ]
