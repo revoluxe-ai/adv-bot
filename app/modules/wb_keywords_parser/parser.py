@@ -7,7 +7,7 @@ from functools import wraps
 import logging
 from statistics import mean
 from typing import AsyncGenerator
-from aiohttp import ServerDisconnectedError
+from aiohttp import ServerDisconnectedError, ClientOSError
 from sqlalchemy.orm import joinedload
 
 from app.modules.wb_adv_updater import data_manager
@@ -88,7 +88,8 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                 #     state['_next_pause'] = pause
                 #     state['_attempts'] += 1
                 except (DataError,
-                        ServerDisconnectedError) as e:
+                        ServerDisconnectedError,
+                        ClientOSError) as e:
                     logger.debug(f'Ошибка при выполнении запроса через {method_name}: {e}, '
                                  f'Пауза перед следующим запросом: {state["_next_pause"]} секунд')
                     state['_attempts'] += 1
