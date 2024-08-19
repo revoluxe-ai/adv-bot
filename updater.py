@@ -22,7 +22,6 @@ run_own_process_list = [
      run_update_data_in_neo4j,
      keywords_parsing_process,
      run_update_vectors_in_redis,
-     run_update_predict_ctr,
      run_update_minus_keywords_on_wb
 
 

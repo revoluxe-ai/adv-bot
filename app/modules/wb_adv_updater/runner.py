@@ -240,5 +240,6 @@ async def main_loop():
         process_payment_for_advs(),
         # .update_min_ctr_in_global_wb_category_settings(),
         update_all_data_in_db(),
+        run_update_predict_ctr(),
         return_exceptions=False
     )
