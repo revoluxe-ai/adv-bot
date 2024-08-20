@@ -40,15 +40,8 @@
     }
   },
 
-    "loggers": {
-        "app.modules.wb_keywords_parser.parser": {
-        "level": "DEBUG",
-        "handlers": ["common_file"]
-        }
-    },
-
   "root": {
-    "level": "DEBUG",
+    "level": "INFO",
     "formatters": ["custom"],
     "handlers": ["console", "common_file", "error_to_file"]
   }
