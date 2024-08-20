@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 run_own_process_list = [
-     run_main_coroutines,
      run_update_data_in_neo4j,
      keywords_parsing_process,
      run_update_vectors_in_redis,
@@ -33,7 +32,8 @@ run_own_process_list = [
      run_update_keyword_stat,
      run_bidder_process,
      update_all_data_in_db,
-      parser_all_white_phrase
+      parser_all_white_phrase,
+     run_main_coroutines,
 
 
 ]
