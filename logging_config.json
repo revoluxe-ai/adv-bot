@@ -46,8 +46,8 @@
       "handlers": ["common_file"]
     },
     "app.modules.wb_adv_updater.data_manager": {
-        "level": "DEBUG",
-        "handlers": ["common_file"],
+        "level": "INFO",
+        "handlers": ["console"],
         "propagate": false
         },
     "app.modules.wb_adv_updater.wb_manager": {
@@ -62,7 +62,7 @@
         }
     },
   "root": {
-    "level": "INFO",
+    "level": "DEBUG",
     "formatters": ["custom"],
     "handlers": ["console", "common_file", "error_to_file"]
   }
