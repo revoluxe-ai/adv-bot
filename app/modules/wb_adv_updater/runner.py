@@ -47,7 +47,7 @@ async def __run_update_keyword_stat():
 
             else:
                 if wb_cabinet_tasks[cabinet_id].done():
-                    logger.info(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
+                    logger.debug(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
                     if wb_cabinet_tasks[cabinet_id].exception():
                         logger.error(
                             f'Ошибка обновления статистики ключей: '
