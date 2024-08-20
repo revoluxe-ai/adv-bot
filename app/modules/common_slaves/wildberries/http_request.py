@@ -77,7 +77,7 @@ async def requests(session, method, url, data=None, json_data=None, headers=None
                 raise ApiForbiddenError('Неверный API ключ') from e
             if e.status == 429:
                 logger.debug(f'Превышен лимит запросов к API: {url}')
-                raise TooManyRequests from e
+                raise TooManyRequests(e) from e
             else:
                 logger.error(f'Ошибка при запросе к {url}: {text}', exc_info=True)
                 raise BadRequestError(e) from e
