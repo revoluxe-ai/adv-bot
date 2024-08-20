@@ -47,14 +47,14 @@ def process_controller(processes: list[Process]):
             proc = psutil.Process(process.pid)
             logger.debug(f'Создан объект процесса: {process.name}')
             # Получаем использование CPU и памяти
-            cpu_usage = proc.cpu_percent(interval=1)
+            # cpu_usage = proc.cpu_percent(interval=1)
             logger.debug('Получили процент использования cpu')# Процент использования CPU за 1 секунду
             memory_usage = proc.memory_info().rss / (1024 * 1024)
             logger.debug('Получили использование памяти')# Использование памяти в МБ
             process_info = {
                 'PID': process.pid,
                 'Name': process.name,
-                'CPU Usage (%)': cpu_usage,
+                # 'CPU Usage (%)': cpu_usage,
                 'Memory Usage (MB)': memory_usage,
                 'Status': proc.status(),
                 'Threads': proc.num_threads(),
@@ -66,7 +66,7 @@ def process_controller(processes: list[Process]):
                 f"Process Info:\n"
                 f"  PID: {process_info['PID']}\n"
                 f"  Name: {process_info['Name']}\n"
-                f"  CPU Usage (%): {process_info['CPU Usage (%)']:.2f}\n"
+                # f"  CPU Usage (%): {process_info['CPU Usage (%)']:.2f}\n"
                 f"  Memory Usage (MB): {process_info['Memory Usage (MB)']:.2f}\n"
                 f"  Status: {process_info['Status']}\n"
                 f"  Threads: {process_info['Threads']}\n"
