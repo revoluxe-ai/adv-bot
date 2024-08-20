@@ -44,9 +44,18 @@
     "updater": {
       "level": "DEBUG",
       "handlers": ["common_file"]
-    }
-  },
-
+    },
+    "app.modules.wb_adv_updater.data_manager": {
+        "level": "DEBUG",
+        "handlers": ["common_file"],
+        "propagate": false
+        },
+    "app.modules.wb_adv_updater.wb_manager": {
+        "level": "DEBUG",
+        "handlers": ["common_file"],
+        "propagate": false
+        }
+    },
   "root": {
     "level": "INFO",
     "formatters": ["custom"],

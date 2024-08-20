@@ -354,7 +354,9 @@ async def update_keywords_in_advs():
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
         accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
+        logger.debug('Получен генератор доступов к кабинетам для обновления минус-ключей в РК')
         async for access in accesses:
+            logger.debug('Получен кабинет для обновления минус-ключей в РК')
             wb_cabinet_id = access.wb_cabinet.id
             if wb_cabinet_id  not in update_tasks:
                 try:
@@ -370,6 +372,7 @@ async def update_keywords_in_advs():
                     result = await session.execute(stmt)
                     adv_settings: list[AdvSetting] = result.scalars().all()
                 if adv_settings:
+                    logger.debug(f'Запуск задачи обновления минус-ключей для кабинета {wb_cabinet_id}')
                     task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings))
                     update_tasks[wb_cabinet_id] = task
             else:

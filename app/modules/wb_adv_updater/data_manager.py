@@ -486,7 +486,6 @@ class DataGetter(AbcManager):
         df = pd.concat(keywords_dfs)
         return df
 
-
     async def get_cards_for_shop(self, shop: WBUserCabinet):
         wb_api = WBApi(shop)
         cards: list[CardFromWB] = await wb_api.advert.get_cards()
