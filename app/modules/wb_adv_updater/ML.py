@@ -11,7 +11,6 @@ import xgboost
 from ..common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from ..common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from ... import settings
-from app.admin_bot.sender import sender_manager
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.utils.db.session_maker import get_async_session_maker
 import numpy as np

@@ -46,11 +46,16 @@
       "handlers": ["common_file"]
     },
     "app.modules.wb_adv_updater.data_manager": {
-        "level": "DEBUG",
+        "level": "INFO",
         "handlers": ["common_file"],
         "propagate": false
         },
     "app.modules.wb_adv_updater.wb_manager": {
+        "level": "INFO",
+        "handlers": ["common_file"],
+        "propagate": false
+        },
+    "app.modules.wb_adv_updater.data_setter": {
         "level": "DEBUG",
         "handlers": ["common_file"],
         "propagate": false

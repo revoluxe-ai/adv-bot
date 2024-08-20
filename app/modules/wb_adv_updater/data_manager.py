@@ -30,13 +30,12 @@ from app.modules.common_slaves.wildberries.models import (
     CommonKeyword,
     WBItemPosition,
 )
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.keywords_query import keywords_query
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.my_types import AdvSetting, WBUserCabinet
 from app.payments.db.models import Payment
-from app.settings import settings
+
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User, RefLink, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
@@ -538,50 +537,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
         raise CardNotFoundInDB('В базе не найдена карточка товара: ' + str(nmid))
     return wb_category
 
-class DataSetter:
-    def __init__(self, access: WBCabinetAccess):
-        self._wb_api = WBApi(access)
-        self._wb_cabinet = access.wb_cabinet
 
-    async def update_minus_keywords(self, adv_settings: list[AdvSetting]):
-        for adv_setting in adv_settings:
-            keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv_setting)
-            good_phrases = []
-            bad_phrases = []
-            for keyword in keywords:
-                if keyword.status == KeywordStatus.GOOD:
-                    good_phrases.append(keyword.text)
-                else:
-                    bad_phrases.append(keyword.text)
-            if bad_phrases:
-                await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
-                logger.debug(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
-                logger.debug(f'Позитивные слова {good_phrases}')
-            else:
-                logger.debug(f'Нет минус слов для {adv_setting.name}')
-        return
-
-
-    def _print_keywords(self, df: pd.DataFrame, df_fact: pd.DataFrame, nmid, min_ctr: float):
-        full_goods = []
-        full_bads = []
-        for _, row in df.iterrows():
-            keyword = row.keyword
-            clicks = df_fact.loc[(df_fact['keyword'] == keyword) & (df_fact['nmid'] == nmid), 'clicks'].item()
-            views = df_fact.loc[(df_fact['keyword'] == keyword) & (df_fact['nmid'] == nmid), 'views'].item()
-            nmid = row.nmid
-            predict_ctr = row.predict_ctr
-            real_ctr = round(clicks / views, 2)
-            str_ = f'{keyword} ({clicks}) ({views}) ({real_ctr}) ({round(predict_ctr, 3)})'
-            if predict_ctr >= min_ctr:
-                full_goods.append(str_)
-            else:
-                full_bads.append(str_)
-        goods = ', '.join(full_goods)
-        bads = ', '.join(full_bads)
-
-        logger.info(f'{str(nmid)} Позитивные ключи: {goods}')
-        logger.info(f'{str(nmid)} Негативные ключи: {bads}')
 
 
 async def get_main_photos(nmids: list[int]):

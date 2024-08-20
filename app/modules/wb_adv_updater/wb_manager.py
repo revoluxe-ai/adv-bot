@@ -11,7 +11,7 @@ from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.models import AdvPayment
 from .ABC_manager import AbcManager
-from .data_manager import  DataSetter
+from .data_setter import DataSetter
 from .graph_vector_updater import GraphUpdater
 from ..common_slaves.wildberries import super_cabinet_manager
 from app.my_types import KeywordStat
