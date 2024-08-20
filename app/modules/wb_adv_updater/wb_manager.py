@@ -842,7 +842,7 @@ class Manager(AbcManager):
 
                 else:
                     if wb_cabinet_tasks[cabinet_id].done():
-                        logger.info(f'Задача обновления обновления ставок {cabinet_id}')
+                        logger.debug(f'Задача обновления обновления ставок {cabinet_id}')
                         if wb_cabinet_tasks[cabinet_id].exception():
                             logger.error(
                                 f'Ошибка обновления ставок: '
