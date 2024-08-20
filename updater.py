@@ -45,16 +45,24 @@ def process_controller(processes: list[Process]):
             # Получаем использование CPU и памяти
             cpu_usage = proc.cpu_percent(interval=1)  # Процент использования CPU за 1 секунду
             memory_usage = proc.memory_info().rss / (1024 * 1024)  # Потребляемая память в МБ
+            process_info = {
+                'PID': process.pid,
+                'Name': process.name,
+                'CPU Usage (%)': cpu_usage,
+                'Memory Usage (MB)': memory_usage,
+                'Status': proc.status(),
+                'Threads': proc.num_threads(),
+                'Create Time': time.ctime(proc.create_time()),
+                'Open Files': len(proc.open_files())
+            }
 
-            logger.info(f'PID дочернего процесса: {process.pid}')
-            logger.info(f'Имя функции: {process.name}')
-            logger.info(f'Использование CPU: {cpu_usage}%')
-            logger.info(f'Использование памяти: {memory_usage} MB')
-            live_process: bool = process.is_alive()
+            logger.info(f'Информация о процессе: {process_info}')
+
+            live_process = process.is_alive()
             if live_process:
                 logger.info(f'Процесс живой: {live_process}')
             else:
-                logger.error(f'Процесс мертв, перезапуск процесса: {process.name}')
+                logger.error(f'Процесс мертв, перезапуск процесса: {process.namу}')
                 process.start()
                 logger.info(f'Процесс перезапущен: {process.name}')
         time.sleep(60)

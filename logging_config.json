@@ -54,12 +54,12 @@
       "propagate": false
     },
     "app.modules.wb_adv_updater.wb_manager": {
-      "level": "DEBUG",
+      "level": "INFO",
       "handlers": ["common_file"],
       "propagate": true
     },
     "app.modules.common_slaves.wildberries.shops_data_updater" : {
-      "level": "DEBUG",
+      "level": "INFO",
       "handlers": ["common_file"],
       "propagate": true
     }
