@@ -48,6 +48,10 @@
     "app.modules.wb_keywords_parser.parser": {
       "level": "INFO",
       "propagate": true
+    },
+    "neo4j.io": {
+      "level": "WARNING",
+      "propagate": true
     }
   },
   "root": {
