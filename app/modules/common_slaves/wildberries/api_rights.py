@@ -33,7 +33,7 @@ class Rights:
 import aiohttp
 import logging
 from .exceptions import ApiForbiddenError, UnknownApiRequestError, TooManyRequests, BadRequestError
-from .ABC_WB_API import ABC_WB_API, WbRequestApiMixin, Headers
+from .ABC_WB_API import WbRequestApiMixin, Headers
 
 logger = logging.getLogger(__name__)
 
