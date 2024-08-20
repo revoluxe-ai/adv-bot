@@ -280,7 +280,7 @@ async def update_all_data_in_db_run(tasks):
                         await session.commit()
                     logger.debug('Задача обновления успешно выполнена')
                 del tasks[wb_access.wb_cabinet.id]
-
+        await asyncio.sleep(0)
 
 
 
