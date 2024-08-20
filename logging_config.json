@@ -42,12 +42,17 @@
   "loggers": {
     "app.modules.wb_adv_updater.ML.py": {
       "level": "DEBUG",
-      "handlers": ["common_file", "console"],
+      "handlers": ["common_file", "console", "error_to_file"],
+      "propagate": true
+    },
+    "app.modules.wb_keywords_parser.parser": {
+      "level": "DEBUG",
+      "handlers": ["common_file", "console", "error_to_file"],
       "propagate": true
     }
   },
   "root": {
-    "level": "DEBUG",
+    "level": "INFO",
     "handlers": ["error_to_file", "console", "common_file"]
   }
 }
