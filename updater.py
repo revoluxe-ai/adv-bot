@@ -1,5 +1,4 @@
-import logging
-
+from threading import Thread
 from app.modules.wb_adv_updater.runner import (
                                                run_update_data_in_neo4j,
                                                run_main_coroutines,
@@ -13,6 +12,11 @@ import logging
 import asyncio
 from multiprocessing import Process
 from functools import partial
+import os
+import time
+import psutil
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +32,21 @@ run_own_process_list = [
 
 ]
 
+
+def process_controller(processes: list[Process]):
+    time.sleep(1)
+    while True:
+        for process in processes:
+            proc = psutil.Process(process.pid)
+            # Получаем использование CPU и памяти
+            cpu_usage = proc.cpu_percent(interval=1)  # Процент использования CPU за 1 секунду
+            memory_usage = proc.memory_info().rss / (1024 * 1024)  # Потребляемая память в МБ
+
+            print(f'PID дочернего процесса: {process.pid}')
+            print(f'Использование CPU: {cpu_usage}%')
+            print(f'Использование памяти: {memory_usage} MB')
+
+
 def run_coroutines(coroutine):
     asyncio.run(coroutine())
 
@@ -40,9 +59,11 @@ def main():
         process.start()
         logger.info(f'Запущен процесс {process.pid} - {run_own_process.__name__}')
         processes.append(process)
+    thread_control = Thread(target=process_controller, args=(processes,))
+    thread_control.start()
+    thread_control.join()
     for process in processes:
         process.join()
-
     return None
 
 if __name__ == '__main__':
