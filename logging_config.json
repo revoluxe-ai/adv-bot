@@ -39,33 +39,16 @@
       "backupCount": 5
     }
   },
-  "loggers": {
-    "app.modules.wb_adv_updater.ML.py": {
-      "level": "INFO",
-      "handlers": ["common_file", "console", "error_to_file"],
-      "propagate": true
+
+    "loggers": {
+        "app.modules.wb_keywords_parser.parser": {
+        "level": "DEBUG",
+        "handlers": ["common_file"]
+        }
     },
-    "app.modules.wb_keywords_parser.parser": {
-      "level": "INFO",
-      "propagate": true
-    },
-    "neo4j.io": {
-      "level": "WARNING",
-      "propagate": false
-    },
-    "app.modules.wb_adv_updater.wb_manager": {
-      "level": "INFO",
-      "handlers": ["common_file"],
-      "propagate": true
-    },
-    "app.modules.common_slaves.wildberries.shops_data_updater" : {
-      "level": "INFO",
-      "handlers": ["common_file"],
-      "propagate": true
-    }
-  },
+
   "root": {
-    "level": "INFO",
+    "level": "DEBUG",
     "formatters": ["custom"],
     "handlers": ["console", "common_file", "error_to_file"]
   }
