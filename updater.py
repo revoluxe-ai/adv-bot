@@ -42,9 +42,10 @@ def process_controller(processes: list[Process]):
             cpu_usage = proc.cpu_percent(interval=1)  # Процент использования CPU за 1 секунду
             memory_usage = proc.memory_info().rss / (1024 * 1024)  # Потребляемая память в МБ
 
-            print(f'PID дочернего процесса: {process.pid}')
-            print(f'Использование CPU: {cpu_usage}%')
-            print(f'Использование памяти: {memory_usage} MB')
+            logger.info(f'PID дочернего процесса: {process.pid}')
+            logger.info(f'Использование CPU: {cpu_usage}%')
+            logger.info(f'Использование памяти: {memory_usage} MB')
+        time.sleep(60)
 
 
 def run_coroutines(coroutine):
