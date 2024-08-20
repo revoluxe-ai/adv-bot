@@ -358,7 +358,7 @@ RETURN graphName
             print(f"""Граф  создан""")
 
     async def linking_images_and_keyword(self):
-       # await self.linking_images()
+       await self.linking_images()
        await self.linking_keywords()
 
 
