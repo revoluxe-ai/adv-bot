@@ -6,7 +6,8 @@ from app.modules.wb_adv_updater.runner import (
                                                run_update_vectors_in_redis,
                                                run_update_minus_keywords_on_wb,
                                                run_update_keyword_stat,
-                                               run_bidder_process
+                                               run_bidder_process,
+                                               update_all_data_in_db
 )
 from python_modules.logger import setup_logging
 import logging
@@ -30,6 +31,7 @@ run_own_process_list = [
      run_update_minus_keywords_on_wb,
      run_update_keyword_stat,
      run_bidder_process,
+     update_all_data_in_db
 
 
 ]

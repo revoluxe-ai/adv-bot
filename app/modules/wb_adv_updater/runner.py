@@ -233,8 +233,7 @@ async def main_loop():
         payment_for_parsing_keyword(),
         # .clear_data_for_expired_wb_cabinets(),
         process_payment_for_advs(),
-        # .update_min_ctr_in_global_wb_category_settings(),
-        update_all_data_in_db(),
+        # .update_min_ctr_in_global_wb_category_settings()
         run_vector_update_in_neo4j(),
         run_update_predict_ctr(),
         return_exceptions=False
