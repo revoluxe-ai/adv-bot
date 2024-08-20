@@ -3,8 +3,7 @@ import json
 import time
 
 import aiohttp
-from aiohttp import ClientOSError, ServerDisconnectedError
-
+from aiohttp import ClientOSError, ServerDisconnectedError, ClientResponseError
 
 from .exceptions import (ApiForbiddenError,
                          TooManyRequests,
@@ -55,7 +54,8 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                         BadRequestError,
                         NotValidDataError,
                         ClientOSError,
-                        ServerDisconnectedError) as e:
+                        ServerDisconnectedError,
+                        ClientResponseError) as e:
                     state['_attempts'] += 1
                     state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:
