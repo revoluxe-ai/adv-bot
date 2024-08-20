@@ -10,6 +10,7 @@ from app.modules.wb_adv_updater.data_manager import DataGetter
 from app.utils.db.session_maker import get_async_session_maker
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
 from .wb_manager import Manager
+from . import wb_manager
 
 sm = get_async_session_maker
 
@@ -201,10 +202,9 @@ async def payment_for_auto_bidder():
 
 
 async def run_bidder_process():
-    manager = Manager()
     while True:
         try:
-            await manager.run_bidder_process()
+            await wb_manager.run_bidder_process()
         except Exception as e:
             logger.error(f'Ошибка процесса управления ставками {e}', exc_info=True)
         await asyncio.sleep(0)
