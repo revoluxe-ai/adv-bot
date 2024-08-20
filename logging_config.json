@@ -41,7 +41,7 @@
   },
   "loggers": {
     "app.modules.wb_adv_updater.ML.py": {
-      "level": "DEBUG",
+      "level": "INFO",
       "handlers": ["common_file", "console", "error_to_file"],
       "propagate": true
     },
