@@ -70,6 +70,54 @@ logger = logging.getLogger(__name__)
 sm = get_async_session_maker
 
 
+
+async def update_predict_ctr():
+    predictor = Predictor()
+    while True:
+        try:
+            await predictor.predict_ctr_for_keywords()
+        except Exception as exc:
+            logger.error(f'Ошибка предсказания CTR {exc}')
+        await asyncio.sleep(0)
+
+
+
+async def update_keywords_in_advs():
+    update_tasks: dict[int, asyncio.Task] = {}
+    while True:
+        accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
+        async for access in accesses:
+            wb_cabinet_id = access.wb_cabinet.id
+            if wb_cabinet_id  not in update_tasks:
+                try:
+                    data_setter = DataSetter(access)
+                except ApiForbiddenError:
+                    logger.error(f'Нет нужных прав у токена')
+                    continue
+                logger.debug(access.wb_cabinet.id)
+                async with sm() as session:
+                    stmt = select(AdvSetting) \
+                        .where(and_(AdvSetting.bot_active == True,
+                                    AdvSetting.wb_cabinet_id == wb_cabinet_id))
+                    result = await session.execute(stmt)
+                    adv_settings: list[AdvSetting] = result.scalars().all()
+                if adv_settings:
+                    task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings))
+                    update_tasks[wb_cabinet_id] = task
+            else:
+                if update_tasks[wb_cabinet_id].done():
+                    if update_tasks[wb_cabinet_id].exception():
+                        logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}',
+                                     exc_info=True)
+                    del update_tasks[wb_cabinet_id]
+        await asyncio.sleep(0)
+
+
+
+
+
+
+
 async def run_bidder_process():
     wb_cabinet_tasks = {}
     adv_tasks = {}
@@ -189,14 +237,73 @@ async def run_bidder_process_for_adv(adv_id: int,
 
 
 
+async def update_keyword_stat(access: WBCabinetAccess,
+                              adv_update_tasks: dict[int, asyncio.Task]):
+    wb_api = WBApi(access)
+    wb_cabinet = access.wb_cabinet
+    logger.debug(f"Начало обновления статистики для кабинета {wb_cabinet.id}")
+
+    async with sm() as session:
+        stmt = select(AdvSetting).where(and_(
+            AdvSetting.wb_cabinet_id == wb_cabinet.id,
+            AdvSetting.type == 8,
+        )).order_by(AdvSetting.last_update.desc())
+        result = (await session.execute(stmt)).unique()
+        adv_settings = result.scalars().all()
+    for adv_setting in adv_settings:
+        if adv_setting not in adv_update_tasks:
+            task = asyncio.create_task(keyword_stat_updater(adv_setting.id, wb_api))
+            adv_update_tasks[adv_setting.id] = task
+        else:
+            if adv_update_tasks[adv_setting.id].done():
+                logger.info(
+                    f'Задача обновления статистики ключей завершена для кабинета '
+                    f'{adv_setting.name}'
+                )
+                if adv_update_tasks[adv_setting.id].exception():
+                    logger.error(
+                        f'Ошибка обновления статистики ключей: '
+                        f'{adv_update_tasks[adv_setting.id].exception()},'
+                        f' для кабинета {adv_setting.name}'
+                    )
+
+                del adv_update_tasks[adv_setting.id]
+                logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
+                logger.debug(f'Установка set для need_update_model')
+                logger.debug(f"Обновление статистики завершено")
+        await asyncio.sleep(0)
+    return
 
 
+async def keyword_stat_updater(adv_setting_id, wb_api):
+    async with sm() as session:
+        stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+        adv_setting = await session.execute(stmt)
+        adv_setting = adv_setting.scalar()
+    try:
+        keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+    except Exception as exc:
+        logger.error(
+            f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+        return
+    if not keywords:
+        logger.debug(f'Для {adv_setting.name} не получены ключевые слова')
+        return
+    logger.debug(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
+    texts_for_adv_setting = {keyword.text for keyword in keywords}
+    existing_keyword_settings = await self._get_existing_keyword_settings(adv_setting.id)
+    new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
+    async with sm() as session:
+        for keyword in new_keywords:
+            keyword_setting = KeywordSetting(
+                text=keyword,
+                adv_setting_id=adv_setting.id,
+            )
+            session.add(keyword_setting)
 
-
-
-
-
-
+        await session.commit()
+    await self.update_keywords_stat_in_click_house(keywords, adv_setting)
+    return
 
 
 
@@ -240,42 +347,7 @@ class Manager(AbcManager):
 
 
 
-    async def update_keyword_stat(self, access: WBCabinetAccess,
-                                  adv_update_tasks: dict[int, asyncio.Task]):
-        wb_api = WBApi(access)
-        wb_cabinet = access.wb_cabinet
-        logger.debug(f"Начало обновления статистики для кабинета {wb_cabinet.id}")
 
-        async with sm() as session:
-            stmt = select(AdvSetting).where(and_(
-                AdvSetting.wb_cabinet_id == wb_cabinet.id,
-                AdvSetting.type == 8,
-            )).order_by(AdvSetting.last_update.desc())
-            result = (await session.execute(stmt)).unique()
-            adv_settings = result.scalars().all()
-        for adv_setting in adv_settings:
-            if adv_setting not in adv_update_tasks:
-                task = asyncio.create_task(self.keyword_stat_updater(adv_setting.id, wb_api))
-                adv_update_tasks[adv_setting.id] = task
-            else:
-                if adv_update_tasks[adv_setting.id].done():
-                    logger.info(
-                        f'Задача обновления статистики ключей завершена для кабинета '
-                        f'{adv_setting.name}'
-                    )
-                    if adv_update_tasks[adv_setting.id].exception():
-                        logger.error(
-                            f'Ошибка обновления статистики ключей: '
-                            f'{adv_update_tasks[adv_setting.id].exception()},'
-                            f' для кабинета {adv_setting.name}'
-                        )
-
-                    del adv_update_tasks[adv_setting.id]
-                    logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
-                    logger.debug(f'Установка set для need_update_model')
-                    logger.debug(f"Обновление статистики завершено")
-            await asyncio.sleep(0)
-        return
 
     # async def insert_keyword_stats(self, client, keyword_stats, adv_setting):
     #     try:
@@ -346,35 +418,6 @@ class Manager(AbcManager):
 
 
 
-    async def keyword_stat_updater(self, adv_setting_id, wb_api):
-        async with sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-            adv_setting = await session.execute(stmt)
-            adv_setting = adv_setting.scalar()
-        try:
-            keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
-        except Exception as exc:
-            logger.error(
-                f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
-            return
-        if not keywords:
-            logger.debug(f'Для {adv_setting.name} не получены ключевые слова')
-            return
-        logger.debug(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
-        texts_for_adv_setting = {keyword.text for keyword in keywords}
-        existing_keyword_settings = await self._get_existing_keyword_settings(adv_setting.id)
-        new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
-        async with sm() as session:
-            for keyword in new_keywords:
-                keyword_setting = KeywordSetting(
-                    text=keyword,
-                    adv_setting_id=adv_setting.id,
-                )
-                session.add(keyword_setting)
-
-            await session.commit()
-        await self.update_keywords_stat_in_click_house(keywords, adv_setting)
-        return
 
 
     async def graph_vector_update(self) -> None:
@@ -436,36 +479,6 @@ class Manager(AbcManager):
     def __load_ml_model(model_path,):
         return joblib.load(model_path)
 
-    @staticmethod
-    async def update_keywords_in_advs() -> list[typing.Awaitable]:
-        update_tasks: dict[int, asyncio.Task] = {}
-        while True:
-            accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
-            async for access in accesses:
-                wb_cabinet_id = access.wb_cabinet.id
-                if wb_cabinet_id  not in update_tasks:
-                    try:
-                        data_setter = DataSetter(access)
-                    except ApiForbiddenError:
-                        logger.error(f'Нет нужных прав у токена')
-                        continue
-                    logger.debug(access.wb_cabinet.id)
-                    async with sm() as session:
-                        stmt = select(AdvSetting) \
-                            .where(and_(AdvSetting.bot_active == True,
-                                        AdvSetting.wb_cabinet_id == wb_cabinet_id))
-                        result = await session.execute(stmt)
-                        adv_settings: list[AdvSetting] = result.scalars().all()
-                    if adv_settings:
-                        task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings))
-                        update_tasks[wb_cabinet_id] = task
-                else:
-                    if update_tasks[wb_cabinet_id].done():
-                        if update_tasks[wb_cabinet_id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}',
-                                         exc_info=True)
-                        del update_tasks[wb_cabinet_id]
-            await asyncio.sleep(0)
 
 
 
@@ -671,13 +684,6 @@ class Manager(AbcManager):
         except ValueError:
             return False
 
-    async def update_predict_ctr(self):
-        while True:
-            try:
-                await self._predictor.predict_ctr_for_keywords()
-            except Exception as exc:
-                logger.error(f'Ошибка предсказания CTR {exc}')
-            await asyncio.sleep(0)
 
     @staticmethod
     async def update_min_ctr_in_global_wb_category_settings():

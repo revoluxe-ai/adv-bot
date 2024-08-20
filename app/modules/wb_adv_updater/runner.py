@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 async def run_update_predict_ctr():
-     manager = Manager()
-     await manager.update_predict_ctr()
+     await wb_manager.update_predict_ctr()
 
 async def   run_update_keyword_stat():
     while True:
@@ -35,14 +34,13 @@ async def __run_update_keyword_stat():
     wb_cabinet_tasks = {}
     adv_update_tasks = {}
     # not_first_runs = set()
-    manager = Manager()
     while True:
         accesses = users_manager.get_accesses_for_wb_cabinets()
         async for access in accesses:
             cabinet_id = access.wb_cabinet.id
             if cabinet_id not in wb_cabinet_tasks:
                 task = asyncio.create_task(
-                    manager.update_keyword_stat(access,
+                    wb_manager.update_keyword_stat(access,
                                                       adv_update_tasks,))
                 wb_cabinet_tasks[cabinet_id] = task
 
