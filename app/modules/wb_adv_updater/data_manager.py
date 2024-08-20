@@ -314,6 +314,7 @@ async def get_category_name_min_ctr_final_data() -> dict[int, float]:
 
 async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]:
     async with _sm() as session:
+        logger.debug('Начинаю получать фразы')
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()

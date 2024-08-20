@@ -46,7 +46,7 @@
       "handlers": ["common_file"]
     },
     "app.modules.wb_adv_updater.data_manager": {
-        "level": "INFO",
+        "level": "DEBUG",
         "handlers": ["common_file"],
         "propagate": false
         },
