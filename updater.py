@@ -70,12 +70,10 @@ def process_controller(processes: list[Process]):
                 f"  Open Files: {process_info['Open Files']}\n")
 
 
-            print(info_str)
+            logger.info(info_str)
 
             live_process = process.is_alive()
-            if live_process:
-                logger.info(f'Процесс живой: {live_process}')
-            else:
+            if not live_process:
                 logger.error(f'Процесс мертв, перезапуск процесса: {process.name}')
                 process.start()
                 logger.info(f'Процесс перезапущен: {process.name}')
