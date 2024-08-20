@@ -59,6 +59,16 @@
         "level": "DEBUG",
         "handlers": ["common_file"],
         "propagate": false
+        },
+    "neo4j.io": {
+        "level": "CRITICAL",
+        "handlers": ["common_file"],
+        "propagate": false
+        },
+    "app.utils.db.session_maker": {
+        "level": "CRITICAL",
+        "handlers": ["common_file"],
+        "propagate": false
         }
     },
   "root": {
