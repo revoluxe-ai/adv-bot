@@ -70,8 +70,7 @@ async def run_update_data_in_neo4j():
 
 async def run_update_minus_keywords_on_wb():
     manager = Manager()
-    await manager\
-        .update_keywords_in_advs()
+    await wb_manager.update_keywords_in_advs()
 
 
 async def run_update_model():
