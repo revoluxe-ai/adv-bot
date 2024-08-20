@@ -76,6 +76,7 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
                         continue
                     if token_shop_id != shop_id:
                         continue
+                    users_live_tokens.append(token)
                 tokens_for_wb_cabinet.extend(users_live_tokens)
 
             if tokens_for_wb_cabinet:
@@ -115,6 +116,7 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
                     continue
                 if token_shop_id != shop_id:
                     continue
+                users_live_tokens.append(token)
             tokens_for_wb_cabinet.extend(users_live_tokens)
 
         if tokens_for_wb_cabinet:
