@@ -57,15 +57,12 @@ def process_controller(process_pids: list[int], process_names: list[str]):
                 continue
 
             logger.debug(f'Создан объект процесса: {name}')
-            cpu_usage = proc.cpu_percent(interval=1)
-            logger.debug('Получили процент использования CPU')
             memory_usage = proc.memory_info().rss / (1024 * 1024)
             logger.debug('Получили использование памяти')
 
             process_info = {
                 'PID': pid,
                 'Name': name,
-                'CPU Usage (%)': cpu_usage,
                 'Memory Usage (MB)': memory_usage,
                 'Status': proc.status(),
                 'Threads': proc.num_threads(),
