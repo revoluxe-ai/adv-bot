@@ -556,10 +556,10 @@ class DataSetter:
                     bad_phrases.append(keyword.text)
             if bad_phrases:
                 await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
-                logger.info(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
-                logger.info(f'Позитивные слова {good_phrases}')
+                logger.debug(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
+                logger.debug(f'Позитивные слова {good_phrases}')
             else:
-                logger.info(f'Нет минус слов для {adv_setting.name}')
+                logger.debug(f'Нет минус слов для {adv_setting.name}')
         return
 
 
@@ -838,9 +838,14 @@ async def get_min_ctr(adv: AdvSetting):
                 """
 
         client = await get_clickhouse_client()
-        result = await client.query(query)
-        rows = result.result_rows
-        client.close()
+        try:
+            result = await client.query(query)
+            rows = result.result_rows
+        except Exception as e:
+            logger.error(f"Error in get_min_ctr: {e}")
+            raise
+        finally:
+            client.close()
         text_to_real_ctr = {row[0]: row[1] for row in rows}
         real_ctrs  = []
         predict_ctrs = []
