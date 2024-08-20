@@ -410,6 +410,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     keyword_stat.reason = 'min_ctr'
                     await redis_manager.set_auto_block_status(keyword_setting.id, True)
             assert keyword_stat.predict_ctr
+            await asyncio.sleep(0)
 
     logger.debug('Проверяю статусы ключевых слов с assert')
 
