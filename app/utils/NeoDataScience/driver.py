@@ -1148,9 +1148,14 @@ UNWIND phrase.words AS word
         return result
 
     async def update_vectors_in_redis(self):
-        await self._update_items_vectors_in_redis()
-        await self._update_keywords_vectors_in_redis()
-
+        try:
+            await self._update_items_vectors_in_redis()
+        except Exception as exc:
+            logger.error(f'Ошибка при обновлении векторов товаров в Redis: {exc}')
+        try:
+            await self._update_keywords_vectors_in_redis()
+        except:
+            logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}')
 
     async def _update_items_vectors_in_redis(self):
         query = """
