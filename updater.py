@@ -46,8 +46,14 @@ def process_controller(processes: list[Process]):
             logger.info(f'Имя функции: {process.name}')
             logger.info(f'Использование CPU: {cpu_usage}%')
             logger.info(f'Использование памяти: {memory_usage} MB')
+            live_process: bool = process.is_alive()
+            if live_process:
+                logger.info(f'Процесс живой: {live_process}')
+            else:
+                logger.error(f'Процесс мертв, перезапуск процесса: {process.name}')
+                process.start()
+                logger.info(f'Процесс перезапущен: {process.name}')
         time.sleep(60)
-
 
 def run_coroutines(coroutine):
     asyncio.run(coroutine())
