@@ -1,4 +1,4 @@
-import multiprocessing
+import logging
 
 from app.modules.wb_adv_updater.runner import (
                                                run_update_data_in_neo4j,
@@ -14,7 +14,7 @@ import asyncio
 from multiprocessing import Process
 from functools import partial
 
-
+logger = logging.getLogger(__name__)
 
 
 run_own_process_list = [
@@ -38,6 +38,7 @@ def main():
         func = partial(run_coroutines, run_own_process)
         process = Process(target=func)
         process.start()
+        logger.info(f'Запущен процесс {process.pid} - {run_own_process.__name__}')
         processes.append(process)
     for process in processes:
         process.join()
