@@ -43,6 +43,7 @@ def process_controller(processes: list[Process]):
             memory_usage = proc.memory_info().rss / (1024 * 1024)  # Потребляемая память в МБ
 
             logger.info(f'PID дочернего процесса: {process.pid}')
+            logger.info(f'Имя функции: {process.name}')
             logger.info(f'Использование CPU: {cpu_usage}%')
             logger.info(f'Использование памяти: {memory_usage} MB')
         time.sleep(60)
@@ -56,7 +57,7 @@ def main():
     processes = []
     for run_own_process in run_own_process_list:
         func = partial(run_coroutines, run_own_process)
-        process = Process(target=func)
+        process = Process(target=func, name=run_own_process.__name__)
         process.start()
         logger.info(f'Запущен процесс {process.pid} - {run_own_process.__name__}')
         processes.append(process)
