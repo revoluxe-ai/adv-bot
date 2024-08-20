@@ -56,7 +56,19 @@ def process_controller(processes: list[Process]):
                 'Open Files': len(proc.open_files())
             }
 
-            logger.info(f'Информация о процессе: {process_info}')
+            info_str = (
+                f"Process Info:\n"
+                f"  PID: {process_info['PID']}\n"
+                f"  Name: {process_info['Name']}\n"
+                f"  CPU Usage (%): {process_info['CPU Usage (%)']:.2f}\n"
+                f"  Memory Usage (MB): {process_info['Memory Usage (MB)']:.2f}\n"
+                f"  Status: {process_info['Status']}\n"
+                f"  Threads: {process_info['Threads']}\n"
+                f"  Create Time: {process_info['Create Time']}\n"
+                f"  Open Files: {process_info['Open Files']}\n")
+
+
+            logger.info(info_str)
 
             live_process = process.is_alive()
             if live_process:
