@@ -7,7 +7,8 @@ from app.modules.wb_adv_updater.runner import (
                                                run_update_minus_keywords_on_wb,
                                                run_update_keyword_stat,
                                                run_bidder_process,
-                                               update_all_data_in_db
+                                               update_all_data_in_db,
+                                                parser_all_white_phrase
 )
 from python_modules.logger import setup_logging
 import logging
@@ -31,7 +32,8 @@ run_own_process_list = [
      run_update_minus_keywords_on_wb,
      run_update_keyword_stat,
      run_bidder_process,
-     update_all_data_in_db
+     update_all_data_in_db,
+    parser_all_white_phrase
 
 
 ]
@@ -68,13 +70,13 @@ def process_controller(processes: list[Process]):
                 f"  Open Files: {process_info['Open Files']}\n")
 
 
-            logger.info(info_str)
+            print(info_str)
 
             live_process = process.is_alive()
             if live_process:
                 logger.info(f'Процесс живой: {live_process}')
             else:
-                logger.error(f'Процесс мертв, перезапуск процесса: {process.namу}')
+                logger.error(f'Процесс мертв, перезапуск процесса: {process.name}')
                 process.start()
                 logger.info(f'Процесс перезапущен: {process.name}')
         time.sleep(60)
