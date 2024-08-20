@@ -192,10 +192,6 @@ RETURN graphName
 
 
 
-
-
-
-
     def get_mean_distance(self, offer_id: str, phrase: list)-> float:
         query = """
         match (item:Item {offer_id: $offer_id})-[r:DIRECT_DIST]-(keyword:Keyword)
@@ -406,32 +402,27 @@ RETURN graphName
 
     async def _set_knn_on_images(self, name):
 
-        stream_query = """
-                CALL gds.knn.stream(
-                $name,
-                {
-                    jobid: 'knn',
-                    nodeProperties: 
-                    {vgg19: 'COSINE'}
-                }
-            )
-            YIELD node1, node2, similarity
-            MATCH (source) WHERE id(source) = node1
-            MATCH (target) WHERE id(target) = node2
-            MERGE (source)-[r:LIKE]->(target)
-            ON CREATE SET r.dist = similarity
-            ON MATCH SET r.dist = similarity
-                
-             """
-
-
-
-
         async def execute_knn_process(tx, name):
-            # Выполняем mutate
-            # Записываем результаты в базу данных
+            stream_query = """
+                               CALL gds.knn.stream(
+                               $name,
+                               {
+                                   jobid: 'knn',
+                                   nodeProperties: 
+                                   {vgg19: 'COSINE'}
+                               }
+                           )
+                           YIELD node1, node2, similarity
+                           MATCH (source) WHERE id(source) = node1
+                           MATCH (target) WHERE id(target) = node2
+                           MERGE (source)-[r:LIKE]->(target)
+                           ON CREATE SET r.dist = similarity
+                           ON MATCH SET r.dist = similarity
+
+                                        """
             stream_result = await tx.run(stream_query, name=name)
             await stream_result.consume()
+
 
 
         async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
