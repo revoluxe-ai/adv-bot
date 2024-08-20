@@ -40,6 +40,13 @@
     }
   },
 
+  "loggers": {
+    "updater": {
+      "level": "DEBUG",
+      "handlers": ["common_file"]
+    }
+  },
+
   "root": {
     "level": "INFO",
     "formatters": ["custom"],

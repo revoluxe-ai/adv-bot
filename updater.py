@@ -43,10 +43,14 @@ def process_controller(processes: list[Process]):
     time.sleep(1)
     while True:
         for process in processes:
+            logger.debug(f'Проверка процесса: {process.name}')
             proc = psutil.Process(process.pid)
+            logger.debug(f'Создан объект процесса: {process.name}')
             # Получаем использование CPU и памяти
-            cpu_usage = proc.cpu_percent(interval=1)  # Процент использования CPU за 1 секунду
-            memory_usage = proc.memory_info().rss / (1024 * 1024)  # Потребляемая память в МБ
+            cpu_usage = proc.cpu_percent(interval=1)
+            logger.debug('Получили процент использования cpu')# Процент использования CPU за 1 секунду
+            memory_usage = proc.memory_info().rss / (1024 * 1024)
+            logger.debug('Получили использование памяти')# Использование памяти в МБ
             process_info = {
                 'PID': process.pid,
                 'Name': process.name,
@@ -71,8 +75,9 @@ def process_controller(processes: list[Process]):
 
 
             logger.info(info_str)
-
+            logger.debug(f'Проверка жив ли процесс: {process.name}')
             live_process = process.is_alive()
+            logger.debug(f'Проверка завершена: {process.name}')
             if not live_process:
                 logger.error(f'Процесс мертв, перезапуск процесса: {process.name}')
                 process.start()
