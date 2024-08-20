@@ -46,8 +46,7 @@
       "propagate": true
     },
     "app.modules.wb_keywords_parser.parser": {
-      "level": "DEBUG",
-      "handlers": ["common_file", "console", "error_to_file"],
+      "level": "INFO",
       "propagate": true
     }
   },
