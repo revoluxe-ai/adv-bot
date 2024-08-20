@@ -231,7 +231,6 @@ async def main_loop():
     await asyncio.gather(
         payment_for_auto_bidder(),
         payment_for_parsing_keyword(),
-        run_bidder_process(),
         # .clear_data_for_expired_wb_cabinets(),
         process_payment_for_advs(),
         # .update_min_ctr_in_global_wb_category_settings(),
