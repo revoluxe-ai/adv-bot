@@ -51,11 +51,17 @@
     },
     "neo4j.io": {
       "level": "WARNING",
+      "propagate": false
+    },
+    "app.modules.wb_adv_updater.wb_manager": {
+      "level": "DEBUG",
+      "handlers": ["common_file"],
+      "propagate": true
+    },
+    "app.modules.common_slaves.wildberries.shops_data_updater" : {
+      "level": "DEBUG",
+      "handlers": ["common_file"],
       "propagate": true
     }
-  },
-  "root": {
-    "level": "INFO",
-    "handlers": ["error_to_file", "console", "common_file"]
   }
 }

@@ -608,7 +608,9 @@ class Manager(AbcManager):
 
     async def update_all_data_in_db_run(self, tasks):
          wb_accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
+         logger.debug('Получен генератор к кабинетам для обновления даты')
          async for wb_access in wb_accesses:
+             logger.debug('Получен кабинет для обновления данных')
              if wb_access.wb_cabinet.id not in tasks:
                  try:
                       shop_data_updater = ShopDataUpdater(wb_access)
@@ -616,9 +618,11 @@ class Manager(AbcManager):
                      logger.error(f'Нет нужных прав у токена')
                      continue
                  task = asyncio.create_task(shop_data_updater.update_all_data())
+                 logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
                  tasks[wb_access.wb_cabinet.id] = task
              else:
                  if tasks[wb_access.wb_cabinet.id].done():
+                     logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} завершена')
                      if tasks[wb_access.wb_cabinet.id].exception():
                          logger.error(f'Ошибка обновления данных для Shop id {wb_access.wb_cabinet.shop_id}: {tasks[wb_access.wb_cabinet.id].exception()}, '
                                       f'{tasks[wb_access.wb_cabinet.id].exception()}')
@@ -827,9 +831,11 @@ class Manager(AbcManager):
         adv_tasks = {}
         while True:
             accesses = super_cabinet_manager.get_accesses_for_bidder()
+            logger.debug(f'Получен генератор доступов к кабинетам для биддера')
             async for access in accesses:
                 cabinet_id = access.wb_cabinet.id
                 if cabinet_id not in wb_cabinet_tasks:
+                    logger.debug(f'Запуск задачи обновления ставок для кабинета {cabinet_id}')
                     task = asyncio.create_task(self._run_bidder_process_for_wb_cabinet(access,
                                                                                        adv_tasks = adv_tasks))
                     wb_cabinet_tasks[cabinet_id] = task
@@ -848,6 +854,7 @@ class Manager(AbcManager):
             await asyncio.sleep(0)
 
     async def _run_bidder_process_for_wb_cabinet(self, access: WBCabinetAccess, adv_tasks: dict):
+        logger.debug(f'Запуск задачи обновления ставок для кабинета {access.wb_cabinet.id}')
         wb_api = WBApi(access)
         wb_cabinet = access.wb_cabinet
         async with sm() as session:
