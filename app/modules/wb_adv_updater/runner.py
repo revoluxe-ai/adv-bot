@@ -237,5 +237,6 @@ async def main_loop():
         # .update_min_ctr_in_global_wb_category_settings(),
         update_all_data_in_db(),
         run_vector_update_in_neo4j(),
+        run_update_predict_ctr(),
         return_exceptions=False
     )
