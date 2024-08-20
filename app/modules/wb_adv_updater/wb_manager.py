@@ -61,13 +61,18 @@ from  app.modules.wb_keywords_parser import parser
 from app.utils.click_house.client import get_clickhouse_client
 
 
-predictor = Predictor()
 
 
 logger = logging.getLogger(__name__)
 
+gds = DataScience()
 
 sm = get_async_session_maker
+
+keywords_hashs_in_neo = set()
+
+
+
 
 async def insert_or_update_keywords(client, keyword_stats, adv_setting):
     try:
@@ -511,66 +516,6 @@ class Manager(AbcManager):
 
 
 
-    async def update_wb_adv_phrase_in_db(self):
-        while True:
-            try:
-                await self.update_wb_adv_phrase_in_db_bot_active()
-            except Exception as exc:
-                logger.error(f'Ошибка обновления фраз в neo4j {exc}')
-
-
-    async def update_wb_adv_phrase_in_db_bot_active(self):
-        process = psutil.Process()  # Получаем процесс текущей программы
-
-        async with sm() as session:
-            stmt = select(KeywordSetting.text).join(AdvSetting)
-            result = await session.execute(stmt)
-            texts = result.unique().scalars().all()
-
-        texts = [text for text in texts if text]
-        new_texts = []
-        for text in texts:
-            text = text.replace('_', ' ')
-            text = text.replace(',', '.')
-            new_texts.append(text)
-        texts = new_texts
-
-        batch_size = 100
-        phrase_data_list = []
-
-        for text in texts:
-            hash_text = self.get_text_hash(text)
-            if hash_text in self._keywords_hashs_in_neo:
-                await asyncio.sleep(0)
-                return
-            if await self._gds.check_phrase_in_neo(text):
-                logger.debug(f'Фраза {text} уже есть в базе данных')
-                self._keywords_hashs_in_neo.add(hash_text)
-                await asyncio.sleep(0)
-                return
-
-            phrase_data = await self._get_phrase_data(text)
-            phrase_data_list.append(phrase_data)
-            self._keywords_hashs_in_neo.add(hash_text)
-
-            # Записываем, если набрался полный батч
-            if len(phrase_data_list) >= batch_size:
-                await self._gds.add_keyword_phrase(phrase_data_list)
-                phrase_data_list.clear()
-                await asyncio.sleep(0)
-
-            # Получение текущего использования памяти
-            mem_info = process.memory_info()
-            print(f"Memory usage: RSS={mem_info.rss / 1024 ** 2:.2f} MB, VMS={mem_info.vms / 1024 ** 2:.2f} MB")
-
-            await asyncio.sleep(1)  # Задержка 1 секунда
-
-        # Записываем оставшиеся данные, если они есть
-        if phrase_data_list:
-            await self._gds.add_keyword_phrase(phrase_data_list)
-            await asyncio.sleep(0)
-
-
     async def get_nearest_surrogate_phrases(self, phrases: set[str]):
         if self._phrase_index is None:
             index = await asyncio.to_thread(self._get_phrase_index)
@@ -965,37 +910,6 @@ class Manager(AbcManager):
                 await asyncio.sleep(0)
 
 
-
-
-
-
-
-
-    @staticmethod
-    def get_text_hash(text):
-        hash_text = hashlib.md5(text.encode()).hexdigest()
-        return hash_text
-
-
-
     async def update_vectors_in_redis(self):
         await self._gds.update_vectors_in_redis()
 
-    @profile
-    async def _get_phrase_data(self, text):
-        words = text.split()
-        keywords = []
-        for word in words:
-            vector = await self._word2vec.average_vector_from_sentence(word)
-            if vector is not None:
-                vector = list(vector)
-            keywords.append(KeywordStatForNeo(text=word, vector=vector))
-            await asyncio.sleep(0)
-
-        phrase_data = KeywordPhrase(
-            text=text,
-            words=keywords,
-            word2vec=await self._word2vec.average_vector_from_sentence(text)
-        )
-
-        return  phrase_data

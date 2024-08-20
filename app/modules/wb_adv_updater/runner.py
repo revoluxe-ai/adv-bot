@@ -10,7 +10,7 @@ from app.modules.wb_adv_updater.data_manager import DataGetter
 from app.utils.db.session_maker import get_async_session_maker
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
 from .wb_manager import Manager
-from . import wb_manager
+from . import wb_manager, ml_data_manager
 
 sm = get_async_session_maker
 
@@ -59,10 +59,9 @@ async def __run_update_keyword_stat():
 
 
 async def run_update_data_in_neo4j():
-    manager = Manager()
     await asyncio.gather(
             update_cards_in_graph(),
-            manager.update_wb_adv_phrase_in_db(),
+            ml_data_manager.update_wb_adv_phrase_in_db(),
         )
 
 

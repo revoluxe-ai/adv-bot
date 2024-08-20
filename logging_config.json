@@ -41,7 +41,7 @@
   },
 
   "root": {
-    "level": "INFO",
+    "level": "DEBUG",
     "formatters": ["custom"],
     "handlers": ["console", "common_file", "error_to_file"]
   }
