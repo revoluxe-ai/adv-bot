@@ -3,7 +3,7 @@ from sqlalchemy import select
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, WBCabinet
-from app.modules.wb_adv_updater.wb_manager import Manager
+from app.modules.wb_adv_updater import wb_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 
@@ -28,7 +28,6 @@ async def get_keywords_stat_from_wb(semaphore = None):
     wb_user_cabinet = await get_wb_user_cabinet()
     access = await super_cabinet_manager.get_access_for_wb_user_cabinet(wb_user_cabinet)
     wb_api = WBApi(access)
-    wb_manager = Manager()
     await wb_manager.keyword_stat_updater(adv_setting, wb_api, semaphore)
 
 

@@ -1,46 +1,27 @@
-import hashlib
 import logging
-import re
-import typing
-from memory_profiler import profile
-
-import tracemalloc
-from asyncio import Semaphore
 from typing import List
-import aiohttp
-from io import BytesIO
 from itertools import product
 import dask.dataframe as dd
 import faiss
 import joblib
 import numpy as np
-import psutil
-from PIL import Image as PilImage
 from sqlalchemy import not_
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.models import AdvPayment
-from app.utils.faiss_manager.faiss_index_manager import FaissManager
-from app.utils.text_master.Transformers import Word2Vec
 from .ABC_manager import AbcManager
-from .data_manager import DataGetter, DataSetter
+from .data_manager import  DataSetter
 from .graph_vector_updater import GraphUpdater
-from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordStatForNeo, KeywordPhrase
 from ..common_slaves.wildberries import super_cabinet_manager
-from .ML import Fitter
 from app.my_types import KeywordStat
 from app.utils.NeoDataScience.driver import DataScience
-from app.modules.common_slaves.wildberries.models import WBCard, WBCabinet
-
-from app.utils.image_master.image_master2 import ImageMaster
-import pymystem3
-from app.utils.image_master import image_tools
+from app.modules.common_slaves.wildberries.models import WBCabinet
 import asyncio
 from app.admin_bot.sender import messages
 import pandas as pd
 from sqlalchemy import and_
-from sqlalchemy.orm import joinedload, selectinload, InstrumentedAttribute
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.future import select
 from .ML import Predictor
 import datetime
@@ -56,7 +37,6 @@ from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
 from ...client_bot import const
 from ...utils import redis_manager
-from ...utils.redis_manager import RedisEvent
 from  app.modules.wb_keywords_parser import parser
 from app.utils.click_house.client import get_clickhouse_client
 
@@ -70,6 +50,237 @@ gds = DataScience()
 sm = get_async_session_maker
 
 keywords_hashs_in_neo = set()
+
+
+async def process_payment_for_auto_bidder():
+    current_date = datetime.datetime.now().date()
+    async with sm() as session:
+        stmt = select(AdvSetting).options(
+            joinedload(AdvSetting.payments),
+            selectinload(AdvSetting.wb_cabinet)
+        ).filter(
+            and_(
+                AdvSetting.bidder_active == True,
+                not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
+                                                  AdvPayment.type == 'auto_bidder')))
+
+            )
+        )
+
+        result = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = result.unique().scalars().all()
+
+        for adv_setting in adv_settings:
+            wb_cabinet = adv_setting.wb_cabinet
+            if not (bonus := wb_cabinet.bonus):
+                bonus = 0
+            if not (balance := wb_cabinet.balance):
+                balance = 0
+            if bonus >= const.AUTO_BIDDER_PRICE:
+                payment = AdvPayment(date=current_date,
+                                     type='auto_bidder')
+                session.add(payment)
+                adv_setting.payments.append(payment)
+                wb_cabinet.bonus -= const.AUTO_BIDDER_PRICE
+            elif balance > 0:
+                payment = AdvPayment(date=current_date,
+                                     type='auto_bidder')
+                session.add(payment)
+                adv_setting.payments.append(payment)
+                wb_cabinet.balance -= const.AUTO_BIDDER_PRICE
+            else:
+                wb_cabinet.bonus = 0
+                adv_setting.bidder_active = False
+            await session.commit()
+            await asyncio.sleep(0)
+
+
+
+async def process_payment_for_parsing():
+    current_date = datetime.datetime.now().date()
+    async with sm() as session:
+        stmt = select(AdvSetting).options(
+            joinedload(AdvSetting.payments),
+            selectinload(AdvSetting.wb_cabinet)
+        ).filter(
+            and_(
+                AdvSetting.parsing_active == True,
+                not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
+                                                  AdvPayment.type == 'parsing')))
+
+            )
+        )
+
+        result = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = result.unique().scalars().all()
+
+        for adv_setting in adv_settings:
+            wb_cabinet = adv_setting.wb_cabinet
+            if not (bonus := wb_cabinet.bonus):
+                bonus = 0
+            if not (balance := wb_cabinet.balance):
+                balance = 0
+            if bonus >= const.PARSING_PRICE:
+                payment = AdvPayment(date=current_date)
+                adv_setting.payments.append(payment)
+                wb_cabinet.bonus -= const.PARSING_PRICE
+            elif balance > 0:
+                payment = AdvPayment(date=current_date,
+                                     type='parsing')
+                adv_setting.payments.append(payment)
+                wb_cabinet.balance -= const.PARSING_PRICE
+            else:
+                wb_cabinet.bonus = 0
+                adv_setting.parsing_active = False
+            await session.commit()
+            await asyncio.sleep(0)
+
+
+async def process_payment_for_advs():
+    current_date = datetime.datetime.now().date()
+    async with sm() as session:
+        stmt = select(AdvSetting).options(
+            joinedload(AdvSetting.payments),
+            selectinload(AdvSetting.wb_cabinet)
+        ).filter(
+            and_(
+                AdvSetting.bot_active == True,
+                not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
+                AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
+                # условие на истекший срок действия
+            )
+        )
+
+        result = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = result.unique().scalars().all()
+
+        for adv_setting in adv_settings:
+            wb_cabinet = adv_setting.wb_cabinet
+            if not (bonus := wb_cabinet.bonus):
+                bonus = 0
+            if not (balance := wb_cabinet.balance):
+                balance = 0
+            if bonus >= const.PRICE_FOR_ADV_FOR_DAY:
+                payment = AdvPayment(date=current_date)
+                adv_setting.payments.append(payment)
+                wb_cabinet.bonus -= const.PRICE_FOR_ADV_FOR_DAY
+            elif balance > 0:
+                payment = AdvPayment(date=current_date)
+                adv_setting.payments.append(payment)
+                wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
+            else:
+                wb_cabinet.bonus = 0
+            await session.commit()
+
+
+async def graph_vector_update() -> None:
+    graph_updater = GraphUpdater()
+    length = 2 ** 4
+    await graph_updater.update_graph_run(length)
+    await asyncio.sleep(1)
+    return
+
+
+
+async def update_vectors_update_in_graph():
+    while True:
+        try:
+            await graph_vector_update()
+        except Exception as exc:
+            logger.error(f'Ошибка векторизации {exc}', exc_info=True)
+        await asyncio.sleep(0)
+
+
+
+
+async def update_vectors_in_redis():
+    await gds.update_vectors_in_redis()
+
+async def shop_subscribe_control():
+    while True:
+        async with sm() as session:
+            stmt = select(WBCabinet) \
+                .options(
+                selectinload(WBCabinet.wb_user_cabinets) \
+                    .selectinload(WBUserCabinet.user),
+                selectinload(WBCabinet.adv_settings)
+            ) \
+                .where(
+                and_(
+                    WBCabinet.expiration_time < datetime.datetime.now(),
+                    WBCabinet.active == True,
+                    WBCabinet.balance < 0
+                )
+            )
+            result = await session.execute(stmt)
+            wb_cabinets_expirated_and_active = result.scalars().all()
+            for wb_cabinet in wb_cabinets_expirated_and_active:
+                access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
+                if not access:
+                    logger.error('Нет доступа для кабинета')
+                wb_api = WBApi(access)
+                adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
+                for adv_setting in adv_settings:
+                    if adv_setting.bot_active is True and adv_setting.active_status == 'started':
+                        try:
+                            await wb_api.advert.pause_company(adv_setting.adv_id)
+                        except:
+                            logger.error(f'Ошибка при попытке остановить кампанию {adv_setting.adv_id}')
+                            continue
+                        adv_setting.bot_active = False
+                wb_cabinet.active = False
+                await session.commit()
+                wb_user_cabinets = wb_cabinet.wb_user_cabinets
+                for wb_user_cabinet in wb_user_cabinets:
+                    user = wb_user_cabinet.user
+                    try:
+                        await messages.ShopExpiredSubscriptionMessage(
+                            bot,
+                            wb_user_cabinet.user.user_telegram_id,
+                            wb_user_cabinet)()
+                        logger.debug(f'Сообщение о просроченной подписке отправлено для юзера {user.username}')
+                    except Exception as exc:
+                        logger.error(f'Ошибка при отправке сообщения о просроченной подписке '
+                                     f'для юзера {user.username}: {exc}')
+                        await asyncio.sleep(1)
+        await asyncio.sleep(60 * 60)
+
+
+async def check_accesses():
+    await rights_control.check_all()
+
+async def update_all_data_in_db_run(tasks):
+    wb_accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
+    logger.debug('Получен генератор к кабинетам для обновления даты')
+    async for wb_access in wb_accesses:
+        logger.debug('Получен кабинет для обновления данных')
+        if wb_access.wb_cabinet.id not in tasks:
+            try:
+                shop_data_updater = ShopDataUpdater(wb_access)
+            except ApiForbiddenError:
+                logger.error(f'Нет нужных прав у токена')
+                continue
+            task = asyncio.create_task(shop_data_updater.update_all_data())
+            logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
+            tasks[wb_access.wb_cabinet.id] = task
+        else:
+            if tasks[wb_access.wb_cabinet.id].done():
+                logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} завершена')
+                if tasks[wb_access.wb_cabinet.id].exception():
+                    logger.error(
+                        f'Ошибка обновления данных для Shop id {wb_access.wb_cabinet.shop_id}: {tasks[wb_access.wb_cabinet.id].exception()}, '
+                        f'{tasks[wb_access.wb_cabinet.id].exception()}')
+                else:
+                    async with sm() as session:
+                        wb_cabinet = wb_access.wb_cabinet
+                        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet.id)
+                        result = await session.execute(stmt)
+                        wb_cabinet = result.scalar()
+                        wb_cabinet.last_update_all_data = datetime.datetime.now()
+                        await session.commit()
+                    logger.debug('Задача обновления успешно выполнена')
+                del tasks[wb_access.wb_cabinet.id]
+
 
 
 
@@ -383,29 +594,6 @@ class MessageCounter:
 message_counter = MessageCounter()
 
 class Manager(AbcManager):
-    _fitter = Fitter()
-    _data_getter = DataGetter()
-    graph_updater = GraphUpdater()
-    # _shop_manager = ShopManager()
-    _word2vec = Word2Vec()
-    _faiss_manager = FaissManager()
-    _lock = asyncio.Lock()
-    _predictor = Predictor()
-
-    def __init__(self):
-        self._image_master = ImageMaster()
-        self._phrase_index = None
-        self._gds = DataScience()
-        self._word2vec = Word2Vec()
-        self._aiosm = get_async_session_maker
-        self._pymystem = pymystem3.Mystem()
-        self._image_tools = image_tools
-        self._keywords_hashs_in_neo = set()
-
-
-
-
-
     # async def insert_keyword_stats(self, client, keyword_stats, adv_setting):
     #     try:
     #         # Генерация новой версии на основе текущего времени
@@ -424,13 +612,6 @@ class Manager(AbcManager):
 
 
 
-
-
-    async def graph_vector_update(self) -> None:
-        length = 2**4
-        await self.graph_updater.update_graph_run(length)
-        await asyncio.sleep(1)
-        return
 
 
     def save_full_predict(self):
@@ -487,28 +668,9 @@ class Manager(AbcManager):
 
 
 
-
-
-    async def update_model(self):
-        logger.debug('Старт обучения и сохранения модели')
-        await self.fit_and_save_model()
-        logger.debug('Устанавливаю сет, разрешаю обновление ключей')
-
-
     def __save_model( model, model_path):
         joblib.dump(model, model_path)
 
-
-    async def fit_and_save_model(self):
-        await self._fitter.getGradientBoostingFullFitModel()
-
-    async def update_vectors_update_in_graph(self):
-        while True:
-             try:
-                 await self.graph_vector_update()
-             except Exception as exc:
-                    logger.error(f'Ошибка векторизации {exc}', exc_info=True)
-             await asyncio.sleep(0)
 
     def __get_keyword_stat(self):
         kw_df = pd.read_csv(self.keyword_stat_df_path)
@@ -547,88 +709,11 @@ class Manager(AbcManager):
         distances, indices = index.search(vector, 1)  # Ищем наиболее похожий вектор
         return indices[0, 0]
 
-
     def _get_phrase_index(self):
        index = self._faiss_manager.get_keyword_phrases_index()
        return index
 
-    async def update_cards_in_graph_for_shops(self):
-        async with sm() as session:
-            stmt = select(AdvSetting)
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.scalars().all()
-            all_nmids = set()
-            for adv in adv_settings:
-                nmids = adv.nmids
-                if not nmids:
-                    continue
-                for nmid in nmids:
-                    all_nmids.add(nmid)
-            if not all_nmids:
-                return
-            stmt = select(WBCard).where(WBCard.nmid.in_(all_nmids))
-            wbcards: list[WBCard] = await session.stream(stmt)
-            async for wbcard in  wbcards.scalars():
-                try:
-                    main_image_url: str = wbcard.photos[0]
-                    async with aiohttp.ClientSession() as http_session:
-                        async with http_session.get(main_image_url) as response:
-                            image_bytes = await response.read()
-                            pil_image = PilImage.open(BytesIO(image_bytes))
-                    characteristics_word = await self._process_product_data(wbcard)
-                    vector = await asyncio.to_thread(self._image_master.get_vector, pil_image)
-                    dhash = await asyncio.to_thread(self._image_tools.dhash, pil_image)
-                    logger.debug(f"Обновляем карточку: {wbcard.name}")
-                    await self._gds.update_wb_card(wbcard, characteristics_word, dhash, vector)# Подтверждение изменений в базе данных
-                except KeyError as exc:
-                    if exc.args[0] == 'photos':
-                        logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
-                    else:
-                        logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
 
-
-
-    async def update_cards_in_graph(self):
-        await self.update_cards_in_graph_for_shops()
-
-    async def _process_product_data(self, wbcard: WBCard):
-        product_data = wbcard.card_json
-        # Обработка характеристик
-        characteristics_words = {}
-        for characteristic in product_data["characteristics"]:
-            char_name = characteristic['name'].lower()
-            char_value = characteristic['value']
-            if not isinstance(char_value, list) or all(
-                    self.is_number(x) for x in char_value):
-                continue
-            characteristics_words[char_name]: tuple(str, list[float]) = await self.__get_words_from_char_value(char_value)
-        characteristics_words['name']: tuple(str, list[float])  = await self.__get_words_from_char_value(wbcard.name)
-        if 'description' in characteristics_words:
-            characteristics_words['description']: tuple(str, list[float]) = await self.__get_words_from_char_value(wbcard.description)
-        return characteristics_words
-
-
-    async def __get_words_from_char_value(self, char_value):
-        if isinstance(char_value, list):
-            char_value = " ".join(char_value)
-        words = re.split(r'[ ,\.]+', char_value)
-        words = list(filter(None, words))
-        groups = []
-        for word in words:
-            word =  word.lower()
-            word2vec = await self._word2vec.average_vector_from_sentence(word)
-            groups.append((word, word2vec,))
-
-        return groups
-
-
-    @staticmethod
-    def is_number(s):
-        try:
-            float(s)
-            return True
-        except ValueError:
-            return False
 
 
     @staticmethod
@@ -691,90 +776,6 @@ class Manager(AbcManager):
             message_counter.add_send()
 
 
-    async def update_all_data_in_db_run(self, tasks):
-         wb_accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
-         logger.debug('Получен генератор к кабинетам для обновления даты')
-         async for wb_access in wb_accesses:
-             logger.debug('Получен кабинет для обновления данных')
-             if wb_access.wb_cabinet.id not in tasks:
-                 try:
-                      shop_data_updater = ShopDataUpdater(wb_access)
-                 except ApiForbiddenError:
-                     logger.error(f'Нет нужных прав у токена')
-                     continue
-                 task = asyncio.create_task(shop_data_updater.update_all_data())
-                 logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
-                 tasks[wb_access.wb_cabinet.id] = task
-             else:
-                 if tasks[wb_access.wb_cabinet.id].done():
-                     logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} завершена')
-                     if tasks[wb_access.wb_cabinet.id].exception():
-                         logger.error(f'Ошибка обновления данных для Shop id {wb_access.wb_cabinet.shop_id}: {tasks[wb_access.wb_cabinet.id].exception()}, '
-                                      f'{tasks[wb_access.wb_cabinet.id].exception()}')
-                     else:
-                         async with sm() as session:
-                             wb_cabinet = wb_access.wb_cabinet
-                             stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet.id)
-                             result = await session.execute(stmt)
-                             wb_cabinet = result.scalar()
-                             wb_cabinet.last_update_all_data = datetime.datetime.now()
-                             await session.commit()
-                         logger.debug('Задача обновления успешно выполнена')
-                     del tasks[wb_access.wb_cabinet.id]
-
-    async def check_accesses(self):
-       await rights_control.check_all()
-
-
-
-    async def shop_subscribe_control(self):
-        while True:
-            async with sm() as session:
-                stmt = select(WBCabinet) \
-                    .options(
-                    selectinload(WBCabinet.wb_user_cabinets)\
-                    .selectinload(WBUserCabinet.user),
-                    selectinload(WBCabinet.adv_settings)
-                ) \
-                    .where(
-                    and_(
-                        WBCabinet.expiration_time < datetime.datetime.now(),
-                        WBCabinet.active == True,
-                        WBCabinet.balance < 0
-                    )
-                )
-                result = await session.execute(stmt)
-                wb_cabinets_expirated_and_active = result.scalars().all()
-                for wb_cabinet in wb_cabinets_expirated_and_active:
-                    access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
-                    if not access:
-                        logger.error('Нет доступа для кабинета')
-                    wb_api = WBApi(access)
-                    adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
-                    for adv_setting in adv_settings:
-                        if adv_setting.bot_active is True and adv_setting.active_status == 'started':
-                            try:
-                                await wb_api.advert.pause_company(adv_setting.adv_id)
-                            except:
-                                logger.error(f'Ошибка при попытке остановить кампанию {adv_setting.adv_id}')
-                                continue
-                            adv_setting.bot_active = False
-                    wb_cabinet.active = False
-                    await session.commit()
-                    wb_user_cabinets = wb_cabinet.wb_user_cabinets
-                    for wb_user_cabinet in wb_user_cabinets:
-                        user = wb_user_cabinet.user
-                        try:
-                            await messages.ShopExpiredSubscriptionMessage(
-                                                                   bot,
-                                                                   wb_user_cabinet.user.user_telegram_id,
-                                                                   wb_user_cabinet)()
-                            logger.debug(f'Сообщение о просроченной подписке отправлено для юзера {user.username}')
-                        except Exception as exc:
-                            logger.error(f'Ошибка при отправке сообщения о просроченной подписке '
-                                         f'для юзера {user.username}: {exc}')
-                            await asyncio.sleep(1)
-            await asyncio.sleep(60*60)
 
     async def clear_expired_data(self):
         async with sm() as session:
@@ -792,124 +793,4 @@ class Manager(AbcManager):
         await self._gds.clear_dead_nodes()
         await asyncio.sleep(60*60)
 
-    async def process_payment_for_advs(self):
-        current_date = datetime.datetime.now().date()
-        async with sm() as session:
-            stmt = select(AdvSetting).options(
-                joinedload(AdvSetting.payments),
-                selectinload(AdvSetting.wb_cabinet)
-            ).filter(
-                and_(
-                    AdvSetting.bot_active == True,
-                    not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
-                    AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
-                    # условие на истекший срок действия
-                )
-            )
-
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.unique().scalars().all()
-
-            for adv_setting in adv_settings:
-                wb_cabinet = adv_setting.wb_cabinet
-                if not (bonus := wb_cabinet.bonus):
-                    bonus = 0
-                if not (balance := wb_cabinet.balance):
-                    balance = 0
-                if bonus >= const.PRICE_FOR_ADV_FOR_DAY:
-                    payment = AdvPayment(date=current_date)
-                    adv_setting.payments.append(payment)
-                    wb_cabinet.bonus -= const.PRICE_FOR_ADV_FOR_DAY
-                elif balance > 0:
-                    payment = AdvPayment(date=current_date)
-                    adv_setting.payments.append(payment)
-                    wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
-                else:
-                    wb_cabinet.bonus = 0
-                await session.commit()
-
-    async def process_payment_for_parsing(self):
-        current_date = datetime.datetime.now().date()
-        async with sm() as session:
-            stmt = select(AdvSetting).options(
-                joinedload(AdvSetting.payments),
-                selectinload(AdvSetting.wb_cabinet)
-            ).filter(
-                and_(
-                    AdvSetting.parsing_active == True,
-                    not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
-                                                      AdvPayment.type == 'parsing')))
-
-                )
-            )
-
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.unique().scalars().all()
-
-            for adv_setting in adv_settings:
-                wb_cabinet = adv_setting.wb_cabinet
-                if not (bonus := wb_cabinet.bonus):
-                    bonus = 0
-                if not (balance := wb_cabinet.balance):
-                    balance = 0
-                if bonus >= const.PARSING_PRICE:
-                    payment = AdvPayment(date=current_date)
-                    adv_setting.payments.append(payment)
-                    wb_cabinet.bonus -= const.PARSING_PRICE
-                elif balance > 0:
-                    payment = AdvPayment(date=current_date,
-                                         type='parsing')
-                    adv_setting.payments.append(payment)
-                    wb_cabinet.balance -= const.PARSING_PRICE
-                else:
-                    wb_cabinet.bonus = 0
-                    adv_setting.parsing_active = False
-                await session.commit()
-                await asyncio.sleep(0)
-
-    async def process_payment_for_auto_bidder(self):
-        current_date = datetime.datetime.now().date()
-        async with sm() as session:
-            stmt = select(AdvSetting).options(
-                joinedload(AdvSetting.payments),
-                selectinload(AdvSetting.wb_cabinet)
-            ).filter(
-                and_(
-                    AdvSetting.bidder_active == True,
-                    not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
-                                                      AdvPayment.type == 'auto_bidder')))
-
-                )
-            )
-
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.unique().scalars().all()
-
-            for adv_setting in adv_settings:
-                wb_cabinet = adv_setting.wb_cabinet
-                if not (bonus := wb_cabinet.bonus):
-                    bonus = 0
-                if not (balance := wb_cabinet.balance):
-                    balance = 0
-                if bonus >= const.AUTO_BIDDER_PRICE:
-                    payment = AdvPayment(date=current_date,
-                                         type='auto_bidder')
-                    session.add(payment)
-                    adv_setting.payments.append(payment)
-                    wb_cabinet.bonus -= const.AUTO_BIDDER_PRICE
-                elif balance > 0:
-                    payment = AdvPayment(date=current_date,
-                                         type='auto_bidder')
-                    session.add(payment)
-                    adv_setting.payments.append(payment)
-                    wb_cabinet.balance -= const.AUTO_BIDDER_PRICE
-                else:
-                    wb_cabinet.bonus = 0
-                    adv_setting.bidder_active = False
-                await session.commit()
-                await asyncio.sleep(0)
-
-
-    async def update_vectors_in_redis(self):
-        await self._gds.update_vectors_in_redis()
 

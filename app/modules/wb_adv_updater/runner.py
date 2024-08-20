@@ -1,16 +1,12 @@
 import datetime
-from app.utils.redis_manager import RedisEvent
 from app.utils.redis_func_cache import set_config
 from ..wb_keywords_parser import parser
-from ...admin_bot.sender import sender_manager
 set_config()
 import asyncio
 import logging
-from app.modules.wb_adv_updater.data_manager import DataGetter
 from app.utils.db.session_maker import get_async_session_maker
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
-from .wb_manager import Manager
-from . import wb_manager, ml_data_manager
+from . import wb_manager
 
 sm = get_async_session_maker
 
@@ -58,85 +54,51 @@ async def __run_update_keyword_stat():
         await asyncio.sleep(0)
 
 
-async def run_update_data_in_neo4j():
-    await asyncio.gather(
-            update_cards_in_graph(),
-            ml_data_manager.update_wb_adv_phrase_in_db(),
-        )
-
 
 async def run_update_minus_keywords_on_wb():
     await wb_manager.update_keywords_in_advs()
 
-
-async def run_update_model():
-    manager = Manager()
-    while True:
-        try:
-            await manager.update_model()
-        except Exception as e:
-            logger.error(f'Ошибка обновления модели {e}', exc_info=True)
-        await asyncio.sleep(0)
-
-
-async def update_cards_in_graph():
-    manager = Manager()
-    while True:
-        try:
-            await manager.update_cards_in_graph()
-            logger.debug('Карточки обновлены')
-        except Exception as exc:
-            logger.error(f'Ошибка обновления карточек в neo4j {exc}', exc_info=True)
-        await asyncio.sleep(0)
-
-
-
-async def update_min_ctr_in_global_wb_category_settings():
-    manager = Manager()
-    while True:
-        try:
-            await manager.update_min_ctr_in_global_wb_category_settings()
-        except Exception as e:
-            logger.error(f'Ошибка обновления минимальных цен {e}')
-        # await asyncio.sleep(60)
+#
+# async def update_min_ctr_in_global_wb_category_settings():
+#     while True:
+#         try:
+#             await manager.update_min_ctr_in_global_wb_category_settings()
+#         except Exception as e:
+#             logger.error(f'Ошибка обновления минимальных цен {e}')
+#         # await asyncio.sleep(60)
 
 async def update_all_data_in_db():
-    manager = Manager()
     tasks = {}
     while True:
         try:
-            await manager.update_all_data_in_db_run(tasks=tasks)
+            await wb_manager.update_all_data_in_db_run(tasks=tasks)
         except Exception as exc:
             logger.error(f'Ошибка обновления данных в базе {exc}', exc_info=True)
             await asyncio.sleep(0)
 
 
 async def demo_subscribe():
-    manager = Manager()
     while True:
-        await manager.check_accesses()
+        await wb_manager.check_accesses()
         await asyncio.sleep(60*60)
 
 async def shop_subscribe_control():
-    manager = Manager()
-    await manager.shop_subscribe_control()
+    await wb_manager.shop_subscribe_control()
 
 async def clear_data_for_expired_wb_cabinets():
-    manager = Manager()
     while True:
         try:
-            await manager.clear_expired_data()
+            await wb_manager.clear_expired_data()
         except Exception as e:
             logger.error(f'Ошибка очистки данных для просроченных кабинетов {e}', exc_info=True)
             await asyncio.sleep(0)
 
 async def process_payment_for_advs():
-    manager = Manager()
     while True:
         hours = datetime.datetime.now().hour
         if 12 < hours < 18:
             try:
-                await manager.process_payment_for_advs()
+                await wb_manager.process_payment_for_advs()
             except Exception as e:
                 logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
         await asyncio.sleep(60*60)
@@ -171,23 +133,21 @@ async def __keywords_parsing_process():
     await  parser_all_white_phrase()
 
 async def payment_for_parsing_keyword():
-    manager = Manager()
     while True:
         hours = datetime.datetime.now().hour
         if 12 < hours < 21:
             try:
-                await manager.process_payment_for_parsing()
+                await wb_manager.process_payment_for_parsing()
             except Exception as e:
                 logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
         await asyncio.sleep(60 * 60)
 
 async def payment_for_auto_bidder():
-    manager =   Manager()
     while True:
         hours = datetime.datetime.now().hour
         if 11 < hours < 21:
             try:
-                await manager.process_payment_for_auto_bidder()
+                await wb_manager.process_payment_for_auto_bidder()
             except Exception as e:
                 logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
         await asyncio.sleep(0)
@@ -205,17 +165,15 @@ async def run_bidder_process():
         await asyncio.sleep(0)
 
 async def run_update_vectors_in_redis():
-    manager = Manager()
     while True:
         try:
-            await manager.update_vectors_in_redis()
+            await wb_manager.update_vectors_in_redis()
         except Exception as e:
             logger.error(f'Ошибка обновления векторов в redis {e}', exc_info=True)
         await asyncio.sleep(0)
 
 async def run_vector_update_in_neo4j():
-    manager = Manager()
-    await manager.update_vectors_update_in_graph()
+    await wb_manager.update_vectors_update_in_graph()
 
 
 
@@ -233,3 +191,4 @@ async def main_loop():
         run_update_predict_ctr(),
         return_exceptions=False
     )
+

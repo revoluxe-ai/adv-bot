@@ -39,7 +39,7 @@ global_model: typing.Union[xgboost.XGBModel, None] = None
 
 path = 'model'
 
-update_predict_ctr_process_semaphore = asyncio.Semaphore(50)
+update_predict_ctr_process_semaphore = asyncio.Semaphore(10)
 
 model_lock = Lock()
 

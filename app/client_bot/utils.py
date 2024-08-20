@@ -3,16 +3,10 @@ import datetime
 from io import BytesIO
 import random
 from typing import Union
-
 import pandas as pd
-import matplotlib
-matplotlib.use('Agg')
-from matplotlib import pyplot as plt
-from matplotlib.ticker import MaxNLocator
 from sqlalchemy import and_, select, func, desc
 import seaborn as sns
 from sqlalchemy.orm import joinedload
-
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvKeyword, CommonKeyword, \
     WBItemPosition
@@ -62,6 +56,10 @@ async def create_ref_link(ref_link_name, user_telegram_id):
 
 
 async def get_keyword_history_graphic(adv_original_id):
+    import matplotlib
+    from matplotlib.ticker import MaxNLocator
+    matplotlib.use('Agg')
+    from matplotlib import pyplot as plt
     async with _sm() as session:
         stmt = select(AdvKeyword.text, func.sum(AdvKeyword.views).label('views')) \
             .where(AdvKeyword.adv_setting_id == adv_original_id) \
