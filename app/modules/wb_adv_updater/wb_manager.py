@@ -69,6 +69,58 @@ logger = logging.getLogger(__name__)
 
 sm = get_async_session_maker
 
+async def insert_or_update_keywords(client, keyword_stats, adv_setting):
+    try:
+        # Подготовка данных для вставки
+        new_version = int(datetime.datetime.now().timestamp())
+        data_to_insert = []
+        for kw in keyword_stats:
+            date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())
+            data_to_insert.append([kw.text,
+                                   date_time,
+                                   adv_setting.adv_id,
+                                   kw.views, kw.clicks,
+                                   kw.spend,
+                                   new_version])
+
+
+        # Удаление существующих записей
+
+        # Вставка новых данных
+        await client.insert(table="default_db.advkeyword"
+                            , data=data_to_insert,
+                            column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
+
+    except Exception as e:
+        logger.error(f"Error handling data in ClickHouse: {e}")
+        raise
+
+
+
+
+
+
+
+async def update_keywords_stat_in_click_house(keyword_stats: List[KeywordStat],
+                                              adv_setting: AdvSetting):
+    client = await get_clickhouse_client()
+    try:
+        await insert_or_update_keywords(client, keyword_stats, adv_setting)
+    except Exception as e:
+        logger.error(f"Error inserting data into ClickHouse: {e}")
+        raise
+    finally:
+        client.close()
+
+
+async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
+    async with sm() as session:
+        stmt = select(KeywordSetting).where(
+            KeywordSetting.adv_setting_id == adv_setting_id
+        )
+        result = await session.execute(stmt)
+        existing_keyword_settings = result.scalars().all()
+    return {ks.text for ks in existing_keyword_settings}
 
 
 async def update_predict_ctr():
@@ -291,7 +343,7 @@ async def keyword_stat_updater(adv_setting_id, wb_api):
         return
     logger.debug(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
     texts_for_adv_setting = {keyword.text for keyword in keywords}
-    existing_keyword_settings = await self._get_existing_keyword_settings(adv_setting.id)
+    existing_keyword_settings = await get_existing_keyword_settings(adv_setting.id)
     new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
     async with sm() as session:
         for keyword in new_keywords:
@@ -302,7 +354,7 @@ async def keyword_stat_updater(adv_setting_id, wb_api):
             session.add(keyword_setting)
 
         await session.commit()
-    await self.update_keywords_stat_in_click_house(keywords, adv_setting)
+    await update_keywords_stat_in_click_house(keywords, adv_setting)
     return
 
 
@@ -364,57 +416,6 @@ class Manager(AbcManager):
     #         logger.error(f"Error inserting data into ClickHouse: {e}")
     #         raise
     #
-    @staticmethod
-    async def insert_or_update_keywords(client, keyword_stats, adv_setting):
-        try:
-            # Подготовка данных для вставки
-            new_version = int(datetime.datetime.now().timestamp())
-            data_to_insert = []
-            for kw in keyword_stats:
-                date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())
-                data_to_insert.append([kw.text,
-                                       date_time,
-                                       adv_setting.adv_id,
-                                       kw.views, kw.clicks,
-                                       kw.spend,
-                                       new_version])
-
-
-            # Удаление существующих записей
-
-            # Вставка новых данных
-            await client.insert(table="default_db.advkeyword"
-                                , data=data_to_insert,
-                                column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
-
-        except Exception as e:
-            logger.error(f"Error handling data in ClickHouse: {e}")
-            raise
-
-
-    async def update_keywords_stat_in_click_house(self, keyword_stats: List[KeywordStat],
-                                                  adv_setting: AdvSetting):
-
-         client = await get_clickhouse_client()
-         try:
-             await self.insert_or_update_keywords(client, keyword_stats, adv_setting)
-         except Exception as e:
-             logger.error(f"Error inserting data into ClickHouse: {e}")
-             raise
-         finally:
-            client.close()
-
-
-
-    @staticmethod
-    async def _get_existing_keyword_settings(adv_setting_id)-> set[str]:
-        async with sm() as session:
-            stmt = select(KeywordSetting).where(
-                KeywordSetting.adv_setting_id == adv_setting_id
-            )
-            result = await session.execute(stmt)
-            existing_keyword_settings = result.scalars().all()
-        return {ks.text for ks in existing_keyword_settings}
 
 
 
