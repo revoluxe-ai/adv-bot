@@ -507,7 +507,7 @@ class Manager(AbcManager):
              try:
                  await self.graph_vector_update()
              except Exception as exc:
-                    logger.error(f'Ошибка векторизации {exc}')
+                    logger.error(f'Ошибка векторизации {exc}', exc_info=True)
              await asyncio.sleep(0)
 
     def __get_keyword_stat(self):
