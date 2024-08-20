@@ -227,7 +227,7 @@ class Manager(AbcManager):
         if not keywords:
             logger.debug(f'Для {adv_setting.name} не получены ключевые слова')
             return
-        logger.info(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
+        logger.debug(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
         texts_for_adv_setting = {keyword.text for keyword in keywords}
         existing_keyword_settings = await self._get_existing_keyword_settings(adv_setting.id)
         new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
@@ -634,7 +634,7 @@ class Manager(AbcManager):
                              wb_cabinet = result.scalar()
                              wb_cabinet.last_update_all_data = datetime.datetime.now()
                              await session.commit()
-                         logger.info('Задача обновления успешно выполнена')
+                         logger.debug('Задача обновления успешно выполнена')
                      del tasks[wb_access.wb_cabinet.id]
 
     async def check_accesses(self):
