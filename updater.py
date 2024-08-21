@@ -51,6 +51,7 @@ def process_controller(process_pids: list[int], process_names: list[str]):
             logger.debug(f'Проверка процесса: {name}')
             try:
                 proc = psutil.Process(pid)
+                assert proc.is_running()
             except psutil.NoSuchProcess:
                 logger.error(f'Процесс с PID {pid} (имя: {name}) не существует.')
                 continue
@@ -107,13 +108,13 @@ def main():
         process_names.append(run_own_process.__name__)
 
     # Запуск process_controller в отдельном процессе
-    controller_process = Process(target=process_controller, args=(process_pids, process_names), name='ProcessController')
-    controller_process.start()
-    logger.info(f'Запущен процесс-контроллер с PID {controller_process.pid}')
+    # controller_process = Process(target=process_controller, args=(process_pids, process_names), name='ProcessController')
+    # controller_process.start()
+    # logger.info(f'Запущен процесс-контроллер с PID {controller_process.pid}')
 
     for process in processes:
         process.join()
-    controller_process.join()
+    # controller_process.join()
     return None
 
 
