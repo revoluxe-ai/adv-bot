@@ -444,7 +444,7 @@ RETURN graphName
 
     async def linking_keywords(self):
         name = 'keywords'
-        if self._graph_exists(name):
+        if await self._graph_exists(name):
             await self.drop_graph(name)
         await self._create_sub_graph_for_like_keyword(name)
         await self._set_knn_on_keywords(name)
