@@ -36,8 +36,6 @@ from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
 from ...client_bot import const
-from ...utils import redis_manager
-from  app.modules.wb_keywords_parser import parser
 from app.utils.click_house.client import get_clickhouse_client
 
 
@@ -423,35 +421,40 @@ async def update_keyword_stat(access: WBCabinetAccess,
     return
 
 
-async def keyword_stat_updater(adv_setting_id, wb_api):
+async def keyword_stat_updater(adv_setting_id, wb_api, batch_size=100):
     async with sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         adv_setting = await session.execute(stmt)
         adv_setting = adv_setting.scalar()
+
     try:
         keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
     except Exception as exc:
-        logger.error(
-            f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+        logger.error(f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
         return
+
     if not keywords:
         logger.debug(f'Для {adv_setting.name} не получены ключевые слова')
         return
+
     logger.debug(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
     texts_for_adv_setting = {keyword.text for keyword in keywords}
     existing_keyword_settings = await get_existing_keyword_settings(adv_setting.id)
     new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
-    async with sm() as session:
-        for keyword in new_keywords:
-            keyword_setting = KeywordSetting(
-                text=keyword,
-                adv_setting_id=adv_setting.id,
-            )
-            session.add(keyword_setting)
 
-        await session.commit()
+    async with sm() as session:
+        # Преобразование ключевых слов в объекты KeywordSetting
+        keyword_settings = [KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords]
+
+        # Обработка данных порциями
+        for i in range(0, len(keyword_settings), batch_size):
+            batch = keyword_settings[i:i + batch_size]
+            session.add_all(batch)
+            await session.commit()  # Коммит порции
+
     await update_keywords_stat_in_click_house(keywords, adv_setting)
     return
+
 
 
 
