@@ -32,22 +32,23 @@
   },
   "loggers": {
     "updater": {
-      "level": "DEBUG",
-      "handlers": ["console"]
+      "level": "CRITICAL",
+      "handlers": ["console"],
+      "propagate": false
     },
     "app.modules.wb_adv_updater.data_manager": {
-      "level": "INFO",
+      "level": "CRITICAL",
       "handlers": ["console"],
       "propagate": false
     },
     "app.modules.wb_adv_updater.wb_manager": {
-      "level": "INFO",
+      "level": "CRITICAL",
       "handlers": ["console"],
       "propagate": false
     },
     "app.modules.wb_adv_updater.data_setter": {
-      "level": "DEBUG",
-      "handlers": ["console"],
+      "level": "CRITICAL",
+      "handlers": ["journal"],
       "propagate": false
     },
     "neo4j.io": {
@@ -61,14 +62,13 @@
       "propagate": false
     },
     "app.modules.wb_adv_updater.bidder": {
-      "level": "DEBUG",
+      "level": "CRITICAL",
       "handlers": ["console"],
-      "propagate": true
+      "propagate": false
     }
   },
   "root": {
     "level": "INFO",
-    "formatters": ["custom"],
     "handlers": ["console", "error_to_file", "journal"]
   }
 }
