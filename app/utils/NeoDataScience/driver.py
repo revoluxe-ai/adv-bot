@@ -354,8 +354,15 @@ RETURN graphName
             print(f"""Граф  создан""")
 
     async def linking_images_and_keyword(self):
-       await self.linking_images()
-       await self.linking_keywords()
+       try:
+           await self.linking_images()
+       except neo4j.exceptions.ClientError as e:
+           logger.error(f'Ошибка при склейке графа изображений {e}')
+       try:
+           await self.linking_keywords()
+       except neo4j.exceptions.ClientError as e:
+           logger.error(f'Ошибка при склейке графа ключевых слов {e}')
+
 
 
     async def linking_images(self):
@@ -439,8 +446,8 @@ RETURN graphName
         name = 'keywords'
         await self.drop_graph(name)
         await self._create_sub_graph_for_like_keyword(name)
-        if  await self._graph_exists(name):
-            await self._set_knn_on_keywords(name)
+        await asyncio.sleep(5)
+        await self._set_knn_on_keywords(name)
         await self.drop_graph(name)
 
 
