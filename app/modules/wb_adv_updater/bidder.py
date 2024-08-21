@@ -1,4 +1,7 @@
 import logging
+
+import aiohttp
+
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
 from ..common_slaves.wildberries import super_cabinet_manager
@@ -118,7 +121,11 @@ async def _run_bidder_process_for_adv(adv_id: int,
         _, views, _= await data_manager.get_keyword_statistic_clickhouse(keyword, adv_id)
         if views == 0:
             continue
-        await parser.add_wb_positions(keyword.text, {nmid_in_adv})
+        try:
+            await parser.add_wb_positions(keyword.text, {nmid_in_adv})
+        except aiohttp.client_exceptions.ClientOSError as e:
+            logger.error(f'Ошибка при получении позиции {e}')
+            continue
         position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
         if not position:
             continue
