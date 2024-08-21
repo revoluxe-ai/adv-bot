@@ -1161,7 +1161,7 @@ UNWIND phrase.words AS word
             logger.error(f'Ошибка при обновлении векторов товаров в Redis: {exc}')
         try:
             await self._update_keywords_vectors_in_redis()
-        except:
+        except Exception as exc:
             logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}')
 
 
