@@ -1,7 +1,3 @@
-import logging
-
-process_logger = logging.getLogger('ProcessController')
-
 
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
