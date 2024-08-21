@@ -421,7 +421,7 @@ async def update_keyword_stat(access: WBCabinetAccess,
     return
 
 
-async def keyword_stat_updater(adv_setting_id, wb_api, batch_size=100):
+async def keyword_stat_updater(adv_setting_id, wb_api, batch_size=30):
     async with sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         adv_setting = await session.execute(stmt)
