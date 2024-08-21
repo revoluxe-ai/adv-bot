@@ -1,9 +1,5 @@
 from app.modules.wb_adv_updater.bidder import run_bidder_process
-import logging
 
-logger = logging.getLogger(__name__)
-
-logger.error('Тест ошибки')
 
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
