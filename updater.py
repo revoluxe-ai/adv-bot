@@ -1,4 +1,6 @@
 from app.modules.wb_adv_updater.bidder import run_bidder_process
+from systemdlogging.toolbox import init_systemd_logging
+init_systemd_logging()
 
 
 from app.modules.wb_adv_updater.runner import (
@@ -7,7 +9,6 @@ from app.modules.wb_adv_updater.runner import (
     run_update_vectors_in_redis,
     run_update_minus_keywords_on_wb,
     run_update_keyword_stat,
-    update_all_data_in_db,
     parser_all_white_phrase,
     run_update_predict_ctr,
     run_update_model
