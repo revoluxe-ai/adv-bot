@@ -69,10 +69,16 @@
         "level": "CRITICAL",
         "handlers": ["common_file"],
         "propagate": false
+        },
+    "app.modules.wb_adv_updater.bidder": {
+        "level": "DEBUG",
+        "handlers": ["common_file"],
+        "propagate": true
         }
+
     },
   "root": {
-    "level": "DEBUG",
+    "level": "INFO",
     "formatters": ["custom"],
     "handlers": ["console", "common_file", "error_to_file"]
   }

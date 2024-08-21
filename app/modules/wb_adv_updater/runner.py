@@ -157,14 +157,6 @@ async def payment_for_auto_bidder():
 
 
 
-async def run_bidder_process():
-    while True:
-        try:
-            await wb_manager.run_bidder_process()
-        except Exception as e:
-            logger.error(f'Ошибка процесса управления ставками {e}', exc_info=True)
-        await asyncio.sleep(0)
-
 async def run_update_vectors_in_redis():
     while True:
         try:
