@@ -23,48 +23,52 @@
       "encoding": "utf-8",
       "maxBytes": 10485760,
       "backupCount": 5
+    },
+    "journal": {
+      "class": "systemd.journal.JournalHandler",
+      "level": "DEBUG",
+      "formatter": "custom"
     }
   },
-
   "loggers": {
     "updater": {
       "level": "DEBUG",
-      "handlers": ["console"]
+      "handlers": ["console", "journal"]
     },
     "app.modules.wb_adv_updater.data_manager": {
       "level": "INFO",
-      "handlers": ["console"],
+      "handlers": ["console", "journal"],
       "propagate": false
     },
     "app.modules.wb_adv_updater.wb_manager": {
       "level": "INFO",
-      "handlers": ["console"],
+      "handlers": ["console", "journal"],
       "propagate": false
     },
     "app.modules.wb_adv_updater.data_setter": {
       "level": "DEBUG",
-      "handlers": ["console"],
+      "handlers": ["console", "journal"],
       "propagate": false
     },
     "neo4j.io": {
       "level": "CRITICAL",
-      "handlers": ["console"],
+      "handlers": ["console", "journal"],
       "propagate": false
     },
     "app.utils.db.session_maker": {
       "level": "CRITICAL",
-      "handlers": ["console"],
+      "handlers": ["console", "journal"],
       "propagate": false
     },
     "app.modules.wb_adv_updater.bidder": {
       "level": "DEBUG",
-      "handlers": ["console"],
+      "handlers": ["console", "journal"],
       "propagate": true
     }
   },
   "root": {
     "level": "DEBUG",
     "formatters": ["custom"],
-    "handlers": ["console", "error_to_file"]
+    "handlers": ["console", "error_to_file", "journal"]
   }
 }
