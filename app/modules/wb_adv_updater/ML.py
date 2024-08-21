@@ -179,7 +179,8 @@ class Fitter(AbcManager):
         # Собираем уникальные nmids и keywords для запросов
         nmids_batch = set()
         keywords_batch = set()
-        for adv in adv_settings:
+        for n, adv in enumerate(adv_settings):
+            logger.debug(f'Обработка кампании для получения keyword_to_features {n}')
             if adv.nmids:
                 nmids_batch.update(adv.nmids)
                 if adv.keyword_settings:
@@ -189,11 +190,14 @@ class Fitter(AbcManager):
         # Получаем все необходимые ItemFeature и KeywordFeature в одном запросе
         if nmids_batch:
                 nmid_to_item_features = await self.get_nmid_to_item_features(nmids_batch)
+        else:
+            return pd.DataFrame()
         if keywords_batch:
             keyword_to_features = await self.__fetch_keyword_features(list(keywords_batch))
             keyword_to_features = dict(keyword_to_features)
 
-        for adv in adv_settings:
+        for n, adv in enumerate(adv_settings):
+            logger.debug(f'Обработка кампании основной цикл {n}')
             try:
                 wb_category = await data_manager.get_wb_category(adv)
             except (CardNotFoundInDB, NotItemsInAdvSetting) as exc:
