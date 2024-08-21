@@ -33,17 +33,17 @@ async def run_hard_processes():
 
 
 run_own_process_list = [
-     run_hard_processes,
-     keywords_parsing_process,
-     run_update_vectors_in_redis,
-     run_update_minus_keywords_on_wb,
-     run_update_keyword_stat,
-     run_bidder_process,
-     update_all_data_in_db,
-      parser_all_white_phrase,
+     # run_hard_processes,
+     # keywords_parsing_process,
+     # run_update_vectors_in_redis,
+     # run_update_minus_keywords_on_wb,
+     # run_update_keyword_stat,
+     # run_bidder_process,
+     # update_all_data_in_db,
+     #  parser_all_white_phrase,
      run_main_coroutines,
-     run_update_predict_ctr,
-     run_update_model
+     # run_update_predict_ctr,
+     # run_update_model
 
 
 ]
@@ -77,7 +77,6 @@ def process_controller(process_pids: list[int], process_names: list[str]):
                 f"Process Info:\n"
                 f"  PID: {process_info['PID']}\n"
                 f"  Name: {process_info['Name']}\n"
-                f"  CPU Usage (%): {process_info['CPU Usage (%)']:.2f}\n"
                 f"  Memory Usage (MB): {process_info['Memory Usage (MB)']:.2f}\n"
                 f"  Status: {process_info['Status']}\n"
                 f"  Threads: {process_info['Threads']}\n"
