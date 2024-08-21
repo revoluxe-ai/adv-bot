@@ -7,7 +7,8 @@ from app.modules.wb_adv_updater.runner import (
     run_update_keyword_stat,
     parser_all_white_phrase,
     run_update_predict_ctr,
-    run_update_model
+    run_update_model,
+    run_bidder_process
 )
 from python_modules.logger import setup_logging
 import logging
@@ -30,6 +31,7 @@ async def run_hard_processes():
 
 
 run_own_process_list = [
+     run_bidder_process,
      run_hard_processes,
      keywords_parsing_process,
      run_update_vectors_in_redis,
