@@ -1,7 +1,9 @@
 from app.modules.wb_adv_updater.bidder import run_bidder_process
-from systemdlogging.toolbox import init_systemd_logging
-init_systemd_logging()
+import logging
 
+logger = logging.getLogger(__name__)
+
+logger.error('Тест ошибки')
 
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
