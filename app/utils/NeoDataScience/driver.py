@@ -918,7 +918,8 @@ UNWIND phrase.words AS word
         query = """
              MATCH (source:Keyword)
             WHERE source.word2vec IS NOT NULL
-          OPTIONAL MATCH (source)-->(target:None)
+           OPTIONAL MATCH (source)-->(target:Keyword) 
+           WHERE target.word2vec IS NOT NULL
         WITH gds.graph.project(
         $graph_name,
         source,
