@@ -8,25 +8,11 @@
     }
   },
   "handlers": {
-    "my_log_handler": {
-      "class": "my_log_handler.ScriptHandler",
-      "level": "ERROR"
-    },
     "console": {
       "class": "logging.StreamHandler",
       "level": "DEBUG",
       "formatter": "custom",
       "stream": "ext://sys.stdout"
-    },
-    "common_file": {
-      "class": "logging.handlers.RotatingFileHandler",
-      "level": "DEBUG",
-      "formatter": "custom",
-      "filename": "logs/common.log",
-      "mode": "a",
-      "encoding": "utf-8",
-      "maxBytes": 10485760,
-      "backupCount": 5
     },
     "error_to_file": {
       "class": "logging.handlers.RotatingFileHandler",
@@ -43,43 +29,42 @@
   "loggers": {
     "updater": {
       "level": "DEBUG",
-      "handlers": ["common_file"]
+      "handlers": ["console"]
     },
     "app.modules.wb_adv_updater.data_manager": {
-        "level": "INFO",
-        "handlers": ["console"],
-        "propagate": false
-        },
-    "app.modules.wb_adv_updater.wb_manager": {
-        "level": "INFO",
-        "handlers": ["common_file"],
-        "propagate": false
-        },
-    "app.modules.wb_adv_updater.data_setter": {
-        "level": "DEBUG",
-        "handlers": ["common_file"],
-        "propagate": false
-        },
-    "neo4j.io": {
-        "level": "CRITICAL",
-        "handlers": ["common_file"],
-        "propagate": false
-        },
-    "app.utils.db.session_maker": {
-        "level": "CRITICAL",
-        "handlers": ["common_file"],
-        "propagate": false
-        },
-    "app.modules.wb_adv_updater.bidder": {
-        "level": "DEBUG",
-        "handlers": ["common_file"],
-        "propagate": true
-        }
-
+      "level": "INFO",
+      "handlers": ["console"],
+      "propagate": false
     },
+    "app.modules.wb_adv_updater.wb_manager": {
+      "level": "INFO",
+      "handlers": ["console"],
+      "propagate": false
+    },
+    "app.modules.wb_adv_updater.data_setter": {
+      "level": "DEBUG",
+      "handlers": ["console"],
+      "propagate": false
+    },
+    "neo4j.io": {
+      "level": "CRITICAL",
+      "handlers": ["console"],
+      "propagate": false
+    },
+    "app.utils.db.session_maker": {
+      "level": "CRITICAL",
+      "handlers": ["console"],
+      "propagate": false
+    },
+    "app.modules.wb_adv_updater.bidder": {
+      "level": "DEBUG",
+      "handlers": ["console"],
+      "propagate": true
+    }
+  },
   "root": {
-    "level": "INFO",
+    "level": "DEBUG",
     "formatters": ["custom"],
-    "handlers": ["console", "common_file", "error_to_file"]
+    "handlers": ["console", "error_to_file"]
   }
 }
