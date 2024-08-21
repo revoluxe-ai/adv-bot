@@ -109,4 +109,9 @@ class ABC_WB_API(WbRequestApiMixin):
 
 
 
-
+    def set_next_token(self):
+        if self._free_tokens:
+            self.headers = Headers(self._free_tokens.pop())
+        else:
+            raise exceptions.ApiForbiddenError('Нет свободных токенов',
+                                               wb_user_cabinet=self._wb_user_cabinet)
