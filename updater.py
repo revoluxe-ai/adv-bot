@@ -1,4 +1,6 @@
+import logging
 
+process_logger = logging.getLogger('ProcessController')
 
 
 from app.modules.wb_adv_updater.runner import (
@@ -56,7 +58,7 @@ def process_controller(process_pids: list[int], process_names: list[str]):
             except psutil.NoSuchProcess:
                 logger.error(f'Процесс с PID {pid} (имя: {name}) не существует.')
                 continue
-
+            cpu_times = proc.cpu_times()
             logger.debug(f'Создан объект процесса: {name}')
             memory_usage = proc.memory_info().rss / (1024 * 1024)
             logger.debug('Получили использование памяти')
@@ -67,23 +69,33 @@ def process_controller(process_pids: list[int], process_names: list[str]):
                 'Status': proc.status(),
                 'Threads': proc.num_threads(),
                 'Create Time': time.ctime(proc.create_time()),
+                'CPU User Time (s)': cpu_times.user,
+                'CPU System Time (s)': cpu_times.system,
                 'Open Files': len(proc.open_files())
             }
 
             info_str = (
-                f"Process Info:\n"
-                f"  PID: {process_info['PID']}\n"
-                f"  Name: {process_info['Name']}\n"
-                f"  Memory Usage (MB): {process_info['Memory Usage (MB)']:.2f}\n"
-                f"  Status: {process_info['Status']}\n"
-                f"  Threads: {process_info['Threads']}\n"
-                f"  Create Time: {process_info['Create Time']}\n"
-                f"  Open Files: {process_info['Open Files']}\n")
+                f"Process Info:, "
+                f"  PID: {process_info['PID']}, "
+                f"  Name: {process_info['Name']}, "
+                f"  Memory Usage (MB): {process_info['Memory Usage (MB)']:.2f}, "
+                f"  Status: {process_info['Status']}, "
+                f"  Threads: {process_info['Threads']}, "
+                f"  Create Time: {process_info['Create Time']}, "
+                f"  Open Files: {process_info['Open Files']}, ",
+                f"  CPU User Time (s): {process_info['CPU User Time (s)']:.2f}, "
+                f"  CPU System Time (s): {process_info['CPU System Time (s)']:.2f}, "
+            )
 
-            logger.info(info_str)
+
+            process_logger.info(info_str)
             logger.debug(f'Проверка жив ли процесс: {name}')
             if not proc.is_running() or proc.status() == psutil.STATUS_ZOMBIE:
                 logger.error(f'Процесс мертв, перезапуск процесса: {name}')
+        process_logger.info('+++++++++++++++++++++++++++++++++++++++++++++++')
+        process_logger.info('================================================')
+        process_logger.info('+++++++++++++++++++++++++++++++++++++++++++++++')
+
         time.sleep(60)
 
 
