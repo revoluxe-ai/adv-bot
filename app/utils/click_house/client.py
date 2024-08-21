@@ -9,7 +9,8 @@ host = settings.clickhouse_host
 username = settings.clickhouse_user
 password = settings.clickhouse_password
 
-semaphore = multiprocessing.Semaphore(9)
+ch_max_thread = settings.CH_MAX_THREAD
+semaphore = multiprocessing.Semaphore(ch_max_thread)
 
 async def get_clickhouse_client():
     with semaphore:

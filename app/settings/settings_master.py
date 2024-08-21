@@ -70,4 +70,8 @@ class Settings:
     def TELEGRAM_WEB_PORT(self):
         return get_document_by_key_name(setting_path, 'TELEGRAM_WEB_PORT')
 
+    @property
+    def CH_MAX_THREAD(self):
+        return get_document_by_key_name(setting_path, 'CH_MAX_THREAD')
+
 settings = Settings()
