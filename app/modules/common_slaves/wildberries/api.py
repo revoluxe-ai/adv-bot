@@ -253,6 +253,7 @@ class ContentApi(ABC_WB_API):
                 logger.debug('Карточка с текстом %s не найдена на Wildberries, возможно, карточка не существует',
                              text)
                 continue
+            await asyncio.sleep(0)
         return cards
 
 
