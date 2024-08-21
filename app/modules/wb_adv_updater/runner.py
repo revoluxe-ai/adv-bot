@@ -1,5 +1,6 @@
 import datetime
 from app.utils.redis_func_cache import set_config
+from .ml_data_manager import update_model
 from ..wb_keywords_parser import parser
 set_config()
 import asyncio
@@ -188,7 +189,13 @@ async def main_loop():
         process_payment_for_advs(),
         # .update_min_ctr_in_global_wb_category_settings()
         run_vector_update_in_neo4j(),
-        run_update_predict_ctr(),
         return_exceptions=False
     )
 
+async def run_update_model():
+    while True:
+        try:
+            await update_model()
+        except Exception as e:
+            logger.error(f'Ошибка обновления модели {e}', exc_info=True)
+        await asyncio.sleep(0)

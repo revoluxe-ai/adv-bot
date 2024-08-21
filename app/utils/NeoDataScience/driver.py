@@ -1157,6 +1157,7 @@ UNWIND phrase.words AS word
         except:
             logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}')
 
+
     async def _update_items_vectors_in_redis(self):
         query = """
         MATCH (item:Item)

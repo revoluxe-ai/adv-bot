@@ -1,13 +1,15 @@
 
 from app.modules.wb_adv_updater.runner import (
-                                               run_main_coroutines,
-                                               keywords_parsing_process,
-                                               run_update_vectors_in_redis,
-                                               run_update_minus_keywords_on_wb,
-                                               run_update_keyword_stat,
-                                               run_bidder_process,
-                                               update_all_data_in_db,
-                                                parser_all_white_phrase
+    run_main_coroutines,
+    keywords_parsing_process,
+    run_update_vectors_in_redis,
+    run_update_minus_keywords_on_wb,
+    run_update_keyword_stat,
+    run_bidder_process,
+    update_all_data_in_db,
+    parser_all_white_phrase,
+    run_update_predict_ctr,
+    run_update_model
 )
 from python_modules.logger import setup_logging
 import logging
@@ -24,14 +26,13 @@ logger = logging.getLogger(__name__)
 
 async def run_hard_processes():
     from app.modules.wb_adv_updater import hard_ml_data_updater_process as hard_data_manager
-    await asyncio.gather(hard_data_manager.run_update_data_in_neo4j(),
-                        hard_data_manager.run_update_model())
+    await asyncio.gather(hard_data_manager.run_update_data_in_neo4j())
 
 
 
 
 run_own_process_list = [
-    run_hard_processes,
+     run_hard_processes,
      keywords_parsing_process,
      run_update_vectors_in_redis,
      run_update_minus_keywords_on_wb,
@@ -40,6 +41,8 @@ run_own_process_list = [
      update_all_data_in_db,
       parser_all_white_phrase,
      run_main_coroutines,
+     run_update_predict_ctr,
+     run_update_model
 
 
 ]
@@ -59,7 +62,6 @@ def process_controller(process_pids: list[int], process_names: list[str]):
             logger.debug(f'Создан объект процесса: {name}')
             memory_usage = proc.memory_info().rss / (1024 * 1024)
             logger.debug('Получили использование памяти')
-
             process_info = {
                 'PID': pid,
                 'Name': name,

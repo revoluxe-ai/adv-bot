@@ -25,10 +25,3 @@ async def update_cards_in_graph():
         await asyncio.sleep(0)
 
 
-async def run_update_model():
-    while True:
-        try:
-            await update_model()
-        except Exception as e:
-            logger.error(f'Ошибка обновления модели {e}', exc_info=True)
-        await asyncio.sleep(0)
