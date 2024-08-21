@@ -39,7 +39,6 @@ run_own_process_list = [
      run_update_minus_keywords_on_wb,
      run_update_keyword_stat,
      run_bidder_process,
-     update_all_data_in_db,
       parser_all_white_phrase,
      run_main_coroutines,
      run_update_predict_ctr,

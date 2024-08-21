@@ -181,6 +181,7 @@ async def main_loop():
         process_payment_for_advs(),
         # .update_min_ctr_in_global_wb_category_settings()
         run_vector_update_in_neo4j(),
+        update_all_data_in_db(),
         return_exceptions=False
     )
 
