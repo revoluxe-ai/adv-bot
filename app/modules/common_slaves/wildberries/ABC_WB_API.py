@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 import os
 from typing import Union
 
+from sqlalchemy import select
+
+from app.utils.db.session_maker import get_async_session_maker as sm
 from . import exceptions
 import json
 import aiohttp
@@ -36,10 +39,10 @@ class WbRequestApiMixin(ABC):
 
 class Headers:
     def __init__(self, token: models.WBToken):
-       self.__token = token
+       self.current_token: models.WBToken = token
     @property
     def standart(self):
-        return {'Authorization': self.__token.api_key}
+        return {'Authorization': self.current_token.api_key}
 
 
 
@@ -109,7 +112,14 @@ class ABC_WB_API(WbRequestApiMixin):
 
 
 
-    def set_next_token(self):
+    async def set_next_token(self):
+        current_token: WBToken = self.headers.current_token
+        async with sm() as session:
+            stmt = select(WBToken).where(WBToken.id == current_token.id)
+            result = await session.execute(stmt)
+            token = result.scalar()
+            token.active = False
+            await session.commit()
         if self._free_tokens:
             self.headers = Headers(self._free_tokens.pop())
         else:

@@ -48,7 +48,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                     state['_attempts'] = 0  # Сброс попыток после успешного выполнения
                     return result
                 except ApiForbiddenError:
-                    instance.set_next_token()
+                    await instance.set_next_token()
                 except (TooManyRequests,
                         UnknownApiRequestError,
                         BadRequestError,
