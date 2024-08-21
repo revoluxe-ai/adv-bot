@@ -1,4 +1,4 @@
-from app.modules.wb_adv_updater.bidder import run_bidder_process
+
 
 
 from app.modules.wb_adv_updater.runner import (
@@ -37,7 +37,6 @@ run_own_process_list = [
      run_update_vectors_in_redis,
      run_update_minus_keywords_on_wb,
      run_update_keyword_stat,
-     run_bidder_process,
       parser_all_white_phrase,
      run_main_coroutines,
      run_update_predict_ctr,

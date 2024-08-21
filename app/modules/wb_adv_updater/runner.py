@@ -8,6 +8,8 @@ import logging
 from app.utils.db.session_maker import get_async_session_maker
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
 from . import wb_manager
+from app.modules.wb_adv_updater.bidder import run_bidder_process
+
 
 sm = get_async_session_maker
 
@@ -176,6 +178,7 @@ def run_main_coroutines():
 async def main_loop():
     await asyncio.gather(
         payment_for_auto_bidder(),
+        run_bidder_process(),
         payment_for_parsing_keyword(),
         # .clear_data_for_expired_wb_cabinets(),
         process_payment_for_advs(),
