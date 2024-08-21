@@ -123,7 +123,7 @@ async def _run_bidder_process_for_adv(adv_id: int,
             continue
         try:
             await parser.add_wb_positions(keyword.text, {nmid_in_adv})
-        except aiohttp.client_exceptions.ClientOSError as e:
+        except Exception as e:
             logger.error(f'Ошибка при получении позиции {e}')
             continue
         position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
