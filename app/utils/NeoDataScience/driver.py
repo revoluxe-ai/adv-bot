@@ -923,20 +923,19 @@ UNWIND phrase.words AS word
 
     async def _create_sub_graph_for_like_keyword(self, graph_name):
         query = """
-             MATCH (source:Keyword)
-            WHERE source.word2vec IS NOT NULL
-           OPTIONAL MATCH (source)-->(target:Keyword) 
-           WHERE target.word2vec IS NOT NULL
-        WITH gds.graph.project(
-        $graph_name,
-        source,
-        target,
-        {
-        sourceNodeProperties: source {word2vec: source.word2vec},
-        targetNodeProperties: Null
-        }
-        ) AS g
-         RETURN g.graphName AS graph, g.nodeCount AS nodes
+                MATCH (source:Keyword) WHERE NOT source.word2vec is Null
+                WITH gds.graph.project(
+                $graph_name,
+                 source,
+                  Null,
+                {
+                  sourceNodeProperties: {word2vec: source.word2vec},
+                  targetNodeProperties: Null
+                }
+                
+                ) AS g
+                RETURN
+             g.graphName AS graph, g.nodeCount AS nodes, g.relationshipCount AS rels
         """
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
