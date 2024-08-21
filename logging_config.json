@@ -64,11 +64,6 @@
       "level": "DEBUG",
       "handlers": ["console", "journal"],
       "propagate": true
-    },
-    "ProcessController": {
-      "level": "DEBUG",
-      "handlers": ["controller"],
-      "propagate": false
     }
   },
   "root": {
