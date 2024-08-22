@@ -103,9 +103,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
         ).where(subquery)
 
         result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
-
-    logger.debug(f'Данные получены, Всего кампаний: {len(adv_settings)}')
+        adv_settings = result.scalars().yield_per(100)
 
     # Собираем уникальные nmids и keywords для запросов
     nmids_batch = set()
