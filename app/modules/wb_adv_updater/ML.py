@@ -2,6 +2,8 @@ import asyncio
 import logging
 import os.path
 import typing
+
+from .data_manager import DataGetter
 from .ml_common_funcs import load_model
 from ast import literal_eval
 import xgboost
@@ -12,7 +14,7 @@ import pandas as pd
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting,  KeywordSetting, WBCabinet
-from . import data_manager
+from . import data_manager, fitter
 from ...utils import redis_manager
 
 
@@ -30,7 +32,7 @@ global_model: typing.Union[xgboost.XGBModel, None] = None
 
 update_predict_ctr_process_semaphore = asyncio.Semaphore(10)
 
-
+data_getter = DataGetter()
 
 class Fitter(AbcManager):
 
@@ -258,13 +260,11 @@ class Predictor:
        return df
 
     async def get_nmid_to_item_features(self, nmids):
-        fitter = Fitter()
         result = await fitter.get_nmid_to_item_features(nmids)
         return result
 
     async def get_keyword_features(self, clear_keywords):
-        fitter = Fitter()
-        result = await fitter.get_keyword_features(clear_keywords)
+        result = await data_getter.get_keyword_features_from_redis(clear_keywords)
         return result
 
 
