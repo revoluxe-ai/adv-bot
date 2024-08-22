@@ -238,6 +238,7 @@ class Predictor:
            clear_keywords = [keyword.text.replace('_', ' ') for keyword in adv.keyword_settings]
            # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
            keyword_features_result = await self.get_keyword_features(clear_keywords)
+           keyword_features_result = {row[0]: row[1] for row in keyword_features_result}
            for keyword in adv.keyword_settings:
                text = keyword.text.replace('_', ' ')
                keyword_features = keyword_features_result.get(text, [])
