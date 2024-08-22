@@ -23,7 +23,12 @@ logger = logging.getLogger(__name__)
 
 
 
-
+def escape_special_characters(text):
+    text = text.replace('"', '\\"')  # Экранирование двойных кавычек
+    text = text.replace("'", "\\'")  # Экранирование одинарных кавычек
+    text = text.replace("\t", "\\t") # Экранирование табуляции
+    text = text.replace("\n", "\\n") # Экранирование новой строки
+    return text
 
 
 class AdvertApi(ABC_WB_API):
@@ -41,6 +46,8 @@ class AdvertApi(ABC_WB_API):
         async with aiohttp.ClientSession() as session:
             response_text = await requests(session, 'GET', url,
                                                 headers=self.headers.standart)
+
+            response_text = escape_special_characters(response_text)
             answer = json.loads(response_text)
             update_timestamp = datetime.datetime.now()
             if not answer:
