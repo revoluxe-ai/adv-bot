@@ -23,11 +23,6 @@
       "encoding": "utf-8",
       "maxBytes": 10485760,
       "backupCount": 5
-    },
-    "journal": {
-      "class": "systemd.journal.JournalHandler",
-      "level": "DEBUG",
-      "formatter": "custom"
     }
   },
   "loggers": {
@@ -37,18 +32,13 @@
       "propagate": false
     },
     "app.modules.wb_adv_updater.data_manager": {
-      "level": "CRITICAL",
+      "level": "DEBUG",
       "handlers": ["console"],
       "propagate": false
     },
     "app.modules.wb_adv_updater.wb_manager": {
       "level": "CRITICAL",
       "handlers": ["console"],
-      "propagate": false
-    },
-    "app.modules.wb_adv_updater.data_setter": {
-      "level": "CRITICAL",
-      "handlers": ["journal"],
       "propagate": false
     },
     "neo4j.io": {
@@ -65,10 +55,16 @@
       "level": "CRITICAL",
       "handlers": ["console"],
       "propagate": false
+    },
+    "app.modules.wb_adv_updater.ML": {
+      "level": "CRITICAL",
+        "handlers": ["console"],
+        "propagate": false
+
     }
   },
   "root": {
-    "level": "INFO",
-    "handlers": ["console", "error_to_file", "journal"]
+    "level": "DEBUG",
+    "handlers": ["console", "error_to_file"]
   }
 }

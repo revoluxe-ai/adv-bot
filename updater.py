@@ -28,8 +28,6 @@ async def run_hard_processes():
     await asyncio.gather(hard_data_manager.run_update_data_in_neo4j())
 
 
-
-
 run_own_process_list = [
      run_bidder_process,
      run_hard_processes,

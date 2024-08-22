@@ -15,12 +15,11 @@ from app.utils.text_master.Transformers import Word2Vec
 import logging
 from PIL import Image as PilImage
 logger = logging.getLogger(__name__)
-
+from . import fitter
 
 predictor = Predictor()
 word2vec = Word2Vec()
 gds = DataScience()
-fitter = Fitter()
 image_master = ImageMaster()
 
 keywords_hashs_in_neo = set()
