@@ -145,7 +145,7 @@ class Predictor:
         try:
             df_for_predict = await self._get_df_for_predict(all_adv_settings)
         except Exception as exc:
-            logger.error(f'Ошибка при получении данных для предсказания: {exc}')
+            logger.error(f'Ошибка при получении данных для предсказания: {exc}', exc_info=True)
             raise exc
         try:
             predict_df: pd.DataFrame = await asyncio.to_thread(self._predict, df_for_predict)
