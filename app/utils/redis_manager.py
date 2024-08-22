@@ -267,3 +267,17 @@ async def get_nmid_vectors(nmids_batch: list[int]) -> list[tuple[int, list[float
         if vector:
             vectors.append((nmid, vector))
     return vectors
+
+
+async def check_phrase_in_neo(hash_text):
+    key = 'phrase_in_neo:' + str(hash_text)
+    answer = await redis_client.get(key)
+    if answer is None:
+        return False
+    return True
+
+
+async def add_phrase_hash_like_is_in_neo(hash_text):
+    key = 'phrase_in_neo:' + str(hash_text)
+    await redis_client.set(key, 1)
+    return None

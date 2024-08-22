@@ -1,4 +1,5 @@
 
+
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     keywords_parsing_process,
@@ -39,7 +40,6 @@ run_own_process_list = [
      run_main_coroutines,
      run_update_predict_ctr,
      run_update_model
-
 
 ]
 

@@ -27,3 +27,4 @@ class get_clickhouse_client:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.client:
             self.client.close()
+

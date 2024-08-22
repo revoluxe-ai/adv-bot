@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-from app.modules.wb_adv_updater.ml_data_manager import update_model
 
 logger = logging.getLogger(__name__)
 

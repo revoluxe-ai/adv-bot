@@ -1,11 +1,12 @@
 import asyncio
 import hashlib
 import re
+from datetime import datetime
 from io import BytesIO
 from app.utils.image_master import image_tools
 import aiohttp
-from sqlalchemy import select
-from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting, WBCard
+from sqlalchemy import select, or_
+from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting, WBCard, WBCabinet
 from app.utils.NeoDataScience.driver import DataScience
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordStatForNeo, KeywordPhrase
@@ -14,6 +15,10 @@ from app.utils.image_master.image_master2 import ImageMaster
 from app.utils.text_master.Transformers import Word2Vec
 import logging
 from PIL import Image as PilImage
+
+from ...utils import redis_manager
+from ...utils.click_house.client import get_clickhouse_client
+
 logger = logging.getLogger(__name__)
 from . import fitter
 
@@ -141,43 +146,35 @@ async def get_phrase_data(text):
     return phrase_data
 
 async def update_wb_adv_phrase_in_db_bot_active():
-    async with sm() as session:
-        stmt = select(KeywordSetting.text).join(AdvSetting)
-        result = await session.execute(stmt)
-        texts = result.unique().scalars().all()
-
-    texts = [text for text in texts if text]
-    new_texts = []
-    for text in texts:
-        text = text.replace('_', ' ')
-        text = text.replace(',', '.')
-        new_texts.append(text)
-    texts = new_texts
-
     batch_size = 100
     phrase_data_list = []
-
-    for text in texts:
-        hash_text = get_text_hash(text)
-        if hash_text in keywords_hashs_in_neo:
+    async with get_clickhouse_client() as ch_client:
+        query = 'SELECT DISTINCT text FROM default_db.advkeyword'
+        result = await ch_client.query(query)
+        texts = result.result_rows
+        for text in texts:
+            text = text[0]
+            text = text.replace('_', ' ')
+            text = text.replace(',', '.')
+            hash_text = get_text_hash(text)
+            check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
+            if check_in_neo_by_redis:
+                logger.debug(f'Фраза {text} уже есть в базе данных')
+                await asyncio.sleep(0)
+                continue
+            if await gds.check_phrase_in_neo(text):
+                logger.debug(f'Фраза {text} уже есть в базе данных')
+                await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
+                await asyncio.sleep(0)
+                continue
+            phrase_data = await get_phrase_data(text)
+            await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
+            phrase_data_list.append(phrase_data)
+            # Записываем, если набрался полный батч
+            if len(phrase_data_list) >= batch_size:
+                await gds.add_keyword_phrase(phrase_data_list)
+                phrase_data_list.clear()
             await asyncio.sleep(0)
-            return
-        if await gds.check_phrase_in_neo(text):
-            logger.debug(f'Фраза {text} уже есть в базе данных')
-            keywords_hashs_in_neo.add(hash_text)
-            await asyncio.sleep(0)
-            return
-
-        phrase_data = await get_phrase_data(text)
-        phrase_data_list.append(phrase_data)
-        keywords_hashs_in_neo.add(hash_text)
-
-        # Записываем, если набрался полный батч
-        if len(phrase_data_list) >= batch_size:
-            await gds.add_keyword_phrase(phrase_data_list)
-            phrase_data_list.clear()
-            await asyncio.sleep(0)
-        await asyncio.sleep(0)
 
     # Записываем оставшиеся данные, если они есть
     if phrase_data_list:
