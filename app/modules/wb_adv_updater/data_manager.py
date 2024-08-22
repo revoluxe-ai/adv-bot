@@ -87,7 +87,7 @@ async def get_keywords_statistic_clickhouse(
             )
             keywords.append(keyword)
 
-        return keywords
+    return keywords
 
 
 async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[List[int]]) -> List[KeywordSetting]:
