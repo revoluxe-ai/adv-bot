@@ -68,9 +68,6 @@ async def get_keywords_statistic_clickhouse(
 ) -> List[CalculatedKeyword]:
     ch_client = await get_clickhouse_client()
     try:
-        keyword_settings = await _get_keyword_settings(adv_setting.id, hard_statuses)
-        if not keyword_settings:
-            return []
         query = _build_clickhouse_query(adv_setting.adv_id, pass_time)
         result = await ch_client.query(query)
         rows = result.result_rows
@@ -630,24 +627,29 @@ async def get_adv_id_to_min_ctr(adv_ids: list[int])-> dict[int, float]:
     adv_id_to_min_ctr = {}
 
     for adv_setting in adv_settings:
+        logger.debug('Получаю min_ctr')
         min_ctr = await get_min_ctr(adv_setting)
+        logger.debug('min_ctr получен')
         adv_id_to_min_ctr[adv_setting.adv_id] = min_ctr
     return adv_id_to_min_ctr
 
 
-async def get_adv_id_keyword_text_to_status(adv_ids: int):
+async def get_adv_id_keyword_text_to_status(adv_ids: list[int]):
     async with _sm() as session:
-        stmt = select(AdvSetting.adv_id, KeywordSetting.text, KeywordSetting.hard_status)\
-            .join(KeywordSetting, AdvSetting.id == KeywordSetting.adv_setting_id)\
-        .where(AdvSetting.adv_id.in_(adv_ids))
+        # Используем только необходимые колонки и убираем лишние алиасы
+        stmt = select(AdvSetting.adv_id, KeywordSetting.text, KeywordSetting.hard_status) \
+            .join(KeywordSetting, AdvSetting.id == KeywordSetting.adv_setting_id) \
+            .where(AdvSetting.adv_id.in_(adv_ids))
+
+        # Выполняем запрос
         result = await session.execute(stmt)
-        result = result.all()
-    adv_id_keyword_text_to_status = {}
-    for row in result:
-        adv_id = row[0]
-        text = row[1]
-        status = row[2]
-        adv_id_keyword_text_to_status[(adv_id, text)] = status
+
+        # Извлекаем данные в виде словаря сразу в процессе итерации по результату
+        adv_id_keyword_text_to_status = {
+            (row.adv_id, row.text): row.hard_status
+            for row in result
+        }
+
     return adv_id_keyword_text_to_status
 
 

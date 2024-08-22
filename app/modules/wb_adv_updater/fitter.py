@@ -57,7 +57,7 @@ async def _fit_modelGradientBoosting():
     df:pd.DataFrame = await _bayesian_apply(df)
     await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
     y = df['ctr']
-    X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids', 'wb_category_name'],
+    X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids'],
                 axis=1)
     logger.debug('Данные подготовлены')
     # Создание модели градиентного бустинга
@@ -85,113 +85,64 @@ async def _fit_modelGradientBoosting():
     await asyncio.to_thread(save_model, model, time_stamp= None)
 
 
+
 async def _get_df_for_fit() -> pd.DataFrame:
     data_rows = []
     logger.debug('Получение данных для обучения')
+
     async with sm() as session:
         # Подзапрос для проверки существования WBCabinet с условиями
         subquery = select(WBCabinet.id).where(
-                or_(
-                    WBCabinet.expiration_time > datetime.now(),
-                    WBCabinet.bonus > 0,
-                    WBCabinet.balance > 0,
-                ),
+            or_(
+                WBCabinet.expiration_time > datetime.now(),
+                WBCabinet.bonus > 0,
+                WBCabinet.balance > 0,
+            )
         ).exists()
 
         # Основной запрос
         stmt = select(AdvSetting).options(
-            # selectinload(AdvSetting.keyword_settings),
             selectinload(AdvSetting.wb_cabinet)
-        ).where(subquery, AdvSetting.type == 8)
+        ).where(subquery, AdvSetting.type == 8)\
 
         result = await session.execute(stmt)
         adv_settings = result.scalars().yield_per(100)
-        nmids_batch = set()
-        keywords_batch = set()
-        keyword_settings_by_adv_id = defaultdict(set)
-        getted_adv_settings = set()
+
         for n, adv in enumerate(adv_settings):
-            getted_adv_settings.add(adv)
-            logger.debug(f'Обработка кампании для получения keyword_to_features {n}')
-            if adv.nmids:
-                nmids_batch.update(adv.nmids)
-                stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv.id)
-                result = await session.execute(stmt)
-                keyword_settings = result.scalars().yield_per(10)
-                for ks in keyword_settings:
-                    keyword_settings_by_adv_id[adv.adv_id].add(ks)
-                    keywords_batch.add(ks.text)
-                await asyncio.sleep(0)
+            logger.debug(f'Обработка кампании {n}')
+            nmids = adv.nmids
 
-        # Получаем все необходимые ItemFeature и KeywordFeature в одном запросе
-        if nmids_batch:
-                nmid_to_item_features = await get_nmid_to_item_features(nmids_batch)
-        else:
-            return pd.DataFrame()
-        if keywords_batch:
-            keyword_to_features = await __fetch_keyword_features(list(keywords_batch))
-            keyword_to_features = dict(keyword_to_features)
+            if len(nmids) > 1:
+                nmid_to_item_features = await get_nmid_to_item_features(nmids)
 
-        for n, adv in enumerate(getted_adv_settings):
-            logger.debug(f'Обработка кампании основной цикл {n}')
-            try:
-                wb_category = await data_manager.get_wb_category(adv)
-            except (CardNotFoundInDB, NotItemsInAdvSetting) as exc:
-                logger.debug(f"Не удалось получить категорию РК {exc}")
-                await asyncio.sleep(0)
-                continue
-            if not adv.nmids:
-                await asyncio.sleep(0)
-                continue
-            item_features_list = []
-            for nmid in adv.nmids:
-                vector = nmid_to_item_features.get(nmid)
-                if vector:
-                    item_features_list.append(vector)
-            if not item_features_list:
-                await asyncio.sleep(0)
-                continue
-            keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
-            keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
-            avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
-            avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
-            keyword_settings = keyword_settings_by_adv_id[adv.adv_id]
-            for keyword_setting in keyword_settings:
-                text = keyword_setting.text
-                text = text.replace('_', ' ')
-                keyword_features = keyword_to_features.get(text, [])
-                keyword_features = list(keyword_features)
-                if not keyword_features:
-                    logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
-                    await asyncio.sleep(0)
-                    continue
+                if nmid_to_item_features:
+                    item_features_list = list(nmid_to_item_features.values())
+                    avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
+                    avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-                keyword_stat = keyword_stat_dict.get(keyword_setting.text)
-                if not keyword_stat:
-                    await asyncio.sleep(0)
-                    continue
+                    keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
 
-                row = {
-                    'adv_id': adv.adv_id,
-                    'adv_type': adv.type,
-                    'keyword': keyword_setting.text,
-                    'views': keyword_stat.views,
-                    'clicks': keyword_stat.clicks,
-                    'spend': keyword_stat.spend,
-                    'nmids': adv.nmids,
-                    'wb_category_name': wb_category.wb_category_name,
-                    **avg_item_features,
-                    **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))}
-                }
-                data_rows.append(row)
-                await asyncio.sleep(0)
+                    for keyword_stat in keyword_stats:
+                        keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
+                        if keyword_features:
+                            keyword_feature = keyword_features[0][1]
+                            row = {
+                                'adv_id': adv.adv_id,
+                                'adv_type': adv.type,
+                                'keyword': keyword_stat.text,
+                                'views': keyword_stat.views,
+                                'clicks': keyword_stat.clicks,
+                                'spend': keyword_stat.spend,
+                                'nmids': adv.nmids,
+                                **avg_item_features,
+                                **{f'keyword_feature_{i}': keyword_feature[i] for i in range(len(keyword_feature))}
+                            }
+                            data_rows.append(row)
 
+                        await asyncio.sleep(0)  # Позволяем другим задачам выполниться
+
+    # Преобразуем данные в DataFrame
     df = pd.DataFrame(data_rows)
-    if df.empty:
-        return df
-
-    df = df[df.views > 0]
-    df['ctr'] = df['clicks'] / df['views']
     return df
 
 
