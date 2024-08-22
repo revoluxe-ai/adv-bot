@@ -50,10 +50,13 @@ class AdvertApi(ABC_WB_API):
                 wb_timestamp = datetime.datetime.fromisoformat(data['date']).date()
                 stat = data['stat']
                 for keyword_stat in stat:
+                    keyword_text = keyword_stat.pop('keyword')
+                    keyword_text = keyword_text.replace(r'"', '')
+                    keyword_text = keyword_text.replace('_', '')
                     keyword_stat['date'] = wb_timestamp
                     keyword_stat['update_timestamp'] = update_timestamp
                     keyword_stat['adv_id'] = adv_setting.adv_id
-                    keyword_stat['text'] = keyword_stat.pop('keyword')
+                    keyword_stat['text'] = keyword_text
                     keyword_stat['spend'] = keyword_stat.pop('sum')
                     keyword = KeywordStat(**keyword_stat)
                     keywords.append(keyword)
