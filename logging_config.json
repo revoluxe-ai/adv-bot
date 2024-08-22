@@ -61,6 +61,13 @@
         "handlers": ["console"],
         "propagate": false
 
+    },
+    "app.modules.wb_adv_updater.fitter": {
+         "level": "DEBUG",
+        "handlers": ["console"],
+        "propagate": false
+
+
     }
   },
   "root": {
