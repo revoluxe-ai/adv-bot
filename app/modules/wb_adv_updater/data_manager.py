@@ -89,31 +89,8 @@ async def get_keywords_statistic_clickhouse(
                 spend=spend
             )
             keywords.append(keyword)
-        text_to_calculated_keyword = {keyword.text: keyword for keyword in keywords}
-        new_calk_keywords = []
-        for keyword_setting in keyword_settings:
-            text = keyword_setting.text
-            if text in text_to_calculated_keyword:
-                keyword = text_to_calculated_keyword[text]
-                keyword.keyword_setting = keyword_setting
-            else:
-                keyword = CalculatedKeyword(text=text,
-                                            clicks=0,
-                                            views=0,
-                                            spend=0,
-                                            keyword_setting=keyword_setting)
 
-            position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
-            if position:
-                keyword.real_position = position.real_position
-                keyword.base_position = position.base_position
-                keyword.promo_position = position.promo_position
-                keyword.position_update = position.timestamp
-                keyword.cpm = position.cpm
-            keyword.query = keywords_query.get_queries_of_keyword(text)
-            new_calk_keywords.append(keyword)
-
-        return new_calk_keywords
+        return keywords
 
     except Exception as e:
         logger.error(f"Error in get_keywords_statistic_clickhouse: {e}")
@@ -322,8 +299,32 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         max_position = adv_setting.max_place
         logger.debug('Минимальный ctr получен')
         keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
+
+        text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
+        kw_stat_with_data  = []
+        for keyword_setting in keyword_settings:
+            text = keyword_setting.text
+            if text in text_to_keyword_stat:
+                keyword = text_to_keyword_stat[text]
+                keyword.keyword_setting = keyword_setting
+            else:
+                keyword = CalculatedKeyword(text=text,
+                                            clicks=0,
+                                            views=0,
+                                            spend=0,
+                                            keyword_setting=keyword_setting)
+
+            position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
+            if position:
+                keyword.real_position = position.real_position
+                keyword.base_position = position.base_position
+                keyword.promo_position = position.promo_position
+                keyword.position_update = position.timestamp
+                keyword.cpm = position.cpm
+            keyword.query = keywords_query.get_queries_of_keyword(text)
+            kw_stat_with_data.append(keyword)
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
-        for keyword_stat in keyword_stats:
+        for keyword_stat in kw_stat_with_data:
             logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
             keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
             keyword_stat.keyword_setting = keyword_setting
