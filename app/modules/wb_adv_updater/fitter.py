@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os.path
+from collections import defaultdict
+
 from .ml_common_funcs import save_model
 import typing
 from ast import literal_eval
@@ -46,7 +48,7 @@ async def _fit_modelGradientBoosting():
     try:
          df = await _get_df_for_fit()
     except Exception as exc:
-        logger.error(f'Ошибка при получении данных для обучения: {exc}')
+        logger.error(f'Ошибка при получении данных для обучения: {exc}', exc_info=True)
         raise exc
     logger.debug('Данные получены')
     if len(df) == 0:
@@ -93,91 +95,96 @@ async def _get_df_for_fit() -> pd.DataFrame:
                     WBCabinet.expiration_time > datetime.now(),
                     WBCabinet.bonus > 0,
                     WBCabinet.balance > 0,
-                )
+                ),
         ).exists()
 
         # Основной запрос
         stmt = select(AdvSetting).options(
-            selectinload(AdvSetting.keyword_settings),
+            # selectinload(AdvSetting.keyword_settings),
             selectinload(AdvSetting.wb_cabinet)
-        ).where(subquery)
+        ).where(subquery, AdvSetting.type == 8)
 
         result = await session.execute(stmt)
         adv_settings = result.scalars().yield_per(100)
-
-    # Собираем уникальные nmids и keywords для запросов
-    nmids_batch = set()
-    keywords_batch = set()
-    for n, adv in enumerate(adv_settings):
-        logger.debug(f'Обработка кампании для получения keyword_to_features {n}')
-        if adv.nmids:
-            nmids_batch.update(adv.nmids)
-            if adv.keyword_settings:
-                keywords_batch.update([ks.text for ks in adv.keyword_settings])
+        nmids_batch = set()
+        keywords_batch = set()
+        keyword_settings_by_adv_id = defaultdict(set)
+        getted_adv_settings = set()
+        for n, adv in enumerate(adv_settings):
+            getted_adv_settings.add(adv)
+            logger.debug(f'Обработка кампании для получения keyword_to_features {n}')
+            if adv.nmids:
+                nmids_batch.update(adv.nmids)
+                stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv.id)
+                result = await session.execute(stmt)
+                keyword_settings = result.scalars().yield_per(10)
+                for ks in keyword_settings:
+                    keyword_settings_by_adv_id[adv.adv_id].add(ks)
+                    keywords_batch.add(ks.text)
                 await asyncio.sleep(0)
 
-    # Получаем все необходимые ItemFeature и KeywordFeature в одном запросе
-    if nmids_batch:
-            nmid_to_item_features = await get_nmid_to_item_features(nmids_batch)
-    else:
-        return pd.DataFrame()
-    if keywords_batch:
-        keyword_to_features = await __fetch_keyword_features(list(keywords_batch))
-        keyword_to_features = dict(keyword_to_features)
+        # Получаем все необходимые ItemFeature и KeywordFeature в одном запросе
+        if nmids_batch:
+                nmid_to_item_features = await get_nmid_to_item_features(nmids_batch)
+        else:
+            return pd.DataFrame()
+        if keywords_batch:
+            keyword_to_features = await __fetch_keyword_features(list(keywords_batch))
+            keyword_to_features = dict(keyword_to_features)
 
-    for n, adv in enumerate(adv_settings):
-        logger.debug(f'Обработка кампании основной цикл {n}')
-        try:
-            wb_category = await data_manager.get_wb_category(adv)
-        except (CardNotFoundInDB, NotItemsInAdvSetting) as exc:
-            logger.debug(f"Не удалось получить категорию РК {exc}")
-            await asyncio.sleep(0)
-            continue
-        if not adv.nmids:
-            await asyncio.sleep(0)
-            continue
-        item_features_list = []
-        for nmid in adv.nmids:
-            vector = nmid_to_item_features.get(nmid)
-            if vector:
-                item_features_list.append(vector)
-        if not item_features_list:
-            await asyncio.sleep(0)
-            continue
-        keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
-        keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
-        avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
-        avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
-
-        for keyword_setting in adv.keyword_settings:
-            text = keyword_setting.text
-            text = text.replace('_', ' ')
-            keyword_features = keyword_to_features.get(text, [])
-            keyword_features = list(keyword_features)
-            if not keyword_features:
-                logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
+        for n, adv in enumerate(getted_adv_settings):
+            logger.debug(f'Обработка кампании основной цикл {n}')
+            try:
+                wb_category = await data_manager.get_wb_category(adv)
+            except (CardNotFoundInDB, NotItemsInAdvSetting) as exc:
+                logger.debug(f"Не удалось получить категорию РК {exc}")
                 await asyncio.sleep(0)
                 continue
-
-            keyword_stat = keyword_stat_dict.get(keyword_setting.text)
-            if not keyword_stat:
+            if not adv.nmids:
                 await asyncio.sleep(0)
                 continue
+            item_features_list = []
+            for nmid in adv.nmids:
+                vector = nmid_to_item_features.get(nmid)
+                if vector:
+                    item_features_list.append(vector)
+            if not item_features_list:
+                await asyncio.sleep(0)
+                continue
+            keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
+            keyword_stat_dict = {stat.text: stat for stat in keyword_stats}
+            avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
+            avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
+            keyword_settings = keyword_settings_by_adv_id[adv.adv_id]
+            for keyword_setting in keyword_settings:
+                text = keyword_setting.text
+                text = text.replace('_', ' ')
+                keyword_features = keyword_to_features.get(text, [])
+                keyword_features = list(keyword_features)
+                if not keyword_features:
+                    logger.debug(f'Нет фичи для ключевого слова {keyword_setting.text}')
+                    await asyncio.sleep(0)
+                    continue
 
-            row = {
-                'adv_id': adv.adv_id,
-                'adv_type': adv.type,
-                'keyword': keyword_setting.text,
-                'views': keyword_stat.views,
-                'clicks': keyword_stat.clicks,
-                'spend': keyword_stat.spend,
-                'nmids': adv.nmids,
-                'wb_category_name': wb_category.wb_category_name,
-                **avg_item_features,
-                **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))}
-            }
-            data_rows.append(row)
-            await asyncio.sleep(0)
+                keyword_stat = keyword_stat_dict.get(keyword_setting.text)
+                if not keyword_stat:
+                    await asyncio.sleep(0)
+                    continue
+
+                row = {
+                    'adv_id': adv.adv_id,
+                    'adv_type': adv.type,
+                    'keyword': keyword_setting.text,
+                    'views': keyword_stat.views,
+                    'clicks': keyword_stat.clicks,
+                    'spend': keyword_stat.spend,
+                    'nmids': adv.nmids,
+                    'wb_category_name': wb_category.wb_category_name,
+                    **avg_item_features,
+                    **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))}
+                }
+                data_rows.append(row)
+                await asyncio.sleep(0)
 
     df = pd.DataFrame(data_rows)
     if df.empty:
@@ -231,8 +238,8 @@ def _get_enough_views(ctr):
      return int(1/ctr)
 
 
-async def get_nmid_to_item_features(self, nmids_batch: set[int]) -> dict[int, np.ndarray]:
-    result = await self.data_getter.get_item_features_from_redis(nmids_batch)
+async def get_nmid_to_item_features(nmids_batch: set[int]) -> dict[int, np.ndarray]:
+    result = await data_getter.get_item_features_from_redis(nmids_batch)
     result_list = []
     for row in result:
         nmid = row[0]
