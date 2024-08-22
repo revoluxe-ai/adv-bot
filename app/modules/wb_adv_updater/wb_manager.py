@@ -421,7 +421,7 @@ async def update_keyword_stat(access: WBCabinetAccess,
     return
 
 
-async def keyword_stat_updater(adv_setting_id, wb_api, batch_size=1):
+async def keyword_stat_updater(adv_setting_id, wb_api):
     async with sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         adv_setting = await session.execute(stmt)
@@ -447,10 +447,10 @@ async def keyword_stat_updater(adv_setting_id, wb_api, batch_size=1):
         keyword_settings = [KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords]
 
         # Обработка данных порциями
-        for i in range(0, len(keyword_settings), batch_size):
-            batch = keyword_settings[i:i + batch_size]
-            session.add_all(batch)
-            await session.commit()  # Коммит порции
+        for keyword in keyword_settings:
+            session.add(keyword)
+            await session.commit()
+            await asyncio.sleep(0)
 
     await update_keywords_stat_in_click_house(keywords, adv_setting)
     return
