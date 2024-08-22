@@ -34,7 +34,7 @@ class ClickHousePool:
     async def release_client(self, client):
         await self._queue.put(client)
 
-pool = ClickHousePool(max_size=20)
+pool = ClickHousePool(max_size=3000)
 
 async def setup_pool():
     await pool.initialize_pool()
