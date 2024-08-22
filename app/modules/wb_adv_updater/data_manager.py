@@ -66,8 +66,8 @@ async def get_keywords_statistic_clickhouse(
         hard_statuses: Optional[List[int]] = None,
         cache_timeout: int = 60 * 15
 ) -> List[CalculatedKeyword]:
-    ch_client = await get_clickhouse_client()
-    try:
+
+    async with get_clickhouse_client() as ch_client:
         query = _build_clickhouse_query(adv_setting.adv_id, pass_time)
         result = await ch_client.query(query)
         rows = result.result_rows
@@ -88,12 +88,6 @@ async def get_keywords_statistic_clickhouse(
             keywords.append(keyword)
 
         return keywords
-
-    except Exception as e:
-        logger.error(f"Error in get_keywords_statistic_clickhouse: {e}")
-        raise
-    finally:
-        ch_client.close()
 
 
 async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[List[int]]) -> List[KeywordSetting]:
@@ -148,8 +142,7 @@ async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
                                            adv_id: int,
                                            pass_days: Union[int, None] = None) -> tuple[int, int, int]:
 
-    client = await get_clickhouse_client()
-    try:
+    async with get_clickhouse_client() as client:
         today = datetime.now().date()
         text = keyword_setting.text
         query = f"""
@@ -204,15 +197,6 @@ async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
             total_views = total_clicks
 
         return total_clicks, total_views, total_spend
-    except Exception as exc:
-        logger.error(f"An error occurred while getting keyword statistic: {exc}")
-        raise
-    finally:
-        client.close()
-
-
-
-
 
 
 
@@ -797,15 +781,9 @@ async def get_min_ctr(adv: AdvSetting):
     
                 """
 
-        client = await get_clickhouse_client()
-        try:
+        async with get_clickhouse_client() as client:
             result = await client.query(query)
             rows = result.result_rows
-        except Exception as e:
-            logger.error(f"Error in get_min_ctr: {e}")
-            raise
-        finally:
-            client.close()
         text_to_real_ctr = {row[0]: row[1] for row in rows}
         real_ctrs  = []
         predict_ctrs = []

@@ -317,14 +317,8 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
 
 async def update_keywords_stat_in_click_house(keyword_stats: List[KeywordStat],
                                               adv_setting: AdvSetting):
-    client = await get_clickhouse_client()
-    try:
+    async with get_clickhouse_client() as client:
         await insert_or_update_keywords(client, keyword_stats, adv_setting)
-    except Exception as e:
-        logger.error(f"Error inserting data into ClickHouse: {e}")
-        raise
-    finally:
-        client.close()
 
 
 async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
