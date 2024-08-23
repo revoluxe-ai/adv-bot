@@ -401,7 +401,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         assert keyword_stat.status in ['good', 'bad']
     logger.debug('Слова по assert проверены')
     logger.debug('Возвращаю итоговую статистику')
-    return keyword_stats
+    return kw_stat_with_data
 
 
 
