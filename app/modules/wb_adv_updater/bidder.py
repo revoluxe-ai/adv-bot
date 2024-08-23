@@ -137,7 +137,7 @@ async def _run_bidder_process_for_adv(adv_id: int,
         promo_positions.append(promo_position)
         cpm_from_parsing: int = position.cpm
         if not cpm_from_parsing:
-            cpm_from_parsing = 125
+            cpm_from_parsing = 100
     if promo_positions:
         fact_max_position: int = max(promo_positions)
         if fact_max_position == 1:
@@ -151,7 +151,7 @@ async def _run_bidder_process_for_adv(adv_id: int,
 
         if new_cpm > max_cpm:
             new_cpm = max_cpm
-        elif new_cpm < 125:
-            new_cpm = 125
+        elif new_cpm < 100:
+            new_cpm = 100
         if new_cpm != cpm_from_parsing:
            await wb_api.advert.update_cpm(adv_id, new_cpm)

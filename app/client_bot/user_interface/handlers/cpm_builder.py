@@ -121,8 +121,8 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
         await message.answer('Введите целое положительное число')
         return
     manual_cpm = int(text)
-    if manual_cpm < 125:
-        await message.answer('Введите целое положительное число от 150 и выше')
+    if manual_cpm < 100:
+        await message.answer('Введите целое положительное число от 100 и выше')
         return
     state_data = await state.get_data()
     adv_original_id = state_data['last_adv_original_id']

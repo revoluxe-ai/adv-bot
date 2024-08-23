@@ -1837,4 +1837,4 @@ class AutoCPMSettingGetMaxCPM(Text):
 
 
 class ManualCPMSetting(Text):
-    text = """Укажите ставку (целое число от 125):"""
+    text = """Укажите ставку (целое число от 100):"""
