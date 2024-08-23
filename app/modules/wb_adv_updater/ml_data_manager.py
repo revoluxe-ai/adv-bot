@@ -71,25 +71,23 @@ async def process_product_data(wbcard: WBCard):
     return characteristics_words
 
 
-
-
-async def update_cards_in_graph_for_shops():
+async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
+    all_nmids = set()
+    for adv in adv_settings:
+        nmids = adv.nmids
+        if not nmids:
+            continue
+        for nmid in nmids:
+            all_nmids.add(nmid)
+    if not all_nmids:
+        return
     async with sm() as session:
-        stmt = select(AdvSetting)
-        result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = result.scalars().all()
-        all_nmids = set()
-        for adv in adv_settings:
-            nmids = adv.nmids
-            if not nmids:
-                continue
-            for nmid in nmids:
-                all_nmids.add(nmid)
-        if not all_nmids:
-            return
         stmt = select(WBCard).where(WBCard.nmid.in_(all_nmids))
         wbcards: list[WBCard] = await session.stream(stmt)
         async for wbcard in wbcards.scalars():
+            check_in_neo = await gds.check_wb_card_in_neo(wbcard.nmid)
+            if check_in_neo:
+                continue
             try:
                 main_image_url: str = wbcard.photos[0]
                 async with aiohttp.ClientSession() as http_session:
@@ -101,7 +99,7 @@ async def update_cards_in_graph_for_shops():
                 dhash = await asyncio.to_thread(image_tools.dhash, pil_image)
                 logger.debug(f"Обновляем карточку: {wbcard.name}")
                 await gds.update_wb_card(wbcard, characteristics_word, dhash,
-                                               vector)  # Подтверждение изменений в базе данных
+                                         vector)  # Подтверждение изменений в базе данных
             except KeyError as exc:
                 if exc.args[0] == 'photos':
                     logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
@@ -110,8 +108,27 @@ async def update_cards_in_graph_for_shops():
 
 
 
-async def update_cards_in_graph():
-    await update_cards_in_graph_for_shops()
+
+
+async def update_cards_in_graph_for_shops_big_cycle():
+    async with sm() as session:
+        stmt = select(AdvSetting)
+        result = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = result.scalars().all()
+    await __update_cards_in_graph_for_shops(adv_settings)
+
+
+
+async def update_cards_in_graph_small_cycle():
+    async with sm() as session:
+        stmt = select(AdvSetting) \
+            .where(or_(AdvSetting.bot_active == True,
+                       AdvSetting.active_status == 'active'))
+        result = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = result.scalars().all()
+    await __update_cards_in_graph_for_shops(adv_settings)
+
+
 
 async def fit_and_save_model():
     await fitter.getGradientBoostingFullFitModel()
@@ -189,3 +206,5 @@ async def update_wb_adv_phrase_in_db():
         except Exception as exc:
             logger.error(f'Ошибка обновления фраз в neo4j {exc}')
         await asyncio.sleep(0)
+
+
