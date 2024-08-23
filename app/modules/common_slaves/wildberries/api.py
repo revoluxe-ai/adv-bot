@@ -26,7 +26,7 @@ def escape_special_characters(text):
     text = text.replace('"', '\"')  # Экранирование двойных кавычек
     # text = text.replace("'", "\\'")  # Экранирование одинарных кавычек
     text = text.replace("\t", "\\t") # Экранирование табуляции
-    # text = text.replace("\n", "\\n") # Экранирование новой строки
+    text = text.replace("\n", "\\n") # Экранирование новой строки
     return text
 
 
