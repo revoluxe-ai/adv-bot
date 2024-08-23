@@ -400,7 +400,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._adv_choice_last_page = adv_choice_last_page
         self._image = image
         self._filter: bool = False
-        self._on_page = 12
+        self._on_page = 24
 
 
     async def __call__(self, state: FSMContext, sort_mode = 'default'):
