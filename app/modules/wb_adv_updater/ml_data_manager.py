@@ -14,7 +14,7 @@ from app.modules.wb_adv_updater.ML import Predictor, Fitter
 from app.utils.image_master.image_master2 import ImageMaster
 from app.utils.text_master.Transformers import Word2Vec
 import logging
-from PIL import Image as PilImage
+from PIL import Image as PilImage, UnidentifiedImageError
 
 from ...utils import redis_manager
 from ...utils.click_house.client import get_clickhouse_client
@@ -105,7 +105,9 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                     logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
                 else:
                     logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
-
+            except UnidentifiedImageError as exc:
+                logger.error(f"Ошибка UnidentifiedImageError при обработке изображения nmid"
+                             f" {wbcard.nmid}, url: {main_image_url}: {exc}", exc_info=True)
 
 
 
