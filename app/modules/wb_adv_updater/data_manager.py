@@ -328,7 +328,6 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             added_clicks = keyword_setting.added_clicks
             if added_clicks:
                 clicks += added_clicks
-                views += enough_views
             real_baes_ctr = clicks / views
             keyword_stat.baes_ctr = real_baes_ctr
             if not original_predict_ctr:
