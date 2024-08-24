@@ -16,26 +16,40 @@ logger = logging.getLogger(__name__)
 
 from functools import wraps
 
-def async_semaphore_wrapper(semaphore):
+max_tries = 50
+total_tries = 0
+
+
+def async_try_wrapper():
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
+            global total_tries
+            global max_tries
             while True:
                 try:
-                    return await func(*args, **kwargs)
+                    result = await func(*args, **kwargs)
+                    total_tries = 0
+                    return result
                 except neo4j.exceptions.TransientError:
-                    logger.error('Ошибка взаимной блокировки, повтор транзакции через 5 сек')
-                    await asyncio.sleep(5)
+                    if max_tries > total_tries:
+                        raise
+                    else:
+                        total_tries += 1
+                        logger.debug('Ошибка взаимной блокировки, повтор транзакции через 5 сек')
+                        await asyncio.sleep(5)
 
         return wrapper
     return decorator
 
+
+
+
 class AsyncMeta(type):
     def __new__(cls, name, bases, dct):
-        semaphore = asyncio.Semaphore(3)
         for key, value in dct.items():
             if callable(value) and asyncio.iscoroutinefunction(value):
-                dct[key] = async_semaphore_wrapper(semaphore)(value)
+                dct[key] = async_try_wrapper()(value)
         return super().__new__(cls, name, bases, dct)
 
 
