@@ -284,7 +284,7 @@ async def update_all_data_in_db_run(tasks):
 
 
 async def insert_or_update_keywords(client, keyword_stats, adv_setting):
-    try:
+    async with get_clickhouse_client() as client:
         # Подготовка данных для вставки
         new_version = int(datetime.datetime.now().timestamp())
         data_to_insert = []
@@ -305,9 +305,6 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
                             , data=data_to_insert,
                             column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
 
-    except Exception as e:
-        logger.error(f"Error handling data in ClickHouse: {e}")
-        raise
 
 
 
