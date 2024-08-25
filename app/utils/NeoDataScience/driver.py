@@ -1220,7 +1220,12 @@ UNWIND phrase.words AS word
         for record in records:
             keyword = record['keyword']
             vector = record['vector']
-            await redis_manager.set_keyword_vector(keyword, vector)
+            try:
+                await redis_manager.set_keyword_vector(keyword, vector)
+            except Exception as exc:
+                logger.error(f'Ошибка при записи вектора ключевой фразы в Redis: {exc}')
+
+
 
     async def check_wb_card_in_neo(self, nmid):
         query = """
