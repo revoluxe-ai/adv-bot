@@ -283,8 +283,7 @@ async def update_all_data_in_db_run(tasks):
 
 
 
-async def insert_or_update_keywords(keyword_stats, adv_setting):
-    async with get_clickhouse_client() as client:
+async def insert_or_update_keywords(client, keyword_stats, adv_setting):
         # Подготовка данных для вставки
         new_version = int(datetime.datetime.now().timestamp())
         data_to_insert = []
@@ -297,9 +296,9 @@ async def insert_or_update_keywords(keyword_stats, adv_setting):
                                    kw.spend,
                                    new_version])
 
-            await client.insert(table="default_db.advkeyword"
-                                    , data=data_to_insert,
-                                    column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
+        await client.insert(table="default_db.advkeyword"
+                                , data=data_to_insert,
+                                column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
 
 
 
@@ -308,9 +307,9 @@ async def insert_or_update_keywords(keyword_stats, adv_setting):
 
 
 
-async def update_keywords_stat_in_click_house(keyword_stats: List[KeywordStat],
+async def update_keywords_stat_in_click_house(client, keyword_stats: List[KeywordStat],
                                               adv_setting: AdvSetting):
-    await insert_or_update_keywords(keyword_stats, adv_setting)
+    await insert_or_update_keywords(client, keyword_stats, adv_setting)
 
 
 async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
@@ -382,36 +381,37 @@ async def update_keyword_stat(access: WBCabinetAccess,
         )).order_by(AdvSetting.last_update.desc())
         result = (await session.execute(stmt)).unique()
         adv_settings = result.scalars().all()
-    for adv_setting in adv_settings:
-        if adv_setting not in adv_update_tasks:
-            task = asyncio.create_task(keyword_stat_updater(adv_setting.id, wb_api))
-            adv_update_tasks[adv_setting.id] = task
-        else:
-            if adv_update_tasks[adv_setting.id].done():
-                logger.info(
-                    f'Задача обновления статистики ключей завершена для кабинета '
-                    f'{adv_setting.name}'
-                )
-                if adv_update_tasks[adv_setting.id].exception():
-                    logger.error(
-                        f'Ошибка обновления статистики ключей: '
-                        f'{adv_update_tasks[adv_setting.id].exception()},'
-                        f' для кабинета {adv_setting.name}'
-                    )
+    async with get_clickhouse_client() as client:
+        async with sm() as session:
+            for adv_setting in adv_settings:
+                if adv_setting not in adv_update_tasks:
+                    task = asyncio.create_task(keyword_stat_updater(client, session, adv_setting.id, wb_api))
+                    adv_update_tasks[adv_setting.id] = task
+                else:
+                    if adv_update_tasks[adv_setting.id].done():
+                        logger.info(
+                            f'Задача обновления статистики ключей завершена для кабинета '
+                            f'{adv_setting.name}'
+                        )
+                        if adv_update_tasks[adv_setting.id].exception():
+                            logger.error(
+                                f'Ошибка обновления статистики ключей: '
+                                f'{adv_update_tasks[adv_setting.id].exception()},'
+                                f' для кабинета {adv_setting.name}'
+                            )
 
-                del adv_update_tasks[adv_setting.id]
-                logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
-                logger.debug(f'Установка set для need_update_model')
-                logger.debug(f"Обновление статистики завершено")
-        await asyncio.sleep(0)
+                        del adv_update_tasks[adv_setting.id]
+                        logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
+                        logger.debug(f'Установка set для need_update_model')
+                        logger.debug(f"Обновление статистики завершено")
+                await asyncio.sleep(0)
     return
 
 
-async def keyword_stat_updater(adv_setting_id, wb_api):
-    async with sm() as session:
-        stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-        adv_setting = await session.execute(stmt)
-        adv_setting = adv_setting.scalar()
+async def keyword_stat_updater(client, session, adv_setting_id, wb_api):
+    stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+    adv_setting = await session.execute(stmt)
+    adv_setting = adv_setting.scalar()
 
     try:
         keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
@@ -438,7 +438,7 @@ async def keyword_stat_updater(adv_setting_id, wb_api):
             await session.commit()
             await asyncio.sleep(0)
 
-    await update_keywords_stat_in_click_house(keywords, adv_setting)
+    await update_keywords_stat_in_click_house(client, keywords, adv_setting)
     return
 
 
