@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from app.client_bot.const import MAX_TOKENS
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from . import exceptions
-from .exceptions import ApiForbiddenError, UnknownApiRequestError
+from .exceptions import ApiForbiddenError, UnknownApiRequestError, NotValidTokenError
 from .models import WBToken, AdvSetting
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
@@ -114,6 +114,10 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
                 except exceptions.TokenExpiredError:
                     logger.error('Срок действия токена истек')
                     continue
+                except NotValidTokenError:
+                    logger.error('Токен не прошел проверку')
+                    continue
+
                 if token_shop_id != shop_id:
                     continue
                 users_live_tokens.append(token)
