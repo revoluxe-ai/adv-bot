@@ -6,22 +6,21 @@ import inspect
 
 logger = logging.getLogger(__name__)
 
-# Используем Manager для создания разделяемого между процессами словаря
+# Используем Manager для создания разделяемых между процессами словарей
 manager = Manager()
 function_connection_count = manager.dict()  # Словарь для отслеживания соединений по функциям
+caller_function_connection_count = manager.dict()  # Словарь для отслеживания соединений по вызывающим функциям
 
-# Глобальные переменные для счётчика и блокировки
+# Глобальные переменные для счётчика и блокировок
 connection_count = Value('i', 0)  # Счётчик открытых соединений
 connection_lock = Lock()  # Блокировка для синхронизации доступа к общему счётчику
-function_count_lock = Lock()  # Блокировка для синхронизации доступа к словарю
+function_count_lock = Lock()  # Блокировка для синхронизации доступа к словарям
 
 host = settings.clickhouse_host
 username = settings.clickhouse_user
 password = settings.clickhouse_password
 database = 'default_db'
 max_connections = settings.CH_MAX_THREAD
-
-
 
 
 class get_clickhouse_client:
@@ -34,6 +33,7 @@ class get_clickhouse_client:
         global connection_count
         global connection_lock
         global function_connection_count
+        global caller_function_connection_count
         global function_count_lock
 
         # Извлекаем имя текущей функции и её вызывающей функции из стека вызовов
@@ -45,17 +45,23 @@ class get_clickhouse_client:
             connection_count.value += 1
             logger.debug(f"Total open connections count: {connection_count.value}")
 
-        # Логгируем вызывающую функцию
-        if self.caller_func_name:
-            logger.debug(f"Caller function: {self.caller_func_name}")
-
-        # Увеличиваем количество соединений для текущей функции
+        # Логгируем и обновляем счетчики для текущей и вызывающей функций
         with function_count_lock:
+            # Текущая функция
             if self.func_name:
                 if self.func_name not in function_connection_count:
                     function_connection_count[self.func_name] = 0
                 function_connection_count[self.func_name] += 1
-                logger.debug(f"Function '{self.func_name}' open connections count: {function_connection_count[self.func_name]}")
+                logger.debug(
+                    f"Function '{self.func_name}' open connections count: {function_connection_count[self.func_name]}")
+
+            # Вызывающая функция
+            if self.caller_func_name:
+                if self.caller_func_name not in caller_function_connection_count:
+                    caller_function_connection_count[self.caller_func_name] = 0
+                caller_function_connection_count[self.caller_func_name] += 1
+                logger.debug(
+                    f"Caller function '{self.caller_func_name}' open connections count: {caller_function_connection_count[self.caller_func_name]}")
 
         self.client = await clickhouse_connect.create_async_client(
             host=host,
@@ -69,6 +75,7 @@ class get_clickhouse_client:
         global connection_count
         global connection_lock
         global function_connection_count
+        global caller_function_connection_count
         global function_count_lock
 
         if self.client:
@@ -78,10 +85,31 @@ class get_clickhouse_client:
             connection_count.value -= 1
             logger.debug(f"Total open connections count: {connection_count.value}")
 
-        # Уменьшаем количество соединений для текущей функции
+        # Уменьшаем количество соединений для текущей и вызывающей функций
         with function_count_lock:
+            # Текущая функция
             if self.func_name in function_connection_count:
                 function_connection_count[self.func_name] -= 1
-                logger.debug(f"Function '{self.func_name}' open connections count: {function_connection_count[self.func_name]}")
+                logger.debug(
+                    f"Function '{self.func_name}' open connections count: {function_connection_count[self.func_name]}")
+
+            # Вызывающая функция
+            if self.caller_func_name in caller_function_connection_count:
+                caller_function_connection_count[self.caller_func_name] -= 1
+                logger.debug(
+                    f"Caller function '{self.caller_func_name}' open connections count: {caller_function_connection_count[self.caller_func_name]}")
 
 
+def track_connections(func):
+    async def wrapper(*args, **kwargs):
+        async with get_clickhouse_client() as client:
+            return await func(client, *args, **kwargs)
+
+    return wrapper
+
+
+# Пример использования декоратора
+@track_connections
+async def query_data(client, query):
+    result = await client.query(query)
+    return result
