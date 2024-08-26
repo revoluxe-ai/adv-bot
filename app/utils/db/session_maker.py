@@ -16,8 +16,8 @@ thread_local = threading.local()
 lock_counter = threading.Lock()
 conn_counter = 0
 
-pool_size = 700
-max_overflow = 300
+pool_size = 300
+max_overflow = 500
 
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
 global_semaphore = asyncio.Semaphore(count_sem)
