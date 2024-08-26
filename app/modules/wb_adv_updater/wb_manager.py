@@ -430,12 +430,12 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
 
     # Преобразование ключевых слов в объекты KeywordSetting
     keyword_settings = [KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords]
-
-    # Обработка данных порциями
-    for keyword in keyword_settings:
-        session.add(keyword)
-        await session.commit()
-        await asyncio.sleep(0)
+    async with sm() as session:
+        # Обработка данных порциями
+        for keyword in keyword_settings:
+            session.add(keyword)
+            await session.commit()
+            await asyncio.sleep(0)
 
     await update_keywords_stat_in_click_house(client, keywords, adv_setting)
     return
