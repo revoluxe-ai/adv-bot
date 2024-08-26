@@ -78,7 +78,7 @@ async def _run_bidder_process_for_wb_cabinet(access: WBCabinetAccess, adv_tasks:
         result = (await session.execute(stmt)).unique()
         adv_settings = result.scalars().all()
     for adv_setting in adv_settings:
-        if adv_setting not in adv_tasks:
+        if adv_setting.id not in adv_tasks:
             task = asyncio.create_task(_run_bidder_process_for_adv(adv_setting.adv_id, wb_api))
             adv_tasks[adv_setting.id] = task
         else:
