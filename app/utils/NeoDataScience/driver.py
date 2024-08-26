@@ -1060,7 +1060,7 @@ UNWIND phrase.words AS word
 
         async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                result = await session.write_transaction(update_wb_card,
+                await session.write_transaction(update_wb_card,
                                                          nmid,
                                                          dhash,
                                                          vector,
@@ -1068,7 +1068,7 @@ UNWIND phrase.words AS word
                                                          brand,
                                                          characteristics)
 
-        logger.debug(result)
+        logger.debug('Добавили карточку')
 
     async def get_keyword_phrases(self) -> list[str]:
         query = """
