@@ -1176,11 +1176,11 @@ UNWIND phrase.words AS word
         try:
             await self._update_items_vectors_in_redis()
         except Exception as exc:
-            logger.error(f'Ошибка при обновлении векторов товаров в Redis: {exc}')
+            logger.error(f'Ошибка при обновлении векторов товаров в Redis: {exc}', exc_info=True)
         try:
             await self._update_keywords_vectors_in_redis()
         except Exception as exc:
-            logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}')
+            logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
 
 
     async def _update_items_vectors_in_redis(self):
@@ -1202,8 +1202,10 @@ UNWIND phrase.words AS word
         for record in records:
             nmid = record['nmid']
             vector = record['vector']
-            await redis_manager.set_item_vector(nmid, vector)
-
+            try:
+                await redis_manager.set_item_vector(nmid, vector)
+            except Exception as exc:
+                logger.error(f'Ошибка при записи вектора товара в Redis: {exc}', exc_info=True)
 
     async def _update_keywords_vectors_in_redis(self):
         query = """
