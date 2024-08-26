@@ -83,7 +83,7 @@ async def _run_bidder_process_for_wb_cabinet(access: WBCabinetAccess, adv_tasks:
             adv_tasks[adv_setting.id] = task
         else:
             if adv_tasks[adv_setting.id].done():
-                logger.info(
+                logger.debug(
                     f'Задача управления ставкой завершена для кабинета '
                     f'{adv_setting.name}'
                 )
@@ -95,8 +95,6 @@ async def _run_bidder_process_for_wb_cabinet(access: WBCabinetAccess, adv_tasks:
                     )
 
                 del adv_tasks[adv_setting.id]
-                logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
-                logger.debug(f'Установка set для need_update_model')
     return
 
 
