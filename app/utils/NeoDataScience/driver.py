@@ -587,11 +587,15 @@ RETURN graphName
         return result
 
     async def update_fastrp(self, leingth):
+        logger.debug('Обновление fastrp')
         await self.drop_graph(self.MAIN_GRAPH_NAME)
+        logger.debug('Граф удален')
         await self.drop_graph(self.SHOP_GRAPH_NAME)
+        logger.debug('Граф магазина удален')
         await self.create_base_graph(self.MAIN_GRAPH_NAME)
+        logger.debug('Базовый граф создан')
         await self.fit_fastrp(self.MAIN_GRAPH_NAME, fastrp_vector_len = leingth)
-
+        logger.debug('fastrp обучен')
 
 
 
