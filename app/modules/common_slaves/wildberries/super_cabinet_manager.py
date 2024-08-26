@@ -113,11 +113,14 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
                     token_shop_id = token.shop_id# Используйте total_clicks для суммы кликов
                 except exceptions.TokenExpiredError:
                     logger.error('Срок действия токена истек')
+                    token.active = False
+                    await session.commit()
                     continue
                 except NotValidTokenError:
                     logger.error('Токен не прошел проверку')
+                    token.active = False
+                    await session.commit()
                     continue
-
                 if token_shop_id != shop_id:
                     continue
                 users_live_tokens.append(token)
