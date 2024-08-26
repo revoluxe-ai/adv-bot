@@ -283,7 +283,7 @@ async def update_all_data_in_db_run(tasks):
 
 
 
-async def insert_or_update_keywords(client, keyword_stats, adv_setting):
+async def insert_or_update_keywords(keyword_stats, adv_setting):
     async with get_clickhouse_client() as client:
         # Подготовка данных для вставки
         new_version = int(datetime.datetime.now().timestamp())
@@ -297,13 +297,9 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
                                    kw.spend,
                                    new_version])
 
-
-        # Удаление существующих записей
-
-        # Вставка новых данных
-        await client.insert(table="default_db.advkeyword"
-                            , data=data_to_insert,
-                            column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
+            await client.insert(table="default_db.advkeyword"
+                                    , data=data_to_insert,
+                                    column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
 
 
 
@@ -314,8 +310,7 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
 
 async def update_keywords_stat_in_click_house(keyword_stats: List[KeywordStat],
                                               adv_setting: AdvSetting):
-    async with get_clickhouse_client() as client:
-        await insert_or_update_keywords(client, keyword_stats, adv_setting)
+    await insert_or_update_keywords(keyword_stats, adv_setting)
 
 
 async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
