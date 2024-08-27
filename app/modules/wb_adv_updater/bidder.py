@@ -16,9 +16,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ...utils import redis_manager
 from  app.modules.wb_keywords_parser import parser
-
-
-
+from ...utils.click_house.client import get_clickhouse_client
 
 logger = logging.getLogger(__name__)
 
@@ -115,27 +113,28 @@ async def _run_bidder_process_for_adv(adv_id: int,
     nmid_in_adv = adv_setting.nmids[0]
     promo_positions = []
     cpm_from_parsing = None
-    for keyword in white_adv_keywords:
-        _, views, _= await data_manager.get_keyword_statistic_clickhouse(keyword, adv_id)
-        if views == 0:
-            continue
-        try:
-            await parser.add_wb_positions(keyword.text, {nmid_in_adv})
-        except Exception as e:
-            logger.error(f'Ошибка при получении позиции {e}')
-            continue
-        position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
-        if not position:
-            continue
-        promo_position = position.promo_position
-        base_position = position.base_position
-        if not promo_position and base_position:
-            logger.debug('Нет буста')
-            continue
-        promo_positions.append(promo_position)
-        cpm_from_parsing: int = position.cpm
-        if not cpm_from_parsing:
-            cpm_from_parsing = 100
+    async with  get_clickhouse_client() as client:
+        for keyword in white_adv_keywords:
+            _, views, _= await data_manager.get_keyword_statistic_clickhouse(client, keyword, adv_id)
+            if views == 0:
+                continue
+            try:
+                await parser.add_wb_positions(keyword.text, {nmid_in_adv})
+            except Exception as e:
+                logger.error(f'Ошибка при получении позиции {e}')
+                continue
+            position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
+            if not position:
+                continue
+            promo_position = position.promo_position
+            base_position = position.base_position
+            if not promo_position and base_position:
+                logger.debug('Нет буста')
+                continue
+            promo_positions.append(promo_position)
+            cpm_from_parsing: int = position.cpm
+            if not cpm_from_parsing:
+                cpm_from_parsing = 100
     if promo_positions:
         fact_max_position: int = max(promo_positions)
         if fact_max_position == 1:

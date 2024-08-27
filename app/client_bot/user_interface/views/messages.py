@@ -12,6 +12,7 @@ from aiogram.utils import deep_linking
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
+from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
 from aiogram.fsm.context import FSMContext
@@ -513,8 +514,11 @@ class KeywordSettingMessage(TextWithKeyboard):
         else:
             self.last_full_update = None
 
-        total_clicks, total_views, total_spend = await data_manager.get_keyword_statistic_clickhouse(self._keyword_setting,
-                                                                                                     self._adv_setting.adv_id)
+        async with get_clickhouse_client() as client:
+            total_clicks, total_views, total_spend\
+                = await data_manager.get_keyword_statistic_clickhouse(client,
+                                                                      self._keyword_setting,
+                                                                      self._adv_setting.adv_id)
 
         self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
 

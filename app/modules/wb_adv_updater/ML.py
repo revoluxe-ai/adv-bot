@@ -16,7 +16,7 @@ from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting,  KeywordSetting, WBCabinet
 from . import data_manager, fitter
 from ...utils import redis_manager
-
+from ...utils.click_house.client import get_clickhouse_client
 
 sm = get_async_session_maker
 
@@ -106,7 +106,7 @@ class Predictor:
 
 
     @staticmethod
-    async def __update_predict_ctr(keyword_setting, predict_df, min_ctr):
+    async def __update_predict_ctr(client, keyword_setting, predict_df, min_ctr):
         async with update_predict_ctr_process_semaphore:
             try:
                 adv_id = keyword_setting.adv_setting.adv_id
@@ -117,7 +117,7 @@ class Predictor:
                 if row.empty:
                     return
                 predict_ctr = float(row['predicted_ctr'].values[0])
-                result = await data_manager.get_keyword_statistic_clickhouse(keyword_setting, adv_id)
+                result = await data_manager.get_keyword_statistic_clickhouse(client, keyword_setting, adv_id)
                 clicks, views, _ = result
                 if clicks == 0:
                     clicks = 1
@@ -168,21 +168,16 @@ class Predictor:
         adv_id_to_min_ctr = {}
 
         tasks = []
-        for keyword_setting in keyword_settings:
-            adv = keyword_setting.adv_setting
-            adv_id = adv.adv_id
-            if not adv_id in adv_id_to_min_ctr:
-                adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
-            min_ctr = adv_id_to_min_ctr[adv_id]
-            # try:
-            #     await update_predict_ctr(keyword_setting)
-            #     logger.debug(f'Предсказание для ключевого слова {keyword_setting.text} в кампании {keyword_setting.adv_setting.name} обновлено')
-            # except Exception as exc:
-            #     logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
-            #     pass
-            task = asyncio.create_task(self.__update_predict_ctr(keyword_setting, predict_df, min_ctr))
-            tasks.append(task)
-            await asyncio.sleep(0)
+        async with get_clickhouse_client() as client:
+            for keyword_setting in keyword_settings:
+                adv = keyword_setting.adv_setting
+                adv_id = adv.adv_id
+                if not adv_id in adv_id_to_min_ctr:
+                    adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
+                min_ctr = adv_id_to_min_ctr[adv_id]
+                task = asyncio.create_task(self.__update_predict_ctr(client, keyword_setting, predict_df, min_ctr))
+                tasks.append(task)
+                await asyncio.sleep(0)
 
         part = 100
         for i in range(0, len(tasks), part):

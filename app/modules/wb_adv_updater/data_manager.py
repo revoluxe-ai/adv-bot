@@ -138,65 +138,64 @@ def _build_clickhouse_query(adv_id: int,  pass_time: Optional[timedelta]) -> tup
     return query
 
 
-async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
+async def get_keyword_statistic_clickhouse(client, keyword_setting: KeywordSetting,
                                            adv_id: int,
                                            pass_days: Union[int, None] = None) -> tuple[int, int, int]:
 
-    async with get_clickhouse_client() as client:
-        today = datetime.now().date()
-        text = keyword_setting.text
-        query = f"""
+    today = datetime.now().date()
+    text = keyword_setting.text
+    query = f"""
+        SELECT
+            COALESCE(SUM(total_clicks), 0) AS total_clicks,
+            COALESCE(SUM(total_views), 0) AS total_views,
+            COALESCE(SUM(total_spend), 0) AS total_spend
+        FROM (
             SELECT
-                COALESCE(SUM(total_clicks), 0) AS total_clicks,
-                COALESCE(SUM(total_views), 0) AS total_views,
-                COALESCE(SUM(total_spend), 0) AS total_spend
-            FROM (
-                SELECT
-                    clicks AS total_clicks,
-                    views AS total_views,
-                    spend AS total_spend
-                FROM
-                    default_db.advkeyword
-                WHERE
-                    adv_id = {adv_id}
-                    AND text = %(text)s
-                    AND (text, date, version) IN (
-                        SELECT
-                            text,
-                            date,
-                            MAX(version) AS version
-                        FROM
-                            default_db.advkeyword
-                        WHERE
-                            adv_id = {adv_id}
-                            AND text = %(text)s
-                        GROUP BY
-                            text,
-                            date
-                    )
-            ) AS latest_records
-        """
+                clicks AS total_clicks,
+                views AS total_views,
+                spend AS total_spend
+            FROM
+                default_db.advkeyword
+            WHERE
+                adv_id = {adv_id}
+                AND text = %(text)s
+                AND (text, date, version) IN (
+                    SELECT
+                        text,
+                        date,
+                        MAX(version) AS version
+                    FROM
+                        default_db.advkeyword
+                    WHERE
+                        adv_id = {adv_id}
+                        AND text = %(text)s
+                    GROUP BY
+                        text,
+                        date
+                )
+        ) AS latest_records
+    """
 
-        # Добавление условия для фильтрации по дате, если указано количество дней
-        if pass_days:
-            start_date = today - timedelta(days=pass_days)
-            query += f" AND date >= '{start_date}'"
+    # Добавление условия для фильтрации по дате, если указано количество дней
+    if pass_days:
+        start_date = today - timedelta(days=pass_days)
+        query += f" AND date >= '{start_date}'"
 
-        # Выполнение запроса
-        result = await client.query(query, {'text': text})
+    # Выполнение запроса
+    result = await client.query(query, {'text': text})
 
-        # Проверка наличия результатов
-        if not result.result_rows:
-            logger.warning("No results found for the query.")
-            return 0, 0, 0
+    # Проверка наличия результатов
+    if not result.result_rows:
+        logger.warning("No results found for the query.")
+        return 0, 0, 0
 
-        total_clicks, total_views, total_spend = result.result_rows[0]
+    total_clicks, total_views, total_spend = result.result_rows[0]
 
-        # Коррекция значений, если количество кликов больше количества просмотров
-        if total_clicks > total_views:
-            total_views = total_clicks
+    # Коррекция значений, если количество кликов больше количества просмотров
+    if total_clicks > total_views:
+        total_views = total_clicks
 
-        return total_clicks, total_views, total_spend
+    return total_clicks, total_views, total_spend
 
 
 
@@ -276,34 +275,34 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
-        min_ctr = await get_min_ctr(adv_setting)
-        max_position = adv_setting.max_place
-        logger.debug('Минимальный ctr получен')
-        keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
+    min_ctr = await get_min_ctr(adv_setting)
+    max_position = adv_setting.max_place
+    logger.debug('Минимальный ctr получен')
+    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
 
-        text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
-        kw_stat_with_data  = []
-        for keyword_setting in keyword_settings:
-            text = keyword_setting.text
-            if text in text_to_keyword_stat:
-                keyword = text_to_keyword_stat[text]
-                keyword.keyword_setting = keyword_setting
-            else:
-                keyword = CalculatedKeyword(text=text,
-                                            clicks=0,
-                                            views=0,
-                                            spend=0,
-                                            keyword_setting=keyword_setting)
+    text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
+    kw_stat_with_data  = []
+    for keyword_setting in keyword_settings:
+        text = keyword_setting.text
+        if text in text_to_keyword_stat:
+            keyword = text_to_keyword_stat[text]
+            keyword.keyword_setting = keyword_setting
+        else:
+            keyword = CalculatedKeyword(text=text,
+                                        clicks=0,
+                                        views=0,
+                                        spend=0,
+                                        keyword_setting=keyword_setting)
 
-            position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
-            if position:
-                keyword.real_position = position.real_position
-                keyword.base_position = position.base_position
-                keyword.promo_position = position.promo_position
-                keyword.position_update = position.timestamp
-                keyword.cpm = position.cpm
-            keyword.query = keywords_query.get_queries_of_keyword(text)
-            kw_stat_with_data.append(keyword)
+        position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
+        if position:
+            keyword.real_position = position.real_position
+            keyword.base_position = position.base_position
+            keyword.promo_position = position.promo_position
+            keyword.position_update = position.timestamp
+            keyword.cpm = position.cpm
+        keyword.query = keywords_query.get_queries_of_keyword(text)
+        kw_stat_with_data.append(keyword)
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
         for keyword_stat in kw_stat_with_data:
             logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')

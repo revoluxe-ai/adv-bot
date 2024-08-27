@@ -18,6 +18,7 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager
+from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from .start import start_registration
@@ -482,7 +483,10 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
 
         elif new_hard_status == -1:
             min_ctr = await data_manager.get_min_ctr(adv_setting)
-            clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(keyword_setting, adv_setting.adv_id)
+            async with get_clickhouse_client() as client:
+                clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(client,
+                                                                                   keyword_setting,
+                                                                                   adv_setting.adv_id)
             if keyword_setting.added_clicks:
                 clicks += keyword_setting.added_clicks
             if keyword_setting.added_views:
