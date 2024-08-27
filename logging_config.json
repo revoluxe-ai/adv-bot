@@ -30,51 +30,10 @@
       "formatter": "custom",
       "address": "/dev/log"
     }
-  },
-  "loggers": {
-    "updater": {
-      "level": "CRITICAL",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "app.modules.wb_adv_updater.data_manager": {
-      "level": "CRITICAL",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "app.modules.wb_adv_updater.wb_manager": {
-      "level": "CRITICAL",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "neo4j.io": {
-      "level": "CRITICAL",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "app.utils.db.session_maker": {
-      "level": "CRITICAL",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "app.modules.wb_adv_updater.bidder": {
-      "level": "CRITICAL",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "app.modules.wb_adv_updater.ML": {
-      "level": "CRITICAL",
-      "handlers": ["console"],
-      "propagate": false
-    },
-    "app.modules.wb_adv_updater.fitter": {
-      "level": "DEBUG",
-      "handlers": ["console"],
-      "propagate": false
-    }
+ 
   },
   "root": {
     "level": "DEBUG",
-    "handlers": ["console", "error_to_file", "journal"]
+    "handlers": ["journal"]
   }
 }
