@@ -3,6 +3,10 @@ from app.settings import settings
 from multiprocessing import Value, Lock, Manager
 import logging
 import inspect
+from urllib3 import PoolManager
+
+pool_mgr = PoolManager(num_pools=10, maxsize=20)  # Пример настройки пула соединений
+
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +83,9 @@ class get_clickhouse_client:
             host=host,
             username=username,
             password=password,
-            database=database
+            database=database,
+            pool_mgr=pool_mgr,
+
         )
         return self.client
 
