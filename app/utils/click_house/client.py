@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 manager = Manager()
 function_connection_count = manager.dict()  # Словарь для отслеживания соединений по функциям
 caller_function_connection_count = manager.dict()  # Словарь для отслеживания соединений по вызывающим функциям
+grand_caller_function_connection_count = manager.dict()  # Словарь для отслеживания соединений по функциям 3-го уровня
 
 # Глобальные переменные для счётчика и блокировок
 connection_count = Value('i', 0)  # Счётчик открытых соединений
@@ -28,24 +29,27 @@ class get_clickhouse_client:
         self.client = None
         self.func_name = None
         self.caller_func_name = None
+        self.grand_caller_func_name = None
 
     async def __aenter__(self):
         global connection_count
         global connection_lock
         global function_connection_count
         global caller_function_connection_count
+        global grand_caller_function_connection_count
         global function_count_lock
 
-        # Извлекаем имя текущей функции и её вызывающей функции из стека вызовов
+        # Извлекаем имя текущей функции, её вызывающей функции и функции, которая вызвала вызывающую функцию из стека вызовов
         stack = inspect.stack()
         self.func_name = stack[1].function  # Имя текущей функции
         self.caller_func_name = stack[2].function if len(stack) > 2 else None  # Имя вызывающей функции
+        self.grand_caller_func_name = stack[3].function if len(stack) > 3 else None  # Имя функции 3-го уровня
 
         with connection_lock:
             connection_count.value += 1
             logger.debug(f"Total open connections count: {connection_count.value}")
 
-        # Логгируем и обновляем счетчики для текущей и вызывающей функций
+        # Логгируем и обновляем счетчики для текущей и вызывающих функций
         with function_count_lock:
             # Текущая функция
             if self.func_name:
@@ -63,6 +67,14 @@ class get_clickhouse_client:
                 logger.debug(
                     f"Caller function '{self.caller_func_name}' open connections count: {caller_function_connection_count[self.caller_func_name]}")
 
+            # Функция 3-го уровня
+            if self.grand_caller_func_name:
+                if self.grand_caller_func_name not in grand_caller_function_connection_count:
+                    grand_caller_function_connection_count[self.grand_caller_func_name] = 0
+                grand_caller_function_connection_count[self.grand_caller_func_name] += 1
+                logger.debug(
+                    f"Grand caller function '{self.grand_caller_func_name}' open connections count: {grand_caller_function_connection_count[self.grand_caller_func_name]}")
+
         self.client = await clickhouse_connect.create_async_client(
             host=host,
             username=username,
@@ -76,6 +88,7 @@ class get_clickhouse_client:
         global connection_lock
         global function_connection_count
         global caller_function_connection_count
+        global grand_caller_function_connection_count
         global function_count_lock
 
         if self.client:
@@ -85,7 +98,7 @@ class get_clickhouse_client:
             connection_count.value -= 1
             logger.debug(f"Total open connections count: {connection_count.value}")
 
-        # Уменьшаем количество соединений для текущей и вызывающей функций
+        # Уменьшаем количество соединений для текущей и вызывающих функций
         with function_count_lock:
             # Текущая функция
             if self.func_name in function_connection_count:
@@ -98,6 +111,12 @@ class get_clickhouse_client:
                 caller_function_connection_count[self.caller_func_name] -= 1
                 logger.debug(
                     f"Caller function '{self.caller_func_name}' open connections count: {caller_function_connection_count[self.caller_func_name]}")
+
+            # Функция 3-го уровня
+            if self.grand_caller_func_name in grand_caller_function_connection_count:
+                grand_caller_function_connection_count[self.grand_caller_func_name] -= 1
+                logger.debug(
+                    f"Grand caller function '{self.grand_caller_func_name}' open connections count: {grand_caller_function_connection_count[self.grand_caller_func_name]}")
 
 
 def track_connections(func):
