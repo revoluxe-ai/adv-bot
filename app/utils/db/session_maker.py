@@ -49,6 +49,7 @@ async def get_async_session_maker(semaphore = None) -> AsyncSession:
                 echo=False,
                 pool_size=pool_size,
                 max_overflow=max_overflow,
+                pool_pre_ping=True
             )
             sync_engine = engine.sync_engine
             event.listen(sync_engine, "checkout", log_checkout)
