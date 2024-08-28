@@ -23,17 +23,11 @@
       "encoding": "utf-8",
       "maxBytes": 10485760,
       "backupCount": 5
-    },
-    "journal": {
-      "class": "logging.handlers.SysLogHandler",
-      "level": "DEBUG",
-      "formatter": "custom",
-      "address": "/dev/log"
     }
  
   },
   "root": {
     "level": "DEBUG",
-    "handlers": ["journal"]
+    "handlers": ["console", "error_to_file"]
   }
 }

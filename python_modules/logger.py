@@ -2,7 +2,12 @@ import json
 import logging
 import logging.config
 import textwrap
-from systemd.journal import JournalHandler
+import platform
+
+system_name = platform.system()
+
+
+
 
 class CustomFormatter(logging.Formatter):
 
@@ -34,35 +39,35 @@ class CustomFormatter(logging.Formatter):
         wrapped = textwrap.fill(formatted, width=100)  # Перенос строк, если длина сообщения больше 100 символов
         return wrapped
 
-def setup_logging():
-    # Создаем логгер
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)  # Устанавливаем уровень логирования (DEBUG, INFO и т.д.)
+if system_name == 'Linux':
+    from systemd.journal import JournalHandler
+    def setup_logging():
+        # Создаем логгер
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)  # Устанавливаем уровень логирования (DEBUG, INFO и т.д.)
 
-    # Настраиваем обработчик для отправки логов в journalctl
-    journal_handler = JournalHandler()
-    journal_handler.setLevel(logging.DEBUG)
+        # Настраиваем обработчик для отправки логов в journalctl
+        journal_handler = JournalHandler()
+        journal_handler.setLevel(logging.DEBUG)
 
-    # Формат сообщений
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    journal_handler.setFormatter(formatter)
+        # Формат сообщений
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        journal_handler.setFormatter(formatter)
 
-    # Добавляем обработчик в логгер
-    logger.addHandler(journal_handler)
+        # Добавляем обработчик в логгер
+        logger.addHandler(journal_handler)
 
+else:
+    def setup_logging():
 
+        def setup_logging_from_file(path_to_config_file):
+            with open(path_to_config_file, 'r') as file:
+                config = json.load(file)
+            logging.config.dictConfig(config)
 
+        # Путь к файлу конфигурации
+        path_to_logging_config = 'logging_config.json'
 
-# def setup_logging():
-#
-#     def setup_logging_from_file(path_to_config_file):
-#         with open(path_to_config_file, 'r') as file:
-#             config = json.load(file)
-#         logging.config.dictConfig(config)
-#
-#     # Путь к файлу конфигурации
-#     path_to_logging_config = 'logging_config.json'
-#
-#     # Вызов функции настройки логгирования
-#     setup_logging_from_file(path_to_logging_config)
+        # Вызов функции настройки логгирования
+        setup_logging_from_file(path_to_logging_config)
 
