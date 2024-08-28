@@ -99,7 +99,7 @@ async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[Lis
         return result.scalars().all()
 
 
-def _build_clickhouse_query(adv_id: int,  pass_time: Optional[timedelta]) -> tuple[str, list]:
+def _build_clickhouse_query(adv_id: int,  pass_time: Optional[timedelta]) -> str:
     query = f"""
           SELECT
               text,
@@ -342,6 +342,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                         keyword_stat.status = KeywordStatus.BAD
                         keyword_stat.reason = 'max_position'
                         await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                        await asyncio.sleep(0)
                         continue
 
             if adv_setting.max_cpc:
@@ -349,32 +350,38 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = 'max_cpc'
                     await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                    await asyncio.sleep(0)
                     continue
 
             if not  original_predict_ctr and enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and not keyword_setting.hard_status != 1:
                 keyword_stat.status = KeywordStatus.GOOD
                 keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
                 await redis_manager.set_auto_block_status(keyword_setting.id, True)
+                await asyncio.sleep(0)
                 continue
 
             if keyword_setting.hard_status == 3:
                 keyword_stat.status = KeywordStatus.BAD
                 keyword_stat.reason = 'turn_off'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                await asyncio.sleep(0)
                 continue
             if keyword_setting.hard_status == 2:
                keyword_stat.status = KeywordStatus.GOOD
                keyword_setting.auto_block = False
                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+               await asyncio.sleep(0)
                continue
             elif keyword_setting.hard_status == 0:
                 keyword_stat.status = KeywordStatus.BAD
                 keyword_stat.reason = 'black_list'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                await asyncio.sleep(0)
                 continue
             if min_ctr == 0:
                 keyword_stat.status = KeywordStatus.GOOD
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                await asyncio.sleep(0)
                 continue
 
             if calculate_ctr >= min_ctr or real_baes_ctr >= min_ctr:
@@ -941,3 +948,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int):
                 session.add(keyword_setting)
             keyword_setting.hard_status = 2
         await session.commit()
+
+
+async def update_black_phrases(adv_setting_id, keywords):
+    await redis_manager.set_black_phrases(adv_setting_id, keywords)
