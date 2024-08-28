@@ -2,7 +2,7 @@ import json
 import logging
 import logging.config
 import textwrap
-
+from systemd.journal import JournalHandler
 
 class CustomFormatter(logging.Formatter):
 
@@ -35,15 +35,34 @@ class CustomFormatter(logging.Formatter):
         return wrapped
 
 def setup_logging():
+    # Создаем логгер
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)  # Устанавливаем уровень логирования (DEBUG, INFO и т.д.)
 
-    def setup_logging_from_file(path_to_config_file):
-        with open(path_to_config_file, 'r') as file:
-            config = json.load(file)
-        logging.config.dictConfig(config)
+    # Настраиваем обработчик для отправки логов в journalctl
+    journal_handler = JournalHandler()
+    journal_handler.setLevel(logging.DEBUG)
 
-    # Путь к файлу конфигурации
-    path_to_logging_config = 'logging_config.json'
+    # Формат сообщений
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    journal_handler.setFormatter(formatter)
 
-    # Вызов функции настройки логгирования
-    setup_logging_from_file(path_to_logging_config)
+    # Добавляем обработчик в логгер
+    logger.addHandler(journal_handler)
+
+
+
+
+# def setup_logging():
+#
+#     def setup_logging_from_file(path_to_config_file):
+#         with open(path_to_config_file, 'r') as file:
+#             config = json.load(file)
+#         logging.config.dictConfig(config)
+#
+#     # Путь к файлу конфигурации
+#     path_to_logging_config = 'logging_config.json'
+#
+#     # Вызов функции настройки логгирования
+#     setup_logging_from_file(path_to_logging_config)
 
