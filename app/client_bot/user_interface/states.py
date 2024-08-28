@@ -57,3 +57,7 @@ class CPMSetting(StatesGroup):
     waiting_for_max_cpm = State()
     waiting_for_manual_cpm = State()
     waiting_for_max_position = State()
+
+
+class AddBlackPhrasesTemplates(StatesGroup):
+    waiting_for_black_phrases = State()

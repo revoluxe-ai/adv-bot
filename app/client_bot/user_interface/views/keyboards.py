@@ -61,11 +61,32 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
     builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
                                                                       type='by_adv').pack()))
+    if adv_setting.bot_active:
+        builder.row(
+            InlineKeyboardButton(text='Отключить бота', callback_data=TurnBot(action='off',
+                                                                              adv_original_id=adv_setting.id,
+                                                                              wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
+
+
+    else:
+        builder.row(
+            InlineKeyboardButton(text='Включить бота',
+                                 callback_data=TurnBot(action='on',
+                                                       adv_original_id=adv_setting.id,
+                                                       wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
+
     button = InlineKeyboardButton(text='Управление ставкой',
                                         callback_data=callbacks.CPMSettingMenu(
                                         action='to_cpm_setting_page',
                                         adv_original_id=adv_setting.id).pack())
     builder.row(button)
+
+
+    botton = InlineKeyboardButton(text = "Шаблоны не релевантных фраз",
+                                  callback_data=callbacks.AddBlackPhrasesTemplates(
+                                        adv_setting_id=adv_setting.id).pack(
+                                  ))
+    builder.row(botton)
 
 
     builder.row(InlineKeyboardButton(text='Добавить фразы в продвижение (Белый список)',
@@ -119,19 +140,6 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
 
     builder.row(button)
 
-    if adv_setting.bot_active:
-        builder.row(
-        InlineKeyboardButton(text='Отключить бота', callback_data=TurnBot(action='off',
-                                                                          adv_original_id=adv_setting.id,
-                                                                          wb_user_cabinet_original_id =wb_user_cabinet.id).pack()))
-
-
-    else:
-        builder.row(
-            InlineKeyboardButton(text='Включить бота',
-                                  callback_data=TurnBot(action='on',
-                                                        adv_original_id=adv_setting.id,
-                                                        wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
 
     wb_user_cabinet_original_id = wb_user_cabinet.id
     builder.row(InlineKeyboardButton(text='Вернуться к списку кампаний',

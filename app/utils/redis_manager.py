@@ -281,3 +281,19 @@ async def add_phrase_hash_like_is_in_neo(hash_text):
     key = 'phrase_in_neo:' + str(hash_text)
     await redis_client.set(key, 1)
     return None
+
+
+async def get_black_phrases(advsetting_id):
+    key = 'black_phrases:' + str(advsetting_id)
+    answer = await redis_client.get(key)
+    if answer is None:
+        return []
+    answer = answer.decode('utf-8')
+    answer = answer.split(',')
+    return answer
+
+async def set_black_phrases(advsetting_id, black_phrases: list[str]):
+    key = 'black_phrases:' + str(advsetting_id)
+    black_phrases = ','.join(black_phrases)
+    await redis_client.set(key, black_phrases)
+    return None

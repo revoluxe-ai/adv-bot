@@ -433,6 +433,9 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
     async with sm() as session:
         # Обработка данных порциями
         for keyword in keyword_settings:
+            check_by_black_list_template = await data_manager.check_by_black_list_template(keyword.text, adv_setting.id)
+            if check_by_black_list_template:
+                keyword.hard_status = 0
             session.add(keyword)
             await session.commit()
             await asyncio.sleep(0)

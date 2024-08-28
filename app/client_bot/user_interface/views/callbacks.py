@@ -132,3 +132,11 @@ class TurnParsing(CallbackData, prefix="turn_parsing"):
 class CPMSettingMenu(CallbackData, prefix="cpm_setting"):
     action: str
     adv_original_id: int
+
+
+class AddBlackPhrasesTemplates(CallbackData, prefix="add_black_phrases"):
+    adv_setting_id: int
+
+
+class ResetBlackPhrases(CallbackData, prefix="reset_black_phrases"):
+    adv_setting_id: int

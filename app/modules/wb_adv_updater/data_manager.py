@@ -950,5 +950,47 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int):
         await session.commit()
 
 
-async def update_black_phrases(adv_setting_id, keywords):
+
+async def update_black_phrases(adv_setting_id, keywords: list[str]):
     await redis_manager.set_black_phrases(adv_setting_id, keywords)
+    async with _sm() as session:
+        stmt = select(KeywordSetting)\
+            .join(KeywordSetting.adv_setting)\
+            .where(AdvSetting.id == adv_setting_id,
+                   KeywordSetting.hard_status != 0)
+        result = await session.execute(stmt)
+        keyword_settings = result.scalars().all()
+        for keyword_setting in keyword_settings:
+            for black_phrase in keywords:
+                black_phrase_text = black_phrase.lower().strip()
+                if "'" in black_phrase_text or '"' in black_phrase_text:
+                    black_phrase_text = black_phrase_text.replace("'", "''").replace('"', '""')
+                    if black_phrase_text == keyword_setting.text:
+                        keyword_setting.hard_status = 0
+                        break
+                else:
+                    if black_phrase_text in keyword_setting.text:
+                        keyword_setting.hard_status = 0
+                        break
+
+        await session.commit()
+
+
+async def check_by_black_list_template(keyword_text: str, adv_setting_id: int):
+    black_keywords = await redis_manager.get_black_phrases(adv_setting_id)
+    keyword_text_lower = keyword_text.lower().strip()
+
+    for black_phrase in black_keywords:
+        black_phrase_text = black_phrase.lower().strip()
+        if "'" in black_phrase_text or '"' in black_phrase_text:
+            black_phrase_text = black_phrase_text.replace("'", "''").replace('"', '""')
+            if black_phrase_text == keyword_text_lower:
+                return True
+        else:
+            if black_phrase_text in keyword_text_lower:
+                return True
+    return False
+
+
+async def reset_black_phrases(adv_setting_id):
+    await redis_manager.set_black_phrases(adv_setting_id, [])

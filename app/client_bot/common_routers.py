@@ -13,6 +13,7 @@ from .user_interface.handlers import (adv_setting,
                                       add_white_phrases,
                                       get_shop_for_admin,
                                       cpm_builder,
+                                      add_black_phrases
 )
 from ..settings import settings
 
@@ -27,6 +28,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 common_router.include_routers(adv_setting.router)
+common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)
 common_router.include_routers(keyword_settings.router)

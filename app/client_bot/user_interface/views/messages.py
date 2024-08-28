@@ -32,7 +32,7 @@ from aiogram import Bot
 
 import logging
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from ... import const
 
@@ -173,18 +173,19 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                 .order_by(AdvSetting.bot_active.desc())
             result = await session.execute(stmt)
             adv_settings = result.scalars().all()
-            adv_settings = await self._filter_advs(adv_settings)
-            self._adv_settings = adv_settings
-            stmt = select(WBCabinet.id)\
+        adv_settings = await self._filter_advs(adv_settings)
+        self._adv_settings = adv_settings
+        stmt = select(WBCabinet.id)\
                 .where(WBCabinet.wb_user_cabinets\
                        .any(WBUserCabinet == self._wb_user_cabinet_original_id))
+        async with _sm() as session:
             result = await session.execute(stmt)
             wb_cabinet_original_id = result.scalar()
-            await self._state.update_data(
-                last_wb_cabinet_original_id=wb_cabinet_original_id,
-                last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
-                last_wb_user_cabinet_page=self._page
-            )
+        await self._state.update_data(
+            last_wb_cabinet_original_id=wb_cabinet_original_id,
+            last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
+            last_wb_user_cabinet_page=self._page
+        )
 
         await super().__call__()
 
@@ -764,7 +765,16 @@ class ShopMenu(TextWithKeyboard):
         user: User = self._wb_user_cabinet.user
         tokens: list[WBToken] = user.wb_tokens
         wb_cabinet: WBCabinet = self._wb_cabinet
-        shops_tokens = [token for token in tokens if token.shop_id == wb_cabinet.shop_id]
+        work_tokens = []
+        for token in tokens:
+            try:
+                if token.shop_id == wb_cabinet.shop_id:
+                    work_tokens.append(token)
+            except NotValideToken:
+                logger.debug(f'Токен {token} не валиден')
+                continue
+
+        shops_tokens = work_tokens
         shops_tokens.sort(key=lambda token:  token.expires, reverse=True)
         if user.user_telegram_id in [373435337]:
             expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
@@ -1843,3 +1853,41 @@ class AutoCPMSettingGetMaxCPM(Text):
 
 class ManualCPMSetting(Text):
     text = """Укажите ставку (целое число от 100):"""
+
+
+class WaitingForBlackPhrases(TextWithKeyboard):
+    async def __call__(self, adv_setting_id):
+        self.adv_setting_id = adv_setting_id
+        black_phrases: Optional[list[str]]  = await redis_manager.get_black_phrases(adv_setting_id)
+        self.black_phrases = black_phrases
+        await super().__call__()
+
+    @property
+    def text(self):
+        if self.black_phrases:
+            blacklist = "\n".join(self.black_phrases)
+            return f"""Текущий черный список:\n{blacklist}\n\nЧтобы обновить фразы, отправьте список еще раз. Список будет обновлен."""
+        else:
+            return ('Укажите через знак переноса фразы, которые вы хотите добавить в черный список (фразы для исключения из продвижения).'
+            ' Если фраза указана без кавычек, то будут учитываться вхождения, если с кавычками - точное соответствие. Пример:\n\n'
+            'платье женское\n'
+            'платье вечернее\n'
+            'платье летнее\n'
+            '"женское летнее"\n'
+        )
+
+    @property
+    def keyboard(self):
+        builder = InlineKeyboardBuilder()
+
+        if self.black_phrases:
+            builder.row(InlineKeyboardButton(text="Сбросить черный список",
+                                                callback_data=callbacks\
+                                             .ResetBlackPhrases(adv_setting_id=self.adv_setting_id).pack()))
+
+        builder.row(InlineKeyboardButton(text="Вернуться в настройки РК",
+                                         callback_data=callbacks.Adv(adv_original_id=self.adv_setting_id).pack()))
+        return builder.as_markup()
+
+
+
