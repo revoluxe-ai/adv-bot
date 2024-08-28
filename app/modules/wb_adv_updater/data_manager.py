@@ -279,7 +279,6 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
     keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
-
     text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
     kw_stat_with_data  = []
     for keyword_setting in keyword_settings:
@@ -293,7 +292,6 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                                         views=0,
                                         spend=0,
                                         keyword_setting=keyword_setting)
-
         position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
         if position:
             keyword.real_position = position.real_position
@@ -303,101 +301,102 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             keyword.cpm = position.cpm
         keyword.query = keywords_query.get_queries_of_keyword(text)
         kw_stat_with_data.append(keyword)
-        keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
-        for keyword_stat in kw_stat_with_data:
-            logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
-            keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
-            keyword_stat.keyword_setting = keyword_setting
-            predict_ctr = await redis_manager.get_predict_ctr(adv_setting.adv_id, keyword_stat.text)
-            if not predict_ctr:
-                predict_ctr = keyword_setting.predict_ctr
-            keyword_stat.predict_ctr = predict_ctr
-            original_predict_ctr = keyword_stat.predict_ctr
-            predict_ctr = original_predict_ctr
-            keyword_stat.hard_status = keyword_setting.hard_status
-            if min_ctr == 0:
-                enough_views = 100
-            else:
-                enough_views = int(1 / min_ctr)
-            views = keyword_stat.views
-            clicks = keyword_stat.clicks
-            if clicks == 0:
-                 clicks += 1
-                 views += enough_views
-            added_clicks = keyword_setting.added_clicks
-            if added_clicks:
-                clicks += added_clicks
-            real_baes_ctr = clicks / views
-            keyword_stat.baes_ctr = real_baes_ctr
-            if not original_predict_ctr:
-                predict_ctr = real_baes_ctr
-                keyword_stat.predict_ctr = predict_ctr
-            calculate_ctr = (real_baes_ctr + predict_ctr)/2
-            keyword_stat.predict_ctr = calculate_ctr
-            if max_position:
-                position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
-                if position:
-                    organic_position = position.base_position
-                    if 0 < organic_position <= max_position:
-                        keyword_stat.status = KeywordStatus.BAD
-                        keyword_stat.reason = 'max_position'
-                        await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                        await asyncio.sleep(0)
-                        continue
+    keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
 
-            if adv_setting.max_cpc:
-                if keyword_stat.cpc > adv_setting.max_cpc:
+    for keyword_stat in kw_stat_with_data:
+        logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
+        keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
+        keyword_stat.keyword_setting = keyword_setting
+        predict_ctr = await redis_manager.get_predict_ctr(adv_setting.adv_id, keyword_stat.text)
+        if not predict_ctr:
+            predict_ctr = keyword_setting.predict_ctr
+        keyword_stat.predict_ctr = predict_ctr
+        original_predict_ctr = keyword_stat.predict_ctr
+        predict_ctr = original_predict_ctr
+        keyword_stat.hard_status = keyword_setting.hard_status
+        if min_ctr == 0:
+            enough_views = 100
+        else:
+            enough_views = int(1 / min_ctr)
+        views = keyword_stat.views
+        clicks = keyword_stat.clicks
+        if clicks == 0:
+             clicks += 1
+             views += enough_views
+        added_clicks = keyword_setting.added_clicks
+        if added_clicks:
+            clicks += added_clicks
+        real_baes_ctr = clicks / views
+        keyword_stat.baes_ctr = real_baes_ctr
+        if not original_predict_ctr:
+            predict_ctr = real_baes_ctr
+            keyword_stat.predict_ctr = predict_ctr
+        calculate_ctr = (real_baes_ctr + predict_ctr)/2
+        keyword_stat.predict_ctr = calculate_ctr
+        if max_position:
+            position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
+            if position:
+                organic_position = position.base_position
+                if 0 < organic_position <= max_position:
                     keyword_stat.status = KeywordStatus.BAD
-                    keyword_stat.reason = 'max_cpc'
+                    keyword_stat.reason = 'max_position'
                     await redis_manager.set_auto_block_status(keyword_setting.id, False)
                     await asyncio.sleep(0)
                     continue
 
-            if not  original_predict_ctr and enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and not keyword_setting.hard_status != 1:
+        if adv_setting.max_cpc:
+            if keyword_stat.cpc > adv_setting.max_cpc:
+                keyword_stat.status = KeywordStatus.BAD
+                keyword_stat.reason = 'max_cpc'
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                await asyncio.sleep(0)
+                continue
+
+        if not  original_predict_ctr and enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and not keyword_setting.hard_status != 1:
+            keyword_stat.status = KeywordStatus.GOOD
+            keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
+            await redis_manager.set_auto_block_status(keyword_setting.id, True)
+            await asyncio.sleep(0)
+            continue
+
+        if keyword_setting.hard_status == 3:
+            keyword_stat.status = KeywordStatus.BAD
+            keyword_stat.reason = 'turn_off'
+            await redis_manager.set_auto_block_status(keyword_setting.id, False)
+            await asyncio.sleep(0)
+            continue
+        if keyword_setting.hard_status == 2:
+           keyword_stat.status = KeywordStatus.GOOD
+           keyword_setting.auto_block = False
+           await redis_manager.set_auto_block_status(keyword_setting.id, False)
+           await asyncio.sleep(0)
+           continue
+        elif keyword_setting.hard_status == 0:
+            keyword_stat.status = KeywordStatus.BAD
+            keyword_stat.reason = 'black_list'
+            await redis_manager.set_auto_block_status(keyword_setting.id, False)
+            await asyncio.sleep(0)
+            continue
+        if min_ctr == 0:
+            keyword_stat.status = KeywordStatus.GOOD
+            await redis_manager.set_auto_block_status(keyword_setting.id, False)
+            await asyncio.sleep(0)
+            continue
+
+        if calculate_ctr >= min_ctr or real_baes_ctr >= min_ctr:
+            keyword_stat.status = KeywordStatus.GOOD
+            await redis_manager.set_auto_block_status(keyword_setting.id, False)
+        else:
+            if keyword_stat.views < adv_setting.min_views_for_ml_predict:
                 keyword_stat.status = KeywordStatus.GOOD
                 keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
                 await redis_manager.set_auto_block_status(keyword_setting.id, True)
-                await asyncio.sleep(0)
-                continue
-
-            if keyword_setting.hard_status == 3:
-                keyword_stat.status = KeywordStatus.BAD
-                keyword_stat.reason = 'turn_off'
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                await asyncio.sleep(0)
-                continue
-            if keyword_setting.hard_status == 2:
-               keyword_stat.status = KeywordStatus.GOOD
-               keyword_setting.auto_block = False
-               await redis_manager.set_auto_block_status(keyword_setting.id, False)
-               await asyncio.sleep(0)
-               continue
-            elif keyword_setting.hard_status == 0:
-                keyword_stat.status = KeywordStatus.BAD
-                keyword_stat.reason = 'black_list'
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                await asyncio.sleep(0)
-                continue
-            if min_ctr == 0:
-                keyword_stat.status = KeywordStatus.GOOD
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                await asyncio.sleep(0)
-                continue
-
-            if calculate_ctr >= min_ctr or real_baes_ctr >= min_ctr:
-                keyword_stat.status = KeywordStatus.GOOD
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
             else:
-                if keyword_stat.views < adv_setting.min_views_for_ml_predict:
-                    keyword_stat.status = KeywordStatus.GOOD
-                    keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
-                    await redis_manager.set_auto_block_status(keyword_setting.id, True)
-                else:
-                    keyword_stat.status = KeywordStatus.BAD
-                    keyword_stat.reason = 'min_ctr'
-                    await redis_manager.set_auto_block_status(keyword_setting.id, True)
-            assert keyword_stat.predict_ctr
-            await asyncio.sleep(0)
+                keyword_stat.status = KeywordStatus.BAD
+                keyword_stat.reason = 'min_ctr'
+                await redis_manager.set_auto_block_status(keyword_setting.id, True)
+        assert keyword_stat.predict_ctr
+        await asyncio.sleep(0)
 
     logger.debug('Проверяю статусы ключевых слов с assert')
 
