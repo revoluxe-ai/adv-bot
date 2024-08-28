@@ -181,6 +181,7 @@ async def main_loop():
         payment_for_parsing_keyword(),
         # .clear_data_for_expired_wb_cabinets(),
         process_payment_for_advs(),
+        run_update_vectors_in_redis(),
         # .update_min_ctr_in_global_wb_category_settings()
         run_vector_update_in_neo4j(),
         update_all_data_in_db(),
