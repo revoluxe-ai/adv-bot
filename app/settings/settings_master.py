@@ -60,6 +60,18 @@ class Settings:
     def clickhouse_password(self):
         return get_document_by_key_name(setting_path, 'click-house-password')
 
+    @property
+    def WEBHOOK_PATH(self):
+        return get_document_by_key_name(setting_path, 'WEBHOOK_PATH')
 
+
+
+    @property
+    def TELEGRAM_WEB_PORT(self):
+        return get_document_by_key_name(setting_path, 'TELEGRAM_WEB_PORT')
+
+    @property
+    def CH_MAX_THREAD(self):
+        return get_document_by_key_name(setting_path, 'CH_MAX_THREAD')
 
 settings = Settings()

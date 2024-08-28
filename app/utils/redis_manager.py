@@ -2,6 +2,9 @@ import asyncio
 import datetime
 import json
 from typing import Union
+import logging
+
+logger = logging.getLogger(__name__)
 
 import redis
 
@@ -61,6 +64,7 @@ async def set_token_rights(hash_token, timeout):
 
 
 async def get_token_rights(hash_token):
+    logger.debug('Получение прав на токен из Redis')
     answer = await redis_client.get('token_rights:'  + str(hash_token))
     return answer
 
@@ -193,3 +197,87 @@ async def get_predict_ctr(adv_id, keyword):
     predict_ctr_str = predict_ctr_bytes.decode('utf-8')
     predict_ctr = float(predict_ctr_str)
     return predict_ctr
+
+
+
+async def set_block_position_status(keywordsetting_original_id: int,
+                                    block_position_status: str,
+                                    new_time: datetime) -> None:
+    key = 'block_position_status:' + str(keywordsetting_original_id)
+    value = block_position_status + ':' + str(new_time.timestamp())
+    await redis_client.set(key, value)
+
+async def get_block_position_status(keywordsetting_original_id: int) -> tuple[str, datetime]:
+    key = 'block_position_status:' + str(keywordsetting_original_id)
+    value = await redis_client.get(key)
+    if value is None:
+        return None
+    value = value.decode('utf-8')
+    block_position_status, timestamp = value.split(':')
+    timestamp = float(timestamp)
+    timestamp = datetime.datetime.fromtimestamp(timestamp)
+    return block_position_status, timestamp
+
+
+async def set_item_vector(nmid: int, vector: list[float]) -> None:
+    key = 'item_vector:' + str(nmid)
+    await redis_client.set(key, json.dumps(vector))
+
+
+async def get_item_vector(nmid: int) -> list[float]:
+    key = 'item_vector:' + str(nmid)
+    vector_bytes = await redis_client.get(key)
+    if vector_bytes is None:
+        return None
+    vector_str = vector_bytes.decode('utf-8')
+    vector = json.loads(vector_str)
+    return vector
+
+
+async def set_keyword_vector(keyword: str, vector: list[float]) -> None:
+    key = 'keyword_vector:' + keyword
+    await redis_client.set(key, json.dumps(vector))
+
+async def get_keyword_vector(keyword: str) -> list[float]:
+    key = 'keyword_vector:' + keyword
+    vector_bytes = await redis_client.get(key)
+    if vector_bytes is None:
+        return None
+    vector_str = vector_bytes.decode('utf-8')
+    vector = json.loads(vector_str)
+    return vector
+
+
+
+
+async def get_keywords_vectors(keywords)->list[tuple[str, list[float]]]:
+    vectors = []
+    for keyword in keywords:
+       vector = await get_keyword_vector(keyword)
+       if vector:
+              vectors.append((keyword, vector))
+    return vectors
+
+
+
+async def get_nmid_vectors(nmids_batch: list[int]) -> list[tuple[int, list[float]]]:
+    vectors = []
+    for nmid in nmids_batch:
+        vector = await get_item_vector(nmid)
+        if vector:
+            vectors.append((nmid, vector))
+    return vectors
+
+
+async def check_phrase_in_neo(hash_text):
+    key = 'phrase_in_neo:' + str(hash_text)
+    answer = await redis_client.get(key)
+    if answer is None:
+        return False
+    return True
+
+
+async def add_phrase_hash_like_is_in_neo(hash_text):
+    key = 'phrase_in_neo:' + str(hash_text)
+    await redis_client.set(key, 1)
+    return None

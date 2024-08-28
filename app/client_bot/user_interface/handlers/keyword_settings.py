@@ -18,11 +18,15 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager
+from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from .start import start_registration
 from ..views import callbacks, messages
 from app.client_bot.user_interface import states
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 router = Router()
@@ -410,6 +414,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
 
     chat_id = callback.message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
+    logger.debug('Обработка собщения')
     await messages.AdvKeywordsSetting(
         bot,
         chat_id,
@@ -420,7 +425,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
         main_photos[0],
         page,
     )(state)
-
+    logger.debug('Отправили сообщение')
     await redis_manager.set_check_last_24_hours(adv_original_id)
     return
 
@@ -478,7 +483,10 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
 
         elif new_hard_status == -1:
             min_ctr = await data_manager.get_min_ctr(adv_setting)
-            clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(keyword_setting, adv_setting.adv_id)
+            async with get_clickhouse_client() as client:
+                clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(client,
+                                                                                   keyword_setting,
+                                                                                   adv_setting.adv_id)
             if keyword_setting.added_clicks:
                 clicks += keyword_setting.added_clicks
             if keyword_setting.added_views:

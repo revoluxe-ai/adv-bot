@@ -16,8 +16,8 @@ thread_local = threading.local()
 lock_counter = threading.Lock()
 conn_counter = 0
 
-pool_size = 700
-max_overflow = 300
+pool_size = 300
+max_overflow = 500
 
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
 global_semaphore = asyncio.Semaphore(count_sem)
@@ -46,9 +46,10 @@ async def get_async_session_maker(semaphore = None) -> AsyncSession:
             async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
             engine = create_async_engine(
                 async_db_connector,
-                echo=True,
+                echo=False,
                 pool_size=pool_size,
                 max_overflow=max_overflow,
+                pool_pre_ping=True
             )
             sync_engine = engine.sync_engine
             event.listen(sync_engine, "checkout", log_checkout)

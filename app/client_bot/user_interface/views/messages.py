@@ -12,6 +12,7 @@ from aiogram.utils import deep_linking
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
+from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
 from aiogram.fsm.context import FSMContext
@@ -400,7 +401,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._adv_choice_last_page = adv_choice_last_page
         self._image = image
         self._filter: bool = False
-        self._on_page = 12
+        self._on_page = 24
 
 
     async def __call__(self, state: FSMContext, sort_mode = 'default'):
@@ -437,7 +438,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                     continue
                 clear_keywords.append(keyword)
             self._keywords = clear_keywords
-
+        logger.debug("Начинаю отправку сообщения")
         await super().__call__()
 
     @property
@@ -513,8 +514,11 @@ class KeywordSettingMessage(TextWithKeyboard):
         else:
             self.last_full_update = None
 
-        total_clicks, total_views, total_spend = await data_manager.get_keyword_statistic_clickhouse(self._keyword_setting,
-                                                                                                     self._adv_setting.adv_id)
+        async with get_clickhouse_client() as client:
+            total_clicks, total_views, total_spend\
+                = await data_manager.get_keyword_statistic_clickhouse(client,
+                                                                      self._keyword_setting,
+                                                                      self._adv_setting.adv_id)
 
         self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
 
@@ -1838,4 +1842,4 @@ class AutoCPMSettingGetMaxCPM(Text):
 
 
 class ManualCPMSetting(Text):
-    text = """Укажите ставку (целое число от 125):"""
+    text = """Укажите ставку (целое число от 100):"""

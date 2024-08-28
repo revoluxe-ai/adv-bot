@@ -7,7 +7,7 @@ from functools import wraps
 import logging
 from statistics import mean
 from typing import AsyncGenerator
-from aiohttp import ServerDisconnectedError
+from aiohttp import ServerDisconnectedError, ClientOSError
 from sqlalchemy.orm import joinedload
 
 from app.modules.wb_adv_updater import data_manager
@@ -26,20 +26,8 @@ from app import settings
 
 logger = logging.getLogger(__name__)
 
-
-
-import warnings
 from sqlalchemy import exc as sa_exc
 
-# Включение отображения всех предупреждений
-warnings.simplefilter("always", sa_exc.SAWarning)
-
-# Пример обработки SAWarning как исключение
-def handle_warnings_as_exceptions(message, category, filename, lineno, file=None, line=None):
-    raise category(message)
-
-# Назначаем обработчик
-warnings.showwarning = handle_warnings_as_exceptions
 
 
 class DataError(Exception):
@@ -100,7 +88,8 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                 #     state['_next_pause'] = pause
                 #     state['_attempts'] += 1
                 except (DataError,
-                        ServerDisconnectedError) as e:
+                        ServerDisconnectedError,
+                        ClientOSError) as e:
                     logger.debug(f'Ошибка при выполнении запроса через {method_name}: {e}, '
                                  f'Пауза перед следующим запросом: {state["_next_pause"]} секунд')
                     state['_attempts'] += 1
@@ -162,11 +151,11 @@ class Parser:
 
 
 
-    @try_except(2, 1)
+    @try_except(1, 1)
     async def __parse_keywords_from_wb(self, text: str, page: int):
         url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get(url) as response:
                 text = await response.text()
         if not text:
             raise DataError('Пустой ответ от сервера', text)
@@ -282,8 +271,10 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
             not_found_positions.append(position)
             await redis_manager.add_positions_to_redis(not_found_positions)
 
-async def limited_add_wb_positions(text:str, need_nmids: set[int], sem: asyncio.Semaphore):
-    async with sem:
+semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
+
+async def limited_add_wb_positions(text:str, need_nmids: set[int]):
+    async with semaphore:
         try:
             await add_wb_positions(text, need_nmids)
         except Exception as e:
@@ -291,7 +282,7 @@ async def limited_add_wb_positions(text:str, need_nmids: set[int], sem: asyncio.
 
 
 
-async def parser_all_white_phrase(semaphore):
+async def parser_all_white_phrase():
     tasks_by_text = {}
     while True:
         logger.debug('Получаем фразы для парсинга')
@@ -300,7 +291,7 @@ async def parser_all_white_phrase(semaphore):
             if text not in tasks_by_text:
                 logger.debug(f'Добавляем фразу {text} в список задач')
                 if need_nmids:
-                    task = asyncio.create_task(limited_add_wb_positions(text, need_nmids, semaphore))
+                    task = asyncio.create_task(limited_add_wb_positions(text, need_nmids))
                     tasks_by_text[text] = task
             else:
                 logger.debug(f'Фраза {text} уже есть в списке задач')

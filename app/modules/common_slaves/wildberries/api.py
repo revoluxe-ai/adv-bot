@@ -12,12 +12,8 @@ from .data_classes.adv import Adv
 import json
 from .data_classes.keywordstat import KeywordStat
 from .data_classes.subcategories import Subcategory
-from .exceptions import (ApiForbiddenError,
-                         TooManyRequests,
-                         UnknownApiRequestError,
-                         BadRequestError,
-                         NotValidDataError,
-                         CardNotFoundInWB)
+from .exceptions import CardNotFoundInWB
+from .http_request import requests, try_except_decorator
 from .models import AdvSetting
 from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
@@ -26,52 +22,12 @@ import time
 logger = logging.getLogger(__name__)
 
 
-def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=50, max_delay=120):
-    def decorator(func):
-        async def wrapper(instance, *args, **kwargs):
-            if not hasattr(instance, '_api_call_state'):
-                instance._api_call_state = {}
-
-            method_name = func.__name__
-            if method_name not in instance._api_call_state:
-                instance._api_call_state[method_name] = {
-                    '_last_query_time': 0,
-                    '_current_pause': interval_seconds / requests_per_interval,
-                    '_attempts': 0,
-                     '_first_request': True
-                }
-
-            state = instance._api_call_state[method_name]
-            while state['_attempts'] < max_attempts:
-                current_time = time.time()
-                time_since_last_query = current_time - state['_last_query_time']
-                time_to_wait = max(state['_current_pause'] - time_since_last_query, 0)
-                if state['_first_request']:
-                    logger.debug(f'Пауза между запросами: {time_to_wait} секунд')
-                    await asyncio.sleep(time_to_wait)
-                    state['_first_request'] = False
-
-                try:
-                    result = await func(instance, *args, **kwargs)
-                    logger.debug(f'Запрос {method_name} выполнен успешно')
-                    state['_last_query_time'] = time.time()
-                    state['_current_pause'] = (interval_seconds / requests_per_interval + state['_current_pause']) / 2
-                    state['_attempts'] = 0  # Сброс попыток после успешного выполнения
-                    return result
-                except ApiForbiddenError:
-                    instance.set_next_token()
-                except (TooManyRequests,
-                        UnknownApiRequestError,
-                        BadRequestError,
-                        NotValidDataError,
-                        ClientOSError,
-                        ServerDisconnectedError) as e:
-                    state['_attempts'] += 1
-                    state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
-                    if state['_attempts'] >= max_attempts:
-                        raise e
-        return wrapper
-    return decorator
+def escape_special_characters(text):
+    text = text.replace('"', '\"')  # Экранирование двойных кавычек
+    # text = text.replace("'", "\\'")  # Экранирование одинарных кавычек
+    text = text.replace("\t", "\\t") # Экранирование табуляции
+    text = text.replace("\n", "\\n") # Экранирование новой строки
+    return text
 
 
 
@@ -88,8 +44,10 @@ class AdvertApi(ABC_WB_API):
         keywords = []
         url = f'https://advert-api.wb.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}'
         async with aiohttp.ClientSession() as session:
-            response_text = await self.requests(session, 'GET', url,
+            response_text = await requests(session, 'GET', url,
                                                 headers=self.headers.standart)
+
+            response_text = escape_special_characters(response_text)
             answer = json.loads(response_text)
             update_timestamp = datetime.datetime.now()
             if not answer:
@@ -99,10 +57,13 @@ class AdvertApi(ABC_WB_API):
                 wb_timestamp = datetime.datetime.fromisoformat(data['date']).date()
                 stat = data['stat']
                 for keyword_stat in stat:
+                    keyword_text = keyword_stat.pop('keyword')
+                    keyword_text = keyword_text.replace(r'"', '')
+                    keyword_text = keyword_text.replace('_', '')
                     keyword_stat['date'] = wb_timestamp
                     keyword_stat['update_timestamp'] = update_timestamp
                     keyword_stat['adv_id'] = adv_setting.adv_id
-                    keyword_stat['text'] = keyword_stat.pop('keyword')
+                    keyword_stat['text'] = keyword_text
                     keyword_stat['spend'] = keyword_stat.pop('sum')
                     keyword = KeywordStat(**keyword_stat)
                     keywords.append(keyword)
@@ -119,7 +80,7 @@ class AdvertApi(ABC_WB_API):
             # "param": None
         }
         async with aiohttp.ClientSession() as session:
-            response_text = await self.requests(session,
+            response_text = await requests(session,
                                               'POST',
                                                 url,
                                                 json_data=data,
@@ -134,7 +95,7 @@ class AdvertApi(ABC_WB_API):
         advertIds = []
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
         async with aiohttp.ClientSession() as session:
-            response_text = await self.requests(session, 'GET', url,
+            response_text = await requests(session, 'GET', url,
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             # Используем json.loads для преобразования текста ответа в JSON
@@ -153,7 +114,7 @@ class AdvertApi(ABC_WB_API):
         advs = []
         url = f'https://advert-api.wb.ru/adv/v1/promotion/adverts'
         async with aiohttp.ClientSession() as session:
-            response_text = await self.requests(session, 'POST', url, json_data=adv_ids,
+            response_text = await requests(session, 'POST', url, json_data=adv_ids,
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             for advert in answer:
@@ -186,7 +147,7 @@ class AdvertApi(ABC_WB_API):
         }
 
         async with aiohttp.ClientSession() as session:
-            await self.requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
+            await requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
             logger.debug('Минус-фразы установлены')
 
     async def create_adv_company(self, nmids: list, budget_type: int, budget: int) -> Union[Adv, str]:
@@ -238,7 +199,7 @@ class AdvertApi(ABC_WB_API):
         url = f'https://advert-api.wb.ru/adv/v0/pause?id={adv_id}'
         async with aiohttp.ClientSession() as session:
             try:
-                await self.requests(session, 'GET',
+                await requests(session, 'GET',
                                 url,
                                 headers=self.headers.standart)
                 logger.debug(f'Рекламная кампания {adv_id} успешно поставлена на паузу')
@@ -256,7 +217,7 @@ class ContentApi(ABC_WB_API):
         @try_except_decorator(1, 1)
         async def request(session, url)-> list[Subcategory]:
             all_categories = []
-            response = await self.requests(session, 'GET', url,
+            response = await requests(session, 'GET', url,
                                            headers=self.headers.standart)
             answer = json.loads(response)
             for data in answer['data']:
@@ -288,7 +249,7 @@ class ContentApi(ABC_WB_API):
     async def get_patent_categories(self):
         url = 'https://suppliers-api.wildberries.ru/content/v2/object/parent/all'
         async with aiohttp.ClientSession() as session:
-            response_text = await self.requests(session, 'GET', url,
+            response_text = await requests(session, 'GET', url,
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             return answer['data']
@@ -302,6 +263,7 @@ class ContentApi(ABC_WB_API):
                 logger.debug('Карточка с текстом %s не найдена на Wildberries, возможно, карточка не существует',
                              text)
                 continue
+            await asyncio.sleep(0)
         return cards
 
 
@@ -326,7 +288,7 @@ class ContentApi(ABC_WB_API):
         }
 
         async with aiohttp.ClientSession() as session:
-            response = await self.requests(session, 'POST', url=url,
+            response = await requests(session, 'POST', url=url,
                                                json_data=data_for_req,
                                                headers=self.headers.standart)
             answer = json.loads(response)
@@ -364,7 +326,7 @@ class ContentApi(ABC_WB_API):
             },
         })
         async with aiohttp.ClientSession() as session:
-            response = await self.requests(session, 'POST', url=url, data=data, headers=self.headers.standart)
+            response = await requests(session, 'POST', url=url, data=data, headers=self.headers.standart)
             return json.loads(response)
 
 

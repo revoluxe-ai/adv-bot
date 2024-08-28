@@ -84,11 +84,14 @@ class ShopDataUpdater:
 
 
     async def update_all_data(self):
+        logger.debug(f'Обновление данных для кабинета {self._wb_cabinet.shop_id}')
         wb_api: WBApi = self.wb_api
         advert_api = wb_api.advert
         adv_ids = await advert_api.get_advertIds()
+        logger.debug(f'Получены adv_ids: {len(adv_ids)} штук')
         advs: list[Adv] = await advert_api.get_advs()
         await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet.id)
+        logger.debug(f'Обновление в базе advs завершено')
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()
@@ -98,6 +101,7 @@ class ShopDataUpdater:
             nmids.update(adv.nmids)
         cards = await wb_api.content.get_cards_by_text(nmids)
         await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+        logger.debug(f'Обновление карточек в базе завершено')
 
 
 

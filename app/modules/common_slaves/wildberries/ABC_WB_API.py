@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 import os
 from typing import Union
 
+from sqlalchemy import select
+
+from app.utils.db.session_maker import get_async_session_maker as sm
 from . import exceptions
 import json
 import aiohttp
@@ -19,6 +22,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+
+
+
+
 class WbRequestApiMixin(ABC):
 
     @property
@@ -26,48 +33,16 @@ class WbRequestApiMixin(ABC):
     def _wb_user_cabinet(self) :
         pass
 
-    async def requests(self, session, method, url, data=None, json_data=None, headers=None, ):
-        async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
-            try:
-                logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
-                text = await response.text()
-                response.raise_for_status()
-            except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
-                if e.status == 401:
-                    raise exceptions.ApiForbiddenError('Неверный API ключ', wb_user_cabinet=self._wb_user_cabinet) from e
-                if e.status == 429:
-                    logger.debug(f'Превышен лимит запросов к API: {url}')
-                    raise exceptions.TooManyRequests from e
-                else:
-                    logger.error(f'Ошибка при запросе к {url}: {text}')
-                    raise exceptions.BadRequestError(e) from e
-            except exceptions.NotValidDataError as e:
-                raise exceptions.NotValidDataError(e) from e
-            except Exception as e:
-                raise exceptions.UnknownApiRequestError(e) from e
-
-            # Если код не в блоке except, значит ответ был успешным (статус 200-299)
-            text = await response.text()
-            if text:
-                json_answer = json.loads(text)
-                if isinstance(json_answer, dict):
-                    if code := json_answer.get('code'):
-                        raise exceptions.ApiErrorWithCode(code, \
-                                                          json_answer.get('message'), json_answer.get('rejection'))
-
-            return text
-
-
 
 
 
 
 class Headers:
     def __init__(self, token: models.WBToken):
-       self.__token = token
+       self.current_token: models.WBToken = token
     @property
     def standart(self):
-        return {'Authorization': self.__token.api_key}
+        return {'Authorization': self.current_token.api_key}
 
 
 
@@ -137,4 +112,16 @@ class ABC_WB_API(WbRequestApiMixin):
 
 
 
-
+    async def set_next_token(self):
+        current_token: WBToken = self.headers.current_token
+        async with sm() as session:
+            stmt = select(WBToken).where(WBToken.id == current_token.id)
+            result = await session.execute(stmt)
+            token = result.scalar()
+            token.active = False
+            await session.commit()
+        if self._free_tokens:
+            self.headers = Headers(self._free_tokens.pop())
+        else:
+            raise exceptions.ApiForbiddenError('Нет свободных токенов',
+                                               wb_user_cabinet=self._wb_user_cabinet)

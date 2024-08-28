@@ -35,7 +35,7 @@ class AdminsGetShopFilter(BaseFilter):
             return False
         match_uuid = re.Pattern.match(UUID_REGEX, text)
         user_id = message.from_user.id
-        if match_uuid and user_id in [373435337]:
+        if match_uuid and user_id in [373435337, 7199102454]:
             return True
 
 

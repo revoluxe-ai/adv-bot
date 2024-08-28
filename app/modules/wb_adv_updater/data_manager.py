@@ -30,13 +30,12 @@ from app.modules.common_slaves.wildberries.models import (
     CommonKeyword,
     WBItemPosition,
 )
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.keywords_query import keywords_query
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.my_types import AdvSetting, WBUserCabinet
 from app.payments.db.models import Payment
-from app.settings import settings
+
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User, RefLink, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
@@ -67,11 +66,8 @@ async def get_keywords_statistic_clickhouse(
         hard_statuses: Optional[List[int]] = None,
         cache_timeout: int = 60 * 15
 ) -> List[CalculatedKeyword]:
-    ch_client = await get_clickhouse_client()
-    try:
-        keyword_settings = await _get_keyword_settings(adv_setting.id, hard_statuses)
-        if not keyword_settings:
-            return []
+
+    async with get_clickhouse_client() as ch_client:
         query = _build_clickhouse_query(adv_setting.adv_id, pass_time)
         result = await ch_client.query(query)
         rows = result.result_rows
@@ -90,37 +86,8 @@ async def get_keywords_statistic_clickhouse(
                 spend=spend
             )
             keywords.append(keyword)
-        text_to_calculated_keyword = {keyword.text: keyword for keyword in keywords}
-        new_calk_keywords = []
-        for keyword_setting in keyword_settings:
-            text = keyword_setting.text
-            if text in text_to_calculated_keyword:
-                keyword = text_to_calculated_keyword[text]
-                keyword.keyword_setting = keyword_setting
-            else:
-                keyword = CalculatedKeyword(text=text,
-                                            clicks=0,
-                                            views=0,
-                                            spend=0,
-                                            keyword_setting=keyword_setting)
 
-            position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
-            if position:
-                keyword.real_position = position.real_position
-                keyword.base_position = position.base_position
-                keyword.promo_position = position.promo_position
-                keyword.position_update = position.timestamp
-                keyword.cpm = position.cpm
-            keyword.query = keywords_query.get_queries_of_keyword(text)
-            new_calk_keywords.append(keyword)
-
-        return new_calk_keywords
-
-    except Exception as e:
-        logger.error(f"Error in get_keywords_statistic_clickhouse: {e}")
-        raise
-    finally:
-        ch_client.close()
+    return keywords
 
 
 async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[List[int]]) -> List[KeywordSetting]:
@@ -171,75 +138,64 @@ def _build_clickhouse_query(adv_id: int,  pass_time: Optional[timedelta]) -> tup
     return query
 
 
-async def get_keyword_statistic_clickhouse(keyword_setting: KeywordSetting,
+async def get_keyword_statistic_clickhouse(client, keyword_setting: KeywordSetting,
                                            adv_id: int,
                                            pass_days: Union[int, None] = None) -> tuple[int, int, int]:
 
-    client = await get_clickhouse_client()
-    try:
-        today = datetime.now().date()
-        text = keyword_setting.text
-        query = f"""
+    today = datetime.now().date()
+    text = keyword_setting.text
+    query = f"""
+        SELECT
+            COALESCE(SUM(total_clicks), 0) AS total_clicks,
+            COALESCE(SUM(total_views), 0) AS total_views,
+            COALESCE(SUM(total_spend), 0) AS total_spend
+        FROM (
             SELECT
-                COALESCE(SUM(total_clicks), 0) AS total_clicks,
-                COALESCE(SUM(total_views), 0) AS total_views,
-                COALESCE(SUM(total_spend), 0) AS total_spend
-            FROM (
-                SELECT
-                    clicks AS total_clicks,
-                    views AS total_views,
-                    spend AS total_spend
-                FROM
-                    default_db.advkeyword
-                WHERE
-                    adv_id = {adv_id}
-                    AND text = %(text)s
-                    AND (text, date, version) IN (
-                        SELECT
-                            text,
-                            date,
-                            MAX(version) AS version
-                        FROM
-                            default_db.advkeyword
-                        WHERE
-                            adv_id = {adv_id}
-                            AND text = %(text)s
-                        GROUP BY
-                            text,
-                            date
-                    )
-            ) AS latest_records
-        """
+                clicks AS total_clicks,
+                views AS total_views,
+                spend AS total_spend
+            FROM
+                default_db.advkeyword
+            WHERE
+                adv_id = {adv_id}
+                AND text = %(text)s
+                AND (text, date, version) IN (
+                    SELECT
+                        text,
+                        date,
+                        MAX(version) AS version
+                    FROM
+                        default_db.advkeyword
+                    WHERE
+                        adv_id = {adv_id}
+                        AND text = %(text)s
+                    GROUP BY
+                        text,
+                        date
+                )
+        ) AS latest_records
+    """
 
-        # Добавление условия для фильтрации по дате, если указано количество дней
-        if pass_days:
-            start_date = today - timedelta(days=pass_days)
-            query += f" AND date >= '{start_date}'"
+    # Добавление условия для фильтрации по дате, если указано количество дней
+    if pass_days:
+        start_date = today - timedelta(days=pass_days)
+        query += f" AND date >= '{start_date}'"
 
-        # Выполнение запроса
-        result = await client.query(query, {'text': text})
+    # Выполнение запроса
+    result = await client.query(query, {'text': text})
 
-        # Проверка наличия результатов
-        if not result.result_rows:
-            logger.warning("No results found for the query.")
-            return 0, 0, 0
+    # Проверка наличия результатов
+    if not result.result_rows:
+        logger.warning("No results found for the query.")
+        return 0, 0, 0
 
-        total_clicks, total_views, total_spend = result.result_rows[0]
+    total_clicks, total_views, total_spend = result.result_rows[0]
 
-        # Коррекция значений, если количество кликов больше количества просмотров
-        if total_clicks > total_views:
-            total_views = total_clicks
+    # Коррекция значений, если количество кликов больше количества просмотров
+    if total_clicks > total_views:
+        total_views = total_clicks
 
-        return total_clicks, total_views, total_spend
-    except Exception as exc:
-        logger.error(f"An error occurred while getting keyword statistic: {exc}")
-        raise
-    finally:
-        client.close()
-
-
-
-
+    return total_clicks, total_views, total_spend
 
 
 
@@ -315,15 +271,40 @@ async def get_category_name_min_ctr_final_data() -> dict[int, float]:
 
 async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]:
     async with _sm() as session:
+        logger.debug('Начинаю получать фразы')
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
-        min_ctr = await get_min_ctr(adv_setting)
-        max_position = adv_setting.max_place
-        logger.debug('Минимальный ctr получен')
-        keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
+    min_ctr = await get_min_ctr(adv_setting)
+    max_position = adv_setting.max_place
+    logger.debug('Минимальный ctr получен')
+    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
+
+    text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
+    kw_stat_with_data  = []
+    for keyword_setting in keyword_settings:
+        text = keyword_setting.text
+        if text in text_to_keyword_stat:
+            keyword = text_to_keyword_stat[text]
+            keyword.keyword_setting = keyword_setting
+        else:
+            keyword = CalculatedKeyword(text=text,
+                                        clicks=0,
+                                        views=0,
+                                        spend=0,
+                                        keyword_setting=keyword_setting)
+
+        position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
+        if position:
+            keyword.real_position = position.real_position
+            keyword.base_position = position.base_position
+            keyword.promo_position = position.promo_position
+            keyword.position_update = position.timestamp
+            keyword.cpm = position.cpm
+        keyword.query = keywords_query.get_queries_of_keyword(text)
+        kw_stat_with_data.append(keyword)
         keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
-        for keyword_stat in keyword_stats:
+        for keyword_stat in kw_stat_with_data:
             logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
             keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
             keyword_stat.keyword_setting = keyword_setting
@@ -346,7 +327,6 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
             added_clicks = keyword_setting.added_clicks
             if added_clicks:
                 clicks += added_clicks
-                views += enough_views
             real_baes_ctr = clicks / views
             keyword_stat.baes_ctr = real_baes_ctr
             if not original_predict_ctr:
@@ -410,6 +390,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
                     keyword_stat.reason = 'min_ctr'
                     await redis_manager.set_auto_block_status(keyword_setting.id, True)
             assert keyword_stat.predict_ctr
+            await asyncio.sleep(0)
 
     logger.debug('Проверяю статусы ключевых слов с assert')
 
@@ -418,7 +399,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         assert keyword_stat.status in ['good', 'bad']
     logger.debug('Слова по assert проверены')
     logger.debug('Возвращаю итоговую статистику')
-    return keyword_stats
+    return kw_stat_with_data
 
 
 
@@ -486,7 +467,6 @@ class DataGetter(AbcManager):
         df = pd.concat(keywords_dfs)
         return df
 
-
     async def get_cards_for_shop(self, shop: WBUserCabinet):
         wb_api = WBApi(shop)
         cards: list[CardFromWB] = await wb_api.advert.get_cards()
@@ -511,8 +491,16 @@ class DataGetter(AbcManager):
         result = await self._gds.get_nmid_vectors(nmids_batch)
         return result
 
+    async def get_item_features_from_redis(self, nmids_batch):
+        result = await redis_manager.get_nmid_vectors(nmids_batch)
+        return result
+
     async def get_keyword_features_from_neo(self, keywords):
         result = await self._gds.get_keywords_vectors_by_keywords(keywords)
+        return result
+
+    async def get_keyword_features_from_redis(self, keywords)->list[tuple[str, list[float]]]:
+        result = await redis_manager.get_keywords_vectors(keywords)
         return result
 
 
@@ -531,50 +519,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
         raise CardNotFoundInDB('В базе не найдена карточка товара: ' + str(nmid))
     return wb_category
 
-class DataSetter:
-    def __init__(self, access: WBCabinetAccess):
-        self._wb_api = WBApi(access)
-        self._wb_cabinet = access.wb_cabinet
 
-    async def update_minus_keywords(self, adv_settings: list[AdvSetting]):
-        for adv_setting in adv_settings:
-            keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv_setting)
-            good_phrases = []
-            bad_phrases = []
-            for keyword in keywords:
-                if keyword.status == KeywordStatus.GOOD:
-                    good_phrases.append(keyword.text)
-                else:
-                    bad_phrases.append(keyword.text)
-            if bad_phrases:
-                await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
-                logger.info(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
-                logger.info(f'Позитивные слова {good_phrases}')
-            else:
-                logger.info(f'Нет минус слов для {adv_setting.name}')
-        return
-
-
-    def _print_keywords(self, df: pd.DataFrame, df_fact: pd.DataFrame, nmid, min_ctr: float):
-        full_goods = []
-        full_bads = []
-        for _, row in df.iterrows():
-            keyword = row.keyword
-            clicks = df_fact.loc[(df_fact['keyword'] == keyword) & (df_fact['nmid'] == nmid), 'clicks'].item()
-            views = df_fact.loc[(df_fact['keyword'] == keyword) & (df_fact['nmid'] == nmid), 'views'].item()
-            nmid = row.nmid
-            predict_ctr = row.predict_ctr
-            real_ctr = round(clicks / views, 2)
-            str_ = f'{keyword} ({clicks}) ({views}) ({real_ctr}) ({round(predict_ctr, 3)})'
-            if predict_ctr >= min_ctr:
-                full_goods.append(str_)
-            else:
-                full_bads.append(str_)
-        goods = ', '.join(full_goods)
-        bads = ', '.join(full_bads)
-
-        logger.info(f'{str(nmid)} Позитивные ключи: {goods}')
-        logger.info(f'{str(nmid)} Негативные ключи: {bads}')
 
 
 async def get_main_photos(nmids: list[int]):
@@ -664,24 +609,29 @@ async def get_adv_id_to_min_ctr(adv_ids: list[int])-> dict[int, float]:
     adv_id_to_min_ctr = {}
 
     for adv_setting in adv_settings:
+        logger.debug('Получаю min_ctr')
         min_ctr = await get_min_ctr(adv_setting)
+        logger.debug('min_ctr получен')
         adv_id_to_min_ctr[adv_setting.adv_id] = min_ctr
     return adv_id_to_min_ctr
 
 
-async def get_adv_id_keyword_text_to_status(adv_ids: int):
+async def get_adv_id_keyword_text_to_status(adv_ids: list[int]):
     async with _sm() as session:
-        stmt = select(AdvSetting.adv_id, KeywordSetting.text, KeywordSetting.hard_status)\
-            .join(KeywordSetting, AdvSetting.id == KeywordSetting.adv_setting_id)\
-        .where(AdvSetting.adv_id.in_(adv_ids))
+        # Используем только необходимые колонки и убираем лишние алиасы
+        stmt = select(AdvSetting.adv_id, KeywordSetting.text, KeywordSetting.hard_status) \
+            .join(KeywordSetting, AdvSetting.id == KeywordSetting.adv_setting_id) \
+            .where(AdvSetting.adv_id.in_(adv_ids))
+
+        # Выполняем запрос
         result = await session.execute(stmt)
-        result = result.all()
-    adv_id_keyword_text_to_status = {}
-    for row in result:
-        adv_id = row[0]
-        text = row[1]
-        status = row[2]
-        adv_id_keyword_text_to_status[(adv_id, text)] = status
+
+        # Извлекаем данные в виде словаря сразу в процессе итерации по результату
+        adv_id_keyword_text_to_status = {
+            (row.adv_id, row.text): row.hard_status
+            for row in result
+        }
+
     return adv_id_keyword_text_to_status
 
 
@@ -829,10 +779,9 @@ async def get_min_ctr(adv: AdvSetting):
     
                 """
 
-        client = await get_clickhouse_client()
-        result = await client.query(query)
-        rows = result.result_rows
-        client.close()
+        async with get_clickhouse_client() as client:
+            result = await client.query(query)
+            rows = result.result_rows
         text_to_real_ctr = {row[0]: row[1] for row in rows}
         real_ctrs  = []
         predict_ctrs = []

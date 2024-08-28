@@ -5,15 +5,14 @@ import typing
 from dataclasses import dataclass
 
 import aiohttp
+from aiohttp import ServerTimeoutError
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.client_bot.const import MAX_TOKENS
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from . import exceptions
-from . import api_rights
-from .api_rights import check_token
-from .exceptions import ApiForbiddenError, UnknownApiRequestError
+from .exceptions import ApiForbiddenError, UnknownApiRequestError, NotValidTokenError
 from .models import WBToken, AdvSetting
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
@@ -52,7 +51,6 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
 
-
         for wb_cabinet in wb_cabinets:
             stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id,
                                             AdvSetting.bidder_active == True)
@@ -77,26 +75,7 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
                         continue
                     if token_shop_id != shop_id:
                         continue
-                    try:
-                        await api_rights.check_token(token)
-                        users_live_tokens.append(token)
-                    except ApiForbiddenError as exc:
-                        logger.debug(exc)
-                        token.active = False
-                        await session.commit()
-                        continue
-
-                    except UnknownApiRequestError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    except aiohttp.client_exceptions.ServerDisconnectedError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    except aiohttp.client_exceptions.ClientOSError as e:
-                        logger.error(e)
-                        users_live_tokens.append(token)
-                    finally:
-                        await asyncio.sleep(1)
+                    users_live_tokens.append(token)
                 tokens_for_wb_cabinet.extend(users_live_tokens)
 
             if tokens_for_wb_cabinet:
@@ -107,15 +86,8 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
     return
 
 
-
-
-
-
-
-
-
-async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> typing.AsyncGenerator[WBCabinetAccess, None]:
-    async with sm(semaphore) as session:
+async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess, None]:
+    async with sm() as session:
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
                                           .selectinload(User.wb_tokens))\
@@ -139,30 +111,18 @@ async def get_accesses_for_wb_cabinets(semaphore: asyncio.Semaphore = None)-> ty
                 try:
                     token_shop_id = token.shop_id# Используйте total_clicks для суммы кликов
                 except exceptions.TokenExpiredError:
-                    logger.error('Срок действия токена истек')
-                    continue
-                if token_shop_id != shop_id:
-                    continue
-                try:
-                    await api_rights.check_token(token)
-                    users_live_tokens.append(token)
-                except ApiForbiddenError as exc:
-                    logger.debug(exc)
+                    logger.debug('Срок действия токена истек')
                     token.active = False
                     await session.commit()
                     continue
-
-                except UnknownApiRequestError as e:
-                    logger.error(e)
-                    users_live_tokens.append(token)
-                except aiohttp.client_exceptions.ServerDisconnectedError as e:
-                    logger.error(e)
-                    users_live_tokens.append(token)
-                except aiohttp.client_exceptions.ClientOSError as e:
-                    logger.error(e)
-                    users_live_tokens.append(token)
-                finally:
-                    await asyncio.sleep(1)
+                except NotValidTokenError:
+                    logger.debug('Токен не прошел проверку')
+                    token.active = False
+                    await session.commit()
+                    continue
+                if token_shop_id != shop_id:
+                    continue
+                users_live_tokens.append(token)
             tokens_for_wb_cabinet.extend(users_live_tokens)
 
         if tokens_for_wb_cabinet:
@@ -193,13 +153,6 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCab
     checked_tokens = []
     for token in tokens:
         if token.shop_id == wb_cabinet.shop_id:
-            try:
-                await check_token(token)
-            except exceptions.ApiForbiddenError:
-                logger.debug('ApiForbiddenError')
-                token.active = False
-                await session.commit()
-                continue
             checked_tokens.append(token)
         else:
             continue

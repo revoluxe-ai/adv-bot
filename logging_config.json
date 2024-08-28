@@ -8,51 +8,32 @@
     }
   },
   "handlers": {
-    "my_log_handler": {
-      "class": "my_log_handler.ScriptHandler",
-      "level": "ERROR"
-    },
     "console": {
       "class": "logging.StreamHandler",
       "level": "DEBUG",
       "formatter": "custom",
       "stream": "ext://sys.stdout"
     },
-    "common_file":{
-        "class": "logging.handlers.RotatingFileHandler",
-        "level": "DEBUG",
-        "formatter": "custom",
-        "filename": "logs/common.log",
-        "mode": "a",
-        "encoding": "utf-8",
-        "maxBytes": 10485760,
-        "backupCount": 5
+    "error_to_file": {
+      "class": "logging.handlers.RotatingFileHandler",
+      "level": "ERROR",
+      "formatter": "custom",
+      "filename": "logs/errors.log",
+      "mode": "a",
+      "encoding": "utf-8",
+      "maxBytes": 10485760,
+      "backupCount": 5
     },
-
-
-   "error_to_file": {
-        "class": "logging.handlers.RotatingFileHandler",
-        "level": "ERROR",
-        "formatter": "custom",
-        "filename": "logs/errors.log",
-        "mode": "a",
-        "encoding": "utf-8",
-        "maxBytes": 10485760,
-        "backupCount": 5
-    }
-  },
-
-
-    "app.modules.wb_keywords_parser.parser": {
+    "journal": {
+      "class": "logging.handlers.SysLogHandler",
       "level": "DEBUG",
-      "handlers": ["common_file"]
-    },
-
-
+      "formatter": "custom",
+      "address": "/dev/log"
+    }
+ 
+  },
   "root": {
     "level": "DEBUG",
-    "handlers": ["console", "error_to_file", "common_file", "my_log_handler"]
+    "handlers": ["journal"]
   }
 }
-
-

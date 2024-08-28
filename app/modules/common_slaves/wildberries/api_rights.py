@@ -1,8 +1,14 @@
 import asyncio
 import datetime
+from .http_request import requests, try_except_decorator
+from aiohttp import ClientTimeout
+
 from app.utils import redis_manager
-from aiocache import cached_stampede
+
 from asyncio import Lock
+
+
+
 class OnlyRead:
     TRUE = True
     FALSE = False
@@ -27,11 +33,16 @@ class Rights:
 import aiohttp
 import logging
 from .exceptions import ApiForbiddenError, UnknownApiRequestError, TooManyRequests, BadRequestError
-from .ABC_WB_API import ABC_WB_API, WbRequestApiMixin, Headers
+from .ABC_WB_API import WbRequestApiMixin, Headers
 
 logger = logging.getLogger(__name__)
 
-
+timeout = aiohttp.ClientTimeout(
+    total=3,  # Общий таймаут для запроса
+    connect=2,  # Таймаут для подключения
+    sock_read=2,  # Таймаут для чтения сокета
+    sock_connect=2  # Таймаут для соединения сокета
+)
 
 
 
@@ -54,15 +65,19 @@ class TokenRightChecker(WbRequestApiMixin):
      def _rights(self) -> set[str]:
          return {Rights.CONTENT, Rights.PROMOTION}
 
-
+     @try_except_decorator(1, 1, max_attempts=50, max_delay=120)
      async def adverts(self):
+        logger.debug('Проверка прав на рекламу')
         url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
 
-        async with aiohttp.ClientSession() as session:
-             await self.requests(session, 'GET', url, headers=self.headers.standart)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+              await requests(session, 'GET', url, headers=self.headers.standart)
+        logger.debug('Проверка прав на рекламу завершена')
 
 
+     @try_except_decorator(1, 1, max_attempts=50, max_delay=120)
      async def content(self):
+        logger.debug('Проверка прав на контент')
         limit = 1
         url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
         data_for_req = {
@@ -78,31 +93,38 @@ class TokenRightChecker(WbRequestApiMixin):
                 }
             }
         }
-
         async with aiohttp.ClientSession() as session:
-            await self.requests(session, 'POST',  url, json_data=data_for_req,
-                                        headers=self.headers.standart)
+            await requests(
+                session,
+                'POST',
+                url,
+                json_data=data_for_req,
+                headers=self.headers.standart
+            )
 
-
-
-
+        logger.debug('Проверка прав на контент завершена')
 
 
 async def check_token(token):
     hash_token = hash(token)
     logger.debug('Проверка прав на токен')
     check = await redis_manager.get_token_rights(hash_token)
+    logger.debug(f'Данные о проверке из Redis: {check}')
     if check:
         logger.debug('Права на токен уже проверены')
         return
     try:
+        logger.debug('Проверка прав на токен')
         expire = token.expires
         if expire < datetime.datetime.now():
             raise ApiForbiddenError('Токен просрочен')
         async with locker:
+            logger.debug('Проверка прав на в чекере')
             checker = TokenRightChecker(token)
             await asyncio.gather(checker.adverts(), checker.content())
+            logger.debug('Проверка прав на токен завершена')
         await redis_manager.set_token_rights(hash_token, timeout=60*60)
+        logger.debug('Права на токен сохранены в Redis')
     except ApiForbiddenError as exc:
         logger.debug(f'Токен отозван')
         raise exc
