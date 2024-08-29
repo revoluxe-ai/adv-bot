@@ -5,7 +5,10 @@ import dask.dataframe as dd
 import faiss
 import joblib
 import numpy as np
+from asyncpg import ProgramLimitExceededError
 from sqlalchemy import not_
+from sqlalchemy.dialects.postgresql import asyncpg
+
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
@@ -433,12 +436,16 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
     async with sm() as session:
         # Обработка данных порциями
         for keyword in keyword_settings:
-            check_by_black_list_template = await data_manager.check_by_black_list_template(keyword.text, adv_setting.id)
-            if check_by_black_list_template:
-                keyword.hard_status = 0
-            session.add(keyword)
-            await session.commit()
-            await asyncio.sleep(0)
+            try:
+                check_by_black_list_template = await data_manager.check_by_black_list_template(keyword.text, adv_setting.id)
+                if check_by_black_list_template:
+                    keyword.hard_status = 0
+                session.add(keyword)
+                await session.commit()
+            except ProgramLimitExceededError:
+                logger.error('Ошибка добавления ключей в postgres', exc_info=True)
+            finally:
+                await asyncio.sleep(0)
 
     await update_keywords_stat_in_click_house(client, keywords, adv_setting)
     return
