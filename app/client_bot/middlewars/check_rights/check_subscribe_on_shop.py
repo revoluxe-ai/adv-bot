@@ -36,9 +36,13 @@ class CheckSubscribeOnShop(BaseMiddleware):
                 result = await session.execute(stmt)
                 wb_cabinet: WBCabinet = result.scalar()
             if wb_cabinet:
+                if not (balance := wb_cabinet.balance):
+                    balance = 0
+                if not (bonus := wb_cabinet.bonus):
+                    bonus = 0
                 if all([wb_cabinet.expiration_time < datetime.datetime.now(),
-                wb_cabinet.bonus <= 0,
-                wb_cabinet.balance <= 0]):
+                bonus <= 0,
+                balance <= 0]):
                     await messages.ExpiredSubscription(bot,
                                                        event.message.chat.id,
                                                        wb_cabinet.id)()
