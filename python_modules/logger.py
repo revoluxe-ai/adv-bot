@@ -5,8 +5,7 @@ import textwrap
 import platform
 
 system_name = platform.system()
-
-
+print(system_name)
 
 
 class CustomFormatter(logging.Formatter):
