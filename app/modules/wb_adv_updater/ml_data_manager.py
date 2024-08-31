@@ -171,6 +171,8 @@ async def update_wb_adv_phrase_in_db_bot_active():
         query = 'SELECT DISTINCT text FROM default_db.advkeyword'
         result = await ch_client.query(query)
         texts = result.result_rows
+        clusters_texts = await redis_manager.get_all_cluster_names()
+        texts += clusters_texts
         for text in texts:
             text = text[0]
             text = text.replace('_', ' ')

@@ -1,5 +1,5 @@
 import json
-import datetime
+from dataclasses import dataclass
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
                         BIGINT, Boolean, Float, DateTime, text)
@@ -212,6 +212,7 @@ class AdvSetting(BaseTable):
     max_cpm = mapped_column(Integer, nullable=True)
     max_place = mapped_column(Integer, nullable=True)
     min_block_position = mapped_column(Integer, nullable=True, default=0)
+    clusters_mode = mapped_column(Boolean, nullable=True, default=False)
 
 
 
@@ -246,24 +247,21 @@ class KeywordSetting(BaseTable):
 
 
 
-class CommonKeyword(BaseTable):
+class CommonKeyword:
     wb_item_positions = relationship('WBItemPosition', back_populates='keyword')
     text = mapped_column(String)
     last_full_update = mapped_column(DateTime, default=datetime.datetime.utcnow)
 
-
-class WBItemPosition(BaseTable):
-    keyword_id = mapped_column(ForeignKey('commonkeyword.id'))
-    keyword = relationship(CommonKeyword, back_populates='wb_item_positions')
-    nmid = mapped_column(Integer)
-    base_position: Mapped[int] = mapped_column(Integer)
-    real_position: Mapped[int] = mapped_column(Integer)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    promo_position: Mapped[int] = mapped_column(Integer, nullable=True)
-    cpm: Mapped[int] = mapped_column(Integer, nullable=True)
-    adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
-    keyword_text = mapped_column(String, nullable=False)
-
+@dataclass
+class WBItemPosition:
+    nmid: Integer = None
+    base_position: Integer = None
+    real_position: int = None
+    timestamp:  DateTime = None
+    promo_position: Integer = None
+    cpm: Integer = None
+    adv_id: Integer = None
+    keyword_text: String = None
 
     def to_dict(self):
         timestamp: datetime = self.timestamp

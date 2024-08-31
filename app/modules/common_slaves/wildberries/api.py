@@ -207,6 +207,22 @@ class AdvertApi(ABC_WB_API):
                 raise
         return
 
+    @try_except_decorator(1, 2)
+    async def get_clusters_for_adv(self, adv: AdvSetting):
+        url = f'https://advert-api.wildberries.ru/adv/v2/auto/stat-words?id={adv.adv_id}'
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(session, 'GET', url,
+                                                headers=self.headers.standart)
+            if response_text:
+                answer = json.loads(response_text)
+                return answer
+            else:
+                return {}
+
+
+
+
+
 
 class ContentApi(ABC_WB_API):
     _only_read = api_rights.OnlyRead.FALSE

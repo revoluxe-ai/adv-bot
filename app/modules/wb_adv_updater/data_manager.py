@@ -269,41 +269,142 @@ async def get_category_name_min_ctr_final_data() -> dict[int, float]:
 
 
 
+def __sort_by_update_keyword(keyword: WBItemPosition):
+    if not (update := keyword.timestamp):
+        update = datetime.now() - timedelta(days=1000)
+    return update
+
+
+async def  set_position(keyword_stat: CalculatedKeyword,
+                        adv_setting: AdvSetting) -> CalculatedKeyword:
+    keyword_cluster_name = await redis_manager.get_cluster_name(keyword_stat.text)
+    position = await redis_manager.get_keyword_position(keyword_cluster_name,
+                                                        adv_setting.nmids[0])
+    if position:
+        base_position = position.base_position
+        promo_position = position.promo_position
+        real_position = position.real_position
+        keyword_stat.base_position = base_position
+        keyword_stat.promo_position = promo_position
+        keyword_stat.real_position = real_position
+        keyword_stat.cpm = position.cpm
+
+    else:
+        keywords = keyword_stat.childs_keywords
+        if keywords:
+            texts = [kw.text for kw in keywords]
+            positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+            if positions:
+                position = max(positions, key=lambda kw: __sort_by_update_keyword(kw))
+                base_position = position.base_position
+                promo_position = position.promo_position
+                real_position = position.real_position
+                keyword_stat.base_position = base_position
+                keyword_stat.promo_position = promo_position
+                keyword_stat.real_position = real_position
+                keyword_stat.cpm = position.cpm
+
+    return keyword_stat
+
+async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
+
+    cluster_name_to_keywords = defaultdict(list)
+
+    for keyword in keyword_stats:
+        text = keyword.text
+        cluster_name = await redis_manager.get_cluster_name(text)
+        if not cluster_name:
+            cluster_name = text
+        else:
+            print(cluster_name, text)
+        cluster_name_to_keywords[cluster_name].append(keyword)
+    print(cluster_name_to_keywords)
+
+    keyword_stats = []
+
+    for keyword_cluster_name in cluster_name_to_keywords:
+        keywords = cluster_name_to_keywords[keyword_cluster_name]
+        views = sum([keyword.views for keyword in keywords])
+        clicks = sum([keyword.clicks for keyword in keywords])
+        spend = sum([keyword.spend for keyword in keywords])
+        query = sum([keyword.query if isinstance(keyword.query, int) else 0  for keyword in keywords])
+        cluster_keyword = CalculatedKeyword(text=keyword_cluster_name,
+                                            views=views,
+                                            clicks=clicks,
+                                            spend=spend
+                                            )
+        cluster_keyword.query = query if query else "<50"
+        cluster_keyword.childs_keywords = keywords
+        keyword_stats.append(cluster_keyword)
+
+    return keyword_stats
+
+
+
 async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]:
+    min_ctr = await get_min_ctr(adv_setting)
+    max_position = adv_setting.max_place
+    logger.debug('Минимальный ctr получен')
+    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
     async with _sm() as session:
         logger.debug('Начинаю получать фразы')
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
-    min_ctr = await get_min_ctr(adv_setting)
-    max_position = adv_setting.max_place
-    logger.debug('Минимальный ctr получен')
-    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
-    text_to_keyword_stat = {keyword_stat.text: keyword_stat for keyword_stat in keyword_stats}
-    kw_stat_with_data  = []
+    texts_to_keyword_setting = {kws.text: kws for kws in keyword_settings}
+    if adv_setting.clusters_mode:
+        keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
+    keyword_stats = [await set_position(kw, adv_setting) for kw in keyword_stats]
+    async with _sm() as session:
+        for keyword_stat in keyword_stats:
+            cluster_name = keyword_stat.text
+            if not (keyword_setting := texts_to_keyword_setting.get(cluster_name)):
+                clusters = keyword_stat.childs_keywords
+                stat_hard_statuses = defaultdict(int)
+                for kw in clusters:
+                    original_text = kw.text
+                    if not (keyword_setting := texts_to_keyword_setting.get(original_text)):
+                        continue
+                    hard_status = keyword_setting.hard_status
+                    stat_hard_statuses[hard_status] += 1
+                result_hard_status = max(stat_hard_statuses.items(), key=lambda x: x[1])[0]
+                keyword_setting = KeywordSetting()
+                keyword_setting.text = cluster_name
+                keyword_setting.adv_setting = adv_setting
+                keyword_setting.hard_status = result_hard_status
+                session.add(adv_setting)
+                session.add(keyword_setting)
+                await session.commit()
+            keyword_stat.keyword_setting = keyword_setting
+
+
+    texts_in_keyword_stat = {kw.text for kw in keyword_stats}
+    text_to_keyword_setting = {kw.text: kw for kw in keyword_settings}
+
+
     for keyword_setting in keyword_settings:
         text = keyword_setting.text
-        if text in text_to_keyword_stat:
-            keyword = text_to_keyword_stat[text]
-            keyword.keyword_setting = keyword_setting
-        else:
+        if text not in texts_in_keyword_stat and keyword_setting.hard_status == 2:
+            keyword_setting = text_to_keyword_setting[text]
+
             keyword = CalculatedKeyword(text=text,
-                                        clicks=0,
-                                        views=0,
-                                        spend=0,
-                                        keyword_setting=keyword_setting)
-        position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
-        if position:
-            keyword.real_position = position.real_position
-            keyword.base_position = position.base_position
-            keyword.promo_position = position.promo_position
-            keyword.position_update = position.timestamp
-            keyword.cpm = position.cpm
-        keyword.query = keywords_query.get_queries_of_keyword(text)
-        kw_stat_with_data.append(keyword)
+                                            clicks=0,
+                                            views=0,
+                                            spend=0,
+                                            keyword_setting=keyword_setting)
+            position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
+            if position:
+                keyword.real_position = position.real_position
+                keyword.base_position = position.base_position
+                keyword.promo_position = position.promo_position
+                keyword.position_update = position.timestamp
+                keyword.cpm = position.cpm
+            keyword.query = keywords_query.get_queries_of_keyword(text)
+            keyword_stats.append(keyword)
+
     keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
 
-    for keyword_stat in kw_stat_with_data:
+    for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
         keyword_stat.keyword_setting = keyword_setting
@@ -405,7 +506,7 @@ async def get_good_bad_phrases(adv_setting: AdvSetting)->list[CalculatedKeyword]
         assert keyword_stat.status in ['good', 'bad']
     logger.debug('Слова по assert проверены')
     logger.debug('Возвращаю итоговую статистику')
-    return kw_stat_with_data
+    return keyword_stats
 
 
 

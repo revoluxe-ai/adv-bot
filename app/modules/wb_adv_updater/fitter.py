@@ -122,6 +122,17 @@ async def _get_df_for_fit() -> pd.DataFrame:
 
                     keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
 
+                    keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
+
+                    in_clusters = {kw.text for kw in keyword_stats}
+
+                    clear_keyword_stat = []
+                    for keyword_stat in keyword_stats:
+                        if keyword_stat.text not in in_clusters:
+                             clear_keyword_stat.append(keyword_stat)
+
+                    keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
+
                     for keyword_stat in keyword_stats:
                         keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
                         if keyword_features:
