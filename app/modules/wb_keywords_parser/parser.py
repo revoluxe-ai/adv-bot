@@ -252,7 +252,8 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
             await redis_manager.add_positions_to_redis(positions)
             logger.debug('Записали позиции в Редис')
             for position in positions:
-                need_nmids.discard(position.nmid)
+                nmid: int = position.nmid
+                need_nmids.discard(nmid)
         if not need_nmids:
             break
     else:
@@ -269,7 +270,7 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
                 cpm=0
             )
             not_found_positions.append(position)
-            await redis_manager.add_positions_to_redis(not_found_positions)
+        await redis_manager.add_positions_to_redis(not_found_positions)
 
 semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
 
