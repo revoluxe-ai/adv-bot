@@ -980,7 +980,6 @@ async def clear_cards_in_db(nmids: list[int]):
 
 
 async def get_phrases_for_parsing(semaphore = None):
-    pass_text = set()
     async with _sm(semaphore) as session:
         stmt = select(AdvSetting).where(
             AdvSetting.parsing_active == True)
@@ -992,9 +991,8 @@ async def get_phrases_for_parsing(semaphore = None):
                 keywords = await get_good_bad_phrases(adv)
             except NotItemsInAdvSetting:
                 continue
+            keywords = await convert_keyword_stats_in_clusters(keywords)
             for keyword in keywords:
-                if keyword.status == 'bad':
-                    continue
                 text = keyword.text
                 stmt = select(AdvSetting)\
                 .join(KeywordSetting)\
@@ -1004,7 +1002,6 @@ async def get_phrases_for_parsing(semaphore = None):
                 need_adv_settinds_for_this_phrase = result.unique().scalars().all()
                 need_nmids = set([nmid for adv in need_adv_settinds_for_this_phrase for nmid in adv.nmids])
                 yield text, need_nmids
-                pass_text.add(text)
 
 
 async def get_last_updated_phrases(all_white_phrases):
