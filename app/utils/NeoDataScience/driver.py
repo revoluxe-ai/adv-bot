@@ -6,11 +6,15 @@ import yaml
 
 from collections import defaultdict
 from neo4j import AsyncGraphDatabase
+from sqlalchemy import select, distinct, func
+
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordPhrase
-from app.modules.common_slaves.wildberries.models import WBCard, WBCategory
-from app.utils import redis_manager
+from app.modules.common_slaves.wildberries.models import WBCard, WBCategory, KeywordSetting, AdvSetting
+from app.utils import redis_manager, text_cleaner
 from python_modules.path_setting_funcs import get_setting_path
+from app.utils.db.session_maker import get_async_session_maker as sm
+
 
 logger = logging.getLogger(__name__)
 
@@ -1183,9 +1187,48 @@ UNWIND phrase.words AS word
             await asyncio.sleep(0)
 
     async def __update_keywords_vectors(self):
+        batch_size = 1000  # Определите размер порции
+        offset = 0
         while True:
+            pass_texts = set()
             try:
-                await self._update_keywords_vectors_in_redis()
+                async with sm() as session:
+                    # Сначала подсчитайте общее количество записей
+                    count_stmt = select(func.count()).select_from(
+                        select(distinct(KeywordSetting.text)).join(KeywordSetting.adv_setting).where(
+                            AdvSetting.active_status.in_(['started'])
+                        )
+                    )
+                    total_count_result = await session.execute(count_stmt)
+                    total_count = total_count_result.scalar_one()
+                    logger.debug(f'Всего {total_count} кампаний')
+
+                    # Если обработали все данные, выйдите из цикла
+                    if offset >= total_count:
+                        break
+
+                    # Получите следующую порцию данных
+                    stmt = select(distinct(KeywordSetting.text)).join(
+                        KeywordSetting.adv_setting
+                    ).where(
+                        AdvSetting.active_status.in_(['started'])
+                    ).offset(offset).limit(batch_size)
+
+                    need_keywords_texts_result = await session.execute(stmt)
+                    need_keywords_texts = need_keywords_texts_result.scalars().all()
+
+                    clear_neend_texts = []
+                    for text in need_keywords_texts:
+                        if text in pass_texts:
+                            continue
+                        pass_texts.add(text)
+                        text = text_cleaner.clear(text)
+                        clear_neend_texts.append(text)
+                    need_keywords_texts = clear_neend_texts
+                    await self._update_keywords_vectors_in_redis(need_keywords_texts)
+                    # Увеличьте смещение для следующей порции
+                    offset += batch_size
+
             except Exception as exc:
                 logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
 
@@ -1221,27 +1264,30 @@ UNWIND phrase.words AS word
             except Exception as exc:
                 logger.error(f'Ошибка при записи вектора товара в Redis: {exc}', exc_info=True)
 
-    async def _update_keywords_vectors_in_redis(self):
+    async def _update_keywords_vectors_in_redis(self, need_keywords_texts: list[str]):
         query = """
         MATCH (k:KeywordPhrase)
         WHERE k.fastrp IS NOT NULL
+        AND k.text IN $need
         RETURN k.text as keyword, k.fastrp as vector
         """
 
-        async def get_keywords_vectors(tx, query):
-            result = await tx.run(query)
+        async def get_keywords_vectors(tx, query, need_keywords_texts):
+            result = await tx.run(query, need = need_keywords_texts)
             records = await result.data()
             return records
 
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                records = await session.read_transaction(get_keywords_vectors, query)
+                records = await session.read_transaction(get_keywords_vectors, query, need_keywords_texts)
 
         for record in records:
             keyword = record['keyword']
             vector = record['vector']
             try:
+                logger.debug('Начинаю писать вектор ключа в редис')
                 await redis_manager.set_keyword_vector(keyword, vector)
+                logger.debug('Записал вектор ключа в редис')
             except Exception as exc:
                 logger.error(f'Ошибка при записи вектора ключевой фразы в Redis: {exc}')
 
