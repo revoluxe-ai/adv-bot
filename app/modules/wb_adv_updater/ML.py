@@ -125,8 +125,9 @@ class Predictor:
                     views += enough_views
                 real_ctr = clicks / views
                 predict_ctr = (real_ctr + predict_ctr) / 2
-                # Создаем задачи для асинхронного обновления Redis
+                logger.debug('Начинаю запись predict ctr в redis')
                 await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+                logger.debug('Записали прогноз в redis')
             except Exception as exc:
                 logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
 
@@ -143,12 +144,16 @@ class Predictor:
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
         try:
+            logger.debug('Начинаю получать DF  для предсказаний')
             df_for_predict = await self._get_df_for_predict(all_adv_settings)
+            logger.debug('Получили DF для предсказаний')
         except Exception as exc:
             logger.error(f'Ошибка при получении данных для предсказания: {exc}', exc_info=True)
             raise exc
         try:
+            logger.debug('Начинаю предсказание')
             predict_df: pd.DataFrame = await asyncio.to_thread(self._predict, df_for_predict)
+            logger.debug('Предсказания получены')
         except Exception as exc:
             logger.error(f'Ошибка при предсказании: {exc}', exc_info=True)
             raise exc
