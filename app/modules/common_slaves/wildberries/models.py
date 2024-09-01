@@ -254,14 +254,14 @@ class CommonKeyword:
 
 @dataclass
 class WBItemPosition:
-    nmid: Integer = None
-    base_position: Integer = None
+    nmid: int = None
+    base_position: int = None
     real_position: int = None
-    timestamp:  DateTime = None
-    promo_position: Integer = None
-    cpm: Integer = None
-    adv_id: Integer = None
-    keyword_text: String = None
+    timestamp:  datetime = None
+    promo_position: int = None
+    cpm: int = None
+    adv_id: int = None
+    keyword_text: str = None
 
     def to_dict(self):
         timestamp: datetime = self.timestamp
