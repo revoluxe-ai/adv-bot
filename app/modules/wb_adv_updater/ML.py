@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting,  KeywordSetting, WBCabinet
 from . import data_manager, fitter
-from ...utils import redis_manager
+from ...utils import redis_manager, text_cleaner
 from ...utils.click_house.client import get_clickhouse_client
 
 sm = get_async_session_maker
@@ -236,7 +236,7 @@ class Predictor:
            if not avg_item_features:
                  logger.debug('Нет item_features: %s', adv.name)
                  continue
-           clear_keywords = [keyword.text.replace('_', ' ') for keyword in adv.keyword_settings]
+           clear_keywords = [text_cleaner.clear(keyword.text) for keyword in adv.keyword_settings]
            # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
            keyword_features_result = await self.get_keyword_features(clear_keywords)
            keyword_features_result = {row[0]: row[1] for row in keyword_features_result}
