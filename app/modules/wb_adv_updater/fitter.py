@@ -172,7 +172,10 @@ async def _bayesian_apply(df: pd.DataFrame):
         clicks = row['clicks']
         views = row['views']
         adv_id = row['adv_id']
-        status = adv_id_keyword_text_to_status[(adv_id, row['keyword'])]
+        try:
+            status = adv_id_keyword_text_to_status[(adv_id, row['keyword'])]
+        except KeyError:
+            status = 1
         if status == 0:
             return 0
         elif status in [2, 3]:
