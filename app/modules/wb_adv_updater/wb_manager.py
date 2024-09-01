@@ -366,7 +366,7 @@ async def update_keywords_in_advs():
                         logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}',
                                      exc_info=True)
                     del update_tasks[wb_cabinet_id]
-        await asyncio.sleep(15*60)
+            await asyncio.sleep(0)
 
 
 
