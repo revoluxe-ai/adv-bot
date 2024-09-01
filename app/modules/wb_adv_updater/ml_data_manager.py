@@ -170,11 +170,13 @@ async def update_wb_adv_phrase_in_db_bot_active():
     async with get_clickhouse_client() as ch_client:
         query = 'SELECT DISTINCT text FROM default_db.advkeyword'
         result = await ch_client.query(query)
-        texts = result.result_rows
-        clusters_texts = await redis_manager.get_all_cluster_names()
-        texts += clusters_texts
+        texts =[text[0] for text in result.result_rows]
+        clusters = set()
         for text in texts:
-            text = text[0]
+            cluster = await redis_manager.get_cluster_name(text)
+            clusters.add(cluster)
+        texts = list(clusters) + cluster
+        for text in texts:
             text = text.replace('_', ' ')
             text = text.replace(',', '.')
             hash_text = get_text_hash(text)
