@@ -135,6 +135,7 @@ class Predictor:
 
 
     async def predict_ctr_for_keywords(self):
+        logger.debug('Начинаю получать кампании для формирования DF для предсказаний')
         async with sm() as session:
             stmt = select(AdvSetting).options(
                 selectinload(AdvSetting.adv_keywords),
