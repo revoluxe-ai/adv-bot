@@ -103,7 +103,8 @@ async def _get_df_for_fit() -> pd.DataFrame:
         # Основной запрос
         stmt = select(AdvSetting).options(
             selectinload(AdvSetting.wb_cabinet)
-        ).where(subquery, AdvSetting.type == 8)\
+        ).where(subquery, AdvSetting.type == 8,
+                AdvSetting.active_status.in_(['pause', 'started']))\
 
         result = await session.execute(stmt)
         adv_settings = result.scalars().yield_per(100)
