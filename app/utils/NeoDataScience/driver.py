@@ -1172,15 +1172,29 @@ UNWIND phrase.words AS word
                 result = await session.read_transaction(check_phrase, query, text)
         return result
 
+
+
+    async def __update_items_vectors(self):
+        while True:
+            try:
+                await self._update_items_vectors_in_redis()
+            except Exception as exc:
+                logger.error(f'Ошибка при обновлении векторов товаров в Redis: {exc}', exc_info=True)
+            await asyncio.sleep(0)
+
+    async def __update_keywords_vectors(self):
+        while True:
+            try:
+                await self._update_keywords_vectors_in_redis()
+            except Exception as exc:
+                logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
+
+
+
     async def update_vectors_in_redis(self):
-        try:
-            await self._update_items_vectors_in_redis()
-        except Exception as exc:
-            logger.error(f'Ошибка при обновлении векторов товаров в Redis: {exc}', exc_info=True)
-        try:
-            await self._update_keywords_vectors_in_redis()
-        except Exception as exc:
-            logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
+        await asyncio.gather(self.__update_items_vectors(),
+                             self.__update_keywords_vectors())
+
 
 
     async def _update_items_vectors_in_redis(self):
