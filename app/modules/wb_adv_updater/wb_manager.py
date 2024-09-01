@@ -326,6 +326,7 @@ async def update_predict_ctr():
     predictor = Predictor()
     while True:
         try:
+            logger.debug('Начинаю прогноз CTR')
             await predictor.predict_ctr_for_keywords()
         except Exception as exc:
             logger.error(f'Ошибка предсказания CTR {exc}')
