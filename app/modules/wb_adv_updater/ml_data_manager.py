@@ -167,15 +167,22 @@ async def get_phrase_data(text):
 async def update_wb_adv_phrase_in_db_bot_active():
     batch_size = 100
     phrase_data_list = []
+    async with sm() as session:
+        stmt = select(AdvSetting.adv_id)\
+        .where(AdvSetting.active_status.in_(['started', 'pause']),
+               AdvSetting.bot_active is False)
+        result = await session.execute(stmt)
+        adv_ids = result.scalars().all()
+
     async with get_clickhouse_client() as ch_client:
-        query = 'SELECT DISTINCT text FROM default_db.advkeyword'
+        query = f'SELECT DISTINCT text FROM default_db.advkeyword WHERE adv_id IN {adv_ids}'
         result = await ch_client.query(query)
         texts =[text[0] for text in result.result_rows]
         clusters = set()
         for text in texts:
             cluster = await redis_manager.get_cluster_name(text)
             clusters.add(cluster)
-        texts = list(clusters) + cluster
+        texts = list(clusters) + texts
         for text in texts:
             text = text.replace('_', ' ')
             text = text.replace(',', '.')
