@@ -117,7 +117,7 @@ class Parser:
         first_place = page*100 - 99
         products = await self.__parse_keywords_from_wb(text, page)
         if not products:
-            return []
+            return None
         positions = []
         for place_on_page, product in enumerate(products):
             nmid = product['id']
@@ -247,6 +247,8 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
     global done_count
     for page in range(1, 100):
         positions = await parser.parse_keywords_from_wb(text, page)
+        if not positions:
+            continue
         logger.debug(f'Найдено {len(positions)}')
         positions = [position for position in positions if position.nmid in need_nmids]
         logger.debug(f'После фильтра осталось {len(positions)}')
