@@ -85,7 +85,10 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
         stmt = select(WBCard).where(WBCard.nmid.in_(all_nmids))
         wbcards: list[WBCard] = await session.stream(stmt)
         async for wbcard in wbcards.scalars():
-            check_in_neo = await gds.check_wb_card_in_neo(wbcard.nmid)
+            try:
+                 check_in_neo = await gds.check_wb_card_in_neo(wbcard.nmid)
+            except Exception:
+                logger.debug('Ошибка чека карты в neo', exc_info=True)
             if check_in_neo:
                 continue
             try:
@@ -114,7 +117,7 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
 
 async def update_cards_in_graph_for_shops_big_cycle():
     async with sm() as session:
-        stmt = select(AdvSetting)
+        stmt = select(AdvSetting).where(AdvSetting.active_status == 'pause')
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
     await __update_cards_in_graph_for_shops(adv_settings)
@@ -210,7 +213,7 @@ async def update_wb_adv_phrase_in_db_bot_active():
     if phrase_data_list:
         await gds.add_keyword_phrase(phrase_data_list)
         await asyncio.sleep(0)
-
+    pass
 
 async def update_wb_adv_phrase_in_db():
     while True:
