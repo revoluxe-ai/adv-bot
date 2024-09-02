@@ -1295,7 +1295,7 @@ UNWIND phrase.words AS word
 
     async def check_wb_card_in_neo(self, nmid):
         query = """
-        MATCH (item:Item {nmid: $nmid})
+        MATCH (item:Item) WHERE item.nmid = $nmid
         RETURN item.nmid as nmid
         """
 
