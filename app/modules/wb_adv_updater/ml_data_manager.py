@@ -101,8 +101,11 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                 vector = await asyncio.to_thread(image_master.get_vector, pil_image)
                 dhash = await asyncio.to_thread(image_tools.dhash, pil_image)
                 logger.debug(f"Обновляем карточку: {wbcard.name}")
-                await gds.update_wb_card(wbcard, characteristics_word, dhash,
+                try:
+                     await gds.update_wb_card(wbcard, characteristics_word, dhash,
                                          vector)  # Подтверждение изменений в базе данных
+                except Exception:
+                    logger.error(f'Ошибка обновления карточки:  {wbcard.nmid}')
             except KeyError as exc:
                 if exc.args[0] == 'photos':
                     logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
