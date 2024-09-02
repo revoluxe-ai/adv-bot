@@ -218,7 +218,10 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
     pass
 
 async def update_wb_adv_phrase_in_db():
-    await update_wb_adv_phrase_in_neo_small_cycle()
-
-
+    while True:
+       try:
+           await update_wb_adv_phrase_in_neo_small_cycle()
+       except:
+           logger.error('Ошибка обновления фраз в neo')
+       await asyncio.sleep(0)
 
