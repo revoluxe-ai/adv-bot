@@ -248,7 +248,7 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
     for page in range(1, 100):
         positions = await parser.parse_keywords_from_wb(text, page)
         if not positions:
-            continue
+            break
         logger.debug(f'Найдено {len(positions)}')
         positions = [position for position in positions if position.nmid in need_nmids]
         logger.debug(f'После фильтра осталось {len(positions)}')
