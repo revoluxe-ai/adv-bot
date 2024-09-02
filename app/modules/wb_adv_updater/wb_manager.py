@@ -425,7 +425,7 @@ async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
                 keyword_text = keyword_text.strip().lower()
                 await redis_manager.set_keyword_cluster(keyword_text, cluster_name)
     except Exception as e:
-        logger.error(f'Error getting clusters for adv {adv.id}: {e}', exc_info=True)
+        logger.debug(f'Error getting clusters for adv {adv.id}: {e}', exc_info=True)
         return
 
 
