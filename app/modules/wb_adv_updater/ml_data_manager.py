@@ -185,11 +185,12 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
         for text in texts:
             clear_text = text_cleaner.clear(text)
             clear_texts.add(clear_text)
-            cluster = await redis_manager.get_cluster_name(clear_text)
-            logger.debug(f'Имя кластера: {cluster}')
-            if cluster:
-               clear_texts.add(cluster)
-               logger.debug(f'Добавили кластер {cluster}')
+        logger.debug('Получаем кластеры')
+        clusters = await redis_manager.get_all_cluster_names()
+        logger.debug(f'Кластеры получены, всего {len(clusters)}')
+        for cluster in clusters:
+            cluster = text_cleaner.clear(cluster)
+            clear_texts.add(cluster)
         texts = clear_texts
         for text in texts:
             hash_text = get_text_hash(text)
