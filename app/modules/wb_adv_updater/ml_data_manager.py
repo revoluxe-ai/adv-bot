@@ -184,20 +184,19 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
         clear_texts = set()
         for text in texts:
             clear_text = text_cleaner.clear(text)
-            clear_texts.add(clear_text)
+            hash_text = get_text_hash(clear_text)
+            check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
+            if not check_in_neo_by_redis:
+                 clear_texts.add(clear_text)
             cluster = await redis_manager.get_cluster_name(clear_text)
-            logger.debug(f'Имя кластера: {cluster}')
             if cluster:
-               clear_texts.add(cluster)
-               logger.debug(f'Добавили кластер {cluster}')
+                cluster = text_cleaner.clear(cluster)
+                hash_text = get_text_hash(cluster)
+                check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
+                if not check_in_neo_by_redis:
+                    clear_texts.add(cluster)
         texts = clear_texts
         for text in texts:
-            hash_text = get_text_hash(text)
-            check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
-            if check_in_neo_by_redis:
-                logger.debug(f'Фраза {text} уже есть в базе данных')
-                await asyncio.sleep(0)
-                continue
             if await gds.check_phrase_in_neo(text):
                 logger.debug(f'Фраза {text} уже есть в базе данных')
                 await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
