@@ -189,6 +189,7 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
             logger.debug(f'Имя кластера: {cluster}')
             if cluster:
                clear_texts.add(cluster)
+               logger.debug(f'Добавили кластер {cluster}')
         texts = clear_texts
         for text in texts:
             hash_text = get_text_hash(text)
