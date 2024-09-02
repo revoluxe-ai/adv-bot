@@ -87,9 +87,10 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
         async for wbcard in wbcards.scalars():
             try:
                  check_in_neo = await gds.check_wb_card_in_neo(wbcard.nmid)
+                 if check_in_neo:
+                     continue
             except Exception:
-                logger.debug('Ошибка чека карты в neo', exc_info=True)
-            if check_in_neo:
+                logger.error('Ошибка чека карты в neo', exc_info=True)
                 continue
             try:
                 main_image_url: str = wbcard.photos[0]
@@ -222,6 +223,6 @@ async def update_wb_adv_phrase_in_db():
        try:
            await update_wb_adv_phrase_in_neo_small_cycle()
        except:
-           logger.error('Ошибка обновления фраз в neo')
+           logger.error('Ошибка обновления фраз в neo', exc_info=True)
        await asyncio.sleep(0)
 
