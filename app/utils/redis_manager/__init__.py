@@ -4,6 +4,8 @@ import json
 from typing import Union
 import logging
 
+from app.utils import text_cleaner
+
 logger = logging.getLogger(__name__)
 
 import redis
@@ -300,12 +302,14 @@ async def set_black_phrases(advsetting_id, black_phrases: list[str]):
 
 
 async def set_keyword_cluster(keyword: str, cluster_name: str):
+    keyword = text_cleaner.clear(keyword)
     key = 'keyword_cluster:' + keyword
     await redis_client.set(key, cluster_name)
     return None
 
 
 async def get_cluster_name(text):
+    text = text_cleaner.clear(text)
     key = 'keyword_cluster:' + text
     answer = await redis_client.get(key)
     if answer is None:
