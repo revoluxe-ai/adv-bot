@@ -255,7 +255,7 @@ async def update_all_data_in_db_run(tasks):
             try:
                 shop_data_updater = ShopDataUpdater(wb_access)
             except ApiForbiddenError:
-                logger.error(f'Нет нужных прав у токена')
+                logger.debug(f'Нет нужных прав у токена')
                 await asyncio.sleep(0)
                 continue
             task = asyncio.create_task(shop_data_updater.update_all_data())
