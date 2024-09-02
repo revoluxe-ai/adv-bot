@@ -90,7 +90,7 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                  if check_in_neo:
                      continue
             except Exception:
-                logger.error('Ошибка чека карты в neo', exc_info=True)
+                logger.error(f'Ошибка чека карты в neo Артикул: {wbcard.nmid} ', exc_info=True)
                 continue
             try:
                 main_image_url: str = wbcard.photos[0]
