@@ -168,7 +168,7 @@ async def get_phrase_data(text):
     return phrase_data
 
 async def update_wb_adv_phrase_in_neo_small_cycle():
-    batch_size = 100
+    batch_size = 5
     phrase_data_list = []
     async with sm() as session:
         stmt = select(AdvSetting.adv_id)\
