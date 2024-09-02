@@ -16,7 +16,7 @@ from app.utils.text_master.Transformers import Word2Vec
 import logging
 from PIL import Image as PilImage, UnidentifiedImageError
 
-from ...utils import redis_manager
+from ...utils import redis_manager, text_cleaner
 from ...utils.click_house.client import get_clickhouse_client
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,6 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                      continue
             except Exception:
                 logger.error(f'Ошибка чека карты в neo Артикул: {wbcard.nmid} ', exc_info=True)
-                continue
             try:
                 main_image_url: str = wbcard.photos[0]
                 async with aiohttp.ClientSession() as http_session:
@@ -182,16 +181,16 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
         query = f'SELECT DISTINCT text FROM default_db.advkeyword WHERE adv_id IN {adv_ids}'
         result = await ch_client.query(query)
         texts = [text[0] for text in result.result_rows]
-        clusters = set()
+        clear_texts = set()
         for text in texts:
-            cluster = await redis_manager.get_cluster_name(text)
+            clear_text = text_cleaner.clear(text)
+            clear_texts.add(clear_text)
+            cluster = await redis_manager.get_cluster_name(clear_text)
+            logger.debug(f'Имя кластера: {cluster}')
             if cluster:
-               clusters.add(cluster)
-        texts = list(clusters) + texts
-        texts = list(set(texts))
+               clear_texts.add(cluster)
+        texts = clear_texts
         for text in texts:
-            text = text.replace('_', ' ')
-            text = text.replace(',', '.')
             hash_text = get_text_hash(text)
             check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
             if check_in_neo_by_redis:
