@@ -315,10 +315,7 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
         cluster_name = await redis_manager.get_cluster_name(text)
         if not cluster_name:
             cluster_name = text
-        else:
-            print(cluster_name, text)
         cluster_name_to_keywords[cluster_name].append(keyword)
-    print(cluster_name_to_keywords)
 
     keyword_stats = []
 
