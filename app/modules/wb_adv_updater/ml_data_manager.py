@@ -202,6 +202,7 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
                 await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
                 await asyncio.sleep(0)
                 continue
+            logger.debug(f'Записываем в нео фразу {text}')
             phrase_data = await get_phrase_data(text)
             await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
             phrase_data_list.append(phrase_data)
