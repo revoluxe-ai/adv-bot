@@ -1296,12 +1296,13 @@ UNWIND phrase.words AS word
     async def check_wb_card_in_neo(self, nmid):
         query = """
         MATCH (item:Item) WHERE item.nmid = $nmid
-        RETURN item.nmid as nmid
+        RETURN item
         """
 
         async def check_wb_card(tx, query, nmid):
             result = await tx.run(query, nmid=nmid)
-            return await result.single()
+            return await result
+
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 result = await session.read_transaction(check_wb_card, query, nmid)
