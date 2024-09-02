@@ -90,7 +90,7 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                  if check_in_neo:
                      continue
             except Exception:
-                logger.error(f'Ошибка чека карты в neo Артикул: {wbcard.nmid} ', exc_info=True)
+                logger.debug(f'Ошибка чека карты в neo Артикул: {wbcard.nmid} ', exc_info=True)
             try:
                 main_image_url: str = wbcard.photos[0]
                 async with aiohttp.ClientSession() as http_session:
