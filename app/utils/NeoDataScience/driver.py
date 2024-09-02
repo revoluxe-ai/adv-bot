@@ -1301,7 +1301,7 @@ UNWIND phrase.words AS word
 
         async def check_wb_card(tx, query, nmid):
             result = await tx.run(query, nmid=nmid)
-            return await result
+            return result
 
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
