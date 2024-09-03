@@ -1,12 +1,12 @@
-import asyncio
-import datetime
-from io import BytesIO
-import random
+import csv
+from io import StringIO
 from typing import Union
 import pandas as pd
 from sqlalchemy import and_, select, func, desc
 from sqlalchemy.orm import joinedload
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+
+from app.client_bot.const import BLACK_LIST, TURN_OFF, WHITE_LIST, AUTO_MODE
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import AdvKeyword, CommonKeyword, \
     WBItemPosition
 from app.modules.wb_adv_updater import data_manager
@@ -18,6 +18,10 @@ from app.modules.common_slaves.wildberries.models import  KeywordSetting
 from app.utils.db.models import RefLink, User
 
 from app.utils.db.session_maker import get_async_session_maker
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 _sm = get_async_session_maker
 
@@ -37,6 +41,89 @@ async def get_keywords_for_keyboard( adv_setting: AdvSetting)-> list[CalculatedK
     return all_phrases
 
 
+
+async def get_csv_file(adv_setting: AdvSetting):
+    keywords: list[CalculatedKeyword] = await get_keywords_for_keyboard(adv_setting)
+    csv_output = StringIO()
+    csv_writer = csv.writer(csv_output,
+                            delimiter=';',
+                            quotechar='"',
+                            quoting=csv.QUOTE_MINIMAL,
+                            lineterminator='\n')
+    rows = []
+    # Заголовки столбцов
+    rows.append([
+        'Запрос',
+        'Клики',
+        'Просмотры',
+        "Количество запросов",
+        'CTR',
+        'Прогнозируемый CTR',
+        'Включен-Выключен',
+        "Статус",
+        'Начальная позиция',
+        'Текущая позиция',
+        'Дополнительные клики'
+    ])
+
+    for keyword in keywords:
+        clicks = keyword.clicks
+        views = keyword.views
+        ctr = round(keyword.ctr * 100, 2)
+        if keyword.reason == 'max_position':
+            hard_status = 'ЦП'
+        elif keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
+            hard_status = 'МП'
+        elif keyword.hard_status == BLACK_LIST:
+            hard_status = 'НРФ'
+        elif keyword.reason == 'max_cpc':
+            hard_status = 'МС'
+        elif keyword.hard_status == TURN_OFF:
+            hard_status = 'О'
+        elif keyword.hard_status == WHITE_LIST:
+            hard_status = 'БС'
+        elif keyword.hard_status == AUTO_MODE:
+            hard_status = 'А'
+        else:
+            raise ValueError(f'Unknown hard_status: {keyword.hard_status}')
+
+        turn_on = '✅Включен' if keyword.status == KeywordStatus.GOOD else '❌Выключен'
+
+        # Определение позиций
+        first_position = ''
+        second_position = ''
+        if adv_setting.parsing_active:
+            if keyword.cpm:
+                first_position = keyword.base_position
+                second_position = keyword.promo_position
+            elif keyword.real_position:
+                first_position = keyword.real_position
+            elif keyword.real_position == 0:
+                first_position = ">i"
+            else:
+                first_position = '?'
+
+        rows.append([
+        keyword.text,
+        clicks,
+        views,
+        keyword.query,
+        ctr,
+        round(keyword.predict_ctr * 100, 2),
+        turn_on,
+        hard_status,
+        first_position,
+        second_position,
+        keyword.keyword_setting.added_clicks or 0
+        ])
+
+    for row in rows:
+        logger.debug(row)
+        csv_writer.writerow(row)
+    csv_string = csv_output.getvalue()
+    csv_output.close()
+
+    return csv_string
 
 async def create_ref_link(ref_link_name, user_telegram_id):
     stmt = select(RefLink).where(and_(RefLink.name == ref_link_name, RefLink.referrer_id == user_telegram_id))

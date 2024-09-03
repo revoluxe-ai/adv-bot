@@ -140,3 +140,7 @@ class AddBlackPhrasesTemplates(CallbackData, prefix="add_black_phrases"):
 
 class ResetBlackPhrases(CallbackData, prefix="reset_black_phrases"):
     adv_setting_id: int
+
+
+class DownloadCSV(CallbackData, prefix="download_csv"):
+    adv_setting_original_id: int
