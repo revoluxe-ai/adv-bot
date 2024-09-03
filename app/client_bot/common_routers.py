@@ -13,7 +13,8 @@ from .user_interface.handlers import (adv_setting,
                                       add_white_phrases,
                                       get_shop_for_admin,
                                       cpm_builder,
-                                      add_black_phrases
+                                      add_black_phrases,
+                                      download_keywords
 )
 from ..settings import settings
 
@@ -27,6 +28,8 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
     common_router.include_routers(exceptions.admin_router)
 
+
+common_router.include_routers(download_keywords.router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(cpm_builder.router)
@@ -37,3 +40,4 @@ common_router.include_routers(setting_min_ctr.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())
+

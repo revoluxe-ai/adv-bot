@@ -93,6 +93,14 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                 callback_data=callbacks.AddWhitePhrases(adv_setting_id=adv_setting.id).pack()))
 
 
+    button = InlineKeyboardButton(text='Выгрузить ключи в csv-файл',
+                                  callback_data=callbacks.DownloadCSV(adv_setting_original_id =adv_setting.id).pack()
+                                  )
+
+    builder.row(button)
+
+
+
     # отключаю так как история толком не работает
     # button = InlineKeyboardButton(text='История позиций ключевых слов',
     #                                 callback_data=callbacks.KeywordPositionHistory(
