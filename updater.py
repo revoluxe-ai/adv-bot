@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 async def run_hard_processes():
     from app.modules.wb_adv_updater import hard_ml_data_updater_process as hard_data_manager
-    await hard_data_manager.run_update_data_in_neo4j()
+    await asyncio.gather(hard_data_manager.run_update_data_in_neo4j(),
+                         hard_data_manager.update_keywords_ctr_by_similary())
 
 
 run_own_process_list = [

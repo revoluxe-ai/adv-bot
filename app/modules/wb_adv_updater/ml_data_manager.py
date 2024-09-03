@@ -229,3 +229,7 @@ async def update_wb_adv_phrase_in_db():
            logger.error('Ошибка обновления фраз в neo', exc_info=True)
        await asyncio.sleep(0)
 
+
+async def update_keywords_ctr_by_similary():
+
+
