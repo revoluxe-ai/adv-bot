@@ -326,3 +326,13 @@ async def get_all_cluster_names()-> set[str]:
         if name is not None:
             cluster_names.add(name.decode('utf-8'))
     return cluster_names
+
+
+async def get_keys(pattern):
+    keys = await redis_client.keys(pattern)
+    return keys
+
+
+async def get(key):
+    value = await redis_client.get(key)
+    return value

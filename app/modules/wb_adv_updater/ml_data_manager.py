@@ -1,8 +1,13 @@
 import asyncio
 import hashlib
+import json
 import re
 from datetime import datetime
 from io import BytesIO
+
+import faiss
+import numpy as np
+
 from app.utils.image_master import image_tools
 import aiohttp
 from sqlalchemy import select, or_
@@ -18,7 +23,6 @@ from PIL import Image as PilImage, UnidentifiedImageError
 
 from ...utils import redis_manager, text_cleaner
 from ...utils.click_house.client import get_clickhouse_client
-
 logger = logging.getLogger(__name__)
 from . import fitter
 
@@ -230,6 +234,85 @@ async def update_wb_adv_phrase_in_db():
        await asyncio.sleep(0)
 
 
+
+index = None
+keywords = []
+
+
+
 async def update_keywords_ctr_by_similary():
+    global index, keywords
+    async with sm() as session:
+        stmt = select(KeywordSetting.text, AdvSetting.adv_id)\
+            .join(AdvSetting, KeywordSetting.adv_setting_id == AdvSetting.id)\
+            .where(AdvSetting.bot_active == True)
+        result = await session.execute(stmt)
+        keyword_texts_adv_ids: list[KeywordSetting] = result.all()
+
+    # Получение ключей из Redis
+    keys = await redis_manager.get_keys('predict_ctr*')
+    if not keys:
+        return
+
+    vectors = []
+    new_keywords = []  # Для новых ключевых слов
+
+    for key in keys:
+        key = key.decode('utf-8')
+        adv_id, keyword_text = key.split(':')[1:]
+        if keyword_text in keywords:
+            continue
+        vector = await word2vec.average_vector_from_sentence(keyword_text)
+        if vector is not None:
+            vector = np.array(vector, dtype=np.float32)
+            vectors.append(vector)
+            new_keywords.append((adv_id, keyword_text,))
+
+    # Добавление векторов в индекс
+    if vectors:
+        vectors_np = np.array(vectors, dtype=np.float32)
+        if index is None:
+            d = vectors_np.shape[1]  # Размерность векторов
+            index = faiss.IndexFlatL2(d)  # Создание нового индекса
+            index = faiss.IndexIDMap(index)  # Создание IDMap для индекса
+        ids = np.arange(len(new_keywords), dtype=np.int64)
+        faiss.normalize_L2(vectors_np)
+        index.add_with_ids(vectors_np, ids)
+        keywords.extend(new_keywords)  # Обновление списка ключевых слов
+
+    # Поиск и обновление данных
 
 
+    for keyword_text_adv_id in keyword_texts_adv_ids:
+        target_text =  keyword_text_adv_id[0]
+        target_text = text_cleaner.clear(target_text)
+        if not target_text:
+            continue
+        target_adv_id = keyword_text_adv_id[1]
+        logger.debug(f'Обработка ключевого слова {target_text} для объявления {target_adv_id}')
+        original_predict_ctr = await redis_manager.get_predict_ctr(target_adv_id, target_text)
+        if original_predict_ctr:
+            continue
+        vector = await word2vec.average_vector_from_sentence(target_text)
+        if vector is None:
+            continue
+        vector = np.array(vector, dtype=np.float32)
+        vector = vector.reshape(1, -1)  # Преобразование в форму (1, d) для поиска
+
+        # Поиск ближайших векторов
+        D, I = index.search(vector, index.ntotal)
+        for idx in I[0]:
+            if idx == -1:
+                break
+            adv_id, text = keywords[idx]
+            adv_id = int(adv_id)
+            if text == target_text:
+                continue
+            if adv_id != target_adv_id:
+                continue
+            predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
+            if predict_ctr:
+                logger.debug(f'Обновление CTR для ключевого слова {target_text} и объявления {adv_id} '
+                             f'на значение {predict_ctr}')
+                await redis_manager.set_predict_ctr(adv_id, target_text, predict_ctr)
+                break
