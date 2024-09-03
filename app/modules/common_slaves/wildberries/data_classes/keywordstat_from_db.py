@@ -4,6 +4,7 @@ from typing import Union, Optional
 
 from sqlalchemy import DateTime
 
+from app.modules.keywords_query import keywords_query
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 
 
@@ -21,7 +22,6 @@ class CalculatedKeyword:
     clicks: int
     views: int
     spend: float
-    query: Union[int, str] = None
     baes_ctr: Optional[float] = None
     predict_ctr: Optional[float] = None
     status: Union[str, None] = None
@@ -33,7 +33,21 @@ class CalculatedKeyword:
     base_position: Optional[int] = None
     promo_position: Optional[int] = None
     position_update: Optional[DateTime] = None
+    childs_keywords: Optional[list] = None
+    _query_static: Optional[int] = None
 
+
+
+    @property
+    def query(self):
+        if self._query_static is None:
+            return keywords_query.get_queries_of_keyword(self.text)
+        else:
+            return self._query_static
+
+    @query.setter
+    def query(self, value):
+        self._query_static = value
 
 
     def __repr__(self):

@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting,  KeywordSetting, WBCabinet
 from . import data_manager, fitter
-from ...utils import redis_manager
+from ...utils import redis_manager, text_cleaner
 from ...utils.click_house.client import get_clickhouse_client
 
 sm = get_async_session_maker
@@ -125,8 +125,9 @@ class Predictor:
                     views += enough_views
                 real_ctr = clicks / views
                 predict_ctr = (real_ctr + predict_ctr) / 2
-                # Создаем задачи для асинхронного обновления Redis
+                logger.debug('Начинаю запись predict ctr в redis')
                 await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+                logger.debug('Записали прогноз в redis')
             except Exception as exc:
                 logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
 
@@ -134,6 +135,7 @@ class Predictor:
 
 
     async def predict_ctr_for_keywords(self):
+        logger.debug('Начинаю получать кампании для формирования DF для предсказаний')
         async with sm() as session:
             stmt = select(AdvSetting).options(
                 selectinload(AdvSetting.adv_keywords),
@@ -143,12 +145,16 @@ class Predictor:
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
         try:
+            logger.debug('Начинаю получать DF  для предсказаний')
             df_for_predict = await self._get_df_for_predict(all_adv_settings)
+            logger.debug('Получили DF для предсказаний')
         except Exception as exc:
             logger.error(f'Ошибка при получении данных для предсказания: {exc}', exc_info=True)
             raise exc
         try:
+            logger.debug('Начинаю предсказание')
             predict_df: pd.DataFrame = await asyncio.to_thread(self._predict, df_for_predict)
+            logger.debug('Предсказания получены')
         except Exception as exc:
             logger.error(f'Ошибка при предсказании: {exc}', exc_info=True)
             raise exc
@@ -230,7 +236,7 @@ class Predictor:
            if not avg_item_features:
                  logger.debug('Нет item_features: %s', adv.name)
                  continue
-           clear_keywords = [keyword.text.replace('_', ' ') for keyword in adv.keyword_settings]
+           clear_keywords = [text_cleaner.clear(keyword.text) for keyword in adv.keyword_settings]
            # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
            keyword_features_result = await self.get_keyword_features(clear_keywords)
            keyword_features_result = {row[0]: row[1] for row in keyword_features_result}

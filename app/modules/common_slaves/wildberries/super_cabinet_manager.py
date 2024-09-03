@@ -69,7 +69,10 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
                     if not token.active:
                         continue
                     try:
-                        token_shop_id = token.shop_id# Используйте total_clicks для суммы кликов
+                        token_shop_id = token.shop_id
+                    except NotValidTokenError:
+                        logger.debug('Не валидный токен')
+                        await asyncio.sleep(0)
                     except exceptions.TokenExpiredError:
                         logger.error('Срок действия токена истек')
                         continue

@@ -5,18 +5,16 @@ import textwrap
 import platform
 
 system_name = platform.system()
-print(system_name)
+
+logging_setup_done = False  # Флаг для проверки, было ли уже выполнено настройка логгирования
 
 
 class CustomFormatter(logging.Formatter):
-
     """Логгирование с цветным выводом в зависимости от уровня сообщений."""
-
-    # Коды ANSI для окрашивания текста
     grey = "\x1b[38;21m"
-    blue = "\x1b[34m"  # Обновлено для синего цвета
-    white = "\x1b[37m"  # Обновлено для белого цвета
-    red = "\x1b[31m"  # Обновлено для красного цвета
+    blue = "\x1b[34m"  # Синий цвет
+    white = "\x1b[37m"  # Белый цвет
+    red = "\x1b[31m"  # Красный цвет
     reset = "\x1b[0m"  # Сброс цвета текста
     format = "%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s"
 
@@ -28,45 +26,37 @@ class CustomFormatter(logging.Formatter):
         logging.CRITICAL: red + format + reset
     }
 
-
-
     def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
+        log_fmt = self.FORMATS.get(record.levelno, self.format)
         formatter = logging.Formatter(log_fmt, "%Y-%m-%d %H:%M:%S")
         formatted = formatter.format(record)
-        # Применяем перенос строк к сообщению, если оно слишком длинное
-        wrapped = textwrap.fill(formatted, width=100)  # Перенос строк, если длина сообщения больше 100 символов
+        wrapped = textwrap.fill(formatted, width=100)  # Перенос строк
         return wrapped
 
-if system_name == 'Linux':
-    from systemd.journal import JournalHandler
-    def setup_logging():
-        # Создаем логгер
-        logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)  # Устанавливаем уровень логирования (DEBUG, INFO и т.д.)
+def setup_logging():
+    global logging_setup_done
 
-        # Настраиваем обработчик для отправки логов в journalctl
+    if logging_setup_done:
+        return
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    if system_name == 'Linux':
+        from systemd.journal import JournalHandler
         journal_handler = JournalHandler()
         journal_handler.setLevel(logging.DEBUG)
-
-        # Формат сообщений
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = CustomFormatter(fmt="%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s",
+                                    datefmt="%Y-%m-%d %H:%M:%S")
         journal_handler.setFormatter(formatter)
-
-        # Добавляем обработчик в логгер
         logger.addHandler(journal_handler)
-
-else:
-    def setup_logging():
-
+    else:
         def setup_logging_from_file(path_to_config_file):
             with open(path_to_config_file, 'r') as file:
                 config = json.load(file)
             logging.config.dictConfig(config)
 
-        # Путь к файлу конфигурации
         path_to_logging_config = 'logging_config.json'
-
-        # Вызов функции настройки логгирования
         setup_logging_from_file(path_to_logging_config)
 
+    logging_setup_done = True

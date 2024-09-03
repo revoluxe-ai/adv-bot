@@ -8,7 +8,7 @@ import logging
 from app.utils.db.session_maker import get_async_session_maker
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
 from . import wb_manager
-from app.modules.wb_adv_updater.bidder import run_bidder_process
+
 
 
 sm = get_async_session_maker
@@ -160,12 +160,8 @@ async def payment_for_auto_bidder():
 
 
 async def run_update_vectors_in_redis():
-    while True:
-        try:
-            await wb_manager.update_vectors_in_redis()
-        except Exception as e:
-            logger.error(f'Ошибка обновления векторов в redis {e}', exc_info=True)
-        await asyncio.sleep(0)
+    await wb_manager.update_vectors_in_redis()
+
 
 async def run_vector_update_in_neo4j():
     await wb_manager.update_vectors_update_in_graph()

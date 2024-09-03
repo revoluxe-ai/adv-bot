@@ -117,7 +117,7 @@ class Parser:
         first_place = page*100 - 99
         products = await self.__parse_keywords_from_wb(text, page)
         if not products:
-            return []
+            return None
         positions = []
         for place_on_page, product in enumerate(products):
             nmid = product['id']
@@ -247,16 +247,22 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
     global done_count
     for page in range(1, 100):
         positions = await parser.parse_keywords_from_wb(text, page)
+        if not positions:
+            break
+        logger.debug(f'Найдено {len(positions)}')
         positions = [position for position in positions if position.nmid in need_nmids]
+        logger.debug(f'После фильтра осталось {len(positions)}')
         if positions:
             await redis_manager.add_positions_to_redis(positions)
             logger.debug('Записали позиции в Редис')
             for position in positions:
-                need_nmids.discard(position.nmid)
+                nmid: int = position.nmid
+                need_nmids.discard(nmid)
         if not need_nmids:
+            logger.debug(f'Все nmid найдены')
             break
     else:
-        # Если какие-то nmids не найдены
+        logger.debug(f'Не найдены nmid: {need_nmids}')
         not_found_positions = []
         for nmid in need_nmids:
             position = WBItemPosition(
@@ -269,7 +275,7 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
                 cpm=0
             )
             not_found_positions.append(position)
-            await redis_manager.add_positions_to_redis(not_found_positions)
+        await redis_manager.add_positions_to_redis(not_found_positions)
 
 semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
 

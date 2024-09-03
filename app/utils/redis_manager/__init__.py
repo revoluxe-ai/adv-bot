@@ -4,6 +4,8 @@ import json
 from typing import Union
 import logging
 
+from app.utils import text_cleaner
+
 logger = logging.getLogger(__name__)
 
 import redis
@@ -286,7 +288,7 @@ async def add_phrase_hash_like_is_in_neo(hash_text):
 async def get_black_phrases(advsetting_id):
     key = 'black_phrases:' + str(advsetting_id)
     answer = await redis_client.get(key)
-    if answer is None:
+    if answer == b'' or not answer:
         return []
     answer = answer.decode('utf-8')
     answer = answer.split(',')
@@ -297,3 +299,30 @@ async def set_black_phrases(advsetting_id, black_phrases: list[str]):
     black_phrases = ','.join(black_phrases)
     await redis_client.set(key, black_phrases)
     return None
+
+
+async def set_keyword_cluster(keyword: str, cluster_name: str):
+    keyword = text_cleaner.clear(keyword)
+    key = 'keyword_cluster:' + keyword
+    await redis_client.set(key, cluster_name)
+    return None
+
+
+async def get_cluster_name(text):
+    text = text_cleaner.clear(text)
+    key = 'keyword_cluster:' + text
+    answer = await redis_client.get(key)
+    if answer is None:
+        return None
+    return answer.decode('utf-8')
+
+
+async def get_all_cluster_names()-> set[str]:
+    pattern = 'keyword_cluster:*'
+    keys = await redis_client.keys(pattern)
+    cluster_names = set()
+    for key in keys:
+        name = await redis_client.get(key)
+        if name is not None:
+            cluster_names.add(name.decode('utf-8'))
+    return cluster_names

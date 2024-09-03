@@ -16,7 +16,7 @@ from app.utils.text_master.Transformers import Word2Vec
 import logging
 from PIL import Image as PilImage, UnidentifiedImageError
 
-from ...utils import redis_manager
+from ...utils import redis_manager, text_cleaner
 from ...utils.click_house.client import get_clickhouse_client
 
 logger = logging.getLogger(__name__)
@@ -85,9 +85,12 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
         stmt = select(WBCard).where(WBCard.nmid.in_(all_nmids))
         wbcards: list[WBCard] = await session.stream(stmt)
         async for wbcard in wbcards.scalars():
-            check_in_neo = await gds.check_wb_card_in_neo(wbcard.nmid)
-            if check_in_neo:
-                continue
+            try:
+                 check_in_neo = await gds.check_wb_card_in_neo(wbcard.nmid)
+                 if check_in_neo:
+                     continue
+            except Exception:
+                logger.debug(f'Ошибка чека карты в neo Артикул: {wbcard.nmid} ', exc_info=True)
             try:
                 main_image_url: str = wbcard.photos[0]
                 async with aiohttp.ClientSession() as http_session:
@@ -98,8 +101,11 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                 vector = await asyncio.to_thread(image_master.get_vector, pil_image)
                 dhash = await asyncio.to_thread(image_tools.dhash, pil_image)
                 logger.debug(f"Обновляем карточку: {wbcard.name}")
-                await gds.update_wb_card(wbcard, characteristics_word, dhash,
+                try:
+                     await gds.update_wb_card(wbcard, characteristics_word, dhash,
                                          vector)  # Подтверждение изменений в базе данных
+                except Exception:
+                    logger.error(f'Ошибка обновления карточки:  {wbcard.nmid}')
             except KeyError as exc:
                 if exc.args[0] == 'photos':
                     logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
@@ -114,7 +120,7 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
 
 async def update_cards_in_graph_for_shops_big_cycle():
     async with sm() as session:
-        stmt = select(AdvSetting)
+        stmt = select(AdvSetting).where(AdvSetting.active_status == 'pause')
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
     await __update_cards_in_graph_for_shops(adv_settings)
@@ -164,28 +170,42 @@ async def get_phrase_data(text):
 
     return phrase_data
 
-async def update_wb_adv_phrase_in_db_bot_active():
-    batch_size = 100
+async def update_wb_adv_phrase_in_neo_small_cycle():
+    batch_size = 5
     phrase_data_list = []
+    async with sm() as session:
+        stmt = select(AdvSetting.adv_id)\
+        .where(AdvSetting.active_status.in_(['started']),
+               AdvSetting.bot_active == True)
+        adv_ids = await session.execute(stmt)
+        adv_ids = adv_ids.scalars().all()
+
     async with get_clickhouse_client() as ch_client:
-        query = 'SELECT DISTINCT text FROM default_db.advkeyword'
+        query = f'SELECT DISTINCT text FROM default_db.advkeyword WHERE adv_id IN {adv_ids}'
         result = await ch_client.query(query)
-        texts = result.result_rows
+        texts = [text[0] for text in result.result_rows]
+        clear_texts = set()
         for text in texts:
-            text = text[0]
-            text = text.replace('_', ' ')
-            text = text.replace(',', '.')
-            hash_text = get_text_hash(text)
+            clear_text = text_cleaner.clear(text)
+            hash_text = get_text_hash(clear_text)
             check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
-            if check_in_neo_by_redis:
-                logger.debug(f'Фраза {text} уже есть в базе данных')
-                await asyncio.sleep(0)
-                continue
+            if not check_in_neo_by_redis:
+                 clear_texts.add(clear_text)
+            cluster = await redis_manager.get_cluster_name(clear_text)
+            if cluster:
+                cluster = text_cleaner.clear(cluster)
+                hash_text = get_text_hash(cluster)
+                check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
+                if not check_in_neo_by_redis:
+                    clear_texts.add(cluster)
+        texts = clear_texts
+        for text in texts:
             if await gds.check_phrase_in_neo(text):
                 logger.debug(f'Фраза {text} уже есть в базе данных')
                 await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
                 await asyncio.sleep(0)
                 continue
+            logger.debug(f'Записываем в нео фразу {text}')
             phrase_data = await get_phrase_data(text)
             await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
             phrase_data_list.append(phrase_data)
@@ -199,14 +219,13 @@ async def update_wb_adv_phrase_in_db_bot_active():
     if phrase_data_list:
         await gds.add_keyword_phrase(phrase_data_list)
         await asyncio.sleep(0)
-
+    pass
 
 async def update_wb_adv_phrase_in_db():
     while True:
-        try:
-            await update_wb_adv_phrase_in_db_bot_active()
-        except Exception as exc:
-            logger.error(f'Ошибка обновления фраз в neo4j {exc}')
-        await asyncio.sleep(0)
-
+       try:
+           await update_wb_adv_phrase_in_neo_small_cycle()
+       except:
+           logger.error('Ошибка обновления фраз в neo', exc_info=True)
+       await asyncio.sleep(0)
 
