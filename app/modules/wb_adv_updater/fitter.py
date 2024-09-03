@@ -113,7 +113,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
             logger.debug(f'Обработка кампании {n}')
             nmids = adv.nmids
 
-            if len(nmids) > 1:
+            if len(nmids) >= 1:
                 nmid_to_item_features = await get_nmid_to_item_features(nmids)
 
                 if nmid_to_item_features:
