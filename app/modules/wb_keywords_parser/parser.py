@@ -244,7 +244,6 @@ async def add_wb_positions_from_queue_to_db():
 
 
 async def add_wb_positions(text: str, need_nmids: set[int]):
-    global done_count
     for page in range(1, 100):
         positions = await parser.parse_keywords_from_wb(text, page)
         if not positions:
@@ -261,21 +260,20 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
         if not need_nmids:
             logger.debug(f'Все nmid найдены')
             break
-    else:
-        logger.debug(f'Не найдены nmid: {need_nmids}')
-        not_found_positions = []
-        for nmid in need_nmids:
-            position = WBItemPosition(
-                real_position=0,
-                base_position=0,
-                promo_position=0,
-                keyword_text=text,
-                timestamp=datetime.datetime.now(),
-                nmid=nmid,
-                cpm=0
-            )
-            not_found_positions.append(position)
-        await redis_manager.add_positions_to_redis(not_found_positions)
+        if need_nmids:
+            not_found_positions = []
+            for nmid in need_nmids:
+                position = WBItemPosition(
+                    real_position=0,
+                    base_position=0,
+                    promo_position=0,
+                    keyword_text=text,
+                    timestamp=datetime.datetime.now(),
+                    nmid=nmid,
+                    cpm=0
+                )
+                not_found_positions.append(position)
+            await redis_manager.add_positions_to_redis(not_found_positions)
 
 semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
 
