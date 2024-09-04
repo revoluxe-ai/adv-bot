@@ -131,24 +131,7 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_cpm = manual_cpm
-        adv.bidder_active = False
         await session.commit()
-    async with sm() as session:
-        stmt = select(WBUserCabinet)\
-            .join(WBUserCabinet.wb_cabinet)\
-            .join(WBCabinet.adv_settings)\
-            .options(selectinload(WBUserCabinet.user))\
-            .where(
-            AdvSetting.id == adv_original_id,
-            User.user_telegram_id == message.from_user.id
-        )
-        result = await session.execute(stmt)
-        wb_user_cabinet = result.scalar()
-    access = await super_cabinet_manager.get_access_for_wb_user_cabinet(wb_user_cabinet)
-
-    api = WBApi(access)
-    await api.advert.update_cpm(adv.adv_id, manual_cpm)
-
     await bot.send_message(message.chat.id, f'CPM успешно установлен ({manual_cpm}) р.')
     await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
     await state.set_state(state=None)
