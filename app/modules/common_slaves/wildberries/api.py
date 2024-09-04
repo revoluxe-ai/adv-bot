@@ -39,8 +39,40 @@ class AdvertApi(ABC_WB_API):
     auto_adv_types = [8, 9]
 
 
-    @try_except_decorator(2, 1)
+    @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_setting: AdvSetting)-> list[KeywordStat]:
+        keywords = []
+        date_to = datetime.datetime.now().date()
+        date_from = date_to - datetime.timedelta(days=6)
+        url = f'https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_setting.adv_id}&from={date_from}&to={date_to}'
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(session, 'GET', url,
+                                                headers=self.headers.standart)
+            answer = json.loads(response_text)
+            update_timestamp = datetime.datetime.now()
+            if not answer:
+                logger.debug('Нет данных по ключевым словам: %s', adv_setting.name)
+                return  []
+            for data in answer['keywords']:
+                wb_timestamp = datetime.datetime.fromisoformat(data['date']).date()
+                stat = data['stats']
+                for keyword_stat in stat:
+                    keyword_text = keyword_stat.pop('keyword')
+                    keyword_text = keyword_text.replace(r'"', '')
+                    keyword_text = keyword_text.replace('_', '')
+                    keyword_stat['date'] = wb_timestamp
+                    keyword_stat['update_timestamp'] = update_timestamp
+                    keyword_stat['adv_id'] = adv_setting.adv_id
+                    keyword_stat['text'] = keyword_text
+                    keyword_stat['spend'] = keyword_stat.pop('sum')
+                    keyword = KeywordStat(**keyword_stat)
+                    keywords.append(keyword)
+            return keywords
+
+
+
+    @try_except_decorator(2, 1)
+    async def get_keywords_stat_depr(self, adv_setting: AdvSetting)-> list[KeywordStat]:
         keywords = []
         url = f'https://advert-api.wb.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}'
         async with aiohttp.ClientSession() as session:
