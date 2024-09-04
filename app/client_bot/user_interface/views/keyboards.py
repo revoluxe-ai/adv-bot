@@ -149,11 +149,25 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
     builder.row(button)
 
 
+    if not adv_setting.clusters_mode:
+        button = InlineKeyboardButton(text='Включить поддержку кластеров',
+                                        callback_data=callbacks.TurnClusters(action='on',
+                                                                            adv_original_id=adv_setting.id).pack())
+    else:
+        button = InlineKeyboardButton(text='Отключить поддержку кластеров',
+                                        callback_data=callbacks.TurnClusters(action='off',
+                                                                            adv_original_id=adv_setting.id).pack())
+    builder.row(button)
+
+
     wb_user_cabinet_original_id = wb_user_cabinet.id
     builder.row(InlineKeyboardButton(text='Вернуться к списку кампаний',
                                          callback_data=\
                         callbacks.ChoiceAdvPaginator(wb_user_cabinet_original_id=wb_user_cabinet_original_id,
                                                                                     page=1).pack()))
+
+
+
 
 
     return builder.as_markup()

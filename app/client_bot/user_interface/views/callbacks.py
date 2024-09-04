@@ -144,3 +144,8 @@ class ResetBlackPhrases(CallbackData, prefix="reset_black_phrases"):
 
 class DownloadCSV(CallbackData, prefix="download_csv"):
     adv_setting_original_id: int
+
+
+class TurnClusters(CallbackData, prefix="turn_clusters"):
+    action: str
+    adv_original_id: int

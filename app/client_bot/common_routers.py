@@ -14,7 +14,8 @@ from .user_interface.handlers import (adv_setting,
                                       get_shop_for_admin,
                                       cpm_builder,
                                       add_black_phrases,
-                                      download_keywords
+                                      download_keywords,
+                                     clusters
 )
 from ..settings import settings
 
@@ -29,6 +30,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 
+common_router.include_routers(clusters.router)
 common_router.include_routers(download_keywords.router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(add_black_phrases.router)
