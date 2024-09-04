@@ -109,8 +109,8 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
             tokens: list[WBToken] = user.wb_tokens
             users_live_tokens = []
             for token in tokens:
-                if not token.active:
-                    continue
+                # if not token.active:
+                #     continue
                 try:
                     token_shop_id = token.shop_id# Используйте total_clicks для суммы кликов
                 except exceptions.TokenExpiredError:
@@ -155,8 +155,11 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCab
     wb_cabinet = wb_user_cabinet.wb_cabinet
     checked_tokens = []
     for token in tokens:
-        if token.shop_id == wb_cabinet.shop_id:
-            checked_tokens.append(token)
+        try:
+            if token.shop_id == wb_cabinet.shop_id:
+                checked_tokens.append(token)
+        except:
+            continue
         else:
             continue
 
