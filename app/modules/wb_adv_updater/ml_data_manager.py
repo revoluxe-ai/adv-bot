@@ -259,7 +259,11 @@ async def update_keywords_ctr_by_similary():
 
     for key in keys:
         key = key.decode('utf-8')
-        adv_id, keyword_text = key.split(':')[1:]
+        try:
+             adv_id, keyword_text = key.split(':')[1:]
+        except Exception:
+            logger.error(f'Ошибка парсинга ключа {key}', exc_info= True)
+            continue
         if keyword_text in keywords:
             continue
         vector = await word2vec.average_vector_from_sentence(keyword_text)
