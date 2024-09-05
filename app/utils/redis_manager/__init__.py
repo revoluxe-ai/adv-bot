@@ -354,8 +354,14 @@ async def get_cluster_and_preset(text)-> (str, int,):
     if isinstance(value, NoneType):
         return None, None
     value = value.decode('utf-8')
-    cluster, preset = value.split(':')
-    return cluster, preset
+    data = value.split(':')
+    try:
+        cluster, preset = data
+        return cluster, preset
+    except Exception:
+        logger.error('Не удалось получить кластер и пресет из значения: ' + value)
+        return None, None
+
 
 
 async def get_nmid(adv_id):
