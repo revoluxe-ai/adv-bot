@@ -1044,8 +1044,7 @@ async def get_phrases_for_parsing(semaphore = None):
                              nmids = [nmid for row in nmids for nmid in row]
                              for nmid in nmids:
                                  await redis_manager.set_nmid(adv_id, nmid)
-
-                nmids_need = nmids_need.union(nmids)
+                             nmids_need = nmids_need.union(nmids)
                 yield text, nmids_need
                 pass_texts.add(hash_text)
                 await asyncio.sleep(0)
