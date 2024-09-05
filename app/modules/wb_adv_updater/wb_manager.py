@@ -458,12 +458,6 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
         stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         adv_setting = await session.execute(stmt)
         adv_setting = adv_setting.scalar()
-
-    try:
-        await update_clusters_for_adv(adv_setting, wb_api)
-    except Exception as e:
-        logger.error(f'Error getting clusters for adv {adv_setting.id}: {e}', exc_info=True)
-        return
     try:
         keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
     except Exception as exc:
