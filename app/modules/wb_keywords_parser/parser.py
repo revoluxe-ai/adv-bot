@@ -251,6 +251,7 @@ async def add_wb_positions(text: str, need_nmids: set[int]):
                 not_found_positions.append(position)
             await redis_manager.add_positions_to_redis(not_found_positions)
 
+
 semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
 
 async def limited_add_wb_positions(text:str, need_nmids: set[int]):
@@ -280,7 +281,8 @@ async def parser_all_white_phrase():
                     if task.exception():
                         logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
                     del tasks_by_text[text]
-        await asyncio.sleep(0)
+            logger.debug(f'Задач в поиске: {len(tasks_by_text)}')
+            await asyncio.sleep(0)
 
 
 async def reset_from_redis_positions_of_out_index():

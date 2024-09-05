@@ -1043,6 +1043,7 @@ async def get_phrases_for_parsing(semaphore = None):
                 nmids_need = nmids_need.union(nmids)
                 yield text, nmids_need
                 pass_texts.add(hash_text)
+                await asyncio.sleep(0)
 
 
 async def get_last_updated_phrases(all_white_phrases):
