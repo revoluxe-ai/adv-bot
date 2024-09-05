@@ -1,6 +1,8 @@
 import asyncio
 import datetime
+import hashlib
 import json
+import re
 import time
 from asyncio import Task
 from functools import wraps
@@ -115,10 +117,13 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
 class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
-        products = await self.__parse_keywords_from_wb(text, page)
+        products, cluster, preset = await self.__parse_keywords_from_wb(text, page)
+        if page == 1 and cluster:
+            await redis_manager.set_cluster_and_preset(text, cluster, preset)
         if not products:
             return None
         positions = []
+        text = cluster
         for place_on_page, product in enumerate(products):
             nmid = product['id']
             real_position = first_place + place_on_page
@@ -161,58 +166,29 @@ class Parser:
             raise DataError('Пустой ответ от сервера', text)
         data = json.loads(text)
         if data == {}:
-            return []
+            return None, None, None
         try:
             assert data['payloadVersion'] == 2
         except Exception as e:
             raise DataError(f'{e}', text)
+        metadata = data['metadata']
+        catalog_type = metadata['catalog_type']
+        if catalog_type == 'merger':
+            preset = hash(text)
+            cluster = text
+        else:
+            catalog_value = metadata['catalog_value']
+            preset = int(re.search(r'preset=(\d+)', catalog_value).group(1))
+            cluster = metadata['normquery']
         products = data['data']['products']
         if not products:
-            return []
-        return products
+            return None, None, None
+        assert isinstance(preset, int)
+        return products, cluster , preset
 
-    # @staticmethod
-    # async def get_common_keyword(text: str)-> CommonKeyword:
-    #     async with sm() as session:
-    #         stmt = select(CommonKeyword).where(CommonKeyword.text == text)
-    #         result = await session.execute(stmt)
-    #         keyword = result.scalar()
-    #         if not keyword:
-    #             keyword = CommonKeyword(text=text)
-    #             session.add(keyword)
-    #             await session.commit()
-    #     return keyword
 
 
 parser = Parser()
-#
-# async def create_tasks_for_adding_wb_positions_to_db(positions: list[WBItemPosition]):
-#     if positions == []:
-#         return
-#     async with sm() as session:
-#         for position in positions:
-#             stmt = select(WBItemPosition) \
-#                 .where(and_(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
-#                             WBItemPosition.keyword_id == CommonKeyword.id)) \
-#                 .order_by(WBItemPosition.timestamp.desc()) \
-#                 .limit(1)
-#             pos_in_db = await session.execute(stmt)
-#             pos_in_db = pos_in_db.scalar_one_or_none()
-#             if not pos_in_db:
-#                 session.add(position)
-#                 await session.commit()
-#             else:
-#                 if any([pos_in_db.base_position != position.base_position,
-#                         pos_in_db.promo_position != position.promo_position,
-#                         pos_in_db.cpm != position.cpm,
-#                         pos_in_db.adv_id != position.adv_id,
-#                         pos_in_db.real_position != position.real_position]):
-#                     session.add(position)
-#                     await session.commit()
-#                 else:
-#                     pos_in_db.timestamp = position.timestamp
-#         await session.commit()
-
 
 text_to_task = {}
 

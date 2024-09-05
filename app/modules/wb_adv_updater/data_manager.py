@@ -13,7 +13,7 @@ from sqlalchemy.exc import NoResultFound
 from app.exc import CardNotFoundInDB
 import pandas as pd
 from PIL import Image
-from sqlalchemy import and_, func, select, case, cast, Float
+from sqlalchemy import and_, func, select, case, cast, Float, distinct
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
@@ -308,19 +308,21 @@ async def  set_position(keyword_stat: CalculatedKeyword,
 
 async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
 
-    cluster_name_to_keywords = defaultdict(list)
+    preset_to_keywords = defaultdict(list)
+    preset_to_cluster_name = {}
 
     for keyword in keyword_stats:
         text = keyword.text
-        cluster_name = await redis_manager.get_cluster_name(text)
-        if not cluster_name:
-            cluster_name = text
-        cluster_name_to_keywords[cluster_name].append(keyword)
+        cluster_name, preset = await redis_manager.get_cluster_and_preset(text)
+        if cluster_name:
+            preset_to_keywords[preset].append(keyword)
+            preset_to_cluster_name[preset] = cluster_name
 
     keyword_stats = []
 
-    for keyword_cluster_name in cluster_name_to_keywords:
-        keywords = cluster_name_to_keywords[keyword_cluster_name]
+    for preset in preset_to_keywords:
+        keywords = preset_to_keywords[preset]
+        keyword_cluster_name = preset_to_cluster_name[preset]
         views = sum([keyword.views for keyword in keywords])
         clicks = sum([keyword.clicks for keyword in keywords])
         spend = sum([keyword.spend for keyword in keywords])
@@ -976,29 +978,71 @@ async def clear_cards_in_db(nmids: list[int]):
              await asyncio.sleep(0)
 
 
+async def get_keywords_from_clickhouse(adv_id: int)-> list[str]:
+    query = f"""
+SELECT DISTINCT text
+FROM default_db.advkeyword 
+WHERE adv_id = {adv_id}
+"""
+    async with get_clickhouse_client() as client:
+        result = await client.query(query)
+        keywords = result.result_rows
+    return [keyword[0] for keyword in keywords if keyword]
+
+
+async def get_nmids_for_keyword_text(text: str )-> set[int]:
+    query = """
+    SELECT DISTINCT adv_id
+    FROM default_db.advkeyword 
+    WHERE text = %(text)s
+    """
+    params = {'text': text}
+    async with get_clickhouse_client() as client:
+        result = await client.query(query, parameters=params)
+        nmids = result.result_rows
+    return set([nmid[0] for nmid in nmids if nmid])
+
+
+
 async def get_phrases_for_parsing(semaphore = None):
+    pass_texts = set()
     async with _sm(semaphore) as session:
-        stmt = select(AdvSetting).where(
+        stmt = select(AdvSetting.adv_id).where(
             AdvSetting.parsing_active == True)
-        adv_settings = await session.execute(stmt)
-        adv_settings = adv_settings.scalars().all()
-        random.shuffle(adv_settings)
-        for adv in adv_settings:
-            try:
-                keywords = await get_good_bad_phrases(adv)
-            except NotItemsInAdvSetting:
-                continue
-            keywords = await convert_keyword_stats_in_clusters(keywords)
-            for keyword in keywords:
-                text = keyword.text
-                stmt = select(AdvSetting)\
-                .join(KeywordSetting)\
-                .where(KeywordSetting.text == text,
-                       AdvSetting.parsing_active == True)
-                result = await session.execute(stmt)
-                need_adv_settinds_for_this_phrase = result.unique().scalars().all()
-                need_nmids = set([nmid for adv in need_adv_settinds_for_this_phrase for nmid in adv.nmids])
-                yield text, need_nmids
+        adv_ids  = await session.execute(stmt)
+        adv_ids = adv_ids.scalars().all()
+        random.shuffle(adv_ids)
+        for adv_id in adv_ids:
+            keywords_texts: list[str] = await get_keywords_from_clickhouse(adv_id)
+            for text in keywords_texts:
+                hash_text = hash(text)
+                if hash_text in pass_texts:
+                    continue
+                adv_ids_with_text: set[int] = await get_nmids_for_keyword_text(text)
+                nmids_need = set()
+                not_found_adv_id = set()
+                for adv_id_with_text in adv_ids_with_text:
+                    if adv_id_with_text not in  adv_ids:
+                        continue
+                    nmid = await redis_manager.get_nmid(adv_id)
+                    if not nmid:
+                        not_found_adv_id.add(adv_id_with_text)
+                    else:
+                        nmids_need.add(nmid)
+
+                if not_found_adv_id:
+                    async with _sm() as session:
+                        stmt = select(distinct(AdvSetting.nmids)).where(AdvSetting.adv_id.in_(not_found_adv_id))
+                        result = await session.execute(stmt)
+                        nmids = result.scalars().all()
+                        if nmids:
+                             nmids = [nmid for row in nmids for nmid in row]
+                             for nmid in nmids:
+                                 await redis_manager.set_nmid(adv_id, nmid)
+
+                nmids_need = nmids_need.union(nmids)
+                yield text, nmids_need
+                pass_texts.add(hash_text)
 
 
 async def get_last_updated_phrases(all_white_phrases):

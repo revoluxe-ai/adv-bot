@@ -336,3 +336,36 @@ async def get_keys(pattern):
 async def get(key):
     value = await redis_client.get(key)
     return value
+
+
+async def set_cluster_and_preset(text, cluster, preset):
+    key = 'cluster_and_preset:' + text
+    value = cluster + ':' + str(preset)
+    await redis_client.set(key, value)
+    return None
+
+
+
+
+async def get_cluster_and_preset(text)-> (str, int,):
+    key = 'cluster_and_preset:' + text
+    value = await redis_client.get(key)
+    if value is None:
+        return None, None
+    value = value.decode('utf-8')
+    cluster, preset = value.split(':')
+    return cluster, preset
+
+
+async def get_nmid(adv_id):
+    key = 'adv_nmid:' + str(adv_id)
+    nmid = await redis_client.get(key)
+    if nmid is None:
+        return None
+    return int(nmid)
+
+
+async def set_nmid(adv_id, nmid):
+    key = 'adv_nmid:' + str(adv_id)
+    await redis_client.set(key, nmid)
+    return None
