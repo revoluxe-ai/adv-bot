@@ -161,10 +161,10 @@ class Parser:
         url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
         async with aiohttp.ClientSession() as http_session:
             async with http_session.get(url) as response:
-                text = await response.text()
-        if not text:
+                response = await response.text()
+        if not response:
             raise DataError('Пустой ответ от сервера', text)
-        data = json.loads(text)
+        data = json.loads(response)
         if data == {}:
             return None, None, None
         try:
@@ -184,6 +184,8 @@ class Parser:
         if not products:
             return None, None, None
         assert isinstance(preset, int)
+        assert isinstance(cluster, str)
+        assert isinstance(products, list)
         return products, cluster , preset
 
 
