@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import json
+from types import NoneType
 from typing import Union
 import logging
 
@@ -350,7 +351,7 @@ async def set_cluster_and_preset(text, cluster, preset):
 async def get_cluster_and_preset(text)-> (str, int,):
     key = 'cluster_and_preset:' + text
     value = await redis_client.get(key)
-    if value is None:
+    if isinstance(value, NoneType):
         return None, None
     value = value.decode('utf-8')
     cluster, preset = value.split(':')
