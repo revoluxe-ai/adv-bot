@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import json
+import typing
 from types import NoneType
 from typing import Union
 import logging
@@ -339,10 +340,13 @@ async def get(key):
     return value
 
 
-async def set_cluster_and_preset(text, cluster, preset):
+async def set_cluster_and_preset(text, cluster: typing.Optional[str], preset:  typing.Optional[int]):
     key = 'cluster_and_preset:' + text
-    value = cluster + ':' + str(preset)
-    await redis_client.set(key, value)
+    if cluster is None or preset is None:
+        await redis_client.delete(key)
+    else:
+        value = cluster + ':' + str(preset)
+        await redis_client.set(key, value)
     return None
 
 
@@ -360,6 +364,7 @@ async def get_cluster_and_preset(text)-> (str, int,):
         return cluster, preset
     except Exception:
         logger.error('Не удалось получить кластер и пресет из значения: ' + value)
+        await set_cluster_and_preset(text, None, None)
         return None, None
 
 
