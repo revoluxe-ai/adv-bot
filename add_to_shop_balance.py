@@ -4,8 +4,8 @@ from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 shop_id = '8a2acf65-1b2c-4061-9ae5-fed8ffb04371'
-# add_balance =
-# add_bonus =
+add_balance = 1000000
+add_bonus = 100000
 
 async def add_balance_and_bonus():
     async with sm() as session:
@@ -13,11 +13,11 @@ async def add_balance_and_bonus():
         result = await session.execute(stmt)
         wb_cabinet = result.scalar_one_or_none()
         if not (balance := wb_cabinet.balance):
-            balance = 0
+            wb_cabinet.balance = 0
         if not (bonus := wb_cabinet.bonus):
-            bonus = 0
-        wb_cabinet.balance = 0
-        wb_cabinet.bonus = 0
+            wb_cabinet.bonus = 0
+        wb_cabinet.balance += add_balance
+        wb_cabinet.bonus = + add_bonus
         await session.commit()
 
 

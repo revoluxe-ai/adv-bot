@@ -135,7 +135,7 @@ async def update_cards_in_graph_small_cycle():
     async with sm() as session:
         stmt = select(AdvSetting) \
             .where(or_(AdvSetting.bot_active == True,
-                       AdvSetting.active_status == 'active'))
+                       AdvSetting.active_status == 'started'))
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
     await __update_cards_in_graph_for_shops(adv_settings)
