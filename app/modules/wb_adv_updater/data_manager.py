@@ -315,7 +315,7 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
         text = keyword.text
         try:
            cluster_name, preset = await redis_manager.get_cluster_and_preset(text)
-        except Exception as exc:
+        except Exception:
             logger.error(f'Ошибка при получении кластера и пресета для ключевого слова {text}', exc_info=True)
             cluster_name = None
             preset = None
