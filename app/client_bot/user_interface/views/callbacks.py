@@ -154,3 +154,8 @@ class TurnClusters(CallbackData, prefix="turn_clusters"):
 class CheckPosition(CallbackData, prefix="check_position"):
     keyword_setting_original_id: int
     adv_original_id: int
+
+
+class UpdateCompanyFromWB(CallbackData, prefix="update_company_from_wb"):
+    wb_user_cabinet_original_id: int
+

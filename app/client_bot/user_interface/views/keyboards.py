@@ -226,6 +226,14 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
                                     callback_data=callbacks.Shop(
                                         action=Action.select,
                                         wb_user_cabinet_original_id = wb_user_cabinet_original_id).pack())
+
+    keyboard_buttons.append([button])
+    button = InlineKeyboardButton(text='Подгрузить новые кампании из кабинета WB',
+                                    callback_data=callbacks.UpdateCompanyFromWB(
+                                        wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack())
+
+
+
     keyboard_buttons.append([button])
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     return keyboard
