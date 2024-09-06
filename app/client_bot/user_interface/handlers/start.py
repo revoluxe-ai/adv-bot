@@ -59,7 +59,7 @@ async def start_registration(message: types.Message, bot: aiogram.Bot, state: FS
             WBUserCabinet.wb_cabinet)) \
             .where(User.user_telegram_id == user_id)
         result = await session.execute(stmt)
-        user = result.scalar()
+        user: User = result.scalar()
         if not user:
             user = User(user_telegram_id=user_id,
                         username=message.from_user.username,
