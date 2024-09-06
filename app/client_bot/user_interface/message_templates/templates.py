@@ -94,10 +94,13 @@ class TextWithImage(Base):
 
     @manage_file_id
     async def __call__(self):
+        parse_mode = getattr(self, 'parse_mode', None)
 
         last_message = await self.bot.send_photo(chat_id=self.chat_id,
                                                  photo=self.image,
-                                                 caption=self.text)
+                                                 caption=self.text,
+                                                 parse_mode=parse_mode
+                                                 )
         return last_message
 
 
