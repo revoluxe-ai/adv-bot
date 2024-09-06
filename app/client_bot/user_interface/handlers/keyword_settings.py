@@ -17,6 +17,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.wb_adv_updater import data_manager
+from app.utils import add_wb_positions_to_redis
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
@@ -517,4 +518,26 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
     return
 
 
+@router.callback_query(callbacks.CheckPosition.filter())
+async def check_position(callback: types.CallbackQuery,
+                            callback_data: callbacks.CheckPosition,
+                            bot: aiogram.Bot, state: FSMContext):
 
+        await callback.answer()
+        await messages.LongTimeOperation(bot, callback.message.chat.id)()
+        keyword_setting_original_id = callback_data.keyword_setting_original_id
+        async with _sm() as session:
+            result = await session.execute(select(KeywordSetting.text)\
+                                                    .where(KeywordSetting.id == keyword_setting_original_id))
+            text: KeywordSetting = result.scalar()
+            adv_setting_original_id = callback_data.adv_original_id
+            stmt = select(AdvSetting.nmids).where(AdvSetting.id == adv_setting_original_id)
+            result = await session.execute(stmt)
+            nmids: AdvSetting = result.scalar()
+            nmid = nmids[0]
+
+        await add_wb_positions_to_redis(text, {nmid})
+        await messages.KeywordSettingMessage(bot,
+                                             callback.message.chat.id,
+                                             keyword_setting_original_id,
+                                             1)()

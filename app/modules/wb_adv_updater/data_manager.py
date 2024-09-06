@@ -1137,3 +1137,23 @@ async def check_by_black_list_template(keyword_text: str, adv_setting_id: int):
 
 async def reset_black_phrases(adv_setting_id):
     await redis_manager.set_black_phrases(adv_setting_id, [])
+
+
+async def get_users_from_nmid(nmid: int):
+    async with _sm() as session:
+        stmt = select(WBCard.adv_setting_id).where(WBCard.nmid == nmid)
+        result = await session.execute(stmt)
+        adv_setting_ids = result.scalars().all()
+        stmt = select(WBCabinet.id).where(WBCabinet.adv_setting_id.in_(adv_setting_ids))
+        result = await session.execute(stmt)
+        wbcabinet_ids = result.scalars().all()
+        stmt = select(WBUserCabinet)\
+            .options(WBUserCabinet.user)  \
+                .where(WBUserCabinet.wbcabinet_id.in_(wbcabinet_ids))
+        result = await session.execute(stmt)
+        wb_user_cabinets = result.scalars().all()
+        users = []
+        for wb_user_cabinet in wb_user_cabinets:
+            user = wb_user_cabinet.user
+            users.append(user)
+        return users

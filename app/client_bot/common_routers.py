@@ -41,5 +41,4 @@ common_router.include_routers(add_white_phrases.router)
 common_router.include_routers(setting_min_ctr.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
-common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())
-
+# common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())

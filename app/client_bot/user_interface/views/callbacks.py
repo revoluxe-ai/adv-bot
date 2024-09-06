@@ -149,3 +149,8 @@ class DownloadCSV(CallbackData, prefix="download_csv"):
 class TurnClusters(CallbackData, prefix="turn_clusters"):
     action: str
     adv_original_id: int
+
+
+class CheckPosition(CallbackData, prefix="check_position"):
+    keyword_setting_original_id: int
+    adv_original_id: int

@@ -297,21 +297,20 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
         turn_on = '✅' if keyword.status == KeywordStatus.GOOD else '❌'
         text = f'{clicks}/{views}/{round(ctr *100,2)}%'
-        if adv_setting.parsing_active:
-            text = text + '|'
-            if keyword.cpm:
-                first_position = keyword.base_position
-                second_position = keyword.promo_position
-                text += f'{first_position}>{second_position}'
-            elif keyword.real_position:
-                first_position = keyword.real_position
-                text += f'{first_position}'
-            elif keyword.real_position == 0:
-                first_position = ">i"
-                text += f'{first_position}'
-            else:
-                first_position = '?'
-                text += f'{first_position}'
+        text = text + '|'
+        if keyword.cpm:
+            first_position = keyword.base_position
+            second_position = keyword.promo_position
+            text += f'{first_position}>{second_position}'
+        elif keyword.real_position:
+            first_position = keyword.real_position
+            text += f'{first_position}'
+        elif keyword.real_position == 0:
+            first_position = ">i"
+            text += f'{first_position}'
+        else:
+            first_position = '?'
+            text += f'{first_position}'
         text += f'{turn_on}({hard_status}) {keyword.text}'
 
         text += f'({keyword.query})'
@@ -457,6 +456,15 @@ def get_keyword_setting_keyboard(
                                            keyword_setting_original_id=keyword.id).pack())]
         buttons.append(button)
 
+    button = [InlineKeyboardButton(text='Проверить позиции',
+                                   callback_data=callbacks.CheckPosition(
+                                       keyword_setting_original_id=keyword.id,
+                                       adv_original_id=adv_setting.id).pack())]
+
+    buttons.append(button)
+
+
+
 
     buttons.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
                                              callback_data=callbacks.SettingKeywords(
@@ -465,7 +473,12 @@ def get_keyword_setting_keyboard(
                                              page=page,
                                              ).pack())])
 
+
+
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
     return keyboard
 
 

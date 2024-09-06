@@ -12,6 +12,7 @@ from typing import AsyncGenerator
 from aiohttp import ServerDisconnectedError, ClientOSError
 from sqlalchemy.orm import joinedload
 
+from app.admin_bot.sender import sender_manager
 from app.modules.wb_adv_updater import data_manager
 from app.settings import settings
 from app.utils import redis_manager
@@ -221,37 +222,86 @@ async def add_wb_positions_from_queue_to_db():
     del queue_position_dict[last_key]
 
 
+class ErrorParsingPositions(Exception):
+    pass
+
+
+async def add_positions_from_page(stop_event: asyncio.Event,
+                                  text: str, page: int,
+                                  need_nmids: set[int],):
+    if stop_event.is_set():
+        return []
+    positions = await parser.parse_keywords_from_wb(text, page)
+    if not positions:
+        stop_event.set()
+        return []
+    logger.debug(f'Найдено {len(positions)}')
+    positions = [position for position in positions if position.nmid in need_nmids]
+    logger.debug(f'После фильтра осталось {len(positions)}')
+    if positions:
+        await redis_manager.add_positions_to_redis(positions)
+        logger.debug('Записали позиции в Редис')
+        for position in positions:
+            nmid: int = position.nmid
+            need_nmids.discard(nmid)
+            if not need_nmids:
+                stop_event.set()
+                break
+    return positions
+
+
 async def add_wb_positions(text: str, need_nmids: set[int]):
+    stop_event = asyncio.Event()
+    tasks = []
     for page in range(1, 100):
-        positions = await parser.parse_keywords_from_wb(text, page)
-        if not positions:
+        task = asyncio.create_task(add_positions_from_page(stop_event,
+                                      text,
+                                      page,
+                                      need_nmids = need_nmids))
+        tasks.append(task)
+        if stop_event.is_set():
             break
-        logger.debug(f'Найдено {len(positions)}')
-        positions = [position for position in positions if position.nmid in need_nmids]
-        logger.debug(f'После фильтра осталось {len(positions)}')
-        if positions:
-            await redis_manager.add_positions_to_redis(positions)
-            logger.debug('Записали позиции в Редис')
-            for position in positions:
-                nmid: int = position.nmid
-                need_nmids.discard(nmid)
-        if not need_nmids:
-            logger.debug(f'Все nmid найдены')
-            break
-        if need_nmids:
-            not_found_positions = []
-            for nmid in need_nmids:
-                position = WBItemPosition(
-                    real_position=0,
-                    base_position=0,
-                    promo_position=0,
-                    keyword_text=text,
-                    timestamp=datetime.datetime.now(),
-                    nmid=nmid,
-                    cpm=0
-                )
-                not_found_positions.append(position)
-            await redis_manager.add_positions_to_redis(not_found_positions)
+        await asyncio.sleep(0.1)
+
+    all_positions = []
+
+    while not stop_event.is_set():
+        await asyncio.sleep(0)
+    for task in tasks:
+        task.cancel()
+        try:
+            positions = await task
+            all_positions.extend(positions)
+        except asyncio.CancelledError:
+            pass
+
+    if not all_positions:
+        raise ErrorParsingPositions('Не удалось получить позиции')
+    if need_nmids:
+        not_found_positions = []
+        for nmid in need_nmids:
+            position = WBItemPosition(
+                real_position=0,
+                base_position=0,
+                promo_position=0,
+                keyword_text=text,
+                timestamp=datetime.datetime.now(),
+                nmid=nmid,
+                cpm=0
+            )
+            not_found_positions.append(position)
+        await redis_manager.add_positions_to_redis(not_found_positions)
+
+
+async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
+    for position in positions:
+        last_position = await redis_manager.get_keyword_position(position.keyword_text,
+                                                                 position.nmid)
+        await sender_manager.check_last_position(last_position, position)
+
+
+
+
 
 
 semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)

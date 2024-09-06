@@ -11,7 +11,7 @@ from python_modules.logger import setup_logging
 
 from python_modules.logger import setup_logging
 from . import messages
-from ...modules.common_slaves.wildberries.models import WBUserCabinet
+from ...modules.common_slaves.wildberries.models import WBUserCabinet, WBItemPosition
 from ...utils import redis_manager
 from ...utils.db.models import User
 
@@ -68,3 +68,28 @@ async def send_message_to_admin(text: str, off = False):
 async def send_message_to_user(wb_user_cabinet: WBUserCabinet, message):
     user: User = wb_user_cabinet.user
     await message(bot, user.user_telegram_id, wb_user_cabinet.name)()
+
+
+async def get_users_from_nmid(nmid: int):
+    users = await data_manager.get_users_from_nmid(nmid)
+    return users
+
+
+async def check_last_position(last_position: WBItemPosition, new_position: WBItemPosition):
+    if last_position.base_position > 0 and new_position.base_position == 0:
+        users = await get_users_from_nmid(last_position.nmid)
+        for user in users:
+            await messages.ItemIsOutOfIndex(bot,
+                                            user.user_telegram_id,
+                                            last_position,
+                                            new_position)()
+    elif last_position.base_position == 0 and new_position.base_position > 0:
+        users = await get_users_from_nmid(last_position.nmid)
+        for user in users:
+            await messages.ItemIsInIndex(bot,
+                                         user.user_telegram_id,
+                                         last_position,
+                                         new_position)()
+
+
+

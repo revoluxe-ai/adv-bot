@@ -538,7 +538,6 @@ class KeywordSettingMessage(TextWithKeyboard):
         if self.position:
             text += (f'🏆 *Органическая позиция:* {self.position.base_position}\n'
                      f"""🚀 *Буст-позиция:* {self.position.promo_position if self.position.promo_position else "Нет"}\n"""
-                     f'📈 *Фактическая позиция:* {self.position.real_position}\n'
                      f"""💰 *Ставка на момент сбора данных:* {self.position.cpm if self.position.cpm else "Нет"}\n"""
                      f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n""")
         else:
@@ -813,49 +812,19 @@ class ShopMenu(TextWithKeyboard):
         )
 
 
-        if balance == 0 and bonus == 0:
-            text += """
-🎉 Отлично! Вы успешно добавили магазин в систему. 🎉
-
-Дальнейшие шаги:
-💳 Теперь вам нужно пополнить баланс для продолжения работы.
-
-Минимальная сумма пополнения - 10 000 р.
-(Если нужно пополнить на меньшую сумму - пишите админу @skyline360\_1)
-Стоимость работы 1 кампании в сутки - 35 р.
-Стоимость парсинга ключей кампании (опционально) - 15 р.
-Стоимость автобиддера - 25 р. кампания в сутки
-📲 Нажмите на кнопку "Пополнить баланс" ниже.
-
-🔖 Если вам нужен купон для тестирования бота, то запросите у админа - @skyline360\_1"""
-        elif balance < 0 and bonus == 0:
-            text += ("""
-🚨 Внимание, у магазина отрицательный баланс. 🚨
-
-🔴 Это значит, что все кампании были отключены от бота и не управляются им.
-
-💳 Если вы планируете продолжить работу с ботом, то пополните баланс в ближайшее время.
-
-❓ Если возникли проблемы, то обратитесь к администратору бота - @skyline360_1
-
-🆕 Канал с последними новостями - https://t.me/auto_wb_master
-
-👥 Чат поддержки - https://t.me/wbgram_disc\n
-""")
-        else:
-            if isinstance(last_for_days, int):
-                if last_for_days > 7:
-                    text += (f"""
+        if isinstance(last_for_days, int):
+            if last_for_days > 7:
+                text += (f"""
 💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота. 💰
-                """)
-                elif last_for_days == 0:
-                    text += (f"""
+            """)
+            elif last_for_days == 0:
+                text += (f"""
 ⚠️ Денег на продление кампаний больше нет! ⚠️
 
 💳 Срочно пополните баланс во избежание проблем с работой кампаний!
 """)
-                else:
-                    text += (f"""
+            else:
+                text += (f"""
 🚨 Внимание!!! 🚨
 
 💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота.
@@ -879,23 +848,15 @@ class ShopMenu(TextWithKeyboard):
         is_active_adv = self.is_active_adv
         wb_cabinet_original_id = wb_cabinet.id
         is_active_adv: True
-
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-        expiration_time: datetime.datetime = wb_cabinet.expiration_time
-        now = datetime.datetime.now()
-        if not (balance := wb_cabinet.balance):
-            balance = 0
-        if not (bonus := wb_cabinet.bonus):
-            bonus = 0
         builder = InlineKeyboardBuilder()
 
-        if any([expiration_time > now, balance > 0, bonus > 0]):
-            button = InlineKeyboardButton(
+        button = InlineKeyboardButton(
         text = 'Автоматические рекламные кампании',
         callback_data = callbacks.ChoiceAdvPaginator(
             wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
-            builder.row(button)
+        builder.row(button)
 
         button = InlineKeyboardButton(
         text = 'Пополнить баланс',
