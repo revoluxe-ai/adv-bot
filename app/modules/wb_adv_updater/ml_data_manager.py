@@ -85,17 +85,21 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
             all_nmids.add(nmid)
     if not all_nmids:
         return
-    async with sm() as session:
-        stmt = select(WBCard).where(WBCard.nmid.in_(all_nmids))
-        wbcards: list[WBCard] = await session.stream(stmt)
-        async for wbcard in wbcards.scalars():
-            try:
-                 check_in_neo = await gds.check_wb_card_in_neo(wbcard.nmid)
-                 if check_in_neo:
-                     continue
-            except Exception:
-                logger.debug(f'Ошибка чека карты в neo Артикул: {wbcard.nmid} ', exc_info=True)
-            try:
+    for nmid in all_nmids:
+        check_in_neo_by_redis = await gds.check_wb_card_in_neo(nmid)
+        try:
+            if check_in_neo_by_redis:
+                logger.debug(f'Карточка {nmid} уже есть в базе данных')
+                continue
+            logger.debug(f'Запрашиваем карточку {nmid}')
+            async with sm() as session:
+                stmt = select(WBCard).where(WBCard.nmid == nmid)
+                result = await session.execute(stmt)
+                wbcard: WBCard = result.scalar()
+                if not wbcard:
+                    logger.debug(f'Карточка {nmid} не найдена')
+                    continue
+                logger.debug(f'Получили карточку {nmid}')
                 main_image_url: str = wbcard.photos[0]
                 async with aiohttp.ClientSession() as http_session:
                     async with http_session.get(main_image_url) as response:
@@ -105,19 +109,19 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                 vector = await asyncio.to_thread(image_master.get_vector, pil_image)
                 dhash = await asyncio.to_thread(image_tools.dhash, pil_image)
                 logger.debug(f"Обновляем карточку: {wbcard.name}")
-                try:
-                     await gds.update_wb_card(wbcard, characteristics_word, dhash,
-                                         vector)  # Подтверждение изменений в базе данных
-                except Exception:
-                    logger.error(f'Ошибка обновления карточки:  {wbcard.nmid}')
-            except KeyError as exc:
-                if exc.args[0] == 'photos':
-                    logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
-                else:
-                    logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
-            except UnidentifiedImageError as exc:
-                logger.error(f"Ошибка UnidentifiedImageError при обработке изображения nmid"
-                             f" {wbcard.nmid}, url: {main_image_url}: {exc}", exc_info=True)
+            try:
+                 await gds.update_wb_card(wbcard, characteristics_word, dhash,
+                                     vector)  # Подтверждение изменений в базе данных
+            except Exception:
+                logger.error(f'Ошибка обновления карточки:  {wbcard.nmid}')
+        except KeyError as exc:
+            if exc.args[0] == 'photos':
+                logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
+            else:
+                logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
+        except UnidentifiedImageError as exc:
+            logger.error(f"Ошибка UnidentifiedImageError при обработке изображения nmid"
+                         f" {wbcard.nmid}, url: {main_image_url}: {exc}", exc_info=True)
 
 
 
@@ -134,8 +138,9 @@ async def update_cards_in_graph_for_shops_big_cycle():
 async def update_cards_in_graph_small_cycle():
     async with sm() as session:
         stmt = select(AdvSetting) \
-            .where(or_(AdvSetting.bot_active == True,
-                       AdvSetting.active_status == 'started'))
+            .where(AdvSetting.bot_active == True,
+                       AdvSetting.active_status == 'started')
+
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
     await __update_cards_in_graph_for_shops(adv_settings)
