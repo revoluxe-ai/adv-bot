@@ -34,7 +34,13 @@ class DataSetter:
                     good_phrases.append(keyword.text)
                 else:
                     bad_phrases.append(keyword.text)
+                    if clusters := keyword.childs_keywords:
+                        for cluster in clusters:
+                            bad_phrases.append(cluster.text)
+
+
             if bad_phrases:
+                bad_phrases = list(set(bad_phrases))
                 await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
                 logger.debug(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
                 logger.debug(f'Позитивные слова {good_phrases}')
