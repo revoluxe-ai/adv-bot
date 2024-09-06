@@ -133,7 +133,7 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
                                  wb_user_cabinet = None,
                                  wb_cabinet = wb_cabinet)
             yield access
-    return
+
 
 
 async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCabinetAccess:
