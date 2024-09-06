@@ -119,7 +119,8 @@ async def _run_bidder_process_for_adv(adv_id: int,
             if views == 0:
                 continue
             try:
-                await parser.add_wb_positions(keyword.text, {nmid_in_adv})
+                text = keyword.text
+                await parser.add_wb_positions(text, {nmid_in_adv})
             except Exception as e:
                 logger.error(f'Ошибка при получении позиции {e}')
                 continue
