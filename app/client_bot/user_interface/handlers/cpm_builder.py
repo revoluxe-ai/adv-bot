@@ -19,6 +19,24 @@ sm = get_async_session_maker
 router = Router()
 
 
+
+@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == 'off_auto_cpm'))
+async def off_auto_cpm(callback: types.CallbackQuery,
+                                    callback_data: callbacks.ChoiceAdvPaginator,
+                                    bot: aiogram.Bot,
+                                    state: FSMContext):
+
+        await callback.answer()
+        adv_original_id = callback_data.adv_original_id
+        async with sm() as session:
+            adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+            adv = adv.scalar()
+            adv.bidder_active = False
+            await session.commit()
+            await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
+        return
+
+
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == 'to_cpm_setting_page'))
 async def to_page_for_cpm_setting(callback: types.CallbackQuery,
                                callback_data: callbacks.ChoiceAdvPaginator,

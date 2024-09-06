@@ -1751,19 +1751,19 @@ class CPMSetting(TextWithKeyboard):
     def keyboard(self):
         builder = InlineKeyboardBuilder()
 
-        if not self.adv_setting.bidder_active:
-        #
-        #     bottom = InlineKeyboardButton(text="Установить фиксированную ставку CPM",
-        #                                   callback_data=callbacks.CPMSettingMenu(
-        #                                   action = "turn_off_ua",
-        #                                   adv_original_id = self.adv_setting.id).pack())
-        # else:
+        if self.adv_setting.bidder_active:
+
+            bottom = InlineKeyboardButton(text="Выключить автоматическое управление ставкой",
+                                          callback_data=callbacks.CPMSettingMenu(
+                                          action = "off_auto_cpm",
+                                          adv_original_id = self.adv_setting.id).pack())
+        else:
             bottom = InlineKeyboardButton(text="Включить автоматическое управление CPM",
                                       callback_data=callbacks.CPMSettingMenu(
                                           action="set_auto_cpm",
                                           adv_original_id=self.adv_setting.id).pack())
 
-            builder.row(bottom)
+        builder.row(bottom)
 
         bottom = InlineKeyboardButton(text = 'Изменить ставку (Максимальную ставку)',
                                       callback_data = callbacks.CPMSettingMenu(
