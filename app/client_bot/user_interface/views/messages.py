@@ -1944,3 +1944,80 @@ class Single_message104(Text):
 Нажмите на /start  ⬇️    
     
     """
+
+
+class Single_message106(Text):
+
+        text = """
+        🚀 СЕКРЕТНАЯ АКЦИЯ ТОЛЬКО ДЛЯ ПОЛЬЗОВАТЕЛЕЙ БОТА - 100% бонус при пополнении на любую сумму!
+
+        🔥 За последнее время в нашем боте появилось много классных функций, которые сделают вашу рекламу на Wildberries ещё эффективнее!
+
+        В честь этого мы объявляем ограниченную акцию:
+        Пополните счёт до 18:00 10.09.2024 и получите 100% бонус на каждое пополнение! 💰
+        Почему стоит действовать прямо сейчас?
+
+        ♾ Удваивайте рекламный бюджет и используйте новые возможности бота на полную!
+        ❗️Акция действует только до 18:00 вторника, так что не упустите шанс удвоить свои вложения.
+
+        💬 Пишите мне, если у вас возникли вопросы или нужна помощь с настройкой:
+
+        ✉️ @skyline360_1
+
+        Успейте воспользоваться предложением и опробовать все новые функции бота!"""
+
+
+class ItemIsOutOfIndex(Text):
+
+    def __init__(self,bot,
+            user_telegram_id,
+            last_position: WBItemPosition,
+            new_position: WBItemPosition):
+        self.user_telegram_id = user_telegram_id
+        self.last_position = last_position
+        self.new_position = new_position
+        super().__init__(bot, user_telegram_id)
+
+
+
+    @property
+    def text(self):
+        return f"""
+Ваш товар {self.last_position.nmid} выпал из индекса по ключевому слову {self.last_position.keyword_text}."""
+
+
+class ItemIsInIndex(Text):
+
+    def __init__(self,bot,
+            user_telegram_id,
+            last_position: WBItemPosition,
+            new_position: WBItemPosition):
+        self.user_telegram_id = user_telegram_id
+        self.last_position = last_position
+        self.new_position = new_position
+        super().__init__(bot, user_telegram_id)
+
+
+    @property
+    def text(self):
+        return f"""
+Ваш товар {self.last_position.nmid} добавлен (вернулся) в индекс по ключевому слову {self.last_position.keyword_text}."""
+
+
+
+class Single_message107(Text):
+    text = """
+    🚀 Как с помощью бота попасть в рекламные полки?
+
+Не все знают, но у нас уже давно доступна эта функция! Чтобы ваши товары оказались на рекламных полках, нужно выполнить всего пару шагов:
+
+1. Добавьте самые релевантные ключевые слова в белый список.
+2. Установите минимальный CTR на 100.
+
+И вуаля — ваши товары появятся на рекламных полках, привлекая больше покупателей! 🔥
+
+Если вам нужна помощь с настройкой бота или у вас возникли вопросы, пишите мне, и я помогу настроить всё быстро и правильно.
+
+📩  @skyline360_1
+    
+    """
