@@ -81,6 +81,8 @@ async def check_last_position(last_position: Optional[WBItemPosition],
         if not last_position:
             last_position = new_position
         cluster_name = await redis_manager.get_cluster_name(new_position.keyword_text)
+        if not cluster_name:
+            return
         if last_position.base_position > 0 and new_position.base_position == 0:
 
             keyword_send_status: str = await redis_manager.get_keyword_send_status(cluster_name, new_position.nmid)
