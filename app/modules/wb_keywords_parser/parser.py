@@ -287,8 +287,7 @@ async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
     for position in positions:
         last_position = await redis_manager.get_keyword_position(position.keyword_text,
                                                                  position.nmid)
-
-        asyncio.create_task(sender_manager.check_last_position(last_position, position))
+        # asyncio.create_task(sender_manager.check_last_position(last_position, position))
 
     await redis_manager.add_positions_to_redis(positions)
 
