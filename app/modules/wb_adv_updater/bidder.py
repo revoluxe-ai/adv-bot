@@ -53,7 +53,7 @@ async def _run_bidder_process():
                         logger.error(
                             f'Ошибка обновления ставок: '
                             f'{wb_cabinet_tasks[cabinet_id].exception()},'
-                            f' для кабинета {cabinet_id}'
+                            f' для кабинета {cabinet_id}', exc_info=True
                         )
 
                     del wb_cabinet_tasks[cabinet_id]
