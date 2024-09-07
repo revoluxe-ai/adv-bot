@@ -53,7 +53,8 @@ async def get_csv_file(adv_setting: AdvSetting):
     rows = []
     # Заголовки столбцов
     rows.append([
-        'Запрос',
+        'Запрос(вхождение)',
+        'Запрос(точное соответствие)',
         'Клики',
         'Просмотры',
         "Количество запросов",
@@ -105,6 +106,7 @@ async def get_csv_file(adv_setting: AdvSetting):
 
         rows.append([
         keyword.text,
+        '"' + keyword.text + '"',
         clicks,
         views,
         keyword.query,
