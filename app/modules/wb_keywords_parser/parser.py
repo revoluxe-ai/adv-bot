@@ -199,27 +199,9 @@ write_to_db_queue = asyncio.Queue(10000)
 
 queue_position_dict = {}
 
-async def add_wb_positions_from_queue_to_db():
-    position: WBItemPosition = await write_to_db_queue.get()
-    key = f'{position.keyword.text}:{position.nmid}'
-    queue_position_dict[key] = position
-    last_key = list(queue_position_dict.keys())[-1]
-    position = list(queue_position_dict.values())[-1]
-    async with sm() as session:
-        stmt = select(WBItemPosition) \
-            .where(WBItemPosition.nmid == position.nmid,  # .options(joinedload(WBItemPosition.keyword))
-                        WBItemPosition.keyword_id == CommonKeyword.id,
-                   WBItemPosition.timestamp > datetime.datetime.now() - datetime.timedelta(hours=8)) \
-            .order_by(WBItemPosition.timestamp.desc()) \
-            .limit(1)
-        pos_in_db = await session.execute(stmt)
-        pos_in_db = pos_in_db.scalar_one_or_none()
-        if not pos_in_db:
-            keyword = position.keyword
-            session.add(keyword)  # Добавляем keyword в сессию
-            session.add(position)  # Добавляем position в сессию
-            await session.commit()
-    del queue_position_dict[last_key]
+
+
+
 
 
 class ErrorParsingPositions(Exception):
@@ -227,19 +209,21 @@ class ErrorParsingPositions(Exception):
 
 
 async def add_positions_from_page(stop_event: asyncio.Event,
-                                  text: str, page: int,
+                                  catch_any_position: asyncio.Event,
+                                  text: str,
+                                  page: int,
                                   need_nmids: set[int],):
     if stop_event.is_set():
         return []
     positions = await parser.parse_keywords_from_wb(text, page)
     if not positions:
-        stop_event.set()
         return []
+    catch_any_position.set()
     logger.debug(f'Найдено {len(positions)}')
     positions = [position for position in positions if position.nmid in need_nmids]
     logger.debug(f'После фильтра осталось {len(positions)}')
     if positions:
-        await redis_manager.add_positions_to_redis(positions)
+        await add_wb_positions_to_redis(positions)
         logger.debug('Записали позиции в Редис')
         for position in positions:
             nmid: int = position.nmid
@@ -250,54 +234,63 @@ async def add_positions_from_page(stop_event: asyncio.Event,
     return positions
 
 
-async def add_wb_positions(text: str, need_nmids: set[int]):
+async def add_wb_positions(text: str, need_nmids: set[int], delay):
     stop_event = asyncio.Event()
+    catch_any_position = asyncio.Event()
     tasks = []
-    for page in range(1, 100):
-        task = asyncio.create_task(add_positions_from_page(stop_event,
-                                      text,
-                                      page,
-                                      need_nmids = need_nmids))
-        tasks.append(task)
-        if stop_event.is_set():
-            break
-        await asyncio.sleep(0.1)
-
-    all_positions = []
-
-    while not stop_event.is_set():
-        await asyncio.sleep(0)
-    for task in tasks:
-        task.cancel()
-        try:
-            positions = await task
-            all_positions.extend(positions)
-        except asyncio.CancelledError:
-            pass
-
-    if not all_positions:
-        raise ErrorParsingPositions('Не удалось получить позиции')
-    if need_nmids:
-        not_found_positions = []
-        for nmid in need_nmids:
-            position = WBItemPosition(
-                real_position=0,
-                base_position=0,
-                promo_position=0,
-                keyword_text=text,
-                timestamp=datetime.datetime.now(),
-                nmid=nmid,
-                cpm=0
+    try:
+        for page in range(1, 100):
+            if stop_event.is_set():
+                break
+            task = asyncio.create_task(
+                add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids=need_nmids)
             )
-            not_found_positions.append(position)
-        await redis_manager.add_positions_to_redis(not_found_positions)
+            tasks.append(task)
+            await asyncio.sleep(delay)
 
+        # Ожидаем завершения всех задач
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    except Exception as e:
+        logger.error(f'Ошибка в процессе добавления позиций: {e}', exc_info=True)
+    finally:
+        # Отменяем оставшиеся задачи, если такие есть
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        # Проверяем, была ли найдена хоть одна позиция
+        if not catch_any_position.is_set():
+            raise ErrorParsingPositions('Не найдено ни одной позиции в выдаче')
+
+        # Добавляем не найденные позиции в Redis
+        if need_nmids:
+            not_found_positions = [
+                WBItemPosition(
+                    real_position=0,
+                    base_position=0,
+                    promo_position=0,
+                    keyword_text=text,
+                    timestamp=datetime.datetime.now(),
+                    nmid=nmid,
+                    cpm=0
+                )
+                for nmid in need_nmids
+            ]
+            await add_wb_positions_to_redis(not_found_positions)
 
 async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
     for position in positions:
         last_position = await redis_manager.get_keyword_position(position.keyword_text,
                                                                  position.nmid)
-        await sender_manager.check_last_position(last_position, position)
+
+        asyncio.create_task(sender_manager.check_last_position(last_position, position))
+
+    await redis_manager.add_positions_to_redis(positions)
 
 
 
@@ -309,7 +302,7 @@ semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
 async def limited_add_wb_positions(text:str, need_nmids: set[int]):
     async with semaphore:
         try:
-            await add_wb_positions(text, need_nmids)
+            await add_wb_positions(text, need_nmids, 1)
         except Exception as e:
             logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
 

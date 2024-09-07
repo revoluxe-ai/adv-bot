@@ -1,7 +1,8 @@
 import asyncio
 import logging
 from hashlib import sha256
-
+from typing import Optional
+# from app.client_bot.user_interface.
 import aiogram
 from aiogram.exceptions import TelegramForbiddenError
 from .utils import utils
@@ -10,10 +11,11 @@ from app.client_bot.utils import data_manager
 from python_modules.logger import setup_logging
 
 from python_modules.logger import setup_logging
-from . import messages
 from ...modules.common_slaves.wildberries.models import WBUserCabinet, WBItemPosition
 from ...utils import redis_manager
 from ...utils.db.models import User
+from app.client_bot.user_interface.views import messages
+
 
 setup_logging()
 
@@ -75,21 +77,50 @@ async def get_users_from_nmid(nmid: int):
     return users
 
 
-async def check_last_position(last_position: WBItemPosition, new_position: WBItemPosition):
-    if last_position.base_position > 0 and new_position.base_position == 0:
-        users = await get_users_from_nmid(last_position.nmid)
-        for user in users:
-            await messages.ItemIsOutOfIndex(bot,
-                                            user.user_telegram_id,
-                                            last_position,
-                                            new_position)()
-    elif last_position.base_position == 0 and new_position.base_position > 0:
-        users = await get_users_from_nmid(last_position.nmid)
-        for user in users:
-            await messages.ItemIsInIndex(bot,
-                                         user.user_telegram_id,
-                                         last_position,
-                                         new_position)()
+async def check_last_position(last_position: Optional[WBItemPosition],
+                              new_position: WBItemPosition):
+    try:
+        nmid = new_position.nmid
+        if not last_position:
+            last_position = new_position
+        cluster_name = await redis_manager.get_cluster_name(new_position.keyword_text)
+        if last_position.base_position > 0 and new_position.base_position == 0:
+
+            keyword_send_status: str = await redis_manager.get_keyword_send_status(cluster_name, new_position.nmid)
+            if keyword_send_status == 'ItemIsOutOfIndex':
+                return
+            users = await get_users_from_nmid(nmid)
+            for user in users:
+                try:
+                    await messages.ItemIsOutOfIndex(bot,
+                                                user.user_telegram_id,
+                                                last_position,
+                                                    new_position)()
+                except Exception as exc:
+                    logger.error(f'Ошибка при отправке сообщения пользователю {user.username}: {exc}')
+            await redis_manager.set_keyword_send_status(cluster_name, nmid,  'ItemIsOutOfIndex')
+        elif last_position.base_position == 0 and new_position.base_position > 0:
+            keyword_send_status: str = await redis_manager.get_keyword_send_status(cluster_name, nmid)
+            if keyword_send_status == 'ItemIsInIndex':
+                return
+            users = await get_users_from_nmid(nmid)
+            for user in users:
+                try:
+                    await messages.ItemIsInIndex(bot,
+                                             user.user_telegram_id,
+                                             last_position,
+                                             new_position)()
+
+                except Exception as exc:
+                    logger.error(f'Ошибка при отправке сообщения пользователю {user.username}: {exc}')
+            await redis_manager.set_keyword_send_status(cluster_name, nmid,  'ItemIsInIndex')
+    except Exception as exc:
+        logger.error(f'Ошибка при проверке позиции {exc}', exc_info=True)
+        pass
 
 
-
+async def send_about_new_adv(adv, wb_cabinet_id):
+    async with sm() as session:
+        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
+        wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
+        users = await data_manager.get_users_from_wb_cabinet(wb_cabinet)
