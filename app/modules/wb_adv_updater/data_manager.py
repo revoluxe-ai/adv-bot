@@ -14,7 +14,7 @@ from app.exc import CardNotFoundInDB
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload, subqueryload, aliased
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
@@ -1140,20 +1140,22 @@ async def reset_black_phrases(adv_setting_id):
 
 
 async def get_users_from_nmid(nmid: int):
-    async with _sm() as session:
-        stmt = select(WBCard.adv_setting_id).where(WBCard.nmid == nmid)
-        result = await session.execute(stmt)
-        adv_setting_ids = result.scalars().all()
-        stmt = select(WBCabinet.id).where(WBCabinet.adv_setting_id.in_(adv_setting_ids))
-        result = await session.execute(stmt)
-        wbcabinet_ids = result.scalars().all()
-        stmt = select(WBUserCabinet)\
-            .options(WBUserCabinet.user)  \
-                .where(WBUserCabinet.wbcabinet_id.in_(wbcabinet_ids))
-        result = await session.execute(stmt)
-        wb_user_cabinets = result.scalars().all()
-        users = []
-        for wb_user_cabinet in wb_user_cabinets:
-            user = wb_user_cabinet.user
-            users.append(user)
-        return users
+    try:
+        async with _sm() as session:
+            # Создаем алиас для AdvSetting
+            adv_setting_alias = aliased(AdvSetting)
+            # Запрос для получения уникальных пользователей
+            stmt = select(User).distinct() \
+                .join(WBUserCabinet, WBUserCabinet.user_id == User.id) \
+                .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id) \
+                .join(adv_setting_alias, WBCabinet.adv_settings) \
+                .where(adv_setting_alias.nmids.contains([nmid])) \
+                .options(subqueryload(User.wb_user_cabinets))
+
+            result = await session.execute(stmt)
+            users = result.scalars().all()
+            return users
+    except Exception as e:
+        logger.error('Ошибка при получении пользователей по nmid', exc_info=True)
+        return []
+
