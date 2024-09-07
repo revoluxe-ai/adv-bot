@@ -381,3 +381,15 @@ async def set_nmid(adv_id, nmid):
     key = 'adv_nmid:' + str(adv_id)
     await redis_client.set(key, nmid)
     return None
+
+
+async def set_keyword_send_status(cluster_name, nmid, status: str):
+    key = 'keyword_send_status:' + cluster_name + ':' + str(nmid)
+    await redis_client.set(key, status)
+    return None
+
+
+async def get_keyword_send_status(cluster_name: str, nmid: int) -> str:
+    key = 'keyword_send_status:' + cluster_name + ':' + str(nmid)
+    status = await redis_client.get(key)
+    return status
