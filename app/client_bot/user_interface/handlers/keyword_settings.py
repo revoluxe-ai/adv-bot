@@ -536,7 +536,8 @@ async def check_position(callback: types.CallbackQuery,
             nmids: AdvSetting = result.scalar()
             nmid = nmids[0]
 
-        await add_wb_positions_to_redis(text, {nmid})
+
+        await add_wb_positions_to_redis(text, {nmid}, delay=0)
         await messages.KeywordSettingMessage(bot,
                                              callback.message.chat.id,
                                              keyword_setting_original_id,
