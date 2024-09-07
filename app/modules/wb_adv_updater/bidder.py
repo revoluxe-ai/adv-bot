@@ -63,93 +63,100 @@ async def _run_bidder_process():
 
 
 async def _run_bidder_process_for_wb_cabinet(access: WBCabinetAccess, adv_tasks: dict):
-    logger.debug(f'Запуск задачи обновления ставок для кабинета {access.wb_cabinet.id}')
-    wb_api = WBApi(access)
-    wb_cabinet = access.wb_cabinet
-    async with sm() as session:
-        stmt = select(AdvSetting) \
-            .join(AdvSetting.wb_cabinet) \
-            .where(WBCabinet.id == wb_cabinet.id,
-                   AdvSetting.bidder_active == True,
-                   AdvSetting.bot_active == True,
-                   AdvSetting.active_status == 'started')
-        result = (await session.execute(stmt)).unique()
-        adv_settings = result.scalars().all()
-    for adv_setting in adv_settings:
-        if adv_setting.id not in adv_tasks:
-            task = asyncio.create_task(_run_bidder_process_for_adv(adv_setting.adv_id, wb_api))
-            adv_tasks[adv_setting.id] = task
-        else:
-            if adv_tasks[adv_setting.id].done():
-                logger.debug(
-                    f'Задача управления ставкой завершена для кабинета '
-                    f'{adv_setting.name}'
-                )
-                if adv_tasks[adv_setting.id].exception():
-                    logger.error(
-                        f'Ошибка обновления статистики ключей: '
-                        f'{adv_tasks[adv_setting.id].exception()},'
-                        f' для кабинета {adv_setting.name}'
+    try:
+        logger.debug(f'Запуск задачи обновления ставок для кабинета {access.wb_cabinet.id}')
+        wb_api = WBApi(access)
+        wb_cabinet = access.wb_cabinet
+        async with sm() as session:
+            stmt = select(AdvSetting) \
+                .join(AdvSetting.wb_cabinet) \
+                .where(WBCabinet.id == wb_cabinet.id,
+                       AdvSetting.bidder_active == True,
+                       AdvSetting.bot_active == True,
+                       AdvSetting.active_status == 'started')
+            result = (await session.execute(stmt)).unique()
+            adv_settings = result.scalars().all()
+        for adv_setting in adv_settings:
+            if adv_setting.id not in adv_tasks:
+                task = asyncio.create_task(_run_bidder_process_for_adv(adv_setting.adv_id, wb_api))
+                adv_tasks[adv_setting.id] = task
+            else:
+                if adv_tasks[adv_setting.id].done():
+                    logger.debug(
+                        f'Задача управления ставкой завершена для кабинета '
+                        f'{adv_setting.name}'
                     )
+                    if adv_tasks[adv_setting.id].exception():
+                        logger.error(
+                            f'Ошибка Управления ставкой: '
+                            f'{adv_tasks[adv_setting.id].exception()},'
+                            f' для кабинета {adv_setting.name}'
+                        )
 
-                del adv_tasks[adv_setting.id]
+                    del adv_tasks[adv_setting.id]
+    except Exception as e:
+        logger.error(f'Ошибка при обновлении ставок для кабинета {access.wb_cabinet.id} {e}', exc_info=True)
+
     return
 
 
 async def _run_bidder_process_for_adv(adv_id: int,
                                       wb_api: WBApi):
-    async with sm() as session:
-        stmt = select(AdvSetting)\
-        .where(AdvSetting.adv_id == adv_id)
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
-        stmt = select(KeywordSetting)\
-        .where(KeywordSetting.adv_setting_id == adv_setting.id,
-               KeywordSetting.hard_status == 2)
-        result = await session.execute(stmt)
-        white_adv_keywords: list[KeywordSetting] = result.scalars().all()
-    max_position_for_adv = adv_setting.max_place
-    max_cpm = adv_setting.max_cpm
-    nmid_in_adv = adv_setting.nmids[0]
-    promo_positions = []
-    cpm_from_parsing = None
-    async with  get_clickhouse_client() as client:
-        for keyword in white_adv_keywords:
-            _, views, _= await data_manager.get_keyword_statistic_clickhouse(client, keyword, adv_id)
-            if views == 0:
-                continue
-            try:
-                text = keyword.text
-                await parser.add_wb_positions(text, {nmid_in_adv}, 1)
-            except Exception as e:
-                logger.error(f'Ошибка при получении позиции {e}')
-                continue
-            position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
-            if not position:
-                continue
-            promo_position = position.promo_position
-            base_position = position.base_position
-            if not promo_position and base_position:
-                logger.debug('Нет буста')
-                continue
-            promo_positions.append(promo_position)
-            cpm_from_parsing: int = position.cpm
-            if not cpm_from_parsing:
-                cpm_from_parsing = 100
-    if promo_positions:
-        fact_max_position: int = max(promo_positions)
-        if fact_max_position == 1:
-            new_cpm = cpm_from_parsing - 1
-        elif fact_max_position < max_position_for_adv:
-            new_cpm = cpm_from_parsing - 1
-        elif fact_max_position > max_position_for_adv:
-            new_cpm = cpm_from_parsing + 1
-        else:
-            new_cpm = cpm_from_parsing
+    try:
+        async with sm() as session:
+            stmt = select(AdvSetting)\
+            .where(AdvSetting.adv_id == adv_id)
+            result = await session.execute(stmt)
+            adv_setting: AdvSetting = result.scalar()
+            stmt = select(KeywordSetting)\
+            .where(KeywordSetting.adv_setting_id == adv_setting.id,
+                   KeywordSetting.hard_status == 2)
+            result = await session.execute(stmt)
+            white_adv_keywords: list[KeywordSetting] = result.scalars().all()
+        max_position_for_adv = adv_setting.max_place
+        max_cpm = adv_setting.max_cpm
+        nmid_in_adv = adv_setting.nmids[0]
+        promo_positions = []
+        cpm_from_parsing = None
+        async with  get_clickhouse_client() as client:
+            for keyword in white_adv_keywords:
+                _, views, _= await data_manager.get_keyword_statistic_clickhouse(client, keyword, adv_id)
+                if views == 0:
+                    continue
+                try:
+                    text = keyword.text
+                    await parser.add_wb_positions(text, {nmid_in_adv}, 1)
+                except Exception as e:
+                    logger.error(f'Ошибка при получении позиции {e}')
+                    continue
+                position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
+                if not position:
+                    continue
+                promo_position = position.promo_position
+                base_position = position.base_position
+                if not promo_position and base_position:
+                    logger.debug('Нет буста')
+                    continue
+                promo_positions.append(promo_position)
+                cpm_from_parsing: int = position.cpm
+                if not cpm_from_parsing:
+                    cpm_from_parsing = 100
+        if promo_positions:
+            fact_max_position: int = max(promo_positions)
+            if fact_max_position == 1:
+                new_cpm = cpm_from_parsing - 1
+            elif fact_max_position < max_position_for_adv:
+                new_cpm = cpm_from_parsing - 1
+            elif fact_max_position > max_position_for_adv:
+                new_cpm = cpm_from_parsing + 1
+            else:
+                new_cpm = cpm_from_parsing
 
-        if new_cpm > max_cpm:
-            new_cpm = max_cpm
-        elif new_cpm < 100:
-            new_cpm = 100
-        if new_cpm != cpm_from_parsing:
-           await wb_api.advert.update_cpm(adv_id, new_cpm)
+            if new_cpm > max_cpm:
+                new_cpm = max_cpm
+            elif new_cpm < 100:
+                new_cpm = 100
+            if new_cpm != cpm_from_parsing:
+               await wb_api.advert.update_cpm(adv_id, new_cpm)
+    except Exception as e:
+        logger.error(f'Ошибка при обновлении ставок для объявления {adv_id} {e}', exc_info=True)
