@@ -65,20 +65,8 @@ class ABC_WB_API(WbRequestApiMixin):
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_user_cabinet)
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
-
-        self._wb_user_cabinet = wb_user_cabinet
-        for token in tokens:
-            if  self._rights.issubset(token.categories) \
-                    and self._only_read == token.read_only:
-                current_token = token
-                self._free_tokens = set(tokens) - {current_token}
-                break
-
-        else:
-            raise (exceptions.ApiForbiddenError
-                   (f'Нет токена с правами {self._rights} и only_read = {self._only_read}',
-                    wb_user_cabinet=wb_user_cabinet
-                    ))
+        self._free_tokens = tokens
+        current_token = self._free_tokens.pop()
         self.headers = Headers(current_token)
         self._shop_id = current_token.shop_id
 
