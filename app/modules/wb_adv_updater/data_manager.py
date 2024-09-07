@@ -885,7 +885,7 @@ async def get_min_ctr(adv: AdvSetting):
                     FROM
                         stats
                     WHERE
-                        total_views > 0
+                        total_clicks > 0
     
     
                 """
@@ -900,9 +900,9 @@ async def get_min_ctr(adv: AdvSetting):
             real_ctr = text_to_real_ctr.get(kw.text)
             if real_ctr:
                 real_ctrs.append(text_to_real_ctr[kw.text])
-            predict_ctr = kw.predict_ctr
+            predict_ctr = await redis_manager.get_predict_ctr(adv_id, kw.text)
             if predict_ctr:
-                predict_ctrs.append(kw.predict_ctr)
+                predict_ctrs.append(predict_ctr)
         if real_ctrs:
             return float(min(real_ctrs))
 
