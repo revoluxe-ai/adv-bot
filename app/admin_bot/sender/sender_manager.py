@@ -27,36 +27,33 @@ test_user_ids = [5378020690, 373435337]
 
 
 
-message = messages.BetaTestIsDone
-
-
-async def send_to_users_out_channel():
-    users = await data_manager.get_all_users()
-    # users = [user for user in users if user.user_telegram_id in test_user_ids]
-    hash = sha256(str(message).encode()).hexdigest()
-    for user in users:
-        if await redis_manager.check_message_send(hash, user.user_telegram_id):
-            logger.info(f'Сообщение уже отправлено пользователю {user.username}')
-            continue
-        user_id = user.user_telegram_id
-        try:
-            check = await utils.check_user_in_support_channel(bot, user_id)
-        except aiogram.exceptions.TelegramBadRequest as e:
-            logger.error(f'Ошибка при проверке пользователя {user.username} в канале поддержки {e}')
-            continue
-        if not check:
-            try:
-                await message(bot, user_id)()
-                await redis_manager.set_message_send(hash, user_id)
-                await asyncio.sleep(1)
-
-            except TelegramForbiddenError:
-                logger.error(f'Пользователь {user.username} заблокировал бота')
-
-            finally:
-                http_session = bot.session
-                if http_session:
-                    await http_session.close()
+# async def send_to_users_out_channel():
+#     users = await data_manager.get_all_users()
+#     # users = [user for user in users if user.user_telegram_id in test_user_ids]
+#     hash = sha256(str(message).encode()).hexdigest()
+#     for user in users:
+#         if await redis_manager.check_message_send(hash, user.user_telegram_id):
+#             logger.info(f'Сообщение уже отправлено пользователю {user.username}')
+#             continue
+#         user_id = user.user_telegram_id
+#         try:
+#             check = await utils.check_user_in_support_channel(bot, user_id)
+#         except aiogram.exceptions.TelegramBadRequest as e:
+#             logger.error(f'Ошибка при проверке пользователя {user.username} в канале поддержки {e}')
+#             continue
+#         if not check:
+#             try:
+#                 await message(bot, user_id)()
+#                 await redis_manager.set_message_send(hash, user_id)
+#                 await asyncio.sleep(1)
+#
+#             except TelegramForbiddenError:
+#                 logger.error(f'Пользователь {user.username} заблокировал бота')
+#
+#             finally:
+#                 http_session = bot.session
+#                 if http_session:
+#                     await http_session.close()
 
 
 async def send_message_to_admin(text: str, off = False):
@@ -119,8 +116,8 @@ async def check_last_position(last_position: Optional[WBItemPosition],
         pass
 
 
-async def send_about_new_adv(adv, wb_cabinet_id):
-    async with sm() as session:
-        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
-        wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
-        users = await data_manager.get_users_from_wb_cabinet(wb_cabinet)
+# async def send_about_new_adv(adv, wb_cabinet_id):
+#     async with sm() as session:
+#         stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
+#         wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
+#         users = await data_manager.get_users_from_wb_cabinet(wb_cabinet)
