@@ -213,7 +213,7 @@ class AdvSetting(BaseTable):
     max_place = mapped_column(Integer, nullable=True)
     min_block_position = mapped_column(Integer, nullable=True, default=0)
     clusters_mode = mapped_column(Boolean, nullable=True, default=True)
-
+    target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
 
 
 
