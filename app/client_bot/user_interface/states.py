@@ -29,6 +29,7 @@ class RefProgram(StatesGroup):
 
 
 class AdvSetting(StatesGroup):
+   waiting_for_filter_by_query = State()
    waiting_for_filter_keywords = State()
 
 

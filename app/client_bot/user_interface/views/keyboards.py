@@ -281,6 +281,11 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
     keywords = sorting_keywords(keywords, sort_mode)
 
+    if adv_setting.hide_small_query_keywords:
+        keywords = [keyword for keyword in keywords\
+                    if isinstance(keyword.query, int)\
+                    and keyword.query >= adv_setting.hide_small_query_keywords]
+
     bottoms = []
     for keyword in keywords[start_index:end_index]:
         clicks = keyword.clicks
@@ -403,6 +408,19 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                        page=page,).pack())]
     bottoms.append(bottom)
 
+    # botton = [InlineKeyboardButton(text='Обновить статистику',
+    #           ]
+
+
+
+    botton = [InlineKeyboardButton(text='Фильтр по "прогнозным" показам'
+                                   , callback_data=callbacks.SettingKeywords(
+            adv_original_id=adv_setting.id,
+            type='filter_by_query',
+            page=page).pack())]
+
+    bottoms.append(botton)
+
     bottoms.append([InlineKeyboardButton(text='К настройкам АРК',
                                          callback_data=callbacks.Adv(
                                                 adv_original_id=adv_setting.id).pack())])
@@ -464,7 +482,7 @@ def get_keyword_setting_keyboard(
                                            keyword_setting_original_id=keyword.id).pack())]
         buttons.append(button)
 
-    button = [InlineKeyboardButton(text='Проверить позиции',
+    button = [InlineKeyboardButton(text='Проверить позицию',
                                    callback_data=callbacks.CheckPosition(
                                        keyword_setting_original_id=keyword.id,
                                        adv_original_id=adv_setting.id).pack())]

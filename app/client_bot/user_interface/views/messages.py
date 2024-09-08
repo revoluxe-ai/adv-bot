@@ -441,6 +441,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 clear_keywords.append(keyword)
             self._keywords = clear_keywords
         logger.debug("Начинаю отправку сообщения")
+
+        filter_by_query = self._adv_setting.hide_small_query_keywords
+        if filter_by_query:
+            clear_keywords = []
+            for keyword in self._keywords:
+                if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
+                     clear_keywords.append(keyword)
+            self._keywords = clear_keywords
+
+
+
         await super().__call__()
 
     @property
@@ -992,7 +1003,7 @@ class SettingMinCTR(TextWithKeyboard):
                 f' равен {round(self._min_ctr*100, 1)} %,'
                 f"""тип минимального CTR: {"Задан в ручную"  if self._min_ctr_type == 'direct' else "Определен автоматически"}\n""")
 
-        keywords = self._goods + self._bads
+        # keywords = self._goods + self._bads
         goods = self._goods
         bads = self._bads
         goods.sort(key=lambda x: x.real_ctr, reverse=True)
@@ -2020,4 +2031,49 @@ class Single_message107(Text):
 
 📩  @skyline360_1
     
+    """
+
+
+class Single_message108(TextWithImage):
+    text = """
+🚀 Теперь в нашем боте есть поддержка кластеров! 🎯
+
+Кластеры позволяют вам следить за ключевыми словами, чтобы они не блокировались. Это значит, что вам больше не нужно беспокоиться о том, что ключи могут выпасть из ротации или потерять эффективность — бот автоматически контролирует этот процесс.
+
+✅ Ключи остаются активными, и вам больше не нужно тратить время на их проверку!
+
+⚠️ Внимание: кластеры работают только при включенном парсинге ключевых слов. Убедитесь, что эта функция активирована для максимальной эффективности!
+
+Если нужна помощь с настройкой кластеров или включением парсинга — пишите мне! Я помогу вам настроить всё быстро и без лишних сложностей.
+
+📩 @skyline360_1    
+    
+    """
+
+    image = 'images_for_sendings/108.jpg'
+
+
+
+class Single_message109(Text):
+    text = """
+    Вы не запустили ещё ни одной рекламной кампании — самое время это исправить! 📈
+
+Я помогу вам бесплатно настроить бота и запустить рекламу на Wildberries, чтобы ваши товары начали приносить прибыль уже сейчас.
+
+Что даст вам бот?
+
+🔹    Полная автоматизация рекламных кампаний — бот сам управляет процессом, освобождая ваше время.
+🔹    Эффективное использование бюджета — вложенные средства будут работать с максимальной отдачей.
+🔹    Моя поддержка на каждом этапе — помогу вам настроить всё с нуля, быстро и без сложностей.
+
+🚀 Напишите мне прямо сейчас, и я помогу вам запустить первую рекламную кампанию, используя средства на вашем счёте!
+
+📩 @skyline360_1
+    
+"""
+
+
+class FilterByQuery(Text):
+    text = """
+    Введите минимальное число прогнозируемых показов для показа (0 - без фильтрации): 
     """
