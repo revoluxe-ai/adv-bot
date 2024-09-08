@@ -581,8 +581,6 @@ async def setting_keywords_filter_by_query(message: types.Message,
         return
     if count_query < 0:
         count_query *= -1
-
-
     callback_data = await state.get_data()
     adv_original_id = int(callback_data.get('last_adv_original_id'))
     await messages.LongTimeOperation(bot, message.chat.id)()
@@ -591,6 +589,8 @@ async def setting_keywords_filter_by_query(message: types.Message,
             .where(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
         adv_setting: AdvSetting = result.scalar()
+        adv_setting.hide_small_query_keywords = count_query
+        await session.commit()
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     page = 1
     await state.update_data(last_keyword_setting_page=page)
