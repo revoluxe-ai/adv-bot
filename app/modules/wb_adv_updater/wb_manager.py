@@ -337,36 +337,29 @@ async def update_predict_ctr():
 async def update_keywords_in_advs():
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
-        accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
-        logger.debug('Получен генератор доступов к кабинетам для обновления минус-ключей в РК')
-        async for access in accesses:
-            logger.debug('Получен кабинет для обновления минус-ключей в РК')
-            wb_cabinet_id = access.wb_cabinet.id
-            if wb_cabinet_id  not in update_tasks:
-                try:
+        async with sm() as session:
+            stmt = select(AdvSetting) \
+                .where(and_(AdvSetting.bot_active == True))
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = result.scalars().all()
+            for adv_setting in adv_settings:
+                if adv_setting.id not in update_tasks:
+                    wb_cabinet_id = adv_setting.wb_cabinet_id
+                    access: WBCabinetAccess = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
+                    if not access:
+                        logger.error(f'Нет доступа к кабинету {wb_cabinet_id}')
+                        continue
                     data_setter = DataSetter(access)
-                except ApiForbiddenError:
-                    logger.error(f'Нет нужных прав у токена')
-                    await asyncio.sleep(0)
-                    continue
-                logger.debug(access.wb_cabinet.id)
-                async with sm() as session:
-                    stmt = select(AdvSetting) \
-                        .where(and_(AdvSetting.bot_active == True,
-                                    AdvSetting.wb_cabinet_id == wb_cabinet_id))
-                    result = await session.execute(stmt)
-                    adv_settings: list[AdvSetting] = result.scalars().all()
-                if adv_settings:
-                    logger.debug(f'Запуск задачи обновления минус-ключей для кабинета {wb_cabinet_id}')
-                    task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings))
-                    update_tasks[wb_cabinet_id] = task
-            else:
-                if update_tasks[wb_cabinet_id].done():
-                    if update_tasks[wb_cabinet_id].exception():
-                        logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}',
-                                     exc_info=True)
-                    del update_tasks[wb_cabinet_id]
-            await asyncio.sleep(0)
+                    task = asyncio.create_task(data_setter.update_minus_keyword(adv_setting))
+                    update_tasks[adv_setting.id] = task
+                else:
+                    if update_tasks[adv_setting.id].done():
+                        if update_tasks[adv_setting.id].exception():
+                            logger.error(f'Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}',
+                                         exc_info=True)
+                        del update_tasks[adv_setting.id]
+                await asyncio.sleep(0)
+
 
 
 

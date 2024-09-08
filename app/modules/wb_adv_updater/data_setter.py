@@ -21,6 +21,33 @@ class DataSetter:
         self._wb_api = WBApi(access)
         self._wb_cabinet = access.wb_cabinet
 
+
+    async def update_minus_keyword(self, adv_setting: AdvSetting):
+        logger.debug(f'Обновляю минус слова для {adv_setting.name}')
+        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
+        logger.debug(f'Получил ключи для {adv_setting.name}')
+        good_phrases = []
+        bad_phrases = []
+        for keyword in keywords:
+            if keyword.status == KeywordStatus.GOOD:
+                good_phrases.append(keyword.text)
+            else:
+                bad_phrases.append(keyword.text)
+                if clusters := keyword.childs_keywords:
+                    for cluster in clusters:
+                        bad_phrases.append(cluster.text)
+
+        if bad_phrases:
+            bad_phrases = list(set(bad_phrases))
+            await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
+            logger.debug(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
+            logger.debug(f'Позитивные слова {good_phrases}')
+        else:
+            logger.debug(f'Нет минус слов для {adv_setting.name}')
+
+
+
+
     async def update_minus_keywords(self, adv_settings: list[AdvSetting]):
         logger.debug('Начинаю обновление минус слов')
         for adv_setting in adv_settings:
