@@ -413,7 +413,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
 
 
-    botton = [InlineKeyboardButton(text='Фильтр по "прогнозным" показам'
+    botton = [InlineKeyboardButton(text='Фильтр по прогнозируемым показам'
                                    , callback_data=callbacks.SettingKeywords(
             adv_original_id=adv_setting.id,
             type='filter_by_query',
