@@ -214,7 +214,7 @@ class AdvSetting(BaseTable):
     min_block_position = mapped_column(Integer, nullable=True, default=0)
     clusters_mode = mapped_column(Boolean, nullable=True, default=True)
     target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
-    hide_small_query_keywords = mapped_column(Boolean, nullable=True, default=0)
+    hide_small_query_keywords = mapped_column(Integer, nullable=True, default=0)
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
 
 
