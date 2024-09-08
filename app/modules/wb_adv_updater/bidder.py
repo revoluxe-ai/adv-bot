@@ -1,6 +1,7 @@
 import logging
 
 import aiohttp
+from sqlalchemy.orm import selectinload
 
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
@@ -33,31 +34,37 @@ async def run_bidder_process():
 
 
 async def _run_bidder_process():
-    wb_cabinet_tasks = {}
     adv_tasks = {}
     while True:
-        accesses = super_cabinet_manager.get_accesses_for_bidder()
-        logger.debug(f'Получен генератор доступов к кабинетам для биддера')
-        async for access in accesses:
-            cabinet_id = access.wb_cabinet.id
-            if cabinet_id not in wb_cabinet_tasks:
-                logger.debug(f'Запуск задачи обновления ставок для кабинета {cabinet_id}')
-                task = asyncio.create_task(_run_bidder_process_for_wb_cabinet(access,
-                                                                              adv_tasks=adv_tasks))
-                wb_cabinet_tasks[cabinet_id] = task
+       async with sm() as session:
+           stmt = select(AdvSetting)\
+               .join(AdvSetting.wb_cabinet)\
+               .options(selectinload(AdvSetting.wb_cabinet))\
+               .where(AdvSetting.bidder_active == True)
+           result = await session.execute(stmt)
+           adv_settings = result.scalars().all()
+           for adv_setting in adv_settings:
+                wb_cabinet_id = adv_setting.wb_cabinet_id
+                if adv_setting.id not in adv_tasks:
+                     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
+                     if not access:
+                         logger.debug(f'Для кабинета {wb_cabinet_id} не найден доступ')
+                         continue
+                     wb_api = WBApi(access)
+                     task = asyncio.create_task((_run_bidder_process_for_adv(adv_setting.adv_id,  wb_api)))
+                     adv_tasks[adv_setting.id] = task
+                else:
+                     if adv_tasks[adv_setting.id].done():
+                          logger.debug(f'Задача обновления ставок завершена для кабинета {wb_cabinet_id}')
+                          if adv_tasks[adv_setting.id].exception():
+                            logger.error(
+                                 f'Ошибка обновления ставок: '
+                                 f'{adv_tasks[adv_setting.id].exception()},'
+                                 f' для кабинета {adv_setting.id}'
+                            )
 
-            else:
-                if wb_cabinet_tasks[cabinet_id].done():
-                    logger.debug(f'Задача обновления обновления ставок {cabinet_id}')
-                    if wb_cabinet_tasks[cabinet_id].exception():
-                        logger.error(
-                            f'Ошибка обновления ставок: '
-                            f'{wb_cabinet_tasks[cabinet_id].exception()},'
-                            f' для кабинета {cabinet_id}', exc_info=True
-                        )
-
-                    del wb_cabinet_tasks[cabinet_id]
-        await asyncio.sleep(0)
+                          del adv_tasks[adv_setting.id]
+                await asyncio.sleep(0)
 
 
 
@@ -71,9 +78,7 @@ async def _run_bidder_process_for_wb_cabinet(access: WBCabinetAccess, adv_tasks:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
                 .where(WBCabinet.id == wb_cabinet.id,
-                       AdvSetting.bidder_active == True,
-                       AdvSetting.bot_active == True,
-                       AdvSetting.active_status == 'started')
+                       AdvSetting.bidder_active == True)
             result = (await session.execute(stmt)).unique()
             adv_settings = result.scalars().all()
         for adv_setting in adv_settings:
@@ -120,7 +125,11 @@ async def _run_bidder_process_for_adv(adv_id: int,
         cpm_from_parsing = None
         async with  get_clickhouse_client() as client:
             for keyword in white_adv_keywords:
-                _, views, _= await data_manager.get_keyword_statistic_clickhouse(client, keyword, adv_id)
+                try:
+                    _, views, _= await data_manager.get_keyword_statistic_clickhouse(client, keyword, adv_id)
+                except Exception as e:
+                    logger.error(f'Ошибка при получении статистики по ключевому слову {keyword.text} {e}')
+                    continue
                 if views == 0:
                     continue
                 try:
