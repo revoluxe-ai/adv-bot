@@ -404,7 +404,8 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
             keyword_stats.append(keyword)
 
     keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
-
+    sum_views = 0
+    sum_clicks = 0
     for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
@@ -458,6 +459,9 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
             await redis_manager.set_auto_block_status(keyword_setting.id, True)
+            sum_views += keyword_stat.views
+            sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
+
             await asyncio.sleep(0)
             continue
 
@@ -471,6 +475,8 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
             keyword_stat.status = KeywordStatus.GOOD
             keyword_setting.auto_block = False
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
+            sum_views += keyword_stat.views
+            sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
             await asyncio.sleep(0)
             continue
         elif keyword_setting.hard_status == 0:
@@ -482,21 +488,24 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
         if min_ctr == 0:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
+            sum_views += keyword_stat.views
+            sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
             await asyncio.sleep(0)
             continue
         assert keyword_stat.predict_ctr
         await asyncio.sleep(0)
 
 
-    sum_views = 1
-    sum_clicks = 1
 
     keyword_stats = sorted(keyword_stats, key=lambda x: x.predict_ctr, reverse=True)
     for keyword_stat in keyword_stats:
         if keyword_stat.status:
             continue
         keyword_setting = keyword_stat.keyword_setting
-        total_ctr = sum_clicks / sum_views
+        if sum_clicks == 0:
+            total_ctr = 0
+        else:
+            total_ctr = sum_clicks / sum_views
         if total_ctr >= min_ctr or total_ctr == 0:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
