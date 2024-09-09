@@ -322,6 +322,11 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
         if cluster_name:
             preset_to_keywords[preset].append(keyword)
             preset_to_cluster_name[preset] = cluster_name
+        else:
+            preset = hash(text)
+            cluster_name = text
+            preset_to_keywords[preset].append(keyword)
+            preset_to_cluster_name[preset] = cluster_name
 
     keyword_stats = []
 
@@ -455,16 +460,6 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
                 await asyncio.sleep(0)
                 continue
 
-        if not original_predict_ctr and enough_views / 2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and not keyword_setting.hard_status != 1:
-            keyword_stat.status = KeywordStatus.GOOD
-            keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
-            await redis_manager.set_auto_block_status(keyword_setting.id, True)
-            sum_views += keyword_stat.views
-            sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
-
-            await asyncio.sleep(0)
-            continue
-
         if keyword_setting.hard_status == 3:
             keyword_stat.status = KeywordStatus.BAD
             keyword_stat.reason = 'turn_off'
@@ -495,12 +490,15 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
         assert keyword_stat.predict_ctr
         await asyncio.sleep(0)
 
-
-
     keyword_stats = sorted(keyword_stats, key=lambda x: x.predict_ctr, reverse=True)
     for keyword_stat in keyword_stats:
         if keyword_stat.status:
             continue
+        if adv_setting.target_ctr_mode_strategy == 'keep':
+            sum_views += keyword_stat.views
+            clicks = keyword_stat.views * keyword_stat.predict_ctr
+            sum_clicks += clicks
+
         keyword_setting = keyword_stat.keyword_setting
         if sum_clicks == 0:
             total_ctr = 0
@@ -509,9 +507,10 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
         if total_ctr >= min_ctr or total_ctr == 0:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
-            sum_views += keyword_stat.views
-            clicks = keyword_stat.views*keyword_stat.predict_ctr
-            sum_clicks += clicks
+            if adv_setting.target_ctr_mode_strategy == 'forward':
+                sum_views += keyword_stat.views
+                clicks = keyword_stat.views*keyword_stat.predict_ctr
+                sum_clicks += clicks
         else:
             if keyword_stat.views < adv_setting.min_views_for_ml_predict:
                 keyword_stat.status = KeywordStatus.GOOD
@@ -1209,6 +1208,8 @@ async def get_nmids_for_keyword_text(text: str )-> set[int]:
 
 async def get_phrases_for_parsing(semaphore = None):
     pass_texts = set()
+    long_list = []
+    short_list = []
     async with _sm(semaphore) as session:
         stmt = select(AdvSetting.adv_id).where(
             AdvSetting.parsing_active == True)
@@ -1243,8 +1244,16 @@ async def get_phrases_for_parsing(semaphore = None):
                              for nmid in nmids:
                                  await redis_manager.set_nmid(adv_id, nmid)
                              nmids_need = nmids_need.union(nmids)
-                yield text, nmids_need
+                cluster, preset = await redis_manager.get_cluster_and_preset(text)
+                if cluster and preset:
+                    long_list.append((text, nmids_need))
+                else:
+                    short_list.append((text, nmids_need))
                 pass_texts.add(hash_text)
+                if short_list:
+                    yield short_list.pop(0)
+                if long_list:
+                    yield long_list.pop(0)
                 await asyncio.sleep(0)
 
 
