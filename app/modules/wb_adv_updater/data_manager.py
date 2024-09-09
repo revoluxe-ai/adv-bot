@@ -60,83 +60,6 @@ async def measure_time(function):
     return wrapper
 
 
-async def get_keywords_statistic_clickhouse(
-        adv_setting: AdvSetting,
-        pass_time: Optional[timedelta] = None,
-        hard_statuses: Optional[List[int]] = None,
-        cache_timeout: int = 60 * 15
-) -> List[CalculatedKeyword]:
-
-    async with get_clickhouse_client() as ch_client:
-        query = _build_clickhouse_query(adv_setting.adv_id, pass_time)
-        result = await ch_client.query(query)
-        rows = result.result_rows
-        keywords = []
-        for row in rows:
-            text = row[0]
-            clicks = row[1]
-            views = row[2]
-            spend = row[3]
-            if clicks > views:
-                views = clicks
-            keyword = CalculatedKeyword(
-                text=text,
-                clicks=clicks,
-                views=views,
-                spend=spend
-            )
-            keywords.append(keyword)
-
-    return keywords
-
-
-async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[List[int]]) -> List[KeywordSetting]:
-    async with _sm() as session:
-        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_id)
-        if hard_statuses:
-            stmt = stmt.where(KeywordSetting.hard_status.in_(hard_statuses))
-        result = await session.execute(stmt)
-        return result.scalars().all()
-
-
-def _build_clickhouse_query(adv_id: int,  pass_time: Optional[timedelta]) -> str:
-    query = f"""
-          SELECT
-              text,
-              COALESCE(SUM(total_clicks), 0) AS total_clicks,
-              COALESCE(SUM(total_views), 0) AS total_views,
-              COALESCE(SUM(total_spend), 0) AS total_spend
-          FROM (
-              SELECT
-                  text,
-                  clicks AS total_clicks,
-                  views AS total_views,
-                  spend AS total_spend
-              FROM
-                  default_db.advkeyword
-              WHERE
-                  adv_id = {adv_id}
-                  AND (text, date, version) IN (
-                      SELECT
-                          text, date, MAX(version) AS version
-                      FROM
-                          default_db.advkeyword
-                      WHERE
-                          adv_id = {adv_id}
-                      GROUP BY
-                          text, date
-                  )
-          ) AS latest_records
-      """
-    if pass_time:
-        start_time = datetime.now() - pass_time
-        query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
-
-
-
-    query += " GROUP BY text"
-    return query
-
 
 async def get_keyword_statistic_clickhouse(client, keyword_setting: KeywordSetting,
                                            adv_id: int,
@@ -196,6 +119,118 @@ async def get_keyword_statistic_clickhouse(client, keyword_setting: KeywordSetti
         total_views = total_clicks
 
     return total_clicks, total_views, total_spend
+
+
+
+
+
+async def get_keywords_statistic_clickhouse(
+        adv_setting: AdvSetting,
+        pass_time: Optional[timedelta] = None,
+        hard_statuses: Optional[List[int]] = None,
+        cache_timeout: int = 60 * 15
+) -> List[CalculatedKeyword]:
+
+    async with get_clickhouse_client() as ch_client:
+        query = _build_clickhouse_query(adv_setting.adv_id, pass_time)
+        result = await ch_client.query(query)
+        rows = result.result_rows
+        keywords = []
+        for row in rows:
+            text = row[0]
+            clicks = row[1]
+            views = row[2]
+            spend = row[3]
+            if clicks > views:
+                views = clicks
+            keyword = CalculatedKeyword(
+                text=text,
+                clicks=clicks,
+                views=views,
+                spend=spend
+            )
+            keywords.append(keyword)
+
+    return keywords
+
+
+async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[List[int]]) -> List[KeywordSetting]:
+    async with _sm() as session:
+        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_id)
+        if hard_statuses:
+            stmt = stmt.where(KeywordSetting.hard_status.in_(hard_statuses))
+        result = await session.execute(stmt)
+        return result.scalars().all()
+
+
+def _build_clickhouse_query(adv_id: int,
+                            pass_time: Optional[timedelta],
+                            last_views: Optional[int] = None) -> str:
+    query = f"""
+          SELECT
+              text,
+              COALESCE(SUM(total_clicks), 0) AS total_clicks,
+              COALESCE(SUM(total_views), 0) AS total_views,
+              COALESCE(SUM(total_spend), 0) AS total_spend,
+              date
+          FROM (
+              SELECT
+                  text,
+                  clicks AS total_clicks,
+                  views AS total_views,
+                  spend AS total_spend,
+                  date
+              FROM
+                  default_db.advkeyword
+              WHERE
+                  adv_id = {adv_id}
+                  AND (text, date, version) IN (
+                      SELECT
+                          text, date, MAX(version) AS version
+                      FROM
+                          default_db.advkeyword
+                      WHERE
+                          adv_id = {adv_id}
+                      GROUP BY
+                          text, date
+                  )
+          ) AS latest_records
+      """
+
+    if pass_time:
+        start_time = datetime.now() - pass_time
+        query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
+
+    query += " GROUP BY text, date"
+
+    if last_views:
+        query = f"""
+            WITH
+            records AS ({query}),
+            cumulative_views AS (
+                SELECT
+                    text,
+                    total_clicks,
+                    total_views,
+                    total_spend,
+                    SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
+                FROM
+                    records
+            )
+            SELECT
+                text,
+                SUM(total_clicks) AS total_clicks,
+                SUM(total_views) AS total_views,
+                SUM(total_spend) AS total_spend
+            FROM
+                cumulative_views
+            WHERE
+                cumulative_total_views <= {last_views}
+            GROUP BY text
+        """
+
+    return query
+
 
 
 
@@ -489,44 +524,51 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
             continue
         assert keyword_stat.predict_ctr
         await asyncio.sleep(0)
-
+    assert sum_views
     keyword_stats = sorted(keyword_stats, key=lambda x: x.predict_ctr, reverse=True)
     for keyword_stat in keyword_stats:
         if keyword_stat.status:
             continue
-        if adv_setting.target_ctr_mode_strategy == 'keep':
-            sum_views += keyword_stat.views
-            clicks = keyword_stat.views * keyword_stat.predict_ctr
-            sum_clicks += clicks
-
-        keyword_setting = keyword_stat.keyword_setting
-        if sum_clicks == 0:
-            total_ctr = 0
-        else:
-            total_ctr = sum_clicks / sum_views
-        if total_ctr >= min_ctr or total_ctr == 0:
+        if keyword_stat.predict_ctr >= min_ctr:
             keyword_stat.status = KeywordStatus.GOOD
-            await redis_manager.set_auto_block_status(keyword_setting.id, False)
-            if adv_setting.target_ctr_mode_strategy == 'forward':
-                sum_views += keyword_stat.views
-                clicks = keyword_stat.views*keyword_stat.predict_ctr
-                sum_clicks += clicks
+            await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
+            sum_views += keyword_stat.views
+            sum_clicks= keyword_stat.views * keyword_stat.predict_ctr
         else:
-            if keyword_stat.views < adv_setting.min_views_for_ml_predict:
-                keyword_stat.status = KeywordStatus.GOOD
-                keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
-                await redis_manager.set_auto_block_status(keyword_setting.id, True)
-            else:
-                keyword_stat.status = KeywordStatus.BAD
-                keyword_stat.reason = 'min_ctr'
-                await redis_manager.set_auto_block_status(keyword_setting.id, True)
+            if adv_setting.target_ctr_mode_strategy == 'forward':
+                total_ctr = sum_clicks / sum_views
+                if total_ctr >= min_ctr:
+                    keyword_stat.status = KeywordStatus.GOOD
+                    await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
+                    sum_views += keyword_stat.views
+                    sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
+                else:
+                    keyword_stat.status = KeywordStatus.BAD
+                    keyword_stat.reason = 'min_ctr'
+                    await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
+            elif adv_setting.target_ctr_mode_strategy == 'keep':
+                sum_views += keyword_stat.views
+                sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
+                total_ctr = sum_clicks / sum_views
+                if total_ctr >= min_ctr:
+                    keyword_stat.status = KeywordStatus.GOOD
+                    await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
+                else:
+                    keyword_stat.status = KeywordStatus.BAD
+                    keyword_stat.reason = 'min_ctr'
+                    await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, True)
+
 
 
     logger.debug('Проверяю статусы ключевых слов с assert')
 
     for keyword_stat in keyword_stats:
-        assert keyword_stat.status
-        assert keyword_stat.status in ['good', 'bad']
+        try:
+            assert keyword_stat.status
+            assert keyword_stat.status in ['good', 'bad']
+        except AssertionError:
+            raise AssertionError(f'Статус не установлен для ключевого слова {keyword_stat.text}')
+
     logger.debug('Слова по assert проверены')
     logger.debug('Возвращаю итоговую статистику')
     return keyword_stats
