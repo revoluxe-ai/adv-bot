@@ -64,8 +64,8 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
         await message.answer("Введите сумму (число) от 10 000 рублей")
         return
     amount = int(amount)
-    if amount < 10000:
-        await message.answer("Введите сумму (число) от 10 000")
+    if amount < 1000:
+        await message.answer("Введите сумму (число) от 1000")
         return
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
@@ -149,28 +149,28 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
 
 Укажите сумму пополнения (не менее 100 рублей):"""
 
-    state_data = await state.get_data()
-    try:
-        master_sum = state_data['master_sum']
-    except:
-        async with sm() as session:
-            time_from = '2024-07-22 00:00:00'
-            time_from_datetime = datetime.datetime.strptime(time_from, '%Y-%m-%d %H:%M:%S')
-            stmt = select(func.max(Payment.amount)) \
-                .where(Payment.timestamp > time_from_datetime)
-            result = await session.execute(stmt)
-            max_amount = result.scalar()
-            if not max_amount:
-                max_amount = 50
-            master_sum = max_amount * 2
-    if cost >= master_sum:
-        bonus = cost
-    else:
-        bonus = round(cost*0.3, 2)
+    # state_data = await state.get_data()
+    # try:
+    #     master_sum = state_data['master_sum']
+    # except:
+    #     async with sm() as session:
+    #         time_from = '2024-07-22 00:00:00'
+    #         time_from_datetime = datetime.datetime.strptime(time_from, '%Y-%m-%d %H:%M:%S')
+    #         stmt = select(func.max(Payment.amount)) \
+    #             .where(Payment.timestamp > time_from_datetime)
+    #         result = await session.execute(stmt)
+    #         max_amount = result.scalar()
+    #         if not max_amount:
+    #             max_amount = 50
+    #         master_sum = max_amount * 2
+    # if cost >= master_sum:
+    #     bonus = cost
+    # else:
+    #     bonus = round(cost*0.3, 2)
 
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
-
+    bonus = cost
     async with sm() as session:
         async with session.begin():
             stmt = select(User).where(User.user_telegram_id == message.chat.id)
