@@ -618,6 +618,7 @@ async def setting_keywords_filter_by_query(message: types.Message,
     chat_id = message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
     logger.debug('Обработка собщения')
+    await state.set_state(None)
     await messages.AdvKeywordsSetting(
         bot,
         chat_id,
