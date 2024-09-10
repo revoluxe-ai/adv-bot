@@ -67,44 +67,6 @@ async def _run_bidder_process():
                 await asyncio.sleep(0)
 
 
-
-
-async def _run_bidder_process_for_wb_cabinet(access: WBCabinetAccess, adv_tasks: dict):
-    try:
-        logger.debug(f'Запуск задачи обновления ставок для кабинета {access.wb_cabinet.id}')
-        wb_api = WBApi(access)
-        wb_cabinet = access.wb_cabinet
-        async with sm() as session:
-            stmt = select(AdvSetting) \
-                .join(AdvSetting.wb_cabinet) \
-                .where(WBCabinet.id == wb_cabinet.id,
-                       AdvSetting.bidder_active == True)
-            result = (await session.execute(stmt)).unique()
-            adv_settings = result.scalars().all()
-        for adv_setting in adv_settings:
-            if adv_setting.id not in adv_tasks:
-                task = asyncio.create_task(_run_bidder_process_for_adv(adv_setting.adv_id, wb_api))
-                adv_tasks[adv_setting.id] = task
-            else:
-                if adv_tasks[adv_setting.id].done():
-                    logger.debug(
-                        f'Задача управления ставкой завершена для кабинета '
-                        f'{adv_setting.name}'
-                    )
-                    if adv_tasks[adv_setting.id].exception():
-                        logger.error(
-                            f'Ошибка Управления ставкой: '
-                            f'{adv_tasks[adv_setting.id].exception()},'
-                            f' для кабинета {adv_setting.name}'
-                        )
-
-                    del adv_tasks[adv_setting.id]
-    except Exception as e:
-        logger.error(f'Ошибка при обновлении ставок для кабинета {access.wb_cabinet.id} {e}', exc_info=True)
-
-    return
-
-
 async def _run_bidder_process_for_adv(adv_id: int,
                                       wb_api: WBApi):
     try:
