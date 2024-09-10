@@ -339,18 +339,20 @@ async def update_keywords_in_advs():
     while True:
         async with sm() as session:
             stmt = select(AdvSetting) \
-                .where(and_(AdvSetting.bot_active == True))
+                .where(AdvSetting.bot_active == True)
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
             for adv_setting in adv_settings:
                 if adv_setting.id not in update_tasks:
+                    if adv_setting.name != '205599587  Царевна лягушка':
+                        continue
                     wb_cabinet_id = adv_setting.wb_cabinet_id
                     access: WBCabinetAccess = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
                     if not access:
                         logger.error(f'Нет доступа к кабинету {wb_cabinet_id}')
                         continue
                     data_setter = DataSetter(access)
-                    task = asyncio.create_task(data_setter.update_minus_keyword(adv_setting))
+                    task = asyncio.create_task(data_setter.update_minus_keywords_in_adv(adv_setting))
                     update_tasks[adv_setting.id] = task
                 else:
                     if update_tasks[adv_setting.id].done():

@@ -22,7 +22,7 @@ class DataSetter:
         self._wb_cabinet = access.wb_cabinet
 
 
-    async def update_minus_keyword(self, adv_setting: AdvSetting):
+    async def update_minus_keywords_in_adv(self, adv_setting: AdvSetting):
         logger.debug(f'Обновляю минус слова для {adv_setting.name}')
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
         logger.debug(f'Получил ключи для {adv_setting.name}')
