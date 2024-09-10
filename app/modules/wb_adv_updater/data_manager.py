@@ -1221,40 +1221,16 @@ async def clear_cards_in_db(nmids: list[int]):
              await asyncio.sleep(0)
 
 
-async def get_keywords_from_clickhouse(adv_id: int) -> tuple[list[str], list[str]]:
+async def get_keywords_from_clickhouse(adv_id: int)-> list[str]:
     query = f"""
-WITH ordered_keywords AS (
-    SELECT 
-        text, 
-        SUM(views) AS total_views
-    FROM default_db.advkeyword 
-    WHERE adv_id = {adv_id}
-    GROUP BY text
-    ORDER BY total_views DESC
-),
-percentile_value AS (
-    SELECT quantile(0.75)(total_views) AS percentile_75
-    FROM ordered_keywords
-)
-SELECT
-    text,
-    total_views,
-    (SELECT percentile_75 FROM percentile_value) AS threshold
-FROM ordered_keywords
+SELECT DISTINCT text
+FROM default_db.advkeyword 
+WHERE adv_id = {adv_id}
 """
     async with get_clickhouse_client() as client:
         result = await client.query(query)
         keywords = result.result_rows
-
-    high_views = []
-    low_views = []
-    for keyword, total_views, threshold in keywords:
-        if total_views >= threshold:
-            high_views.append(keyword)
-        else:
-            low_views.append(keyword)
-
-    return high_views, low_views
+    return [keyword[0] for keyword in keywords if keyword]
 
 
 async def get_nmids_for_keyword_text(text: str )-> set[int]:
@@ -1282,13 +1258,11 @@ async def get_phrases_for_parsing(semaphore = None):
         adv_ids = adv_ids.scalars().all()
         random.shuffle(adv_ids)
         for adv_id in adv_ids:
-            high_views, low_views = await get_keywords_from_clickhouse(adv_id)
-            keywords_texts = set(high_views + low_views)
+            keywords_texts: list[str] = await get_keywords_from_clickhouse(adv_id)
             for text in keywords_texts:
                 hash_text = hash(text)
                 if hash_text in pass_texts:
                     continue
-                pass_texts.add(hash_text)
                 adv_ids_with_text: set[int] = await get_nmids_for_keyword_text(text)
                 nmids_need = set()
                 not_found_adv_id = set()
@@ -1313,34 +1287,15 @@ async def get_phrases_for_parsing(semaphore = None):
                              nmids_need = nmids_need.union(nmids)
                 cluster, preset = await redis_manager.get_cluster_and_preset(text)
                 if cluster and preset:
-                    if text in high_views:
-                        short_list.append((text, nmids_need))
-                        if len(short_list) < 10:
-                            continue
-                    else:
-                         long_list.append((text, nmids_need))
+                    long_list.append((text, nmids_need))
                 else:
                     short_list.append((text, nmids_need))
-                    if len(short_list) < 10:
-                        continue
-
-                if len(short_list) == 0 and  len(long_list) > 0:
-                         yield long_list.pop(0)
-                         continue
-                if len(short_list) > 0:
+                pass_texts.add(hash_text)
+                if short_list:
                     yield short_list.pop(0)
-                    await asyncio.sleep(0)
-                if len(short_list) > 0:
-                    yield short_list.pop(0)
-                    await asyncio.sleep(0)
-                if len(short_list) > 0:
-                    yield short_list.pop(0)
-                    await asyncio.sleep(0)
-                if len(long_list) > 0:
+                if long_list:
                     yield long_list.pop(0)
-                    await asyncio.sleep(0)
                 await asyncio.sleep(0)
-
 
 
 async def get_last_updated_phrases(all_white_phrases):
