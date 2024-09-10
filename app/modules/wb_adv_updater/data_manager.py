@@ -524,7 +524,6 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
             continue
         assert keyword_stat.predict_ctr
         await asyncio.sleep(0)
-    assert sum_views
     keyword_stats = sorted(keyword_stats, key=lambda x: x.predict_ctr, reverse=True)
     for keyword_stat in keyword_stats:
         if keyword_stat.status:
