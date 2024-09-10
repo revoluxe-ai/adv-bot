@@ -193,7 +193,7 @@ async def set_predict_ctr(adv_id, keyword, predict_ctr):
     await redis_client.set(key, predict_ctr)
 
 
-async def get_predict_ctr(adv_id, keyword):
+async def get_predict_ctr(adv_id: int, keyword: str):
     key = f'predict_ctr:{adv_id}:{keyword}'
     predict_ctr_bytes = await redis_client.get(key)
     if predict_ctr_bytes is None:
