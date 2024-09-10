@@ -2116,3 +2116,32 @@ class Single_message111(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
+
+
+class Single_message112(TextWithKeyboard):
+
+    async def  __call__(self, wb_user_cabinets: list[WBUserCabinet]):
+        self._wb_user_cabinets = wb_user_cabinets
+        await super().__call__()
+
+    text = """
+ ⏳ До окончания акции "Удвоение пополнений" осталось всего несколько часов!
+
+❗️ Акция завершается сегодня в 18:00, и у вас ещё есть возможность удвоить свой баланс! Напоминаем, что минимальный платёж — всего 1000 рублей.
+
+💡 Что вы получаете?
+
+🔸    100% бонус на каждое пополнение на любую сумму
+🔸    Увеличенный баланс для будущих возможностей и успехов
+
+Если вы планировали пополнить счёт — сегодня последний шанс получить двойную выгоду.   
+    
+    
+    
+    """
+
+
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
