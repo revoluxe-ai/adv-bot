@@ -662,3 +662,18 @@ def get_call_me_keyboard1():
                                   url='https://t.me/skyline360_1')
     builder.row(button)
     return builder.as_markup()
+
+
+def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]):
+    builder = InlineKeyboardBuilder()
+    for wb_user_cabinet in wb_user_cabinets[:20]:
+        wb_cabinet = wb_user_cabinet.wb_cabinet
+        balance = wb_cabinet.balance or 0
+        bonus = wb_cabinet.bonus or 0
+        total_money = balance + bonus
+
+        button = InlineKeyboardButton(text="Пополнить " + wb_user_cabinet.name + f' Текущий общий баланс({total_money})',
+                                      callback_data=callbacks.AddBalance(
+                                          wb_cabinet_original_id=wb_user_cabinet.wb_cabinet_id).pack())
+        builder.row(button)
+    return builder.as_markup()
