@@ -9,6 +9,7 @@ from aiohttp import ServerTimeoutError
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload, joinedload
 
+from app.admin_bot.sender import sender_manager
 from app.client_bot.const import MAX_TOKENS
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from . import exceptions
@@ -211,6 +212,8 @@ async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
             tokens.extend(user_tokens)
         live_tokens = []
         for token in  tokens:
+            if not token.active:
+                continue
             try:
                 if token.shop_id !=  wb_cabinet.shop_id:
                     continue
@@ -219,8 +222,15 @@ async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
             try:
                 await CabinetManager.check_access(token)
                 live_tokens.append(token)
-            except Exception as exc:
-                logger.error(f'Токен не прошел проверку: {exc}')
+            except ApiForbiddenError:
+                logger.debug(f'Токен Отозван')
+                token.active = False
+                await sender_manager.send_ApiForbiddenError(token)
+                await session.commit()
+
+
+
+
                 continue
         if live_tokens:
             access = WBCabinetAccess(tokens = live_tokens,
