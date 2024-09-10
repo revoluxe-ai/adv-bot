@@ -11,6 +11,7 @@ from aiogram.fsm.context import FSMContext
 import logging
 from app import client_bot as tb
 from app.client_bot import const
+from app.modules.common_slaves.wildberries.exceptions import ApiForbiddenError
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,25 @@ admin_router = Router()
 async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
     logger.error('Юзер заблокировал бота')
     return
+
+
+
+@admin_router.errors(ExceptionTypeFilter(ApiForbiddenError))
+async def api_forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+    message = error_event.update.message
+    exception = error_event.exception
+
+    if message is None:
+        chat_id = error_event.update.callback_query.message.chat.id
+    else:
+        chat_id = message.chat.id
+    await bot.send_message(chat_id=chat_id,
+                           text='Нет доступов к данному магазину. Получите или создайте новый токен с правами "Контент" и "Продвижение" (галочку "Только для чтения" не ставить) \n\n'
+                                'Затем добавьте этот магазин ЕЩЕ РАЗ под НОВЫМ именем и с новым токеном (новый магазин создан не будет, токен добавиться к старому)')
+    return
+
+
+
 
 
 @admin_router.errors(ExceptionTypeFilter(CardNotFoundInDB))

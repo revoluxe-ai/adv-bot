@@ -159,3 +159,7 @@ class CheckPosition(CallbackData, prefix="check_position"):
 class UpdateCompanyFromWB(CallbackData, prefix="update_company_from_wb"):
     wb_user_cabinet_original_id: int
 
+
+class WBUpdate(CallbackData, prefix="wb_update"):
+    action: str
+    adv_setting_original_id: int

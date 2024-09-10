@@ -2145,3 +2145,11 @@ class Single_message112(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
+
+
+class KeywordStatUpdated(Text):
+    text = """Статистика из WB успешно загружена, подгружаю страницу"""
+
+
+class MinusKeywordsUpdated(Text):
+    text = "Минус-слова успешно обновлены, подгружаю страницу"
