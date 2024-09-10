@@ -159,6 +159,18 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                                                             adv_original_id=adv_setting.id).pack())
     builder.row(button)
 
+    button = InlineKeyboardButton(text='Загрузить статистику из WB',
+                                  callback_data=callbacks.WBUpdate(action='update_keyword_stat',
+                                                                   adv_setting_original_id=adv_setting.id).pack())
+    builder.row(button)
+
+
+    button = InlineKeyboardButton(text='Обновить минус-слова',
+                                    callback_data=callbacks.WBUpdate(action='update_minus_keywords',
+                                                                        adv_setting_original_id=adv_setting.id).pack())
+
+    builder.row(button)
+
 
     wb_user_cabinet_original_id = wb_user_cabinet.id
     builder.row(InlineKeyboardButton(text='Вернуться к списку кампаний',
