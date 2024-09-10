@@ -504,7 +504,7 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
             min_ctr = await data_manager.get_min_ctr(adv_setting)
             async with get_clickhouse_client() as client:
                 clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(client,
-                                                                                   keyword_setting,
+                                                                                   keyword_setting.text,
                                                                                    adv_setting.adv_id)
             if keyword_setting.added_clicks:
                 clicks += keyword_setting.added_clicks

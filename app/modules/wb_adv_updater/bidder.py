@@ -126,7 +126,7 @@ async def _run_bidder_process_for_adv(adv_id: int,
         async with  get_clickhouse_client() as client:
             for keyword in white_adv_keywords:
                 try:
-                    _, views, _= await data_manager.get_keyword_statistic_clickhouse(client, keyword, adv_id)
+                    _, views, _= await data_manager.get_keyword_statistic_clickhouse(client, keyword.text, adv_id)
                 except Exception as e:
                     logger.error(f'Ошибка при получении статистики по ключевому слову {keyword.text} {e}')
                     continue

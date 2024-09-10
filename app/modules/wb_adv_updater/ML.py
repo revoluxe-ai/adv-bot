@@ -117,7 +117,7 @@ class Predictor:
                 if row.empty:
                     return
                 predict_ctr = float(row['predicted_ctr'].values[0])
-                result = await data_manager.get_keyword_statistic_clickhouse(client, keyword_setting, adv_id)
+                result = await data_manager.get_keyword_statistic_clickhouse(client, keyword_setting.text, adv_id)
                 clicks, views, _ = result
                 if clicks == 0:
                     clicks = 1

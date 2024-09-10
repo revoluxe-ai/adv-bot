@@ -393,3 +393,17 @@ async def get_keyword_send_status(cluster_name: str, nmid: int) -> str:
     key = 'keyword_send_status:' + cluster_name + ':' + str(nmid)
     status = await redis_client.get(key)
     return status
+
+
+async def set_last_views(adv_id: int, text: str, total_views: int):
+    key = 'last_views:' + str(adv_id) + ':' + text
+    await redis_client.set(key, total_views)
+    return None
+
+
+async def get_last_views(adv_id, text):
+    key = 'last_views:' + str(adv_id) + ':' + text
+    total_views = await redis_client.get(key)
+    if total_views is None:
+        return None
+    return int(total_views)

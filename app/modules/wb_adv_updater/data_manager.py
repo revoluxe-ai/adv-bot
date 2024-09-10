@@ -61,12 +61,12 @@ async def measure_time(function):
 
 
 
-async def get_keyword_statistic_clickhouse(client, keyword_setting: KeywordSetting,
+async def get_keyword_statistic_clickhouse(client,
+                                           text: str,
                                            adv_id: int,
                                            pass_days: Union[int, None] = None) -> tuple[int, int, int]:
 
     today = datetime.now().date()
-    text = keyword_setting.text
     query = f"""
         SELECT
             COALESCE(SUM(total_clicks), 0) AS total_clicks,
@@ -1233,6 +1233,20 @@ WHERE adv_id = {adv_id}
     return [keyword[0] for keyword in keywords if keyword]
 
 
+
+
+async def get_keywords_from_clickhouse(adv_id: int)-> list[str]:
+    query = f"""
+SELECT DISTINCT text
+FROM default_db.advkeyword 
+WHERE adv_id = {adv_id}
+"""
+    async with get_clickhouse_client() as client:
+        result = await client.query(query)
+        keywords = result.result_rows
+    return [keyword[0] for keyword in keywords if keyword]
+
+
 async def get_nmids_for_keyword_text(text: str )-> set[int]:
     query = """
     SELECT DISTINCT adv_id
@@ -1246,56 +1260,76 @@ async def get_nmids_for_keyword_text(text: str )-> set[int]:
     return set([nmid[0] for nmid in nmids if nmid])
 
 
+async def get_need_nmids_for_parsing(text, adv_id, adv_ids):
+    adv_ids_with_text: set[int] = await get_nmids_for_keyword_text(text)
+    nmids_need = set()
+    not_found_adv_id = set()
+    for adv_id_with_text in adv_ids_with_text:
+        if adv_id_with_text not in adv_ids:
+            continue
+        nmid = await redis_manager.get_nmid(adv_id)
+        if not nmid:
+            not_found_adv_id.add(adv_id_with_text)
+        else:
+            nmids_need.add(nmid)
+    if not_found_adv_id:
+        async with _sm() as session:
+            stmt = select(distinct(AdvSetting.nmids)).where(AdvSetting.adv_id.in_(not_found_adv_id))
+            result = await session.execute(stmt)
+            nmids = result.scalars().all()
+            if nmids:
+                nmids = [nmid for row in nmids for nmid in row]
+                for nmid in nmids:
+                    await redis_manager.set_nmid(adv_id, nmid)
+                nmids_need = nmids_need.union(nmids)
+    return nmids_need
+
 
 async def get_phrases_for_parsing(semaphore = None):
     pass_texts = set()
-    long_list = []
-    short_list = []
     async with _sm(semaphore) as session:
-        stmt = select(AdvSetting.adv_id).where(
+        stmt = select(AdvSetting).where(
             AdvSetting.parsing_active == True)
-        adv_ids  = await session.execute(stmt)
-        adv_ids = adv_ids.scalars().all()
-        random.shuffle(adv_ids)
-        for adv_id in adv_ids:
-            keywords_texts: list[str] = await get_keywords_from_clickhouse(adv_id)
-            for text in keywords_texts:
-                hash_text = hash(text)
-                if hash_text in pass_texts:
-                    continue
-                adv_ids_with_text: set[int] = await get_nmids_for_keyword_text(text)
-                nmids_need = set()
-                not_found_adv_id = set()
-                for adv_id_with_text in adv_ids_with_text:
-                    if adv_id_with_text not in  adv_ids:
+        advs  = await session.execute(stmt)
+        advs = advs.scalars().all()
+        adv_ids = [adv.adv_id for adv in advs]
+        random.shuffle(advs)
+        async with get_clickhouse_client() as client:
+            for adv in advs:
+                adv_id = adv.adv_id
+                keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv)
+                for keyword in keywords:
+                    text = keyword.text
+                    hash_text = hash(text)
+                    if hash_text in pass_texts:
                         continue
-                    nmid = await redis_manager.get_nmid(adv_id)
-                    if not nmid:
-                        not_found_adv_id.add(adv_id_with_text)
-                    else:
-                        nmids_need.add(nmid)
+                    _, total_views, _ = await get_keyword_statistic_clickhouse(client,
+                                                                               text,
+                                                                               adv_id)
+                    cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+                    if not cluster_name:
+                        nmids_need = await get_need_nmids_for_parsing(text, adv_id, adv_ids)
+                        yield text, nmids_need
+                        pass_texts.add(hash_text)
+                        await redis_manager.set_last_views(adv_id, text, total_views)
+                        continue
+                    if keyword.status == KeywordStatus.GOOD:
+                        last_views = await redis_manager.get_last_views(adv_id, text)
+                        if not last_views or ((total_views - last_views) > 5):
+                            nmids_need = await get_need_nmids_for_parsing(text, adv_id, adv_ids)
+                            stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)))
+                            result = await session.execute(stmt)
+                            adv_ids = result.scalars().all()
+                            for adv_id in adv_ids:
+                                _ , views, _ = await get_keyword_statistic_clickhouse(client,
+                                                                                             text,
+                                                                                             adv_id)
+                                await redis_manager.set_last_views(adv_id, text, views)
+                            yield text, nmids_need
+                            pass_texts.add(hash_text)
+                            break
 
-                if not_found_adv_id:
-                    async with _sm() as session:
-                        stmt = select(distinct(AdvSetting.nmids)).where(AdvSetting.adv_id.in_(not_found_adv_id))
-                        result = await session.execute(stmt)
-                        nmids = result.scalars().all()
-                        if nmids:
-                             nmids = [nmid for row in nmids for nmid in row]
-                             for nmid in nmids:
-                                 await redis_manager.set_nmid(adv_id, nmid)
-                             nmids_need = nmids_need.union(nmids)
-                cluster, preset = await redis_manager.get_cluster_and_preset(text)
-                if cluster and preset:
-                    long_list.append((text, nmids_need))
-                else:
-                    short_list.append((text, nmids_need))
-                pass_texts.add(hash_text)
-                if short_list:
-                    yield short_list.pop(0)
-                if long_list:
-                    yield long_list.pop(0)
-                await asyncio.sleep(0)
+
 
 
 async def get_last_updated_phrases(all_white_phrases):

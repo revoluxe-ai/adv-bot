@@ -530,7 +530,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         async with get_clickhouse_client() as client:
             total_clicks, total_views, total_spend\
                 = await data_manager.get_keyword_statistic_clickhouse(client,
-                                                                      self._keyword_setting,
+                                                                      self._keyword_setting.text,
                                                                       self._adv_setting.adv_id)
 
         self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
