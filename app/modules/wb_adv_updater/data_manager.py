@@ -1316,7 +1316,7 @@ async def get_phrases_for_parsing(semaphore = None):
                         continue
                     if keyword.status == KeywordStatus.GOOD:
                         last_views = await redis_manager.get_last_views(adv_id, text)
-                        if not last_views or ((total_views - last_views) > max_views_difference):
+                        if not last_views or ((total_views - last_views) > max_views_difference) or keyword.hard_status == 2:
                             nmids_need = await get_need_nmids_for_parsing(text, adv_id, adv_ids)
                             stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)))
                             result = await session.execute(stmt)
