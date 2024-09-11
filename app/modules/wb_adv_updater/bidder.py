@@ -96,20 +96,21 @@ async def _run_bidder_process_for_adv(adv_id: int,
                     continue
                 try:
                     text = keyword.text
-                    await parser.add_wb_positions(text, {nmid_in_adv}, 1)
+                    await parser.add_wb_positions(text, {nmid_in_adv}, 0)
                 except Exception as e:
                     logger.error(f'Ошибка при получении позиции {e}')
                     continue
                 position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
                 if not position:
                     continue
+                if position.promo_position > 0:
+                    cpm_from_parsing: int = position.cpm
                 promo_position = position.promo_position
                 base_position = position.base_position
                 if not promo_position and base_position:
                     logger.debug('Нет буста')
                     continue
                 promo_positions.append(promo_position)
-                cpm_from_parsing: int = position.cpm
                 if not cpm_from_parsing:
                     cpm_from_parsing = 100
         if promo_positions:
