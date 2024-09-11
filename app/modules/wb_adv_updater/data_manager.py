@@ -3,10 +3,12 @@ import io
 import logging
 import random
 import time
+import cProfile
+import pstats
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Union, Optional, List
+from typing import Any, Union, Optional, List, Callable
 import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
@@ -167,41 +169,40 @@ def _build_clickhouse_query(adv_id: int,
                             pass_time: Optional[timedelta],
                             last_views: Optional[int] = None) -> str:
     query = f"""
-          SELECT
-              text,
-              COALESCE(SUM(total_clicks), 0) AS total_clicks,
-              COALESCE(SUM(total_views), 0) AS total_views,
-              COALESCE(SUM(total_spend), 0) AS total_spend,
-              date
-          FROM (
-              SELECT
-                  text,
-                  clicks AS total_clicks,
-                  views AS total_views,
-                  spend AS total_spend,
-                  date
-              FROM
-                  default_db.advkeyword
-              WHERE
-                  adv_id = {adv_id}
-                  AND (text, date, version) IN (
-                      SELECT
-                          text, date, MAX(version) AS version
-                      FROM
-                          default_db.advkeyword
-                      WHERE
-                          adv_id = {adv_id}
-                      GROUP BY
-                          text, date
-                  )
-          ) AS latest_records
-      """
+        SELECT
+            text,
+            SUM(total_clicks) AS total_clicks,
+            SUM(total_views) AS total_views,
+            SUM(total_spend) AS total_spend
+        FROM (
+            SELECT
+                text,
+                COALESCE(SUM(clicks), 0) AS total_clicks,
+                COALESCE(SUM(views), 0) AS total_views,
+                COALESCE(SUM(spend), 0) AS total_spend,
+                date
+            FROM
+                default_db.advkeyword
+            WHERE
+                adv_id = {adv_id}
+                AND (text, date, version) IN (
+                    SELECT
+                        text, date, MAX(version) AS version
+                    FROM
+                        default_db.advkeyword
+                    WHERE
+                        adv_id = {adv_id}
+                    GROUP BY
+                        text, date
+                )
+            GROUP BY
+                text, date
+        ) AS latest_records
+    """
 
     if pass_time:
         start_time = datetime.now() - pass_time
         query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
-
-    query += " GROUP BY text, date"
 
     if last_views:
         query = f"""
@@ -210,9 +211,9 @@ def _build_clickhouse_query(adv_id: int,
             cumulative_views AS (
                 SELECT
                     text,
-                    total_clicks,
-                    total_views,
-                    total_spend,
+                    SUM(total_clicks) AS total_clicks,
+                    SUM(total_views) AS total_views,
+                    SUM(total_spend) AS total_spend,
                     SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
                 FROM
                     records
@@ -228,8 +229,11 @@ def _build_clickhouse_query(adv_id: int,
                 cumulative_total_views <= {last_views}
             GROUP BY text
         """
+    else:
+        query += " GROUP BY text"
 
     return query
+
 
 
 
@@ -341,19 +345,63 @@ async def  set_position(keyword_stat: CalculatedKeyword,
 
     return keyword_stat
 
-async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
 
+def __calculate_clusters(preset_to_keywords, preset_to_cluster_name):
+    keyword_stats = []
+    start_time = time.time()
+
+    for preset in preset_to_keywords:
+        logger.debug(f'Обрабатываю кластер {preset}')
+        keywords = preset_to_keywords[preset]
+        keyword_cluster_name = preset_to_cluster_name[preset]
+
+        cluster_start_time = time.time()
+        views = clicks = spend = query = 0
+        for keyword in keywords:
+            logger.debug(f'Обрабатываю ключевое слово {keyword.text}')
+            views += keyword.views
+            clicks += keyword.clicks
+            spend += keyword.spend
+            if isinstance(keyword.query, int):
+                logger.debug(f'Пишу прогноз показов')
+                query += keyword.query
+
+        cluster_end_time = time.time()
+        logger.debug(f'Время обработки кластера {preset}: {cluster_end_time - cluster_start_time} секунд')
+
+        cluster_keyword = CalculatedKeyword(
+            text=keyword_cluster_name,
+            views=views,
+            clicks=clicks,
+            spend=spend
+        )
+        cluster_keyword.query = query if query else "<50"
+        cluster_keyword.childs_keywords = keywords
+        keyword_stats.append(cluster_keyword)
+
+    end_time = time.time()
+    logger.debug(f'Общее время выполнения: {end_time - start_time} секунд')
+
+    return keyword_stats
+
+
+def profile_function(func: Callable, *args, **kwargs):
+    profiler = cProfile.Profile()
+    profiler.enable()
+    func(*args, **kwargs)
+    profiler.disable()
+    stats = pstats.Stats(profiler).sort_stats('cumulative')
+    stats.print_stats(10)
+
+
+async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
     preset_to_keywords = defaultdict(list)
     preset_to_cluster_name = {}
-
+    texts = [keyword.text for keyword in keyword_stats]
+    text_to_custer_and_present: dict[str, tuple] = await redis_manager.get_clusters_and_presets(texts)
     for keyword in keyword_stats:
         text = keyword.text
-        try:
-           cluster_name, preset = await redis_manager.get_cluster_and_preset(text)
-        except Exception:
-            logger.error(f'Ошибка при получении кластера и пресета для ключевого слова {text}', exc_info=True)
-            cluster_name = None
-            preset = None
+        cluster_name, preset = text_to_custer_and_present.get(text, (None, None))
         if cluster_name:
             preset_to_keywords[preset].append(keyword)
             preset_to_cluster_name[preset] = cluster_name
@@ -362,24 +410,10 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
             cluster_name = text
             preset_to_keywords[preset].append(keyword)
             preset_to_cluster_name[preset] = cluster_name
-
-    keyword_stats = []
-
-    for preset in preset_to_keywords:
-        keywords = preset_to_keywords[preset]
-        keyword_cluster_name = preset_to_cluster_name[preset]
-        views = sum([keyword.views for keyword in keywords])
-        clicks = sum([keyword.clicks for keyword in keywords])
-        spend = sum([keyword.spend for keyword in keywords])
-        query = sum([keyword.query if isinstance(keyword.query, int) else 0  for keyword in keywords])
-        cluster_keyword = CalculatedKeyword(text=keyword_cluster_name,
-                                            views=views,
-                                            clicks=clicks,
-                                            spend=spend
-                                            )
-        cluster_keyword.query = query if query else "<50"
-        cluster_keyword.childs_keywords = keywords
-        keyword_stats.append(cluster_keyword)
+    # loop = asyncio.get_event_loop()
+    # task = loop.run_in_executor(None, profile_function, __calculate_clusters, preset_to_keywords, preset_to_cluster_name)
+    # await task
+    keyword_stats = __calculate_clusters(preset_to_keywords, preset_to_cluster_name)
 
     return keyword_stats
 
@@ -1441,4 +1475,5 @@ async def get_users_from_nmid(nmid: int):
     except Exception as e:
         logger.error('Ошибка при получении пользователей по nmid', exc_info=True)
         return []
+
 

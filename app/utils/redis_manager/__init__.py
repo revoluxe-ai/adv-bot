@@ -16,8 +16,8 @@ from app.modules.keywords_query import keywords_query
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 
+# redis_client = redis.asyncio.Redis(host='147.45.151.145', port=6379, db=0)
 redis_client = redis.asyncio.Redis(host='localhost', port=6379, db=0)
-
 
 class RedisEvent(asyncio.Event):
     def __init__(self, key=None):
@@ -407,3 +407,17 @@ async def get_last_views(adv_id, text):
     if total_views is None:
         return None
     return int(total_views)
+
+
+async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]]]:
+    result = await redis_client.mget([f'cluster_and_preset:{text}' for text in texts])
+    clusters_and_presets = {}
+    for i, value in enumerate(result):
+        if value is None:
+            continue
+        value = value.decode('utf-8')
+        cluster, preset = value.split(':')
+        clusters_and_presets[texts[i]] = (cluster, int(preset))
+    return clusters_and_presets
+
+
