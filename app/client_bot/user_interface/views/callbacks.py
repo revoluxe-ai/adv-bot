@@ -163,3 +163,8 @@ class UpdateCompanyFromWB(CallbackData, prefix="update_company_from_wb"):
 class WBUpdate(CallbackData, prefix="wb_update"):
     action: str
     adv_setting_original_id: int
+
+
+class StrategySetting(CallbackData, prefix="strategy_setting"):
+    action: str
+    adv_setting_original_id: int

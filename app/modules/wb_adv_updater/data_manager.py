@@ -609,7 +609,6 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
 
 
 async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
-    adv.target_ctr_mode = True
     if adv.target_ctr_mode:
         return await get_good_bad_phrases_for_target_ctr(adv)
     else:

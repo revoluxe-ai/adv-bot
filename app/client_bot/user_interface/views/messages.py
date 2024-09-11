@@ -2153,3 +2153,83 @@ class KeywordStatUpdated(Text):
 
 class MinusKeywordsUpdated(Text):
     text = "Минус-слова успешно обновлены, подгружаю страницу"
+
+
+
+
+
+
+class Single_message113(TextWithKeyboard):
+
+    async def  __call__(self, wb_user_cabinets: list[WBUserCabinet]):
+        self._wb_user_cabinets = wb_user_cabinets
+        await super().__call__()
+
+
+
+    text = """
+ ⏳ Остался всего 1 час до окончания акции "Удвоение пополнений"!
+
+Акция завершится уже в 18:00, и это ваш последний шанс удвоить сумму пополнения.
+
+🎯 Что важно помнить?
+
+🔹    100% бонус на сумму пополнения от 1000 рублей.
+🔹    Акция действует ещё 1 час — не упустите эту возможность!
+
+Если планировали пополнить счёт — сделайте это сейчас и получите двойную выгоду! Время на исходе!"""
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
+
+
+class StrategySetting(TextWithKeyboard):
+
+    async def __call__(self, adv_setting_id):
+        async with _sm() as session:
+            stmt = select(AdvSetting)\
+            .where(AdvSetting.id == adv_setting_id)
+            result = await session.execute(stmt)
+            adv_setting = result.scalars().first()
+            self.adv_setting = adv_setting
+            await super().__call__()
+
+    text = """Настройка стратегии"""
+
+
+
+    @property
+    def keyboard(self):
+        builder = InlineKeyboardBuilder()
+        if self.adv_setting.target_ctr_mode is True:
+             button = InlineKeyboardButton(text="Включить стратегию Минимальный CTR",
+                                        callback_data=callbacks.StrategySetting(
+                                            action="turn_on_min_ctr",
+                                            adv_setting_original_id=self.adv_setting.id).pack())
+             builder.row(button)
+             if self.adv_setting.target_ctr_mode_strategy == 'keep':
+                 button = InlineKeyboardButton(text="Включить Поддерживающий Режим",
+                                        callback_data=callbacks.StrategySetting(
+                                            action="turn_on_forward_mode",
+                                            adv_original_id=self.adv_setting.id).pack())
+                 builder.row(button)
+             elif self.adv_setting.target_ctr_mode_strategy == 'forward':
+                 button = InlineKeyboardButton(text="Включить Агрессивный Режим",
+                                        callback_data=callbacks.StrategySetting(
+                                            action="turn_on_keep_mode",
+                                            adv_setting_original_id=self.adv_setting.id).pack())
+                 builder.row(button)
+
+        else:
+            button = InlineKeyboardButton(text="Включить стратегию Целевой CTR",
+                                            callback_data=callbacks.StrategySetting(
+                                            action="on_target_ctr",
+                                            adv_setting_original_id=self.adv_setting.id).pack())
+            builder.row(button)
+
+        button = InlineKeyboardButton(text="Вернуться к настройкам кампании",
+                                      callback_data=callbacks.Adv(adv_original_id=self.adv_setting.id).pack())
+        builder.row(button)
+        return builder.as_markup()
+

@@ -145,7 +145,12 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                             action='to_min_views_for_predict_ctr_change_page',
                                             adv_original_id=adv_setting.id).pack())
 
+    builder.row(button)
 
+    button = InlineKeyboardButton(text = "Настройка стратегии",
+                                        callback_data=callbacks.StrategySetting(
+                                        action='main_menu',
+                                        adv_setting_original_id = adv_setting.id).pack())
     builder.row(button)
 
 
