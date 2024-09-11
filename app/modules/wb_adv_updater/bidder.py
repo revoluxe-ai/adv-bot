@@ -46,6 +46,8 @@ async def _run_bidder_process():
            for adv_setting in adv_settings:
                 wb_cabinet_id = adv_setting.wb_cabinet_id
                 if adv_setting.id not in adv_tasks:
+                     if adv_setting.adv_id != 19471991:
+                         continue
                      access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
                      if not access:
                          logger.debug(f'Для кабинета {wb_cabinet_id} не найден доступ')
@@ -103,7 +105,7 @@ async def _run_bidder_process_for_adv(adv_id: int,
                 position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
                 if not position:
                     continue
-                if position.promo_position > 0:
+                if position.promo_position:
                     cpm_from_parsing: int = position.cpm
                 promo_position = position.promo_position
                 base_position = position.base_position
