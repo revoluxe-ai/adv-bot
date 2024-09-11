@@ -212,13 +212,13 @@ async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
             tokens.extend(user_tokens)
         live_tokens = []
         for token in  tokens:
-            if not token.active:
-                continue
             try:
                 if token.shop_id !=  wb_cabinet.shop_id:
                     continue
             except:
                 logger.error('Не валидный токен')
+            if not token.active:
+                continue
             try:
                 await CabinetManager.check_access(token)
                 live_tokens.append(token)
