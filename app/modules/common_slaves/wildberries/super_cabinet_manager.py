@@ -195,41 +195,22 @@ async def get_super_user_access():
 
 async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
     async with sm() as session:
-        stmt = (
-            select(WBCabinet)
-            .options(selectinload(WBCabinet.wb_user_cabinets)
-                     .selectinload(WBUserCabinet.user)
-                     .selectinload(User.wb_tokens))
-            .where(WBCabinet.id == wb_cabinet_id)
-        )
+        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
         result = await session.execute(stmt)
-        wb_cabinet: WBCabinet = result.scalars().first()
-        wb_user_cabinets = wb_cabinet.wb_user_cabinets
-        tokens = []
-        for wb_user_cabinet in wb_user_cabinets:
-            user = wb_user_cabinet.user
-            user_tokens = user.wb_tokens
-            tokens.extend(user_tokens)
-        live_tokens = []
-        for token in  tokens:
-            try:
-                if token.shop_id !=  wb_cabinet.shop_id:
-                    continue
-            except:
-                logger.error('Не валидный токен')
-            if not token.active:
+        wb_cabinet: WBCabinet = result.scalar()
+        shop_id = wb_cabinet.shop_id
+        stmt = select(WBToken).where(WBToken.active == True)
+        result =  await session.stream(stmt)
+        catch_tokens = []
+        async for token in  result.yield_per(100):
+            token: WBToken = token[0]
+            if not token.check_valid():
+                logger.debug(f'Не валидный токен {token.api_key}')
                 continue
-            try:
-                await CabinetManager.check_access(token)
-                live_tokens.append(token)
-            except ApiForbiddenError:
-                logger.debug(f'Токен Отозван')
-                # token.active = False
-                # await sender_manager.send_ApiForbiddenError(token)
-                # await session.commit()
-                continue
-        if live_tokens:
-            access = WBCabinetAccess(tokens = live_tokens,
+            if token.shop_id == shop_id:
+                catch_tokens.append(token)
+        if catch_tokens:
+            access = WBCabinetAccess(tokens = catch_tokens,
                                      wb_user_cabinet = None,
                                      wb_cabinet = wb_cabinet)
             return access

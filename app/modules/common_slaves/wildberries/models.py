@@ -58,6 +58,7 @@ class WBToken(BaseTable):
     user = relationship('User', back_populates='wb_tokens',
                         lazy='joined')
     active = Column(Boolean, default=True)
+    shop_id = mapped_column(String, nullable=True)
     __table_args__ = (UniqueConstraint('api_key', 'user_id', name='_api_key_user_id_uc'),)
 
 
@@ -65,9 +66,20 @@ class WBToken(BaseTable):
     @property
     def __payload(self):
         try:
-            return jwt.decode(self.api_key, options={"verify_signature": False})
+            result = jwt.decode(self.api_key, options={"verify_signature": False})
+            return result
         except:
             raise exceptions.NotValidTokenError
+
+    def check_valid(self):
+        try:
+            result = jwt.decode(self.api_key, options={"verify_signature": False})
+            if result:
+                return True
+        except Exception:
+           return False
+
+
     def get_payload(self, key, default=0):
         payload = self.__payload
         return payload.get(key)
