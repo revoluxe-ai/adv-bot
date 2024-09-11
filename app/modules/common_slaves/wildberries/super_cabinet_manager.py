@@ -224,9 +224,9 @@ async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
                 live_tokens.append(token)
             except ApiForbiddenError:
                 logger.debug(f'Токен Отозван')
-                token.active = False
+                # token.active = False
                 # await sender_manager.send_ApiForbiddenError(token)
-                await session.commit()
+                # await session.commit()
                 continue
         if live_tokens:
             access = WBCabinetAccess(tokens = live_tokens,
