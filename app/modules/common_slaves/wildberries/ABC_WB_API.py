@@ -101,13 +101,13 @@ class ABC_WB_API(WbRequestApiMixin):
 
 
     async def set_next_token(self):
-        current_token: WBToken = self.headers.current_token
-        async with sm() as session:
-            stmt = select(WBToken).where(WBToken.id == current_token.id)
-            result = await session.execute(stmt)
-            token = result.scalar()
-            token.active = False
-            await session.commit()
+        # current_token: WBToken = self.headers.current_token
+        # async with sm() as session:
+        #     stmt = select(WBToken).where(WBToken.id == current_token.id)
+        #     result = await session.execute(stmt)
+        #     token = result.scalar()
+        #     token.active = False
+        #     await session.commit()
         if self._free_tokens:
             self.headers = Headers(self._free_tokens.pop())
         else:
