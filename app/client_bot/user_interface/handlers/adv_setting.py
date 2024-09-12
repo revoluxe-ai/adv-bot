@@ -55,8 +55,7 @@ async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, stat
     filter_advs = [keyword.strip().lower() for keyword in filter_advs if keyword]
     await state.update_data(filter_advs=filter_advs)
     state_data = await state.get_data()
-    wb_user_cabinet_original_id = state_data['wb_user_cabinet_original_id']
-    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    wb_user_cabinet_original_id = state_data['last_wb_user_cabinet_original_id']
     page = 1
     check_data = await state.get_data()
     logger.debug(f'check_data: {check_data}')

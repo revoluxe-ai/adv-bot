@@ -722,6 +722,8 @@ class ShopMenu(TextWithKeyboard):
             return False
 
      async def __call__(self):
+        wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
+        await self._state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
         async with _sm() as session:
             stmt = select(WBUserCabinet)\
                 .options(selectinload(WBUserCabinet.wb_cabinet),
