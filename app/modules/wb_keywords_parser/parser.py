@@ -119,7 +119,7 @@ class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
         products, cluster, preset = await self.__parse_keywords_from_wb(text, page)
-        if page == 1 and cluster:
+        if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
         if not products:
             return None
