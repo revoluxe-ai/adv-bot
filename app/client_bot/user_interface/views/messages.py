@@ -22,6 +22,7 @@ from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           KeywordSetting, WBCabinet)
 from app.utils import redis_manager
 from app.utils.suffixes import get_day_suffix
+from .. import states
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
                                            TextWithImage,
@@ -166,6 +167,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
 
     async def __call__(self):
+        await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
         async with _sm() as session:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
