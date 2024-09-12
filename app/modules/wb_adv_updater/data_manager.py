@@ -1323,7 +1323,9 @@ async def get_phrases_for_parsing(semaphore = None):
     pass_texts = set()
     async with _sm(semaphore) as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.parsing_active == True)
+            AdvSetting.parsing_active == True,
+        AdvSetting.active_status == 'started'
+        )
         advs  = await session.execute(stmt)
         advs = advs.scalars().all()
         adv_ids = [adv.adv_id for adv in advs]
