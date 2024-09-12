@@ -2212,7 +2212,7 @@ class StrategySetting(TextWithKeyboard):
                  button = InlineKeyboardButton(text="Включить Поддерживающий Режим",
                                         callback_data=callbacks.StrategySetting(
                                             action="turn_on_forward_mode",
-                                            adv_original_id=self.adv_setting.id).pack())
+                                            adv_setting_original_id=self.adv_setting.id).pack())
                  builder.row(button)
              elif self.adv_setting.target_ctr_mode_strategy == 'forward':
                  button = InlineKeyboardButton(text="Включить Агрессивный Режим",
@@ -2233,3 +2233,20 @@ class StrategySetting(TextWithKeyboard):
         builder.row(button)
         return builder.as_markup()
 
+
+class Single_message114(TextWithImage):
+
+    parse_mode='Markdown'
+
+    text = """
+    ⚡️Ваша выручка на WB взлетит в космос, если вы поймете это🚀
+
+    ➡️На продаже сезонных товаров можно делать x2-x5, и для этого не нужно делать ничего сверхъестественного!
+
+    👉Просто приходите [на живой эфир](https://t.me/start_nawb_bot?start=link_GO377LwN5k), где вы получите секреты «сезонки»-2024-2025
+
+    Именно [эти алгоритмы](https://t.me/start_nawb_bot?start=link_GO377LwN5k) помогли селлерам сделать рекордную выручку на школьных товарах в августе🔥
+
+    🎁Переходите в бота, жмите старт и сразу получите доступ к сервисам-помощникам: [@Sezonka_WB](https://t.me/start_nawb_bot?start=link_GO377LwN5k)"""
+
+    image = './images_for_sendings/1.jpg'
