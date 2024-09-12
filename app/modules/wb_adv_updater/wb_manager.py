@@ -344,8 +344,6 @@ async def update_keywords_in_advs():
             adv_settings: list[AdvSetting] = result.scalars().all()
             for adv_setting in adv_settings:
                 if adv_setting.id not in update_tasks:
-                    if adv_setting.name != '205599587  Царевна лягушка':
-                        continue
                     wb_cabinet_id = adv_setting.wb_cabinet_id
                     access: WBCabinetAccess = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
                     if not access:
