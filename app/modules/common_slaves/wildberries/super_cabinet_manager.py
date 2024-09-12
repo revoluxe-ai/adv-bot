@@ -199,7 +199,7 @@ async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
         result = await session.execute(stmt)
         wb_cabinet: WBCabinet = result.scalar()
         shop_id = wb_cabinet.shop_id
-        stmt = select(WBToken).where(WBToken.active == True)
+        stmt = select(WBToken)
         result =  await session.stream(stmt)
         catch_tokens = []
         async for token in  result.yield_per(100):
