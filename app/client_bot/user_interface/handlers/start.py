@@ -315,6 +315,9 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
 async def select_shop(callback_query: types.CallbackQuery,
                       callback_data: callbacks.Shop,
                       bot: aiogram.Bot, state: FSMContext):
+    reset_filter = callback_data.reset_filter
+    if reset_filter:
+        await state.update_data(filter_advs=None)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await state.update_data(last_wb_user_cabinet_original_id = wb_user_cabinet_original_id)
     await callback_query.answer()
