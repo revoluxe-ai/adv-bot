@@ -220,6 +220,7 @@ async def add_positions_from_page(stop_event: asyncio.Event,
         return []
     positions = await parser.parse_keywords_from_wb(text, page)
     if not positions:
+        stop_event.set()
         return []
     catch_any_position.set()
     logger.debug(f'Найдено {len(positions)}')
