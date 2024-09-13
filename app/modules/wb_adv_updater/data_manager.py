@@ -313,6 +313,38 @@ def __sort_by_update_keyword(keyword: WBItemPosition):
         update = datetime.now() - timedelta(days=1000)
     return update
 
+async def set_positions(keyword_stats: list[CalculatedKeyword],
+                        adv_setting: AdvSetting) -> list[CalculatedKeyword]:
+    texts = [keyword.text for keyword in keyword_stats]
+    positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    text_to_position = {position.keyword_text: position for position in positions}
+    for keyword_stat in keyword_stats:
+        text = keyword_stat.text
+        if position := text_to_position.get(text):
+            keyword_stat.base_position = position.base_position
+            keyword_stat.promo_position = position.promo_position
+            keyword_stat.real_position = position.real_position
+            keyword_stat.cpm = position.cpm
+        else:
+            keywords = keyword_stat.childs_keywords
+            if keywords:
+                texts = [kw.text for kw in keywords]
+                positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+                if positions:
+                    position = max(positions, key=lambda kw: __sort_by_update_keyword(kw))
+                    base_position = position.base_position
+                    promo_position = position.promo_position
+                    real_position = position.real_position
+                    keyword_stat.base_position = base_position
+                    keyword_stat.promo_position = promo_position
+                    keyword_stat.real_position = real_position
+                    keyword_stat.cpm = position.cpm
+
+    return keyword_stats
+
+
+
+
 
 async def  set_position(keyword_stat: CalculatedKeyword,
                         adv_setting: AdvSetting) -> CalculatedKeyword:
@@ -431,7 +463,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
     texts_to_keyword_setting = {kws.text: kws for kws in keyword_settings}
     if adv_setting.clusters_mode:
         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
-    keyword_stats = [await set_position(kw, adv_setting) for kw in keyword_stats]
+    keyword_stats = await set_positions(keyword_stats, adv_setting)
     async with _sm() as session:
         for keyword_stat in keyword_stats:
             cluster_name = keyword_stat.text
@@ -629,7 +661,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting)->list[Calcul
     texts_to_keyword_setting = {kws.text: kws for kws in keyword_settings}
     if adv_setting.clusters_mode:
         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
-    keyword_stats = [await set_position(kw, adv_setting) for kw in keyword_stats]
+    keyword_stats = await set_positions(keyword_stats, adv_setting)
     async with _sm() as session:
         for keyword_stat in keyword_stats:
             cluster_name = keyword_stat.text
