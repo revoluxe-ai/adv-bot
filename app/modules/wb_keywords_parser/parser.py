@@ -312,8 +312,7 @@ async def limited_add_wb_positions(text:str, need_nmids: set[int]):
 
 
 async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncGenerator[tuple[str, set[int]], None]:
-    max_views_difference = 50
-    pass_texts = set()
+    max_views_difference = 10
     async with sm(semaphore) as session:
         logger.debug("Открытие сессии для выполнения запросов к базе данных.")
 
@@ -335,6 +334,9 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
         logger.debug("Подключение к ClickHouse клиенту.")
 
         for adv in advs:
+            need_nmids = set(adv.nmids)
+            if not need_nmids:
+                continue
             adv_id = adv.adv_id
             logger.debug(f"Обработка рекламной кампании ID: {adv_id}. Получение ключевых слов.")
 
@@ -345,64 +347,23 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
                     continue
                 total_views = keyword.views
                 text = keyword.text
-                hash_text = hash(text)
-                if hash_text in pass_texts:
-                    logger.debug(f"Ключевое слово '{text}' уже обрабатывалось, пропуск.")
-                    continue
                 logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
                 cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
-
                 if not cluster_name:
                     logger.debug(
                         f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
-                    nmids_need = await data_manager.get_need_nmids_for_parsing(text, adv_id, adv_ids)
-                    if nmids_need:
-                        logger.debug(
-                            "Выполнение запроса для обновления списка ID рекламных кампаний с новыми nmids.")
-                        stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)),
-                                                               AdvSetting.parsing_active == True)
-                        result = await session.execute(stmt)
-                        adv_ids = result.scalars().all()
-
-                        for adv_id in adv_ids:
-                            logger.debug(
-                                f"Обновление просмотров для ключевого слова '{text}' в рекламной кампании ID: {adv_id}.")
-                            _, views, _ = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
-                            await redis_manager.set_last_views(adv_id, text, views)
-                        await queue.put((text, nmids_need))
-                        pass_texts.add(hash_text)
-
-                    logger.debug(
-                        f"Обновление последнего количества просмотров для ключевого слова '{text}' в Redis.")
                     await redis_manager.set_last_views(adv_id, text, total_views)
+                    await queue.put((text, need_nmids))
                     continue
 
                 if keyword.status == KeywordStatus.GOOD:
                     logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
                     last_views = await redis_manager.get_last_views(adv_id, text)
-
                     if not last_views or\
                             (total_views - last_views) > max_views_difference and keyword.hard_status == 2 or\
                             last_views == total_views and keyword.hard_status == 2:
-                        logger.debug(
-                            f"Значительное изменение просмотров или жесткий статус у ключевого слова '{text}'. Обновление nmids для парсинга.")
-                        nmids_need = await data_manager.get_need_nmids_for_parsing(text, adv_id, adv_ids)
-                        if nmids_need:
-                            logger.debug(
-                                "Выполнение запроса для обновления списка ID рекламных кампаний с новыми nmids.")
-                            stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)),
-                                                                   AdvSetting.parsing_active == True)
-                            result = await session.execute(stmt)
-                            adv_ids = result.scalars().all()
-
-                            for adv_id in adv_ids:
-                                logger.debug(
-                                    f"Обновление просмотров для ключевого слова '{text}' в рекламной кампании ID: {adv_id}.")
-                                _, views, _ = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
-                                await redis_manager.set_last_views(adv_id, text, views)
-
-                            await queue.put((text, nmids_need))
-                            pass_texts.add(hash_text)
+                            await redis_manager.set_last_views(adv_id, text, total_views)
+                            await queue.put((text, need_nmids))
                             logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
                             break
 
