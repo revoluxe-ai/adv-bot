@@ -339,8 +339,11 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
                 continue
             adv_id = adv.adv_id
             logger.debug(f"Обработка рекламной кампании ID: {adv_id}. Получение ключевых слов.")
-
-            keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
+            try:
+                 keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
+            except Exception as exc:
+                logger.error('Ошибка получения фраз для парсинга', exc_info=True)
+                continue
             for keyword in keywords:
                 if keyword.views == 0:
                     logger.debug(f"Ключевое слово '{keyword.text}' не имеет просмотров. Пропуск.")
