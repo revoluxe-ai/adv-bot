@@ -818,7 +818,7 @@ class ShopMenu(TextWithKeyboard):
         else:
             last_for_days = '∞'
         text = (
-            f'📊 *Подключенных к боту кампаний*: {count_active_advs}\n'
+            f'📊 *Кампаний на автоуправлении*: {count_active_advs}\n'
             f'🔍 *Включен парсинг у кампаний*: {count_active_parsing}\n'
             f'🔧 *Включено автоуправление ставкой у кампаний*: {count_auto_bidder}\n'
             f'💸 *Расход в сутки*: {total_amount_for_day} рублей\n'
@@ -2199,9 +2199,16 @@ class StrategySetting(TextWithKeyboard):
             self.adv_setting = adv_setting
             await super().__call__()
 
-    text = """Настройка стратегии"""
 
+    @property
+    def text(self):
+        text = f"""Настройка стратегии\n
+        Текущая стратегия: {'Минимальный CTR' if not self.adv_setting.target_ctr_mode else 'Целевой CTR'}\n
+        """
+        if self.adv_setting.target_ctr_mode:
+            text += f"""{'Агрессивный режим' if self.adv_setting.target_ctr_mode_strategy == 'forward' else 'Поддерживающий режим'}\n"""
 
+        return text
 
     @property
     def keyboard(self):
@@ -2238,7 +2245,7 @@ class StrategySetting(TextWithKeyboard):
         return builder.as_markup()
 
 
-class Single_message114(TextWithImage):
+class Single_message115(TextWithImage):
 
     parse_mode='Markdown'
 
@@ -2254,3 +2261,18 @@ class Single_message114(TextWithImage):
     🎁Переходите в бота, жмите старт и сразу получите доступ к сервисам-помощникам: [@Sezonka_WB](https://t.me/start_nawb_bot?start=link_GO377LwN5k)"""
 
     image = './images_for_sendings/1.jpg'
+
+
+
+class Single_message115(Text):
+
+    text = """
+Привет! 👋
+
+Если у Вас возникли сложности с настройкой бота или что-то осталось непонятным — не волнуйся, такое бывает. Просто напишите мне, и я помогу разобраться и всё настроить правильно. Это бесплатно, так что можешь спокойно обращаться.
+
+Если Вы уже писали, но я не ответил — не стесняйся напомнить о себе. Иногда сообщений приходит много, и я могу случайно пропустить или забыть. Пишите ещё раз, и я обязательно помогу.
+
+📩 @skyline360_1
+    
+    """
