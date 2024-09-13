@@ -316,8 +316,8 @@ def __sort_by_update_keyword(keyword: WBItemPosition):
 
 async def  set_position(keyword_stat: CalculatedKeyword,
                         adv_setting: AdvSetting) -> CalculatedKeyword:
-    keyword_cluster_name = await redis_manager.get_cluster_name(keyword_stat.text)
-    position = await redis_manager.get_keyword_position(keyword_cluster_name,
+    text = keyword_stat.text
+    position = await redis_manager.get_keyword_position(text,
                                                         adv_setting.nmids[0])
     if position:
         base_position = position.base_position
