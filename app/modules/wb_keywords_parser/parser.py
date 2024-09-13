@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import hashlib
 import json
+import random
 import re
 import time
 from asyncio import Task
@@ -13,15 +14,17 @@ from aiohttp import ServerDisconnectedError, ClientOSError
 from sqlalchemy.orm import joinedload
 
 from app.admin_bot.sender import sender_manager
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
 from app.modules.wb_adv_updater import data_manager
 from app.settings import settings
 from app.utils import redis_manager
+from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select, and_, not_
 
 
 
-from app.modules.common_slaves.wildberries.models import WBItemPosition, CommonKeyword
+from app.modules.common_slaves.wildberries.models import WBItemPosition, CommonKeyword, AdvSetting
 from aiogram.client.session import aiohttp
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -301,9 +304,93 @@ semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
 async def limited_add_wb_positions(text:str, need_nmids: set[int]):
     async with semaphore:
         try:
-            await add_wb_positions(text, need_nmids, 1)
+            await add_wb_positions(text, need_nmids, 0)
         except Exception as e:
             logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
+
+
+
+async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, set[int]], None]:
+    max_views_difference = 50
+    pass_texts = set()
+    async with sm(semaphore) as session:
+        logger.debug("Открытие сессии для выполнения запросов к базе данных.")
+
+        stmt = select(AdvSetting).where(
+            AdvSetting.parsing_active == True,
+            AdvSetting.active_status == 'started'
+        )
+        logger.debug("Формирование запроса для выбора активных рекламных кампаний.")
+
+        advs = await session.execute(stmt)
+        advs = advs.scalars().all()
+    logger.debug(f"Получено {len(advs)} активных рекламных кампаний для парсинга.")
+
+    adv_ids = [adv.adv_id for adv in advs]
+    logger.debug(f"Список ID рекламных кампаний: {adv_ids}. Перемешивание списка для случайного порядка обработки.")
+
+    random.shuffle(advs)
+    async with get_clickhouse_client() as client:
+        logger.debug("Подключение к ClickHouse клиенту.")
+
+        for adv in advs:
+            adv_id = adv.adv_id
+            logger.debug(f"Обработка рекламной кампании ID: {adv_id}. Получение ключевых слов.")
+
+            keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
+            for keyword in keywords:
+                text = keyword.text
+                hash_text = hash(text)
+
+                if hash_text in pass_texts:
+                    logger.debug(f"Ключевое слово '{text}' уже обрабатывалось, пропуск.")
+                    continue
+
+                logger.debug(
+                    f"Получение статистики по ключевому слову '{text}' для рекламной кампании ID: {adv_id}.")
+                _, total_views, _ = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
+
+                logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
+                cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+
+                if not cluster_name and total_views > 0:
+                    logger.debug(
+                        f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
+                    nmids_need = await data_manager.get_need_nmids_for_parsing(text, adv_id, adv_ids)
+                    yield text, nmids_need
+                    pass_texts.add(hash_text)
+
+                    logger.debug(
+                        f"Обновление последнего количества просмотров для ключевого слова '{text}' в Redis.")
+                    await redis_manager.set_last_views(adv_id, text, total_views)
+                    continue
+
+                if keyword.status == KeywordStatus.GOOD:
+                    logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
+                    last_views = await redis_manager.get_last_views(adv_id, text)
+
+                    if not last_views or ((
+                            (total_views - last_views) > max_views_difference) and keyword.hard_status == 2):
+                        logger.debug(
+                            f"Значительное изменение просмотров или жесткий статус у ключевого слова '{text}'. Обновление nmids для парсинга.")
+                        nmids_need = await data_manager.get_need_nmids_for_parsing(text, adv_id, adv_ids)
+
+                        logger.debug(
+                            "Выполнение запроса для обновления списка ID рекламных кампаний с новыми nmids.")
+                        stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)))
+                        result = await session.execute(stmt)
+                        adv_ids = result.scalars().all()
+
+                        for adv_id in adv_ids:
+                            logger.debug(
+                                f"Обновление просмотров для ключевого слова '{text}' в рекламной кампании ID: {adv_id}.")
+                            _, views, _ = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
+                            await redis_manager.set_last_views(adv_id, text, views)
+
+                        yield text, nmids_need
+                        pass_texts.add(hash_text)
+                        logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
+                        break
 
 
 
@@ -311,7 +398,7 @@ async def parser_all_white_phrase():
     tasks_by_text = {}
     while True:
         logger.debug('Получаем фразы для парсинга')
-        all_white_phrases_generator: AsyncGenerator[str] = data_manager.get_phrases_for_parsing()
+        all_white_phrases_generator: AsyncGenerator[tuple[str, set[int]]] = get_phrases_for_parsing()
         async for text, need_nmids in all_white_phrases_generator:
             if text not in tasks_by_text:
                 logger.debug(f'Добавляем фразу {text} в список задач')

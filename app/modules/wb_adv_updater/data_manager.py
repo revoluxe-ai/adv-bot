@@ -1318,54 +1318,6 @@ async def get_need_nmids_for_parsing(text, adv_id, adv_ids):
     return nmids_need
 
 
-async def get_phrases_for_parsing(semaphore = None):
-    max_views_difference = 5
-    pass_texts = set()
-    async with _sm(semaphore) as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.parsing_active == True,
-        AdvSetting.active_status == 'started'
-        )
-        advs  = await session.execute(stmt)
-        advs = advs.scalars().all()
-        adv_ids = [adv.adv_id for adv in advs]
-        random.shuffle(advs)
-        async with get_clickhouse_client() as client:
-            for adv in advs:
-                adv_id = adv.adv_id
-                keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv)
-                for keyword in keywords:
-                    text = keyword.text
-                    hash_text = hash(text)
-                    if hash_text in pass_texts:
-                        continue
-                    _, total_views, _ = await get_keyword_statistic_clickhouse(client,
-                                                                               text,
-                                                                               adv_id)
-                    cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
-                    if not cluster_name:
-                        nmids_need = await get_need_nmids_for_parsing(text, adv_id, adv_ids)
-                        yield text, nmids_need
-                        pass_texts.add(hash_text)
-                        await redis_manager.set_last_views(adv_id, text, total_views)
-                        continue
-                    if keyword.status == KeywordStatus.GOOD:
-                        last_views = await redis_manager.get_last_views(adv_id, text)
-                        if not last_views or ((total_views - last_views) > max_views_difference) or keyword.hard_status == 2:
-                            nmids_need = await get_need_nmids_for_parsing(text, adv_id, adv_ids)
-                            stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)))
-                            result = await session.execute(stmt)
-                            adv_ids = result.scalars().all()
-                            for adv_id in adv_ids:
-                                _ , views, _ = await get_keyword_statistic_clickhouse(client,
-                                                                                             text,
-                                                                                             adv_id)
-                                await redis_manager.set_last_views(adv_id, text, views)
-                            yield text, nmids_need
-                            pass_texts.add(hash_text)
-                            break
-
-
 
 
 async def get_last_updated_phrases(all_white_phrases):
