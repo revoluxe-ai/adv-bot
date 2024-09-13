@@ -42,7 +42,7 @@ async def turn_clusters_on(callback: types.CallbackQuery, bot: Bot,
         adv_setting: AdvSetting = adv_setting.scalar()
         adv_setting.clusters_mode = True
         await session.commit()
-    wb_user_cabinet_original_id = data['wb_user_cabinet_original_id']
+    wb_user_cabinet_original_id = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
         wb_user_cabinet = await session.execute(
             select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
@@ -65,7 +65,7 @@ async def turn_clusters_off(callback: types.CallbackQuery, bot: Bot,
         adv_setting: AdvSetting = adv_setting.scalar()
         adv_setting.clusters_mode = False
         await session.commit()
-    wb_user_cabinet_original_id = data['wb_user_cabinet_original_id']
+    wb_user_cabinet_original_id = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
         wb_user_cabinet = await session.execute(
             select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
