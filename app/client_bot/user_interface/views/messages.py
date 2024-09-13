@@ -2220,13 +2220,13 @@ class StrategySetting(TextWithKeyboard):
                                             adv_setting_original_id=self.adv_setting.id).pack())
              builder.row(button)
              if self.adv_setting.target_ctr_mode_strategy == 'keep':
-                 button = InlineKeyboardButton(text="Включить Поддерживающий Режим",
+                 button = InlineKeyboardButton(text="Включить Агрессивный Режим",
                                         callback_data=callbacks.StrategySetting(
                                             action="turn_on_forward_mode",
                                             adv_setting_original_id=self.adv_setting.id).pack())
                  builder.row(button)
              elif self.adv_setting.target_ctr_mode_strategy == 'forward':
-                 button = InlineKeyboardButton(text="Включить Агрессивный Режим",
+                 button = InlineKeyboardButton(text="Включить Поддерживающий Режим",
                                         callback_data=callbacks.StrategySetting(
                                             action="turn_on_keep_mode",
                                             adv_setting_original_id=self.adv_setting.id).pack())
