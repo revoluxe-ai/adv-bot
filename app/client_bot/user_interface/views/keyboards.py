@@ -63,14 +63,14 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                                                       type='by_adv').pack()))
     if adv_setting.bot_active:
         builder.row(
-            InlineKeyboardButton(text='Отключить бота', callback_data=TurnBot(action='off',
+            InlineKeyboardButton(text='Выключить автоматическое управление', callback_data=TurnBot(action='off',
                                                                               adv_original_id=adv_setting.id,
                                                                               wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
 
 
     else:
         builder.row(
-            InlineKeyboardButton(text='Включить бота',
+            InlineKeyboardButton(text='Включить автоматическое управление',
                                  callback_data=TurnBot(action='on',
                                                        adv_original_id=adv_setting.id,
                                                        wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
