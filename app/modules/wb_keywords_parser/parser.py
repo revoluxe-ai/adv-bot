@@ -355,10 +355,24 @@ async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, se
                 logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
                 cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
 
-                if not cluster_name and total_views > 0:
+                if not cluster_name:
                     logger.debug(
                         f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
                     nmids_need = await data_manager.get_need_nmids_for_parsing(text, adv_id, adv_ids)
+
+                    logger.debug(
+                        "Выполнение запроса для обновления списка ID рекламных кампаний с новыми nmids.")
+                    stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)),
+                                                           AdvSetting.active_status == 'started',
+                                                           AdvSetting.parsing_active == True)
+                    result = await session.execute(stmt)
+                    adv_ids = result.scalars().all()
+
+                    for adv_id in adv_ids:
+                        logger.debug(
+                            f"Обновление просмотров для ключевого слова '{text}' в рекламной кампании ID: {adv_id}.")
+                        _, views, _ = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
+                        await redis_manager.set_last_views(adv_id, text, views)
                     yield text, nmids_need
                     pass_texts.add(hash_text)
 
@@ -371,8 +385,9 @@ async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, se
                     logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
                     last_views = await redis_manager.get_last_views(adv_id, text)
 
-                    if not last_views or ((
-                            (total_views - last_views) > max_views_difference) and keyword.hard_status == 2):
+                    if any([not last_views,
+                            (total_views - last_views) > max_views_difference and keyword.hard_status == 2,
+                            last_views == total_views and keyword.hard_status == 2]):
                         logger.debug(
                             f"Значительное изменение просмотров или жесткий статус у ключевого слова '{text}'. Обновление nmids для парсинга.")
                         nmids_need = await data_manager.get_need_nmids_for_parsing(text, adv_id, adv_ids)
