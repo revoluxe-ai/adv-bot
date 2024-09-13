@@ -377,7 +377,9 @@ async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, se
 
                         logger.debug(
                             "Выполнение запроса для обновления списка ID рекламных кампаний с новыми nmids.")
-                        stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)))
+                        stmt = select(AdvSetting.adv_id).where(AdvSetting.nmids.contains(list(nmids_need)),
+                                                               AdvSetting.active_status == 'started',
+                                                               AdvSetting.parsing_active == True)
                         result = await session.execute(stmt)
                         adv_ids = result.scalars().all()
 
