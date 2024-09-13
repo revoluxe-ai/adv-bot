@@ -349,7 +349,9 @@ async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, se
                 logger.debug(
                     f"Получение статистики по ключевому слову '{text}' для рекламной кампании ID: {adv_id}.")
                 _, total_views, _ = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
-
+                if total_views == 0:
+                    logger.debug(f"Ключевое слово '{text}' не имеет просмотров. Пропуск.")
+                    continue
                 logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
                 cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
 
