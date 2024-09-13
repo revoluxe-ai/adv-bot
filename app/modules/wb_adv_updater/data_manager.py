@@ -320,6 +320,9 @@ async def set_positions(keyword_stats: list[CalculatedKeyword],
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
+        cluster, preset = await redis_manager.get_cluster_and_preset(text)
+        keyword_stat.cluster_name = cluster
+        keyword_stat.preset = preset
         if position := text_to_position.get(text):
             keyword_stat.base_position = position.base_position
             keyword_stat.promo_position = position.promo_position

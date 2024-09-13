@@ -35,6 +35,8 @@ class CalculatedKeyword:
     position_update: Optional[DateTime] = None
     childs_keywords: Optional[list] = None
     _query_static: Optional[int] = None
+    cluster_name: Optional[str] = None
+    preset: Optional[int] = None
 
 
 

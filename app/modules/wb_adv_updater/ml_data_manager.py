@@ -200,7 +200,7 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
             check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
             if not check_in_neo_by_redis:
                  clear_texts.add(clear_text)
-            cluster = await redis_manager.get_cluster_name(clear_text)
+            cluster, _ = await redis_manager.get_cluster_and_preset(text)
             if cluster:
                 cluster = text_cleaner.clear(cluster)
                 hash_text = get_text_hash(cluster)

@@ -465,7 +465,7 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
     texts_for_adv_setting = {keyword.text for keyword in keywords}
     clusters = set()
     for text in texts_for_adv_setting:
-        cluster_name = await redis_manager.get_cluster_name(text)
+        cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
         if cluster_name:
            clusters.add(cluster_name)
 

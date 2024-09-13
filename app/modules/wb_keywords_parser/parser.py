@@ -318,7 +318,6 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
 
         stmt = select(AdvSetting).where(
             AdvSetting.parsing_active == True,
-            AdvSetting.active_status == 'started'
         )
         logger.debug("Формирование запроса для выбора активных рекламных кампаний.")
 
@@ -330,54 +329,48 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
     logger.debug(f"Список ID рекламных кампаний: {adv_ids}. Перемешивание списка для случайного порядка обработки.")
 
     random.shuffle(advs)
-    async with get_clickhouse_client() as client:
-        logger.debug("Подключение к ClickHouse клиенту.")
-
-        for adv in advs:
-            need_nmids = set(adv.nmids)
-            if not need_nmids:
+    for adv in advs:
+        need_nmids = set(adv.nmids)
+        adv_id = adv.adv_id
+        logger.debug(f"Обработка рекламной кампании ID: {adv_id}. Получение ключевых слов.")
+        try:
+             keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
+        except Exception as exc:
+            logger.error('Ошибка получения фраз для парсинга', exc_info=True)
+            continue
+        for keyword in keywords:
+            if keyword.views == 0:
+                logger.debug(f"Ключевое слово '{keyword.text}' не имеет просмотров. Пропуск.")
                 continue
-            adv_id = adv.adv_id
-            logger.debug(f"Обработка рекламной кампании ID: {adv_id}. Получение ключевых слов.")
-            try:
-                 keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
-            except Exception as exc:
-                logger.error('Ошибка получения фраз для парсинга', exc_info=True)
+            total_views = keyword.views
+            text = keyword.text
+            logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
+            cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+            if not cluster_name:
+                logger.debug(
+                    f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
+                await redis_manager.set_last_views(adv_id, text, total_views)
+                await queue.put((text, need_nmids))
                 continue
-            for keyword in keywords:
-                if keyword.views == 0:
-                    logger.debug(f"Ключевое слово '{keyword.text}' не имеет просмотров. Пропуск.")
-                    continue
-                total_views = keyword.views
-                text = keyword.text
-                logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
-                cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
-                if not cluster_name:
-                    logger.debug(
-                        f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
-                    await redis_manager.set_last_views(adv_id, text, total_views)
-                    await queue.put((text, need_nmids))
-                    continue
 
-                if keyword.status == KeywordStatus.GOOD:
-                    logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
-                    last_views = await redis_manager.get_last_views(adv_id, text)
-                    last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
-                    if not last_views or\
-                            (total_views - last_views) > max_views_difference and keyword.hard_status == 2 or\
-                            last_views == total_views and keyword.hard_status == 2\
-                            or not last_position:
-                            await redis_manager.set_last_views(adv_id, text, total_views)
-                            await queue.put((text, need_nmids))
-                            logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
-                            break
+            if keyword.status == KeywordStatus.GOOD:
+                logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
+                last_views = await redis_manager.get_last_views(adv_id, text)
+                last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
+                if not last_views or\
+                        (total_views - last_views) > max_views_difference and keyword.hard_status == 2 or\
+                        last_views == total_views and keyword.hard_status == 2\
+                        or not last_position:
+                        await redis_manager.set_last_views(adv_id, text, total_views)
+                        await queue.put((text, need_nmids))
+                        logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
+                        break
 
 
 
 async def parser_all_white_phrase():
     tasks_by_text = {}
     queue = asyncio.Queue()
-
     while True:
         logger.debug('Получаем фразы для парсинга')
         generate_tasks = asyncio.create_task(get_phrases_for_parsing(queue))
