@@ -310,7 +310,7 @@ async def limited_add_wb_positions(text:str, need_nmids: set[int]):
 
 
 
-async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, set[int]], None]:
+async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncGenerator[tuple[str, set[int]], None]:
     max_views_difference = 50
     pass_texts = set()
     async with sm(semaphore) as session:
@@ -373,7 +373,7 @@ async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, se
                             f"Обновление просмотров для ключевого слова '{text}' в рекламной кампании ID: {adv_id}.")
                         _, views, _ = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
                         await redis_manager.set_last_views(adv_id, text, views)
-                    yield text, nmids_need
+                    await queue.put((text, nmids_need))
                     pass_texts.add(hash_text)
 
                     logger.debug(
@@ -406,7 +406,7 @@ async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, se
                             _, views, _ = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
                             await redis_manager.set_last_views(adv_id, text, views)
 
-                        yield text, nmids_need
+                        await queue.put((text, nmids_need))
                         pass_texts.add(hash_text)
                         logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
                         break
@@ -415,15 +415,29 @@ async def get_phrases_for_parsing(semaphore=None)-> AsyncGenerator[tuple[str, se
 
 async def parser_all_white_phrase():
     tasks_by_text = {}
+    queue = asyncio.Queue()
+
     while True:
         logger.debug('Получаем фразы для парсинга')
-        all_white_phrases_generator: AsyncGenerator[tuple[str, set[int]]] = get_phrases_for_parsing()
-        async for text, need_nmids in all_white_phrases_generator:
+        generate_tasks = asyncio.create_task(get_phrases_for_parsing(queue))
+        while True:
+            try:
+                # Попытка извлечь данные из очереди с таймаутом
+                data = await asyncio.wait_for(queue.get(), timeout=5.0)
+                text, need_nmids = data
+            except asyncio.TimeoutError:
+                logger.debug('Очередь пуста в течение 5 секунд, проверяем завершение генерации задач.')
+                if generate_tasks.done():
+                    # Если генерация задач завершена и очередь пуста, выходим из цикла
+                    break
+                continue
+
             if text not in tasks_by_text:
                 logger.debug(f'Добавляем фразу {text} в список задач')
                 if need_nmids:
                     task = asyncio.create_task(limited_add_wb_positions(text, need_nmids))
                     tasks_by_text[text] = task
+                queue.task_done()
             else:
                 logger.debug(f'Фраза {text} уже есть в списке задач')
                 task = tasks_by_text[text]
@@ -431,8 +445,20 @@ async def parser_all_white_phrase():
                     if task.exception():
                         logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
                     del tasks_by_text[text]
+
             logger.debug(f'Задач в поиске: {len(tasks_by_text)}')
             await asyncio.sleep(0)
+
+        # Ждем завершения генерации задач перед новой итерацией основного цикла
+        await generate_tasks
+        # Проверяем, есть ли незавершенные задачи, если нет - завершаем цикл
+        if not tasks_by_text:
+            logger.debug('Все задачи выполнены, завершение работы.')
+            break
+
+    # Ждем завершения всех задач, если такие остались
+    await asyncio.gather(*tasks_by_text.values(), return_exceptions=True)
+
 
 
 async def reset_from_redis_positions_of_out_index():
