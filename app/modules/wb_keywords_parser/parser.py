@@ -306,7 +306,7 @@ async def limited_add_wb_positions(text:str, need_nmids: set[int]):
         try:
             await add_wb_positions(text, need_nmids, 0)
         except Exception as e:
-            logger.error(f'Ошибка при добавлении позиций в базу данных: {e}', exc_info=True)
+            logger.error(f'Ошибка при добавлении позиций для запроса {text} в базу данных: {e}', exc_info=True)
 
 
 
