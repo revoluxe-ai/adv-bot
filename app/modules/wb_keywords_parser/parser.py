@@ -362,9 +362,11 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
                 if keyword.status == KeywordStatus.GOOD:
                     logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
                     last_views = await redis_manager.get_last_views(adv_id, text)
+                    last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
                     if not last_views or\
                             (total_views - last_views) > max_views_difference and keyword.hard_status == 2 or\
-                            last_views == total_views and keyword.hard_status == 2:
+                            last_views == total_views and keyword.hard_status == 2\
+                            or not last_position:
                             await redis_manager.set_last_views(adv_id, text, total_views)
                             await queue.put((text, need_nmids))
                             logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
