@@ -600,23 +600,26 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
         if keyword_stat.predict_ctr >= min_ctr:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
-            sum_views += keyword_stat.views
-            sum_clicks= keyword_stat.views * keyword_stat.predict_ctr
+            if keyword_stat.base_position:
+                sum_views += keyword_stat.views
+                sum_clicks= keyword_stat.views * keyword_stat.predict_ctr
         else:
             if adv_setting.target_ctr_mode_strategy == 'forward':
                 total_ctr = sum_clicks / sum_views
                 if total_ctr >= min_ctr:
                     keyword_stat.status = KeywordStatus.GOOD
                     await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
-                    sum_views += keyword_stat.views
-                    sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
+                    if keyword_stat.base_position:
+                        sum_views += keyword_stat.views
+                        sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
                 else:
                     keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = 'min_ctr'
                     await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
             elif adv_setting.target_ctr_mode_strategy == 'keep':
-                sum_views += keyword_stat.views
-                sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
+                if keyword_stat.base_position:
+                    sum_views += keyword_stat.views
+                    sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
                 total_ctr = sum_clicks / sum_views
                 if total_ctr >= min_ctr:
                     keyword_stat.status = KeywordStatus.GOOD
