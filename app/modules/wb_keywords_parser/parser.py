@@ -379,6 +379,8 @@ async def parser_all_white_phrase():
                 # Попытка извлечь данные из очереди с таймаутом
                 data = await asyncio.wait_for(queue.get(), timeout=5.0)
                 text, need_nmids = data
+                need_nmids = tuple(need_nmids)
+                data = (text, need_nmids)
             except asyncio.TimeoutError:
                 logger.debug('Очередь пуста в течение 5 секунд, проверяем завершение генерации задач.')
                 if generate_tasks.done():
@@ -386,19 +388,23 @@ async def parser_all_white_phrase():
                     break
                 continue
 
-            if text not in tasks_by_text:
-                logger.debug(f'Добавляем фразу {text} в список задач')
+            if data not in tasks_by_text:
+                logger.debug(f'Добавляем задачу {data} в список задач')
+                text, need_nmids = data
                 if need_nmids:
-                    task = asyncio.create_task(limited_add_wb_positions(text, need_nmids))
-                    tasks_by_text[text] = task
+                    task = asyncio.create_task(limited_add_wb_positions(text, set(need_nmids)))
+                    tasks_by_text[data] = task
                 queue.task_done()
-            else:
-                logger.debug(f'Фраза {text} уже есть в списке задач')
-                task = tasks_by_text[text]
+            data_for_delete = set()
+            for data in tasks_by_text:
+                task = tasks_by_text[data]
                 if task.done():
                     if task.exception():
                         logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
-                    del tasks_by_text[text]
+                    data_for_delete.add(data)
+            for data in data_for_delete:
+                del tasks_by_text[data]
+
 
             logger.debug(f'Задач в поиске: {len(tasks_by_text)}')
             await asyncio.sleep(0)
