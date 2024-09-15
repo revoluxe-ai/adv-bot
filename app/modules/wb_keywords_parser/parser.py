@@ -116,7 +116,7 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
     return decorator
 
 
-proxy = 'http://iparchitect_38169_14_09_24:72b3ZN7GNeHhKnDe6T@188.143.169.27:30151'
+
 
 class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int):
@@ -164,7 +164,7 @@ class Parser:
     async def __parse_keywords_from_wb(self, text: str, page: int):
         url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
         async with aiohttp.ClientSession() as http_session:
-            async with http_session.get(url, proxy = proxy) as response:
+            async with http_session.get(url) as response:
                 response = await response.text()
         if not response:
             raise DataError('Пустой ответ от сервера', text)
