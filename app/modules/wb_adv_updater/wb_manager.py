@@ -58,6 +58,7 @@ async def process_payment_for_auto_bidder():
         ).filter(
             and_(
                 AdvSetting.bidder_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
                                                   AdvPayment.type == 'auto_bidder')))
 
@@ -102,6 +103,7 @@ async def process_payment_for_parsing():
         ).filter(
             and_(
                 AdvSetting.parsing_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
                                                   AdvPayment.type == 'parsing')))
 
@@ -142,6 +144,7 @@ async def process_payment_for_advs():
         ).filter(
             and_(
                 AdvSetting.bot_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
                 AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
                 # условие на истекший срок действия
