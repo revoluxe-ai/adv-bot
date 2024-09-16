@@ -186,7 +186,7 @@ class Parser:
             cluster = metadata['normquery']
         products = data['data']['products']
         if not products:
-            return None, None, None
+            return None, cluster, preset
         assert isinstance(preset, int)
         assert isinstance(cluster, str)
         assert isinstance(products, list)
