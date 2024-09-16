@@ -129,12 +129,15 @@ async def get_keyword_statistic_clickhouse(client,
 async def get_keywords_statistic_clickhouse(
         adv_setting: AdvSetting,
         pass_time: Optional[timedelta] = None,
+        last_views = None,
         hard_statuses: Optional[List[int]] = None,
         cache_timeout: int = 60 * 15
 ) -> List[CalculatedKeyword]:
 
     async with get_clickhouse_client() as ch_client:
-        query = _build_clickhouse_query(adv_setting.adv_id, pass_time)
+        query = _build_clickhouse_query(adv_setting.adv_id,
+                                        pass_time,
+                                        last_views)
         result = await ch_client.query(query)
         rows = result.result_rows
         keywords = []
