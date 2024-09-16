@@ -625,7 +625,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
                 else:
                     keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = 'min_ctr'
-                    await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
+                    await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, True)
             elif adv_setting.target_ctr_mode_strategy == 'keep':
                 if keyword_stat.base_position:
                     sum_views += keyword_stat.views
