@@ -604,7 +604,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
             await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
             if keyword_stat.base_position != 0:
                 sum_views += keyword_stat.views
-                sum_clicks= keyword_stat.views * keyword_stat.predict_ctr
+                sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
         else:
             if adv_setting.target_ctr_mode_strategy == 'forward':
                 if sum_views != 0:
