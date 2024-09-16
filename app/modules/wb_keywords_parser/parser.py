@@ -364,7 +364,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
                         await redis_manager.set_last_views(adv_id, text, total_views)
                         await queue.put((text, need_nmids))
                         logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
-                        break
+
 
 
 
