@@ -127,7 +127,6 @@ class Parser:
         if not products:
             return None
         positions = []
-        text = cluster
         for place_on_page, product in enumerate(products):
             nmid = product['id']
             real_position = first_place + place_on_page
@@ -144,7 +143,7 @@ class Parser:
                 promo_position = None
                 base_position = real_position
 
-            # Создаем объект WBItemPosition и устанавливаем все атрибуты перед добавлением в сессию
+
             position = WBItemPosition(
                 nmid = nmid,
                 base_position=base_position,
@@ -156,6 +155,21 @@ class Parser:
                 timestamp = datetime.datetime.now()
             )
             positions.append(position)
+
+            if cluster != text:
+                position = WBItemPosition(
+                    nmid=nmid,
+                    base_position=base_position,
+                    promo_position=promo_position,
+                    cpm=cpm,
+                    adv_id=adv_id,
+                    real_position=real_position,
+                    keyword_text=cluster,
+                    timestamp=datetime.datetime.now()
+                )
+
+                positions.append(position)
+
         return positions
 
 

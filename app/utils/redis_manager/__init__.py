@@ -157,7 +157,16 @@ async def get_keyword_position(keyword: str, nmid: int)->Union[WBItemPosition, N
     base_key = f'adv_positions:{keyword}:{nmid}'
     json_data = await redis_client.get(base_key)
     if not json_data:
-        return None
+        cluster, _ = await get_cluster_and_preset(keyword)
+        if not cluster:
+            return None
+        base_key = f'adv_positions:{cluster}:{nmid}'
+        json_data = await redis_client.get(base_key)
+        if not json_data:
+            return None
+        else:
+            position = WBItemPosition.from_dict(json.loads(json_data))
+            return position
     position = WBItemPosition.from_dict(json.loads(json_data))
     return position
 
@@ -168,7 +177,13 @@ async def get_keywords_positions(adv_setting, texts):
         key = 'adv_positions:' + text + ':' + str(adv_setting.nmids[0])
         json_data = await redis_client.get(key)
         if not json_data:
-            continue
+            cluster, _ = await get_cluster_and_preset(text)
+            if not cluster:
+                continue
+            key = 'adv_positions:' + cluster + ':' + str(adv_setting.nmids[0])
+            json_data = await redis_client.get(key)
+            if not json_data:
+                continue
         position = WBItemPosition.from_dict(json.loads(json_data))
         if position:
             position.keyword_text = text
