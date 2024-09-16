@@ -304,10 +304,8 @@ semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
 
 async def limited_add_wb_positions(text:str, need_nmids: set[int]):
     async with semaphore:
-        try:
-            await add_wb_positions(text, need_nmids, 1)
-        except Exception as e:
-            logger.error(f'Ошибка при добавлении позиций для запроса {text} в базу данных: {e}', exc_info=True)
+        await add_wb_positions(text, need_nmids, 1)
+
 
 
 
@@ -400,7 +398,11 @@ async def parser_all_white_phrase():
                 task = tasks_by_text[data]
                 if task.done():
                     if task.exception():
-                        logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
+                        if isinstance(task.exception(), ErrorParsingPositions):
+                            logger.debug(f'Не найдено позиций для фразы: {data}')
+                        else:
+                            logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
+                        await asyncio.sleep(60)
                     data_for_delete.add(data)
             for data in data_for_delete:
                 del tasks_by_text[data]
