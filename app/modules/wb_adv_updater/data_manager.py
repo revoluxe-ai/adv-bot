@@ -602,7 +602,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
         if keyword_stat.predict_ctr >= min_ctr:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
-            if keyword_stat.base_position:
+            if keyword_stat.base_position != 0:
                 sum_views += keyword_stat.views
                 sum_clicks= keyword_stat.views * keyword_stat.predict_ctr
         else:
@@ -614,7 +614,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
                 if not total_ctr or total_ctr >= min_ctr:
                     keyword_stat.status = KeywordStatus.GOOD
                     await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
-                    if keyword_stat.base_position:
+                    if keyword_stat.base_position != 0:
                         sum_views += keyword_stat.views
                         sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
                 else:
