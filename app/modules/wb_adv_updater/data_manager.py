@@ -176,7 +176,8 @@ def _build_clickhouse_query(adv_id: int,
             text,
             SUM(total_clicks) AS total_clicks,
             SUM(total_views) AS total_views,
-            SUM(total_spend) AS total_spend
+            SUM(total_spend) AS total_spend,
+            date
         FROM (
             SELECT
                 text,
@@ -207,6 +208,8 @@ def _build_clickhouse_query(adv_id: int,
         start_time = datetime.now() - pass_time
         query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
 
+    query += " GROUP BY text, date"
+
     if last_views:
         query = f"""
             WITH
@@ -214,9 +217,10 @@ def _build_clickhouse_query(adv_id: int,
             cumulative_views AS (
                 SELECT
                     text,
-                    SUM(total_clicks) AS total_clicks,
-                    SUM(total_views) AS total_views,
-                    SUM(total_spend) AS total_spend,
+                    total_clicks,
+                    total_views,
+                    total_spend,
+                    date,
                     SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
                 FROM
                     records
@@ -230,12 +234,10 @@ def _build_clickhouse_query(adv_id: int,
                 cumulative_views
             WHERE
                 cumulative_total_views <= {last_views}
-            GROUP BY text
+            GROUP BY text, date
         """
-    else:
-        query += " GROUP BY text"
-
     return query
+
 
 
 
