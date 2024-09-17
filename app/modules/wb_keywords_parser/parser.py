@@ -421,7 +421,6 @@ async def parser_all_white_phrase():
     while True:
         logger.debug('Получаем фразы для парсинга')
         generate_tasks = asyncio.create_task(get_phrases_for_parsing(queue))
-        done_success_flag = True
         while True:
             if len(tasks) >= settings.MAX_THREAD_PARSER:
                 logger.debug('Достигнуто максимальное количество задач, ожидание завершения одной из них.')
@@ -444,17 +443,15 @@ async def parser_all_white_phrase():
                     if generate_tasks.done():
                         break
                 finally:
-                    done_success_flag = False
                     for task in tasks:
                         if task.done():
                             if task.exception():
                                 if isinstance(task.exception(), ErrorParsingPositions):
-                                    logger.debug(f'Не найдено позиций для фразы: {data}')
+                                    logger.debug(f'Ошибка парсинга: {task.exception()}')
                                 else:
                                     logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
                                 await asyncio.sleep(60)
-                            else:
-                                done_success_flag = True
+
                             tasks.remove(task)
 
 
