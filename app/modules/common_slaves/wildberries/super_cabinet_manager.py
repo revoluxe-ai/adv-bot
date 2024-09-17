@@ -120,7 +120,7 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
                     # await session.commit()
                     continue
                 except NotValidTokenError:
-                    logger.error('Токен не прошел проверку')
+                    logger.debug('Токен не прошел проверку')
                     # token.active = False
                     # await session.commit()
                     continue
