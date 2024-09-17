@@ -232,7 +232,6 @@ async def add_positions_from_page(stop_event: asyncio.Event,
         return []
     positions = await parser.parse_keywords_from_wb(text, page)
     if not positions:
-        stop_event.set()
         return []
     catch_any_position.set()
     logger.debug(f'Найдено {len(positions)}')
@@ -250,54 +249,89 @@ async def add_positions_from_page(stop_event: asyncio.Event,
     return positions
 
 
-async def add_wb_positions(text: str, need_nmids: set[int], delay):
+async def add_wb_positions(text: str, need_nmids: set[int], delay, max_page):
     stop_event = asyncio.Event()
     catch_any_position = asyncio.Event()
     tasks = []
-    try:
-        for page in range(1, 100):
-            if stop_event.is_set():
-                break
-            task = asyncio.create_task(
-                add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids=need_nmids)
-            )
-            tasks.append(task)
-            await asyncio.sleep(delay)
-
-        # Ожидаем завершения всех задач
-        await asyncio.gather(*tasks, return_exceptions=True)
-
-    except Exception as e:
-        logger.error(f'Ошибка в процессе добавления позиций: {e}', exc_info=True)
-    finally:
-        # Отменяем оставшиеся задачи, если такие есть
-        for task in tasks:
-            if not task.done():
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-
-        # Проверяем, была ли найдена хоть одна позиция
-        if not catch_any_position.is_set():
-            raise ErrorParsingPositions('Не найдено ни одной позиции в выдаче')
-
-        # Добавляем не найденные позиции в Redis
-        if need_nmids:
-            not_found_positions = [
-                WBItemPosition(
-                    real_position=0,
-                    base_position=0,
-                    promo_position=0,
-                    keyword_text=text,
-                    timestamp=datetime.datetime.now(),
-                    nmid=nmid,
-                    cpm=0
+    last_positions = []
+    checked_pages = set()
+    # Получаем последние позиции для всех артикулов
+    for nmid in need_nmids:
+        last_position = await redis_manager.get_keyword_position(text, nmid)
+        if last_position:
+            last_positions.append(last_position)
+    # Если нет предыдущих позиций или все позиции на первой странице, начинаем с конца
+    if not last_positions or any([lp.real_position for lp in last_positions]) == 0:
+            for page in range(100, 0, -1):
+                if len(checked_pages) >= max_page:
+                    break
+                if stop_event.is_set():
+                    break
+                checked_pages.add(page)
+                task = asyncio.create_task(
+                    add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids=need_nmids)
                 )
-                for nmid in need_nmids
-            ]
-            await add_wb_positions_to_redis(not_found_positions)
+                tasks.append(task)
+                await asyncio.sleep(delay)
+    else:
+        for position in last_positions:
+            max_page = position.real_position
+            min_page = max_page
+            while need_nmids and not stop_event.is_set():
+                if len(checked_pages) >= max_page:
+                    break
+                logger.debug(f'Проверка артикула {position.nmid} запроса {text}')
+                if max_page > 100 and min_page < 1:
+                    logger.debug('Достигнут лимит страниц')
+                    break
+                if max_page <= 100:
+                    max_page += 1
+                    if max_page in checked_pages:
+                        continue
+                    task_right = asyncio.create_task(
+                        add_positions_from_page(stop_event, catch_any_position, text, max_page, need_nmids=need_nmids)
+                    )
+                    tasks.append(task_right)
+                    checked_pages.add(max_page)
+                    await asyncio.sleep(delay)
+                if min_page > 1:
+                    min_page -= 1
+                    if  min_page in checked_pages:
+                        continue
+                    task_left = asyncio.create_task(
+                        add_positions_from_page(stop_event, catch_any_position, text, min_page, need_nmids=need_nmids)
+                    )
+                    tasks.append(task_left)
+                    checked_pages.add(min_page)
+
+                    await asyncio.sleep(delay)
+
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    if not catch_any_position.is_set():
+        raise ErrorParsingPositions('Не найдено ни одной позиции в выдаче')
+
+    # Добавляем не найденные позиции в Redis
+    if need_nmids:
+        not_found_positions = [
+            WBItemPosition(
+                real_position=0,
+                base_position=0,
+                promo_position=0,
+                keyword_text=text,
+                timestamp=datetime.datetime.now(),
+                nmid=nmid,
+                cpm=0
+            )
+            for nmid in need_nmids
+        ]
+        await add_wb_positions_to_redis(not_found_positions)
 
 async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
     for position in positions:
@@ -314,10 +348,9 @@ async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
 
 semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
 
-async def limited_add_wb_positions(text:str, need_nmids: set[int]):
+async def limited_add_wb_positions(text:str, need_nmids: set[int], max_page: int):
     async with semaphore:
-        await add_wb_positions(text, need_nmids, 1)
-
+        await add_wb_positions(text, need_nmids, 1, max_page)
 
 
 
@@ -341,6 +374,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
 
     random.shuffle(advs)
     for adv in advs:
+        logger.debug(f'Обработка кампании {adv.name}')
         need_nmids = set(adv.nmids)
         adv_id = adv.adv_id
         logger.debug(f"Обработка рекламной кампании ID: {adv_id}. Получение ключевых слов.")
@@ -361,7 +395,8 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
                 logger.debug(
                     f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
                 await redis_manager.set_last_views(adv_id, text, total_views)
-                await queue.put((text, need_nmids))
+                max_page = 1
+                await queue.put((text, need_nmids, max_page,))
                 continue
 
             if keyword.status == KeywordStatus.GOOD:
@@ -373,7 +408,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
                         last_views == total_views and keyword.hard_status == 2\
                         or not last_position:
                         await redis_manager.set_last_views(adv_id, text, total_views)
-                        await queue.put((text, need_nmids))
+                        await queue.put((text, need_nmids, 100))
                         logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
 
 
@@ -382,9 +417,11 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
 async def parser_all_white_phrase():
     tasks = []
     queue = asyncio.Queue()
+
     while True:
         logger.debug('Получаем фразы для парсинга')
         generate_tasks = asyncio.create_task(get_phrases_for_parsing(queue))
+        done_success_flag = True
         while True:
             if len(tasks) >= settings.MAX_THREAD_PARSER:
                 logger.debug('Достигнуто максимальное количество задач, ожидание завершения одной из них.')
@@ -393,13 +430,13 @@ async def parser_all_white_phrase():
             else:
                 try:
                     data = await asyncio.wait_for(queue.get(), timeout=5.0)
-                    text, need_nmids = data
+                    text, need_nmids, max_page = data
                     need_nmids = tuple(need_nmids)
                     data = (text, need_nmids)
                     logger.debug(f'Добавляем на парсинг {data} в список задач')
                     text, need_nmids = data
                     if need_nmids:
-                        task = asyncio.create_task(limited_add_wb_positions(text, set(need_nmids)))
+                        task = asyncio.create_task(limited_add_wb_positions(text, set(need_nmids), max_page))
                         tasks.append(task)
                     queue.task_done()
                 except asyncio.TimeoutError:
@@ -407,6 +444,7 @@ async def parser_all_white_phrase():
                     if generate_tasks.done():
                         break
                 finally:
+                    done_success_flag = False
                     for task in tasks:
                         if task.done():
                             if task.exception():
@@ -415,6 +453,10 @@ async def parser_all_white_phrase():
                                 else:
                                     logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
                                 await asyncio.sleep(60)
+                            else:
+                                done_success_flag = True
+                            tasks.remove(task)
+
 
 
 
