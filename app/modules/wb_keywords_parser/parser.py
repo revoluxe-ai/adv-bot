@@ -319,6 +319,8 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
                 await task
             except asyncio.CancelledError:
                 pass
+            except Exception as e:
+                logger.error(f'Ошибка при парсинге страницы {e}')
 
     if page_limit == 100 and not catch_any_position.is_set():
         raise ErrorParsingPositions('Не найдено ни одной позиции в выдаче')
