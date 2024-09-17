@@ -57,11 +57,9 @@ async def get_users():
                 active_advs_with_bot += len([adv for adv in advs if adv.bot_active])
             shop_ids = '; '.join([wb_user_cabinet.wb_cabinet.shop_id for wb_user_cabinet in wb_user_cabinets])
             total_money = total_bonus + total_balance
-            yield user
-            continue
-            # if  total_money < 50:
-            #     yield user
-            #     continue
+            if  not  wb_user_cabinets:
+                yield user
+                continue
 
 
 
@@ -86,7 +84,7 @@ async def send_message_to_users():
     users = get_users()
     async for user in users:
         user_id =  user.user_telegram_id
-        message = messages.Single_message113
+        message = messages.Single_message116
         hash = sha256((str(message)) \
                       .encode()).hexdigest()
         # if await redis_manager.check_message_send(hash, user_id):
@@ -96,7 +94,7 @@ async def send_message_to_users():
             # if user.user_telegram_id not in [373435337]:
             #     continue
             wb_user_cabinets = user.wb_user_cabinets
-            await message(bot, user_id)(wb_user_cabinets)
+            await message(bot, user_id)()
             await redis_manager.set_message_send(hash, user_id)
             send_count += 1
         except Exception as e:

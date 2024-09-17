@@ -2276,3 +2276,26 @@ class Single_message115(Text):
 📩 @skyline360_1
     
     """
+
+
+class Single_message116(TextWithImage):
+    parse_mode='Markdown'
+
+    image = 'images_for_sendings/108.jpg'
+
+    text = """
+**85% селлеров упускают из вида показатели, которые влияют на прибыль**
+
+Когда у тебя 100500 сервисов учета и таблиц, 1С и бухгалтер, можно часами анализировать цифры, но так и не увидеть, что можно улучшить.
+
+Хорошая новость: появился наикрутейший [сервис Marketran, который создали селлеры для селлеров](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540)🤝
+
+Объясняем по-простому. Когда-то у нас были будильники, фотоаппараты и музыкальный центр, а потом появились смартфоны.
+
+Так вот, [Marketran](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540) — это смартфон в мире бизнеса на маркетплейсах. Там всё в одном месте.
+
+Селлеры, которые уже пользуются сервисом, увеличивают прибыль, сокращают расходы на рекламу и успешно привлекают инвесторов за счёт АБСОЛЮТНОЙ ПРОЗРАЧНОСТИ бизнеса.
+
+Попробуйте бесплатно и оптимизируйте показатели прямо сейчас : [ЗДЕСЬ](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540)
+
+     """

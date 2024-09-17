@@ -249,7 +249,7 @@ async def add_positions_from_page(stop_event: asyncio.Event,
     return positions
 
 
-async def add_wb_positions(text: str, need_nmids: set[int], delay, max_page):
+async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=100):
     stop_event = asyncio.Event()
     catch_any_position = asyncio.Event()
     tasks = []
@@ -263,7 +263,7 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, max_page):
     # Если нет предыдущих позиций или все позиции на первой странице, начинаем с конца
     if not last_positions or any([lp.real_position for lp in last_positions]) == 0:
             for page in range(100, 0, -1):
-                if len(checked_pages) >= max_page:
+                if len(checked_pages) >= page_limit:
                     break
                 if stop_event.is_set():
                     break

@@ -3,9 +3,9 @@ from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-shop_id = '8a2acf65-1b2c-4061-9ae5-fed8ffb04371'
-add_balance = 1000000
-add_bonus = 100000
+shop_id = 'b3bfee45-0c2a-42c5-82cf-0a253365085b'
+add_balance = 10000
+add_bonus = 0
 
 async def add_balance_and_bonus():
     async with sm() as session:
@@ -13,11 +13,11 @@ async def add_balance_and_bonus():
         result = await session.execute(stmt)
         wb_cabinet = result.scalar_one_or_none()
         if not (balance := wb_cabinet.balance):
-            wb_cabinet.balance = 0
+            balance = 0
         if not (bonus := wb_cabinet.bonus):
-            wb_cabinet.bonus = 0
-        wb_cabinet.balance += add_balance
-        wb_cabinet.bonus = + add_bonus
+            bonus = 0
+        wb_cabinet.balance = balance + add_balance
+        wb_cabinet.bonus = bonus + add_bonus
         await session.commit()
 
 
