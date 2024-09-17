@@ -260,7 +260,7 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
     checked_pages = set()
     # Получаем последние позиции для всех артикулов
     for nmid in need_nmids:
-        last_position = await redis_manager.get_keyword_position(text, nmid)
+        last_position: WBItemPosition = await redis_manager.get_keyword_position(text, nmid)
         if last_position:
             last_positions.append(last_position)
     # Если нет предыдущих позиций или все позиции на первой странице, начинаем с конца
@@ -278,8 +278,9 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
                 await asyncio.sleep(delay)
     else:
         for position in last_positions:
-            max_page = position.real_position
-            min_page = max_page
+            start_page = position.real_position // 100 + 1
+            min_page = start_page
+            max_page = start_page
             while need_nmids and not stop_event.is_set():
                 if len(checked_pages) >= max_page:
                     break
@@ -288,25 +289,27 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
                     logger.debug('Достигнут лимит страниц')
                     break
                 if max_page <= 100:
-                    max_page += 1
                     if max_page in checked_pages:
                         continue
-                    task_right = asyncio.create_task(
-                        add_positions_from_page(stop_event, catch_any_position, text, max_page, need_nmids=need_nmids)
-                    )
-                    tasks.append(task_right)
+
+                    await add_positions_from_page(stop_event,
+                                                  catch_any_position,
+                                                  text, max_page,
+                                                  need_nmids=need_nmids)
+
                     checked_pages.add(max_page)
+                    max_page += 1
                     await asyncio.sleep(delay)
                 if min_page > 1:
-                    min_page -= 1
                     if  min_page in checked_pages:
                         continue
-                    task_left = asyncio.create_task(
-                        add_positions_from_page(stop_event, catch_any_position, text, min_page, need_nmids=need_nmids)
-                    )
-                    tasks.append(task_left)
-                    checked_pages.add(min_page)
 
+                    await add_positions_from_page(stop_event,
+                                                  catch_any_position,
+                                                  text, min_page,
+                                                  need_nmids=need_nmids)
+                    checked_pages.add(min_page)
+                    min_page -= 1
                     await asyncio.sleep(delay)
 
     for task in tasks:
