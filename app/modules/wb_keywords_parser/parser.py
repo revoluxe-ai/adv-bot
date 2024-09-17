@@ -277,7 +277,12 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, max_page):
         for position in last_positions:
             max_page = position.real_position
             min_page = max_page
+            count_cycle = 0
             while need_nmids and not stop_event.is_set():
+                count_cycle +=1
+                if count_cycle > 100:
+                    import ipdb;
+                    ipdb.set_trace()
                 if len(checked_pages) >= max_page:
                     break
                 logger.debug(f'Проверка артикула {position.nmid} запроса {text}')
@@ -303,7 +308,6 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, max_page):
                     )
                     tasks.append(task_left)
                     checked_pages.add(min_page)
-
                     await asyncio.sleep(delay)
 
     for task in tasks:
