@@ -122,7 +122,6 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
 class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
-
         products, cluster, preset = await self.__parse_keywords_from_wb(text, page)
         if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
@@ -237,7 +236,7 @@ async def add_positions_from_page(stop_event: asyncio.Event,
          positions = await parser.parse_keywords_from_wb(text, page)
     except Exception as e:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}')
-        raise e
+        return []
     if not positions:
         return []
     catch_any_position.set()
