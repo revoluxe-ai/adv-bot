@@ -291,23 +291,26 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
                 if max_page <= 100:
                     if max_page in checked_pages:
                         continue
-
-                    await add_positions_from_page(stop_event,
-                                                  catch_any_position,
-                                                  text, max_page,
-                                                  need_nmids=need_nmids)
-
+                    try:
+                        await add_positions_from_page(stop_event,
+                                                      catch_any_position,
+                                                      text, max_page,
+                                                      need_nmids=need_nmids)
+                    except Exception as e:
+                        logger.error(f'Ошибка при парсинге страницы {e}')
                     checked_pages.add(max_page)
                     max_page += 1
                     await asyncio.sleep(delay)
                 if min_page > 1:
                     if  min_page in checked_pages:
                         continue
-
-                    await add_positions_from_page(stop_event,
+                    try:
+                        await add_positions_from_page(stop_event,
                                                   catch_any_position,
                                                   text, min_page,
                                                   need_nmids=need_nmids)
+                    except Exception as e:
+                        logger.error(f'Ошибка при парсинге страницы {e}')
                     checked_pages.add(min_page)
                     min_page -= 1
                     await asyncio.sleep(delay)
