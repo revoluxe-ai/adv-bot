@@ -362,6 +362,9 @@ async def set_cluster_and_preset(text, cluster: typing.Optional[str], preset:  t
     else:
         value = cluster + ':' + str(preset)
         await redis_client.set(key, value)
+        text = cluster
+        key = 'cluster_and_preset:' + text
+        await redis_client.set(key, value)
     return None
 
 
