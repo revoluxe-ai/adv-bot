@@ -116,8 +116,6 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
     return decorator
 
 
-
-
 class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
@@ -330,6 +328,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
 
         stmt = select(AdvSetting).where(
             AdvSetting.parsing_active == True,
+            AdvSetting.active_status == 'started'
         )
         logger.debug("Формирование запроса для выбора активных рекламных кампаний.")
 
@@ -381,59 +380,43 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None)-> AsyncG
 
 
 async def parser_all_white_phrase():
-    tasks_by_text = {}
+    tasks = []
     queue = asyncio.Queue()
     while True:
         logger.debug('Получаем фразы для парсинга')
         generate_tasks = asyncio.create_task(get_phrases_for_parsing(queue))
         while True:
-            try:
-                # Попытка извлечь данные из очереди с таймаутом
-                data = await asyncio.wait_for(queue.get(), timeout=5.0)
-                text, need_nmids = data
-                need_nmids = tuple(need_nmids)
-                data = (text, need_nmids)
-            except asyncio.TimeoutError:
-                logger.debug('Очередь пуста в течение 5 секунд, проверяем завершение генерации задач.')
-                if generate_tasks.done():
-                    # Если генерация задач завершена и очередь пуста, выходим из цикла
-                    break
+            if len(tasks) >= settings.MAX_THREAD_PARSER:
+                logger.debug('Достигнуто максимальное количество задач, ожидание завершения одной из них.')
+                await asyncio.sleep(0)
                 continue
+            else:
+                try:
+                    data = await asyncio.wait_for(queue.get(), timeout=5.0)
+                    text, need_nmids = data
+                    need_nmids = tuple(need_nmids)
+                    data = (text, need_nmids)
+                    logger.debug(f'Добавляем на парсинг {data} в список задач')
+                    text, need_nmids = data
+                    if need_nmids:
+                        task = asyncio.create_task(limited_add_wb_positions(text, set(need_nmids)))
+                        tasks.append(task)
+                    queue.task_done()
+                except asyncio.TimeoutError:
+                    logger.debug('Очередь пуста в течение 5 секунд, проверяем завершение генерации задач.')
+                    if generate_tasks.done():
+                        break
+                finally:
+                    for task in tasks:
+                        if task.done():
+                            if task.exception():
+                                if isinstance(task.exception(), ErrorParsingPositions):
+                                    logger.debug(f'Не найдено позиций для фразы: {data}')
+                                else:
+                                    logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
+                                await asyncio.sleep(60)
 
-            if data not in tasks_by_text:
-                logger.debug(f'Добавляем задачу {data} в список задач')
-                text, need_nmids = data
-                if need_nmids:
-                    task = asyncio.create_task(limited_add_wb_positions(text, set(need_nmids)))
-                    tasks_by_text[data] = task
-                queue.task_done()
-            data_for_delete = set()
-            for data in tasks_by_text:
-                task = tasks_by_text[data]
-                if task.done():
-                    if task.exception():
-                        if isinstance(task.exception(), ErrorParsingPositions):
-                            logger.debug(f'Не найдено позиций для фразы: {data}')
-                        else:
-                            logger.error(f'Ошибка при выполнении задачи: {task.exception()}', exc_info=True)
-                        await asyncio.sleep(60)
-                    data_for_delete.add(data)
-            for data in data_for_delete:
-                del tasks_by_text[data]
 
-
-            logger.debug(f'Задач в поиске: {len(tasks_by_text)}')
-            await asyncio.sleep(0)
-
-        # Ждем завершения генерации задач перед новой итерацией основного цикла
-        await generate_tasks
-        # Проверяем, есть ли незавершенные задачи, если нет - завершаем цикл
-        if not tasks_by_text:
-            logger.debug('Все задачи выполнены, завершение работы.')
-            break
-
-    # Ждем завершения всех задач, если такие остались
-    await asyncio.gather(*tasks_by_text.values(), return_exceptions=True)
 
 
 
