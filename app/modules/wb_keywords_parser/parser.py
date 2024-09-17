@@ -317,6 +317,9 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
                     checked_pages.add(min_page)
                     min_page -= 1
                     await asyncio.sleep(delay)
+                if max_page >= 101 and min_page <= 5:
+                    break
+
 
     for task in tasks:
         if not task.done():
