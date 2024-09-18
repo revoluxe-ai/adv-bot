@@ -355,7 +355,7 @@ async def get(key):
     return value
 
 
-async def set_cluster_and_preset(text, cluster: typing.Optional[str], preset:  typing.Optional[int]):
+async def set_cluster_and_preset(text, cluster: str, preset:  typing.Optional[int]):
     key = 'cluster_and_preset:' + text
     if cluster is None or preset is None:
         await redis_client.delete(key)
@@ -376,14 +376,11 @@ async def get_cluster_and_preset(text)-> (str, int,):
     if isinstance(value, NoneType):
         return None, None
     value = value.decode('utf-8')
+    value = str(value)
     data = value.split(':')
-    try:
-        cluster, preset = data
-        return cluster, preset
-    except Exception:
-        logger.error('Не удалось получить кластер и пресет из значения: ' + value)
-        await set_cluster_and_preset(text, None, None)
-        return None, None
+    cluster, preset = data
+    return cluster, preset
+
 
 
 
