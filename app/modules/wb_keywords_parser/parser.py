@@ -227,7 +227,7 @@ class Parser:
         try:
             assert data['payloadVersion'] == 2
         except Exception as e:
-            logger.error(f'Ошибка в проверке версии данных: {e}', exc_info=True)
+            logger.debug(f'Ошибка в проверке версии данных: {e}', exc_info=True)
             raise DataError(f'{e}', text)
 
         metadata = data['metadata']
