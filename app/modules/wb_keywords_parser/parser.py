@@ -48,8 +48,8 @@ class TotalPages:
 
     @total_pages.setter
     def total_pages(self, value):
-        if value > 100:
-            value = 100
+        if value > 60:
+            value = 60
         self._total_pages = value
 
 
@@ -138,7 +138,7 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
 
 
 def get_parse_url(text: str, page: int):
-    assert  100 >=  page > 0
+    assert  60 >=  page > 0
     url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
     return url
 
@@ -282,14 +282,17 @@ async def add_positions_from_page(stop_event: asyncio.Event,
                                   text: str,
                                   page: int,
                                   need_nmids: set[int],
-                                  total_pages: TotalPages) -> (list[WBItemPosition], int,):
+                                  total_pages: TotalPages,
+                                  checked_pages: set) -> (list[WBItemPosition], int,):
     try:
        await _add_positions_from_page(stop_event,
                                                                catch_any_position,
                                                                text,
                                                                page,
                                                                need_nmids,
-                                                               total_pages)
+                                                                 total_pages,
+                                                           )
+       checked_pages.add(page)
     except Exception as e:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
         logger.debug(f'{get_parse_url(text, page)}')
@@ -328,7 +331,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
     return positions
 
 
-async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=100):
+async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60):
     total_pages = TotalPages()
     stop_event = asyncio.Event()
     catch_any_position = asyncio.Event()
@@ -342,21 +345,21 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
             last_positions.append(last_position)
     # Если нет предыдущих позиций или все позиции на первой странице, начинаем с конца
     if not last_positions or any([lp.real_position for lp in last_positions]) == 0:
-            for page in range(1, 101):
+            for page in range(1, 61):
                 if page > total_pages.total_pages:
                     break
                 if len(checked_pages) >= page_limit:
                     break
                 if stop_event.is_set():
                     break
-                checked_pages.add(page)
                 task = asyncio.create_task(
                     add_positions_from_page(stop_event,
                                             catch_any_position,
                                             text,
                                             page,
                                             need_nmids,
-                                            total_pages))
+                                            total_pages,
+                                            checked_pages))
 
                 tasks.append(task)
                 await asyncio.sleep(delay)
@@ -368,21 +371,22 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
 
             while need_nmids and not stop_event.is_set():
                 # Прерывание, если страница выходит за пределы
-                if min_page < 1 and max_page > 100:
+                if min_page < 1 and max_page > 60:
                     logger.debug('Достигнут предел страниц')
                     break
 
                 logger.debug(f'Проверка артикула {position.nmid} запроса {text}: {min_page} {max_page}')
 
                 # Проверка max_page
-                if max_page <= 100 and max_page not in checked_pages:
+                if max_page <= 60 and max_page not in checked_pages:
                     if max_page <= total_pages.total_pages:
                         try:
                             await add_positions_from_page(stop_event,
                                                           catch_any_position,
                                                           text, max_page,
                                                           need_nmids,
-                                                          total_pages)
+                                                          total_pages,
+                                                          checked_pages)
                             checked_pages.add(max_page)
                         except Exception as e:
                             logger.error(f'Ошибка при парсинге страницы {max_page}: {e}')
@@ -397,7 +401,8 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
                                                           catch_any_position,
                                                           text, min_page,
                                                           need_nmids,
-                                                          total_pages)
+                                                          total_pages,
+                                                          checked_pages)
                             checked_pages.add(min_page)
                         except Exception as e:
                             logger.error(f'Ошибка при парсинге страницы {min_page}: {e}')
@@ -405,11 +410,14 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
                     await asyncio.sleep(delay)
 
                 # Прерывание, если обе страницы уже проверены
-                if (min_page in checked_pages or min_page < 1) and (max_page in checked_pages or max_page > 100):
+                if (min_page in checked_pages or min_page < 1) and (max_page in checked_pages or max_page > 60):
                     logger.debug('Достигнут предел страниц или все страницы проверены')
                     break
-
-    await stop_event.wait()
+    while True:
+        if page_limit <= len(checked_pages):
+            break
+        else:
+            await asyncio.sleep(0)
 
     for task in tasks:
         if not task.done():
@@ -421,9 +429,9 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
             except Exception as e:
                 logger.error(f'Ошибка при парсинге страницы {e}')
 
-    if page_limit in [1, 100] and not catch_any_position.is_set():
+    if page_limit in [1, 60] and not catch_any_position.is_set():
         raise ErrorParsingPositions('Не найдено ни одной позиции в выдаче')
-    if page_limit == 100 and need_nmids:
+    if page_limit == 60 and need_nmids:
         not_found_positions = [
             WBItemPosition(
                 real_position=0,
@@ -521,7 +529,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
                         (total_views - last_views) > max_views_difference and keyword.hard_status == 2 or\
                         last_views == total_views and keyword.hard_status == 2\
                         or not last_position:
-                        await queue.put((text, adv.adv_id, list(need_nmids), last_views, 100))
+                        await queue.put((text, adv.adv_id, list(need_nmids), last_views, 60))
                         logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
 
 
