@@ -469,18 +469,26 @@ max_threads = settings.MAX_THREAD_PARSER
 
 semaphore = asyncio.Semaphore(max_threads)
 
+
 async def limited_add_wb_positions(text:str,
                                    need_nmids: set[int],
                                    last_view,
                                    adv_id,
                                    max_page: int):
+    global max_threads
     async with semaphore:
         try:
             await add_wb_positions(text, need_nmids, 1, max_page)
             if last_view:
                  await redis_manager.set_last_views(adv_id, text, last_view)
+                 max_threads += 1
+                 semaphore.release()
         except ErrorParsingPositions as e:
             logger.error(f'По запросу {text} не найдено ни одной позиции')
+            max_threads -= 1
+            await semaphore.acquire()
+        finally:
+            logger.debug(f'Максимум потоков {max_threads}')
 
 
 
