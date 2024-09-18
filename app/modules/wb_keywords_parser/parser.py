@@ -5,6 +5,7 @@ import json
 import random
 import re
 import time
+import typing
 from asyncio import Task
 from functools import wraps
 import logging
@@ -175,7 +176,9 @@ class Parser:
 
 
     @try_except(1, 1)
-    async def __parse_keywords_from_wb(self, text: str, page: int):
+    async def __parse_keywords_from_wb(self, text: str, page: int)-> tuple[typing.Optional[list[WBItemPosition]],
+                                                                     typing.Optional[str],
+                                                                     typing.Optional[int]]:
         url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
         async with aiohttp.ClientSession() as http_session:
             async with http_session.get(url) as response:
@@ -218,14 +221,24 @@ queue_position_dict = {}
 
 
 
-
-
-
 class ErrorParsingPositions(Exception):
     pass
 
 
 async def add_positions_from_page(stop_event: asyncio.Event,
+                                  catch_any_position: asyncio.Event,
+                                  text: str,
+                                  page: int,
+                                  need_nmids: set[int]):
+    try:
+        await _add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids)
+    except Exception as e:
+        logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}')
+
+
+
+
+async def _add_positions_from_page(stop_event: asyncio.Event,
                                   catch_any_position: asyncio.Event,
                                   text: str,
                                   page: int,
@@ -364,9 +377,9 @@ async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
 
 
 
+max_threads = settings.MAX_THREAD_PARSER
 
-
-semaphore = asyncio.Semaphore(settings.MAX_THREAD_PARSER)
+semaphore = asyncio.Semaphore(max_threads)
 
 async def limited_add_wb_positions(text:str,
                                    need_nmids: set[int],
