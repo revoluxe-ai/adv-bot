@@ -289,7 +289,10 @@ async def add_positions_from_page(stop_event: asyncio.Event,
                                                                need_nmids,
                                                                  total_pages,
                                                            )
+       logger.debug(f'Добавляем страницу {page} в проверенные')
        checked_pages.add(page)
+       logger.debug('Проверенные позиции добавили')
+       logger.debug(f'Проверенные страницы: {checked_pages}')
     except Exception as e:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
         logger.debug(f'{get_parse_url(text, page)}')
@@ -384,6 +387,7 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60
                                                           need_nmids,
                                                           total_pages,
                                                           checked_pages)
+                            logger.debug(f'Добавляем страницу {max_page} в проверенные')
                             checked_pages.add(max_page)
                         except Exception as e:
                             logger.error(f'Ошибка при парсинге страницы {max_page}: {e}')
@@ -410,13 +414,18 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60
                 if (min_page in checked_pages or min_page < 1) and (max_page in checked_pages or max_page > 60):
                     logger.debug('Достигнут предел страниц или все страницы проверены')
                     break
+    logger.debug('Ожидание завершения всех задач')
     while True:
+        logger.debug(f'Проверяем лимиты страниц {page_limit} {len(checked_pages)}')
         if page_limit <= len(checked_pages):
+            logger.debug(f'Достигнут лимит страниц {page_limit}')
             break
         else:
+            logger.debug(f'Не достигнут лимит страниц {page_limit}')
             await asyncio.sleep(0)
 
     for task in tasks:
+        logger.debug(f'Проверяем задачу {task}')
         if not task.done():
             task.cancel()
             try:
