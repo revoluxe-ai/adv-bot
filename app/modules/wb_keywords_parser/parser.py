@@ -209,55 +209,52 @@ class Parser:
     typing.Optional[int]]:
         url = get_parse_url(text, page)
         logger.debug(f'Запрос к URL: {url}')
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.get(url) as response:
+                response_text = await response.text()
+
+        logger.debug(f'Полученный ответ: {response_text}')
+
+        if not response_text:
+            raise DataError('Пустой ответ от сервера', text)
+
+        data = json.loads(response_text)
+
+        if data == {}:
+            logger.warning(f'Получены пустые данные для ключа {text} на странице {page}')
+            return None, None, None, None
+
         try:
-            async with aiohttp.ClientSession() as http_session:
-                async with http_session.get(url) as response:
-                    response_text = await response.text()
-
-            logger.debug(f'Полученный ответ: {response_text}')
-
-            if not response_text:
-                raise DataError('Пустой ответ от сервера', text)
-
-            data = json.loads(response_text)
-
-            if data == {}:
-                logger.warning(f'Получены пустые данные для ключа {text} на странице {page}')
-                return None, None, None, None
-
-            try:
-                assert data['payloadVersion'] == 2
-            except Exception as e:
-                logger.error(f'Ошибка в проверке версии данных: {e}', exc_info=True)
-                raise DataError(f'{e}', text)
-
-            metadata = data['metadata']
-            catalog_type = metadata['catalog_type']
-
-            if catalog_type == 'merger':
-                preset = hash(text)
-                cluster = text
-            else:
-                catalog_value = metadata['catalog_value']
-                preset = int(re.search(r'preset=(\d+)', catalog_value).group(1))
-                cluster = metadata['normquery']
-            total_items = data['data']['total']
-            products = data['data']['products']
-
-            if not products:
-                logger.info(f'Нет продуктов для ключа {text} на странице {page}')
-                return None, cluster, preset, total_items
-
-            assert isinstance(preset, int)
-            assert isinstance(cluster, str)
-            assert isinstance(products, list)
-
-            logger.debug(f'Возвращаемые данные: products={products}, cluster={cluster}, preset={preset}')
-            return products, cluster, preset, total_items
-
+            assert data['payloadVersion'] == 2
         except Exception as e:
-            logger.error(f'Ошибка при парсинге страницы {page} ключа {text}: {e}', exc_info=True)
-            raise
+            logger.error(f'Ошибка в проверке версии данных: {e}', exc_info=True)
+            raise DataError(f'{e}', text)
+
+        metadata = data['metadata']
+        catalog_type = metadata['catalog_type']
+
+        if catalog_type == 'merger':
+            preset = hash(text)
+            cluster = text
+        else:
+            catalog_value = metadata['catalog_value']
+            preset = int(re.search(r'preset=(\d+)', catalog_value).group(1))
+            cluster = metadata['normquery']
+        total_items = data['data']['total']
+        products = data['data']['products']
+
+        if not products:
+            logger.info(f'Нет продуктов для ключа {text} на странице {page}')
+            return None, cluster, preset, total_items
+
+        assert isinstance(preset, int)
+        assert isinstance(cluster, str)
+        assert isinstance(products, list)
+
+        logger.debug(f'Возвращаемые данные: products={products}, cluster={cluster}, preset={preset}')
+        return products, cluster, preset, total_items
+
+
 
 
 
