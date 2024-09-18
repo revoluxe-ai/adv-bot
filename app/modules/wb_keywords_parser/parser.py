@@ -151,7 +151,7 @@ class Parser:
             if total_items:
                 total_pages.total_pages = total_items // 100 + 1
         except Exception as e:
-            logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
+            logger.debug(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
             return []
         if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
