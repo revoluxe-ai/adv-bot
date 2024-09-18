@@ -37,6 +37,23 @@ from sqlalchemy import exc as sa_exc
 
 
 
+
+class TotalPages:
+    def __init__(self):
+        self._total_pages = 60
+
+    @property
+    def total_pages(self):
+        return self._total_pages
+
+    @total_pages.setter
+    def total_pages(self, value):
+        if value > 100:
+            value = 100
+        self._total_pages = value
+
+
+
 class EmptyDataDictFromSearchWB(Exception):
     pass
 
@@ -126,17 +143,20 @@ def get_parse_url(text: str, page: int):
     return url
 
 class Parser:
-    async def parse_keywords_from_wb(self, text: str, page: int):
+
+    async def parse_keywords_from_wb(self, text: str, page: int, total_pages: TotalPages) -> list[WBItemPosition]:
         first_place = page*100 - 99
         try:
             products, cluster, preset, total_items = await self.__parse_keywords_from_wb(text, page)
+            if total_items:
+                total_pages.total_pages = total_items // 100 + 1
         except Exception as e:
             logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
             return []
         if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
         if not products:
-            return None
+            return []
         positions = []
         for place_on_page, product in enumerate(products):
             nmid = product['id']
@@ -180,7 +200,7 @@ class Parser:
 
                 positions.append(position)
 
-        return positions, total_items
+        return positions
 
     @try_except(1, 1)
     async def __parse_keywords_from_wb(self, text: str, page: int) -> tuple[typing.Optional[list[WBItemPosition]],
@@ -241,19 +261,6 @@ class Parser:
 
 
 
-class TotalPages:
-    def __init__(self):
-        self._total_pages = 100
-
-    @property
-    def total_pages(self):
-        return self._total_pages
-
-    @total_pages.setter
-    def total_pages(self, value):
-        if value > 100:
-            value = 100
-        self._total_pages = value
 
 
 parser = Parser()
@@ -298,7 +305,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
     if stop_event.is_set():
         return []
     try:
-         positions, total_items = await parser.parse_keywords_from_wb(text, page)
+         positions = await parser.parse_keywords_from_wb(text, page, total_pages)
     except Exception as e:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text}', exc_info=True)
         logger.debug(f'{get_parse_url(text, page)}')
@@ -318,7 +325,6 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
             if not need_nmids:
                 stop_event.set()
                 break
-    total_pages.total_pages = total_items // 100 + 1
     return positions
 
 
