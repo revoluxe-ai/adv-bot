@@ -129,7 +129,7 @@ class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
         try:
-            products, cluster, preset = await self.__parse_keywords_from_wb(text, page)
+            products, cluster, preset, total_items = await self.__parse_keywords_from_wb(text, page)
         except Exception as e:
             logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
             return []
@@ -180,11 +180,12 @@ class Parser:
 
                 positions.append(position)
 
-        return positions
+        return positions, total_items
 
     @try_except(1, 1)
     async def __parse_keywords_from_wb(self, text: str, page: int) -> tuple[typing.Optional[list[WBItemPosition]],
     typing.Optional[str],
+    typing.Optional[int],
     typing.Optional[int]]:
         url = get_parse_url(text, page)
         logger.debug(f'Запрос к URL: {url}')
@@ -202,7 +203,7 @@ class Parser:
 
             if data == {}:
                 logger.warning(f'Получены пустые данные для ключа {text} на странице {page}')
-                return None, None, None
+                return None, None, None, None
 
             try:
                 assert data['payloadVersion'] == 2
@@ -220,24 +221,39 @@ class Parser:
                 catalog_value = metadata['catalog_value']
                 preset = int(re.search(r'preset=(\d+)', catalog_value).group(1))
                 cluster = metadata['normquery']
-
+            total_items = data['data']['total']
             products = data['data']['products']
 
             if not products:
                 logger.info(f'Нет продуктов для ключа {text} на странице {page}')
-                return None, cluster, preset
+                return None, cluster, preset, total_items
 
             assert isinstance(preset, int)
             assert isinstance(cluster, str)
             assert isinstance(products, list)
 
             logger.debug(f'Возвращаемые данные: products={products}, cluster={cluster}, preset={preset}')
-            return products, cluster, preset
+            return products, cluster, preset, total_items
 
         except Exception as e:
             logger.error(f'Ошибка при парсинге страницы {page} ключа {text}: {e}', exc_info=True)
             raise
 
+
+
+class TotalPages:
+    def __init__(self):
+        self._total_pages = 100
+
+    @property
+    def total_pages(self):
+        return self._total_pages
+
+    @total_pages.setter
+    def total_pages(self, value):
+        if value > 100:
+            value = 100
+        self._total_pages = value
 
 
 parser = Parser()
@@ -258,9 +274,15 @@ async def add_positions_from_page(stop_event: asyncio.Event,
                                   catch_any_position: asyncio.Event,
                                   text: str,
                                   page: int,
-                                  need_nmids: set[int]):
+                                  need_nmids: set[int],
+                                  total_pages: TotalPages) -> (list[WBItemPosition], int,):
     try:
-        await _add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids)
+       await _add_positions_from_page(stop_event,
+                                                               catch_any_position,
+                                                               text,
+                                                               page,
+                                                               need_nmids,
+                                                               total_pages)
     except Exception as e:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
         logger.debug(f'{get_parse_url(text, page)}')
@@ -271,11 +293,12 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
                                   catch_any_position: asyncio.Event,
                                   text: str,
                                   page: int,
-                                  need_nmids: set[int],):
+                                  need_nmids: set[int],
+                                  total_pages: TotalPages) -> (list[WBItemPosition], int,):
     if stop_event.is_set():
         return []
     try:
-         positions = await parser.parse_keywords_from_wb(text, page)
+         positions, total_items = await parser.parse_keywords_from_wb(text, page)
     except Exception as e:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text}', exc_info=True)
         logger.debug(f'{get_parse_url(text, page)}')
@@ -295,10 +318,12 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
             if not need_nmids:
                 stop_event.set()
                 break
+    total_pages.total_pages = total_items // 100 + 1
     return positions
 
 
 async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=100):
+    total_pages = TotalPages()
     stop_event = asyncio.Event()
     catch_any_position = asyncio.Event()
     tasks = []
@@ -312,14 +337,21 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
     # Если нет предыдущих позиций или все позиции на первой странице, начинаем с конца
     if not last_positions or any([lp.real_position for lp in last_positions]) == 0:
             for page in range(1, 101):
+                if page > total_pages.total_pages:
+                    break
                 if len(checked_pages) >= page_limit:
                     break
                 if stop_event.is_set():
                     break
                 checked_pages.add(page)
                 task = asyncio.create_task(
-                    add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids=need_nmids)
-                )
+                    add_positions_from_page(stop_event,
+                                            catch_any_position,
+                                            text,
+                                            page,
+                                            need_nmids,
+                                            total_pages))
+
                 tasks.append(task)
                 await asyncio.sleep(delay)
     else:
@@ -338,27 +370,31 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
 
                 # Проверка max_page
                 if max_page <= 100 and max_page not in checked_pages:
-                    try:
-                        await add_positions_from_page(stop_event,
-                                                      catch_any_position,
-                                                      text, max_page,
-                                                      need_nmids=need_nmids)
-                        checked_pages.add(max_page)
-                    except Exception as e:
-                        logger.error(f'Ошибка при парсинге страницы {max_page}: {e}')
+                    if max_page <= total_pages.total_pages:
+                        try:
+                            await add_positions_from_page(stop_event,
+                                                          catch_any_position,
+                                                          text, max_page,
+                                                          need_nmids,
+                                                          total_pages)
+                            checked_pages.add(max_page)
+                        except Exception as e:
+                            logger.error(f'Ошибка при парсинге страницы {max_page}: {e}')
                     max_page += 1
                     await asyncio.sleep(delay)
 
                 # Проверка min_page
                 if min_page > 1 and min_page not in checked_pages:
-                    try:
-                        await add_positions_from_page(stop_event,
-                                                      catch_any_position,
-                                                      text, min_page,
-                                                      need_nmids=need_nmids)
-                        checked_pages.add(min_page)
-                    except Exception as e:
-                        logger.error(f'Ошибка при парсинге страницы {min_page}: {e}')
+                    if min_page <= total_pages.total_pages:
+                        try:
+                            await add_positions_from_page(stop_event,
+                                                          catch_any_position,
+                                                          text, min_page,
+                                                          need_nmids,
+                                                          total_pages)
+                            checked_pages.add(min_page)
+                        except Exception as e:
+                            logger.error(f'Ошибка при парсинге страницы {min_page}: {e}')
                     min_page -= 1
                     await asyncio.sleep(delay)
 
