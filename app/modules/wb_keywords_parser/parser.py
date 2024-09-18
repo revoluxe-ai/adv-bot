@@ -403,7 +403,7 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
                     logger.debug('Достигнут предел страниц или все страницы проверены')
                     break
 
-
+    await stop_event.wait()
 
     for task in tasks:
         if not task.done():
