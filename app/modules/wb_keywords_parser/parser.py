@@ -238,9 +238,8 @@ async def add_positions_from_page(stop_event: asyncio.Event,
     try:
         await _add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids)
     except Exception as e:
-        logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}')
+        logger.debug(f'Ошибка при парсинге страницы {page} ключа {text} {e}')
         logger.debug(f'{get_parse_url(text, page)}')
-
 
 
 
@@ -254,7 +253,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
     try:
          positions = await parser.parse_keywords_from_wb(text, page)
     except Exception as e:
-        logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}')
+        logger.error(f'Ошибка при парсинге страницы {page} ключа {text}', exc_info=True)
         logger.debug(f'{get_parse_url(text, page)}')
         return []
     if not positions:
