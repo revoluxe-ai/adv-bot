@@ -120,6 +120,11 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
     return decorator
 
 
+def get_parse_url(text: str, page: int):
+    assert  100 >=  page > 0
+    url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
+    return url
+
 class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
@@ -179,7 +184,7 @@ class Parser:
     async def __parse_keywords_from_wb(self, text: str, page: int)-> tuple[typing.Optional[list[WBItemPosition]],
                                                                      typing.Optional[str],
                                                                      typing.Optional[int]]:
-        url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
+        url = get_parse_url(text, page)
         async with aiohttp.ClientSession() as http_session:
             async with http_session.get(url) as response:
                 response = await response.text()
@@ -234,6 +239,7 @@ async def add_positions_from_page(stop_event: asyncio.Event,
         await _add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids)
     except Exception as e:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}')
+        logger.debug(f'{get_parse_url(text, page)}')
 
 
 
@@ -249,6 +255,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
          positions = await parser.parse_keywords_from_wb(text, page)
     except Exception as e:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}')
+        logger.debug(f'{get_parse_url(text, page)}')
         return []
     if not positions:
         return []
