@@ -356,7 +356,7 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
             except Exception as e:
                 logger.error(f'Ошибка при парсинге страницы {e}')
 
-    if page_limit == 100 and not catch_any_position.is_set():
+    if page_limit in [1, 100] and not catch_any_position.is_set():
         raise ErrorParsingPositions('Не найдено ни одной позиции в выдаче')
     if page_limit == 100 and need_nmids:
         not_found_positions = [
