@@ -284,41 +284,46 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=10
             start_page = position.real_position // 100 + 1
             min_page = start_page
             max_page = start_page
+
             while need_nmids and not stop_event.is_set():
-                if len(checked_pages) >= max_page:
+                # Прерывание, если страница выходит за пределы
+                if min_page < 1 and max_page > 100:
+                    logger.debug('Достигнут предел страниц')
                     break
+
                 logger.debug(f'Проверка артикула {position.nmid} запроса {text}: {min_page} {max_page}')
-                if max_page > 100 and min_page < 1:
-                    logger.debug('Достигнут лимит страниц')
-                    break
-                if max_page <= 100:
-                    if max_page in checked_pages:
-                        continue
+
+                # Проверка max_page
+                if max_page <= 100 and max_page not in checked_pages:
                     try:
                         await add_positions_from_page(stop_event,
                                                       catch_any_position,
                                                       text, max_page,
                                                       need_nmids=need_nmids)
+                        checked_pages.add(max_page)
                     except Exception as e:
-                        logger.error(f'Ошибка при парсинге страницы {e}')
-                    checked_pages.add(max_page)
+                        logger.error(f'Ошибка при парсинге страницы {max_page}: {e}')
                     max_page += 1
                     await asyncio.sleep(delay)
-                if min_page > 1:
-                    if  min_page in checked_pages:
-                        continue
+
+                # Проверка min_page
+                if min_page > 1 and min_page not in checked_pages:
                     try:
                         await add_positions_from_page(stop_event,
-                                                  catch_any_position,
-                                                  text, min_page,
-                                                  need_nmids=need_nmids)
+                                                      catch_any_position,
+                                                      text, min_page,
+                                                      need_nmids=need_nmids)
+                        checked_pages.add(min_page)
                     except Exception as e:
-                        logger.error(f'Ошибка при парсинге страницы {e}')
-                    checked_pages.add(min_page)
+                        logger.error(f'Ошибка при парсинге страницы {min_page}: {e}')
                     min_page -= 1
                     await asyncio.sleep(delay)
-                if max_page >= 101 and min_page <= 5:
+
+                # Прерывание, если обе страницы уже проверены
+                if (min_page in checked_pages or min_page < 1) and (max_page in checked_pages or max_page > 100):
+                    logger.debug('Достигнут предел страниц или все страницы проверены')
                     break
+
 
 
     for task in tasks:
