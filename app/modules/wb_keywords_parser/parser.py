@@ -128,7 +128,11 @@ def get_parse_url(text: str, page: int):
 class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int):
         first_place = page*100 - 99
-        products, cluster, preset = await self.__parse_keywords_from_wb(text, page)
+        try:
+            products, cluster, preset = await self.__parse_keywords_from_wb(text, page)
+        except Exception as e:
+            logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
+            return []
         if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
         if not products:
@@ -238,7 +242,7 @@ async def add_positions_from_page(stop_event: asyncio.Event,
     try:
         await _add_positions_from_page(stop_event, catch_any_position, text, page, need_nmids)
     except Exception as e:
-        logger.debug(f'Ошибка при парсинге страницы {page} ключа {text} {e}')
+        logger.error(f'Ошибка при парсинге страницы {page} ключа {text} {e}', exc_info=True)
         logger.debug(f'{get_parse_url(text, page)}')
 
 
