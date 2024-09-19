@@ -168,3 +168,7 @@ class WBUpdate(CallbackData, prefix="wb_update"):
 class StrategySetting(CallbackData, prefix="strategy_setting"):
     action: str
     adv_setting_original_id: int
+
+
+class ResetWhiteList(CallbackData, prefix="reset_white_list"):
+    adv_setting_original_id: int

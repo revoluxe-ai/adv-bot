@@ -176,6 +176,11 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
 
     builder.row(button)
 
+    button = InlineKeyboardButton(text='Сбросить белый список',
+                                    callback_data=callbacks.ResetWhiteList(
+                                        adv_setting_original_id=adv_setting.id).pack())
+    builder.row(button)
+
 
     wb_user_cabinet_original_id = wb_user_cabinet.id
     builder.row(InlineKeyboardButton(text='Вернуться к списку кампаний',
@@ -508,16 +513,12 @@ def get_keyword_setting_keyboard(
     buttons.append(button)
 
 
-
-
     buttons.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
                                              callback_data=callbacks.SettingKeywords(
                                              adv_original_id=adv_setting.id,
                                              type=return_to,
                                              page=page,
                                              ).pack())])
-
-
 
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
