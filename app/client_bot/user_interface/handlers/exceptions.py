@@ -1,4 +1,7 @@
 import typing
+
+from sqlalchemy import select
+
 from app.exc import CardNotFoundInDB
 from aiogram import Router
 from aiogram.exceptions import TelegramForbiddenError
@@ -6,12 +9,16 @@ from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.types.error_event import ErrorEvent
 import app
 import aiogram
+
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker as sm
 import traceback
 from aiogram.fsm.context import FSMContext
 import logging
 from app import client_bot as tb
 from app.client_bot import const
 from app.modules.common_slaves.wildberries.exceptions import ApiForbiddenError
+from app.modules.wb_keywords_parser.parser import ErrorParsingPositions
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +62,32 @@ async def bad_request_error_handler(error_event: ErrorEvent, state: FSMContext, 
                            text='Эта кнопка устарела. Нажмите на /start и начните сначала'
                            'Если ошибка повторяется, обратитесь к администратору бота @skyline360_1')
     return
+
+
+@admin_router.errors(ExceptionTypeFilter(ErrorParsingPositions))
+async def error_parsing_positions_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+    message = error_event.update.message
+    exception = error_event.exception
+
+    if message is None:
+        chat_id = error_event.update.callback_query.message.chat.id
+    else:
+        chat_id = message.chat.id
+    await bot.send_message(chat_id=chat_id,
+                           text='Ошибка парсинга позиций. Попробуйте через время еще раз. '
+                            'Если ошибка будет повторяться, то обратитесь к администратору бота @skyline360_1')
+    await bot.send_message(admin_telegram_id, str(exception))
+
+    async with sm() as session:
+        stmt = select(User.username).where(User.user_telegram_id == chat_id)
+        user_name = await session.execute(stmt)
+        user_name = user_name.scalar_one_or_none()
+
+
+    await bot.send_message(admin_telegram_id, f'Ошибка парсинга у пользователя {user_name}')
+
+    return
+
 
 
 @admin_router.errors(ExceptionTypeFilter(ApiForbiddenError))
