@@ -96,7 +96,7 @@ async def _run_bidder_process_for_adv(adv_id: int,
                     continue
                 try:
                     text = keyword.text
-                    await parser.add_wb_positions(text, {nmid_in_adv}, 0, 100)
+                    await parser.add_wb_positions(text, {nmid_in_adv}, 0)
                     await redis_manager.set_last_views(adv_id, text, views)
                 except Exception as e:
                     logger.error(f'Ошибка при получении позиции {e}')
