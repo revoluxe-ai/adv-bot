@@ -17,6 +17,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_keywords_parser.parser import ErrorParsingPositions
 from app.utils import add_wb_positions_to_redis
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
@@ -555,7 +556,7 @@ async def check_position(callback: types.CallbackQuery,
             nmid = nmids[0]
 
 
-        await add_wb_positions_to_redis(text, {nmid}, delay=0)
+        await add_wb_positions_to_redis(text, {nmid}, delay=1)
         await messages.KeywordSettingMessage(bot,
                                              callback.message.chat.id,
                                              keyword_setting_original_id,
