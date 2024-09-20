@@ -7,6 +7,8 @@ import joblib
 import numpy as np
 from asyncpg import ProgramLimitExceededError
 from sqlalchemy import not_
+from sqlalchemy.exc import IntegrityError
+
 from app.utils import redis_manager
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
@@ -487,8 +489,9 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
                     keyword.hard_status = 0
                 session.add(keyword)
                 await session.commit()
-            except ProgramLimitExceededError:
+            except (ProgramLimitExceededError, IntegrityError):
                 logger.error('Ошибка добавления ключей в postgres', exc_info=True)
+
             finally:
                 await asyncio.sleep(0)
 
