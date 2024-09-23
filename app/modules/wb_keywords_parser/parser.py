@@ -317,6 +317,9 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
         return []
     catch_any_position.set()
     logger.debug(f'Найдено {len(positions)}')
+
+    await data_manager.add_positions_to_ch(positions)
+
     positions = [position for position in positions if position.nmid in need_nmids]
     logger.debug(f'После фильтра осталось {len(positions)}')
     if positions:
