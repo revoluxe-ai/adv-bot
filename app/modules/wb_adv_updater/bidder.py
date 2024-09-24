@@ -15,6 +15,7 @@ from app.modules.common_slaves.wildberries.models import (
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from ...settings import settings
 from ...utils import redis_manager
 from  app.modules.wb_keywords_parser import parser
 from ...utils.click_house.client import get_clickhouse_client
@@ -69,6 +70,8 @@ async def _run_bidder_process():
 
 async def _run_bidder_process_for_adv(adv_id: int,
                                       wb_api: WBApi):
+
+    step = settings.BIDDER_STEP
     try:
         async with sm() as session:
             stmt = select(AdvSetting)\
@@ -116,11 +119,11 @@ async def _run_bidder_process_for_adv(adv_id: int,
         if promo_positions:
             fact_max_position: int = max(promo_positions)
             if fact_max_position == 1:
-                new_cpm = cpm_from_parsing - 1
+                new_cpm = cpm_from_parsing - step
             elif fact_max_position < max_position_for_adv:
-                new_cpm = cpm_from_parsing - 1
+                new_cpm = cpm_from_parsing - step
             elif fact_max_position > max_position_for_adv:
-                new_cpm = cpm_from_parsing + 1
+                new_cpm = cpm_from_parsing + step
             else:
                 new_cpm = cpm_from_parsing
 

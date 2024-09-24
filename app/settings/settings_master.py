@@ -74,4 +74,10 @@ class Settings:
     def CH_MAX_THREAD(self):
         return get_document_by_key_name(setting_path, 'CH_MAX_THREAD')
 
+
+    @property
+    def BIDDER_STEP(self):
+        return get_document_by_key_name(setting_path, 'BIDDER_STEP_RUB')
+
+
 settings = Settings()
