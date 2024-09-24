@@ -1,11 +1,10 @@
+from abc import ABC
+
 from .data_classes.card_from_wb import CardFromWB
 import asyncio
 import datetime
-import json
 import logging
-import time
 from typing import Union
-from aiohttp import ClientOSError, ServerDisconnectedError
 import aiohttp
 from .ABC_WB_API import ABC_WB_API
 from .data_classes.adv import Adv
@@ -17,7 +16,97 @@ from .http_request import requests, try_except_decorator
 from .models import AdvSetting
 from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
-import time
+
+
+"""
+
+Пример ответа от API по полной статистики рекламы:
+[
+{
+"views": 1052,
+"clicks": 2,
+"ctr": 0.19,
+"cpc": 0.09,
+"sum": 177.7,
+"atbs": 0,
+"orders": 0,
+"cr": 0,
+"shks": 0,
+"sum_price": 0,
+"dates": [
+"2023-10-07",
+"2023-10-06"
+],
+"days": [
+{
+"date": "2023-10-06T03:00:00+03:00",
+"views": 414,
+"clicks": 1,
+"ctr": 0.24,
+"cpc": 70,
+"sum": 70,
+"atbs": 0,
+"orders": 0,
+"cr": 0,
+"shks": 0,
+"sum_price": 0,
+"apps": []
+}
+],
+"boosterStats": [
+{
+"date": "2023-10-07T00:00:00Z",
+"nm": 170095908,
+"avg_position": 348
+}
+],
+"advertId": 10524818
+}
+]
+
+
+"""
+
+
+class DayStat:
+    def __init__(self, data):
+        self.date = data['date']
+        self.views = data['views']
+        self.clicks = data['clicks']
+        self.ctr = data['ctr']
+        self.cpc = data['cpc']
+        self.sum = data['sum']
+        self.atbs = data['atbs']
+        self.orders = data['orders']
+        self.cr = data['cr']
+        self.shks = data['shks']
+        self.sum_price = data['sum_price']
+        self.apps = data['apps']
+
+
+class FullAdvStat(ABC):
+    def __init__(self, data):
+        self.views = data['views']
+        self.clicks = data['clicks']
+        self.ctr = data['ctr']
+        self.cpc = data['cpc']
+        self.sum = data['sum']
+        self.atbs = data['atbs']
+        self.orders = data['orders']
+        self.cr = data['cr']
+        self.shks = data['shks']
+        self.sum_price = data['sum_price']
+        self.dates = data['dates']
+        self.days = []
+        for day_data in data['days']:
+            day = DayStat(day_data)
+            self.days.append(day)
+        self.boosterStats = data['boosterStats']
+        self.advertId = data['advertId']
+
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +126,96 @@ class AdvertApi(ABC_WB_API):
     _only_read = api_rights.OnlyRead.FALSE
     live_company_status = [4, 9, 11]
     auto_adv_types = [8, 9]
+
+
+
+    @try_except_decorator(1, 60)
+    async def def_get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None):
+        assert [isinstance(dt, datetime.date) for dt in dates]
+        assert [isinstance(adv_id, int) for adv_id in adv_ids]
+        """Пример даты [
+  {
+    "id": 8960367,
+    "dates": [
+      "2023-10-07",
+      "2023-10-06"
+    ]
+  },
+  {
+    "id": 9876543,
+    "dates": [
+      "2023-10-07",
+      "2023-12-06"
+    ]
+  }
+       ]"""
+        dates = [date.isoformat() for date in dates]
+        url = 'https://advert-api.wildberries.ru/adv/v2/fullstats'
+        query_data = []
+        for adv_id in adv_ids:
+            query_data .append({'id': adv_id, 'dates': dates})
+
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(session, 'POST', url, json_data=query_data ,
+                                                headers=self.headers.standart)
+            answer = json.loads(response_text)
+            """
+
+            Пример ответа от API по полной статистики рекламы:
+            [
+            {
+            "views": 1052,
+            "clicks": 2,
+            "ctr": 0.19,
+            "cpc": 0.09,
+            "sum": 177.7,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "dates": [
+            "2023-10-07",
+            "2023-10-06"
+            ],
+            "days": [
+            {
+            "date": "2023-10-06T03:00:00+03:00",
+            "views": 414,
+            "clicks": 1,
+            "ctr": 0.24,
+            "cpc": 70,
+            "sum": 70,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "apps": []
+            }
+            ],
+            "boosterStats": [
+            {
+            "date": "2023-10-07T00:00:00Z",
+            "nm": 170095908,
+            "avg_position": 348
+            }
+            ],
+            "advertId": 10524818
+            }
+            ]
+
+
+            """
+
+            full_stats = []
+            for data in answer:
+                full_stat = FullAdvStat(data)
+                full_stats.append(full_stat)
+
+            return full_stats
+
+
 
 
     @try_except_decorator(5, 60)
