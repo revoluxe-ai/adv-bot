@@ -1481,3 +1481,28 @@ async def get_users_from_nmid(nmid: int):
         return []
 
 
+async def add_relevant_phrases(keywords, adv_setting_id):
+    async with _sm() as session:
+        for text in keywords:
+            stmt = select(KeywordSetting)\
+                .join(KeywordSetting.adv_setting)\
+                .where(KeywordSetting.text == text,
+                       AdvSetting.id == adv_setting_id)
+            result = await session.execute(stmt)
+            keyword_setting = result.scalar()
+            if not keyword_setting:
+                adv_keyword = AdvKeyword(text=text,
+                                         adv_setting_id=adv_setting_id,
+                                         views=0,
+                                         clicks=0,
+                                         spend=0,
+                                         date=datetime.now().date())
+
+                keyword_setting = KeywordSetting(text=text,
+                                                 adv_setting_id=adv_setting_id,
+                                                 )
+                keyword_setting.adv_keywords.append(adv_keyword)
+                session.add(keyword_setting)
+            if keyword_setting.hard_status == 0:
+                keyword_setting.hard_status = 1
+        await session.commit()

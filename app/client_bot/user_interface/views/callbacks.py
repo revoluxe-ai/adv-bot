@@ -172,3 +172,9 @@ class StrategySetting(CallbackData, prefix="strategy_setting"):
 
 class ResetWhiteList(CallbackData, prefix="reset_white_list"):
     adv_setting_original_id: int
+
+
+class AddRelevantPhrases(CallbackData, prefix="add_relevant_phrases"):
+    adv_setting_id: int
+
+

@@ -2328,3 +2328,21 @@ class Single_message117(Text):
 
 class WhiteListReset(Text):
     text = "Белый список успешно сброшен"
+
+
+
+class RelevantPhrasesAdded(TextWithKeyboard):
+
+    def __init__(self, bot, user_telegram_id, adv_setting_id):
+        self.adv_setting_id = adv_setting_id
+        super().__init__(bot, user_telegram_id)
+
+    text = "Фразы успешно добавлены в бот (авто) список"
+
+    @property
+    def keyboard(self):
+        return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+
+class WaitingForRelevantPhrases(Text):
+    text = "Введите фразы, которые вы хотите добавить в кампанию в качестве релевантных фраз:"

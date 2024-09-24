@@ -45,6 +45,34 @@ async def waiting_for_white_phrases(message, bot: Bot, state: FSMContext):
     await messages.WhitePhrasesAdded(bot, message.from_user.id)(adv_setting_id)
 
 
+@router.callback_query(callbacks.AddRelevantPhrases.filter())
+async def add_relevant_phrases(callback: CallbackQuery,
+                                 bot: Bot,
+                                 callback_data: callbacks.AddRelevantPhrases,
+                                 state: FSMContext):
+     await callback.answer('Добавление фраз в релевантный список')
+     adv_setting_id = callback_data.adv_setting_id
+     await state.update_data(last_adv_setting_id=adv_setting_id)
+     await state.set_state(states.AddRelevantPhrases.waiting_for_relevant_phrases)
+     await messages.WaitingForRelevantPhrases(bot, callback.from_user.id)()
+
+
+
+@router.message(StateFilter(states.AddRelevantPhrases.waiting_for_relevant_phrases))
+async def waiting_for_relevant_phrases(message, bot: Bot, state: FSMContext):
+    text = message.text
+    if '/start' in text:
+        await start_registration(message, bot, state)
+        return
+    keywords = text.split('\n')
+    keywords = [keyword.strip().lower() for keyword in keywords]
+    data = await state.get_data()
+    adv_setting_id = data['last_adv_setting_id']
+    await messages.LongTimeOperation(bot, message.from_user.id)()
+    await data_manager.add_relevant_phrases(keywords, adv_setting_id)
+    await messages.RelevantPhrasesAdded(bot, message.from_user.id, adv_setting_id)()
+
+
 
 @router.callback_query(callbacks.ResetWhiteList.filter())
 async def reset_white_list(callback: CallbackQuery,
