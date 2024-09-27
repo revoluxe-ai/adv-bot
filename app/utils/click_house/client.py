@@ -95,6 +95,7 @@ class get_clickhouse_client:
             password=password,
             database=database,
             pool_mgr=pool_mgr,
+            port=settings.CLICKHOUSE_PORT,
 
         )
         return self.client

@@ -79,5 +79,9 @@ class Settings:
     def BIDDER_STEP(self):
         return get_document_by_key_name(setting_path, 'BIDDER_STEP_RUB')
 
+    @property
+    def CLICKHOUSE_PORT(self):
+        return get_document_by_key_name(setting_path, 'CLICKHOUSE_PORT')
+
 
 settings = Settings()
