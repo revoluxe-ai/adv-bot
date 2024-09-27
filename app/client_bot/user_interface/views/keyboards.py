@@ -73,7 +73,7 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
             InlineKeyboardButton(text='Включить автоматическое управление',
                                  callback_data=TurnBot(action='on',
                                                        adv_original_id=adv_setting.id,
-                                                       wb_user_cabinet_original_id=wb_user_cabinet.id).pack()))
+                                                       wb_user_cabinet_original_id = wb_user_cabinet.id).pack()))
 
     button = InlineKeyboardButton(text='Управление ставкой',
                                         callback_data=callbacks.CPMSettingMenu(
@@ -186,6 +186,20 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                     callback_data=callbacks.ResetWhiteList(
                                         adv_setting_original_id=adv_setting.id).pack())
     builder.row(button)
+
+    if adv_setting.new_auto_min_ctr_mode:
+        button = InlineKeyboardButton(text='Отключить новый режим управления CTR',
+                                        callback_data=callbacks.ChangeAutoMinCTR(
+                                            action='turn_off_auto_min_ctr',
+                                            adv_setting_original_id=adv_setting.id).pack())
+        builder.row(button)
+    else:
+        button = InlineKeyboardButton(text='Включить новый режим управления CTR',
+                                        callback_data=callbacks.ChangeAutoMinCTR(
+                                            action='turn_on_auto_min_ctr',
+                                            adv_setting_original_id=adv_setting.id).pack())
+        builder.row(button)
+
 
 
     wb_user_cabinet_original_id = wb_user_cabinet.id

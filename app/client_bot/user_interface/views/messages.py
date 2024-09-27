@@ -257,16 +257,13 @@ class AdvSettingMenu(TextWithKeyboard):
         self.wb_user_cabinet = wb_user_cabinet
 
     async def __call__(self):
-        if self.adv.hard_min_ctr:
-            self._min_ctr = round(self.adv.hard_min_ctr, 2)*100
-        else:
-            try:
-                self._min_ctr = await data_manager.get_min_ctr(self.adv)
-                if not self._min_ctr:
-                    raise NoResultFound
-                self._min_ctr = round(self._min_ctr*100, 1)
-            except NoResultFound:
-                self._min_ctr = 'Минимальный CTR не определен'
+        try:
+            self._min_ctr = await data_manager.get_min_ctr(self.adv)
+            if not self._min_ctr:
+                raise NoResultFound
+            self._min_ctr = round(self._min_ctr*100, 1)
+        except NoResultFound:
+            self._min_ctr = 'Минимальный CTR не определен'
 
         try:
             self._mean_ctr = await data_manager.get_mean_ctr(self.adv)

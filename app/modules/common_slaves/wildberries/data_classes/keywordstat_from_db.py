@@ -38,6 +38,15 @@ class CalculatedKeyword:
     cluster_name: Optional[str] = None
     preset: Optional[int] = None
 
+    @property
+    def rating_by_predict_ctr(self):
+        if self.predict_ctr is None:
+            return 0
+        if isinstance(self.query, str):
+            self.query = 25
+        return  self.query * self.predict_ctr**2
+
+
 
 
     @property

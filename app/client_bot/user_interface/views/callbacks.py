@@ -178,3 +178,6 @@ class AddRelevantPhrases(CallbackData, prefix="add_relevant_phrases"):
     adv_setting_id: int
 
 
+class ChangeAutoMinCTR(CallbackData, prefix="change_auto_min_ctr"):
+    action: str
+    adv_setting_original_id: int

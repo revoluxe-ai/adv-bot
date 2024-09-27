@@ -1150,7 +1150,34 @@ async def get_mean_ctr(adv: AdvSetting):
         return mean_ctr  # Возвращаем значение mean_ctr вместо pass
 
 
+
 async def get_min_ctr(adv: AdvSetting):
+    if not adv.new_auto_min_ctr_mode:
+        return await _get_min_ctr(adv)
+    else:
+        return await _get_new_min_ctr(adv)
+
+
+
+async def _get_new_min_ctr(adv: AdvSetting):
+    keywords: list[CalculatedKeyword] = await get_keywords_statistic_clickhouse(adv,
+                                                                      None)
+
+    if not keywords:
+        return 0.05
+
+    for keyword in keywords:
+        keyword.predict_ctr = await redis_manager.get_predict_ctr(adv.adv_id, keyword.text)
+
+    best_keyword = sorted(keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True)[0]
+    logger.debug(f'Лучшее ключевое слово {best_keyword.text} с рейтингом {best_keyword.rating_by_predict_ctr}')
+    best_predict_ctr = best_keyword.predict_ctr
+    if not best_predict_ctr:
+        return 0.05
+    return best_predict_ctr
+
+
+async def _get_min_ctr(adv: AdvSetting):
     if adv.hard_min_ctr:
         return float(adv.hard_min_ctr)
     async with _sm() as session:
