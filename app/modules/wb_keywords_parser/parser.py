@@ -366,7 +366,7 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60
     else:
         for position in last_positions:
             start_page = position.real_position // 100 + 1
-            min_page = start_page
+            min_page = start_page - 1
             max_page = start_page
 
             while need_nmids and not stop_event.is_set():
@@ -394,7 +394,6 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60
                     max_page += 1
                     await asyncio.sleep(delay)
 
-                # Проверка min_page
                 if min_page > 1 and min_page not in checked_pages:
                     if min_page <= total_pages.total_pages:
                         try:
