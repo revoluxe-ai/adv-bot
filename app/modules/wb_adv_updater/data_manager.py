@@ -37,6 +37,7 @@ from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.my_types import AdvSetting, WBUserCabinet
 from app.payments.db.models import Payment
+from app.settings import settings
 
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User, RefLink, user_reflink_association
@@ -171,6 +172,7 @@ async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[Lis
 def _build_clickhouse_query(adv_id: int,
                             pass_time: Optional[timedelta],
                             last_views: Optional[int] = None) -> str:
+    # Формируем основной запрос
     query = f"""
         SELECT
             text,
@@ -199,17 +201,22 @@ def _build_clickhouse_query(adv_id: int,
                     GROUP BY
                         text, date
                 )
-            GROUP BY
-                text, date
-        ) AS latest_records
     """
 
+    # Добавляем условие для pass_time
     if pass_time:
         start_time = datetime.now() - pass_time
         query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
 
-    query += " GROUP BY text, date"
+    # Завершаем основной подзапрос
+    query += """
+            GROUP BY
+                text, date
+        ) AS latest_records
+        GROUP BY text, date
+    """
 
+    # Если указаны last_views, добавляем дополнительный запрос с CTE
     if last_views:
         query = f"""
             WITH
@@ -234,10 +241,10 @@ def _build_clickhouse_query(adv_id: int,
                 cumulative_views
             WHERE
                 cumulative_total_views <= {last_views}
-            GROUP BY text, date
+            GROUP BY text
         """
-    return query
 
+    return query
 
 
 
@@ -462,7 +469,8 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[C
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
-    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
+    pass_time = timedelta(days=7)
+    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time)
     async with _sm() as session:
         logger.debug('Начинаю получать фразы')
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
