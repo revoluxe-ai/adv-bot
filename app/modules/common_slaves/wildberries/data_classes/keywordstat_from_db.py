@@ -44,7 +44,7 @@ class CalculatedKeyword:
             return 0
         if isinstance(self.query, str):
             self.query = 25
-        return  self.query * self.predict_ctr**2
+        return  self.query * (self.predict_ctr*100)**2
 
 
 

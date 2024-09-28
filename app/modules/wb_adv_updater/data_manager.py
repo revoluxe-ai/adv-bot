@@ -1169,7 +1169,7 @@ async def get_min_ctr(adv: AdvSetting):
 
 async def _get_new_min_ctr(adv: AdvSetting):
     keywords: list[CalculatedKeyword] = await get_keywords_statistic_clickhouse(adv,
-                                                                      None)
+                                                                      timedelta(days=7))
 
     if not keywords:
         return 0.05
@@ -1181,7 +1181,7 @@ async def _get_new_min_ctr(adv: AdvSetting):
     logger.debug(f'Лучшее ключевое слово {best_keyword.text} с рейтингом {best_keyword.rating_by_predict_ctr}')
     best_predict_ctr = best_keyword.predict_ctr
     if not best_predict_ctr:
-        return 0.05
+        return 0.09
     return best_predict_ctr
 
 
