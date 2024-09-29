@@ -95,17 +95,20 @@ async def get_keyword_statistic_clickhouse(client,
                     WHERE
                         adv_id = {adv_id}
                         AND text = %(text)s
+                    """
+
+    # Добавление условия для фильтрации по дате внутри подзапроса
+    if pass_days:
+        start_date = today - timedelta(days=pass_days)
+        query += f" AND date >= '{start_date}'"
+
+    query += """
                     GROUP BY
                         text,
                         date
                 )
         ) AS latest_records
     """
-
-    # Добавление условия для фильтрации по дате, если указано количество дней
-    if pass_days:
-        start_date = today - timedelta(days=pass_days)
-        query += f" AND date >= '{start_date}'"
 
     # Выполнение запроса
     result = await client.query(query, {'text': text})
@@ -122,6 +125,7 @@ async def get_keyword_statistic_clickhouse(client,
         total_views = total_clicks
 
     return total_clicks, total_views, total_spend
+
 
 
 
