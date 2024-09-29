@@ -67,7 +67,7 @@ async def measure_time(function):
 async def get_keyword_statistic_clickhouse(client,
                                            text: str,
                                            adv_id: int,
-                                           pass_days: Union[int, None] = None) -> tuple[int, int, int]:
+                                           pass_days: Union[int, None] = 7) -> tuple[int, int, int]:
 
     today = datetime.now().date()
     query = f"""
@@ -1162,10 +1162,12 @@ async def get_mean_ctr(adv: AdvSetting):
 
 async def get_min_ctr(adv: AdvSetting):
     if not adv.new_auto_min_ctr_mode:
-        return await _get_min_ctr(adv)
+        min_ctr = await _get_min_ctr(adv)
     else:
-        return await _get_new_min_ctr(adv)
-
+        min_ctr = await _get_new_min_ctr(adv)
+    if adv.hard_min_ctr and min_ctr < adv.hard_min_ctr:
+        min_ctr = adv.hard_min_ctr
+    return min_ctr
 
 
 async def _get_new_min_ctr(adv: AdvSetting):
@@ -1187,8 +1189,6 @@ async def _get_new_min_ctr(adv: AdvSetting):
 
 
 async def _get_min_ctr(adv: AdvSetting):
-    if adv.hard_min_ctr:
-        return float(adv.hard_min_ctr)
     async with _sm() as session:
         stmt = select(KeywordSetting)\
         .where(
