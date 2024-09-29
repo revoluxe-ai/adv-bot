@@ -394,7 +394,7 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60
                     max_page += 1
                     await asyncio.sleep(delay)
 
-                if min_page > 1 and min_page not in checked_pages:
+                if min_page >= 1 and min_page not in checked_pages:
                     if min_page <= total_pages.total_pages:
                         try:
                             await add_positions_from_page(stop_event,
