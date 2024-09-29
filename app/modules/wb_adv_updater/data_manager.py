@@ -587,7 +587,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
             await asyncio.sleep(0)
             continue
-        if keyword_setting.hard_status == 2:
+        if keyword_setting.hard_status == 2 and not adv_setting.new_auto_min_ctr_mode:
             keyword_stat.status = KeywordStatus.GOOD
             keyword_setting.auto_block = False
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
@@ -805,7 +805,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
             await asyncio.sleep(0)
             continue
-        if keyword_setting.hard_status == 2:
+        if keyword_setting.hard_status == 2 and not adv_setting.new_auto_min_ctr_mode:
            keyword_stat.status = KeywordStatus.GOOD
            keyword_setting.auto_block = False
            await redis_manager.set_auto_block_status(keyword_setting.id, False)
