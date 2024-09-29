@@ -1182,6 +1182,9 @@ async def _get_new_min_ctr(adv: AdvSetting):
         return 0.05
 
     for keyword in keywords:
+        position = await redis_manager.get_keyword_position(keyword.text, adv.nmids[0])
+        if not position or position.base_position == 0:
+            continue
         keyword.predict_ctr = await redis_manager.get_predict_ctr(adv.adv_id, keyword.text)
 
     best_keyword = sorted(keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True)[0]
