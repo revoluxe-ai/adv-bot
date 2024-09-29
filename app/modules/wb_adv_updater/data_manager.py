@@ -129,7 +129,7 @@ async def get_keyword_statistic_clickhouse(client,
 
 async def get_keywords_statistic_clickhouse(
         adv_setting: AdvSetting,
-        pass_time: Optional[timedelta] = None,
+        pass_time: Optional[timedelta] = timedelta(days=7),
         last_views = None,
         hard_statuses: Optional[List[int]] = None,
         cache_timeout: int = 60 * 15
@@ -465,11 +465,11 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
     return keyword_stats
 
 
-async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
+async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
+                                              pass_time = timedelta(days=7)) -> list[CalculatedKeyword]:
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
-    pass_time = timedelta(days=7)
     keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time)
     async with _sm() as session:
         logger.debug('Начинаю получать фразы')
@@ -675,11 +675,12 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
 
 
 
-async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting)->list[CalculatedKeyword]:
+async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
+                                           pass_time = timedelta(days=7))->list[CalculatedKeyword]:
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
-    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, None)
+    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time)
     async with _sm() as session:
         logger.debug('Начинаю получать фразы')
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
