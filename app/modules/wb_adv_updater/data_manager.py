@@ -792,7 +792,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 await asyncio.sleep(0)
                 continue
 
-        if not  original_predict_ctr and enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and not keyword_setting.hard_status != 1:
+        if not  original_predict_ctr and enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and  keyword_setting.hard_status in [1, 2]:
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
             await redis_manager.set_auto_block_status(keyword_setting.id, True)
