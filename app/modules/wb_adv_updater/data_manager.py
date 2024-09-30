@@ -633,7 +633,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
                     await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
                     if keyword_stat.base_position != 0:
                         sum_views += keyword_stat.views
-                        sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
+                        sum_clicks += keyword_stat.ctr * keyword_stat.views
                 else:
                     keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = 'min_ctr'
