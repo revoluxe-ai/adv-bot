@@ -12,11 +12,12 @@ from typing import Any, Union, Optional, List, Callable
 import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
+from app.client_bot import const
 from app.exc import CardNotFoundInDB
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
-from sqlalchemy.orm import selectinload, joinedload, subqueryload, aliased
+from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
@@ -469,6 +470,27 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
     return keyword_stats
 
 
+async def _get_cpm(adv_id):
+    cpm = await __get_cpm_from_positions(adv_id)
+    return cpm
+
+
+async def __get_cpm_from_positions(adv_id: int):
+    positions = await redis_manager.get_keywords_positions_by_adv_id(adv_id)
+    if not positions:
+        return const.MIN_CPM
+    def __get_last_update(position: WBItemPosition):
+        return position.timestamp
+
+    last_position = sorted(positions, key=lambda pos: __get_last_update(pos),
+                           reverse=True)[0]
+    cpm = last_position.cpm
+    return cpm
+
+
+
+
+
 async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
                                               pass_time = timedelta(days=7)) -> list[CalculatedKeyword]:
     min_ctr = await get_min_ctr(adv_setting)
@@ -532,6 +554,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
     keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
     sum_views = 0
     sum_clicks = 0
+    cpm_now = await _get_cpm(adv_setting.adv_id)
     for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
@@ -574,7 +597,8 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
                     continue
 
         if adv_setting.max_cpc:
-            if keyword_stat.cpc > adv_setting.max_cpc:
+            cpc = cpm_now * keyword_stat.predict_ctr
+            if cpc > adv_setting.max_cpc:
                 keyword_stat.status = KeywordStatus.BAD
                 keyword_stat.reason = 'max_cpc'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
@@ -634,6 +658,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
                     if keyword_stat.base_position != 0:
                         sum_views += keyword_stat.views
                         calculate_clicks = keyword_stat.views * keyword_stat.predict_ctr
+                        calculate_clicks -= 1
                         if calculate_clicks < 0:
                             calculate_clicks = 0
                         sum_clicks += calculate_clicks
@@ -1552,3 +1577,15 @@ async def add_relevant_phrases(keywords, adv_setting_id):
             if keyword_setting.hard_status == 0:
                 keyword_setting.hard_status = 1
         await session.commit()
+
+
+    async def get_active_search_advs():
+        stmt = select(AdvSetting)\
+        .options(load_only(AdvSetting.adv_id,
+                           AdvSetting.name))
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+        adv_settings = [adv_setting for adv_setting in adv_settings if adv_setting.search_adv_id]
+        return adv_settings
+
+

@@ -436,3 +436,12 @@ async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]
     return clusters_and_presets
 
 
+async def get_keywords_positions_by_adv_id(adv_id):
+    keys = await redis_client.keys(f'adv_positions:*:{adv_id}')
+    positions = []
+    for key in keys:
+        json_data = await redis_client.get(key)
+        if json_data:
+            position = WBItemPosition.from_dict(json.loads(json_data))
+            positions.append(position)
+    return positions
