@@ -9,6 +9,7 @@ from aiohttp import ServerTimeoutError
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload, joinedload
 
+from app.admin_bot.sender import sender_manager
 from app.client_bot.const import MAX_TOKENS
 from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from . import exceptions
@@ -72,7 +73,7 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
                         token_shop_id = token.shop_id
                     except NotValidTokenError:
                         logger.debug('Не валидный токен')
-                        await asyncio.sleep(0)
+                        continue
                     except exceptions.TokenExpiredError:
                         logger.error('Срок действия токена истек')
                         continue
@@ -109,19 +110,19 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
             tokens: list[WBToken] = user.wb_tokens
             users_live_tokens = []
             for token in tokens:
-                if not token.active:
-                    continue
+                # if not token.active:
+                #     continue
                 try:
                     token_shop_id = token.shop_id# Используйте total_clicks для суммы кликов
                 except exceptions.TokenExpiredError:
                     logger.debug('Срок действия токена истек')
-                    token.active = False
-                    await session.commit()
+                    # token.active = False
+                    # await session.commit()
                     continue
                 except NotValidTokenError:
                     logger.debug('Токен не прошел проверку')
-                    token.active = False
-                    await session.commit()
+                    # token.active = False
+                    # await session.commit()
                     continue
                 if token_shop_id != shop_id:
                     continue
@@ -133,7 +134,7 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
                                  wb_user_cabinet = None,
                                  wb_cabinet = wb_cabinet)
             yield access
-    return
+
 
 
 async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCabinetAccess:
@@ -155,8 +156,11 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCab
     wb_cabinet = wb_user_cabinet.wb_cabinet
     checked_tokens = []
     for token in tokens:
-        if token.shop_id == wb_cabinet.shop_id:
-            checked_tokens.append(token)
+        try:
+            if token.shop_id == wb_cabinet.shop_id:
+                checked_tokens.append(token)
+        except:
+            continue
         else:
             continue
 
@@ -191,31 +195,22 @@ async def get_super_user_access():
 
 async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
     async with sm() as session:
-        stmt = (
-            select(WBCabinet)
-            .options(selectinload(WBCabinet.wb_user_cabinets)
-                     .selectinload(WBUserCabinet.user)
-                     .selectinload(User.wb_tokens))
-            .where(WBCabinet.id == wb_cabinet_id)
-        )
+        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
         result = await session.execute(stmt)
-        wb_cabinet: WBCabinet = result.scalars().first()
-        wb_user_cabinets = wb_cabinet.wb_user_cabinets
-        tokens = []
-        for wb_user_cabinet in wb_user_cabinets:
-            user = wb_user_cabinet.user
-            user_tokens = user.wb_tokens
-            tokens.extend(user_tokens)
-        live_tokens = []
-        for token in user_tokens:
-            try:
-                await CabinetManager.check_access(token)
-                live_tokens.append(token)
-            except Exception as exc:
-                logger.error(f'Токен не прошел проверку: {exc}')
+        wb_cabinet: WBCabinet = result.scalar()
+        shop_id = wb_cabinet.shop_id
+        stmt = select(WBToken)
+        result =  await session.stream(stmt)
+        catch_tokens = []
+        async for token in  result.yield_per(100):
+            token: WBToken = token[0]
+            if not token.check_valid():
+                logger.debug(f'Не валидный токен {token.api_key}')
                 continue
-        if live_tokens:
-            access = WBCabinetAccess(tokens = live_tokens,
+            if token.shop_id == shop_id:
+                catch_tokens.append(token)
+        if catch_tokens:
+            access = WBCabinetAccess(tokens = catch_tokens,
                                      wb_user_cabinet = None,
                                      wb_cabinet = wb_cabinet)
             return access

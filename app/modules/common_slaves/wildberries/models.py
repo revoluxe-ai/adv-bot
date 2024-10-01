@@ -20,9 +20,9 @@ from app.utils.db.session_maker import get_async_session_maker
 _sm = get_async_session_maker
 
 class WBUserCabinet(BaseTable):
-    wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
+    wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
+    user_id: Mapped[Integer] = Column(Integer, ForeignKey('user.id'), nullable=False)
     user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
@@ -58,6 +58,7 @@ class WBToken(BaseTable):
     user = relationship('User', back_populates='wb_tokens',
                         lazy='joined')
     active = Column(Boolean, default=True)
+    shop_id = mapped_column(String, nullable=True)
     __table_args__ = (UniqueConstraint('api_key', 'user_id', name='_api_key_user_id_uc'),)
 
 
@@ -65,9 +66,20 @@ class WBToken(BaseTable):
     @property
     def __payload(self):
         try:
-            return jwt.decode(self.api_key, options={"verify_signature": False})
+            result = jwt.decode(self.api_key, options={"verify_signature": False})
+            return result
         except:
             raise exceptions.NotValidTokenError
+
+    def check_valid(self):
+        try:
+            result = jwt.decode(self.api_key, options={"verify_signature": False})
+            if result:
+                return True
+        except Exception:
+           return False
+
+
     def get_payload(self, key, default=0):
         payload = self.__payload
         return payload.get(key)
@@ -212,9 +224,11 @@ class AdvSetting(BaseTable):
     max_cpm = mapped_column(Integer, nullable=True)
     max_place = mapped_column(Integer, nullable=True)
     min_block_position = mapped_column(Integer, nullable=True, default=0)
-    clusters_mode = mapped_column(Boolean, nullable=True, default=False)
-
-
+    clusters_mode = mapped_column(Boolean, nullable=True, default=True)
+    target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
+    hide_small_query_keywords = mapped_column(Integer, nullable=True, default=0)
+    target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
+    new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
 
 
 

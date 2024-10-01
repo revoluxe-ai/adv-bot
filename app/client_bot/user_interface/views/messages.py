@@ -1,6 +1,7 @@
 import datetime
 import re
 
+import aiogram
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
@@ -21,6 +22,7 @@ from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           KeywordSetting, WBCabinet)
 from app.utils import redis_manager
 from app.utils.suffixes import get_day_suffix
+from .. import states
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
                                            TextWithImage,
@@ -165,6 +167,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
 
     async def __call__(self):
+        await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
         async with _sm() as session:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
@@ -254,16 +257,13 @@ class AdvSettingMenu(TextWithKeyboard):
         self.wb_user_cabinet = wb_user_cabinet
 
     async def __call__(self):
-        if self.adv.hard_min_ctr:
-            self._min_ctr = round(self.adv.hard_min_ctr, 2)*100
-        else:
-            try:
-                self._min_ctr = await data_manager.get_min_ctr(self.adv)
-                if not self._min_ctr:
-                    raise NoResultFound
-                self._min_ctr = round(self._min_ctr*100, 1)
-            except NoResultFound:
-                self._min_ctr = 'Минимальный CTR не определен'
+        try:
+            self._min_ctr = await data_manager.get_min_ctr(self.adv)
+            if not self._min_ctr:
+                raise NoResultFound
+            self._min_ctr = round(self._min_ctr*100, 1)
+        except NoResultFound:
+            self._min_ctr = 'Минимальный CTR не определен'
 
         try:
             self._mean_ctr = await data_manager.get_mean_ctr(self.adv)
@@ -440,6 +440,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 clear_keywords.append(keyword)
             self._keywords = clear_keywords
         logger.debug("Начинаю отправку сообщения")
+
+        filter_by_query = self._adv_setting.hide_small_query_keywords
+        if filter_by_query:
+            clear_keywords = []
+            for keyword in self._keywords:
+                if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
+                     clear_keywords.append(keyword)
+            self._keywords = clear_keywords
+
+
+
         await super().__call__()
 
     @property
@@ -518,7 +529,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         async with get_clickhouse_client() as client:
             total_clicks, total_views, total_spend\
                 = await data_manager.get_keyword_statistic_clickhouse(client,
-                                                                      self._keyword_setting,
+                                                                      self._keyword_setting.text,
                                                                       self._adv_setting.adv_id)
 
         self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
@@ -538,7 +549,6 @@ class KeywordSettingMessage(TextWithKeyboard):
         if self.position:
             text += (f'🏆 *Органическая позиция:* {self.position.base_position}\n'
                      f"""🚀 *Буст-позиция:* {self.position.promo_position if self.position.promo_position else "Нет"}\n"""
-                     f'📈 *Фактическая позиция:* {self.position.real_position}\n'
                      f"""💰 *Ставка на момент сбора данных:* {self.position.cpm if self.position.cpm else "Нет"}\n"""
                      f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n""")
         else:
@@ -709,6 +719,8 @@ class ShopMenu(TextWithKeyboard):
             return False
 
      async def __call__(self):
+        wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
+        await self._state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
         async with _sm() as session:
             stmt = select(WBUserCabinet)\
                 .options(selectinload(WBUserCabinet.wb_cabinet),
@@ -803,7 +815,7 @@ class ShopMenu(TextWithKeyboard):
         else:
             last_for_days = '∞'
         text = (
-            f'📊 *Подключенных к боту кампаний*: {count_active_advs}\n'
+            f'📊 *Кампаний на автоуправлении*: {count_active_advs}\n'
             f'🔍 *Включен парсинг у кампаний*: {count_active_parsing}\n'
             f'🔧 *Включено автоуправление ставкой у кампаний*: {count_auto_bidder}\n'
             f'💸 *Расход в сутки*: {total_amount_for_day} рублей\n'
@@ -813,49 +825,19 @@ class ShopMenu(TextWithKeyboard):
         )
 
 
-        if balance == 0 and bonus == 0:
-            text += """
-🎉 Отлично! Вы успешно добавили магазин в систему. 🎉
-
-Дальнейшие шаги:
-💳 Теперь вам нужно пополнить баланс для продолжения работы.
-
-Минимальная сумма пополнения - 10 000 р.
-(Если нужно пополнить на меньшую сумму - пишите админу @skyline360\_1)
-Стоимость работы 1 кампании в сутки - 35 р.
-Стоимость парсинга ключей кампании (опционально) - 15 р.
-Стоимость автобиддера - 25 р. кампания в сутки
-📲 Нажмите на кнопку "Пополнить баланс" ниже.
-
-🔖 Если вам нужен купон для тестирования бота, то запросите у админа - @skyline360\_1"""
-        elif balance < 0 and bonus == 0:
-            text += ("""
-🚨 Внимание, у магазина отрицательный баланс. 🚨
-
-🔴 Это значит, что все кампании были отключены от бота и не управляются им.
-
-💳 Если вы планируете продолжить работу с ботом, то пополните баланс в ближайшее время.
-
-❓ Если возникли проблемы, то обратитесь к администратору бота - @skyline360_1
-
-🆕 Канал с последними новостями - https://t.me/auto_wb_master
-
-👥 Чат поддержки - https://t.me/wbgram_disc\n
-""")
-        else:
-            if isinstance(last_for_days, int):
-                if last_for_days > 7:
-                    text += (f"""
+        if isinstance(last_for_days, int):
+            if last_for_days > 7:
+                text += (f"""
 💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота. 💰
-                """)
-                elif last_for_days == 0:
-                    text += (f"""
+            """)
+            elif last_for_days == 0:
+                text += (f"""
 ⚠️ Денег на продление кампаний больше нет! ⚠️
 
 💳 Срочно пополните баланс во избежание проблем с работой кампаний!
 """)
-                else:
-                    text += (f"""
+            else:
+                text += (f"""
 🚨 Внимание!!! 🚨
 
 💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота.
@@ -879,23 +861,15 @@ class ShopMenu(TextWithKeyboard):
         is_active_adv = self.is_active_adv
         wb_cabinet_original_id = wb_cabinet.id
         is_active_adv: True
-
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-        expiration_time: datetime.datetime = wb_cabinet.expiration_time
-        now = datetime.datetime.now()
-        if not (balance := wb_cabinet.balance):
-            balance = 0
-        if not (bonus := wb_cabinet.bonus):
-            bonus = 0
         builder = InlineKeyboardBuilder()
 
-        if any([expiration_time > now, balance > 0, bonus > 0]):
-            button = InlineKeyboardButton(
+        button = InlineKeyboardButton(
         text = 'Автоматические рекламные кампании',
         callback_data = callbacks.ChoiceAdvPaginator(
             wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
-            builder.row(button)
+        builder.row(button)
 
         button = InlineKeyboardButton(
         text = 'Пополнить баланс',
@@ -1030,7 +1004,7 @@ class SettingMinCTR(TextWithKeyboard):
                 f' равен {round(self._min_ctr*100, 1)} %,'
                 f"""тип минимального CTR: {"Задан в ручную"  if self._min_ctr_type == 'direct' else "Определен автоматически"}\n""")
 
-        keywords = self._goods + self._bads
+        # keywords = self._goods + self._bads
         goods = self._goods
         bads = self._bads
         goods.sort(key=lambda x: x.real_ctr, reverse=True)
@@ -1157,21 +1131,12 @@ class WaitingForAmount(Text):
 - Работа одной кампании, подключенной к боту: 35 р/сутки
 - Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
 - Биддер (управление ставками) - 25 р. в сутки за кампанию
-
         
-🔥 Внимание! Только до {date_to}(завтра):
+🔥 Внимание! Только до 10-09-2024(завтра):
 
-💰 Бонус 30 % от суммы пополнения!
+💰 Бонус 100 % от суммы пополнения!
 
-🚀 При пополнении счета свыше мастер-суммы: бонус 100 % от суммы пополнения!
-
-👍 Это делает его не только лучшим, но и самым выгодным решением для автоматизации рекламы на WB!
-
-💼 Мастер-сумма (бонус 100%): {self.master_sum} рублей.
-
-📩 Подробности у администратора бота: @skyline360_1 \n
-
-Укажите сумму пополнения (от 10 000 рублей):"""
+Укажите сумму пополнения:"""
 
         return text
 
@@ -1791,9 +1756,9 @@ class CPMSetting(TextWithKeyboard):
 
         if self.adv_setting.bidder_active:
 
-            bottom = InlineKeyboardButton(text="Установить фиксированную ставку CPM",
+            bottom = InlineKeyboardButton(text="Выключить автоматическое управление ставкой",
                                           callback_data=callbacks.CPMSettingMenu(
-                                          action = "set_manual_cpm",
+                                          action = "off_auto_cpm",
                                           adv_original_id = self.adv_setting.id).pack())
         else:
             bottom = InlineKeyboardButton(text="Включить автоматическое управление CPM",
@@ -1890,4 +1855,491 @@ class WaitingForBlackPhrases(TextWithKeyboard):
         return builder.as_markup()
 
 
+class Single_message102(TextWithImage):
+    parse_mode='MarkdownV2'
 
+    @property
+    def text(self):
+        return """
+**💸Как продавцу на WB вывести карточку в ТОП и удержать позиции?**
+
+[Получить пошаговое руководство \>\>](https://t.me/marpla_web_bot?start=link_5LpkvSXwOG)
+
+➡️Вы получите эффективную **стратегию, по которой работают селлеры с доходом от 500к
+**
+**📅 5 сентября, Чт, 14:00 МСК**
+
+**Что будет?**
+\- Что изменилось за лето, и как подчинить алгоритмы ранжирования
+\- Способы повысить конверсию, которые работают сейчас
+\- Акции: убытки или возможность быстро заработать?
+\- CTR, Склады и рейтинг: чего не договаривает WB?
+
+**🎁Также вам будут доступны специальные сервисы\+биддер для управления рекламой БЕСПЛАТНО⚡️**
+
+**Переходите в бота, чтобы уже в сентябре поднять выручку в 2\-3 раза, не увеличивая рекламный бюджет:** [@marpla_web_bot](https://t.me/marpla_web_bot?start=link_5LpkvSXwOG)   
+    
+    """
+
+    image = 'app/client_bot/images/webinar.png'
+
+
+class Single_message103(Text):
+
+
+    @property
+    def text(self):
+
+
+
+        text = """
+        📢 Хотите увеличить продажи на Wildberries? Давайте я вам помогу!
+
+🔝 Ваши товары могут выделяться среди конкурентов уже завтра!
+
+Я предлагаю вам решение, которое сэкономит ваше время и увеличит продажи через автоматизацию рекламы на Wildberries.
+
+С помощью моего бота вы сможете легко запускать рекламные кампании, а я лично помогу вам на каждом этапе — от настройки до получения первых результатов.
+Что вы получите? 🔥
+
+    Полную автоматизацию рекламных кампаний — бот сам управляет процессом, вам не нужно тратить часы на ручные действия.
+    Эффективное управление бюджетом — бот настраивает рекламу так, чтобы вы получали максимальные результаты при минимальных расходах.
+    Простота в использовании — я подробно объясню, как всё работает, и помогу вам начать.
+    Поддержка на каждом шаге — если возникнут вопросы, я всегда на связи.
+
+🎁 И это не всё! Я дарю вам 1000 рублей на счёт для пробы бота. Вы сможете протестировать его возможности без рисков!
+🚀 Хотите, чтобы я всё настроил и показал, как работает бот?
+
+Пишите мне прямо сейчас, и я проведу вас через весь процесс настройки. Без лишних сложностей и головной боли!
+
+@skyline360_1
+
+Не упустите шанс, пока ваши конкуренты не заняли ваше место в топе!
+        
+        
+        """
+
+
+
+        return text
+
+
+class Single_message104(Text):
+
+    text = """
+🔔 У вас на счету есть деньги, а бот простаивает? Пора действовать!
+
+💰 Вы уже пополнили счёт, но ещё не используете наш бот для автоматизации рекламы на Wildberries?
+
+Ваша возможность увеличить продажи ждёт! Бот готов к работе, и теперь он стал ещё мощнее благодаря новым функциям. Вложенные средства уже на счету — всё, что осталось, это запустить кампании и увидеть результаты!
+Почему стоит активировать бота прямо сейчас?
+
+- Ваш бюджет уже готов — не теряйте время, запускайте рекламу с минимальными усилиями.
+- Новые возможности бота помогут вам настроить рекламу эффективнее, чем когда-либо.
+- Лёгкий старт — я помогу вам на каждом этапе, от настройки до первой кампании.
+
+💬 Напишите мне прямо сейчас, и я расскажу, как быстро и просто начать использовать бот для увеличения ваших продаж.
+
+✉️ Связаться со мной: @skyline360_1
+
+Деньги на счету — не дайте им простаивать, сделайте первый шаг к увеличению доходов на Wildberries!
+
+Нажмите на /start  ⬇️    
+    
+    """
+
+
+class Single_message106(Text):
+
+        text = """
+        🚀 СЕКРЕТНАЯ АКЦИЯ ТОЛЬКО ДЛЯ ПОЛЬЗОВАТЕЛЕЙ БОТА - 100% бонус при пополнении на любую сумму!
+
+        🔥 За последнее время в нашем боте появилось много классных функций, которые сделают вашу рекламу на Wildberries ещё эффективнее!
+
+        В честь этого мы объявляем ограниченную акцию:
+        Пополните счёт до 18:00 10.09.2024 и получите 100% бонус на каждое пополнение! 💰
+        Почему стоит действовать прямо сейчас?
+
+        ♾ Удваивайте рекламный бюджет и используйте новые возможности бота на полную!
+        ❗️Акция действует только до 18:00 вторника, так что не упустите шанс удвоить свои вложения.
+
+        💬 Пишите мне, если у вас возникли вопросы или нужна помощь с настройкой:
+
+        ✉️ @skyline360_1
+
+        Успейте воспользоваться предложением и опробовать все новые функции бота!"""
+
+
+class ItemIsOutOfIndex(Text):
+
+    def __init__(self,bot,
+            user_telegram_id,
+            last_position: WBItemPosition,
+            new_position: WBItemPosition):
+        self.user_telegram_id = user_telegram_id
+        self.last_position = last_position
+        self.new_position = new_position
+        super().__init__(bot, user_telegram_id)
+
+
+
+    @property
+    def text(self):
+        return f"""
+Ваш товар {self.last_position.nmid} выпал из индекса по ключевому слову {self.last_position.keyword_text}."""
+
+
+class ItemIsInIndex(Text):
+
+    def __init__(self,bot,
+            user_telegram_id,
+            last_position: WBItemPosition,
+            new_position: WBItemPosition):
+        self.user_telegram_id = user_telegram_id
+        self.last_position = last_position
+        self.new_position = new_position
+        super().__init__(bot, user_telegram_id)
+
+
+    @property
+    def text(self):
+        return f"""
+Ваш товар {self.last_position.nmid} добавлен (вернулся) в индекс по ключевому слову {self.last_position.keyword_text}."""
+
+
+
+class Single_message107(Text):
+    text = """
+    🚀 Как с помощью бота попасть в рекламные полки?
+
+Не все знают, но у нас уже давно доступна эта функция! Чтобы ваши товары оказались на рекламных полках, нужно выполнить всего пару шагов:
+
+1. Добавьте самые релевантные ключевые слова в белый список.
+2. Установите минимальный CTR на 100.
+
+И вуаля — ваши товары появятся на рекламных полках, привлекая больше покупателей! 🔥
+
+Если вам нужна помощь с настройкой бота или у вас возникли вопросы, пишите мне, и я помогу настроить всё быстро и правильно.
+
+📩  @skyline360_1
+    
+    """
+
+
+class Single_message108(TextWithImage):
+    text = """
+🚀 Теперь в нашем боте есть поддержка кластеров! 🎯
+
+Кластеры позволяют вам следить за ключевыми словами, чтобы они не блокировались. Это значит, что вам больше не нужно беспокоиться о том, что ключи могут выпасть из ротации или потерять эффективность — бот автоматически контролирует этот процесс.
+
+✅ Ключи остаются активными, и вам больше не нужно тратить время на их проверку!
+
+⚠️ Внимание: кластеры работают только при включенном парсинге ключевых слов. Убедитесь, что эта функция активирована для максимальной эффективности!
+
+Если нужна помощь с настройкой кластеров или включением парсинга — пишите мне! Я помогу вам настроить всё быстро и без лишних сложностей.
+
+📩 @skyline360_1    
+    
+    """
+
+    image = 'images_for_sendings/108.jpg'
+
+
+
+class Single_message109(Text):
+    text = """
+    Вы не запустили ещё ни одной рекламной кампании — самое время это исправить! 📈
+
+Я помогу вам бесплатно настроить бота и запустить рекламу на Wildberries, чтобы ваши товары начали приносить прибыль уже сейчас.
+
+Что даст вам бот?
+
+🔹    Полная автоматизация рекламных кампаний — бот сам управляет процессом, освобождая ваше время.
+🔹    Эффективное использование бюджета — вложенные средства будут работать с максимальной отдачей.
+🔹    Моя поддержка на каждом этапе — помогу вам настроить всё с нуля, быстро и без сложностей.
+
+🚀 Напишите мне прямо сейчас, и я помогу вам запустить первую рекламную кампанию, используя средства на вашем счёте!
+
+📩 @skyline360_1
+    
+"""
+
+
+class FilterByQuery(Text):
+    text = """
+    Введите минимальное число прогнозируемых показов для показа (0 - без фильтрации): 
+    """
+
+
+class Single_message110(TextWithKeyboard):
+
+
+    text = """
+Не получилось настроить бота или что-то пошло не так? Давайте я помогу! 🙌
+
+Если вы уже пробовали использовать наш бот, но что-то не сработало или вы не до конца разобрались в настройках — это не проблема!
+
+💡 Пишите мне, и я помогу вам бесплатно настроить бота, объясню все шаги и покажу, как эффективно запустить рекламу. Вы получите поддержку на каждом этапе, и вам не придётся разбираться во всём самостоятельно.
+Что вам это даст?
+
+    Личная помощь и настройка — я проведу вас через весь процесс.
+    Ответы на все вопросы — объясню всё простыми словами.
+    Полная готовность к запуску — вы сможете начать использовать бота с уверенностью.
+
+🚀 Напишите мне прямо сейчас, и мы вместе запустим вашу рекламную кампанию без лишних сложностей!
+
+📩 @skyline360_1    
+    
+    """
+
+
+class Single_message111(TextWithKeyboard):
+    async def  __call__(self, wb_user_cabinets: list[WBUserCabinet]):
+        self._wb_user_cabinets = wb_user_cabinets
+        await super().__call__()
+
+
+    text = """
+  ⏳ Последние сутки акции "Удвоение пополнений"!
+
+❗️Мы снизили минимальный платёж до тысячи рублей!
+
+Осталось всего 24 часа до завершения нашей акции, когда каждый ваш платёж удваивается. Это отличная возможность увеличить свой баланс, если вы планировали пополнить счёт.
+
+💡 В чём суть?
+
+🔸    На любую сумму пополнения вы получите 100% бонус.
+🔸    Акция действует только до 18:00 вторника (завтра).
+🔸    Если вы уже думали о пополнении — сейчас самое время, чтобы сделать это с дополнительной выгодой.
+
+Акция подходит к концу, но вы ещё успеваете воспользоваться ей на полную. Всё решаете вы — никаких обязательств, только возможность получить больше. """
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
+
+
+class Single_message112(TextWithKeyboard):
+
+    async def  __call__(self, wb_user_cabinets: list[WBUserCabinet]):
+        self._wb_user_cabinets = wb_user_cabinets
+        await super().__call__()
+
+    text = """
+ ⏳ До окончания акции "Удвоение пополнений" осталось всего несколько часов!
+
+❗️ Акция завершается сегодня в 18:00, и у вас ещё есть возможность удвоить свой баланс! Напоминаем, что минимальный платёж — всего 1000 рублей.
+
+💡 Что вы получаете?
+
+🔸    100% бонус на каждое пополнение на любую сумму
+🔸    Увеличенный баланс для будущих возможностей и успехов
+
+Если вы планировали пополнить счёт — сегодня последний шанс получить двойную выгоду.   
+    
+    
+    
+    """
+
+
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
+
+
+class KeywordStatUpdated(Text):
+    text = """Статистика из WB успешно загружена, подгружаю страницу"""
+
+
+class MinusKeywordsUpdated(Text):
+    text = "Минус-слова успешно обновлены, подгружаю страницу"
+
+
+
+
+
+
+class Single_message113(TextWithKeyboard):
+
+    async def  __call__(self, wb_user_cabinets: list[WBUserCabinet]):
+        self._wb_user_cabinets = wb_user_cabinets
+        await super().__call__()
+
+
+
+    text = """
+ ⏳ Остался всего 1 час до окончания акции "Удвоение пополнений"!
+
+Акция завершится уже в 18:00, и это ваш последний шанс удвоить сумму пополнения.
+
+🎯 Что важно помнить?
+
+🔹    100% бонус на сумму пополнения от 1000 рублей.
+🔹    Акция действует ещё 1 час — не упустите эту возможность!
+
+Если планировали пополнить счёт — сделайте это сейчас и получите двойную выгоду! Время на исходе!"""
+
+    @property
+    def keyboard(self):
+        return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
+
+
+class StrategySetting(TextWithKeyboard):
+
+    async def __call__(self, adv_setting_id):
+        async with _sm() as session:
+            stmt = select(AdvSetting)\
+            .where(AdvSetting.id == adv_setting_id)
+            result = await session.execute(stmt)
+            adv_setting = result.scalars().first()
+            self.adv_setting = adv_setting
+            await super().__call__()
+
+
+    @property
+    def text(self):
+        text = f"""Настройка стратегии\n
+        Текущая стратегия: {'Минимальный CTR' if not self.adv_setting.target_ctr_mode else 'Целевой CTR'}\n
+        """
+        if self.adv_setting.target_ctr_mode:
+            text += f"""{'Агрессивный режим' if self.adv_setting.target_ctr_mode_strategy == 'forward' else 'Поддерживающий режим'}\n"""
+
+        return text
+
+    @property
+    def keyboard(self):
+        builder = InlineKeyboardBuilder()
+        if self.adv_setting.target_ctr_mode is True:
+             button = InlineKeyboardButton(text="Включить стратегию Минимальный CTR",
+                                        callback_data=callbacks.StrategySetting(
+                                            action="turn_on_min_ctr",
+                                            adv_setting_original_id=self.adv_setting.id).pack())
+             builder.row(button)
+             if self.adv_setting.target_ctr_mode_strategy == 'keep':
+                 button = InlineKeyboardButton(text="Включить Агрессивный Режим",
+                                        callback_data=callbacks.StrategySetting(
+                                            action="turn_on_forward_mode",
+                                            adv_setting_original_id=self.adv_setting.id).pack())
+                 builder.row(button)
+             elif self.adv_setting.target_ctr_mode_strategy == 'forward':
+                 button = InlineKeyboardButton(text="Включить Поддерживающий Режим",
+                                        callback_data=callbacks.StrategySetting(
+                                            action="turn_on_keep_mode",
+                                            adv_setting_original_id=self.adv_setting.id).pack())
+                 builder.row(button)
+
+        else:
+            button = InlineKeyboardButton(text="Включить стратегию Целевой CTR",
+                                            callback_data=callbacks.StrategySetting(
+                                            action="on_target_ctr",
+                                            adv_setting_original_id=self.adv_setting.id).pack())
+            builder.row(button)
+
+        button = InlineKeyboardButton(text="Вернуться к настройкам кампании",
+                                      callback_data=callbacks.Adv(adv_original_id=self.adv_setting.id).pack())
+        builder.row(button)
+        return builder.as_markup()
+
+
+class Single_message115(TextWithImage):
+
+    parse_mode='Markdown'
+
+    text = """
+    ⚡️Ваша выручка на WB взлетит в космос, если вы поймете это🚀
+
+    ➡️На продаже сезонных товаров можно делать x2-x5, и для этого не нужно делать ничего сверхъестественного!
+
+    👉Просто приходите [на живой эфир](https://t.me/start_nawb_bot?start=link_GO377LwN5k), где вы получите секреты «сезонки»-2024-2025
+
+    Именно [эти алгоритмы](https://t.me/start_nawb_bot?start=link_GO377LwN5k) помогли селлерам сделать рекордную выручку на школьных товарах в августе🔥
+
+    🎁Переходите в бота, жмите старт и сразу получите доступ к сервисам-помощникам: [@Sezonka_WB](https://t.me/start_nawb_bot?start=link_GO377LwN5k)"""
+
+    image = './images_for_sendings/1.jpg'
+
+
+
+class Single_message115(Text):
+
+    text = """
+Привет! 👋
+
+Если у Вас возникли сложности с настройкой бота или что-то осталось непонятным — не волнуйся, такое бывает. Просто напишите мне, и я помогу разобраться и всё настроить правильно. Это бесплатно, так что можешь спокойно обращаться.
+
+Если Вы уже писали, но я не ответил — не стесняйся напомнить о себе. Иногда сообщений приходит много, и я могу случайно пропустить или забыть. Пишите ещё раз, и я обязательно помогу.
+
+📩 @skyline360_1
+    
+    """
+
+
+class Single_message116(TextWithImage):
+    parse_mode='Markdown'
+
+    image = 'images_for_sendings/108.jpg'
+
+    text = """
+**85% селлеров упускают из вида показатели, которые влияют на прибыль**
+
+Когда у тебя 100500 сервисов учета и таблиц, 1С и бухгалтер, можно часами анализировать цифры, но так и не увидеть, что можно улучшить.
+
+Хорошая новость: появился наикрутейший [сервис Marketran, который создали селлеры для селлеров](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540)🤝
+
+Объясняем по-простому. Когда-то у нас были будильники, фотоаппараты и музыкальный центр, а потом появились смартфоны.
+
+Так вот, [Marketran](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540) — это смартфон в мире бизнеса на маркетплейсах. Там всё в одном месте.
+
+Селлеры, которые уже пользуются сервисом, увеличивают прибыль, сокращают расходы на рекламу и успешно привлекают инвесторов за счёт АБСОЛЮТНОЙ ПРОЗРАЧНОСТИ бизнеса.
+
+Попробуйте бесплатно и оптимизируйте показатели прямо сейчас : [ЗДЕСЬ](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540)
+
+     """
+
+
+class Single_message117(Text):
+    parse_mode='Markdown'
+    image = 'images_for_sendings/108.jpg'
+    text = """
+⬇️ЭТА ОШИБКА НЕ ДАЁТ СЕЛЛЕРАМ ЗАРАБАТЫВАТЬ НА WB
+
+Как бы вы ни оформили карточку, что бы вы ни делали, неправильно выбранный товар уведет вас в минус❗️
+
+**Типичная ситуация**: закупили товар, потратили деньги на фотосессию, оформили всё как положено, а продаж нет. В итоге приходится распродавать всё по себестоимости, чтобы получить хоть что-то.
+
+Чтобы такого не произошло, не пропустите вебинар [«Как выбрать прибыльный товар для WB](https://t.me/marpla_web_bot?start=link_UU8pJWWFNU)»⤵️
+
+**📅 19 сентября, Чт, 14:00 МСК вы узнаете:**
+
+— Главные параметры выбора высокомаржинального товара, на которые не обращают внимание 78% селлеров
+— Как отстроиться от конкурентов: пошаговый план
+— Как выбрать стратегию продаж, исходя из категории товара
+— 5 фатальных ошибок при запуске нового товара, и как их избежать
+
+❗️Именно эти знания спасут вас от потери бизнеса, даже если вы всё остальное делаете неправильно: [@marpla_web_bot](https://t.me/marpla_web_bot?start=link_UU8pJWWFNU)    
+    
+    
+    """
+
+
+class WhiteListReset(Text):
+    text = "Белый список успешно сброшен"
+
+
+
+class RelevantPhrasesAdded(TextWithKeyboard):
+
+    def __init__(self, bot, user_telegram_id, adv_setting_id):
+        self.adv_setting_id = adv_setting_id
+        super().__init__(bot, user_telegram_id)
+
+    text = "Фразы успешно добавлены в бот (авто) список"
+
+    @property
+    def keyboard(self):
+        return keyboards.get_return_to_adv_setting_keyboard(self.adv_setting_id)
+
+
+class WaitingForRelevantPhrases(Text):
+    text = "Введите фразы, которые вы хотите добавить в кампанию в качестве релевантных фраз:"

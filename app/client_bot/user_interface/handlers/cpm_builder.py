@@ -19,6 +19,24 @@ sm = get_async_session_maker
 router = Router()
 
 
+
+@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == 'off_auto_cpm'))
+async def off_auto_cpm(callback: types.CallbackQuery,
+                                    callback_data: callbacks.ChoiceAdvPaginator,
+                                    bot: aiogram.Bot,
+                                    state: FSMContext):
+
+        await callback.answer()
+        adv_original_id = callback_data.adv_original_id
+        async with sm() as session:
+            adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+            adv = adv.scalar()
+            adv.bidder_active = False
+            await session.commit()
+            await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
+        return
+
+
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == 'to_cpm_setting_page'))
 async def to_page_for_cpm_setting(callback: types.CallbackQuery,
                                callback_data: callbacks.ChoiceAdvPaginator,
@@ -131,24 +149,7 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_cpm = manual_cpm
-        adv.bidder_active = False
         await session.commit()
-    async with sm() as session:
-        stmt = select(WBUserCabinet)\
-            .join(WBUserCabinet.wb_cabinet)\
-            .join(WBCabinet.adv_settings)\
-            .options(selectinload(WBUserCabinet.user))\
-            .where(
-            AdvSetting.id == adv_original_id,
-            User.user_telegram_id == message.from_user.id
-        )
-        result = await session.execute(stmt)
-        wb_user_cabinet = result.scalar()
-    access = await super_cabinet_manager.get_access_for_wb_user_cabinet(wb_user_cabinet)
-
-    api = WBApi(access)
-    await api.advert.update_cpm(adv.adv_id, manual_cpm)
-
     await bot.send_message(message.chat.id, f'CPM успешно установлен ({manual_cpm}) р.')
     await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
     await state.set_state(state=None)

@@ -1,6 +1,8 @@
 import asyncio
 import datetime
 import json
+import typing
+from types import NoneType
 from typing import Union
 import logging
 
@@ -14,8 +16,8 @@ from app.modules.keywords_query import keywords_query
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 
+# redis_client = redis.asyncio.Redis(host='147.45.151.145', port=6379, db=0)
 redis_client = redis.asyncio.Redis(host='localhost', port=6379, db=0)
-
 
 class RedisEvent(asyncio.Event):
     def __init__(self, key=None):
@@ -155,7 +157,16 @@ async def get_keyword_position(keyword: str, nmid: int)->Union[WBItemPosition, N
     base_key = f'adv_positions:{keyword}:{nmid}'
     json_data = await redis_client.get(base_key)
     if not json_data:
-        return None
+        cluster, _ = await get_cluster_and_preset(keyword)
+        if not cluster:
+            return None
+        base_key = f'adv_positions:{cluster}:{nmid}'
+        json_data = await redis_client.get(base_key)
+        if not json_data:
+            return None
+        else:
+            position = WBItemPosition.from_dict(json.loads(json_data))
+            return position
     position = WBItemPosition.from_dict(json.loads(json_data))
     return position
 
@@ -166,7 +177,13 @@ async def get_keywords_positions(adv_setting, texts):
         key = 'adv_positions:' + text + ':' + str(adv_setting.nmids[0])
         json_data = await redis_client.get(key)
         if not json_data:
-            continue
+            cluster, _ = await get_cluster_and_preset(text)
+            if not cluster:
+                continue
+            key = 'adv_positions:' + cluster + ':' + str(adv_setting.nmids[0])
+            json_data = await redis_client.get(key)
+            if not json_data:
+                continue
         position = WBItemPosition.from_dict(json.loads(json_data))
         if position:
             position.keyword_text = text
@@ -191,7 +208,7 @@ async def set_predict_ctr(adv_id, keyword, predict_ctr):
     await redis_client.set(key, predict_ctr)
 
 
-async def get_predict_ctr(adv_id, keyword):
+async def get_predict_ctr(adv_id: int, keyword: str):
     key = f'predict_ctr:{adv_id}:{keyword}'
     predict_ctr_bytes = await redis_client.get(key)
     if predict_ctr_bytes is None:
@@ -326,3 +343,96 @@ async def get_all_cluster_names()-> set[str]:
         if name is not None:
             cluster_names.add(name.decode('utf-8'))
     return cluster_names
+
+
+async def get_keys(pattern):
+    keys = await redis_client.keys(pattern)
+    return keys
+
+
+async def get(key):
+    value = await redis_client.get(key)
+    return value
+
+
+async def set_cluster_and_preset(text, cluster: str, preset:  typing.Optional[int]):
+    key = 'cluster_and_preset:' + text
+    if cluster is None or preset is None:
+        await redis_client.delete(key)
+    else:
+        value = cluster + ':' + str(preset)
+        await redis_client.set(key, value)
+        text = cluster
+        key = 'cluster_and_preset:' + text
+        await redis_client.set(key, value)
+    return None
+
+
+
+
+async def get_cluster_and_preset(text)-> (str, int,):
+    key = 'cluster_and_preset:' + text
+    value = await redis_client.get(key)
+    if isinstance(value, NoneType):
+        return None, None
+    value = value.decode('utf-8')
+    value = str(value)
+    data = value.split(':')
+    cluster, preset = data
+    return cluster, preset
+
+
+
+
+async def get_nmid(adv_id):
+    key = 'adv_nmid:' + str(adv_id)
+    nmid = await redis_client.get(key)
+    if nmid is None:
+        return None
+    return int(nmid)
+
+
+async def set_nmid(adv_id, nmid):
+    key = 'adv_nmid:' + str(adv_id)
+    await redis_client.set(key, nmid)
+    return None
+
+
+async def set_keyword_send_status(cluster_name, nmid, status: str):
+    key = 'keyword_send_status:' + cluster_name + ':' + str(nmid)
+    await redis_client.set(key, status)
+    return None
+
+
+async def get_keyword_send_status(cluster_name: str, nmid: int) -> str:
+    key = 'keyword_send_status:' + cluster_name + ':' + str(nmid)
+    status = await redis_client.get(key)
+    return status
+
+
+async def set_last_views(adv_id: int, text: str, total_views: int):
+    key = 'last_views:' + str(adv_id) + ':' + text
+    await redis_client.set(key, total_views)
+    return None
+
+
+async def get_last_views(adv_id, text):
+    key = 'last_views:' + str(adv_id) + ':' + text
+    total_views = await redis_client.get(key)
+    if total_views is None:
+        return None
+    return int(total_views)
+
+
+async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]]]:
+    result = await redis_client.mget([f'cluster_and_preset:{text}' for text in texts])
+    clusters_and_presets = {}
+    for i, value in enumerate(result):
+        if value is None:
+            continue
+        value = value.decode('utf-8')
+        cluster, preset = value.split(':')
+        clusters_and_presets[texts[i]] = (cluster, int(preset))
+    return clusters_and_presets
+
+

@@ -53,6 +53,10 @@ class TokenRightChecker(WbRequestApiMixin):
         self.token = token
         self.headers = Headers(token)
 
+
+     def set_next_token(self):
+        raise ApiForbiddenError('Токен отозван')
+
      @property
      def _wb_user_cabinet(self):
         return None

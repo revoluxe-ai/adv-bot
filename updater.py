@@ -1,5 +1,4 @@
 
-
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     keywords_parsing_process,
@@ -25,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 async def run_hard_processes():
     from app.modules.wb_adv_updater import hard_ml_data_updater_process as hard_data_manager
-    await hard_data_manager.run_update_data_in_neo4j()
+    await asyncio.gather(
+        hard_data_manager.run_update_data_in_neo4j(),
+                         hard_data_manager.update_keywords_ctr_by_similary())
+
 
 
 run_own_process_list = [
@@ -34,8 +36,7 @@ run_own_process_list = [
      keywords_parsing_process,
      run_update_minus_keywords_on_wb,
      run_update_keyword_stat,
-      parser_all_white_phrase,
-     run_main_coroutines,
+      run_main_coroutines,
      run_update_predict_ctr,
      run_update_model
 

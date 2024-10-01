@@ -144,3 +144,40 @@ class ResetBlackPhrases(CallbackData, prefix="reset_black_phrases"):
 
 class DownloadCSV(CallbackData, prefix="download_csv"):
     adv_setting_original_id: int
+
+
+class TurnClusters(CallbackData, prefix="turn_clusters"):
+    action: str
+    adv_original_id: int
+
+
+class CheckPosition(CallbackData, prefix="check_position"):
+    keyword_setting_original_id: int
+    adv_original_id: int
+
+
+class UpdateCompanyFromWB(CallbackData, prefix="update_company_from_wb"):
+    wb_user_cabinet_original_id: int
+
+
+class WBUpdate(CallbackData, prefix="wb_update"):
+    action: str
+    adv_setting_original_id: int
+
+
+class StrategySetting(CallbackData, prefix="strategy_setting"):
+    action: str
+    adv_setting_original_id: int
+
+
+class ResetWhiteList(CallbackData, prefix="reset_white_list"):
+    adv_setting_original_id: int
+
+
+class AddRelevantPhrases(CallbackData, prefix="add_relevant_phrases"):
+    adv_setting_id: int
+
+
+class ChangeAutoMinCTR(CallbackData, prefix="change_auto_min_ctr"):
+    action: str
+    adv_setting_original_id: int

@@ -7,6 +7,8 @@ import joblib
 import numpy as np
 from asyncpg import ProgramLimitExceededError
 from sqlalchemy import not_
+from sqlalchemy.exc import IntegrityError
+
 from app.utils import redis_manager
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
@@ -58,6 +60,7 @@ async def process_payment_for_auto_bidder():
         ).filter(
             and_(
                 AdvSetting.bidder_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
                                                   AdvPayment.type == 'auto_bidder')))
 
@@ -102,6 +105,7 @@ async def process_payment_for_parsing():
         ).filter(
             and_(
                 AdvSetting.parsing_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
                                                   AdvPayment.type == 'parsing')))
 
@@ -142,6 +146,7 @@ async def process_payment_for_advs():
         ).filter(
             and_(
                 AdvSetting.bot_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
                 AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
                 # условие на истекший срок действия
@@ -337,36 +342,29 @@ async def update_predict_ctr():
 async def update_keywords_in_advs():
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
-        accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
-        logger.debug('Получен генератор доступов к кабинетам для обновления минус-ключей в РК')
-        async for access in accesses:
-            logger.debug('Получен кабинет для обновления минус-ключей в РК')
-            wb_cabinet_id = access.wb_cabinet.id
-            if wb_cabinet_id  not in update_tasks:
-                try:
+        async with sm() as session:
+            stmt = select(AdvSetting) \
+                .where(AdvSetting.bot_active == True)
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = result.scalars().all()
+            for adv_setting in adv_settings:
+                if adv_setting.id not in update_tasks:
+                    wb_cabinet_id = adv_setting.wb_cabinet_id
+                    access: WBCabinetAccess = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
+                    if not access:
+                        logger.error(f'Нет доступа к кабинету {wb_cabinet_id}')
+                        continue
                     data_setter = DataSetter(access)
-                except ApiForbiddenError:
-                    logger.error(f'Нет нужных прав у токена')
-                    await asyncio.sleep(0)
-                    continue
-                logger.debug(access.wb_cabinet.id)
-                async with sm() as session:
-                    stmt = select(AdvSetting) \
-                        .where(and_(AdvSetting.bot_active == True,
-                                    AdvSetting.wb_cabinet_id == wb_cabinet_id))
-                    result = await session.execute(stmt)
-                    adv_settings: list[AdvSetting] = result.scalars().all()
-                if adv_settings:
-                    logger.debug(f'Запуск задачи обновления минус-ключей для кабинета {wb_cabinet_id}')
-                    task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings))
-                    update_tasks[wb_cabinet_id] = task
-            else:
-                if update_tasks[wb_cabinet_id].done():
-                    if update_tasks[wb_cabinet_id].exception():
-                        logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}',
-                                     exc_info=True)
-                    del update_tasks[wb_cabinet_id]
-            await asyncio.sleep(0)
+                    task = asyncio.create_task(data_setter.update_minus_keywords_in_adv(adv_setting))
+                    update_tasks[adv_setting.id] = task
+                else:
+                    if update_tasks[adv_setting.id].done():
+                        if update_tasks[adv_setting.id].exception():
+                            logger.error(f'Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}',
+                                         exc_info=True)
+                        del update_tasks[adv_setting.id]
+                await asyncio.sleep(0)
+
 
 
 
@@ -458,12 +456,6 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
         stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         adv_setting = await session.execute(stmt)
         adv_setting = adv_setting.scalar()
-
-    try:
-        await update_clusters_for_adv(adv_setting, wb_api)
-    except Exception as e:
-        logger.error(f'Error getting clusters for adv {adv_setting.id}: {e}', exc_info=True)
-        return
     try:
         keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
     except Exception as exc:
@@ -478,7 +470,7 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
     texts_for_adv_setting = {keyword.text for keyword in keywords}
     clusters = set()
     for text in texts_for_adv_setting:
-        cluster_name = await redis_manager.get_cluster_name(text)
+        cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
         if cluster_name:
            clusters.add(cluster_name)
 
@@ -497,8 +489,9 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
                     keyword.hard_status = 0
                 session.add(keyword)
                 await session.commit()
-            except ProgramLimitExceededError:
+            except (ProgramLimitExceededError, IntegrityError):
                 logger.error('Ошибка добавления ключей в postgres', exc_info=True)
+
             finally:
                 await asyncio.sleep(0)
 

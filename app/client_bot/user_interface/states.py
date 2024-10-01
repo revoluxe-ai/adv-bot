@@ -29,6 +29,7 @@ class RefProgram(StatesGroup):
 
 
 class AdvSetting(StatesGroup):
+   waiting_for_filter_by_query = State()
    waiting_for_filter_keywords = State()
 
 
@@ -61,3 +62,7 @@ class CPMSetting(StatesGroup):
 
 class AddBlackPhrasesTemplates(StatesGroup):
     waiting_for_black_phrases = State()
+
+
+class AddRelevantPhrases(StatesGroup):
+    waiting_for_relevant_phrases = State()

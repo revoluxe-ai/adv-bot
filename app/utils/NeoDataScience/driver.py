@@ -1291,19 +1291,33 @@ UNWIND phrase.words AS word
             except Exception as exc:
                 logger.error(f'Ошибка при записи вектора ключевой фразы в Redis: {exc}')
 
-
-
     async def check_wb_card_in_neo(self, nmid):
         query = """
         MATCH (item:Item) WHERE item.nmid = $nmid
         RETURN item
         """
-
         async def check_wb_card(tx, query, nmid):
             result = await tx.run(query, nmid=nmid)
-            return result
-
+            return await result.single()
         async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 result = await session.read_transaction(check_wb_card, query, nmid)
         return result
+
+    async def get_nmids_not_in_neo(self, all_nmids: set[int]):
+        query = """
+        MATCH (item:Item) WHERE item.nmid IN $all_nmids
+        RETURN item.nmid as nmid
+        """
+
+        async def get_nmids_not_in_neo(tx, query, all_nmids):
+            result = await tx.run(query, all_nmids=list(all_nmids))
+            records = await result.data()
+            nmids = [record['nmid'] for record in records]
+            return nmids
+
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
+            async with driver.session() as session:
+                nmids_in_neo = await session.read_transaction(get_nmids_not_in_neo, query, all_nmids)
+        nmids_not_in_neo = [nmid for nmid in all_nmids if nmid not in nmids_in_neo]
+        return set(nmids_not_in_neo)

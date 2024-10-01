@@ -1,0 +1,1 @@
+from app.modules.wb_keywords_parser.parser import add_wb_positions as add_wb_positions_to_redis

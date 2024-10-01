@@ -1,11 +1,10 @@
+from abc import ABC
+
 from .data_classes.card_from_wb import CardFromWB
 import asyncio
 import datetime
-import json
 import logging
-import time
 from typing import Union
-from aiohttp import ClientOSError, ServerDisconnectedError
 import aiohttp
 from .ABC_WB_API import ABC_WB_API
 from .data_classes.adv import Adv
@@ -17,7 +16,97 @@ from .http_request import requests, try_except_decorator
 from .models import AdvSetting
 from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
-import time
+
+
+"""
+
+Пример ответа от API по полной статистики рекламы:
+[
+{
+"views": 1052,
+"clicks": 2,
+"ctr": 0.19,
+"cpc": 0.09,
+"sum": 177.7,
+"atbs": 0,
+"orders": 0,
+"cr": 0,
+"shks": 0,
+"sum_price": 0,
+"dates": [
+"2023-10-07",
+"2023-10-06"
+],
+"days": [
+{
+"date": "2023-10-06T03:00:00+03:00",
+"views": 414,
+"clicks": 1,
+"ctr": 0.24,
+"cpc": 70,
+"sum": 70,
+"atbs": 0,
+"orders": 0,
+"cr": 0,
+"shks": 0,
+"sum_price": 0,
+"apps": []
+}
+],
+"boosterStats": [
+{
+"date": "2023-10-07T00:00:00Z",
+"nm": 170095908,
+"avg_position": 348
+}
+],
+"advertId": 10524818
+}
+]
+
+
+"""
+
+
+class DayStat:
+    def __init__(self, data):
+        self.date = data['date']
+        self.views = data['views']
+        self.clicks = data['clicks']
+        self.ctr = data['ctr']
+        self.cpc = data['cpc']
+        self.sum = data['sum']
+        self.atbs = data['atbs']
+        self.orders = data['orders']
+        self.cr = data['cr']
+        self.shks = data['shks']
+        self.sum_price = data['sum_price']
+        self.apps = data['apps']
+
+
+class FullAdvStat(ABC):
+    def __init__(self, data):
+        self.views = data['views']
+        self.clicks = data['clicks']
+        self.ctr = data['ctr']
+        self.cpc = data['cpc']
+        self.sum = data['sum']
+        self.atbs = data['atbs']
+        self.orders = data['orders']
+        self.cr = data['cr']
+        self.shks = data['shks']
+        self.sum_price = data['sum_price']
+        self.dates = data['dates']
+        self.days = []
+        for day_data in data['days']:
+            day = DayStat(day_data)
+            self.days.append(day)
+        self.boosterStats = data['boosterStats']
+        self.advertId = data['advertId']
+
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +128,130 @@ class AdvertApi(ABC_WB_API):
     auto_adv_types = [8, 9]
 
 
-    @try_except_decorator(2, 1)
+
+    @try_except_decorator(1, 60)
+    async def def_get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None):
+        assert [isinstance(dt, datetime.date) for dt in dates]
+        assert [isinstance(adv_id, int) for adv_id in adv_ids]
+        """Пример даты [
+  {
+    "id": 8960367,
+    "dates": [
+      "2023-10-07",
+      "2023-10-06"
+    ]
+  },
+  {
+    "id": 9876543,
+    "dates": [
+      "2023-10-07",
+      "2023-12-06"
+    ]
+  }
+       ]"""
+        dates = [date.isoformat() for date in dates]
+        url = 'https://advert-api.wildberries.ru/adv/v2/fullstats'
+        query_data = []
+        for adv_id in adv_ids:
+            query_data .append({'id': adv_id, 'dates': dates})
+
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(session, 'POST', url, json_data=query_data ,
+                                                headers=self.headers.standart)
+            answer = json.loads(response_text)
+            """
+
+            Пример ответа от API по полной статистики рекламы:
+            [
+            {
+            "views": 1052,
+            "clicks": 2,
+            "ctr": 0.19,
+            "cpc": 0.09,
+            "sum": 177.7,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "dates": [
+            "2023-10-07",
+            "2023-10-06"
+            ],
+            "days": [
+            {
+            "date": "2023-10-06T03:00:00+03:00",
+            "views": 414,
+            "clicks": 1,
+            "ctr": 0.24,
+            "cpc": 70,
+            "sum": 70,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "apps": []
+            }
+            ],
+            "boosterStats": [
+            {
+            "date": "2023-10-07T00:00:00Z",
+            "nm": 170095908,
+            "avg_position": 348
+            }
+            ],
+            "advertId": 10524818
+            }
+            ]
+
+
+            """
+
+            full_stats = []
+            for data in answer:
+                full_stat = FullAdvStat(data)
+                full_stats.append(full_stat)
+
+            return full_stats
+
+
+
+
+    @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_setting: AdvSetting)-> list[KeywordStat]:
+        keywords = []
+        date_to = datetime.datetime.now().date()
+        date_from = date_to - datetime.timedelta(days=6)
+        url = f'https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_setting.adv_id}&from={date_from}&to={date_to}'
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(session, 'GET', url,
+                                                headers=self.headers.standart)
+            answer = json.loads(response_text)
+            update_timestamp = datetime.datetime.now()
+            if not answer:
+                logger.debug('Нет данных по ключевым словам: %s', adv_setting.name)
+                return  []
+            for data in answer['keywords']:
+                wb_timestamp = datetime.datetime.fromisoformat(data['date']).date()
+                stat = data['stats']
+                for keyword_stat in stat:
+                    keyword_text = keyword_stat.pop('keyword')
+                    keyword_text = keyword_text.replace(r'"', '')
+                    keyword_text = keyword_text.replace('_', '')
+                    keyword_stat['date'] = wb_timestamp
+                    keyword_stat['update_timestamp'] = update_timestamp
+                    keyword_stat['adv_id'] = adv_setting.adv_id
+                    keyword_stat['text'] = keyword_text
+                    keyword_stat['spend'] = keyword_stat.pop('sum')
+                    keyword = KeywordStat(**keyword_stat)
+                    keywords.append(keyword)
+            return keywords
+
+
+
+    @try_except_decorator(2, 1)
+    async def get_keywords_stat_depr(self, adv_setting: AdvSetting)-> list[KeywordStat]:
         keywords = []
         url = f'https://advert-api.wb.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}'
         async with aiohttp.ClientSession() as session:

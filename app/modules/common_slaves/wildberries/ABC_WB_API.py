@@ -60,25 +60,13 @@ class ABC_WB_API(WbRequestApiMixin):
     def __init__(self, wb_access: 'WBCabinetAccess'):
         tokens: list[WBToken]= wb_access.tokens
         wb_user_cabinet: Union[WBUserCabinet] = wb_access.wb_user_cabinet
-
+        self.__wb_user_cabinet = wb_user_cabinet
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_user_cabinet)
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
-
-        self._wb_user_cabinet = wb_user_cabinet
-        for token in tokens:
-            if  self._rights.issubset(token.categories) \
-                    and self._only_read == token.read_only:
-                current_token = token
-                self._free_tokens = set(tokens) - {current_token}
-                break
-
-        else:
-            raise (exceptions.ApiForbiddenError
-                   (f'Нет токена с правами {self._rights} и only_read = {self._only_read}',
-                    wb_user_cabinet=wb_user_cabinet
-                    ))
+        self._free_tokens = tokens
+        current_token = self._free_tokens.pop()
         self.headers = Headers(current_token)
         self._shop_id = current_token.shop_id
 
@@ -113,13 +101,13 @@ class ABC_WB_API(WbRequestApiMixin):
 
 
     async def set_next_token(self):
-        current_token: WBToken = self.headers.current_token
-        async with sm() as session:
-            stmt = select(WBToken).where(WBToken.id == current_token.id)
-            result = await session.execute(stmt)
-            token = result.scalar()
-            token.active = False
-            await session.commit()
+        # current_token: WBToken = self.headers.current_token
+        # async with sm() as session:
+        #     stmt = select(WBToken).where(WBToken.id == current_token.id)
+        #     result = await session.execute(stmt)
+        #     token = result.scalar()
+        #     token.active = False
+        #     await session.commit()
         if self._free_tokens:
             self.headers = Headers(self._free_tokens.pop())
         else:

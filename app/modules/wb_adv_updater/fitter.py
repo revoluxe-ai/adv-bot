@@ -121,7 +121,9 @@ async def _get_df_for_fit() -> pd.DataFrame:
                     avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
                     avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-                    keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
+                    keyword_stats: list[CalculatedKeyword]\
+                        = await data_manager.get_keywords_statistic_clickhouse(adv,
+                        last_views=500)
 
                     keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
 
