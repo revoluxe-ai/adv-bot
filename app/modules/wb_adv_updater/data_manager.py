@@ -604,13 +604,16 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
                     continue
 
         if adv_setting.max_cpc:
-            cpc = cpm_now * keyword_stat.predict_ctr
-            if cpc > adv_setting.max_cpc:
-                keyword_stat.status = KeywordStatus.BAD
-                keyword_stat.reason = 'max_cpc'
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                await asyncio.sleep(0)
-                continue
+            if not cpm_now:
+                cpm_now = await _get_cpm_by_nmid(adv_setting.nmids[0])
+                if cpm_now:
+                    cpc = cpm_now * keyword_stat.predict_ctr
+                    if cpc > adv_setting.max_cpc:
+                        keyword_stat.status = KeywordStatus.BAD
+                        keyword_stat.reason = 'max_cpc'
+                        await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                        await asyncio.sleep(0)
+                        continue
 
         if keyword_setting.hard_status == 3:
             keyword_stat.status = KeywordStatus.BAD
