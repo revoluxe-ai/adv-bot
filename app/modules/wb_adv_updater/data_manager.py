@@ -483,13 +483,21 @@ async def _get_cpm_by_nmid(nmid)-> Optional[int]:
 async def __get_cpm_from_positions(nmid: int):
     positions = await redis_manager.get_keywords_positions_by_nmid(nmid)
     if not positions:
-        return  None
+        return None
+
+    positions = [position for position in positions if position.cpm and position.type_native == 'auto']
+
     def __get_last_update(position: WBItemPosition):
+        # Выводим значение timestamp для отладки
+        print(f"Timestamp: {position.timestamp}")
         return position.timestamp
 
-    last_position = sorted(positions, key=lambda pos: __get_last_update(pos),
-                           reverse=True)[0]
+    # Сортируем позиции по последнему обновлению
+    last_position = sorted(positions, key=__get_last_update, reverse=True)[0]
     cpm = last_position.cpm
+
+    # Выводим последний cpm для отладки
+    print(f"Last CPM: {cpm}")
     return cpm
 
 
@@ -1590,13 +1598,7 @@ async def add_relevant_phrases(keywords, adv_setting_id):
 
 
 async def get_active_search_advs():
-    stmt = select(AdvSetting)\
-    .options(load_only(AdvSetting.adv_id,
-                       AdvSetting.name,
-                       AdvSetting.wb_cabinet_id,
-                       AdvSetting.new_auto_min_ctr_mode,
-                       AdvSetting.nmids,
-                       AdvSetting.max_cpm))
+    stmt = select(AdvSetting)
     async with _sm() as session:
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()

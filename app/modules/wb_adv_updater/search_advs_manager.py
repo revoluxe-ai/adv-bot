@@ -96,7 +96,7 @@ async def update_search_advs_module_run():
         try:
             adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
             await asyncio.gather(
-                # _set_keyword_phrases_for_search_advs(adv_settinds),
+                _set_keyword_phrases_for_search_advs(adv_settinds),
                 _update_cpm_in_search_advs(adv_settinds)
             )
         except:
