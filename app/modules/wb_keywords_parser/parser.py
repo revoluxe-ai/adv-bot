@@ -159,6 +159,7 @@ class Parser:
             return []
         positions = []
         for place_on_page, product in enumerate(products):
+            adv_type = None
             nmid = product['id']
             real_position = first_place + place_on_page
             if 'log' in product:
@@ -168,6 +169,13 @@ class Parser:
                 base_position = log['position']
                 promo_position = log['promoPosition']
                 real_position = promo_position
+                adv_type_original = log['tp']
+                if adv_type_original == 'c':
+                    adv_type = 9
+                elif adv_type_original == 'b':
+                    adv_type = 8
+                else:
+                    raise DataError(f'Неизвестный тип рекламы {adv_type_original}', text)
             else:
                 adv_id = None
                 cpm = None
@@ -182,7 +190,8 @@ class Parser:
                 adv_id=adv_id,
                 real_position=real_position,
                 keyword_text = text,
-                timestamp = datetime.datetime.now()
+                timestamp = datetime.datetime.now(),
+                adv_type = adv_type
             )
             positions.append(position)
 
@@ -212,8 +221,6 @@ class Parser:
         async with aiohttp.ClientSession() as http_session:
             async with http_session.get(url) as response:
                 response_text = await response.text()
-
-        logger.debug(f'Полученный ответ: {response_text}')
 
         if not response_text:
             raise DataError('Пустой ответ от сервера', text)

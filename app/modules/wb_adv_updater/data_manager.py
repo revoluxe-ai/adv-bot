@@ -21,6 +21,7 @@ from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
+from app.modules.common_slaves.wildberries.data_classes.keywordstat import KeywordStat
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
@@ -163,6 +164,10 @@ async def get_keywords_statistic_clickhouse(
             keywords.append(keyword)
 
     return keywords
+
+
+
+
 
 
 async def _get_keyword_settings(adv_setting_id: int, hard_statuses: Optional[List[int]]) -> List[KeywordSetting]:
@@ -470,15 +475,15 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
     return keyword_stats
 
 
-async def _get_cpm(adv_id):
-    cpm = await __get_cpm_from_positions(adv_id)
+async def _get_cpm_by_nmid(nmid)-> Optional[int]:
+    cpm = await __get_cpm_from_positions(nmid)
     return cpm
 
 
-async def __get_cpm_from_positions(adv_id: int):
-    positions = await redis_manager.get_keywords_positions_by_adv_id(adv_id)
+async def __get_cpm_from_positions(nmid: int):
+    positions = await redis_manager.get_keywords_positions_by_nmid(nmid)
     if not positions:
-        return const.MIN_CPM
+        return  None
     def __get_last_update(position: WBItemPosition):
         return position.timestamp
 
@@ -554,7 +559,9 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
     keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
     sum_views = 0
     sum_clicks = 0
-    cpm_now = await _get_cpm(adv_setting.adv_id)
+    cpm_now = await _get_cpm_by_nmid(adv_setting.nmids[0])
+    if not cpm_now:
+        cpm_now = adv_setting.max_cpm
     for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
@@ -1579,13 +1586,27 @@ async def add_relevant_phrases(keywords, adv_setting_id):
         await session.commit()
 
 
-    async def get_active_search_advs():
-        stmt = select(AdvSetting)\
-        .options(load_only(AdvSetting.adv_id,
-                           AdvSetting.name))
+async def get_active_search_advs():
+    stmt = select(AdvSetting)\
+    .options(load_only(AdvSetting.adv_id,
+                       AdvSetting.name,
+                       AdvSetting.wb_cabinet_id,
+                       AdvSetting.new_auto_min_ctr_mode,
+                       AdvSetting.nmids,
+                       AdvSetting.max_cpm))
+    async with _sm() as session:
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
-        adv_settings = [adv_setting for adv_setting in adv_settings if adv_setting.search_adv_id]
-        return adv_settings
+    adv_settings_with_search_adv_id = []
+    for adv in adv_settings:
+        if adv.search_adv_id:
+            adv_settings_with_search_adv_id.append(adv)
+    return adv_settings_with_search_adv_id
+
+
+
+
+
+
 
 

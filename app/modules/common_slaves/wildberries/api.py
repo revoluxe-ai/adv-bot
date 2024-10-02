@@ -127,6 +127,45 @@ class AdvertApi(ABC_WB_API):
     live_company_status = [4, 9, 11]
     auto_adv_types = [8, 9]
 
+    @try_except_decorator(1, 1)
+    async def get_search_keywords_stat(self, adv_id):
+        url = f"https://advert-api.wildberries.ru/adv/v1/stat/words?id={adv_id}"
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(session, 'GET', url, headers=self.headers.standart)
+            answer = json.loads(response_text)
+            keywords = []
+            update_timestamp = datetime.datetime.now()
+            ...#нет правильной обработки ответа
+            return keywords
+
+    @try_except_decorator(1, 1)
+    async def set_search_cpm(self, search_adv_id: int, cpm: int):
+        url = 'https://advert-api.wildberries.ru/adv/v0/cpm'
+        data = {
+            "advertId": search_adv_id,
+            "type": 9,
+            "cpm": cpm
+        }
+        async with aiohttp.ClientSession() as session:
+            response = await requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
+            if response == '':
+                logger.debug(f'CPM для поисковой кампании {search_adv_id} установлен')
+                return
+            else:
+                logger.error(f'Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}')
+
+
+
+
+    @try_except_decorator(1, 1)
+    async def set_search_keywords(self, search_adv_id, texts):
+        url = f'https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={search_adv_id}'
+        data = {'pluse': texts}
+        async with aiohttp.ClientSession() as session:
+            await requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
+            logger.debug('Плюс-фразы установлены')
+
+
 
 
     @try_except_decorator(1, 60)
@@ -555,6 +594,10 @@ class ContentApi(ABC_WB_API):
         async with aiohttp.ClientSession() as session:
             response = await requests(session, 'POST', url=url, data=data, headers=self.headers.standart)
             return json.loads(response)
+
+
+
+
 
 
 

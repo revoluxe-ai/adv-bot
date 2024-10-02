@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
@@ -230,6 +231,16 @@ class AdvSetting(BaseTable):
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
     new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
 
+    @property
+    def search_adv_id(self):
+        if not self.name:
+            return None
+        pattern = re.compile(r'<!-\[(\d+)\]-!>') # Изменено на поиск по всей строке
+        match = pattern.search(self.name)
+        if not match:
+            return None
+        else:
+            return int(match.group(1))
 
 
 
@@ -276,6 +287,14 @@ class WBItemPosition:
     cpm: int = None
     adv_id: int = None
     keyword_text: str = None
+    adv_type: int = None
+
+    @property
+    def type_native(self)-> str:
+        if self.adv_type == 9:
+            return 'search'
+        elif self.adv_type == 8:
+            return 'auto'
 
     def to_dict(self):
         timestamp: datetime = self.timestamp
@@ -288,7 +307,8 @@ class WBItemPosition:
             'cpm': self.cpm,
             'adv_id': self.adv_id,
             'nmid': self.nmid,
-            'timestamp': str_timestamp
+            'timestamp': str_timestamp,
+            'adv_type': self.adv_type
         }
 
     @staticmethod
@@ -305,8 +325,11 @@ class WBItemPosition:
            position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
         except:
             position.timestamp = None
+
+        position.keyword_text = data['keyword_text']
         try:
-            position.keyword_text = data['keyword_text']
+            position.adv_type = data['adv_type']
         except:
-            return None
+            position.adv_type = None
+
         return position

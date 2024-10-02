@@ -436,8 +436,9 @@ async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]
     return clusters_and_presets
 
 
-async def get_keywords_positions_by_adv_id(adv_id):
-    keys = await redis_client.keys(f'adv_positions:*:{adv_id}')
+async def get_keywords_positions_by_nmid(nmid: int):
+    key_pattern = f'adv_positions:*:{nmid}*'
+    keys = await redis_client.keys(key_pattern)
     positions = []
     for key in keys:
         json_data = await redis_client.get(key)
