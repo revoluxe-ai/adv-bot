@@ -567,9 +567,11 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
     keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
     sum_views = 0
     sum_clicks = 0
-    cpm_now = await _get_cpm_by_nmid(adv_setting.nmids[0])
-    if not cpm_now:
-        cpm_now = adv_setting.max_cpm
+    try:
+        cpm_now = await _get_cpm_by_nmid(adv_setting.nmids[0])
+    except Exception as e:
+        logger.error(f'Ошибка при получении cpm {e}')
+        cpm_now = None
     for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
@@ -612,16 +614,18 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
                     continue
 
         if adv_setting.max_cpc:
-            if not cpm_now:
-                cpm_now = await _get_cpm_by_nmid(adv_setting.nmids[0])
-                if cpm_now:
-                    cpc = cpm_now * keyword_stat.predict_ctr
-                    if cpc > adv_setting.max_cpc:
-                        keyword_stat.status = KeywordStatus.BAD
-                        keyword_stat.reason = 'max_cpc'
-                        await redis_manager.set_auto_block_status(keyword_setting.id, False)
-                        await asyncio.sleep(0)
-                        continue
+            if cpm_now:
+                cpc = cpm_now * keyword_stat.predict_ctr
+            elif clicks > 0:
+                cpc = views/clicks
+            else:
+                cpc = None
+            if cpc and  cpc > adv_setting.max_cpc:
+                keyword_stat.status = KeywordStatus.BAD
+                keyword_stat.reason = 'max_cpc'
+                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                await asyncio.sleep(0)
+                continue
 
         if keyword_setting.hard_status == 3:
             keyword_stat.status = KeywordStatus.BAD
