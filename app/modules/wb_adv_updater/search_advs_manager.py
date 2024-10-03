@@ -49,6 +49,7 @@ async def _set_keyword_phrases_for_search_adv(adv_setting):
     keywords = await data_manager.get_good_bad_phrases(adv_setting)
     texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.GOOD \
              and keyword.hard_status == 2]
+    texts = [text.replace('"', '') for text in texts]
     try:
         search_adv_id = adv_setting.search_adv_id
         await api.advert.set_search_keywords(search_adv_id, texts)
@@ -97,7 +98,7 @@ async def update_search_advs_module_run():
             adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
             await asyncio.gather(
                 _set_keyword_phrases_for_search_advs(adv_settinds),
-                _update_cpm_in_search_advs(adv_settinds)
+                # _update_cpm_in_search_advs(adv_settinds)
             )
         except:
             logger.error('Ошибка обновления статистики по ключам для поисковых РК', exc_info=True)
