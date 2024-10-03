@@ -43,8 +43,8 @@ class CalculatedKeyword:
         if self.predict_ctr is None:
             return 0
         if isinstance(self.query, str):
-            self.query = 25
-        return  self.query * (self.predict_ctr*100)**2
+            self.query = 0
+        return  self.views * (self.predict_ctr*100)**2
 
 
 
