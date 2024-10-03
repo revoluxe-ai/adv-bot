@@ -265,13 +265,6 @@ class AdvSettingMenu(TextWithKeyboard):
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
 
-        try:
-            self._mean_ctr = await data_manager.get_mean_ctr(self.adv)
-            if not self._mean_ctr:
-                raise NoResultFound
-            self._mean_ctr = round(self._mean_ctr, 2) * 100
-        except NoResultFound:
-            self._mean_ctr = 'Средний CTR не определен'
         await super().__call__()
 
 
@@ -288,7 +281,6 @@ class AdvSettingMenu(TextWithKeyboard):
             f'🆔 *ID кампании:* {self.adv.adv_id}\n'
             f'📌 *Статус:* {self.adv.active_status}\n'
             f'🎯 *Минимальный CTR для кампании:* {self._min_ctr} %\n'
-            f'📈 *Средний CTR по активным ключам за весь период:* {self._mean_ctr} %\n'
             f'🔢 *Минимальное количество показов для прогноза CTR:* {self.adv.min_views_for_ml_predict}\n'
         )
         text += f'{max_cpc_text}'
