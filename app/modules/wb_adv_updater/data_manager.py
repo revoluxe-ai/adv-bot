@@ -615,7 +615,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
 
         if adv_setting.max_cpc:
             if cpm_now:
-                cpc = cpm_now * keyword_stat.predict_ctr
+                cpc = (cpm_now / 1000) * keyword_stat.predict_ctr
             elif clicks > 0:
                 cpc = views/clicks
             else:
