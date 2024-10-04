@@ -47,8 +47,7 @@ async def _set_keyword_phrases_for_search_adv(adv_setting):
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
     api = WBApi(access)
     keywords = await data_manager.get_good_bad_phrases(adv_setting)
-    texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.GOOD \
-             and keyword.hard_status == 2]
+    texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.GOOD]
     texts = [text.replace('"', '') for text in texts]
     try:
         search_adv_id = adv_setting.search_adv_id
