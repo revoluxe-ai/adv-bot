@@ -167,6 +167,7 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 1)
     async def set_pluse_status_in_search_adv(self, adv_id: int, status: bool):
+        status = 'true' if status else 'false'
         url = f'https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={adv_id}&fixed={status}'
         async with aiohttp.ClientSession() as session:
             await requests(session, 'GET', url, headers=self.headers.standart)
