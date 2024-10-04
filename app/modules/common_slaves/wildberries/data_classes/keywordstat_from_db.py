@@ -42,11 +42,7 @@ class CalculatedKeyword:
     def rating_by_predict_ctr(self):
         if self.predict_ctr is None:
             return 0
-        if isinstance(self.query, str):
-            self.query = 0
-        return  self.views * (self.predict_ctr*100)**2
-
-
+        return  self.views * self.predict_ctr
 
 
     @property
