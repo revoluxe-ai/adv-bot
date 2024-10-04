@@ -165,7 +165,12 @@ class AdvertApi(ABC_WB_API):
             await requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
             logger.debug('Плюс-фразы установлены')
 
-
+    @try_except_decorator(1, 1)
+    async def set_pluse_status_in_search_adv(self, adv_id: int, status: bool):
+        url = f'https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={adv_id}&fixed={status}'
+        async with aiohttp.ClientSession() as session:
+            await requests(session, 'GET', url, headers=self.headers.standart)
+            logger.debug('Статус фиксированных фраз установлен')
 
 
     @try_except_decorator(1, 60)

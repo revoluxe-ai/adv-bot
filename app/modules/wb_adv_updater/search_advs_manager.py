@@ -52,6 +52,7 @@ async def _set_keyword_phrases_for_search_adv(adv_setting):
     texts = [text.replace('"', '') for text in texts]
     try:
         search_adv_id = adv_setting.search_adv_id
+        await api.advert.set_pluse_status_in_search_adv(search_adv_id, True)
         await api.advert.set_search_keywords(search_adv_id, texts)
     except Exception as e:
         logger.error(f'Ошибка установки фраз для {adv_setting.name}: {e}', exc_info=True)
@@ -98,7 +99,7 @@ async def update_search_advs_module_run():
             adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
             await asyncio.gather(
                 _set_keyword_phrases_for_search_advs(adv_settinds),
-                _update_cpm_in_search_advs(adv_settinds)
+                # _update_cpm_in_search_advs(adv_settinds)
             )
         except:
             logger.error('Ошибка обновления статистики по ключам для поисковых РК', exc_info=True)
