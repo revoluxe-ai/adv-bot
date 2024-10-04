@@ -67,7 +67,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
 
 
 
-async def requests(session, method, url, data=None, json_data=None, headers=None, ):
+async def requests(session, method, url, data=None, json_data=None, headers=None):
     async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
         try:
             logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')

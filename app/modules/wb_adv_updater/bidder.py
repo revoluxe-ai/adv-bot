@@ -114,25 +114,36 @@ async def _run_bidder_process_for_adv(adv_id: int,
                 if not promo_position and base_position:
                     logger.debug('Нет буста')
                     continue
-                promo_positions.append(promo_position)
+                promo_positions.append(position)
                 if not cpm_from_parsing:
                     cpm_from_parsing = 100
         if promo_positions:
-            fact_max_position: int = max(promo_positions)
-            if fact_max_position == 1:
+            fact_max_position = max(promo_positions, key=lambda x: x.promo_position)
+            promo_position = fact_max_position.promo_position
+            if promo_position == 1:
                 new_cpm = cpm_from_parsing - step
-            elif fact_max_position < max_position_for_adv:
+            elif promo_position < max_position_for_adv:
                 new_cpm = cpm_from_parsing - step
-            elif fact_max_position > max_position_for_adv:
+            elif promo_position > max_position_for_adv:
                 new_cpm = cpm_from_parsing + step
             else:
                 new_cpm = cpm_from_parsing
 
             if new_cpm > max_cpm:
                 new_cpm = max_cpm
-            elif new_cpm < 100:
-                new_cpm = 100
-            await wb_api.advert.set_search_cpm(adv_id, new_cpm)
-            await wb_api.advert.update_cpm(adv_id, new_cpm)
+            if new_cpm == cpm_from_parsing:
+                return
+            adv_id = position.adv_id
+            if position.type_native == 'search':
+                if new_cpm < 150:
+                    new_cpm = 150
+                await wb_api.advert.set_search_cpm(adv_id, new_cpm)
+            elif position.type_native == 'auto':
+                if new_cpm < 100:
+                    new_cpm = 100
+                await wb_api.advert.update_cpm(adv_id, new_cpm)
+            else:
+                logger.error(f'Неизвестный тип объявления {position.type_native}')
+                raise ValueError(f'Неизвестный тип объявления {position.type_native}')
     except Exception as e:
         logger.error(f'Ошибка при обновлении ставок для объявления {adv_id} {e}', exc_info=True)
