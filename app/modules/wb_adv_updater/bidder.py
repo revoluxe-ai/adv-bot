@@ -41,7 +41,8 @@ async def _run_bidder_process():
            stmt = select(AdvSetting)\
                .join(AdvSetting.wb_cabinet)\
                .options(selectinload(AdvSetting.wb_cabinet))\
-               .where(AdvSetting.bidder_active == True)
+               .where(AdvSetting.bidder_active == True,
+                      AdvSetting.adv_id == 16989604)
            result = await session.execute(stmt)
            adv_settings = result.scalars().all()
            for adv_setting in adv_settings:
@@ -131,7 +132,7 @@ async def _run_bidder_process_for_adv(adv_id: int,
                 new_cpm = max_cpm
             elif new_cpm < 100:
                 new_cpm = 100
-            if new_cpm != cpm_from_parsing:
-               await wb_api.advert.update_cpm(adv_id, new_cpm)
+            await wb_api.advert.set_search_cpm(adv_id, new_cpm)
+            await wb_api.advert.update_cpm(adv_id, new_cpm)
     except Exception as e:
         logger.error(f'Ошибка при обновлении ставок для объявления {adv_id} {e}', exc_info=True)
