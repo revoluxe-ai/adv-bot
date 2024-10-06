@@ -735,6 +735,7 @@ async def get_max_cpc(adv: AdvSetting)-> Optional[int]:
     if not adv.max_cpc:
         return max_cpc
 
+
 async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
     max_pay_for_order: Optional[int]  = adv.max_pay_for_order
     if not max_pay_for_order:
