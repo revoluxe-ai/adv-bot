@@ -8,7 +8,6 @@ import numpy as np
 from asyncpg import ProgramLimitExceededError
 from sqlalchemy import not_
 from sqlalchemy.exc import IntegrityError
-
 from app.utils import redis_manager
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
@@ -717,6 +716,6 @@ class Manager(AbcManager):
         keywords = list(set(await data_manager.get_all_keywords()))
         await self._gds.clear_keywords_in_neo4j(need_keywords=keywords)
         await self._gds.clear_dead_nodes()
-        await asyncio.sleep(60*60)
+        await asyncio.sleep(60 * 60)
 
 

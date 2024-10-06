@@ -17,8 +17,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser.parser import ErrorParsingPositions
-from app.utils import add_wb_positions_to_redis
+from app.modules.wb_keywords_parser.parser import add_wb_positions_to_redis
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User

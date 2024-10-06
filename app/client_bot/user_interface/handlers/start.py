@@ -1,30 +1,26 @@
-import asyncio
 from operator import and_
 from typing import Union
 import aiogram
 from aiogram import Router, types
+from aiogram.filters import StateFilter, CommandStart
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.orm import joinedload, selectinload
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, WBToken
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError, ApiForbiddenError
 from sqlalchemy.future import select
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from   .. import states
-from ..views import messages
-from aiogram.filters import StateFilter, CommandStart
+from app.modules.wb_adv_updater.right_checker import RightChecker
 from aiogram.types import Message
-
 from ..views.callbacks import Action
 from ...redis_manager import RedisManager
 import logging
-from ..views import callbacks
+from ..views import callbacks, messages
 from app.utils.db.models import User
-from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from app.modules.common_slaves.wildberries import models as wb_models, super_cabinet_manager
-from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
 
@@ -140,7 +136,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
     access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
     chat_id = message.chat.id
     try:
-        await CabinetManager.check_access(wb_token)
+        await RightChecker.check_access(wb_token)
     except NotValidTokenError:
         await messages. \
             NotValideToken(bot, chat_id)()
@@ -287,7 +283,7 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
     user.wb_tokens.append(wb_token)
     chat_id = message.chat.id
     try:
-         check_right = await CabinetManager.check_access(wb_user_cabinet)
+         check_right = await RightChecker.check_access(wb_user_cabinet)
     except NotValidTokenError:
          await messages. \
             NotValideToken(bot, chat_id)()

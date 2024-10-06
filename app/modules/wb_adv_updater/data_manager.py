@@ -1,7 +1,6 @@
 import asyncio
 import io
 import logging
-import random
 import time
 import cProfile
 import pstats
@@ -12,16 +11,13 @@ from typing import Any, Union, Optional, List, Callable
 import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
-from app.client_bot import const
 from app.exc import CardNotFoundInDB
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
-from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
+from sqlalchemy.orm import selectinload, subqueryload, aliased
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
-from app.modules.common_slaves.wildberries.data_classes.keywordstat import KeywordStat
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
@@ -35,17 +31,18 @@ from app.modules.common_slaves.wildberries.models import (
     WBItemPosition,
 )
 from app.modules.keywords_query import keywords_query
+from app.modules.shops_data_updater.types import FullAdvStat
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.my_types import AdvSetting, WBUserCabinet
 from app.payments.db.models import Payment
-from app.settings import settings
 
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User, RefLink, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
 from app.utils import redis_manager
+from app.utils.redis_manager.exc import DataNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -305,15 +302,15 @@ async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
 #     return wb_category_to_keywordstat_list
 
 
-async def get_parent_id_categories_subcategories_name_list() -> defaultdict[Any, list[Subcategory]]:
-    access = await super_cabinet_manager.get_super_user_access()
-    wb_api = WBApi(access)
-    subcategories: list[Subcategory] = await wb_api.content.get_subcategories()
-    parent_categories = defaultdict(list)
-    for category in subcategories:
-        parent_categories[category.parentID].append(category.subjectName)
-    parent_categories_subcategories_name_list = parent_categories
-    return parent_categories_subcategories_name_list
+# async def get_parent_id_categories_subcategories_name_list() -> defaultdict[Any, list[Subcategory]]:
+#     access = await super_cabinet_manager.get_super_user_access()
+#     wb_api = WBApi(access)
+#     subcategories: list[Subcategory] = await wb_api.content.get_subcategories()
+#     parent_categories = defaultdict(list)
+#     for category in subcategories:
+#         parent_categories[category.parentID].append(category.subjectName)
+#     parent_categories_subcategories_name_list = parent_categories
+#     return parent_categories_subcategories_name_list
 
 
 async def get_category_name_min_ctr_final_data() -> dict[int, float]:
@@ -505,7 +502,8 @@ async def __get_cpm_from_positions(nmid: int):
 
 
 async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
-                                              pass_time = timedelta(days=7)) -> list[CalculatedKeyword]:
+                                              max_cpc: Optional[float] = None,
+    pass_time = timedelta(days=7)) -> list[CalculatedKeyword]:
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
@@ -613,14 +611,14 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
                     await asyncio.sleep(0)
                     continue
 
-        if adv_setting.max_cpc:
+        if max_cpc:
             if cpm_now:
                 cpc = (cpm_now / 1000) * keyword_stat.predict_ctr
             elif clicks > 0:
                 cpc = views/clicks
             else:
                 cpc = None
-            if cpc and  cpc > adv_setting.max_cpc:
+            if cpc and  cpc > max_cpc:
                 keyword_stat.status = KeywordStatus.BAD
                 keyword_stat.reason = 'max_cpc'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
@@ -720,17 +718,55 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
     return keyword_stats
 
 
+async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullAdvStat]:
+    try:
+        full_stat_json = await redis_manager.get_full_stat_adv(adv_id)
+        full_stat = FullAdvStat.from_json(full_stat_json)
+        return full_stat
+    except  DataNotFoundError:
+        return None
+
+async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
+    max_pay_for_order: Optional[int]  = adv.max_pay_for_order
+    if not max_pay_for_order:
+        return None
+    cpm_now = await _get_cpm_by_nmid(adv.nmids[0])
+    if not cpm_now:
+        return None
+    full_stat: FullAdvStat = await get_full_adv_stat_for_adv_id_from_redis(adv.adv_id)
+    if not full_stat:
+        return None
+    else:
+        views = full_stat.views + 1
+        added_to_card = full_stat.added_to_card + 1
+        orders = full_stat.orders + 1
+        convert_rate_views_to_added_to_card = added_to_card / views
+        convert_rate_added_to_card_to_orders = orders / added_to_card
+        calculated_orders = views * convert_rate_views_to_added_to_card * convert_rate_added_to_card_to_orders
+        views_for_order = views / calculated_orders
+        max_cpc = max_pay_for_order / views_for_order*1000
+        return max_cpc
+
+
 
 async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
-    if adv.target_ctr_mode:
-        return await get_good_bad_phrases_for_target_ctr(adv)
+    max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
+    if not max_cpc:
+        max_cpc = adv.max_cpc
     else:
-        return await get_good_bad_phrases_for_min_ctr(adv)
+        if max_cpc > adv.max_cpc:
+            max_cpc = adv.max_cpc
+    if adv.target_ctr_mode:
+        return await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
+    else:
+        return await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
 
 
 
 async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
+                                           max_cpc = None,
                                            pass_time = timedelta(days=7))->list[CalculatedKeyword]:
+    cpm_now = await _get_cpm_by_nmid(adv_setting.nmids[0])
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
@@ -834,8 +870,14 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                     await asyncio.sleep(0)
                     continue
 
-        if adv_setting.max_cpc:
-            if keyword_stat.cpc > adv_setting.max_cpc:
+        if max_cpc:
+            if cpm_now:
+                cpc = (cpm_now / 1000) * keyword_stat.predict_ctr
+            elif clicks > 0:
+                cpc = views / clicks
+            else:
+                cpc = None
+            if cpc and cpc > max_cpc:
                 keyword_stat.status = KeywordStatus.BAD
                 keyword_stat.reason = 'max_cpc'
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
@@ -914,11 +956,11 @@ class DataGetter(AbcManager):
         return (df[param_for_norm] - min_) / (max_ - min_)
 
 
-    async def get_full_df(self, shops: list[WBUserCabinet]):
-        shops_df_tasks = [self.get_df_for_shop(shop) for shop in shops]
-        shops_dfs = await asyncio.gather(*shops_df_tasks)
-        df = pd.concat(shops_dfs)
-        return df
+    # async def get_full_df(self, shops: list[WBUserCabinet]):
+    #     shops_df_tasks = [self.get_df_for_shop(shop) for shop in shops]
+    #     shops_dfs = await asyncio.gather(*shops_df_tasks)
+    #     df = pd.concat(shops_dfs)
+    #     return df
 
 
     @staticmethod
@@ -945,32 +987,33 @@ class DataGetter(AbcManager):
         return df
 
 
-    async def get_df_for_shop(self, shop: WBUserCabinet) -> pd.DataFrame:
-        wb_api = WBApi(shop)
-        companies = await wb_api.advert.get_all_adv_companies()
-        keywords_dfs = []
-        for company in companies:
-            logger.debug('Начинаю получать ключи')
-            answer = await wb_api.advert.get_keywords_stat(company)
-            logger.debug('Ключи получены')
-            await asyncio.sleep(10)
-            if answer == []:
-                continue
-            df = self.__get_df_from_date_answer(answer, company)
-            keywords_dfs.append(df)
-        if keywords_dfs == []:
-            return pd.DataFrame()
-        df = pd.concat(keywords_dfs)
-        return df
+    # async def get_df_for_shop(self, shop: WBUserCabinet) -> pd.DataFrame:
+    #     wb_api = WBApi(shop)
+    #     companies = await wb_api.advert.get_all_adv_companies()
+    #     keywords_dfs = []
+    #     for company in companies:
+    #         logger.debug('Начинаю получать ключи')
+    #         answer = await wb_api.advert.get_keywords_stat(company)
+    #         logger.debug('Ключи получены')
+    #         await asyncio.sleep(10)
+    #         if answer == []:
+    #             continue
+    #         df = self.__get_df_from_date_answer(answer, company)
+    #         keywords_dfs.append(df)
+    #     if keywords_dfs == []:
+    #         return pd.DataFrame()
+    #     df = pd.concat(keywords_dfs)
+    #     return df
 
-    async def get_cards_for_shop(self, shop: WBUserCabinet):
-        wb_api = WBApi(shop)
-        cards: list[CardFromWB] = await wb_api.advert.get_cards()
-        for card in cards:
-            card.shop_name = shop.name
-        return cards
+    # async def get_cards_for_shop(self, shop: WBUserCabinet):
+    #     wb_api = WBApi(shop)
+    #     cards: list[CardFromWB] = await wb_api.advert.get_cards()
+    #     for card in cards:
+    #         card.shop_name = shop.name
+    #     return cards
 
-    def get_nmid_offer_id_df(self, cards: list[CardFromWB]) -> pd.DataFrame:
+    @staticmethod
+    def get_nmid_offer_id_df(cards: list[CardFromWB]) -> pd.DataFrame:
         dict_ = defaultdict(list)
         for card in cards:
             dict_['nmid'].append(card.nmid)
@@ -987,7 +1030,8 @@ class DataGetter(AbcManager):
         result = await self._gds.get_nmid_vectors(nmids_batch)
         return result
 
-    async def get_item_features_from_redis(self, nmids_batch):
+    @staticmethod
+    async def get_item_features_from_redis(nmids_batch):
         result = await redis_manager.get_nmid_vectors(nmids_batch)
         return result
 
@@ -995,7 +1039,8 @@ class DataGetter(AbcManager):
         result = await self._gds.get_keywords_vectors_by_keywords(keywords)
         return result
 
-    async def get_keyword_features_from_redis(self, keywords)->list[tuple[str, list[float]]]:
+    @staticmethod
+    async def get_keyword_features_from_redis(keywords)->list[tuple[str, list[float]]]:
         result = await redis_manager.get_keywords_vectors(keywords)
         return result
 
@@ -1224,10 +1269,15 @@ async def get_min_ctr(adv: AdvSetting):
     return min_ctr
 
 
+async def get_best_keyword(keywords: list[CalculatedKeyword])-> CalculatedKeyword:
+    best_keyword = sorted(keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True)[0]
+    return best_keyword
+
+
 async def _get_new_min_ctr(adv: AdvSetting):
     keywords: list[CalculatedKeyword] = await get_keywords_statistic_clickhouse(adv,
                                                                       timedelta(days=7))
-
+    best_keyword = await get_best_keyword(keywords)
     if not keywords:
         return 0.05
 
@@ -1237,7 +1287,6 @@ async def _get_new_min_ctr(adv: AdvSetting):
             continue
         keyword.predict_ctr = await redis_manager.get_predict_ctr(adv.adv_id, keyword.text)
 
-    best_keyword = sorted(keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True)[0]
     logger.debug(f'Лучшее ключевое слово {best_keyword.text} с рейтингом {best_keyword.rating_by_predict_ctr}')
     best_predict_ctr = best_keyword.predict_ctr
     if not best_predict_ctr:
@@ -1613,9 +1662,43 @@ async def get_active_search_advs():
     return adv_settings_with_search_adv_id
 
 
+async def get_all_shop_ids()-> list[str]:
+    stmt = select(WBCabinet.shop_id).distinct()
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        shop_ids = result.scalars().all()
+    return shop_ids
 
 
+async def get_active_adv_ids_for_shop(shop_id: str):
+    stmt = select(AdvSetting.adv_id).distinct()\
+        .join(AdvSetting.wb_cabinet)\
+        .where(WBCabinet.shop_id == shop_id,
+               AdvSetting.bot_active == True)
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        adv_ids = result.scalars().all()
+    return adv_ids
 
 
+async def get_keyword_statistic(adv_setting)-> list[CalculatedKeyword]:
+    keywords = await get_keywords_statistic_clickhouse(adv_setting,
+                                                       last_views=3000)
+    return keywords
 
 
+async def get_max_adv_bid(adv_setting: AdvSetting):
+    setting_max_bid = adv_setting.max_cpm
+    if adv_setting.auto_max_bid:
+        keywords: list[CalculatedKeyword] = await get_keyword_statistic(adv_setting)
+        full_keyword_stat = await get_full_adv_stat_for_adv_id_from_redis(adv_setting.adv_id)
+        max_pay_for_order = adv_setting.max_pay_for_order
+        views = full_keyword_stat.views + 1
+        orders = full_keyword_stat.orders + 1
+        best_keyword: CalculatedKeyword = await get_best_keyword(keywords)
+        convert_views_to_order = views / orders
+        ctr = best_keyword.predict_ctr
+        max_bid_for_1000_views = (max_pay_for_order / convert_views_to_order) * ctr * 1000
+        if setting_max_bid < max_bid_for_1000_views:
+            setting_max_bid = max_bid_for_1000_views
+    return setting_max_bid

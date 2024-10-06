@@ -16,7 +16,7 @@ from .http_request import requests, try_except_decorator
 from .models import AdvSetting
 from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
-
+from app.modules.shops_data_updater.types import FullAdvStat
 
 """
 
@@ -66,43 +66,6 @@ from .super_cabinet_manager import WBCabinetAccess
 
 
 """
-
-
-class DayStat:
-    def __init__(self, data):
-        self.date = data['date']
-        self.views = data['views']
-        self.clicks = data['clicks']
-        self.ctr = data['ctr']
-        self.cpc = data['cpc']
-        self.sum = data['sum']
-        self.atbs = data['atbs']
-        self.orders = data['orders']
-        self.cr = data['cr']
-        self.shks = data['shks']
-        self.sum_price = data['sum_price']
-        self.apps = data['apps']
-
-
-class FullAdvStat(ABC):
-    def __init__(self, data):
-        self.views = data['views']
-        self.clicks = data['clicks']
-        self.ctr = data['ctr']
-        self.cpc = data['cpc']
-        self.sum = data['sum']
-        self.atbs = data['atbs']
-        self.orders = data['orders']
-        self.cr = data['cr']
-        self.shks = data['shks']
-        self.sum_price = data['sum_price']
-        self.dates = data['dates']
-        self.days = []
-        for day_data in data['days']:
-            day = DayStat(day_data)
-            self.days.append(day)
-        self.boosterStats = data['boosterStats']
-        self.advertId = data['advertId']
 
 
 
@@ -175,7 +138,7 @@ class AdvertApi(ABC_WB_API):
 
 
     @try_except_decorator(1, 60)
-    async def def_get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None):
+    async def get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None)-> list[FullAdvStat]:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
         """Пример даты [
@@ -600,9 +563,6 @@ class ContentApi(ABC_WB_API):
         async with aiohttp.ClientSession() as session:
             response = await requests(session, 'POST', url=url, data=data, headers=self.headers.standart)
             return json.loads(response)
-
-
-
 
 
 

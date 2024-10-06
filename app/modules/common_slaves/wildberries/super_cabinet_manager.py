@@ -1,19 +1,12 @@
 import asyncio
 import datetime
-import logging
 import typing
 from dataclasses import dataclass
-
-import aiohttp
-from aiohttp import ServerTimeoutError
-from sqlalchemy import select, or_
-from sqlalchemy.orm import selectinload, joinedload
-
-from app.admin_bot.sender import sender_manager
+from sqlalchemy import  or_
+from sqlalchemy.orm import joinedload
 from app.client_bot.const import MAX_TOKENS
-from app.client_bot.wb_user_cabinet_manager import CabinetManager
 from . import exceptions
-from .exceptions import ApiForbiddenError, UnknownApiRequestError, NotValidTokenError
+from .exceptions import NotValidTokenError
 from .models import WBToken, AdvSetting
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
@@ -21,8 +14,8 @@ from app.utils.db.session_maker import get_async_session_maker
 from sqlalchemy import select
 from app.utils.db.models import User
 import logging
-import aiohttp
 
+from ...wb_adv_updater.right_checker import RightChecker
 
 sm = get_async_session_maker
 
@@ -178,7 +171,7 @@ async def get_super_user_access():
         tokens = access.tokens
         for token in tokens:
                 try:
-                    await CabinetManager.check_access(token)
+                    await RightChecker.check_access(token)
                     leave_tokens.append(token)
                     if len(leave_tokens) >= MAX_TOKENS:
                         break
@@ -193,7 +186,16 @@ async def get_super_user_access():
     return super_user_access
 
 
-async def get_access_for_wb_cabinet(wb_cabinet_id: int)->WBCabinetAccess:
+
+async def get_access_for_wb_cabinet(wb_cabinet_id_or_shop_id: typing.Union[int, str])->WBCabinetAccess:
+    if isinstance(wb_cabinet_id_or_shop_id, str):
+        shop_id = wb_cabinet_id_or_shop_id
+        stmt = select(WBCabinet.id).where(WBCabinet.shop_id == shop_id)
+        async with sm() as session:
+            result = await session.execute(stmt)
+            wb_cabinet_id = result.scalar()
+    else:
+        wb_cabinet_id = wb_cabinet_id_or_shop_id
     async with sm() as session:
         stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
         result = await session.execute(stmt)

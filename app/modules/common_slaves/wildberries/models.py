@@ -1,6 +1,8 @@
 import json
 import re
 from dataclasses import dataclass
+from typing import Optional
+
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
                         BIGINT, Boolean, Float, DateTime, text)
@@ -191,7 +193,7 @@ class AdvSetting(BaseTable):
     def __repr__(self):
         return f'name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}'
     adv_id = Column(BIGINT(), unique=True)
-    name = Column(String, nullable=False)
+    name = mapped_column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet: Mapped[WBCabinet] =  relationship('WBCabinet',
                                                  back_populates='adv_settings',
@@ -236,12 +238,27 @@ class AdvSetting(BaseTable):
         if not self.name:
             return None
         pattern = re.compile(r'<!-\[(\d+)\]-!>') # Изменено на поиск по всей строке
-        match = pattern.search(self.name)
+        match = re.search(pattern, self.name)
         if not match:
             return None
         else:
             return int(match.group(1))
 
+    @property
+    def max_pay_for_order(self) -> Optional[int]:
+        pattern = re.compile(r'<MAX_PAY>(\d+)!?</MAX_PAY>')  # Добавили !? для необязательного символа "!"
+        match = re.search(pattern, self.name)
+        if match:
+            return int(match.group(1))
+        return None
+
+    @property
+    def auto_max_bid(self) -> bool:
+        pattern = re.compile(r'<MAX_PAY>(\d+)!?</MAX_PAY>')  # Используем тот же паттерн, чтобы найти !
+        match = re.search(pattern, self.name)
+        if match and '!' in match.group(0):  # Проверяем, есть ли "!" в найденной строке
+            return True
+        return False
 
 
 class KeywordSetting(BaseTable):

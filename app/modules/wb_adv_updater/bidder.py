@@ -88,7 +88,7 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
         result = await session.execute(stmt)
         white_adv_keywords: list[KeywordSetting] = result.scalars().all()
     max_position_for_adv = adv_setting.max_place
-    max_cpm = adv_setting.max_cpm
+    max_cpm = await data_manager.get_max_adv_bid(adv_setting)
     nmid_in_adv = adv_setting.nmids[0]
     promo_positions = []
     cpm_from_parsing = None

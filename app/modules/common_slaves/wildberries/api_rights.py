@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 from .http_request import requests, try_except_decorator
-from aiohttp import ClientTimeout
 
 from app.utils import redis_manager
 
