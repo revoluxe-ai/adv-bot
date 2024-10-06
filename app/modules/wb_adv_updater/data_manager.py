@@ -726,6 +726,15 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullA
     except  DataNotFoundError:
         return None
 
+async def get_max_cpc(adv: AdvSetting)-> Optional[int]:
+    max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
+    if max_cpc and adv.max_cpc:
+        return min(max_cpc, adv.max_cpc)
+    if not max_cpc:
+        return adv.max_cpc
+    if not adv.max_cpc:
+        return max_cpc
+
 async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
     max_pay_for_order: Optional[int]  = adv.max_pay_for_order
     if not max_pay_for_order:
@@ -737,14 +746,10 @@ async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
     if not full_stat:
         return None
     else:
-        views = full_stat.views + 1
-        added_to_card = full_stat.added_to_card + 1
+        clicks = full_stat.clicks + 1
         orders = full_stat.orders + 1
-        convert_rate_views_to_added_to_card = added_to_card / views
-        convert_rate_added_to_card_to_orders = orders / added_to_card
-        calculated_orders = views * convert_rate_views_to_added_to_card * convert_rate_added_to_card_to_orders
-        views_for_order = views / calculated_orders
-        max_cpc = max_pay_for_order / views_for_order*1000
+        need_clicks_for_order = clicks/orders
+        max_cpc = max_pay_for_order / need_clicks_for_order
         return max_cpc
 
 
@@ -1681,7 +1686,7 @@ async def get_active_adv_ids_for_shop(shop_id: str):
     return adv_ids
 
 
-async def get_keyword_statistic(adv_setting)-> list[CalculatedKeyword]:
+async def get_keywords_statistic(adv_setting)-> list[CalculatedKeyword]:
     keywords = await get_keywords_statistic_clickhouse(adv_setting,
                                                        last_views=3000)
     return keywords
@@ -1690,7 +1695,7 @@ async def get_keyword_statistic(adv_setting)-> list[CalculatedKeyword]:
 async def get_max_adv_bid(adv_setting: AdvSetting):
     setting_max_bid = adv_setting.max_cpm
     if adv_setting.auto_max_bid:
-        keywords: list[CalculatedKeyword] = await get_keyword_statistic(adv_setting)
+        keywords: list[CalculatedKeyword] = await get_keywords_statistic(adv_setting)
         full_keyword_stat = await get_full_adv_stat_for_adv_id_from_redis(adv_setting.adv_id)
         max_pay_for_order = adv_setting.max_pay_for_order
         views = full_keyword_stat.views + 1

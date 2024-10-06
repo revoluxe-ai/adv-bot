@@ -1,8 +1,5 @@
-import asyncio
-import datetime
-from .http_request import requests, try_except_decorator
 
-from app.utils import redis_manager
+from .http_request import requests, try_except_decorator
 
 from asyncio import Lock
 
@@ -108,32 +105,3 @@ class TokenRightChecker(WbRequestApiMixin):
         logger.debug('Проверка прав на контент завершена')
 
 
-async def check_token(token):
-    hash_token = hash(token)
-    logger.debug('Проверка прав на токен')
-    check = await redis_manager.get_token_rights(hash_token)
-    logger.debug(f'Данные о проверке из Redis: {check}')
-    if check:
-        logger.debug('Права на токен уже проверены')
-        return
-    try:
-        logger.debug('Проверка прав на токен')
-        expire = token.expires
-        if expire < datetime.datetime.now():
-            raise ApiForbiddenError('Токен просрочен')
-        async with locker:
-            logger.debug('Проверка прав на в чекере')
-            checker = TokenRightChecker(token)
-            await asyncio.gather(checker.adverts(), checker.content())
-            logger.debug('Проверка прав на токен завершена')
-        await redis_manager.set_token_rights(hash_token, timeout=60*60)
-        logger.debug('Права на токен сохранены в Redis')
-    except ApiForbiddenError as exc:
-        logger.debug(f'Токен отозван')
-        raise exc
-    except UnknownApiRequestError:
-        logger.debug('Ошибка проверки токена (пропущено)')
-    except TooManyRequests:
-        logger.debug('Превышен лимит запросов')
-    except BadRequestError:
-        logger.debug('Ошибка запроса')
