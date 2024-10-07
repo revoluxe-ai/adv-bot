@@ -55,8 +55,7 @@ async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, stat
     filter_advs = [keyword.strip().lower() for keyword in filter_advs if keyword]
     await state.update_data(filter_advs=filter_advs)
     state_data = await state.get_data()
-    wb_user_cabinet_original_id = state_data['wb_user_cabinet_original_id']
-    await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    wb_user_cabinet_original_id = state_data['last_wb_user_cabinet_original_id']
     page = 1
     check_data = await state.get_data()
     logger.debug(f'check_data: {check_data}')
@@ -223,23 +222,78 @@ async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
 
 
 @router.callback_query(callbacks.TurnBot.filter(F.action == 'off'))
-async def turn_adv_off(callback: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot, ):
-    await callback.answer('Выключаю бота')
-    adv_original_id = callback_data.adv_original_id
+async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot, state: FSMContext):
+    await call.answer()
+    data = await state.get_data()
+    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv: AdvSetting = adv.scalar()
-
-        adv.bot_active = False
-        await session.commit()
-    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    async with sm() as session:
-        wb_user_cabinet = await session.execute(select(WBUserCabinet) \
-                                                .where(WBUserCabinet.id == wb_user_cabinet_original_id))
+        stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet) \
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
-    chat_id = callback.message.chat.id
-    await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet,adv)()
-    return
+
+    async with sm() as session:
+        adv_setting = await session.execute(select(AdvSetting) \
+                                            .where(AdvSetting.id == callback_data.adv_original_id))
+
+        adv_setting: AdvSetting = adv_setting.scalars().first()
+        adv_setting.new_auto_min_ctr_mode = False
+        await session.commit()
+
+    await messages.AdvSettingMenu(call.bot,
+                                  call.message.chat.id,
+                                  wb_user_cabinet,
+                                  adv_setting, )()
+
+
+@router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_on_auto_min_ctr'))
+async def turn_on_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR, state: FSMContext):
+    await call.answer()
+    data = await state.get_data()
+    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
+    async with sm() as session:
+        stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet) \
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        wb_user_cabinet = await session.execute(stmt)
+        wb_user_cabinet = wb_user_cabinet.scalar()
+
+    async with sm() as session:
+        adv_setting = await session.execute(select(AdvSetting) \
+                                            .where(AdvSetting.id == callback_data.adv_setting_original_id))
+
+        adv_setting: AdvSetting = adv_setting.scalars().first()
+        adv_setting.new_auto_min_ctr_mode = True
+        await session.commit()
+
+    await messages.AdvSettingMenu(call.bot,
+                                  call.message.chat.id,
+                                  wb_user_cabinet,
+                                  adv_setting,)()
+
+
+@router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_off_auto_min_ctr'))
+async def turn_off_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR,
+                                state: FSMContext):
+    await call.answer()
+    async with sm() as session:
+        adv_setting = await session.execute(select(AdvSetting) \
+                                            .where(AdvSetting.id == callback_data.adv_setting_original_id))
+
+        adv_setting: AdvSetting = adv_setting.scalars().first()
+        adv_setting.new_auto_min_ctr_mode = False
+        await session.commit()
+    data = await state.get_data()
+    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
+    async with sm() as session:
+        stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet) \
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        wb_user_cabinet = await session.execute(stmt)
+        wb_user_cabinet = wb_user_cabinet.scalar()
+    await messages.AdvSettingMenu(call.bot,
+                                  call.message.chat.id,
+                                  wb_user_cabinet,
+                                  adv_setting, )()
+
 #
 #
 # @router.callback_query(callbacks.Min_ctr.filter(F.action == 'change'))

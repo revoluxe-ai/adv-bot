@@ -1,8 +1,13 @@
 import asyncio
 import hashlib
+import json
 import re
 from datetime import datetime
 from io import BytesIO
+
+import faiss
+import numpy as np
+
 from app.utils.image_master import image_tools
 import aiohttp
 from sqlalchemy import select, or_
@@ -16,9 +21,8 @@ from app.utils.text_master.Transformers import Word2Vec
 import logging
 from PIL import Image as PilImage, UnidentifiedImageError
 
-from ...utils import redis_manager
+from ...utils import redis_manager, text_cleaner
 from ...utils.click_house.client import get_clickhouse_client
-
 logger = logging.getLogger(__name__)
 from . import fitter
 
@@ -81,14 +85,21 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
             all_nmids.add(nmid)
     if not all_nmids:
         return
-    async with sm() as session:
-        stmt = select(WBCard).where(WBCard.nmid.in_(all_nmids))
-        wbcards: list[WBCard] = await session.stream(stmt)
-        async for wbcard in wbcards.scalars():
-            check_in_neo = await gds.check_wb_card_in_neo(wbcard.nmid)
-            if check_in_neo:
+    for nmid in all_nmids:
+        check_in_neo_by_redis = await gds.check_wb_card_in_neo(nmid)
+        try:
+            if check_in_neo_by_redis:
+                logger.debug(f'Карточка {nmid} уже есть в базе данных')
                 continue
-            try:
+            logger.debug(f'Запрашиваем карточку {nmid}')
+            async with sm() as session:
+                stmt = select(WBCard).where(WBCard.nmid == nmid)
+                result = await session.execute(stmt)
+                wbcard: WBCard = result.scalar()
+                if not wbcard:
+                    logger.debug(f'Карточка {nmid} не найдена')
+                    continue
+                logger.debug(f'Получили карточку {nmid}')
                 main_image_url: str = wbcard.photos[0]
                 async with aiohttp.ClientSession() as http_session:
                     async with http_session.get(main_image_url) as response:
@@ -98,23 +109,26 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                 vector = await asyncio.to_thread(image_master.get_vector, pil_image)
                 dhash = await asyncio.to_thread(image_tools.dhash, pil_image)
                 logger.debug(f"Обновляем карточку: {wbcard.name}")
-                await gds.update_wb_card(wbcard, characteristics_word, dhash,
-                                         vector)  # Подтверждение изменений в базе данных
-            except KeyError as exc:
-                if exc.args[0] == 'photos':
-                    logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
-                else:
-                    logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
-            except UnidentifiedImageError as exc:
-                logger.error(f"Ошибка UnidentifiedImageError при обработке изображения nmid"
-                             f" {wbcard.nmid}, url: {main_image_url}: {exc}", exc_info=True)
+            try:
+                 await gds.update_wb_card(wbcard, characteristics_word, dhash,
+                                     vector)  # Подтверждение изменений в базе данных
+            except Exception:
+                logger.error(f'Ошибка обновления карточки:  {wbcard.nmid}')
+        except KeyError as exc:
+            if exc.args[0] == 'photos':
+                logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
+            else:
+                logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
+        except UnidentifiedImageError as exc:
+            logger.error(f"Ошибка UnidentifiedImageError при обработке изображения nmid"
+                         f" {wbcard.nmid}, url: {main_image_url}: {exc}", exc_info=True)
 
 
 
 
 async def update_cards_in_graph_for_shops_big_cycle():
     async with sm() as session:
-        stmt = select(AdvSetting)
+        stmt = select(AdvSetting).where(AdvSetting.active_status == 'pause')
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
     await __update_cards_in_graph_for_shops(adv_settings)
@@ -124,8 +138,9 @@ async def update_cards_in_graph_for_shops_big_cycle():
 async def update_cards_in_graph_small_cycle():
     async with sm() as session:
         stmt = select(AdvSetting) \
-            .where(or_(AdvSetting.bot_active == True,
-                       AdvSetting.active_status == 'active'))
+            .where(AdvSetting.bot_active == True,
+                       AdvSetting.active_status == 'started')
+
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
     await __update_cards_in_graph_for_shops(adv_settings)
@@ -164,28 +179,42 @@ async def get_phrase_data(text):
 
     return phrase_data
 
-async def update_wb_adv_phrase_in_db_bot_active():
-    batch_size = 100
+async def update_wb_adv_phrase_in_neo_small_cycle():
+    batch_size = 5
     phrase_data_list = []
+    async with sm() as session:
+        stmt = select(AdvSetting.adv_id)\
+        .where(AdvSetting.active_status.in_(['started']),
+               AdvSetting.bot_active == True)
+        adv_ids = await session.execute(stmt)
+        adv_ids = adv_ids.scalars().all()
+
     async with get_clickhouse_client() as ch_client:
-        query = 'SELECT DISTINCT text FROM default_db.advkeyword'
+        query = f'SELECT DISTINCT text FROM default_db.advkeyword WHERE adv_id IN {adv_ids}'
         result = await ch_client.query(query)
-        texts = result.result_rows
+        texts = [text[0] for text in result.result_rows]
+        clear_texts = set()
         for text in texts:
-            text = text[0]
-            text = text.replace('_', ' ')
-            text = text.replace(',', '.')
-            hash_text = get_text_hash(text)
+            clear_text = text_cleaner.clear(text)
+            hash_text = get_text_hash(clear_text)
             check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
-            if check_in_neo_by_redis:
-                logger.debug(f'Фраза {text} уже есть в базе данных')
-                await asyncio.sleep(0)
-                continue
+            if not check_in_neo_by_redis:
+                 clear_texts.add(clear_text)
+            cluster, _ = await redis_manager.get_cluster_and_preset(text)
+            if cluster:
+                cluster = text_cleaner.clear(cluster)
+                hash_text = get_text_hash(cluster)
+                check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
+                if not check_in_neo_by_redis:
+                    clear_texts.add(cluster)
+        texts = clear_texts
+        for text in texts:
             if await gds.check_phrase_in_neo(text):
                 logger.debug(f'Фраза {text} уже есть в базе данных')
                 await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
                 await asyncio.sleep(0)
                 continue
+            logger.debug(f'Записываем в нео фразу {text}')
             phrase_data = await get_phrase_data(text)
             await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
             phrase_data_list.append(phrase_data)
@@ -199,14 +228,100 @@ async def update_wb_adv_phrase_in_db_bot_active():
     if phrase_data_list:
         await gds.add_keyword_phrase(phrase_data_list)
         await asyncio.sleep(0)
-
+    pass
 
 async def update_wb_adv_phrase_in_db():
     while True:
+       try:
+           await update_wb_adv_phrase_in_neo_small_cycle()
+       except:
+           logger.error('Ошибка обновления фраз в neo', exc_info=True)
+       await asyncio.sleep(0)
+
+
+
+index = None
+keywords = []
+
+
+
+async def update_keywords_ctr_by_similary():
+    global index, keywords
+    async with sm() as session:
+        stmt = select(KeywordSetting.text, AdvSetting.adv_id)\
+            .join(AdvSetting, KeywordSetting.adv_setting_id == AdvSetting.id)\
+            .where(AdvSetting.bot_active == True)
+        result = await session.execute(stmt)
+        keyword_texts_adv_ids: list[KeywordSetting] = result.all()
+
+    # Получение ключей из Redis
+    keys = await redis_manager.get_keys('predict_ctr*')
+    if not keys:
+        return
+
+    vectors = []
+    new_keywords = []  # Для новых ключевых слов
+
+    for key in keys:
+        key = key.decode('utf-8')
         try:
-            await update_wb_adv_phrase_in_db_bot_active()
-        except Exception as exc:
-            logger.error(f'Ошибка обновления фраз в neo4j {exc}')
-        await asyncio.sleep(0)
+             adv_id, keyword_text = key.split(':')[1:]
+        except Exception:
+            logger.error(f'Ошибка парсинга ключа {key}', exc_info= True)
+            continue
+        if keyword_text in keywords:
+            continue
+        vector = await word2vec.average_vector_from_sentence(keyword_text)
+        if vector is not None:
+            vector = np.array(vector, dtype=np.float32)
+            vectors.append(vector)
+            new_keywords.append((adv_id, keyword_text,))
+
+    # Добавление векторов в индекс
+    if vectors:
+        vectors_np = np.array(vectors, dtype=np.float32)
+        if index is None:
+            d = vectors_np.shape[1]  # Размерность векторов
+            index = faiss.IndexFlatL2(d)  # Создание нового индекса
+            index = faiss.IndexIDMap(index)  # Создание IDMap для индекса
+        ids = np.arange(len(new_keywords), dtype=np.int64)
+        faiss.normalize_L2(vectors_np)
+        index.add_with_ids(vectors_np, ids)
+        keywords.extend(new_keywords)  # Обновление списка ключевых слов
+
+    # Поиск и обновление данных
 
 
+    for keyword_text_adv_id in keyword_texts_adv_ids:
+        target_text =  keyword_text_adv_id[0]
+        target_text = text_cleaner.clear(target_text)
+        if not target_text:
+            continue
+        target_adv_id = keyword_text_adv_id[1]
+        logger.debug(f'Обработка ключевого слова {target_text} для объявления {target_adv_id}')
+        original_predict_ctr = await redis_manager.get_predict_ctr(target_adv_id, target_text)
+        if original_predict_ctr:
+            continue
+        vector = await word2vec.average_vector_from_sentence(target_text)
+        if vector is None:
+            continue
+        vector = np.array(vector, dtype=np.float32)
+        vector = vector.reshape(1, -1)  # Преобразование в форму (1, d) для поиска
+
+        # Поиск ближайших векторов
+        D, I = index.search(vector, index.ntotal)
+        for idx in I[0]:
+            if idx == -1:
+                break
+            adv_id, text = keywords[idx]
+            adv_id = int(adv_id)
+            if text == target_text:
+                continue
+            if adv_id != target_adv_id:
+                continue
+            predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
+            if predict_ctr:
+                logger.debug(f'Обновление CTR для ключевого слова {target_text} и объявления {adv_id} '
+                             f'на значение {predict_ctr}')
+                await redis_manager.set_predict_ctr(adv_id, target_text, predict_ctr)
+                break

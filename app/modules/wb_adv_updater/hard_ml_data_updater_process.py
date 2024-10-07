@@ -39,3 +39,15 @@ async def update_cards_in_graph_small_cycle():
         await asyncio.sleep(0)
 
 
+async def update_keywords_ctr_by_similary():
+    from . import ml_data_manager
+    while True:
+        try:
+            await ml_data_manager.update_keywords_ctr_by_similary()
+            logger.debug('CTR обновлен')
+        except Exception as exc:
+            logger.error(f'Ошибка обновления CTR по похожести {exc}', exc_info=True)
+        await asyncio.sleep(0)
+
+
+

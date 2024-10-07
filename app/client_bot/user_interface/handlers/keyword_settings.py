@@ -5,9 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
-
 from sqlalchemy.future import select
-
 from app.client_bot import utils
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import (
@@ -17,6 +15,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_keywords_parser import parser
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
@@ -35,11 +34,24 @@ router = Router()
 _sm = get_async_session_maker
 
 
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == 'filter_by_query'))
+async def setting_keywords_filter_by_query(callback: types.CallbackQuery,
+                                           callback_data: callbacks.SettingKeywords,
+                                           bot: aiogram.Bot, state: FSMContext):
+    await callback.answer()
+    adv_original_id = callback_data.adv_original_id
+    await state.update_data(last_adv_original_id=adv_original_id)
+    await state.set_state(states.AdvSetting.waiting_for_filter_by_query)
+    await messages.FilterByQuery(bot, callback.message.chat.id)()
+
+
+
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'active_keywords'))
 async def setting_keywords_active_keywords(callback: CallbackQuery,
                                            callback_data: callbacks.SettingKeywords,
                                            bot: aiogram.Bot,
                                            state: FSMContext):
+    await callback.answer()
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -60,7 +72,7 @@ async def setting_keywords_active_keywords(callback: CallbackQuery,
     try:
          main_photos = await data_manager.get_main_photos(nmids[:1])
     except:
-        await messages.NoMainPhotos(bot, callback.message.chat.id)()
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
         return
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -84,6 +96,7 @@ async def setting_keywords_sort_by_ctr_desc(callback: CallbackQuery,
                                             callback_data: callbacks.SettingKeywords,
                                             bot: aiogram.Bot,
                                             state: FSMContext):
+    await callback.answer()
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -103,7 +116,7 @@ async def setting_keywords_sort_by_ctr_desc(callback: CallbackQuery,
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     except:
-        await messages.NoMainPhotos(bot, callback.message.chat.id)()
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
         return
     await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(
@@ -126,6 +139,7 @@ async def setting_keywords_show_keywords_is_hard(callback: CallbackQuery,
                                                     callback_data: callbacks.SettingKeywords,
                                                     bot: aiogram.Bot,
                                                     state: FSMContext):
+        await callback.answer()
         await state.update_data(keywords_filter=None)
         adv_original_id = callback_data.adv_original_id
         async with _sm() as session:
@@ -146,7 +160,7 @@ async def setting_keywords_show_keywords_is_hard(callback: CallbackQuery,
         try:
             main_photos = await data_manager.get_main_photos(nmids[:1])
         except:
-            await messages.NoMainPhotos(bot, callback.message.chat.id)()
+            await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
             return
         await redis_manager.set_check_last_24_hours(adv_original_id)
         await messages.AdvKeywordsSetting(
@@ -169,6 +183,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
                                       callback_data: callbacks.SettingKeywords,
                                         bot: aiogram.Bot,
                                         state: FSMContext):
+    await callback.answer()
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
 
@@ -191,7 +206,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
     try:
        main_photos = await data_manager.get_main_photos(nmids[:1])
     except:
-        await messages.NoMainPhotos(bot, callback.message.chat.id)()
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
         return
     await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(
@@ -258,7 +273,7 @@ async def setting_keywords_by_adv(message: types.Message,
         await messages.NoMainPhotos(
             bot,
             chat_id,
-        )()
+        )(adv_setting)
         await redis_manager.set_check_last_24_hours(adv_original_id)
         return
 
@@ -283,6 +298,7 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
                                                     callback_data: callbacks.SettingKeywords,
                                                     bot: aiogram.Bot,
                                                     state: FSMContext):
+        await callback.answer()
         await state.update_data(hide_keywords_is_not_relevant=True)
         adv_original_id = callback_data.adv_original_id
         async with _sm() as session:
@@ -300,7 +316,7 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
         try:
             main_photos = await data_manager.get_main_photos(nmids[:1])
         except:
-            await messages.NoMainPhotos(bot, callback.message.chat.id)()
+            await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
             return
         await redis_manager.set_check_last_24_hours(adv_original_id)
         await messages.AdvKeywordsSetting(
@@ -323,6 +339,7 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
                                                     callback_data: callbacks.SettingKeywords,
                                                     bot: aiogram.Bot,
                                                     state: FSMContext):
+        await callback.answer()
         await state.update_data(hide_keywords_is_not_relevant = False)
         adv_original_id = callback_data.adv_original_id
         async with _sm() as session:
@@ -340,7 +357,7 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
         try:
             main_photos = await data_manager.get_main_photos(nmids[:1])
         except:
-            await messages.NoMainPhotos(bot, callback.message.chat.id)()
+            await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
             return
         await redis_manager.set_check_last_24_hours(adv_original_id)
         await messages.AdvKeywordsSetting(
@@ -409,7 +426,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
     if nmids:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     else:
-        await messages.NoMainPhotos(bot, callback.message.chat.id)()
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
         return
 
     chat_id = callback.message.chat.id
@@ -485,7 +502,7 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
             min_ctr = await data_manager.get_min_ctr(adv_setting)
             async with get_clickhouse_client() as client:
                 clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(client,
-                                                                                   keyword_setting,
+                                                                                   keyword_setting.text,
                                                                                    adv_setting.adv_id)
             if keyword_setting.added_clicks:
                 clicks += keyword_setting.added_clicks
@@ -517,4 +534,96 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
     return
 
 
+@router.callback_query(callbacks.CheckPosition.filter())
+async def check_position(callback: types.CallbackQuery,
+                            callback_data: callbacks.CheckPosition,
+                            bot: aiogram.Bot, state: FSMContext):
 
+        await callback.answer()
+        await messages.LongTimeOperation(bot, callback.message.chat.id)()
+        keyword_setting_original_id = callback_data.keyword_setting_original_id
+        async with _sm() as session:
+            result = await session.execute(select(KeywordSetting.text)\
+                                                    .where(KeywordSetting.id == keyword_setting_original_id))
+            text: KeywordSetting = result.scalar()
+            adv_setting_original_id = callback_data.adv_original_id
+            stmt = select(AdvSetting.nmids).where(AdvSetting.id == adv_setting_original_id)
+            result = await session.execute(stmt)
+            nmids: AdvSetting = result.scalar()
+            nmid = nmids[0]
+        await parser.add_wb_positions(text, {nmid}, delay=3)
+        await messages.KeywordSettingMessage(bot,
+                                             callback.message.chat.id,
+                                             keyword_setting_original_id,
+                                             1)()
+
+
+
+
+
+@router.message(StateFilter(states.AdvSetting.waiting_for_filter_by_query))
+async def setting_keywords_filter_by_query(message: types.Message,
+                                           bot: aiogram.Bot,
+                                           state: FSMContext):
+    text = message.text
+    if '/start' in text:
+        await state.clear()
+        await start_registration(message, bot, state)
+        return
+    try:
+        count_query = int(text)
+    except ValueError:
+        await message.answer("Введите число от нуля и выше:")
+        return
+    if count_query < 0:
+        count_query *= -1
+    callback_data = await state.get_data()
+    adv_original_id = int(callback_data.get('last_adv_original_id'))
+    await messages.LongTimeOperation(bot, message.chat.id)()
+    async with _sm() as session:
+        stmt = select(AdvSetting) \
+            .where(AdvSetting.id == adv_original_id)
+        result = await session.execute(stmt)
+        adv_setting: AdvSetting = result.scalar()
+        adv_setting.hide_small_query_keywords = count_query
+        await session.commit()
+    keywords = await utils.get_keywords_for_keyboard(adv_setting)
+    page = 1
+    await state.update_data(last_keyword_setting_page=page)
+    state_data = await state.get_data()
+    adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
+    async with _sm() as session:
+        stmt = select(WBUserCabinet) \
+            .join(User, User.id == WBUserCabinet.user_id) \
+            .join(WBCabinet,
+                  WBCabinet.id == WBUserCabinet.wb_cabinet_id) \
+            .options(selectinload(WBUserCabinet.user),
+                     selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings)) \
+            .where(and_(User.user_telegram_id == message.from_user.id,
+                        WBCabinet.id == adv_setting.wb_cabinet_id))
+        wb_user_cabinet = await session.execute(stmt)
+        wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
+    wb_user_cabinet_original_id = wb_user_cabinet.id
+    nmids = adv_setting.nmids
+    if nmids:
+        main_photos = await data_manager.get_main_photos(nmids[:1])
+    else:
+        await messages.NoMainPhotos(bot, message.chat.id)(adv_setting)
+        return
+
+    chat_id = message.chat.id
+    await redis_manager.set_check_last_24_hours(adv_original_id)
+    logger.debug('Обработка собщения')
+    await state.set_state(None)
+    await messages.AdvKeywordsSetting(
+        bot,
+        chat_id,
+        keywords,
+        adv_setting,
+        wb_user_cabinet_original_id,
+        adv_choice_last_page,
+        main_photos[0],
+        page,
+    )(state)
+    logger.debug('Отправили сообщение')
+    await redis_manager.set_check_last_24_hours(adv_original_id)

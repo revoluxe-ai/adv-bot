@@ -7,8 +7,8 @@ import joblib
 import numpy as np
 from asyncpg import ProgramLimitExceededError
 from sqlalchemy import not_
-from sqlalchemy.dialects.postgresql import asyncpg
-
+from sqlalchemy.exc import IntegrityError
+from app.utils import redis_manager
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
@@ -41,9 +41,6 @@ from .shops_manager import rights_control
 from ...client_bot import const
 from app.utils.click_house.client import get_clickhouse_client
 
-
-
-
 logger = logging.getLogger(__name__)
 
 gds = DataScience()
@@ -62,6 +59,7 @@ async def process_payment_for_auto_bidder():
         ).filter(
             and_(
                 AdvSetting.bidder_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
                                                   AdvPayment.type == 'auto_bidder')))
 
@@ -106,6 +104,7 @@ async def process_payment_for_parsing():
         ).filter(
             and_(
                 AdvSetting.parsing_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
                                                   AdvPayment.type == 'parsing')))
 
@@ -146,6 +145,7 @@ async def process_payment_for_advs():
         ).filter(
             and_(
                 AdvSetting.bot_active == True,
+                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
                 AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
                 # условие на истекший срок действия
@@ -259,7 +259,8 @@ async def update_all_data_in_db_run(tasks):
             try:
                 shop_data_updater = ShopDataUpdater(wb_access)
             except ApiForbiddenError:
-                logger.error(f'Нет нужных прав у токена')
+                logger.debug(f'Нет нужных прав у токена')
+                await asyncio.sleep(0)
                 continue
             task = asyncio.create_task(shop_data_updater.update_all_data())
             logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
@@ -329,6 +330,7 @@ async def update_predict_ctr():
     predictor = Predictor()
     while True:
         try:
+            logger.debug('Начинаю прогноз CTR')
             await predictor.predict_ctr_for_keywords()
         except Exception as exc:
             logger.error(f'Ошибка предсказания CTR {exc}')
@@ -339,35 +341,29 @@ async def update_predict_ctr():
 async def update_keywords_in_advs():
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
-        accesses  = super_cabinet_manager.get_accesses_for_wb_cabinets()
-        logger.debug('Получен генератор доступов к кабинетам для обновления минус-ключей в РК')
-        async for access in accesses:
-            logger.debug('Получен кабинет для обновления минус-ключей в РК')
-            wb_cabinet_id = access.wb_cabinet.id
-            if wb_cabinet_id  not in update_tasks:
-                try:
+        async with sm() as session:
+            stmt = select(AdvSetting) \
+                .where(AdvSetting.bot_active == True)
+            result = await session.execute(stmt)
+            adv_settings: list[AdvSetting] = result.scalars().all()
+            for adv_setting in adv_settings:
+                if adv_setting.id not in update_tasks:
+                    wb_cabinet_id = adv_setting.wb_cabinet_id
+                    access: WBCabinetAccess = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
+                    if not access:
+                        logger.error(f'Нет доступа к кабинету {wb_cabinet_id}')
+                        continue
                     data_setter = DataSetter(access)
-                except ApiForbiddenError:
-                    logger.error(f'Нет нужных прав у токена')
-                    continue
-                logger.debug(access.wb_cabinet.id)
-                async with sm() as session:
-                    stmt = select(AdvSetting) \
-                        .where(and_(AdvSetting.bot_active == True,
-                                    AdvSetting.wb_cabinet_id == wb_cabinet_id))
-                    result = await session.execute(stmt)
-                    adv_settings: list[AdvSetting] = result.scalars().all()
-                if adv_settings:
-                    logger.debug(f'Запуск задачи обновления минус-ключей для кабинета {wb_cabinet_id}')
-                    task = asyncio.create_task(data_setter.update_minus_keywords(adv_settings))
-                    update_tasks[wb_cabinet_id] = task
-            else:
-                if update_tasks[wb_cabinet_id].done():
-                    if update_tasks[wb_cabinet_id].exception():
-                        logger.error(f'Ошибка обновления ключей: {update_tasks[wb_cabinet_id].exception()}',
-                                     exc_info=True)
-                    del update_tasks[wb_cabinet_id]
-        await asyncio.sleep(15*60)
+                    task = asyncio.create_task(data_setter.update_minus_keywords_in_adv(adv_setting))
+                    update_tasks[adv_setting.id] = task
+                else:
+                    if update_tasks[adv_setting.id].done():
+                        if update_tasks[adv_setting.id].exception():
+                            logger.error(f'Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}',
+                                         exc_info=True)
+                        del update_tasks[adv_setting.id]
+                await asyncio.sleep(0)
+
 
 
 
@@ -407,7 +403,51 @@ async def update_keyword_stat(access: WBCabinetAccess,
                     logger.debug(f'Установка set для need_update_model')
                     logger.debug(f"Обновление статистики завершено")
             await asyncio.sleep(0)
+
+        await asyncio.sleep(60*15)
     return
+
+
+
+async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
+    try:
+        clusters = await wb_api.advert.get_clusters_for_adv(adv)
+        clusters = clusters['clusters']
+        if not clusters:
+            return
+        for cluster in clusters:
+            cluster_name = cluster['cluster'].strip().lower()
+            keywords = cluster['keywords']
+            for keyword_text in keywords:
+                keyword_text = keyword_text.strip().lower()
+                await redis_manager.set_keyword_cluster(keyword_text, cluster_name)
+    except Exception as e:
+        logger.debug(f'Error getting clusters for adv {adv.id}: {e}', exc_info=True)
+        return
+
+
+async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
+    try:
+        wb_api = WBApi(access)
+    except ApiForbiddenError:
+        logger.error('Доступ запрещен')
+        return
+    async with sm() as session:
+        query = select(AdvSetting).where(AdvSetting.wb_cabinet_id == access.wb_cabinet.id)
+        adv_settings = await session.execute(query)
+        adv_settings = adv_settings.scalars().all()
+    for adv in adv_settings:
+        if adv.id not in tasks:
+            task = asyncio.create_task(update_clusters_for_adv(adv, wb_api))
+            tasks[adv.id] = task
+        else:
+            if tasks[adv.id].done():
+                logger.debug(f'Задача обновления кластеров завершена для РК {adv.name}')
+                if tasks[adv.id].exception():
+                    logger.error(f'Ошибка обновления кластеров: {tasks[adv.id].exception()}')
+                del tasks[adv.id]
+        await asyncio.sleep(0)
+
 
 
 async def keyword_stat_updater(client, adv_setting_id, wb_api):
@@ -415,7 +455,6 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
         stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         adv_setting = await session.execute(stmt)
         adv_setting = adv_setting.scalar()
-
     try:
         keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
     except Exception as exc:
@@ -428,6 +467,13 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
 
     logger.debug(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
     texts_for_adv_setting = {keyword.text for keyword in keywords}
+    clusters = set()
+    for text in texts_for_adv_setting:
+        cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+        if cluster_name:
+           clusters.add(cluster_name)
+
+    texts_for_adv_setting.update(clusters)
     existing_keyword_settings = await get_existing_keyword_settings(adv_setting.id)
     new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
 
@@ -442,8 +488,9 @@ async def keyword_stat_updater(client, adv_setting_id, wb_api):
                     keyword.hard_status = 0
                 session.add(keyword)
                 await session.commit()
-            except ProgramLimitExceededError:
+            except (ProgramLimitExceededError, IntegrityError):
                 logger.error('Ошибка добавления ключей в postgres', exc_info=True)
+
             finally:
                 await asyncio.sleep(0)
 
@@ -669,6 +716,6 @@ class Manager(AbcManager):
         keywords = list(set(await data_manager.get_all_keywords()))
         await self._gds.clear_keywords_in_neo4j(need_keywords=keywords)
         await self._gds.clear_dead_nodes()
-        await asyncio.sleep(60*60)
+        await asyncio.sleep(60 * 60)
 
 

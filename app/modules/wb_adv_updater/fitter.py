@@ -103,7 +103,8 @@ async def _get_df_for_fit() -> pd.DataFrame:
         # Основной запрос
         stmt = select(AdvSetting).options(
             selectinload(AdvSetting.wb_cabinet)
-        ).where(subquery, AdvSetting.type == 8)\
+        ).where(subquery, AdvSetting.type == 8,
+                AdvSetting.active_status.in_(['pause', 'started']))\
 
         result = await session.execute(stmt)
         adv_settings = result.scalars().yield_per(100)
@@ -112,7 +113,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
             logger.debug(f'Обработка кампании {n}')
             nmids = adv.nmids
 
-            if len(nmids) > 1:
+            if len(nmids) >= 1:
                 nmid_to_item_features = await get_nmid_to_item_features(nmids)
 
                 if nmid_to_item_features:
@@ -120,7 +121,20 @@ async def _get_df_for_fit() -> pd.DataFrame:
                     avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
                     avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-                    keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(adv)
+                    keyword_stats: list[CalculatedKeyword]\
+                        = await data_manager.get_keywords_statistic_clickhouse(adv,
+                        last_views=500)
+
+                    keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
+
+                    in_clusters = {kw.text for kw in keyword_stats}
+
+                    clear_keyword_stat = []
+                    for keyword_stat in keyword_stats:
+                        if keyword_stat.text not in in_clusters:
+                             clear_keyword_stat.append(keyword_stat)
+
+                    keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
 
                     for keyword_stat in keyword_stats:
                         keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
@@ -161,7 +175,10 @@ async def _bayesian_apply(df: pd.DataFrame):
         clicks = row['clicks']
         views = row['views']
         adv_id = row['adv_id']
-        status = adv_id_keyword_text_to_status[(adv_id, row['keyword'])]
+        try:
+            status = adv_id_keyword_text_to_status[(adv_id, row['keyword'])]
+        except KeyError:
+            status = 1
         if status == 0:
             return 0
         elif status in [2, 3]:

@@ -1,30 +1,26 @@
-import asyncio
 from operator import and_
 from typing import Union
 import aiogram
 from aiogram import Router, types
+from aiogram.filters import StateFilter, CommandStart
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.orm import joinedload, selectinload
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet, WBToken
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError, ApiForbiddenError
 from sqlalchemy.future import select
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from   .. import states
-from ..views import messages
-from aiogram.filters import StateFilter, CommandStart
+from app.modules.wb_adv_updater.right_checker import RightChecker
 from aiogram.types import Message
-
 from ..views.callbacks import Action
 from ...redis_manager import RedisManager
 import logging
-from ..views import callbacks
+from ..views import callbacks, messages
 from app.utils.db.models import User
-from app.client_bot.wb_user_cabinet_manager import CabinetManager
-from app.modules.common_slaves.wildberries import models as wb_models
-from app.modules.common_slaves.wildberries import super_cabinet_manager as scm
+from app.modules.common_slaves.wildberries import models as wb_models, super_cabinet_manager
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
 
@@ -36,6 +32,8 @@ router = Router()
 
 
 redis_manager = RedisManager()
+
+
 
 
 async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
@@ -59,7 +57,7 @@ async def start_registration(message: types.Message, bot: aiogram.Bot, state: FS
             WBUserCabinet.wb_cabinet)) \
             .where(User.user_telegram_id == user_id)
         result = await session.execute(stmt)
-        user = result.scalar()
+        user: User = result.scalar()
         if not user:
             user = User(user_telegram_id=user_id,
                         username=message.from_user.username,
@@ -138,7 +136,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
     access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
     chat_id = message.chat.id
     try:
-        await CabinetManager.check_access(wb_token)
+        await RightChecker.check_access(wb_token)
     except NotValidTokenError:
         await messages. \
             NotValideToken(bot, chat_id)()
@@ -194,7 +192,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             wb_cabinet = result.scalar()
             if not wb_cabinet: #если кабинета нет, то создаем кабинет
                 wb_cabinet = WBCabinet(shop_id=wb_token.shop_id)
-                wb_cabinet.bonus = 1000
+                wb_cabinet.bonus = 300
                 session.add(wb_cabinet)
             access.wb_cabinet = wb_cabinet
             wb_user_cabinet = WBUserCabinet(name=cabinet_name)
@@ -285,7 +283,7 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
     user.wb_tokens.append(wb_token)
     chat_id = message.chat.id
     try:
-         check_right = await CabinetManager.check_access(wb_user_cabinet)
+         check_right = await RightChecker.check_access(wb_user_cabinet)
     except NotValidTokenError:
          await messages. \
             NotValideToken(bot, chat_id)()
@@ -313,6 +311,9 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
 async def select_shop(callback_query: types.CallbackQuery,
                       callback_data: callbacks.Shop,
                       bot: aiogram.Bot, state: FSMContext):
+    reset_filter = callback_data.reset_filter
+    if reset_filter:
+        await state.update_data(filter_advs=None)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await state.update_data(last_wb_user_cabinet_original_id = wb_user_cabinet_original_id)
     await callback_query.answer()
@@ -339,6 +340,38 @@ async def shop_menu_process(
     await callback.answer()
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await messages.ShopMenu(bot, callback.message.chat.id, state, wb_user_cabinet_original_id)()
+
+
+
+@router.callback_query(callbacks.UpdateCompanyFromWB.filter())
+async def update_company_from_wb(callback_query: types.CallbackQuery,
+                                    bot: aiogram.Bot,
+                                    callback_data: callbacks.UpdateCompanyFromWB,
+                                   state: FSMContext):
+    await callback_query.answer()
+    await messages.LongTimeOperation(bot, callback_query.message.chat.id)()
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    async with sm() as session:
+        stmt = select(WBUserCabinet) \
+            .options(
+            joinedload(WBUserCabinet.user)\
+                .joinedload(User.wb_tokens),
+            joinedload(WBUserCabinet.wb_cabinet)
+        ) \
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        result = await session.execute(stmt)
+        wb_user_cabinet: WBUserCabinet = result.scalar()
+    wb_cabinet = wb_user_cabinet.wb_cabinet
+    access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
+    shop_updater = ShopDataUpdater(access)
+    await shop_updater.quick_update_all_data()
+    await messages.AdvCompanyChoicing(bot,
+                                      state,
+                                      callback_query.message.chat.id,
+                                      wb_user_cabinet_original_id, page=1)()
+
+
+
 
 router.callback_query.register(start_registration, callbacks.Start.filter())
 router.message.register(start_registration, CommandStart())

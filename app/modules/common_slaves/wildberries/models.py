@@ -1,5 +1,8 @@
 import json
-import datetime
+import re
+from dataclasses import dataclass
+from typing import Optional
+
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
                         BIGINT, Boolean, Float, DateTime, text)
@@ -20,9 +23,9 @@ from app.utils.db.session_maker import get_async_session_maker
 _sm = get_async_session_maker
 
 class WBUserCabinet(BaseTable):
-    wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
+    wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
+    user_id: Mapped[Integer] = Column(Integer, ForeignKey('user.id'), nullable=False)
     user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
@@ -58,6 +61,7 @@ class WBToken(BaseTable):
     user = relationship('User', back_populates='wb_tokens',
                         lazy='joined')
     active = Column(Boolean, default=True)
+    shop_id = mapped_column(String, nullable=True)
     __table_args__ = (UniqueConstraint('api_key', 'user_id', name='_api_key_user_id_uc'),)
 
 
@@ -65,9 +69,20 @@ class WBToken(BaseTable):
     @property
     def __payload(self):
         try:
-            return jwt.decode(self.api_key, options={"verify_signature": False})
+            result = jwt.decode(self.api_key, options={"verify_signature": False})
+            return result
         except:
             raise exceptions.NotValidTokenError
+
+    def check_valid(self):
+        try:
+            result = jwt.decode(self.api_key, options={"verify_signature": False})
+            if result:
+                return True
+        except Exception:
+           return False
+
+
     def get_payload(self, key, default=0):
         payload = self.__payload
         return payload.get(key)
@@ -178,7 +193,7 @@ class AdvSetting(BaseTable):
     def __repr__(self):
         return f'name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}'
     adv_id = Column(BIGINT(), unique=True)
-    name = Column(String, nullable=False)
+    name = mapped_column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet: Mapped[WBCabinet] =  relationship('WBCabinet',
                                                  back_populates='adv_settings',
@@ -212,10 +227,38 @@ class AdvSetting(BaseTable):
     max_cpm = mapped_column(Integer, nullable=True)
     max_place = mapped_column(Integer, nullable=True)
     min_block_position = mapped_column(Integer, nullable=True, default=0)
+    clusters_mode = mapped_column(Boolean, nullable=True, default=True)
+    target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
+    hide_small_query_keywords = mapped_column(Integer, nullable=True, default=0)
+    target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
+    new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
 
+    @property
+    def search_adv_id(self):
+        if not self.name:
+            return None
+        pattern = re.compile(r'<!-\[(\d+)\]-!>') # Изменено на поиск по всей строке
+        match = re.search(pattern, self.name)
+        if not match:
+            return None
+        else:
+            return int(match.group(1))
 
+    @property
+    def max_pay_for_order(self) -> Optional[int]:
+        pattern = re.compile(r'<MAX_PAY>(\d+)!?</MAX_PAY>')  # Добавили !? для необязательного символа "!"
+        match = re.search(pattern, self.name)
+        if match:
+            return int(match.group(1))
+        return None
 
-
+    @property
+    def auto_max_bid(self) -> bool:
+        pattern = re.compile(r'<MAX_PAY>(\d+)!?</MAX_PAY>')  # Используем тот же паттерн, чтобы найти !
+        match = re.search(pattern, self.name)
+        if match and '!' in match.group(0):  # Проверяем, есть ли "!" в найденной строке
+            return True
+        return False
 
 
 class KeywordSetting(BaseTable):
@@ -246,24 +289,29 @@ class KeywordSetting(BaseTable):
 
 
 
-class CommonKeyword(BaseTable):
+class CommonKeyword:
     wb_item_positions = relationship('WBItemPosition', back_populates='keyword')
     text = mapped_column(String)
     last_full_update = mapped_column(DateTime, default=datetime.datetime.utcnow)
 
+@dataclass
+class WBItemPosition:
+    nmid: int = None
+    base_position: int = None
+    real_position: int = None
+    timestamp:  datetime = None
+    promo_position: int = None
+    cpm: int = None
+    adv_id: int = None
+    keyword_text: str = None
+    adv_type: int = None
 
-class WBItemPosition(BaseTable):
-    keyword_id = mapped_column(ForeignKey('commonkeyword.id'))
-    keyword = relationship(CommonKeyword, back_populates='wb_item_positions')
-    nmid = mapped_column(Integer)
-    base_position: Mapped[int] = mapped_column(Integer)
-    real_position: Mapped[int] = mapped_column(Integer)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    promo_position: Mapped[int] = mapped_column(Integer, nullable=True)
-    cpm: Mapped[int] = mapped_column(Integer, nullable=True)
-    adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
-    keyword_text = mapped_column(String, nullable=False)
-
+    @property
+    def type_native(self)-> str:
+        if self.adv_type == 9:
+            return 'search'
+        elif self.adv_type == 8:
+            return 'auto'
 
     def to_dict(self):
         timestamp: datetime = self.timestamp
@@ -276,7 +324,8 @@ class WBItemPosition(BaseTable):
             'cpm': self.cpm,
             'adv_id': self.adv_id,
             'nmid': self.nmid,
-            'timestamp': str_timestamp
+            'timestamp': str_timestamp,
+            'adv_type': self.adv_type
         }
 
     @staticmethod
@@ -293,8 +342,11 @@ class WBItemPosition(BaseTable):
            position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
         except:
             position.timestamp = None
+
+        position.keyword_text = data['keyword_text']
         try:
-            position.keyword_text = data['keyword_text']
+            position.adv_type = data['adv_type']
         except:
-            return None
+            position.adv_type = None
+
         return position

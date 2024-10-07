@@ -8,7 +8,7 @@ import logging
 from app.utils.db.session_maker import get_async_session_maker
 from ..common_slaves.wildberries import super_cabinet_manager as users_manager
 from . import wb_manager
-from app.modules.wb_adv_updater.bidder import run_bidder_process
+
 
 
 sm = get_async_session_maker
@@ -160,20 +160,23 @@ async def payment_for_auto_bidder():
 
 
 async def run_update_vectors_in_redis():
-    while True:
-        try:
-            await wb_manager.update_vectors_in_redis()
-        except Exception as e:
-            logger.error(f'Ошибка обновления векторов в redis {e}', exc_info=True)
-        await asyncio.sleep(0)
+    await wb_manager.update_vectors_in_redis()
+
 
 async def run_vector_update_in_neo4j():
     await wb_manager.update_vectors_update_in_graph()
 
 
 
-def run_main_coroutines():
-    asyncio.run(main_loop())
+async def run_update_model():
+    while True:
+        try:
+            await update_model()
+        except Exception as e:
+            logger.error(f'Ошибка обновления модели {e}', exc_info=True)
+        await asyncio.sleep(0)
+
+
 
 async def main_loop():
     await asyncio.gather(
@@ -188,10 +191,12 @@ async def main_loop():
         return_exceptions=False
     )
 
-async def run_update_model():
+
+async def run_main_coroutines():
     while True:
         try:
-            await update_model()
+            await main_loop()
         except Exception as e:
-            logger.error(f'Ошибка обновления модели {e}', exc_info=True)
-        await asyncio.sleep(0)
+            logger.error(f'Ошибка в главном цикле {e}', exc_info=True)
+            await asyncio.sleep(0)
+
