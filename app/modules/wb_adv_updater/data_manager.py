@@ -1695,12 +1695,14 @@ async def get_keywords_statistic(adv_setting)-> list[CalculatedKeyword]:
 
 async def get_max_adv_bid(adv_setting: AdvSetting):
     setting_max_bid = adv_setting.max_cpm
+    max_pay_for_order = adv_setting.max_pay_for_order
+    if not max_pay_for_order:
+        return setting_max_bid
     if adv_setting.auto_max_bid:
         keywords: list[CalculatedKeyword] = await get_keywords_statistic(adv_setting)
         full_keyword_stat = await get_full_adv_stat_for_adv_id_from_redis(adv_setting.adv_id)
         if not full_keyword_stat:
             return setting_max_bid
-        max_pay_for_order = adv_setting.max_pay_for_order
         views = full_keyword_stat.views + 1
         orders = full_keyword_stat.orders + 1
         best_keyword: CalculatedKeyword = await get_best_keyword(keywords)
