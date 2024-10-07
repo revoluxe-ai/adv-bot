@@ -482,7 +482,7 @@ async def __get_cpm_from_positions(nmid: int):
     if not positions:
         return None
 
-    positions = [position for position in positions if position.cpm and position.type_native == 'auto']
+    positions = [position for position in positions if position.cpm]
 
     def __get_last_update(position: WBItemPosition):
         # Выводим значение timestamp для отладки
