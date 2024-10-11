@@ -71,7 +71,7 @@ async def update_keyword_stat(callback: types.CallbackQuery,
         """
         adv_original_id = callback_data.adv_setting_original_id
         async with sm() as session:
-            adv = await session.execute(select(AdvSetting)\
+            adv: AdvSetting = await session.execute(select(AdvSetting)\
             .join(AdvSetting.wb_cabinet)\
             .where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
@@ -86,8 +86,8 @@ async def update_keyword_stat(callback: types.CallbackQuery,
             raise ApiForbiddenError('Не удалось получить доступ к Wildberries')
         wb_api = WBApi(access)
         await messages.LongTimeOperation(bot, callback.message.chat.id)()
-        async with get_clickhouse_client() as client:
-            await wb_manager.keyword_stat_updater(client, adv.id, wb_api)
+        async with get_clickhouse_client() as ch_client:
+            await wb_manager.keyword_stat_updater(ch_client, adv, wb_api)
         chat_id = callback.message.chat.id
         await messages.KeywordStatUpdated(bot, chat_id)()
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
