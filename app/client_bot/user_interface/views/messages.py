@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import re
 
@@ -176,7 +177,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                 .order_by(AdvSetting.bot_active.desc())
             result = await session.execute(stmt)
             adv_settings = result.scalars().all()
-        adv_settings = await self._filter_advs(adv_settings)
+        adv_settings: list[AdvSetting] = await self._filter_advs(adv_settings)
         self._adv_settings = adv_settings
         stmt = select(WBCabinet.id)\
                 .where(WBCabinet.wb_user_cabinets\
@@ -190,6 +191,22 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_page=self._page
         )
 
+        async def update_adv_positions(adv_settings, data_manager):
+            # Запускаем все задачи параллельно
+            tasks = [
+                update_adv_position(adv, data_manager)
+                for adv in adv_settings
+            ]
+            adv_settings = await asyncio.gather(*tasks)
+            return adv_settings
+
+        async def update_adv_position(adv, data_manager):
+            if not adv.bot_active or not adv.active_status == 'started':
+                return adv
+            position: int = await data_manager.get_down_scale_white_list_bust_wb_item_position(adv)
+            adv.worst_promo_position = position
+            return adv
+        self._adv_settings = await update_adv_positions(adv_settings, data_manager)
         await super().__call__()
 
 

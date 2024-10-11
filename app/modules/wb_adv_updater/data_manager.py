@@ -1721,3 +1721,20 @@ async def get_max_adv_bid(adv_setting: AdvSetting):
     return setting_max_bid
 
 
+async def get_down_scale_white_list_bust_wb_item_position(adv)-> Optional[int]:
+    stmt = select(KeywordSetting.text).where(KeywordSetting.hard_status == 2,
+                                             KeywordSetting.adv_setting_id == adv.id)
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        white_phrases = result.scalars().all()
+    positions: dict[str, WBItemPosition] = await get_keywords_positions_dict_by_text(adv, white_phrases)
+    if positions:
+        positions = [position for position in positions.values()]
+        positions = [position for position in positions if position.promo_position]
+        if positions:
+            position: WBItemPosition = sorted(positions, key=lambda x: x.promo_position, reverse=True)[0]
+        else:
+            return None
+    else:
+         return None
+    return position.promo_position
