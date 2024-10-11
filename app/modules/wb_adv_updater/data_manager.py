@@ -476,7 +476,7 @@ async def _get_cpm_by_nmid(nmid)-> Optional[int]:
     try:
         cpm = await __get_cpm_from_positions(nmid)
     except Exception:
-        logger.error('Ошибка получения cmp из позиции', exc_info=True)
+        logger.debug('Ошибка получения cmp из позиции', exc_info=True)
         cpm = None
     return cpm
 
