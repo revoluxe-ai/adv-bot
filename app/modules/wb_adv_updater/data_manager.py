@@ -160,6 +160,8 @@ async def get_keywords_statistic_clickhouse(
             )
             keywords.append(keyword)
 
+    for keyword in keywords:
+        keyword.predict_ctr = await redis_manager.get_predict_ctr(adv_setting.adv_id, keyword.text)
     return keywords
 
 
@@ -476,7 +478,7 @@ async def _get_cpm_by_nmid(nmid)-> Optional[int]:
     try:
         cpm = await __get_cpm_from_positions(nmid)
     except Exception:
-        logger.error('Ошибка получения cmp из позиции', exc_info=True)
+        logger.debug('Ошибка получения cmp из позиции', exc_info=True)
         cpm = None
     return cpm
 
@@ -1378,11 +1380,11 @@ async def _get_min_ctr(adv: AdvSetting):
             predict_ctr = await redis_manager.get_predict_ctr(adv_id, kw.text)
             if predict_ctr:
                 predict_ctrs.append(predict_ctr)
-        if real_ctrs:
-            return float(min(real_ctrs))
-
         if predict_ctrs:
             return float(min(predict_ctrs))
+
+        if real_ctrs:
+            return float(min(real_ctrs))
 
     category = await get_wb_category(adv)
     category_name = category.wb_category_name

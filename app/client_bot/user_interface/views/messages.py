@@ -261,7 +261,6 @@ class AdvSettingMenu(TextWithKeyboard):
             self._min_ctr = await data_manager.get_min_ctr(self.adv)
             if not self._min_ctr:
                 raise NoResultFound
-            self._min_ctr = round(self._min_ctr*100, 1)
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
 
@@ -455,7 +454,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """                                                      
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
                  'Статистика и настройка ключевых слов \n'
-                 f'Минимальный CRT для кампании: {round(self.min_ctr*100, 2)}%\n'
+                 f'Минимальный CRT для кампании: {self.min_ctr*100}%\n'
                  'Расшифровка: \n'
                  '✅  - ключевое слово активно \n'
                  '❌  - ключевое слово не активно \n'
@@ -523,8 +522,12 @@ class KeywordSettingMessage(TextWithKeyboard):
                 = await data_manager.get_keyword_statistic_clickhouse(client,
                                                                       self._keyword_setting.text,
                                                                       self._adv_setting.adv_id)
+        self.clicks = total_clicks
+        self.views = total_views
+        self.fact_ctr = total_clicks / total_views if total_views else 0
 
-        self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
+        self.original_predict_ctr =  await redis_manager.get_predict_ctr(self._adv_setting.adv_id,
+                                                                         self._keyword_setting.text)
 
         self.spend = total_spend
 
@@ -535,7 +538,10 @@ class KeywordSettingMessage(TextWithKeyboard):
         keyword_text = self._keyword_setting.text
         keyword_text  = re.sub(r'([_*[\]()~>`#+\-=|{}.!])', r'\\\1', keyword_text)
         text = (f'🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n'
-                f'📊 *Фактический CTR:* {self.fact_ctr}%\n'
+                f'📈 *Показы:* {self.views}\n'
+                f'🖱 *Клики:* {self.clicks}\n'
+                f'Прогнозируемый CTR: {self.original_predict_ctr*100 if self.original_predict_ctr else "Не просчитан"}%\n'
+                f'📊 *Фактический CTR:* {self.fact_ctr*100}%\n'
                 f'💰 *Расход:* {round(self.spend, 2)} руб.\n')
 
         if self.position:
