@@ -261,7 +261,6 @@ class AdvSettingMenu(TextWithKeyboard):
             self._min_ctr = await data_manager.get_min_ctr(self.adv)
             if not self._min_ctr:
                 raise NoResultFound
-            self._min_ctr = round(self._min_ctr*100, 1)
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
 
@@ -455,7 +454,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """                                                      
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
                  'Статистика и настройка ключевых слов \n'
-                 f'Минимальный CRT для кампании: {round(self.min_ctr*100, 2)}%\n'
+                 f'Минимальный CRT для кампании: {self.min_ctr*100}%\n'
                  'Расшифровка: \n'
                  '✅  - ключевое слово активно \n'
                  '❌  - ключевое слово не активно \n'
