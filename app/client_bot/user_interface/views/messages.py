@@ -522,8 +522,12 @@ class KeywordSettingMessage(TextWithKeyboard):
                 = await data_manager.get_keyword_statistic_clickhouse(client,
                                                                       self._keyword_setting.text,
                                                                       self._adv_setting.adv_id)
+        self.clicks = total_clicks
+        self.views = total_views
+        self.fact_ctr = total_clicks / total_views if total_views else 0
 
-        self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
+        self.original_predict_ctr =  await redis_manager.get_predict_ctr(self._adv_setting.adv_id,
+                                                                         self._keyword_setting.text)
 
         self.spend = total_spend
 
@@ -534,7 +538,10 @@ class KeywordSettingMessage(TextWithKeyboard):
         keyword_text = self._keyword_setting.text
         keyword_text  = re.sub(r'([_*[\]()~>`#+\-=|{}.!])', r'\\\1', keyword_text)
         text = (f'🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n'
-                f'📊 *Фактический CTR:* {self.fact_ctr}%\n'
+                f'📈 *Показы:* {self.views}\n'
+                f'🖱 *Клики:* {self.clicks}\n'
+                f'Прогнозируемый CTR: {self.original_predict_ctr*100}%\n'
+                f'📊 *Фактический CTR:* {self.fact_ctr*100}%\n'
                 f'💰 *Расход:* {round(self.spend, 2)} руб.\n')
 
         if self.position:
