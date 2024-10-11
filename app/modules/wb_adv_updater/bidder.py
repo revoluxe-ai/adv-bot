@@ -118,8 +118,10 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
                 logger.debug('Нет буста')
                 continue
             promo_positions.append(position)
-            if not cpm_from_parsing:
-                cpm_from_parsing = 100
+    if not cpm_from_parsing:
+        logger.error('Не удалось получить ставку из парсинга')
+        return
+
     if promo_positions:
         fact_max_position = max(promo_positions, key=lambda x: x.promo_position)
         promo_position = fact_max_position.promo_position

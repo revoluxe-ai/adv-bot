@@ -382,24 +382,25 @@ async def update_keyword_stat(access: WBCabinetAccess,
         adv_settings = result.scalars().all()
     async with get_clickhouse_client() as client:
         for adv_setting in adv_settings:
-            if adv_setting not in adv_update_tasks:
-                task = asyncio.create_task(keyword_stat_updater(client, adv_setting.id, wb_api))
-                adv_update_tasks[adv_setting.id] = task
+            adv_id = adv_setting.adv_id
+            if adv_id not in adv_update_tasks:
+                task = asyncio.create_task(keyword_stat_updater(client, adv_setting, wb_api))
+                adv_update_tasks[adv_id] = task
             else:
-                if adv_update_tasks[adv_setting.id].done():
+                if adv_update_tasks[adv_id].done():
                     logger.info(
-                        f'Задача обновления статистики ключей завершена для кабинета '
-                        f'{adv_setting.name}'
+                        f'Задача обновления статистики ключей завершена для adv_id '
+                        f'{adv_id}'
                     )
-                    if adv_update_tasks[adv_setting.id].exception():
+                    if adv_update_tasks[adv_id].exception():
                         logger.error(
                             f'Ошибка обновления статистики ключей: '
-                            f'{adv_update_tasks[adv_setting.id].exception()},'
-                            f' для кабинета {adv_setting.name}'
+                            f'{adv_update_tasks[adv_id].exception()},'
+                            f' для кабинета {adv_id}'
                         )
 
-                    del adv_update_tasks[adv_setting.id]
-                    logger.info(f'Статистика ключевых слов для {adv_setting.name} обновлена')
+                    del adv_update_tasks[adv_id]
+                    logger.info(f'Статистика ключевых слов для {adv_id} обновлена')
                     logger.debug(f'Установка set для need_update_model')
                     logger.debug(f"Обновление статистики завершено")
             await asyncio.sleep(0)
@@ -450,20 +451,39 @@ async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
 
 
 
-async def keyword_stat_updater(client, adv_setting_id, wb_api):
-    async with sm() as session:
-        stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-        adv_setting = await session.execute(stmt)
-        adv_setting = adv_setting.scalar()
+async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
+    adv_id = adv_setting.adv_id
     try:
-        keywords: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_setting)
+        keywords_from_auto: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_id)
+    except ApiForbiddenError as exc:
+        raise exc
     except Exception as exc:
+        keywords_from_auto = []
         logger.error(f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+    try:
+        if not adv_setting.search_adv_id:
+            keywords_from_search_adv = []
+        else:
+             keywords_from_search_adv = await wb_api.advert.get_keywords_stat(adv_setting.search_adv_id)
+    except Exception as exc:
+        keywords_from_search_adv = []
+        logger.error(f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+
+    if not keywords_from_auto and not keywords_from_search_adv:
+        logger.debug(f'Пустой список ключевых слов для {adv_setting.adv_id}')
         return
 
-    if not keywords:
-        logger.debug(f'Для {adv_setting.name} не получены ключевые слова')
-        return
+    text_to_keyword_from_auto = {kw.text: kw for kw in keywords_from_auto}
+    for kw in keywords_from_search_adv:
+        if kw.text not in text_to_keyword_from_auto:
+            text_to_keyword_from_auto[kw.text] = kw
+        else:
+            text_to_keyword_from_auto[kw.text].views += kw.views
+            text_to_keyword_from_auto[kw.text].clicks += kw.clicks
+            text_to_keyword_from_auto[kw.text].spend += kw.spend
+    full_stat  = list(text_to_keyword_from_auto.values())
+
+    keywords = full_stat
 
     logger.debug(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
     texts_for_adv_setting = {keyword.text for keyword in keywords}
