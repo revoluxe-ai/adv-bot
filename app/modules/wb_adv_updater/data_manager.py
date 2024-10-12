@@ -38,6 +38,7 @@ from app.my_types import AdvSetting, WBUserCabinet
 from app.payments.db.models import Payment
 
 from app.utils.click_house.client import get_clickhouse_client
+from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.models import User, RefLink, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
@@ -1738,3 +1739,13 @@ async def get_down_scale_white_list_bust_wb_item_position(adv)-> Optional[int]:
     else:
          return None
     return position.promo_position
+
+
+async def is_adv_in_favorites(adv_setting_original_id: int, user_original_id: int) -> bool:
+    stmt = select(favorite_advs_association).where(
+        favorite_advs_association.c.user_id == user_original_id,
+        favorite_advs_association.c.adv_id == adv_setting_original_id
+    )
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        return result.first() is not None

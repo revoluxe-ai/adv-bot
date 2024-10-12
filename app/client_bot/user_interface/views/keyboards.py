@@ -56,7 +56,9 @@ def get_adv_list_keyboard(advs: list[Adv]):
     return keyboard
 
 
-def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting):
+def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
+                             adv_setting: AdvSetting,
+                             in_favorites: bool):
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
