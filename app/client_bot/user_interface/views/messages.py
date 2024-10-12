@@ -191,29 +191,16 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_page=self._page
         )
 
-        async def update_adv_position(adv, data_manager):
+        for adv in self._adv_settings:
             if not adv.bot_active or not adv.active_status == 'started':
-                return adv
+                adv.worst_promo_position = None
+                continue
             position: int = await data_manager.get_down_scale_white_list_bust_wb_item_position(adv)
             if position:
-                adv.best_promo_position = position
+                adv.worst_promo_position = position
             else:
-                adv.best_promo_position = None
-            return adv
-
-        async def update_adv_positions(adv_settings, data_manager):
-            # Запускаем все задачи параллельно
-            tasks = [
-                update_adv_position(adv, data_manager)
-                for adv in adv_settings
-            ]
-            adv_settings = await asyncio.gather(*tasks)
-            return adv_settings
-
-
-        self._adv_settings = await update_adv_positions(adv_settings, data_manager)
+                adv.worst_promo_position = None
         await super().__call__()
-
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
         state_data = await self._state.get_data()
