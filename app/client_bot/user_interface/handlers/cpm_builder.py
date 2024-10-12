@@ -1,15 +1,9 @@
-import logging
 import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-
-from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.api import WBApi
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
-from app.utils.db.models import User
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
 from . import start
 from .. import states
