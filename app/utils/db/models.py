@@ -1,16 +1,10 @@
-from sqlalchemy import Column, BIGINT, ForeignKey, DateTime, func
-from sqlalchemy.orm import Mapped, relationship
-from sqlalchemy import String
+from sqlalchemy import func
 from app.modules.common_slaves.wildberries.models import *
 from app.payments.db.models import Payment
-from app.utils.db.base import BaseTable, Base
-from sqlalchemy import Table
+from app.utils.db.assoc_tables import favorite_advs_association, user_reflink_association
+from app.utils.db.base import BaseTable
 
-user_reflink_association = Table(
-    'user_reflink_association', Base.metadata,
-    Column('user_id', BIGINT, ForeignKey('user.id'), primary_key=True),
-    Column('reflink_id', BIGINT, ForeignKey('reflink.id'), primary_key=True)
-)
+
 
 
 class User(BaseTable):
@@ -22,7 +16,7 @@ class User(BaseTable):
                                                            cascade="all, delete-orphan")
     payments: Mapped[list['Payment']] = relationship('Payment', back_populates='user')
     wb_tokens: Mapped[list['WBToken']] = relationship('WBToken', back_populates='user', cascade="all, delete-orphan")
-
+    favorites_advs: Mapped[list['AdvSetting']] = relationship('AdvSetting', secondary=favorite_advs_association)
 
 class RefLink(BaseTable):
     name = Column(String, nullable=False)
