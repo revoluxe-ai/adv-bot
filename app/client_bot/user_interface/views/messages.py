@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import re
 
@@ -176,7 +177,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                 .order_by(AdvSetting.bot_active.desc())
             result = await session.execute(stmt)
             adv_settings = result.scalars().all()
-        adv_settings = await self._filter_advs(adv_settings)
+        adv_settings: list[AdvSetting] = await self._filter_advs(adv_settings)
         self._adv_settings = adv_settings
         stmt = select(WBCabinet.id)\
                 .where(WBCabinet.wb_user_cabinets\
@@ -190,8 +191,16 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_page=self._page
         )
 
+        for adv in self._adv_settings:
+            if not adv.bot_active or not adv.active_status == 'started':
+                adv.worst_promo_position = None
+                continue
+            position: int = await data_manager.get_down_scale_white_list_bust_wb_item_position(adv)
+            if position:
+                adv.worst_promo_position = position
+            else:
+                adv.worst_promo_position = None
         await super().__call__()
-
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
         state_data = await self._state.get_data()
@@ -264,6 +273,9 @@ class AdvSettingMenu(TextWithKeyboard):
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
 
+        self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(self.adv.id,
+                                                                        self.wb_user_cabinet.user_id)
+
         await super().__call__()
 
 
@@ -287,7 +299,9 @@ class AdvSettingMenu(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        return keyboards.get_adv_setting_keyboard(self.wb_user_cabinet,  self.adv)
+        return keyboards.get_adv_setting_keyboard(self.wb_user_cabinet,
+                                                  self.adv,
+                                                  self.in_favorites_user)
 
 
 class CabinetNameExists(Text):

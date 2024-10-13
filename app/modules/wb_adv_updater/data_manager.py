@@ -38,6 +38,7 @@ from app.my_types import AdvSetting, WBUserCabinet
 from app.payments.db.models import Payment
 
 from app.utils.click_house.client import get_clickhouse_client
+from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.models import User, RefLink, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
@@ -1721,3 +1722,30 @@ async def get_max_adv_bid(adv_setting: AdvSetting):
     return setting_max_bid
 
 
+async def get_down_scale_white_list_bust_wb_item_position(adv)-> Optional[int]:
+    stmt = select(KeywordSetting.text).where(KeywordSetting.hard_status == 2,
+                                             KeywordSetting.adv_setting_id == adv.id)
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        white_phrases = result.scalars().all()
+    positions: dict[str, WBItemPosition] = await get_keywords_positions_dict_by_text(adv, white_phrases)
+    if positions:
+        positions = [position for position in positions.values()]
+        positions = [position for position in positions if position.promo_position]
+        if positions:
+            position: WBItemPosition = sorted(positions, key=lambda x: x.promo_position, reverse=True)[0]
+        else:
+            return None
+    else:
+         return None
+    return position.promo_position
+
+
+async def is_adv_in_favorites(adv_setting_original_id: int, user_original_id: int) -> bool:
+    stmt = select(favorite_advs_association).where(
+        favorite_advs_association.c.user_id == user_original_id,
+        favorite_advs_association.c.adv_id == adv_setting_original_id
+    )
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        return result.first() is not None
