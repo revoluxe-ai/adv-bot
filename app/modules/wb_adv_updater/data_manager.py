@@ -1722,7 +1722,7 @@ async def get_max_adv_bid(adv_setting: AdvSetting):
     return setting_max_bid
 
 
-async def get_down_scale_white_list_bust_wb_item_position(adv)-> Optional[int]:
+async def _get_down_scale_white_list_bust_wb_item_position(adv)-> Optional[int]:
     stmt = select(KeywordSetting.text).where(KeywordSetting.hard_status == 2,
                                              KeywordSetting.adv_setting_id == adv.id)
     async with _sm() as session:
@@ -1749,3 +1749,16 @@ async def is_adv_in_favorites(adv_setting_original_id: int, user_original_id: in
     async with _sm() as session:
         result = await session.execute(stmt)
         return result.first() is not None
+
+
+async def set_worst_promo_position(adv_settings: list[AdvSetting]):
+    for adv in adv_settings:
+        if not adv.bot_active or not adv.active_status == 'started':
+            adv.worst_promo_position = None
+            continue
+        position: int = await _get_down_scale_white_list_bust_wb_item_position(adv)
+        if position:
+            adv.worst_promo_position = position
+        else:
+            adv.worst_promo_position = None
+    return adv_settings

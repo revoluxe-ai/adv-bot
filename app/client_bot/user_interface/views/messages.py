@@ -12,7 +12,7 @@ from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
 from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
@@ -70,6 +70,8 @@ class ShopChoice(TextWithKeyboard):
                  all_shops: list[WBUserCabinet]):
         super().__init__(bot, chat_id)
         self.__all_shops = all_shops
+
+
 
 
     @property
@@ -190,16 +192,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
             last_wb_user_cabinet_page=self._page
         )
-
-        for adv in self._adv_settings:
-            if not adv.bot_active or not adv.active_status == 'started':
-                adv.worst_promo_position = None
-                continue
-            position: int = await data_manager.get_down_scale_white_list_bust_wb_item_position(adv)
-            if position:
-                adv.worst_promo_position = position
-            else:
-                adv.worst_promo_position = None
+        self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
         await super().__call__()
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
@@ -2361,3 +2354,29 @@ class RelevantPhrasesAdded(TextWithKeyboard):
 
 class WaitingForRelevantPhrases(Text):
     text = "Введите фразы, которые вы хотите добавить в кампанию в качестве релевантных фраз:"
+
+
+class ShowFavoriteAdvs(TextWithKeyboard):
+    text = '''Ваши избранные рекламные кампании:'''
+    def __init__(self, bot, user_telegram_id):
+        self.user_telegram_id = user_telegram_id
+        super().__init__(bot, user_telegram_id)
+
+    async def __call__(self):
+        async with _sm() as session:
+            stmt = select(User)\
+            .options(joinedload(User.favorites_advs))\
+            .join(User.favorites_advs)
+            result = await session.execute(stmt)
+            user = result.scalars().first()
+            self.user = user
+            advs: list[AdvSetting] = user.favorites_advs
+        self.advs = await data_manager.set_worst_promo_position(advs)
+        await super().__call__()
+
+
+    @property
+    def keyboard(self):
+         keyboard = keyboards.get_advs_list(self.advs)
+         return keyboard
+
