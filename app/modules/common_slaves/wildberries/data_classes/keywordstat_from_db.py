@@ -38,14 +38,34 @@ class CalculatedKeyword:
     cluster_name: Optional[str] = None
     preset: Optional[int] = None
 
+
+
     @property
     def rating_by_predict_ctr(self):
+        if not self.base_position:
+            return 0
         if self.predict_ctr is None:
             return 0
         if self.views < 10:
-            return
-        rating = self.predict_ctr * self.views
-        return  rating
+            # Для случаев, когда показов меньше 10, рейтинг не рассчитывается
+            return 0
+
+        # Рассчитываем уверенность в данных на основе количества показов (views)
+        if self.views < 10:
+            confidence = self.views / 10  # Уверенность для показов меньше 10
+        elif 10 <= self.views < 100:
+            confidence = (self.views - 10) / 90  # Постепенное увеличение уверенности
+        else:
+            confidence = 1  # Полная уверенность, если показов >= 100
+
+        # Рейтинг с учетом уверенности
+        rating = self.predict_ctr**2 * self.views /self.base_position
+        return rating
+
+
+
+
+
 
 
     @property
