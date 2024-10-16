@@ -1,10 +1,8 @@
 import asyncio
 import logging
-from app.utils.db.session_maker import get_async_session_maker as sm
-from sqlalchemy import select
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater import data_manager
 
@@ -46,10 +44,10 @@ async def _set_keyword_phrases_for_search_adv(adv_setting):
     wb_cabinet_id = adv_setting.wb_cabinet_id
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
     api = WBApi(access)
-    keywords = await data_manager.get_good_bad_phrases(adv_setting)
+    keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
     if not keywords:
         return
-    keywords = sorted(keywords, key=lambda kw: kw.predict_ctr, reverse=True)
+    keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
     texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.GOOD][:100]
 
     texts = [text.replace('"', '') for text in texts]

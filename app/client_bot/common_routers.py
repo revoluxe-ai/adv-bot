@@ -5,6 +5,7 @@ from .user_interface.handlers import (adv_setting,
                                       exceptions,
                                       keyword_settings,
                                       setting_min_ctr,
+                                      favorite_advs_for_users,
                                       change_max_cpc,
                                       min_views_for_ml_predict_ctr,
                                       keywords_positions_history,
@@ -32,8 +33,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 
-
-
+common_router.include_routers(favorite_advs_for_users.router)
 common_router.include_routers(clusters.router)
 common_router.include_routers(start.router)
 common_router.include_routers(download_keywords.router)

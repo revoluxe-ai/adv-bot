@@ -20,6 +20,10 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet]):
     # Создаем список для строк кнопок
     keyboard_buttons = []
 
+
+    button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
+    keyboard_buttons.append([button])
+
     for wb_user_cabinet in all_shops:
         shop_name = wb_user_cabinet.name
         wb_user_cabinet_original_id = wb_user_cabinet.id
@@ -201,7 +205,16 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
                                             action='turn_on_auto_min_ctr',
                                             adv_setting_original_id=adv_setting.id).pack())
         builder.row(button)
+    if not in_favorites:
+        button = InlineKeyboardButton(text='Добавить в избранное',
+                                        callback_data=callbacks.AddToFavorites(
+                                            adv_setting_original_id=adv_setting.id).pack())
+    else:
+        button = InlineKeyboardButton(text='Удалить из избранного',
+                                        callback_data=callbacks.RemoveFromFavorites(
+                                            adv_setting_original_id=adv_setting.id).pack())
 
+    builder.row(button)
 
 
     wb_user_cabinet_original_id = wb_user_cabinet.id
@@ -716,5 +729,17 @@ def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]):
         button = InlineKeyboardButton(text="Пополнить " + wb_user_cabinet.name + f' Текущий общий баланс({total_money})',
                                       callback_data=callbacks.AddBalance(
                                           wb_cabinet_original_id=wb_user_cabinet.wb_cabinet_id).pack())
+        builder.row(button)
+    return builder.as_markup()
+
+
+def get_advs_list(advs: list[AdvSetting]):
+    builder = InlineKeyboardBuilder()
+    for adv in advs:
+        name = '(' + str(adv.worst_promo_position) + ')' if adv.worst_promo_position else ''
+        name += adv.name
+        button = InlineKeyboardButton(text=name,
+                                      callback_data=callbacks.Adv(
+                                          adv_original_id=adv.id).pack())
         builder.row(button)
     return builder.as_markup()

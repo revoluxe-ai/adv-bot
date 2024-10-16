@@ -64,7 +64,8 @@ async def get_csv_file(adv_setting: AdvSetting):
         "Статус",
         'Начальная позиция',
         'Текущая позиция',
-        'Дополнительные клики'
+        'Дополнительные клики',
+        'Рейтинг'
     ])
 
     for keyword in keywords:
@@ -110,13 +111,14 @@ async def get_csv_file(adv_setting: AdvSetting):
         clicks,
         views,
         keyword.query,
-        ctr,
-        round(keyword.predict_ctr * 100, 2),
+        str(ctr).replace('.', ','),
+        str(round(keyword.predict_ctr * 100, 2)).replace('.', ','),
         turn_on,
         hard_status,
         first_position,
         second_position,
-        keyword.keyword_setting.added_clicks or 0
+        keyword.keyword_setting.added_clicks or 0,
+        keyword.rating_by_predict_ctr
         ])
 
     for row in rows:

@@ -181,3 +181,16 @@ class AddRelevantPhrases(CallbackData, prefix="add_relevant_phrases"):
 class ChangeAutoMinCTR(CallbackData, prefix="change_auto_min_ctr"):
     action: str
     adv_setting_original_id: int
+
+
+
+class ShowFavorites(CallbackData, prefix="show_favorites"):
+    pass
+
+
+class AddToFavorites(CallbackData, prefix="add_to_favorites"):
+    adv_setting_original_id: int
+
+
+class RemoveFromFavorites(CallbackData, prefix="remove_from_favorites"):
+    adv_setting_original_id: int
