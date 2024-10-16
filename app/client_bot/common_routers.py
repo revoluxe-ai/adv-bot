@@ -17,7 +17,8 @@ from .user_interface.handlers import (adv_setting,
                                      clusters,
                                      update_adv,
                                      start,
-                                     strategy_setting
+                                     strategy_setting,
+                                      change_cpm
 
 )
 from ..settings import settings
@@ -33,6 +34,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 
+common_router.include_routers(change_cpm.router)
 common_router.include_routers(favorite_advs_for_users.router)
 common_router.include_routers(clusters.router)
 common_router.include_routers(start.router)
