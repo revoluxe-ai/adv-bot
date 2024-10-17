@@ -25,7 +25,7 @@ async def off_auto_cpm(callback: types.CallbackQuery,
         async with sm() as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
-            adv.bot_active = False
+            adv.bidder_active = False
             await session.commit()
             await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
         return
