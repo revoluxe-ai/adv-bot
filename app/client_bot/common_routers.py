@@ -21,6 +21,9 @@ from .user_interface.handlers import (adv_setting,
                                       change_cpm
 
 )
+
+from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
+
 from ..settings import settings
 
 common_router = Router()
@@ -34,6 +37,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 
+common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)
 common_router.include_routers(favorite_advs_for_users.router)
 common_router.include_routers(clusters.router)
