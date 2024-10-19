@@ -194,3 +194,7 @@ class AddToFavorites(CallbackData, prefix="add_to_favorites"):
 
 class RemoveFromFavorites(CallbackData, prefix="remove_from_favorites"):
     adv_setting_original_id: int
+
+
+class ChangeCPM(CallbackData, prefix="change_cpm"):
+    adv_setting_original_id: int

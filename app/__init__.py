@@ -3,3 +3,4 @@ set_config()
 
 
 from app.modules.common_slaves.wildberries import exceptions as exc
+from app.modules.wb_adv_updater import wb_manager

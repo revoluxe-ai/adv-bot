@@ -237,7 +237,7 @@ async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnB
                                             .where(AdvSetting.id == callback_data.adv_original_id))
 
         adv_setting: AdvSetting = adv_setting.scalars().first()
-        adv_setting.new_auto_min_ctr_mode = False
+        adv_setting.bot_active = False
         await session.commit()
 
     await messages.AdvSettingMenu(call.bot,
