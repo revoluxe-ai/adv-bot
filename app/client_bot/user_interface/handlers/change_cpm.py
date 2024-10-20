@@ -43,7 +43,7 @@ async def change_cpm(message: aiogram.types.Message,
             await message.answer('CPM должен быть числом')
             return
         cpm = int(cpm)
-        if cpm > 1500:
+        if cpm > 3000:
             await message.answer('Внимание! Системное ограничение: нельзя задать ставку больше 1500. Если нужно снять ограничение, обратитесь к администратору')
             return
 
