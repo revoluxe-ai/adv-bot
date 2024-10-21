@@ -71,16 +71,5 @@ async def show_favorites(callback: types.CallbackQuery,
                             state: FSMContext):
      await callback.answer()
      user_telegram_id = callback.from_user.id
-     async with sm() as session:
-         stmt = select(User)\
-             .options(joinedload(User.favorites_advs))\
-             .where(User.user_telegram_id == user_telegram_id)
-         user = await session.execute(stmt)
-         user = user.scalar()
-         advs = user.favorites_advs
-         if not advs:
-             await bot.send_message(callback.message.chat.id, "У вас нет избранных кампаний")
-         else:
-             user_telegram_id = callback.from_user.id
-             await messages.ShowFavoriteAdvs(bot, user_telegram_id)()
+     await messages.ShowFavoriteAdvs(bot, user_telegram_id)()
      return

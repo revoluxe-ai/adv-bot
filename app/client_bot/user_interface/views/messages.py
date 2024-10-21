@@ -2366,7 +2366,8 @@ class ShowFavoriteAdvs(TextWithKeyboard):
         async with _sm() as session:
             stmt = select(User)\
             .options(joinedload(User.favorites_advs))\
-            .join(User.favorites_advs)
+            .join(User.favorites_advs)\
+            .where(User.user_telegram_id == self.user_telegram_id)
             result = await session.execute(stmt)
             user = result.scalars().first()
             self.user = user
