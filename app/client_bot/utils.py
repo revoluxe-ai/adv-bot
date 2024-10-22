@@ -118,8 +118,10 @@ async def get_csv_file(adv_setting: AdvSetting):
         first_position,
         second_position,
         keyword.keyword_setting.added_clicks or 0,
-        keyword.rating_by_predict_ctr
+        str(round(keyword.rating_by_predict_ctr*100, 4)).replace('.', ',')
         ])
+
+    rows.sort(key=lambda row: row[-1], reverse=True)
 
     for row in rows:
         logger.debug(row)
