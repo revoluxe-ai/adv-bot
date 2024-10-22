@@ -198,3 +198,8 @@ class RemoveFromFavorites(CallbackData, prefix="remove_from_favorites"):
 
 class ChangeCPM(CallbackData, prefix="change_cpm"):
     adv_setting_original_id: int
+
+    class DeleteWBUserCabinet(CallbackData, prefix="delete_wb_user_cabinet"):
+        wb_user_cabinet_original_id: int
+
+

@@ -885,6 +885,15 @@ class ShopMenu(TextWithKeyboard):
 
         builder.row(button)
 
+        button = InlineKeyboardButton(
+            text = 'Удалить личный кабинет магазина',
+            callback_data\
+                = callbacks.DeleteWbUserCabinet(
+                wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
+        )
+
+        builder.row(button)
+
         if is_active_adv:
             button = InlineKeyboardButton(
             text = 'Отключить все кампании',
