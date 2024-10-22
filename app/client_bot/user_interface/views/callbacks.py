@@ -165,6 +165,12 @@ class WBUpdate(CallbackData, prefix="wb_update"):
     adv_setting_original_id: int
 
 
+class ResetAddedClicks(CallbackData, prefix="reset_added_clicks"):
+    adv_setting_original_id: int
+
+
+
+
 class StrategySetting(CallbackData, prefix="strategy_setting"):
     action: str
     adv_setting_original_id: int

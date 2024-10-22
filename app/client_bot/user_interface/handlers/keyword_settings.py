@@ -627,3 +627,19 @@ async def setting_keywords_filter_by_query(message: types.Message,
     )(state)
     logger.debug('Отправили сообщение')
     await redis_manager.set_check_last_24_hours(adv_original_id)
+
+@router.callback_query(callbacks.ResetAddedClicks.filter())
+async def reset_added_clicks(callback: types.CallbackQuery,
+                             callback_data: callbacks.ResetAddedClicks,
+                             bot: aiogram.Bot, state: FSMContext):
+    await callback.answer()
+    adv_setting_original_id = callback_data.adv_setting_original_id
+    async with _sm() as session:
+        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)
+        result = await session.execute(stmt)
+        keyword_settings = result.scalars().all()
+        for keyword_setting in keyword_settings:
+            keyword_setting.added_clicks = 0
+        await session.commit()
+    await bot.send_message(callback.message.chat.id, "Добавленные клики сброшены")
+    return

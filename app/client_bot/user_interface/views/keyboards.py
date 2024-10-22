@@ -479,6 +479,15 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
     bottoms.append(botton)
 
+
+    botton = [InlineKeyboardButton(text='Сбросить добавочные клики',
+                                   callback_data=callbacks.ResetAddedClicks(
+              adv_setting_original_id=adv_setting.id).pack())]
+
+
+    bottoms.append(botton)
+
+
     bottoms.append([InlineKeyboardButton(text='К настройкам АРК',
                                          callback_data=callbacks.Adv(
                                                 adv_original_id=adv_setting.id).pack())])
