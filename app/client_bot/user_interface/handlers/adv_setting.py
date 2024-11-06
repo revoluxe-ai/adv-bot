@@ -224,8 +224,8 @@ async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
 @router.callback_query(callbacks.TurnBot.filter(F.action == 'off'))
 async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot, state: FSMContext):
     await call.answer()
-    data = await state.get_data()
-    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
+    # data = await state.get_data()
+    wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet) \
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
