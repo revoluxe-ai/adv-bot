@@ -1076,7 +1076,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
 
 
 
-async def get_main_photos(nmids: list[int]):
+async def get_main_photos(nmids: list[int])-> list[str]:
     async with _sm() as session:
         smtp = (select(WBCard).where(WBCard.nmid.in_(nmids)))
         result = await session.execute(smtp)

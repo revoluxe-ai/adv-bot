@@ -247,7 +247,7 @@ class ShopUpdateInfo(Text):
 
 
 
-class AdvSettingMenu(TextWithKeyboard):
+class AdvSettingMenu(TextWithKeyboardAndImage):
     parse_mode = ParseMode.MARKDOWN
 
     def __init__(self, bot: Bot,
@@ -255,6 +255,8 @@ class AdvSettingMenu(TextWithKeyboard):
                  wb_user_cabinet: WBUserCabinet,
                  adv: AdvSetting):
         super().__init__(bot, chat_id)
+        self._bot = bot
+        self._chat_id = chat_id
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
 
@@ -269,8 +271,16 @@ class AdvSettingMenu(TextWithKeyboard):
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(self.adv.id,
                                                                         self.wb_user_cabinet.user_id)
 
-        await super().__call__()
+        try:
+            nmids = self.adv.nmids
+            images = await data_manager.get_main_photos(nmids[:1])
+            image = images[0]
+            self.image = image
+        except:
+            await NoMainPhotos(self._bot, self._chat_id)(self.adv)
+            return
 
+        await super().__call__()
 
     @property
     def text(self):

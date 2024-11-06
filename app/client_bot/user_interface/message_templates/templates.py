@@ -148,6 +148,7 @@ class TextWithKeyboardPagination(Base):
 
 
 class TextWithKeyboardAndImage(Base):
+
     @property
     @abstractmethod
     def text(self):
@@ -159,9 +160,15 @@ class TextWithKeyboardAndImage(Base):
         pass
 
     @property
-    @abstractmethod
     def image(self):
-        pass
+        return self._image
+
+    @image.setter
+    def image(self, value):
+        self._image = value
+
+
+
 
     @manage_file_id
     async def __call__(self):
@@ -169,6 +176,8 @@ class TextWithKeyboardAndImage(Base):
         last_message = await self.bot.send_photo(chat_id=self.chat_id,
                                                  photo=self.image,
                                                  caption=self.text,
-                                                 reply_markup=self.keyboard)
+                                                 reply_markup=self.keyboard,
+                                                 parse_mode= getattr(self, 'parse_mode', None)
+                                                 )
         logger.debug('Отправка сообщения завершена')
         return last_message
