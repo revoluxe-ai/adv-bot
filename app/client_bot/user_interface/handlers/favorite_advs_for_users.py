@@ -71,5 +71,6 @@ async def show_favorites(callback: types.CallbackQuery,
                             state: FSMContext):
      await callback.answer()
      user_telegram_id = callback.from_user.id
+     await messages.LongTimeOperation(bot, user_telegram_id)()
      await messages.ShowFavoriteAdvs(bot, user_telegram_id)()
      return
