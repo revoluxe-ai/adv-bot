@@ -2301,7 +2301,7 @@ class Single_message115(Text):
     """
 
 
-class Single_message116(TextWithImage):
+class Single_message1000(TextWithImage):
     parse_mode='Markdown'
 
     image = 'images_for_sendings/2.jpg'
