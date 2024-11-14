@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.future import select
-from app.client_bot import utils
+from app.client_bot import utils, const
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -375,6 +375,7 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
         return
 
 
+
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'by_adv'))
 async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
                                   callback_data: callbacks.SettingKeywords,
@@ -411,7 +412,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
                         WBCabinet.id == adv_setting.wb_cabinet_id))
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
-    if wb_user_cabinet is None and callback.from_user.id == 373435337:
+    if wb_user_cabinet is None and callback.from_user.id in const.ADMINS:
         stmt = select(User).where(User.user_telegram_id == callback.from_user.id)
         admin_user = await session.execute(stmt)
         admin_user = admin_user.scalar()
