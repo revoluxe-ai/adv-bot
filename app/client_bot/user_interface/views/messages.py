@@ -247,7 +247,7 @@ class ShopUpdateInfo(Text):
 
 
 
-class AdvSettingMenu(TextWithKeyboard):
+class AdvSettingMenu(TextWithKeyboardAndImage):
     parse_mode = ParseMode.MARKDOWN
 
     def __init__(self, bot: Bot,
@@ -255,6 +255,8 @@ class AdvSettingMenu(TextWithKeyboard):
                  wb_user_cabinet: WBUserCabinet,
                  adv: AdvSetting):
         super().__init__(bot, chat_id)
+        self._bot = bot
+        self._chat_id = chat_id
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
 
@@ -269,8 +271,16 @@ class AdvSettingMenu(TextWithKeyboard):
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(self.adv.id,
                                                                         self.wb_user_cabinet.user_id)
 
-        await super().__call__()
+        try:
+            nmids = self.adv.nmids
+            images = await data_manager.get_main_photos(nmids[:1])
+            image = images[0]
+            self.image = image
+        except:
+            await NoMainPhotos(self._bot, self._chat_id)(self.adv)
+            return
 
+        await super().__call__()
 
     @property
     def text(self):
@@ -881,6 +891,15 @@ class ShopMenu(TextWithKeyboard):
         button = InlineKeyboardButton(
         text = 'Пополнить баланс',
         callback_data = callbacks.AddBalance(wb_cabinet_original_id=wb_cabinet_original_id).pack(),
+        )
+
+        builder.row(button)
+
+        button = InlineKeyboardButton(
+            text = 'Удалить личный кабинет магазина',
+            callback_data\
+                = callbacks.DeleteWbUserCabinet(
+                wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
         )
 
         builder.row(button)
@@ -2282,30 +2301,31 @@ class Single_message115(Text):
     """
 
 
-class Single_message116(TextWithImage):
+class Single_message1000(TextWithImage):
     parse_mode='Markdown'
 
-    image = 'images_for_sendings/1.jpg'
+    image = 'images_for_sendings/2.jpg'
 
     text = """
-Закупайте товар напрямую из Китая и экономьте до 40% на услугах посредников
+🚀 ИЩЕТЕ АВТОМАТИЗИРОВАННЫЙ ФУЛФИЛМЕНТ С ПОЛНОЙ ОБРАТНОЙ СВЯЗЬЮ И С ПРОХОДНОЙ ЦЕНОй ? 
+*Мы знаем, как вам помочь!* 🚀
 
-Анна Шифу набирает группу из 10 человек для поездки в производственные центры Китая🇨🇳 Гуанчжоу, Шэньчжэнь, Вэньчжоу, Иу. 
-Вас ждет не просто бизнес-тур, а полноценное обучение и практика по самостоятельной работе с производителями🔥
+Представляем вам наши услуги фулфилмента — [Win-Win](https://t.me/ffwinwinmanager) идеальное решение для вашего бизнеса! 
 
-Узнать подробнее >> [@AnnaShifubot](https://t.me/AnnaShifuBot?start=missia1)
 
-Что вы получите:
+📦 *Отгрузка с коэффициентом х0:* Обходите платную приемку на Wildberries и получайте больше прибыли! 
 
-— прямые контакты китайских производителей для работы без посредников
-— научитесь выбирать качественный товар и отличать фабрику от перекупа
-— способы выгодной доставки товара
-— узнаете, как снижать себестоимость товара и зарабатывать больше
-— возможность задавать тренды и зарабатывать на новинках раньше конкурентов🔥
+💰 *Низкие цены:* От 7 руб упаковка. С нами вы экономите на аренде склада и логистике. 
 
-❗️Осталось несколько мест. Успейте забронировать: [@AnnaShifubot](https://t.me/AnnaShifuBot?start=missia1)
+⚡️ *Скорость:* Обработка заказов происходит в течение 72 часов, а доставка — в кратчайшие сроки!
 
-— Tg: @annashifu
+📊 *Подробная отчетность:* Получайте полную информацию о движении ваших товаров на нашем складе — всегда будьте в курсе!
+
+🏆 *Качество:* Мы гарантируем высокие стандарты упаковки и отгрузки, чтобы ваши товары всегда доходили до клиентов в идеальном состоянии.
+
+🤝 *Быстрая обратная связь:* Мы всегда на связи! Ваши вопросы не останутся без ответа.
+
+🎁Всем тем кто пришел по этой ссылке, в ноябре 11% скидка на 🏷 на упаковку: [Win-Win](https://t.me/ffwinwinmanager)
      """
 
 
@@ -2366,7 +2386,8 @@ class ShowFavoriteAdvs(TextWithKeyboard):
         async with _sm() as session:
             stmt = select(User)\
             .options(joinedload(User.favorites_advs))\
-            .join(User.favorites_advs)
+            .join(User.favorites_advs)\
+            .where(User.user_telegram_id == self.user_telegram_id)
             result = await session.execute(stmt)
             user = result.scalars().first()
             self.user = user

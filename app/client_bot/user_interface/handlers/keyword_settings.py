@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.future import select
-from app.client_bot import utils
+from app.client_bot import utils, const
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -375,6 +375,7 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
         return
 
 
+
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'by_adv'))
 async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
                                   callback_data: callbacks.SettingKeywords,
@@ -411,7 +412,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
                         WBCabinet.id == adv_setting.wb_cabinet_id))
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
-    if wb_user_cabinet is None and callback.from_user.id == 373435337:
+    if wb_user_cabinet is None and callback.from_user.id in const.ADMINS:
         stmt = select(User).where(User.user_telegram_id == callback.from_user.id)
         admin_user = await session.execute(stmt)
         admin_user = admin_user.scalar()
@@ -627,3 +628,19 @@ async def setting_keywords_filter_by_query(message: types.Message,
     )(state)
     logger.debug('Отправили сообщение')
     await redis_manager.set_check_last_24_hours(adv_original_id)
+
+@router.callback_query(callbacks.ResetAddedClicks.filter())
+async def reset_added_clicks(callback: types.CallbackQuery,
+                             callback_data: callbacks.ResetAddedClicks,
+                             bot: aiogram.Bot, state: FSMContext):
+    await callback.answer()
+    adv_setting_original_id = callback_data.adv_setting_original_id
+    async with _sm() as session:
+        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)
+        result = await session.execute(stmt)
+        keyword_settings = result.scalars().all()
+        for keyword_setting in keyword_settings:
+            keyword_setting.added_clicks = 0
+        await session.commit()
+    await bot.send_message(callback.message.chat.id, "Добавленные клики сброшены")
+    return

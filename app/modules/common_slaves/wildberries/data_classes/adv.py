@@ -171,7 +171,7 @@ class Adv:
                 else:
                     raise Exception('NMID не найден')
         except:
-            nmids = re.findall('\d{8,9}', self.name)
+            nmids = re.findall(r"(?<!\[)\d{7,9}(?!\])", self.name)
             nmids = [int(nmid) for nmid in nmids]
             return nmids if nmids else []
 

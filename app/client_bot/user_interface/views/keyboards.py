@@ -8,9 +8,8 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
-from ...user_interface.views import callbacks
-from ...user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot
-from .callbacks import Action
+from app.client_bot.user_interface.views import callbacks
+from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
@@ -323,11 +322,21 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                   hide_keywords_is_not_relevant,
                                   sort_mode = 'default'):
 
-    min_ctr = min_ctr
+
     def sorting_keywords(keywords, sort_mode):
         if sort_mode == 'default':
-            keywords.sort(key=lambda x: abs(x.predict_ctr - min_ctr))
-            return keywords
+            def sort_by_raiting_and_predict_ctr(keyword: CalculatedKeyword):
+                if keyword.rating_by_predict_ctr:
+                    return keyword.rating_by_predict_ctr
+                else:
+                    return keyword.predict_ctr
+
+            keywords_sorted = sorted(
+                keywords,
+                key=sort_by_raiting_and_predict_ctr,
+                reverse=True
+            )
+            return keywords_sorted
         elif sort_mode == 'sort_by_ctr_desc':
             return sorted(keywords, key=lambda x: x.ctr, reverse=True)
         else:
@@ -478,6 +487,15 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
             page=page).pack())]
 
     bottoms.append(botton)
+
+
+    botton = [InlineKeyboardButton(text='Сбросить добавочные клики',
+                                   callback_data=callbacks.ResetAddedClicks(
+              adv_setting_original_id=adv_setting.id).pack())]
+
+
+    bottoms.append(botton)
+
 
     bottoms.append([InlineKeyboardButton(text='К настройкам АРК',
                                          callback_data=callbacks.Adv(

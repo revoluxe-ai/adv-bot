@@ -18,9 +18,14 @@ from .user_interface.handlers import (adv_setting,
                                      update_adv,
                                      start,
                                      strategy_setting,
-                                      change_cpm
+                                      change_cpm,
+                                      shop_settings
 
 )
+
+from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
+
+
 from ..settings import settings
 
 common_router = Router()
@@ -34,6 +39,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 
+common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)
 common_router.include_routers(favorite_advs_for_users.router)
 common_router.include_routers(clusters.router)
@@ -50,4 +56,5 @@ common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.include_routers(update_adv.router)
 common_router.include_routers(strategy_setting.router)
+common_router.include_routers(shop_settings.router)
 # common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())

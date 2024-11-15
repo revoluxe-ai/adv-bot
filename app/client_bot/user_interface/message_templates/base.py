@@ -2,6 +2,7 @@ import datetime
 from abc import ABC, abstractmethod
 
 import aiogram
+from aiogram.enums import ParseMode
 
 
 class Base(ABC):
@@ -17,11 +18,29 @@ class Base(ABC):
     def chat_id(self):
         return self._chat_id
 
+    def _escape_markdown_2(self, text: str) -> str:
+        return text\
+            .replace('[', '\\[') \
+            .replace('`', '\\`') \
+            .replace(']', '\\]') \
+            .replace('(', '\\(') \
+            .replace(')', '\\)') \
+            .replace('~', '\\~') \
+            .replace('>', '\\>') \
+            .replace('#', '\\#') \
+            .replace('+', '\\+') \
+            .replace('-', '\\-') \
+            .replace('=', '\\=') \
+            .replace('{', '\\{') \
+            .replace('}', '\\}')
 
 
-    async def __call__(self)-> (str):
+    async def __call__(self) -> (str):  # type: ignore
         parse_mode = getattr(self, 'parse_mode', None)
         self.parse_mode = parse_mode
+        if parse_mode == ParseMode.MARKDOWN_V2:
+            text = self.text  # type: ignore
+            self.text = self._escape_markdown_2(text)
 
     def __get_parent_class_name(self):
         # Получаем первый родительский класс из кортежа __bases__
@@ -30,7 +49,6 @@ class Base(ABC):
 
     def get_content_type(self):
         return self.__get_parent_class_name()
-
 
     @staticmethod
     def can_edit_message(message) -> bool:
@@ -48,5 +66,3 @@ class Base(ABC):
                              text: str,
                              keyboard: aiogram.types.InlineKeyboardMarkup):
         return last_message.text == text and last_message.reply_markup == keyboard
-
-

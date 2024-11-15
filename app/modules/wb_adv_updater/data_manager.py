@@ -1076,7 +1076,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
 
 
 
-async def get_main_photos(nmids: list[int]):
+async def get_main_photos(nmids: list[int])-> list[str]:
     async with _sm() as session:
         smtp = (select(WBCard).where(WBCard.nmid.in_(nmids)))
         result = await session.execute(smtp)
@@ -1273,10 +1273,10 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 async def get_min_ctr(adv: AdvSetting):
-    if not adv.new_auto_min_ctr_mode:
-        min_ctr = await _get_min_ctr(adv)
-    else:
-        min_ctr = await _get_new_min_ctr(adv)
+    # if not adv.new_auto_min_ctr_mode:
+    min_ctr = await _get_min_ctr(adv)
+    # else:
+    #     min_ctr = await _get_new_min_ctr(adv)
     if adv.hard_min_ctr and min_ctr < adv.hard_min_ctr:
         min_ctr = adv.hard_min_ctr
     return min_ctr

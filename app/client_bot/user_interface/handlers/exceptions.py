@@ -51,17 +51,17 @@ async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bo
     return
 
 
-@admin_router.errors(ExceptionTypeFilter(aiogram.exceptions.TelegramBadRequest))
-async def bad_request_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-    message = error_event.update.message
-    if message is None:
-        chat_id = error_event.update.callback_query.message.chat.id
-    else:
-        chat_id = message.chat.id
-    await bot.send_message(chat_id=chat_id,
-                           text='Эта кнопка устарела. Нажмите на /start и начните сначала'
-                           'Если ошибка повторяется, обратитесь к администратору бота @skyline360_1')
-    return
+# @admin_router.errors(ExceptionTypeFilter(aiogram.exceptions.TelegramBadRequest))
+# async def bad_request_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+#     message = error_event.update.message
+#     if message is None:
+#         chat_id = error_event.update.callback_query.message.chat.id
+#     else:
+#         chat_id = message.chat.id
+#     await bot.send_message(chat_id=chat_id,
+#                            text='Эта кнопка устарела. Нажмите на /start и начните сначала'
+#                            'Если ошибка повторяется, обратитесь к администратору бота @skyline360_1')
+#     return
 
 
 @admin_router.errors(ExceptionTypeFilter(ErrorParsingPositions))

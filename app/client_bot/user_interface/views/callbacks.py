@@ -165,6 +165,12 @@ class WBUpdate(CallbackData, prefix="wb_update"):
     adv_setting_original_id: int
 
 
+class ResetAddedClicks(CallbackData, prefix="reset_added_clicks"):
+    adv_setting_original_id: int
+
+
+
+
 class StrategySetting(CallbackData, prefix="strategy_setting"):
     action: str
     adv_setting_original_id: int
@@ -198,3 +204,8 @@ class RemoveFromFavorites(CallbackData, prefix="remove_from_favorites"):
 
 class ChangeCPM(CallbackData, prefix="change_cpm"):
     adv_setting_original_id: int
+
+    class DeleteWBUserCabinet(CallbackData, prefix="delete_wb_user_cabinet"):
+        wb_user_cabinet_original_id: int
+
+
