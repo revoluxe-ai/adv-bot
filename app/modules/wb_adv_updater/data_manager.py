@@ -1,9 +1,11 @@
 import asyncio
+import hashlib
 import io
 import logging
 import time
 import cProfile
 import pstats
+import zlib
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -1762,3 +1764,89 @@ async def set_worst_promo_position(adv_settings: list[AdvSetting]):
         else:
             adv.worst_promo_position = None
     return adv_settings
+
+
+def __calculate_version(position):
+    return int(position.timestamp.timestamp())
+
+
+
+async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
+    async with get_clickhouse_client() as client:
+        for position in positions:
+            try:
+                # Генерация версии и подготовка timestamp
+                version = __calculate_version(position)
+                timestamp_str = position.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+
+                # Проверяем существующую запись
+                query_check = f"""
+                SELECT promo_position,
+                 base_position,
+                  cpm,
+                   timestamp
+                FROM default_db.wbitemposition
+                WHERE nmid = {position.nmid}
+                  AND adv_type = {position.adv_type}
+                  AND text = '{position.keyword_text}'
+                ORDER BY version DESC
+                LIMIT 1
+                """
+                result = await client.query(query_check)
+                result_rows = result.result_rows
+                if result_rows:
+                    if result_rows:
+                        result_row = result_rows[0]  # Первая строка результата
+                        last_promo_position = result_row[1]
+                        last_base_position = result_row[2]
+                        last_cpm = result_row[3]
+
+                    if (position.promo_position == last_promo_position and
+                        position.base_position == last_base_position and
+                        position.cpm == last_cpm):
+                        # Данные совпадают — обновляем только timestamp
+                        query_update_timestamp = f"""
+                        ALTER TABLE default_db.wbitemposition
+                        UPDATE timestamp = now()
+                        WHERE nmid = {position.nmid}
+                          AND adv_type = {position.adv_type}
+                          AND text = '{position.keyword_text}'
+                          AND promo_position = {position.promo_position}
+                          AND base_position = {position.base_position}
+                          AND cpm = {position.cpm}
+                        """
+                        await client.query(query_update_timestamp)
+                        logger.debug(f"Обновлено время проверки для nmid={position.nmid}")
+                        continue
+
+                # Если данные изменились или записи нет — добавляем новую запись
+                query_insert = f"""
+                INSERT INTO default_db.wbitemposition (
+                    nmid,
+                    text,
+                    promo_position,
+                    base_position,
+                    cpm,
+                    adv_type,
+                    timestamp,
+                    version
+                )
+                VALUES (
+                    {position.nmid},
+                    '{position.keyword_text}',
+                    {position.promo_position},
+                    {position.base_position},
+                    {position.cpm},
+                    {int(position.adv_type)},
+                    '{timestamp_str}',
+                    {version}
+                )
+                """
+                await client.query(query_insert)
+                logger.debug(f"Добавлена запись для nmid={position.nmid}")
+            except Exception as e:
+                logger.error(f"Ошибка при обработке позиции nmid={position.nmid}: {e}", exc_info=True)
+                raise e
+
+
+
