@@ -192,7 +192,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             wb_cabinet = result.scalar()
             if not wb_cabinet: #если кабинета нет, то создаем кабинет
                 wb_cabinet = WBCabinet(shop_id=wb_token.shop_id)
-                wb_cabinet.bonus = 300
+                wb_cabinet.bonus = 0
                 session.add(wb_cabinet)
             access.wb_cabinet = wb_cabinet
             wb_user_cabinet = WBUserCabinet(name=cabinet_name)
