@@ -291,6 +291,16 @@ async def add_positions_from_page(stop_event: asyncio.Event,
         logger.debug(f'{get_parse_url(text, page)}')
 
 
+async def add_wb_positions_to_clickhouse(positions):
+    await data_manager.add_positions_to_clickhouse(positions)
+
+
+
+async def add_wb_positions_to_all_bases(positions: list[WBItemPosition]):
+    await asyncio.gather(
+        add_wb_positions_to_redis(positions),
+        add_wb_positions_to_clickhouse(positions),
+    )
 
 async def _add_positions_from_page(stop_event: asyncio.Event,
                                   catch_any_position: asyncio.Event,
@@ -313,7 +323,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
     positions = [position for position in positions if position.nmid in need_nmids]
     logger.debug(f'После фильтра осталось {len(positions)}')
     if positions:
-        await add_wb_positions_to_redis(positions)
+        await add_wb_positions_to_all_bases(positions)
         logger.debug('Записали позиции в Редис')
         for position in positions:
             nmid: int = position.nmid
@@ -447,9 +457,9 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60
         await add_wb_positions_to_redis(not_found_positions)
 
 async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
-    for position in positions:
-        last_position = await redis_manager.get_keyword_position(position.keyword_text,
-                                                                 position.nmid)
+    # for position in positions:
+        # last_position = await redis_manager.get_keyword_position(position.keyword_text,
+        #                                                          position.nmid)
         # asyncio.create_task(sender_manager.check_last_position(last_position, position))
 
     await redis_manager.add_positions_to_redis(positions)
