@@ -805,7 +805,7 @@ class ShopMenu(TextWithKeyboard):
 
         shops_tokens = work_tokens
         shops_tokens.sort(key=lambda token:  token.expires, reverse=True)
-        if user.user_telegram_id in [373435337]:
+        if user.user_telegram_id in const.ADMINS:
             expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
         else:
             expiration_time = shops_tokens[0].expires
