@@ -8,9 +8,8 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
-from ...user_interface.views import callbacks
-from ...user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot
-from .callbacks import Action
+from app.client_bot.user_interface.views import callbacks
+from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
@@ -111,13 +110,10 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
 
     builder.row(button)
 
-
-
-    # отключаю так как история толком не работает
-    # button = InlineKeyboardButton(text='История позиций ключевых слов',
-    #                                 callback_data=callbacks.KeywordPositionHistory(
-    #                                     adv_original_id=adv_setting.id).pack())
-    # builder.row(button)
+    button = InlineKeyboardButton(text='История позиций ключевых слов',
+                                    callback_data=callbacks.KeywordPositionHistory(
+                                        adv_original_id=adv_setting.id).pack())
+    builder.row(button)
 
 
     if adv_setting.parsing_active:
