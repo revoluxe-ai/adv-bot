@@ -586,22 +586,6 @@ async def parser_all_white_phrase():
 
 
 
-async def reset_from_redis_positions_of_out_index():
-    async with sm() as session:
-        # Выбираем позиции, для которых нет более новых позиций по этому ключевому слову
-        stmt = (
-            select(WBItemPosition)
-            .join(WBItemPosition.keyword)  # Предполагается, что этот join корректно настроен
-            .options(joinedload(WBItemPosition.keyword))
-        ).where(and_(not_(WBItemPosition.keyword.has(CommonKeyword.last_full_update < WBItemPosition.timestamp)),
-                CommonKeyword.last_full_update is not None))
-        result = await session.execute(stmt)
-        positions = result.scalars().all()
-
-        for position in positions:
-            await redis_manager.set_position_to_out_index(position)
-            await asyncio.sleep(0)  # Чтобы предотвратить блокировку event loop
-
 
 count_semaphore = settings.MAX_THREAD_PARSER
 semaphore = asyncio.Semaphore(count_semaphore)
