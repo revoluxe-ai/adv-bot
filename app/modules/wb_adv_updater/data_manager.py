@@ -29,7 +29,6 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBCard,
     WBCategory,
-    CommonKeyword,
     WBItemPosition,
 )
 from app.modules.keywords_query import keywords_query
@@ -772,9 +771,15 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
         if max_cpc > adv.max_cpc:
             max_cpc = adv.max_cpc
     if adv.target_ctr_mode:
-        return await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
+        keywords =  await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
     else:
-        return await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
+        keywords =  await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
+    keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
+    keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
+    keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
+    keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+    keywords = keywords_with_rating + keywords_without_rating
+    return keywords
 
 
 
@@ -1529,14 +1534,14 @@ async def get_need_nmids_for_parsing(text, adv_id, adv_ids):
 
 
 
-async def get_last_updated_phrases(all_white_phrases):
-    async with _sm() as session:
-        stmt = select(CommonKeyword.text)\
-            .where(CommonKeyword.text.in_(all_white_phrases))\
-            .order_by(CommonKeyword.updated_at)
-        result = await session.execute(stmt)
-        last_updated_phrases = result.scalars().all()
-        return last_updated_phrases
+# async def get_last_updated_phrases(all_white_phrases):
+#     async with _sm() as session:
+#         stmt = select(CommonKeyword.text)\
+#             .where(CommonKeyword.text.in_(all_white_phrases))\
+#             .order_by(CommonKeyword.updated_at)
+#         result = await session.execute(stmt)
+#         last_updated_phrases = result.scalars().all()
+#         return last_updated_phrases
 
 
 async def get_keywords_positions_dict_by_text(adv_setting: AdvSetting, texts: list[str]) -> dict[str, WBItemPosition]:
@@ -1849,4 +1854,36 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
                 raise e
 
 
+<<<<<<< HEAD
 
+=======
+async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
+    query = f"""
+    SELECT
+        text,
+        toDate(timestamp) AS day,
+        AVG(promo_position) AS avg_promo_position,
+        AVG(base_position) AS avg_base_position,
+        AVG(cpm) AS avg_cpm
+    FROM default_db.wbitemposition
+    WHERE nmid = {nmid}
+    GROUP BY text, day
+    ORDER BY day
+    """
+
+    async with get_clickhouse_client() as client:
+        result = await client.query(query)
+        positions_rows = result.result_rows
+    positions = []
+    for row in positions_rows:
+        position = WBItemPosition()
+        position.nmid = nmid
+        position.keyword_text = row[0]
+        position.promo_position = row[2] if row[2] else 6000
+        position.base_position = row[3] if row[3] else 6000
+        position.cpm = row[4]
+        position.timestamp = datetime.combine(row[1], datetime.min.time())
+        positions.append(position)
+
+    return positions
+>>>>>>> stage

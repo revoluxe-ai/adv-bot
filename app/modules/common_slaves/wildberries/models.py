@@ -306,10 +306,7 @@ class KeywordSetting(BaseTable):
 
 
 
-class CommonKeyword:
-    wb_item_positions = relationship('WBItemPosition', back_populates='keyword')
-    text = mapped_column(String)
-    last_full_update = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
 
 @dataclass
 class WBItemPosition:

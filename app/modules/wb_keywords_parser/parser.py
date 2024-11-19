@@ -16,7 +16,7 @@ from sqlalchemy import select, and_, not_
 
 
 
-from app.modules.common_slaves.wildberries.models import WBItemPosition, CommonKeyword, AdvSetting
+from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting
 from aiogram.client.session import aiohttp
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
