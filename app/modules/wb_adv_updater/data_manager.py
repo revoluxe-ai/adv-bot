@@ -1844,7 +1844,7 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
                     {position.promo_position},
                     {position.base_position},
                     {position.cpm},
-                    {int(position.adv_type)},
+                    {int(position.adv_type) if position.adv_type else 0},
                     '{timestamp_str}',
                     {version}
                 )
