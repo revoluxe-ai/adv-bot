@@ -32,6 +32,8 @@ class CustomFormatter(logging.Formatter):
         return wrapped
 
 def setup_logging():
+    import warnings
+    warnings.filterwarnings("error", category=RuntimeWarning)
     global logging_setup_done
 
     if logging_setup_done:
@@ -40,7 +42,7 @@ def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
-    if system_name == 'Linux':
+    if system_name == 'Linux':  # type: ignore
         from systemd.journal import JournalHandler
         journal_handler = JournalHandler()
         journal_handler.setLevel(logging.DEBUG)
