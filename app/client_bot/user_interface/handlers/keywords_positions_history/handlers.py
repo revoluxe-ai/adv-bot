@@ -4,7 +4,8 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 import logging
-from app.client_bot import utils, const
+from app import utils
+from app.client_bot import const
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBCabinet,

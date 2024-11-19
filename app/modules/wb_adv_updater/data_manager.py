@@ -1779,6 +1779,8 @@ def __calculate_version(position):
 async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
     async with get_clickhouse_client() as client:
         for position in positions:
+            position.base_position = position.base_position if position.base_position else 100000
+            position.promo_position = position.promo_position if position.promo_position else 100000
             try:
                 # Генерация версии и подготовка timestamp
                 version = __calculate_version(position)
@@ -1854,25 +1856,32 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
                 raise e
 
 
-async def get_keyword_positions_from_click_house(nmid)-> list[WBItemPosition]:
+async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
     query = f"""
     SELECT
         text,
-        promo_position,
-        base_position,
-        cpm,
-        timestamp       
+        toDate(timestamp) AS day,
+        AVG(promo_position) AS avg_promo_position,
+        AVG(base_position) AS avg_base_position,
+        AVG(cpm) AS avg_cpm
     FROM default_db.wbitemposition
     WHERE nmid = {nmid}
+    GROUP BY text, day
+    ORDER BY day
     """
 
     async with get_clickhouse_client() as client:
         result = await client.query(query)
-        positions = result.result_rows
-    positions = [WBItemPosition(nmid=nmid,
-                                 keyword_text=row[0],
-                                 promo_position=row[1],
-                                 base_position=row[2],
-                                 cpm=row[3],
-                                 timestamp=row[4]) for row in positions]
+        positions_rows = result.result_rows
+    positions = []
+    for row in positions_rows:
+        position = WBItemPosition()
+        position.nmid = nmid
+        position.keyword_text = row[0]
+        position.promo_position = row[2] if row[2] else 6000
+        position.base_position = row[3] if row[3] else 6000
+        position.cpm = row[4]
+        position.timestamp = datetime.combine(row[1], datetime.min.time())
+        positions.append(position)
+
     return positions
