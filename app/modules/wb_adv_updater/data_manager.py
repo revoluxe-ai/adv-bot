@@ -1779,54 +1779,12 @@ def __calculate_version(position):
 async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
     async with get_clickhouse_client() as client:
         for position in positions:
-            position.base_position = position.base_position if position.base_position else 100000
-            position.promo_position = position.promo_position if position.promo_position else 100000
             try:
                 # Генерация версии и подготовка timestamp
                 version = __calculate_version(position)
                 timestamp_str = position.timestamp.strftime('%Y-%m-%d %H:%M:%S')
 
-                # Проверяем существующую запись
-                query_check = f"""
-                SELECT promo_position,
-                 base_position,
-                  cpm,
-                   timestamp
-                FROM default_db.wbitemposition
-                WHERE nmid = {position.nmid}
-                  AND adv_type = {position.adv_type}
-                  AND text = '{position.keyword_text}'
-                ORDER BY version DESC
-                LIMIT 1
-                """
-                result = await client.query(query_check)
-                result_rows = result.result_rows
-                if result_rows:
-                    if result_rows:
-                        result_row = result_rows[0]  # Первая строка результата
-                        last_promo_position = result_row[1]
-                        last_base_position = result_row[2]
-                        last_cpm = result_row[3]
-
-                    if (position.promo_position == last_promo_position and
-                        position.base_position == last_base_position and
-                        position.cpm == last_cpm):
-                        # Данные совпадают — обновляем только timestamp
-                        query_update_timestamp = f"""
-                        ALTER TABLE default_db.wbitemposition
-                        UPDATE timestamp = now()
-                        WHERE nmid = {position.nmid}
-                          AND adv_type = {position.adv_type}
-                          AND text = '{position.keyword_text}'
-                          AND promo_position = {position.promo_position}
-                          AND base_position = {position.base_position}
-                          AND cpm = {position.cpm}
-                        """
-                        await client.query(query_update_timestamp)
-                        logger.debug(f"Обновлено время проверки для nmid={position.nmid}")
-                        continue
-
-                # Если данные изменились или записи нет — добавляем новую запись
+                # Всегда вставляем новые данные
                 query_insert = f"""
                 INSERT INTO default_db.wbitemposition (
                     nmid,
@@ -1840,9 +1798,9 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
                 )
                 VALUES (
                     {position.nmid},
-                    '{position.keyword_text}',
-                    {position.promo_position},
-                    {position.base_position},
+                    '{position.keyword_text.replace("'", "''")}',  # Экранирование одинарных кавычек
+                    {position.promo_position if position.promo_position else 0},
+                    {position.base_position if position.base_position else 0},
                     {position.cpm if position.cpm else 0},
                     {int(position.adv_type) if position.adv_type else 0},
                     '{timestamp_str}',
@@ -1851,9 +1809,13 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
                 """
                 await client.query(query_insert)
                 logger.debug(f"Добавлена запись для nmid={position.nmid}")
+
             except Exception as e:
                 logger.error(f"Ошибка при обработке позиции nmid={position.nmid}: {e}", exc_info=True)
-                raise e
+
+
+
+
 
 
 async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
