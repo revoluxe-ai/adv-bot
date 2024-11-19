@@ -110,13 +110,10 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
 
     builder.row(button)
 
-
-
-    # отключаю так как история толком не работает
-    # button = InlineKeyboardButton(text='История позиций ключевых слов',
-    #                                 callback_data=callbacks.KeywordPositionHistory(
-    #                                     adv_original_id=adv_setting.id).pack())
-    # builder.row(button)
+    button = InlineKeyboardButton(text='История позиций ключевых слов',
+                                    callback_data=callbacks.KeywordPositionHistory(
+                                        adv_original_id=adv_setting.id).pack())
+    builder.row(button)
 
 
     if adv_setting.parsing_active:
@@ -325,18 +322,13 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
     def sorting_keywords(keywords, sort_mode):
         if sort_mode == 'default':
-            def sort_by_raiting_and_predict_ctr(keyword: CalculatedKeyword):
-                if keyword.rating_by_predict_ctr:
-                    return keyword.rating_by_predict_ctr
-                else:
-                    return keyword.predict_ctr
+            keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
+            keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
+            keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
+            keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+            keywords = keywords_with_rating + keywords_without_rating
+            return keywords
 
-            keywords_sorted = sorted(
-                keywords,
-                key=sort_by_raiting_and_predict_ctr,
-                reverse=True
-            )
-            return keywords_sorted
         elif sort_mode == 'sort_by_ctr_desc':
             return sorted(keywords, key=lambda x: x.ctr, reverse=True)
         else:

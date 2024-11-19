@@ -64,8 +64,8 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
         await message.answer("Введите сумму (число) от 10 000 рублей")
         return
     amount = int(amount)
-    if amount < 1000:
-        await message.answer("Введите сумму (число) от 1000")
+    if amount < 10000:
+        await message.answer("Введите сумму (число) от 10000")
         return
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
@@ -170,7 +170,7 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
 
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
-    bonus = cost
+    bonus = 0
     async with sm() as session:
         async with session.begin():
             stmt = select(User).where(User.user_telegram_id == message.chat.id)

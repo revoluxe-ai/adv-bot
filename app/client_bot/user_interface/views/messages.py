@@ -805,7 +805,7 @@ class ShopMenu(TextWithKeyboard):
 
         shops_tokens = work_tokens
         shops_tokens.sort(key=lambda token:  token.expires, reverse=True)
-        if user.user_telegram_id in [373435337]:
+        if user.user_telegram_id in const.ADMINS:
             expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
         else:
             expiration_time = shops_tokens[0].expires
@@ -1007,7 +1007,13 @@ class SettingMinCTR(TextWithKeyboard):
             self._min_ctr_type = 'direct'
 
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
-        keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
+
+        keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
+        keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
+        keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
+        keywords_with_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+        keywords = keywords_with_rating + keywords_without_rating
+
         goods = []
         bads = []
         for kw in keywords:
@@ -1157,10 +1163,8 @@ class WaitingForAmount(Text):
 - Работа одной кампании, подключенной к боту: 35 р/сутки
 - Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
 - Биддер (управление ставками) - 25 р. в сутки за кампанию
-        
-🔥 Внимание! Только до 10-09-2024(завтра):
 
-💰 Бонус 100 % от суммы пополнения!
+Минимальная сумма пополнения: 10 т.р.        
 
 Укажите сумму пополнения:"""
 
