@@ -94,7 +94,6 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
     await callback.answer()
     await state.set_state(state = None)
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
-    await bot.answer_callback_query(callback.id)
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     data = await state.get_data()
