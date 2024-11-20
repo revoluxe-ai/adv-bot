@@ -536,7 +536,7 @@ async def check_position(callback: types.CallbackQuery,
                             callback_data: callbacks.CheckPosition,
                             bot: aiogram.Bot, state: FSMContext):
 
-        await callback.answer()
+
         await messages.LongTimeOperation(bot, callback.message.chat.id)()
         keyword_setting_original_id = callback_data.keyword_setting_original_id
         async with _sm() as session:
