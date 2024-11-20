@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter == True))
 async def reset_filter(callback: types.CallbackQuery, callback_data: callbacks.ChoiceAdvPaginator,
                           bot: aiogram.Bot, state: FSMContext):
-     await callback.answer()
+
      wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
      await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
      await state.update_data(filter_advs=[])
@@ -91,7 +91,7 @@ async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Messag
 @router.callback_query(callbacks.Adv.filter())
 async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
               bot: aiogram.Bot, state: FSMContext):
-    await callback.answer()
+
     await state.set_state(state = None)
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     adv_original_id = callback_data.adv_original_id
@@ -299,7 +299,7 @@ async def turn_off_auto_min_ctr(call: types.CallbackQuery, callback_data: callba
 # @router.callback_query(callbacks.Min_ctr.filter(F.action == 'change'))
 # async def change_min_ctr(callback: types.CallbackQuery,  callback_data: callbacks.Min_ctr,
 #                          bot: aiogram.Bot, state: FSMContext, last_message:LastMessage):
-#     await callback.answer()
+
 #     adv_original_id = callback_data.adv_original_id
 #     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
 #     async with sm() as session:

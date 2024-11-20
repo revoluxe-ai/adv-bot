@@ -64,7 +64,7 @@ async def update_keyword_stat(callback: types.CallbackQuery,
                                 callback_data: callbacks.WBUpdate,
                                 bot: aiogram.Bot,
                                 state: FSMContext):
-        await callback.answer()
+
         """"
         нужно обновить статистику ключевых слов из Wildberreis, а для этого нужен access
         

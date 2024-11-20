@@ -295,6 +295,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f'🆔 *ID кампании:* {self.adv.adv_id}\n'
             f'📌 *Статус:* {self.adv.active_status}\n'
             f'🎯 *Минимальный CTR для кампании:* {round(self._min_ctr*100, 2)} %\n'
+
             f'🔢 *Минимальное количество показов для прогноза CTR:* {self.adv.min_views_for_ml_predict}\n'
         )
         text += f'{max_cpc_text}'

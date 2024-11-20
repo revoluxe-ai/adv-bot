@@ -20,7 +20,7 @@ async def to_page_for_cpm_setting(callback: types.CallbackQuery,
                                bot: aiogram.Bot,
                                ):
 
-    await callback.answer()
+
     adv_original_id = callback_data.adv_original_id
     await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
     return
@@ -86,7 +86,7 @@ async def set_manual_cpm(callback: types.CallbackQuery,
                                  bot: aiogram.Bot,
                                  state: FSMContext):
 
-    await callback.answer()
+
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_manual_cpm)
@@ -128,7 +128,7 @@ async def set_max_position(callback: types.CallbackQuery,
                                     bot: aiogram.Bot,
                                     state: FSMContext):
 
-        await callback.answer()
+
         adv_original_id = callback_data.adv_original_id
         await state.update_data(last_adv_original_id=adv_original_id)
         await state.set_state(states.CPMSetting.waiting_for_max_position)

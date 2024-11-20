@@ -20,7 +20,7 @@ async def to_page_for_cpc_setting(callback: types.CallbackQuery,
                                bot: aiogram.Bot,
                                state: FSMContext):
 
-    await callback.answer()
+
     await state.set_state(states.ChangeMaxCPC.waiting_for_new_max_cpc)
     adv_original_id = callback_data.adv_original_id
     await messages.MaxCPCSetting(bot,
@@ -68,7 +68,7 @@ async def turn_off_max_cpc(callback: types.CallbackQuery,
                            callback_data: callbacks.ChoiceAdvPaginator,
                            bot: aiogram.Bot,
                            state: FSMContext):
-    await callback.answer()
+
     adv_original_id = callback_data.adv_original_id
     async with sm() as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))

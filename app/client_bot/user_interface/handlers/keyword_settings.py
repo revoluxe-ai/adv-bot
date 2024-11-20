@@ -38,7 +38,6 @@ _sm = get_async_session_maker
 async def setting_keywords_filter_by_query(callback: types.CallbackQuery,
                                            callback_data: callbacks.SettingKeywords,
                                            bot: aiogram.Bot, state: FSMContext):
-    await callback.answer()
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.AdvSetting.waiting_for_filter_by_query)
@@ -51,7 +50,7 @@ async def setting_keywords_active_keywords(callback: CallbackQuery,
                                            callback_data: callbacks.SettingKeywords,
                                            bot: aiogram.Bot,
                                            state: FSMContext):
-    await callback.answer()
+
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -96,7 +95,7 @@ async def setting_keywords_sort_by_ctr_desc(callback: CallbackQuery,
                                             callback_data: callbacks.SettingKeywords,
                                             bot: aiogram.Bot,
                                             state: FSMContext):
-    await callback.answer()
+
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -139,7 +138,7 @@ async def setting_keywords_show_keywords_is_hard(callback: CallbackQuery,
                                                     callback_data: callbacks.SettingKeywords,
                                                     bot: aiogram.Bot,
                                                     state: FSMContext):
-        await callback.answer()
+
         await state.update_data(keywords_filter=None)
         adv_original_id = callback_data.adv_original_id
         async with _sm() as session:
@@ -183,7 +182,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
                                       callback_data: callbacks.SettingKeywords,
                                         bot: aiogram.Bot,
                                         state: FSMContext):
-    await callback.answer()
+
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
 
@@ -298,7 +297,7 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
                                                     callback_data: callbacks.SettingKeywords,
                                                     bot: aiogram.Bot,
                                                     state: FSMContext):
-        await callback.answer()
+
         await state.update_data(hide_keywords_is_not_relevant=True)
         adv_original_id = callback_data.adv_original_id
         async with _sm() as session:
@@ -339,7 +338,7 @@ async def setting_keywords_hide_keywords_is_hard(callback: CallbackQuery,
                                                     callback_data: callbacks.SettingKeywords,
                                                     bot: aiogram.Bot,
                                                     state: FSMContext):
-        await callback.answer()
+
         await state.update_data(hide_keywords_is_not_relevant = False)
         adv_original_id = callback_data.adv_original_id
         async with _sm() as session:
@@ -450,7 +449,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
 @router.callback_query(callbacks.SettingKeywords.filter())
 async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,
                            state: FSMContext):
-    await callback.answer()
+
     keyword_original_id: int = callback_data.keyword_original_id
     chat_id = callback.message.chat.id
 
@@ -466,8 +465,6 @@ async def setting_keyword(callback: types.CallbackQuery,
                           callback_data: callbacks.SettingKeyword,
                           bot: aiogram.Bot, state: FSMContext):
 
-    await callback.answer()
-
     keyword_setting_original_id: int = callback_data.keyword_setting_original_id
 
     data = await state.get_data()
@@ -475,7 +472,6 @@ async def setting_keyword(callback: types.CallbackQuery,
 
     chat_id = callback.message.chat.id
     await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
-
     return
 
 
@@ -486,7 +482,7 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
                                      bot: aiogram.Bot, state: FSMContext):
 
-    await callback.answer()
+
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     new_hard_status = callback_data.new_hard_status
     keyword_setting_original_id = callback_data.keyword_setting_original_id
@@ -633,7 +629,7 @@ async def setting_keywords_filter_by_query(message: types.Message,
 async def reset_added_clicks(callback: types.CallbackQuery,
                              callback_data: callbacks.ResetAddedClicks,
                              bot: aiogram.Bot, state: FSMContext):
-    await callback.answer()
+
     adv_setting_original_id = callback_data.adv_setting_original_id
     async with _sm() as session:
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)

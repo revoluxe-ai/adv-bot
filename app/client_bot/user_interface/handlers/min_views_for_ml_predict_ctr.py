@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 async def setting_min_views_for_predict_ctr(callback: types.CallbackQuery,
                                    bot: aiogram.Bot,
                                    state: FSMContext):
-    await callback.answer()
+
     callback_data = await state.get_data()
     adv_original_id = callback_data['last_adv_original_id']
     await state.set_state(states.ChangeMinViewsForPredictCTR.waiting_for_new_min_views)

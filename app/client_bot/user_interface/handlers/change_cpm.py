@@ -25,7 +25,7 @@ async def change_cpm(callback: aiogram.types.CallbackQuery,
                      callback_data: callbacks.ChangeCPM,
                      bot: aiogram.Bot,
                      state: FSMContext):
-    await callback.answer()
+
     adv_setting_original_id = callback_data.adv_setting_original_id
     await state.update_data(last_adv_setting_original_id=adv_setting_original_id)
     await state.set_state(states.ChangeCPM.waiting_for_cpm)

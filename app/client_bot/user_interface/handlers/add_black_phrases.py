@@ -16,7 +16,7 @@ async def add_white_phrases(callback: CallbackQuery,
                             bot: Bot,
                             callback_data: callbacks.AddWhitePhrases,
                             state: FSMContext):
-    await callback.answer()
+
     adv_setting_id = callback_data.adv_setting_id
     await state.update_data(last_adv_setting_id=adv_setting_id)
     await state.set_state(states.AddBlackPhrasesTemplates.waiting_for_black_phrases)
@@ -40,6 +40,6 @@ async def waiting_for_black_phrases(message, bot: Bot, state: FSMContext):
 
 @router.callback_query(callbacks.ResetBlackPhrases.filter())
 async def reset_black_phrases(callback: CallbackQuery, bot: Bot, callback_data: callbacks.ResetBlackPhrases):
-    await callback.answer()
+
     await data_manager.reset_black_phrases(callback_data.adv_setting_id)
     await messages.WaitingForBlackPhrases(bot, callback.from_user.id)(callback_data.adv_setting_id)

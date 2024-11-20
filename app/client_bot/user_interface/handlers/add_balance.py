@@ -36,7 +36,7 @@ async def add_balance(callback: types.CallbackQuery,
                       callback_data: callbacks.AddBalance,
                       state: FSMContext,
                       bot: aiogram.Bot):
-    await callback.answer()
+
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
     await state.update_data(wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id)
     await state.set_state(states.AddBalance.awaiting_amount)
