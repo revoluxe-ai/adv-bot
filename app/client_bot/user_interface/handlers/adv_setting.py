@@ -103,12 +103,13 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
         async with sm() as session:
             stmt = select(WBUserCabinet) \
                 .join(WBUserCabinet.user) \
-                .options(selectinload(WBUserCabinet.wb_cabinet) \
-                         .selectinload(WBCabinet.adv_settings)) \
-                .filter(User.user_telegram_id == callback.from_user.id,
-                        AdvSetting.id == adv_original_id)
-            wb_user_cabinet = await session.execute(stmt)
-            wb_user_cabinet = wb_user_cabinet.scalar()
+                .join(WBUserCabinet.wb_cabinet) \
+                .join(WBCabinet.adv_settings) \
+                .filter(User.user_telegram_id == callback.from_user.id,  # Фильтрация по user_telegram_id
+                        AdvSetting.id == adv_original_id)  # Фильтрация по нужному AdvSetting
+
+            result = await session.execute(stmt)
+            wb_user_cabinet = result.scalar()  # Извлекаем первую строку
         wb_user_cabinet_original_id = wb_user_cabinet.id
     async with sm() as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
