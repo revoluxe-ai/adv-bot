@@ -316,7 +316,6 @@ async def select_shop(callback_query: types.CallbackQuery,
         await state.update_data(filter_advs=None)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await state.update_data(last_wb_user_cabinet_original_id = wb_user_cabinet_original_id)
-    await callback_query.answer()
     message = callback_query.message
 
     chat_id = message.chat.id
