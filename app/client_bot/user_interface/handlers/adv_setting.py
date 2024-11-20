@@ -73,7 +73,6 @@ async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Messag
                                state: FSMContext):
 
     chat_id = callback.message.chat.id
-    await bot.answer_callback_query(callback_query_id= callback.id)
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(state=states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
