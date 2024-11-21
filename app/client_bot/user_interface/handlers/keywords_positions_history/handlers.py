@@ -31,10 +31,8 @@ async def keyword_position_history(callback: types.CallbackQuery,
                                    callback_data: callbacks.KeywordPositionHistory,
                                    bot: aiogram.Bot,
                                    state: FSMContext):
-    await callback.answer()
     await state.set_state(state = None)
     adv_original_id: int = callback_data.adv_original_id
-    await callback.answer()
     try:
           graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id))
     except Exception as e:
