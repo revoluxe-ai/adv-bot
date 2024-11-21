@@ -23,8 +23,6 @@ class CheckSubscribeOnShop(BaseMiddleware):
         data: Dict[str, Any],
     ) -> Any:
 
-        await event.answer()
-
         bot: aiogram.Bot = data['bot']
         state: FSMContext = data['state']
         state_data = await state.get_data()

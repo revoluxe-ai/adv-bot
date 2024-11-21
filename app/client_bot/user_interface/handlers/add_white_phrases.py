@@ -24,7 +24,7 @@ async def add_white_phrases(callback: CallbackQuery,
                             bot: Bot,
                             callback_data: callbacks.AddWhitePhrases,
                             state: FSMContext):
-    await callback.answer('Добавление фраз в белый список')
+    await bot.answer_callback_query(callback.id, 'Добавление фраз в белый список')
     adv_setting_id = callback_data.adv_setting_id
     await state.update_data(last_adv_setting_id=adv_setting_id)
     await state.set_state(states.AddWhitePhrases.waiting_for_white_phrases)

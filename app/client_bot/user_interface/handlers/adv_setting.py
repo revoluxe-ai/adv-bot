@@ -179,13 +179,13 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
                     adv.payments.append(payment)
                     wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
                 else:
-                    await callback.answer('На балансе недостаточно средств')
+                    await bot.send_message(callback.message.chat.id, 'Недостаточно средств')
                     await messages.ShopMenu(bot,
                                             callback.message.chat.id,
                                             state,
                                             wb_user_cabinet_original_id)()
                     return
-        await callback.answer('Включаю бота')
+        await bot.send_message(callback.message.chat.id, 'Включаю бота')
         adv.bot_active = True
         await session.commit()
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
@@ -205,7 +205,7 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
 @router.callback_query(callbacks.TurnBot.filter(F.action == 'off_all'))
 async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
                            callback_data: callbacks.TurnBot, bot: aiogram.Bot, ):
-    await callback.answer('Выключаю всех ботов')
+    await bot.send_message(callback.message.chat.id, 'Отключаю бота от всех кампаний')
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         advs = await session.execute(select(AdvSetting).join(AdvSetting.wb_cabinet)\
@@ -222,7 +222,6 @@ async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
 
 @router.callback_query(callbacks.TurnBot.filter(F.action == 'off'))
 async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot, state: FSMContext):
-    await call.answer()
     # data = await state.get_data()
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
@@ -247,7 +246,6 @@ async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnB
 
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_on_auto_min_ctr'))
 async def turn_on_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR, state: FSMContext):
-    await call.answer()
     data = await state.get_data()
     wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
@@ -273,7 +271,6 @@ async def turn_on_auto_min_ctr(call: types.CallbackQuery, callback_data: callbac
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_off_auto_min_ctr'))
 async def turn_off_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR,
                                 state: FSMContext):
-    await call.answer()
     async with sm() as session:
         adv_setting = await session.execute(select(AdvSetting) \
                                             .where(AdvSetting.id == callback_data.adv_setting_original_id))
