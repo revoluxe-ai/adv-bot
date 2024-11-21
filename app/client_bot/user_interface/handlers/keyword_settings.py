@@ -3,6 +3,7 @@ from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
+from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.future import select
@@ -479,54 +480,52 @@ async def setting_keyword(callback: types.CallbackQuery,
 async def change_keyword_hard_status(callback: types.CallbackQuery,
                                      callback_data: callbacks.ChangeKeywordHardStatus,
                                      bot: aiogram.Bot, state: FSMContext):
+    async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
+        new_hard_status = callback_data.new_hard_status
+        keyword_setting_original_id = callback_data.keyword_setting_original_id
+        async with _sm() as session:
+            keyword_setting = await session.execute(select(KeywordSetting)
+             .options(selectinload(KeywordSetting.adv_setting))
+                                                   .where(KeywordSetting.id == keyword_setting_original_id))
+            keyword_setting: KeywordSetting = keyword_setting.scalar()
+            adv_setting = keyword_setting.adv_setting
+            if new_hard_status >= 0:
+               keyword_setting.hard_status = new_hard_status
 
+            elif new_hard_status == -1:
+                min_ctr = await data_manager.get_min_ctr(adv_setting)
+                async with get_clickhouse_client() as client:
+                    clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(client,
+                                                                                       keyword_setting.text,
+                                                                                       adv_setting.adv_id)
+                if keyword_setting.added_clicks:
+                    clicks += keyword_setting.added_clicks
+                if keyword_setting.added_views:
+                    views += keyword_setting.added_views
 
-    await messages.LongTimeOperation(bot, callback.message.chat.id)()
-    new_hard_status = callback_data.new_hard_status
-    keyword_setting_original_id = callback_data.keyword_setting_original_id
-    async with _sm() as session:
-        keyword_setting = await session.execute(select(KeywordSetting)
-         .options(selectinload(KeywordSetting.adv_setting))
-                                               .where(KeywordSetting.id == keyword_setting_original_id))
-        keyword_setting: KeywordSetting = keyword_setting.scalar()
-        adv_setting = keyword_setting.adv_setting
-        if new_hard_status >= 0:
-           keyword_setting.hard_status = new_hard_status
+                n = 10 # Процент увеличения CTR, который вы хотите достичь
 
-        elif new_hard_status == -1:
-            min_ctr = await data_manager.get_min_ctr(adv_setting)
-            async with get_clickhouse_client() as client:
-                clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(client,
-                                                                                   keyword_setting.text,
-                                                                                   adv_setting.adv_id)
-            if keyword_setting.added_clicks:
-                clicks += keyword_setting.added_clicks
-            if keyword_setting.added_views:
-                views += keyword_setting.added_views
+                # Расчет нового CTR
+                new_ctr = min_ctr * (1 + n / 100)
 
-            n = 10 # Процент увеличения CTR, который вы хотите достичь
+                # Вычисление необходимого количества дополнительных кликов
+                add_clicks = max([int(round(new_ctr * views - clicks)), 1])
 
-            # Расчет нового CTR
-            new_ctr = min_ctr * (1 + n / 100)
+                # Добавление кликов без изменения показов
+                if not keyword_setting.added_clicks:
+                    keyword_setting.added_clicks = 0
+                keyword_setting.added_clicks += add_clicks
 
-            # Вычисление необходимого количества дополнительных кликов
-            add_clicks = max([int(round(new_ctr * views - clicks)), 1])
+                await redis_manager.set_auto_block_status(keyword_setting_original_id, False)
 
-            # Добавление кликов без изменения показов
-            if not keyword_setting.added_clicks:
-                keyword_setting.added_clicks = 0
-            keyword_setting.added_clicks += add_clicks
+            await session.commit()
+        data = await state.get_data()
+        page = data.get('last_keyword_setting_page', 1)
 
-            await redis_manager.set_auto_block_status(keyword_setting_original_id, False)
+        chat_id = callback.message.chat.id
+        await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
 
-        await session.commit()
-    data = await state.get_data()
-    page = data.get('last_keyword_setting_page', 1)
-
-    chat_id = callback.message.chat.id
-    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
-
-    return
+        return
 
 
 @router.callback_query(callbacks.CheckPosition.filter())
