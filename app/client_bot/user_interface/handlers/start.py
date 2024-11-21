@@ -14,7 +14,7 @@ from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from   .. import states
 from app.modules.wb_adv_updater.right_checker import RightChecker
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from ..views.callbacks import Action
 from ...redis_manager import RedisManager
 import logging
@@ -77,6 +77,31 @@ async def start_registration(message: types.Message, bot: aiogram.Bot, state: FS
         await messages. \
                 ShopChoice(bot, chat_id, wb_user_cabinets)()
     return
+
+
+
+async def callback_start_registration(callback: CallbackQuery,
+                                      callback_data: callbacks.Start,
+                                      bot: aiogram.Bot, state: FSMContext):
+    await state.clear()
+    async with sm() as session:
+        user_id = callback.from_user.id
+
+        stmt = select(User)\
+            .options(joinedload(User.wb_user_cabinets).joinedload(
+            WBUserCabinet.wb_cabinet)) \
+            .where(User.user_telegram_id == user_id)
+        result = await session.execute(stmt)
+        user: User = result.scalar()
+
+        wb_user_cabinets = user.wb_user_cabinets
+        chat_id = callback.message.chat.id
+        await messages. \
+                ShopChoice(bot, chat_id, wb_user_cabinets)()
+    return
+
+
+
 
 @router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(callback_query: types.CallbackQuery,
@@ -366,5 +391,10 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
 
 
 
-router.callback_query.register(start_registration, callbacks.Start.filter())
+
+
+
+
+
+router.callback_query.register(callback_start_registration, callbacks.Start.filter())
 router.message.register(start_registration, CommandStart())
