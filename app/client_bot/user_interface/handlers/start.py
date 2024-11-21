@@ -366,5 +366,5 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
 
 
 
-# router.callback_query.register(start_registration, callbacks.Start.filter())
+router.callback_query.register(start_registration, callbacks.Start.filter())
 router.message.register(start_registration, CommandStart())
