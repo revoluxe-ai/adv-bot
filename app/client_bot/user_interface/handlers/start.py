@@ -38,8 +38,6 @@ redis_manager = RedisManager()
 
 async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     await state.clear()
-    if isinstance(message, types.CallbackQuery):
-        await message.answer()
     referral_link  = None
     async with sm() as session:
         user_id = message.from_user.id
