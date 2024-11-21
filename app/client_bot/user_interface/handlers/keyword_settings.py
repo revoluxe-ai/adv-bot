@@ -382,8 +382,6 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
                                   state: FSMContext):
     if callback_data.reset_filter == True:
         await state.update_data(keywords_filter=None)
-
-    await callback.message.answer("Пожалуйста подождите, эта операция займет немного времени")
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
     adv_original_id: int = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id,
