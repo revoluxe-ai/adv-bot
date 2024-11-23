@@ -38,14 +38,22 @@ class CalculatedKeyword:
     cluster_name: Optional[str] = None
     preset: Optional[int] = None
 
+
+
     @property
     def rating_by_predict_ctr(self):
+        if not self.base_position:
+            return 0
         if self.predict_ctr is None:
             return 0
-        if self.views < 10:
-            return
-        rating = self.predict_ctr * self.views
-        return  rating
+        # Рейтинг с учетом уверенности
+        rating = self.predict_ctr**2 * self.views /self.base_position
+        return rating
+
+
+
+
+
 
 
     @property

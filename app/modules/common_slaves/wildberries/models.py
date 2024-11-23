@@ -15,7 +15,7 @@ from app.utils.db.base import BaseTable
 from . import exceptions
 from ...wb_adv_updater.models import AdvPayment
 
-from app.utils.db.models import User
+from app.utils.db.models import User, favorite_advs_association
 
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -192,6 +192,10 @@ class WBCard(BaseTable): # Изменено название таблицы
 class AdvSetting(BaseTable):
     def __repr__(self):
         return f'name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}'
+    favorite_users: Mapped[list[User]] = relationship(
+        'User',
+        secondary=favorite_advs_association,
+        back_populates='favorites_advs')
     adv_id = Column(BIGINT(), unique=True)
     name = mapped_column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
@@ -260,6 +264,19 @@ class AdvSetting(BaseTable):
             return True
         return False
 
+    @property
+    def worst_promo_position(self):
+        try:
+            return self._worst_promo_position
+        except:
+            return None
+
+
+    @worst_promo_position.setter
+    def worst_promo_position(self, value):
+        self._worst_promo_position = value
+
+
 
 class KeywordSetting(BaseTable):
 
@@ -289,10 +306,7 @@ class KeywordSetting(BaseTable):
 
 
 
-class CommonKeyword:
-    wb_item_positions = relationship('WBItemPosition', back_populates='keyword')
-    text = mapped_column(String)
-    last_full_update = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
 
 @dataclass
 class WBItemPosition:

@@ -35,7 +35,7 @@ async def update_minus_keywords(callback: types.CallbackQuery,
                                 callback_data: callbacks.WBUpdate,
                                 bot: aiogram.Bot,
                                 state: FSMContext):
-    await callback.answer()
+
     adv_original_id = callback_data.adv_setting_original_id
     async with sm() as session:
         adv = await session.execute(select(AdvSetting)\
@@ -64,7 +64,7 @@ async def update_keyword_stat(callback: types.CallbackQuery,
                                 callback_data: callbacks.WBUpdate,
                                 bot: aiogram.Bot,
                                 state: FSMContext):
-        await callback.answer()
+
         """"
         нужно обновить статистику ключевых слов из Wildberreis, а для этого нужен access
         

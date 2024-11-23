@@ -38,7 +38,7 @@ async def turn_on_min_ctr(callback: types.CallbackQuery,
                             bot: aiogram.Bot,
                             callback_data: callbacks.StrategySetting,
                             state: FSMContext):
-     await callback.answer()
+
      adv_original_id = callback_data.adv_setting_original_id
      async with sm() as session:
           adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
@@ -55,7 +55,7 @@ async def on_target_ctr(callback: types.CallbackQuery,
                             bot: aiogram.Bot,
                             callback_data: callbacks.StrategySetting,
                             state: FSMContext):
-     await callback.answer()
+
      adv_original_id = callback_data.adv_setting_original_id
      async with sm() as session:
           adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
@@ -73,7 +73,7 @@ async def turn_on_forward_mode(callback: types.CallbackQuery,
                             bot: aiogram.Bot,
                             callback_data: callbacks.StrategySetting,
                             state: FSMContext):
-     await callback.answer()
+
      adv_original_id = callback_data.adv_setting_original_id
      async with sm() as session:
           adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
@@ -89,7 +89,7 @@ async def turn_on_keep_mode(callback: types.CallbackQuery,
                             bot: aiogram.Bot,
                             callback_data: callbacks.StrategySetting,
                             state: FSMContext):
-     await callback.answer()
+
      adv_original_id = callback_data.adv_setting_original_id
      async with sm() as session:
           adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
@@ -108,7 +108,7 @@ async def strategy_setting(callback: types.CallbackQuery,
                            callback_data: callbacks.StrategySetting,
                             state: FSMContext):
 
-    await callback.answer()
+
     adv_original_id = callback_data.adv_setting_original_id
     await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
     return

@@ -1,9 +1,11 @@
 import asyncio
+import hashlib
 import io
 import logging
 import time
 import cProfile
 import pstats
+import zlib
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -27,7 +29,6 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBCard,
     WBCategory,
-    CommonKeyword,
     WBItemPosition,
 )
 from app.modules.keywords_query import keywords_query
@@ -38,6 +39,7 @@ from app.my_types import AdvSetting, WBUserCabinet
 from app.payments.db.models import Payment
 
 from app.utils.click_house.client import get_clickhouse_client
+from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.models import User, RefLink, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
@@ -160,6 +162,8 @@ async def get_keywords_statistic_clickhouse(
             )
             keywords.append(keyword)
 
+    for keyword in keywords:
+        keyword.predict_ctr = await redis_manager.get_predict_ctr(adv_setting.adv_id, keyword.text)
     return keywords
 
 
@@ -476,7 +480,7 @@ async def _get_cpm_by_nmid(nmid)-> Optional[int]:
     try:
         cpm = await __get_cpm_from_positions(nmid)
     except Exception:
-        logger.error('Ошибка получения cmp из позиции', exc_info=True)
+        logger.debug('Ошибка получения cmp из позиции', exc_info=True)
         cpm = None
     return cpm
 
@@ -617,7 +621,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
 
         if max_cpc:
             if cpm_now:
-                cpc = (cpm_now / 1000) * keyword_stat.predict_ctr
+                cpc = (cpm_now / 1000)/ keyword_stat.predict_ctr
             elif clicks > 0:
                 cpc = views/clicks
             else:
@@ -767,9 +771,15 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
         if max_cpc > adv.max_cpc:
             max_cpc = adv.max_cpc
     if adv.target_ctr_mode:
-        return await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
+        keywords =  await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
     else:
-        return await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
+        keywords =  await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
+    keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
+    keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
+    keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
+    keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+    keywords = keywords_with_rating + keywords_without_rating
+    return keywords
 
 
 
@@ -882,7 +892,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
         if max_cpc:
             if cpm_now:
-                cpc = (cpm_now / 1000) * keyword_stat.predict_ctr
+                cpc = (cpm_now / 1000) / keyword_stat.predict_ctr
             elif clicks > 0:
                 cpc = views / clicks
             else:
@@ -1073,7 +1083,7 @@ async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
 
 
 
-async def get_main_photos(nmids: list[int]):
+async def get_main_photos(nmids: list[int])-> list[str]:
     async with _sm() as session:
         smtp = (select(WBCard).where(WBCard.nmid.in_(nmids)))
         result = await session.execute(smtp)
@@ -1270,10 +1280,10 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 async def get_min_ctr(adv: AdvSetting):
-    if not adv.new_auto_min_ctr_mode:
-        min_ctr = await _get_min_ctr(adv)
-    else:
-        min_ctr = await _get_new_min_ctr(adv)
+    # if not adv.new_auto_min_ctr_mode:
+    min_ctr = await _get_min_ctr(adv)
+    # else:
+    #     min_ctr = await _get_new_min_ctr(adv)
     if adv.hard_min_ctr and min_ctr < adv.hard_min_ctr:
         min_ctr = adv.hard_min_ctr
     return min_ctr
@@ -1378,11 +1388,11 @@ async def _get_min_ctr(adv: AdvSetting):
             predict_ctr = await redis_manager.get_predict_ctr(adv_id, kw.text)
             if predict_ctr:
                 predict_ctrs.append(predict_ctr)
-        if real_ctrs:
-            return float(min(real_ctrs))
-
         if predict_ctrs:
             return float(min(predict_ctrs))
+
+        if real_ctrs:
+            return float(min(real_ctrs))
 
     category = await get_wb_category(adv)
     category_name = category.wb_category_name
@@ -1524,14 +1534,14 @@ async def get_need_nmids_for_parsing(text, adv_id, adv_ids):
 
 
 
-async def get_last_updated_phrases(all_white_phrases):
-    async with _sm() as session:
-        stmt = select(CommonKeyword.text)\
-            .where(CommonKeyword.text.in_(all_white_phrases))\
-            .order_by(CommonKeyword.updated_at)
-        result = await session.execute(stmt)
-        last_updated_phrases = result.scalars().all()
-        return last_updated_phrases
+# async def get_last_updated_phrases(all_white_phrases):
+#     async with _sm() as session:
+#         stmt = select(CommonKeyword.text)\
+#             .where(CommonKeyword.text.in_(all_white_phrases))\
+#             .order_by(CommonKeyword.updated_at)
+#         result = await session.execute(stmt)
+#         last_updated_phrases = result.scalars().all()
+#         return last_updated_phrases
 
 
 async def get_keywords_positions_dict_by_text(adv_setting: AdvSetting, texts: list[str]) -> dict[str, WBItemPosition]:
@@ -1719,3 +1729,121 @@ async def get_max_adv_bid(adv_setting: AdvSetting):
     return setting_max_bid
 
 
+async def _get_down_scale_white_list_bust_wb_item_position(adv)-> Optional[int]:
+    stmt = select(KeywordSetting.text).where(KeywordSetting.hard_status == 2,
+                                             KeywordSetting.adv_setting_id == adv.id)
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        white_phrases = result.scalars().all()
+    positions: dict[str, WBItemPosition] = await get_keywords_positions_dict_by_text(adv, white_phrases)
+    if positions:
+        positions = [position for position in positions.values()]
+        positions = [position for position in positions if position.promo_position]
+        if positions:
+            position: WBItemPosition = sorted(positions, key=lambda x: x.promo_position, reverse=True)[0]
+        else:
+            return None
+    else:
+         return None
+    return position.promo_position
+
+
+async def is_adv_in_favorites(adv_setting_original_id: int, user_original_id: int) -> bool:
+    stmt = select(favorite_advs_association).where(
+        favorite_advs_association.c.user_id == user_original_id,
+        favorite_advs_association.c.adv_id == adv_setting_original_id
+    )
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        return result.first() is not None
+
+
+async def set_worst_promo_position(adv_settings: list[AdvSetting]):
+    for adv in adv_settings:
+        if not adv.bot_active or not adv.active_status == 'started':
+            adv.worst_promo_position = None
+            continue
+        position: int = await _get_down_scale_white_list_bust_wb_item_position(adv)
+        if position:
+            adv.worst_promo_position = position
+        else:
+            adv.worst_promo_position = None
+    return adv_settings
+
+
+def __calculate_version(position):
+    return int(position.timestamp.timestamp())
+
+
+
+async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
+    async with get_clickhouse_client() as client:
+        for position in positions:
+            try:
+                # Генерация версии и подготовка timestamp
+                version = __calculate_version(position)
+                timestamp_str = position.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+
+                # Всегда вставляем новые данные
+                query_insert = f"""
+                INSERT INTO default_db.wbitemposition (
+                    nmid,
+                    text,
+                    promo_position,
+                    base_position,
+                    cpm,
+                    adv_type,
+                    timestamp,
+                    version
+                )
+                VALUES (
+                    {position.nmid},
+                    '{position.keyword_text.replace("'", "''")}',  # Экранирование одинарных кавычек
+                    {position.promo_position if position.promo_position else 0},
+                    {position.base_position if position.base_position else 0},
+                    {position.cpm if position.cpm else 0},
+                    {int(position.adv_type) if position.adv_type else 0},
+                    '{timestamp_str}',
+                    {version}
+                )
+                """
+                await client.query(query_insert)
+                logger.debug(f"Добавлена запись для nmid={position.nmid}")
+
+            except Exception as e:
+                logger.error(f"Ошибка при обработке позиции nmid={position.nmid}: {e}", exc_info=True)
+
+
+
+
+
+
+async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
+    query = f"""
+    SELECT
+        text,
+        toDate(timestamp) AS day,
+        AVG(promo_position) AS avg_promo_position,
+        AVG(base_position) AS avg_base_position,
+        AVG(cpm) AS avg_cpm
+    FROM default_db.wbitemposition
+    WHERE nmid = {nmid}
+    GROUP BY text, day
+    ORDER BY day
+    """
+
+    async with get_clickhouse_client() as client:
+        result = await client.query(query)
+        positions_rows = result.result_rows
+    positions = []
+    for row in positions_rows:
+        position = WBItemPosition()
+        position.nmid = nmid
+        position.keyword_text = row[0]
+        position.promo_position = row[2] if row[2] else 6000
+        position.base_position = row[3] if row[3] else 6000
+        position.cpm = row[4]
+        position.timestamp = datetime.combine(row[1], datetime.min.time())
+        positions.append(position)
+
+    return positions

@@ -24,7 +24,6 @@ async def add_white_phrases(callback: CallbackQuery,
                             bot: Bot,
                             callback_data: callbacks.AddWhitePhrases,
                             state: FSMContext):
-    await callback.answer('Добавление фраз в белый список')
     adv_setting_id = callback_data.adv_setting_id
     await state.update_data(last_adv_setting_id=adv_setting_id)
     await state.set_state(states.AddWhitePhrases.waiting_for_white_phrases)
@@ -79,7 +78,7 @@ async def reset_white_list(callback: CallbackQuery,
                            bot: Bot,  # оставь bot ключевым аргументом
                            state: FSMContext,
                            callback_data: callbacks.ResetWhiteList):
-    await callback.answer('Сброс белого списка')
+    await bot.send_message(callback.from_user.id, 'Сброс белого списка...')
     adv_setting_id = callback_data.adv_setting_original_id
     async with sm() as session:
         stmt = select(KeywordSetting)\

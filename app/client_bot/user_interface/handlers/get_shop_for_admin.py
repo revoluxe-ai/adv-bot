@@ -1,20 +1,15 @@
 import logging
 import re
-
 from aiogram.types import Message
-
-from app.client_bot.user_interface.handlers import start
-import aiogram
 from aiogram import F, Router, types, Bot
-from aiogram.filters import StateFilter, BaseFilter
+from aiogram.filters import  BaseFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 
+from app.client_bot import const
+from app.client_bot.user_interface.views import messages
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
-from .. import states
-
-from ..views import callbacks, messages
 
 
 sm = get_async_session_maker
@@ -35,7 +30,7 @@ class AdminsGetShopFilter(BaseFilter):
             return False
         match_uuid = re.Pattern.match(UUID_REGEX, text)
         user_id = message.from_user.id
-        if match_uuid and user_id in [373435337]:
+        if match_uuid and user_id in const.ADMINS:
             return True
 
 

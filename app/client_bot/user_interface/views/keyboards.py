@@ -8,9 +8,8 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
-from ...user_interface.views import callbacks
-from ...user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot
-from .callbacks import Action
+from app.client_bot.user_interface.views import callbacks
+from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
@@ -19,6 +18,10 @@ sm = get_async_session_maker
 def get_shop_keyboard(all_shops: list[WBUserCabinet]):
     # Создаем список для строк кнопок
     keyboard_buttons = []
+
+
+    button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
+    keyboard_buttons.append([button])
 
     for wb_user_cabinet in all_shops:
         shop_name = wb_user_cabinet.name
@@ -56,7 +59,9 @@ def get_adv_list_keyboard(advs: list[Adv]):
     return keyboard
 
 
-def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting):
+def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
+                             adv_setting: AdvSetting,
+                             in_favorites: bool):
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
@@ -105,13 +110,10 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
 
     builder.row(button)
 
-
-
-    # отключаю так как история толком не работает
-    # button = InlineKeyboardButton(text='История позиций ключевых слов',
-    #                                 callback_data=callbacks.KeywordPositionHistory(
-    #                                     adv_original_id=adv_setting.id).pack())
-    # builder.row(button)
+    button = InlineKeyboardButton(text='История позиций ключевых слов',
+                                    callback_data=callbacks.KeywordPositionHistory(
+                                        adv_original_id=adv_setting.id).pack())
+    builder.row(button)
 
 
     if adv_setting.parsing_active:
@@ -199,7 +201,16 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet, adv_setting: AdvSet
                                             action='turn_on_auto_min_ctr',
                                             adv_setting_original_id=adv_setting.id).pack())
         builder.row(button)
+    if not in_favorites:
+        button = InlineKeyboardButton(text='Добавить в избранное',
+                                        callback_data=callbacks.AddToFavorites(
+                                            adv_setting_original_id=adv_setting.id).pack())
+    else:
+        button = InlineKeyboardButton(text='Удалить из избранного',
+                                        callback_data=callbacks.RemoveFromFavorites(
+                                            adv_setting_original_id=adv_setting.id).pack())
 
+    builder.row(button)
 
 
     wb_user_cabinet_original_id = wb_user_cabinet.id
@@ -229,7 +240,7 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
     for adv in adv_settings[start_index:end_index]:
         check_last_24_hours = loop.run_until_complete(redis_manager.check_last_24_hours(adv.id))
         check_text = '✅' if check_last_24_hours else '❓'
-        button_text = f'{check_text} {adv.name} (Бот включен)' if adv.bot_active else f'{adv.name} (Бот отключен)'
+        button_text = f'{"(" + str(adv.worst_promo_position) + ")" if adv.worst_promo_position else ""}{check_text} {adv.name} (Бот включен)' if adv.bot_active else f'{adv.name} (Бот отключен)'
         button_text += f'({adv.adv_id})'
         button_text += f' Статус: {adv.active_status}'
         callback_data = callbacks.Adv(action='select', adv_original_id=adv.id,
@@ -308,11 +319,16 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                   hide_keywords_is_not_relevant,
                                   sort_mode = 'default'):
 
-    min_ctr = min_ctr
+
     def sorting_keywords(keywords, sort_mode):
         if sort_mode == 'default':
-            keywords.sort(key=lambda x: abs(x.predict_ctr - min_ctr))
+            keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
+            keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
+            keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
+            keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+            keywords = keywords_with_rating + keywords_without_rating
             return keywords
+
         elif sort_mode == 'sort_by_ctr_desc':
             return sorted(keywords, key=lambda x: x.ctr, reverse=True)
         else:
@@ -464,6 +480,15 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
     bottoms.append(botton)
 
+
+    botton = [InlineKeyboardButton(text='Сбросить добавочные клики',
+                                   callback_data=callbacks.ResetAddedClicks(
+              adv_setting_original_id=adv_setting.id).pack())]
+
+
+    bottoms.append(botton)
+
+
     bottoms.append([InlineKeyboardButton(text='К настройкам АРК',
                                          callback_data=callbacks.Adv(
                                                 adv_original_id=adv_setting.id).pack())])
@@ -532,6 +557,11 @@ def get_keyword_setting_keyboard(
 
     buttons.append(button)
 
+    button = [InlineKeyboardButton(text='Изменить ставку',
+                                   callback_data=callbacks.ChangeCPM(
+                                       adv_setting_original_id=adv_setting.id).pack())]
+
+    buttons.append(button)
 
     buttons.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
                                              callback_data=callbacks.SettingKeywords(
@@ -714,5 +744,17 @@ def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]):
         button = InlineKeyboardButton(text="Пополнить " + wb_user_cabinet.name + f' Текущий общий баланс({total_money})',
                                       callback_data=callbacks.AddBalance(
                                           wb_cabinet_original_id=wb_user_cabinet.wb_cabinet_id).pack())
+        builder.row(button)
+    return builder.as_markup()
+
+
+def get_advs_list(advs: list[AdvSetting]):
+    builder = InlineKeyboardBuilder()
+    for adv in advs:
+        name = '(' + str(adv.worst_promo_position) + ')' if adv.worst_promo_position else ''
+        name += adv.name
+        button = InlineKeyboardButton(text=name,
+                                      callback_data=callbacks.Adv(
+                                          adv_original_id=adv.id).pack())
         builder.row(button)
     return builder.as_markup()

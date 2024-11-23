@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import re
 
@@ -11,7 +12,7 @@ from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
 from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
@@ -69,6 +70,8 @@ class ShopChoice(TextWithKeyboard):
                  all_shops: list[WBUserCabinet]):
         super().__init__(bot, chat_id)
         self.__all_shops = all_shops
+
+
 
 
     @property
@@ -176,7 +179,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                 .order_by(AdvSetting.bot_active.desc())
             result = await session.execute(stmt)
             adv_settings = result.scalars().all()
-        adv_settings = await self._filter_advs(adv_settings)
+        adv_settings: list[AdvSetting] = await self._filter_advs(adv_settings)
         self._adv_settings = adv_settings
         stmt = select(WBCabinet.id)\
                 .where(WBCabinet.wb_user_cabinets\
@@ -189,9 +192,8 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
             last_wb_user_cabinet_page=self._page
         )
-
+        self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
         await super().__call__()
-
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
         state_data = await self._state.get_data()
@@ -245,7 +247,7 @@ class ShopUpdateInfo(Text):
 
 
 
-class AdvSettingMenu(TextWithKeyboard):
+class AdvSettingMenu(TextWithKeyboardAndImage):
     parse_mode = ParseMode.MARKDOWN
 
     def __init__(self, bot: Bot,
@@ -253,6 +255,8 @@ class AdvSettingMenu(TextWithKeyboard):
                  wb_user_cabinet: WBUserCabinet,
                  adv: AdvSetting):
         super().__init__(bot, chat_id)
+        self._bot = bot
+        self._chat_id = chat_id
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
 
@@ -261,12 +265,22 @@ class AdvSettingMenu(TextWithKeyboard):
             self._min_ctr = await data_manager.get_min_ctr(self.adv)
             if not self._min_ctr:
                 raise NoResultFound
-            self._min_ctr = round(self._min_ctr*100, 1)
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
 
-        await super().__call__()
+        self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(self.adv.id,
+                                                                        self.wb_user_cabinet.user_id)
 
+        try:
+            nmids = self.adv.nmids
+            images = await data_manager.get_main_photos(nmids[:1])
+            image = images[0]
+            self.image = image
+        except:
+            await NoMainPhotos(self._bot, self._chat_id)(self.adv)
+            return
+
+        await super().__call__()
 
     @property
     def text(self):
@@ -280,7 +294,8 @@ class AdvSettingMenu(TextWithKeyboard):
             f'📢 *Кампания:* {self.adv.name}\n'
             f'🆔 *ID кампании:* {self.adv.adv_id}\n'
             f'📌 *Статус:* {self.adv.active_status}\n'
-            f'🎯 *Минимальный CTR для кампании:* {self._min_ctr} %\n'
+            f'🎯 *Минимальный CTR для кампании:* {round(self._min_ctr*100, 2)} %\n'
+
             f'🔢 *Минимальное количество показов для прогноза CTR:* {self.adv.min_views_for_ml_predict}\n'
         )
         text += f'{max_cpc_text}'
@@ -288,7 +303,9 @@ class AdvSettingMenu(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        return keyboards.get_adv_setting_keyboard(self.wb_user_cabinet,  self.adv)
+        return keyboards.get_adv_setting_keyboard(self.wb_user_cabinet,
+                                                  self.adv,
+                                                  self.in_favorites_user)
 
 
 class CabinetNameExists(Text):
@@ -455,7 +472,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """                                                      
                   'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
                  'Статистика и настройка ключевых слов \n'
-                 f'Минимальный CRT для кампании: {round(self.min_ctr*100, 2)}%\n'
+                 f'Минимальный CRT для кампании: {self.min_ctr*100}%\n'
                  'Расшифровка: \n'
                  '✅  - ключевое слово активно \n'
                  '❌  - ключевое слово не активно \n'
@@ -523,8 +540,12 @@ class KeywordSettingMessage(TextWithKeyboard):
                 = await data_manager.get_keyword_statistic_clickhouse(client,
                                                                       self._keyword_setting.text,
                                                                       self._adv_setting.adv_id)
+        self.clicks = total_clicks
+        self.views = total_views
+        self.fact_ctr = total_clicks / total_views if total_views else 0
 
-        self.fact_ctr = round(total_clicks / total_views*100, 2) if total_views else 0
+        self.original_predict_ctr =  await redis_manager.get_predict_ctr(self._adv_setting.adv_id,
+                                                                         self._keyword_setting.text)
 
         self.spend = total_spend
 
@@ -535,7 +556,10 @@ class KeywordSettingMessage(TextWithKeyboard):
         keyword_text = self._keyword_setting.text
         keyword_text  = re.sub(r'([_*[\]()~>`#+\-=|{}.!])', r'\\\1', keyword_text)
         text = (f'🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n'
-                f'📊 *Фактический CTR:* {self.fact_ctr}%\n'
+                f'📈 *Показы:* {self.views}\n'
+                f'🖱 *Клики:* {self.clicks}\n'
+                f'Прогнозируемый CTR: {self.original_predict_ctr*100 if self.original_predict_ctr else "Не просчитан"}%\n'
+                f'📊 *Фактический CTR:* {self.fact_ctr*100}%\n'
                 f'💰 *Расход:* {round(self.spend, 2)} руб.\n')
 
         if self.position:
@@ -782,12 +806,12 @@ class ShopMenu(TextWithKeyboard):
 
         shops_tokens = work_tokens
         shops_tokens.sort(key=lambda token:  token.expires, reverse=True)
-        if user.user_telegram_id in [373435337]:
+        if user.user_telegram_id in const.ADMINS:
             expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
         else:
             expiration_time = shops_tokens[0].expires
         if expiration_time < datetime.datetime.now():
-            self.bot.send_message(self.chat_id, 'Срок действия токена истек. Пожалуйста, обновите токен.\n'
+            await self.bot.send_message(self.chat_id, 'Срок действия токена истек. Пожалуйста, обновите токен.\n'
                                                 'Для этого добавьте магазин под другим именем с новым токеном')
             return
         self.expiration_time = expiration_time
@@ -868,6 +892,15 @@ class ShopMenu(TextWithKeyboard):
         button = InlineKeyboardButton(
         text = 'Пополнить баланс',
         callback_data = callbacks.AddBalance(wb_cabinet_original_id=wb_cabinet_original_id).pack(),
+        )
+
+        builder.row(button)
+
+        button = InlineKeyboardButton(
+            text = 'Удалить личный кабинет магазина',
+            callback_data\
+                = callbacks.DeleteWbUserCabinet(
+                wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
         )
 
         builder.row(button)
@@ -1125,10 +1158,8 @@ class WaitingForAmount(Text):
 - Работа одной кампании, подключенной к боту: 35 р/сутки
 - Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
 - Биддер (управление ставками) - 25 р. в сутки за кампанию
-        
-🔥 Внимание! Только до 10-09-2024(завтра):
 
-💰 Бонус 100 % от суммы пополнения!
+Минимальная сумма пополнения: 10 т.р.        
 
 Укажите сумму пополнения:"""
 
@@ -2272,27 +2303,28 @@ class Single_message115(Text):
 class Single_message116(TextWithImage):
     parse_mode='Markdown'
 
-    image = 'images_for_sendings/1.jpg'
+    image = 'images_for_sendings/2.jpg'
 
     text = """
-Закупайте товар напрямую из Китая и экономьте до 40% на услугах посредников
+🚀 ИЩЕТЕ АВТОМАТИЗИРОВАННЫЙ ФУЛФИЛМЕНТ С ПОЛНОЙ ОБРАТНОЙ СВЯЗЬЮ И С ПРОХОДНОЙ ЦЕНОй ? 
+*Мы знаем, как вам помочь!* 🚀
 
-Анна Шифу набирает группу из 10 человек для поездки в производственные центры Китая🇨🇳 Гуанчжоу, Шэньчжэнь, Вэньчжоу, Иу. 
-Вас ждет не просто бизнес-тур, а полноценное обучение и практика по самостоятельной работе с производителями🔥
+Представляем вам наши услуги фулфилмента — [Win-Win](https://t.me/ffwinwinmanager) идеальное решение для вашего бизнеса! 
 
-Узнать подробнее >> [@AnnaShifubot](https://t.me/AnnaShifuBot?start=missia1)
 
-Что вы получите:
+📦 *Отгрузка с коэффициентом х0:* Обходите платную приемку на Wildberries и получайте больше прибыли! 
 
-— прямые контакты китайских производителей для работы без посредников
-— научитесь выбирать качественный товар и отличать фабрику от перекупа
-— способы выгодной доставки товара
-— узнаете, как снижать себестоимость товара и зарабатывать больше
-— возможность задавать тренды и зарабатывать на новинках раньше конкурентов🔥
+💰 *Низкие цены:* От 7 руб упаковка. С нами вы экономите на аренде склада и логистике. 
 
-❗️Осталось несколько мест. Успейте забронировать: [@AnnaShifubot](https://t.me/AnnaShifuBot?start=missia1)
+⚡️ *Скорость:* Обработка заказов происходит в течение 72 часов, а доставка — в кратчайшие сроки!
 
-— Tg: @annashifu
+📊 *Подробная отчетность:* Получайте полную информацию о движении ваших товаров на нашем складе — всегда будьте в курсе!
+
+🏆 *Качество:* Мы гарантируем высокие стандарты упаковки и отгрузки, чтобы ваши товары всегда доходили до клиентов в идеальном состоянии.
+
+🤝 *Быстрая обратная связь:* Мы всегда на связи! Ваши вопросы не останутся без ответа.
+
+🎁Всем тем кто пришел по этой ссылке, в ноябре 11% скидка на 🏷 на упаковку: [Win-Win](https://t.me/ffwinwinmanager)
      """
 
 
@@ -2341,3 +2373,30 @@ class RelevantPhrasesAdded(TextWithKeyboard):
 
 class WaitingForRelevantPhrases(Text):
     text = "Введите фразы, которые вы хотите добавить в кампанию в качестве релевантных фраз:"
+
+
+class ShowFavoriteAdvs(TextWithKeyboard):
+    text = '''Ваши избранные рекламные кампании:'''
+    def __init__(self, bot, user_telegram_id):
+        self.user_telegram_id = user_telegram_id
+        super().__init__(bot, user_telegram_id)
+
+    async def __call__(self):
+        async with _sm() as session:
+            stmt = select(User)\
+            .options(joinedload(User.favorites_advs))\
+            .join(User.favorites_advs)\
+            .where(User.user_telegram_id == self.user_telegram_id)
+            result = await session.execute(stmt)
+            user = result.scalars().first()
+            self.user = user
+            advs: list[AdvSetting] = user.favorites_advs
+        self.advs = await data_manager.set_worst_promo_position(advs)
+        await super().__call__()
+
+
+    @property
+    def keyboard(self):
+         keyboard = keyboards.get_advs_list(self.advs)
+         return keyboard
+

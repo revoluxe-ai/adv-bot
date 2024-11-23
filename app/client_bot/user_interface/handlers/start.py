@@ -14,7 +14,7 @@ from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from   .. import states
 from app.modules.wb_adv_updater.right_checker import RightChecker
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from ..views.callbacks import Action
 from ...redis_manager import RedisManager
 import logging
@@ -38,8 +38,6 @@ redis_manager = RedisManager()
 
 async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     await state.clear()
-    if isinstance(message, types.CallbackQuery):
-        await message.answer()
     referral_link  = None
     async with sm() as session:
         user_id = message.from_user.id
@@ -80,10 +78,35 @@ async def start_registration(message: types.Message, bot: aiogram.Bot, state: FS
                 ShopChoice(bot, chat_id, wb_user_cabinets)()
     return
 
+
+
+async def callback_start_registration(callback: CallbackQuery,
+                                      callback_data: callbacks.Start,
+                                      bot: aiogram.Bot, state: FSMContext):
+    await state.clear()
+    async with sm() as session:
+        user_id = callback.from_user.id
+
+        stmt = select(User)\
+            .options(joinedload(User.wb_user_cabinets).joinedload(
+            WBUserCabinet.wb_cabinet)) \
+            .where(User.user_telegram_id == user_id)
+        result = await session.execute(stmt)
+        user: User = result.scalar()
+
+        wb_user_cabinets = user.wb_user_cabinets
+        chat_id = callback.message.chat.id
+        await messages. \
+                ShopChoice(bot, chat_id, wb_user_cabinets)()
+    return
+
+
+
+
 @router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(callback_query: types.CallbackQuery,
                    bot: aiogram.Bot, state: FSMContext):
-    await callback_query.answer('Добавление нового магазина (кабинета)')
+    await bot.send_message(callback_query.message.chat.id, 'Добавление нового магазина (кабинета)')
     await state.set_state(states.CabinetRegistration.cabinet_name)
     chat_id: int = callback_query.message.chat.id
     await messages.ShopNameGet(bot, chat_id)()
@@ -192,7 +215,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             wb_cabinet = result.scalar()
             if not wb_cabinet: #если кабинета нет, то создаем кабинет
                 wb_cabinet = WBCabinet(shop_id=wb_token.shop_id)
-                wb_cabinet.bonus = 300
+                wb_cabinet.bonus = 0
                 session.add(wb_cabinet)
             access.wb_cabinet = wb_cabinet
             wb_user_cabinet = WBUserCabinet(name=cabinet_name)
@@ -226,9 +249,8 @@ async def delete_shop(callback_query: types.CallbackQuery,
                       callback_data : callbacks.DeleteWbUserCabinet,
                       bot: aiogram.Bot,
                       state: FSMContext):
-    await callback_query.answer('Удаление магазина (кабинета)')
+    await bot.send_message(callback_query.message.chat.id, 'Удаление магазина (кабинета)')
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
-
     async with sm() as session:
         stmt = select(WBUserCabinet).options(
             joinedload(WBUserCabinet.user),
@@ -251,7 +273,6 @@ async def delete_shop(callback_query: types.CallbackQuery,
 async def add_app_token(callback_query: types.CallbackQuery,
                   callback_data: callbacks.AddNewToken,
                   bot: aiogram.Bot, state: FSMContext):
-    await callback_query.answer()
     logger.debug('Текущее состояние: %s', await state.get_state())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
@@ -316,7 +337,6 @@ async def select_shop(callback_query: types.CallbackQuery,
         await state.update_data(filter_advs=None)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await state.update_data(last_wb_user_cabinet_original_id = wb_user_cabinet_original_id)
-    await callback_query.answer()
     message = callback_query.message
 
     chat_id = message.chat.id
@@ -337,7 +357,6 @@ async def shop_menu_process(
 ):
     await state.update_data(last_wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id)
     logger.debug('Текущее состояние: %s', await state.get_data())
-    await callback.answer()
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await messages.ShopMenu(bot, callback.message.chat.id, state, wb_user_cabinet_original_id)()
 
@@ -348,7 +367,6 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
                                     bot: aiogram.Bot,
                                     callback_data: callbacks.UpdateCompanyFromWB,
                                    state: FSMContext):
-    await callback_query.answer()
     await messages.LongTimeOperation(bot, callback_query.message.chat.id)()
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
@@ -373,5 +391,10 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
 
 
 
-router.callback_query.register(start_registration, callbacks.Start.filter())
+
+
+
+
+
+router.callback_query.register(callback_start_registration, callbacks.Start.filter())
 router.message.register(start_registration, CommandStart())

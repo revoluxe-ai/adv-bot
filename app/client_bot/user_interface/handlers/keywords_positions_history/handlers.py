@@ -4,7 +4,8 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 import logging
-from app.client_bot import utils, const
+from app import utils
+from app.client_bot import const
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBCabinet,
@@ -30,10 +31,8 @@ async def keyword_position_history(callback: types.CallbackQuery,
                                    callback_data: callbacks.KeywordPositionHistory,
                                    bot: aiogram.Bot,
                                    state: FSMContext):
-    await callback.answer()
     await state.set_state(state = None)
     adv_original_id: int = callback_data.adv_original_id
-    await callback.answer()
     try:
           graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id))
     except Exception as e:
@@ -51,7 +50,7 @@ async def keyword_position_history(callback: types.CallbackQuery,
 async def turn_parsing_on(callback: types.CallbackQuery,
                             callback_data: callbacks.TurnParsing,
                             bot: aiogram.Bot):
-        await callback.answer()
+
         adv_setting_original_id = callback_data.adv_original_id
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         async with _sm() as session:
@@ -102,7 +101,6 @@ async def turn_parsing_on(callback: types.CallbackQuery,
 async def turn_parsing_off(callback: types.CallbackQuery,
                             callback_data: callbacks.TurnParsing,
                             bot: aiogram.Bot):
-        await callback.answer()
         adv_setting_original_id = callback_data.adv_original_id
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         async with _sm() as session:

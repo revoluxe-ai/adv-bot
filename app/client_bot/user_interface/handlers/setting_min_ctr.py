@@ -24,7 +24,6 @@ async def setting_min_ctr(callback: types.CallbackQuery,
                                callback_data: callbacks.ChoiceAdvPaginator,
                                bot: aiogram.Bot,
                                state: FSMContext):
-    await callback.answer()
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.ChangeMinCTR.waiting_for_new_min_ctr)

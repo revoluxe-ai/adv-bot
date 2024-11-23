@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter == True))
 async def reset_filter(callback: types.CallbackQuery, callback_data: callbacks.ChoiceAdvPaginator,
                           bot: aiogram.Bot, state: FSMContext):
-     await callback.answer()
+
      wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
      await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
      await state.update_data(filter_advs=[])
@@ -73,7 +73,6 @@ async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Messag
                                state: FSMContext):
 
     chat_id = callback.message.chat.id
-    await bot.answer_callback_query(callback_query_id= callback.id)
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(state=states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
@@ -91,10 +90,9 @@ async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Messag
 @router.callback_query(callbacks.Adv.filter())
 async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
               bot: aiogram.Bot, state: FSMContext):
-    await callback.answer()
+
     await state.set_state(state = None)
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
-    await bot.answer_callback_query(callback.id)
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     data = await state.get_data()
@@ -104,12 +102,13 @@ async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
         async with sm() as session:
             stmt = select(WBUserCabinet) \
                 .join(WBUserCabinet.user) \
-                .options(selectinload(WBUserCabinet.wb_cabinet) \
-                         .selectinload(WBCabinet.adv_settings)) \
-                .filter(User.user_telegram_id == callback.from_user.id,
-                        AdvSetting.id == adv_original_id)
-            wb_user_cabinet = await session.execute(stmt)
-            wb_user_cabinet = wb_user_cabinet.scalar()
+                .join(WBUserCabinet.wb_cabinet) \
+                .join(WBCabinet.adv_settings) \
+                .filter(User.user_telegram_id == callback.from_user.id,  # Фильтрация по user_telegram_id
+                        AdvSetting.id == adv_original_id)  # Фильтрация по нужному AdvSetting
+
+            result = await session.execute(stmt)
+            wb_user_cabinet = result.scalar()  # Извлекаем первую строку
         wb_user_cabinet_original_id = wb_user_cabinet.id
     async with sm() as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
@@ -180,13 +179,13 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
                     adv.payments.append(payment)
                     wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
                 else:
-                    await callback.answer('На балансе недостаточно средств')
+                    await bot.send_message(callback.message.chat.id, 'Недостаточно средств')
                     await messages.ShopMenu(bot,
                                             callback.message.chat.id,
                                             state,
                                             wb_user_cabinet_original_id)()
                     return
-        await callback.answer('Включаю бота')
+        await bot.send_message(callback.message.chat.id, 'Включаю бота')
         adv.bot_active = True
         await session.commit()
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
@@ -206,7 +205,7 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
 @router.callback_query(callbacks.TurnBot.filter(F.action == 'off_all'))
 async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
                            callback_data: callbacks.TurnBot, bot: aiogram.Bot, ):
-    await callback.answer('Выключаю всех ботов')
+    await bot.send_message(callback.message.chat.id, 'Отключаю бота от всех кампаний')
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         advs = await session.execute(select(AdvSetting).join(AdvSetting.wb_cabinet)\
@@ -223,9 +222,8 @@ async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
 
 @router.callback_query(callbacks.TurnBot.filter(F.action == 'off'))
 async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot, state: FSMContext):
-    await call.answer()
-    data = await state.get_data()
-    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
+    # data = await state.get_data()
+    wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet) \
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
@@ -237,7 +235,7 @@ async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnB
                                             .where(AdvSetting.id == callback_data.adv_original_id))
 
         adv_setting: AdvSetting = adv_setting.scalars().first()
-        adv_setting.new_auto_min_ctr_mode = False
+        adv_setting.bot_active = False
         await session.commit()
 
     await messages.AdvSettingMenu(call.bot,
@@ -248,7 +246,6 @@ async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnB
 
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_on_auto_min_ctr'))
 async def turn_on_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR, state: FSMContext):
-    await call.answer()
     data = await state.get_data()
     wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
@@ -274,7 +271,6 @@ async def turn_on_auto_min_ctr(call: types.CallbackQuery, callback_data: callbac
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_off_auto_min_ctr'))
 async def turn_off_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR,
                                 state: FSMContext):
-    await call.answer()
     async with sm() as session:
         adv_setting = await session.execute(select(AdvSetting) \
                                             .where(AdvSetting.id == callback_data.adv_setting_original_id))
@@ -299,7 +295,7 @@ async def turn_off_auto_min_ctr(call: types.CallbackQuery, callback_data: callba
 # @router.callback_query(callbacks.Min_ctr.filter(F.action == 'change'))
 # async def change_min_ctr(callback: types.CallbackQuery,  callback_data: callbacks.Min_ctr,
 #                          bot: aiogram.Bot, state: FSMContext, last_message:LastMessage):
-#     await callback.answer()
+
 #     adv_original_id = callback_data.adv_original_id
 #     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
 #     async with sm() as session:

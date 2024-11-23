@@ -66,3 +66,7 @@ class AddBlackPhrasesTemplates(StatesGroup):
 
 class AddRelevantPhrases(StatesGroup):
     waiting_for_relevant_phrases = State()
+
+
+class ChangeCPM(StatesGroup):
+    waiting_for_cpm = State()
