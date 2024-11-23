@@ -5,7 +5,9 @@ from . import models
 from app.utils.db.session_maker import get_async_session_maker
 import logging
 from . import wb_db_manager
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+import typing
+if typing.TYPE_CHECKING:
+    from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.common_slaves.wildberries.api import WBApi
 from .data_classes.adv import Adv
 from .models import WBCabinet
@@ -37,13 +39,10 @@ class ShopDataUpdater:
     def __repr__(self):
         return f'{self._wb_cabinet.shop_id}'
 
-    def __init__(self, wb_access:  WBCabinetAccess):
+    def __init__(self, wb_access:  'WBCabinetAccess'):
         self.wb_api = WBApi(wb_access)
         self._wb_cabinet: WBCabinet = wb_access.wb_cabinet
         pass
-
-
-
 
 
     async def quick_update_all_data(self):

@@ -265,13 +265,6 @@ class AdvSettingMenu(TextWithKeyboard):
         except NoResultFound:
             self._min_ctr = 'Минимальный CTR не определен'
 
-        try:
-            self._mean_ctr = await data_manager.get_mean_ctr(self.adv)
-            if not self._mean_ctr:
-                raise NoResultFound
-            self._mean_ctr = round(self._mean_ctr, 2) * 100
-        except NoResultFound:
-            self._mean_ctr = 'Средний CTR не определен'
         await super().__call__()
 
 
@@ -288,7 +281,6 @@ class AdvSettingMenu(TextWithKeyboard):
             f'🆔 *ID кампании:* {self.adv.adv_id}\n'
             f'📌 *Статус:* {self.adv.active_status}\n'
             f'🎯 *Минимальный CTR для кампании:* {self._min_ctr} %\n'
-            f'📈 *Средний CTR по активным ключам за весь период:* {self._mean_ctr} %\n'
             f'🔢 *Минимальное количество показов для прогноза CTR:* {self.adv.min_views_for_ml_predict}\n'
         )
         text += f'{max_cpc_text}'
@@ -550,7 +542,9 @@ class KeywordSettingMessage(TextWithKeyboard):
             text += (f'🏆 *Органическая позиция:* {self.position.base_position}\n'
                      f"""🚀 *Буст-позиция:* {self.position.promo_position if self.position.promo_position else "Нет"}\n"""
                      f"""💰 *Ставка на момент сбора данных:* {self.position.cpm if self.position.cpm else "Нет"}\n"""
-                     f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n""")
+                     f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n"""
+                     f"""Тип кампании: {self.position.type_native if self.position.type_native else "Нет"}\n""")
+
         else:
             text += '📉 *Позиция на Wildberries:* не определена\n'
 
@@ -2278,23 +2272,27 @@ class Single_message115(Text):
 class Single_message116(TextWithImage):
     parse_mode='Markdown'
 
-    image = 'images_for_sendings/108.jpg'
+    image = 'images_for_sendings/1.jpg'
 
     text = """
-**85% селлеров упускают из вида показатели, которые влияют на прибыль**
+Закупайте товар напрямую из Китая и экономьте до 40% на услугах посредников
 
-Когда у тебя 100500 сервисов учета и таблиц, 1С и бухгалтер, можно часами анализировать цифры, но так и не увидеть, что можно улучшить.
+Анна Шифу набирает группу из 10 человек для поездки в производственные центры Китая🇨🇳 Гуанчжоу, Шэньчжэнь, Вэньчжоу, Иу. 
+Вас ждет не просто бизнес-тур, а полноценное обучение и практика по самостоятельной работе с производителями🔥
 
-Хорошая новость: появился наикрутейший [сервис Marketran, который создали селлеры для селлеров](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540)🤝
+Узнать подробнее >> [@AnnaShifubot](https://t.me/AnnaShifuBot?start=missia1)
 
-Объясняем по-простому. Когда-то у нас были будильники, фотоаппараты и музыкальный центр, а потом появились смартфоны.
+Что вы получите:
 
-Так вот, [Marketran](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540) — это смартфон в мире бизнеса на маркетплейсах. Там всё в одном месте.
+— прямые контакты китайских производителей для работы без посредников
+— научитесь выбирать качественный товар и отличать фабрику от перекупа
+— способы выгодной доставки товара
+— узнаете, как снижать себестоимость товара и зарабатывать больше
+— возможность задавать тренды и зарабатывать на новинках раньше конкурентов🔥
 
-Селлеры, которые уже пользуются сервисом, увеличивают прибыль, сокращают расходы на рекламу и успешно привлекают инвесторов за счёт АБСОЛЮТНОЙ ПРОЗРАЧНОСТИ бизнеса.
+❗️Осталось несколько мест. Успейте забронировать: [@AnnaShifubot](https://t.me/AnnaShifuBot?start=missia1)
 
-Попробуйте бесплатно и оптимизируйте показатели прямо сейчас : [ЗДЕСЬ](https://salebot.site/f91f116d3db968adfc2ed5e5d9b232cc_1?utm_source=tg&utm_medium=seed&utm_campaign=factor&utm_content=1540)
-
+— Tg: @annashifu
      """
 
 

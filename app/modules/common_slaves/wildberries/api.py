@@ -16,7 +16,7 @@ from .http_request import requests, try_except_decorator
 from .models import AdvSetting
 from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
-
+from app.modules.shops_data_updater.types import FullAdvStat
 
 """
 
@@ -68,43 +68,6 @@ from .super_cabinet_manager import WBCabinetAccess
 """
 
 
-class DayStat:
-    def __init__(self, data):
-        self.date = data['date']
-        self.views = data['views']
-        self.clicks = data['clicks']
-        self.ctr = data['ctr']
-        self.cpc = data['cpc']
-        self.sum = data['sum']
-        self.atbs = data['atbs']
-        self.orders = data['orders']
-        self.cr = data['cr']
-        self.shks = data['shks']
-        self.sum_price = data['sum_price']
-        self.apps = data['apps']
-
-
-class FullAdvStat(ABC):
-    def __init__(self, data):
-        self.views = data['views']
-        self.clicks = data['clicks']
-        self.ctr = data['ctr']
-        self.cpc = data['cpc']
-        self.sum = data['sum']
-        self.atbs = data['atbs']
-        self.orders = data['orders']
-        self.cr = data['cr']
-        self.shks = data['shks']
-        self.sum_price = data['sum_price']
-        self.dates = data['dates']
-        self.days = []
-        for day_data in data['days']:
-            day = DayStat(day_data)
-            self.days.append(day)
-        self.boosterStats = data['boosterStats']
-        self.advertId = data['advertId']
-
-
 
 
 
@@ -127,10 +90,55 @@ class AdvertApi(ABC_WB_API):
     live_company_status = [4, 9, 11]
     auto_adv_types = [8, 9]
 
+    @try_except_decorator(1, 1)
+    async def get_search_keywords_stat(self, adv_id):
+        url = f"https://advert-api.wildberries.ru/adv/v1/stat/words?id={adv_id}"
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(session, 'GET', url, headers=self.headers.standart)
+            answer = json.loads(response_text)
+            keywords = []
+            update_timestamp = datetime.datetime.now()
+            ...#нет правильной обработки ответа
+            return keywords
+
+    @try_except_decorator(1, 1)
+    async def set_search_cpm(self, search_adv_id: int, cpm: int):
+        url = 'https://advert-api.wildberries.ru/adv/v0/cpm'
+        data = {
+            "advertId": search_adv_id,
+            "type": 9,
+            "cpm": cpm
+        }
+        async with aiohttp.ClientSession() as session:
+            response = await requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
+            if response == '':
+                logger.debug(f'CPM для поисковой кампании {search_adv_id} установлен')
+                return
+            else:
+                logger.error(f'Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}')
+
+
+
+
+    @try_except_decorator(1, 1)
+    async def set_search_keywords(self, search_adv_id, texts):
+        url = f'https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={search_adv_id}'
+        data = {'pluse': texts}
+        async with aiohttp.ClientSession() as session:
+            await requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
+            logger.debug('Плюс-фразы установлены')
+
+    @try_except_decorator(1, 1)
+    async def set_pluse_status_in_search_adv(self, adv_id: int, status: bool):
+        status = 'true' if status else 'false'
+        url = f'https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={adv_id}&fixed={status}'
+        async with aiohttp.ClientSession() as session:
+            await requests(session, 'GET', url, headers=self.headers.standart)
+            logger.debug('Статус фиксированных фраз установлен')
 
 
     @try_except_decorator(1, 60)
-    async def def_get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None):
+    async def get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None)-> list[FullAdvStat]:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
         """Пример даты [
@@ -219,18 +227,18 @@ class AdvertApi(ABC_WB_API):
 
 
     @try_except_decorator(5, 60)
-    async def get_keywords_stat(self, adv_setting: AdvSetting)-> list[KeywordStat]:
+    async def get_keywords_stat(self, adv_id)-> list[KeywordStat]:
         keywords = []
         date_to = datetime.datetime.now().date()
         date_from = date_to - datetime.timedelta(days=6)
-        url = f'https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_setting.adv_id}&from={date_from}&to={date_to}'
+        url = f'https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}'
         async with aiohttp.ClientSession() as session:
             response_text = await requests(session, 'GET', url,
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             update_timestamp = datetime.datetime.now()
             if not answer:
-                logger.debug('Нет данных по ключевым словам: %s', adv_setting.name)
+                logger.debug('Нет данных по ключевым словам: %s', adv_id)
                 return  []
             for data in answer['keywords']:
                 wb_timestamp = datetime.datetime.fromisoformat(data['date']).date()
@@ -241,7 +249,7 @@ class AdvertApi(ABC_WB_API):
                     keyword_text = keyword_text.replace('_', '')
                     keyword_stat['date'] = wb_timestamp
                     keyword_stat['update_timestamp'] = update_timestamp
-                    keyword_stat['adv_id'] = adv_setting.adv_id
+                    keyword_stat['adv_id'] = adv_id
                     keyword_stat['text'] = keyword_text
                     keyword_stat['spend'] = keyword_stat.pop('sum')
                     keyword = KeywordStat(**keyword_stat)
@@ -555,6 +563,7 @@ class ContentApi(ABC_WB_API):
         async with aiohttp.ClientSession() as session:
             response = await requests(session, 'POST', url=url, data=data, headers=self.headers.standart)
             return json.loads(response)
+
 
 
 

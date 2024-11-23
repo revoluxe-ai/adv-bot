@@ -1,5 +1,8 @@
 import json
+import re
 from dataclasses import dataclass
+from typing import Optional
+
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
                         BIGINT, Boolean, Float, DateTime, text)
@@ -190,7 +193,7 @@ class AdvSetting(BaseTable):
     def __repr__(self):
         return f'name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}'
     adv_id = Column(BIGINT(), unique=True)
-    name = Column(String, nullable=False)
+    name = mapped_column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet: Mapped[WBCabinet] =  relationship('WBCabinet',
                                                  back_populates='adv_settings',
@@ -230,7 +233,32 @@ class AdvSetting(BaseTable):
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
     new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
 
+    @property
+    def search_adv_id(self):
+        if not self.name:
+            return None
+        pattern = re.compile(r'<!-\[(\d+)\]-!>') # Изменено на поиск по всей строке
+        match = re.search(pattern, self.name)
+        if not match:
+            return None
+        else:
+            return int(match.group(1))
 
+    @property
+    def max_pay_for_order(self) -> Optional[int]:
+        pattern = re.compile(r'<MAX_PAY>(\d+)!?</MAX_PAY>')  # Добавили !? для необязательного символа "!"
+        match = re.search(pattern, self.name)
+        if match:
+            return int(match.group(1))
+        return None
+
+    @property
+    def auto_max_bid(self) -> bool:
+        pattern = re.compile(r'<MAX_PAY>(\d+)!?</MAX_PAY>')  # Используем тот же паттерн, чтобы найти !
+        match = re.search(pattern, self.name)
+        if match and '!' in match.group(0):  # Проверяем, есть ли "!" в найденной строке
+            return True
+        return False
 
 
 class KeywordSetting(BaseTable):
@@ -276,6 +304,14 @@ class WBItemPosition:
     cpm: int = None
     adv_id: int = None
     keyword_text: str = None
+    adv_type: int = None
+
+    @property
+    def type_native(self)-> str:
+        if self.adv_type == 9:
+            return 'search'
+        elif self.adv_type == 8:
+            return 'auto'
 
     def to_dict(self):
         timestamp: datetime = self.timestamp
@@ -288,7 +324,8 @@ class WBItemPosition:
             'cpm': self.cpm,
             'adv_id': self.adv_id,
             'nmid': self.nmid,
-            'timestamp': str_timestamp
+            'timestamp': str_timestamp,
+            'adv_type': self.adv_type
         }
 
     @staticmethod
@@ -305,8 +342,11 @@ class WBItemPosition:
            position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
         except:
             position.timestamp = None
+
+        position.keyword_text = data['keyword_text']
         try:
-            position.keyword_text = data['keyword_text']
+            position.adv_type = data['adv_type']
         except:
-            return None
+            position.adv_type = None
+
         return position

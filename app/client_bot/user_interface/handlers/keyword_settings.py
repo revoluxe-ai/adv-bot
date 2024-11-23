@@ -5,9 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
-
 from sqlalchemy.future import select
-
 from app.client_bot import utils
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import (
@@ -17,8 +15,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser.parser import ErrorParsingPositions
-from app.utils import add_wb_positions_to_redis
+from app.modules.wb_keywords_parser import parser
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
@@ -554,9 +551,7 @@ async def check_position(callback: types.CallbackQuery,
             result = await session.execute(stmt)
             nmids: AdvSetting = result.scalar()
             nmid = nmids[0]
-
-
-        await add_wb_positions_to_redis(text, {nmid}, delay=1)
+        await parser.add_wb_positions(text, {nmid}, delay=3)
         await messages.KeywordSettingMessage(bot,
                                              callback.message.chat.id,
                                              keyword_setting_original_id,

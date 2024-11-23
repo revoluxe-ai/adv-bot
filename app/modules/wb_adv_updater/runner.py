@@ -168,8 +168,15 @@ async def run_vector_update_in_neo4j():
 
 
 
-def run_main_coroutines():
-    asyncio.run(main_loop())
+async def run_update_model():
+    while True:
+        try:
+            await update_model()
+        except Exception as e:
+            logger.error(f'Ошибка обновления модели {e}', exc_info=True)
+        await asyncio.sleep(0)
+
+
 
 async def main_loop():
     await asyncio.gather(
@@ -184,10 +191,12 @@ async def main_loop():
         return_exceptions=False
     )
 
-async def run_update_model():
+
+async def run_main_coroutines():
     while True:
         try:
-            await update_model()
+            await main_loop()
         except Exception as e:
-            logger.error(f'Ошибка обновления модели {e}', exc_info=True)
-        await asyncio.sleep(0)
+            logger.error(f'Ошибка в главном цикле {e}', exc_info=True)
+            await asyncio.sleep(0)
+

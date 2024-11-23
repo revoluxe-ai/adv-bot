@@ -1,12 +1,12 @@
-
+from app.modules.wb_adv_updater.search_advs_manager import update_search_advs_module_run
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     keywords_parsing_process,
     run_update_minus_keywords_on_wb,
     run_update_keyword_stat,
-    parser_all_white_phrase,
     run_update_predict_ctr,
     run_update_model,
+
 )
 from app.modules.wb_adv_updater.bidder import run_bidder_process
 from python_modules.logger import setup_logging
@@ -38,7 +38,8 @@ run_own_process_list = [
      run_update_keyword_stat,
       run_main_coroutines,
      run_update_predict_ctr,
-     run_update_model
+     run_update_model,
+    update_search_advs_module_run
 
 ]
 

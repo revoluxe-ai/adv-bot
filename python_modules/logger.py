@@ -8,7 +8,6 @@ system_name = platform.system()
 
 logging_setup_done = False  # Флаг для проверки, было ли уже выполнено настройка логгирования
 
-
 class CustomFormatter(logging.Formatter):
     """Логгирование с цветным выводом в зависимости от уровня сообщений."""
     grey = "\x1b[38;21m"

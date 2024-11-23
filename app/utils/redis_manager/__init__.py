@@ -6,7 +6,9 @@ from types import NoneType
 from typing import Union
 import logging
 
+from app.modules.shops_data_updater.types import FullAdvStat
 from app.utils import text_cleaner
+from app.utils.redis_manager.exc import DataNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -436,3 +438,33 @@ async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]
     return clusters_and_presets
 
 
+async def get_keywords_positions_by_nmid(nmid: int):
+    key_pattern = f'adv_positions:*:{nmid}*'
+    keys = await redis_client.keys(key_pattern)
+    positions = []
+    for key in keys:
+        json_data = await redis_client.get(key)
+        if json_data:
+            position = WBItemPosition.from_dict(json.loads(json_data))
+            positions.append(position)
+    return positions
+
+
+async def set_full_stat_adv(adv_stats: list['FullAdvStat']):
+    async with redis_client.pipeline() as pipe:
+        for adv_stat in adv_stats:
+            key = f'full_stat_adv:{adv_stat.adv_id}'
+            json_data = adv_stat.to_json()
+            await pipe.set(key, json_data)
+        await pipe.execute()  # Выполняем все команды за один раз
+    return None
+
+
+
+async def get_full_stat_adv(adv_id: int)-> str:
+    key = f'full_stat_adv:{adv_id}'
+    json_data = await redis_client.get(key)
+    if json_data is None:
+        raise DataNotFoundError(f'Данные для объявления с adv_id={adv_id} не найдены в Redis')
+    json_data = json_data.decode('utf-8')
+    return json_data
