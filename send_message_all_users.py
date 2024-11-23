@@ -1,3 +1,5 @@
+import itertools
+
 from app.client_bot import single_messages
 from hashlib import sha256
 from sqlalchemy import select, or_
@@ -76,23 +78,29 @@ async def get_test_user():
         yield user
 
 
+async def async_chain(*async_generators):
+    for gen in async_generators:
+        async for item in gen:
+            yield item
+
 
 
 async def send_message_to_users():
     send_count = 0
     not_send_count = 0
     users = get_users()
+    # admin_users = get_test_user()
+    # chain = async_chain(admin_users, users)
     async for user in users:
         user_id =  user.user_telegram_id
-        message = single_messages.Single_message1
+        message = single_messages.Single_message3
         hash = sha256((str(message)) \
                       .encode()).hexdigest()
-        # if await redis_manager.check_message_send(hash, user_id):
-        #     continue
+        if await redis_manager.check_message_send(hash, user_id):
+            if user_id not in [373435337]:
+                continue
 
         try:
-            # if user.user_telegram_id not in [373435337]:
-            #     continue
             wb_user_cabinets = user.wb_user_cabinets
             await message(bot, user_id)()
             await redis_manager.set_message_send(hash, user_id)
