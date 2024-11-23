@@ -50,7 +50,7 @@ async def keyword_position_history(callback: types.CallbackQuery,
 async def turn_parsing_on(callback: types.CallbackQuery,
                             callback_data: callbacks.TurnParsing,
                             bot: aiogram.Bot):
-        await callback.answer()
+
         adv_setting_original_id = callback_data.adv_original_id
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         async with _sm() as session:
