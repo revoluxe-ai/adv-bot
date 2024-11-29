@@ -2,6 +2,7 @@ import logging
 import threading
 import asyncio
 from contextlib import asynccontextmanager
+from time import time
 
 from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -16,8 +17,8 @@ thread_local = threading.local()
 lock_counter = threading.Lock()
 conn_counter = 0
 
-pool_size = 300
-max_overflow = 500
+pool_size = 20
+max_overflow = 30
 
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
 global_semaphore = asyncio.Semaphore(count_sem)
@@ -40,6 +41,7 @@ def log_checkin(dbapi_con, con_record):
 async def get_async_session_maker(semaphore = None) -> AsyncSession:
     if semaphore is None:
         semaphore = global_semaphore
+    start_time = time()
     async with semaphore:
         if not hasattr(thread_local, "session_maker"):
             db_connector = path_setting_funcs.get_alchemy_row()
@@ -61,3 +63,7 @@ async def get_async_session_maker(semaphore = None) -> AsyncSession:
         session_maker = thread_local.session_maker
         async with session_maker() as session:
             yield session
+        stop =time()
+        duration = stop - start_time
+        if duration > 1.0:  # логируем медленные запросы
+            logger.error(f"Slow database operation: {duration:.2f} seconds")
