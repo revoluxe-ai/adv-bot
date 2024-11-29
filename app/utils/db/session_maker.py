@@ -21,37 +21,38 @@ conn_counter = 0
 pool_size = 20
 max_overflow = 30
 
-SLOW_QUERY_THRESHOLD = 1.0  # секунда
-
 
 class AnalyticAsyncSession(AsyncSession):
     async def execute(self, statement, *args, **kwargs):
         query_start = time()
         try:
+            # Определяем тип операции
+            operation_type = type(statement).__name__
+
+            # Анализ стека для поиска вызывающего кода
+            stack = traceback.extract_stack()
+            caller = next((frame for frame in reversed(stack[:-1])
+                           if 'sqlalchemy' not in frame.filename), None)
+
             result = await super().execute(statement, *args, **kwargs)
             duration = time() - query_start
 
-            if duration > SLOW_QUERY_THRESHOLD:
-                # Добавить больше информации о запросе
-                params = statement.compile().params if hasattr(statement, 'compile') else None
+            if duration > 1.0:
                 logger.error(
                     f"Slow query ({duration:.2f}s)\n"
-                    f"Type: {type(statement).__name__}\n"
-                    f"Parameters: {params}\n"
+                    f"Type: {operation_type}\n"
+                    f"Location: {caller.filename}:{caller.lineno}\n"
                     f"Statement: {statement}"
                 )
             return result
         except Exception as e:
-            logger.error(f"Query error: {e}, Query: {statement}")
+            logger.error(f"Query error: {e}")
             raise
 
 
 
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
 global_semaphore = asyncio.Semaphore(count_sem)
-
-
-
 
 def log_checkout(dbapi_con, con_record, con_proxy):
     logger.debug("Соединение взято из пула")
@@ -80,14 +81,11 @@ async def get_async_session_maker(semaphore = None) -> AsyncSession:
                 echo=False,
                 pool_size=pool_size,
                 max_overflow=max_overflow,
-                pool_pre_ping=True,
-                pool_timeout=30,
-                pool_recycle=3600
+                pool_pre_ping=True
             )
             sync_engine = engine.sync_engine
             event.listen(sync_engine, "checkout", log_checkout)
             event.listen(sync_engine, "checkin", log_checkin)
-            event.listen(sync_engine, "connect", lambda conn, record: logger.info("New connection created"))
 
             async_session_maker = sessionmaker(engine, expire_on_commit=False,
                                                class_=AnalyticAsyncSession)
