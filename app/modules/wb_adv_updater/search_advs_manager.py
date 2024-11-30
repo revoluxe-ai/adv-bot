@@ -100,7 +100,6 @@ async def update_search_advs_module_run():
             adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
             await asyncio.gather(
                 _set_keyword_phrases_for_search_advs(adv_settinds),
-                # _update_cpm_in_search_advs(adv_settinds)
             )
         except:
             logger.error('Ошибка обновления статистики по ключам для поисковых РК', exc_info=True)
