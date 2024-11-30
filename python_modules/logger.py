@@ -42,12 +42,28 @@ def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
-    if system_name == 'Linux':  # type: ignore
+    if system_name == 'Linux':
         from systemd.journal import JournalHandler
-        journal_handler = JournalHandler()
+
+        class CustomJournalHandler(JournalHandler):
+            priority_map = {
+                logging.DEBUG: 7,
+                logging.INFO: 6,
+                logging.WARNING: 4,
+                logging.ERROR: 3,
+                logging.CRITICAL: 2
+            }
+
+            def emit(self, record):
+                priority = self.priority_map.get(record.levelno, 6)
+                record.priority = priority
+                super().emit(record)
+
+        journal_handler = CustomJournalHandler(SYSLOG_IDENTIFIER='updater')
         journal_handler.setLevel(logging.DEBUG)
-        formatter = CustomFormatter(fmt="%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s",
-                                    datefmt="%Y-%m-%d %H:%M:%S")
+        formatter = CustomFormatter(
+            fmt="%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S")
         journal_handler.setFormatter(formatter)
         logger.addHandler(journal_handler)
     else:
