@@ -51,11 +51,21 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int):
 
 
 async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet):
-    async with _sm() as session:  # Assuming _sm() is a function that returns an AsyncSession
+    async with _sm() as session:
+        # Получаем все nmid из списка карточек
+        nmids = [card.nmid for card in cards]
+
+        # Делаем один запрос для получения всех карточек
+        stmt = select(my_types.WBCard).where(my_types.WBCard.nmid.in_(nmids))
+        result = await session.execute(stmt)
+        existing_cards = result.scalars().all()
+
+        # Создаём словарь для быстрого поиска
+        cards_by_nmid = {card.nmid: card for card in existing_cards}
+
+        # Теперь можем итерироваться по исходным карточкам
         for card in cards:
-            stmt = select(my_types.WBCard).where(my_types.WBCard.nmid == card.nmid)
-            result = await session.execute(stmt)
-            existing_card: my_types.WBCard = result.scalars().first()
+            existing_card = cards_by_nmid.get(card.nmid)
             if existing_card:
                 # Если карточка уже существует, обновляем ее
                 existing_card.json = json.dumps(card.data)
