@@ -68,30 +68,75 @@ def log_checkin(dbapi_con, con_record):
         conn_counter -= 1
     logger.debug(f"Количество соединений: {conn_counter}")
 
+
 @asynccontextmanager
-async def get_async_session_maker(semaphore = None) -> AsyncSession:
+async def get_async_session_maker(semaphore=None) -> AsyncSession:
+    session_start = time()
+    current_task = asyncio.current_task()
+
     if semaphore is None:
         semaphore = global_semaphore
-    async with semaphore:
-        if not hasattr(thread_local, "session_maker"):
-            db_connector = path_setting_funcs.get_alchemy_row()
-            async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
-            engine = create_async_engine(
-                async_db_connector,
-                echo=False,
-                pool_size=pool_size,
-                max_overflow=max_overflow,
-                pool_pre_ping=True
-            )
-            sync_engine = engine.sync_engine
-            event.listen(sync_engine, "checkout", log_checkout)
-            event.listen(sync_engine, "checkin", log_checkin)
 
-            async_session_maker = sessionmaker(engine, expire_on_commit=False,
-                                               class_=AnalyticAsyncSession)
-            thread_local.session_maker = async_session_maker
+    try:
+        async with semaphore:
+            if not hasattr(thread_local, "session_maker"):
+                db_connector = path_setting_funcs.get_alchemy_row()
+                async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
+                engine = create_async_engine(
+                    async_db_connector,
+                    echo=False,
+                    pool_size=pool_size,
+                    max_overflow=max_overflow,
+                    pool_pre_ping=True
+                )
+                sync_engine = engine.sync_engine
+                event.listen(sync_engine, "checkout", log_checkout)
+                event.listen(sync_engine, "checkin", log_checkin)
 
-        session_maker = thread_local.session_maker
-        async with session_maker() as session:
-            yield session
+                async_session_maker = sessionmaker(engine, expire_on_commit=False,
+                                                   class_=AnalyticAsyncSession)
+                thread_local.session_maker = async_session_maker
+
+            session_maker = thread_local.session_maker
+
+            # Логируем время ожидания сессии
+            wait_time = time() - session_start
+            if wait_time > 0.1:  # Если ждали больше 100мс
+                logger.warning(
+                    f"Long session wait time:\n"
+                    f"Wait duration: {wait_time:.3f}s\n"
+                    f"Task: {current_task.get_name()}\n"
+                    f"Active connections: {conn_counter}"
+                )
+
+            async with session_maker() as session:
+                try:
+                    yield session
+                finally:
+                    hold_time = time() - session_start
+                    if hold_time > 1.0:  # Логируем долгие удержания сессии
+                        stack = traceback.extract_stack()
+                        caller = next((frame for frame in reversed(stack[:-1])
+                                       if 'sqlalchemy' not in frame.filename), None)
+
+                        # Собираем больше контекста
+                        stack_trace = ''.join(traceback.format_stack()[:-1])
+
+                        logger.warning(
+                            f"Long session hold detected:\n"
+                            f"Total duration: {hold_time:.3f}s\n"
+                            f"Wait time: {wait_time:.3f}s\n"
+                            f"Task name: {current_task.get_name()}\n"
+                            f"Location: {caller.filename}:{caller.lineno}\n"
+                            f"Active connections: {conn_counter}\n"
+                            f"Stack trace:\n{stack_trace}"
+                        )
+    except Exception as e:
+        logger.error(
+            f"Session error after {time() - session_start:.3f}s:\n"
+            f"Task: {current_task.get_name()}\n"
+            f"Error: {str(e)}",
+            exc_info=True
+        )
+        raise
 
