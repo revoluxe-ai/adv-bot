@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import io
 import logging
+import re
 import time
 import cProfile
 import pstats
@@ -1672,15 +1673,17 @@ async def add_relevant_phrases(keywords, adv_setting_id):
 
 
 async def get_active_search_advs():
-    stmt = select(AdvSetting)
+    pattern = r'<!-\[(\d+)\]-!>'
+    stmt = select(AdvSetting).where(
+        # Проверяем, что name содержит паттерн <!-[цифры]-!>
+        AdvSetting.name.op('~')(pattern),
+        AdvSetting.bot_active == True,
+        AdvSetting.active_status == 'started'
+    )
     async with _sm() as session:
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
-    adv_settings_with_search_adv_id = []
-    for adv in adv_settings:
-        if adv.search_adv_id:
-            adv_settings_with_search_adv_id.append(adv)
-    return adv_settings_with_search_adv_id
+    return adv_settings
 
 
 async def get_all_shop_ids()-> list[str]:
