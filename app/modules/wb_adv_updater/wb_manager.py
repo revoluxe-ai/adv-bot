@@ -6,7 +6,7 @@ import faiss
 import joblib
 import numpy as np
 from asyncpg import ProgramLimitExceededError
-from sqlalchemy import not_
+from sqlalchemy import not_, text
 from sqlalchemy.exc import IntegrityError
 from app.utils import redis_manager
 from app.client_bot.bot import bot
@@ -378,6 +378,9 @@ async def update_keyword_stat(access: WBCabinetAccess,
             AdvSetting.wb_cabinet_id == wb_cabinet.id,
             AdvSetting.type == 8,
         )).order_by(AdvSetting.last_update.desc())
+        explain_stmt = text(f"EXPLAIN ANALYZE {stmt.compile(compile_kwargs={'literal_binds': True})}")
+        explain_result = await session.execute(explain_stmt)
+        logger.info("Query plan:\n" + "\n".join([row[0] for row in explain_result]))
         result = (await session.execute(stmt)).unique()
         adv_settings = result.scalars().all()
     async with get_clickhouse_client() as client:
