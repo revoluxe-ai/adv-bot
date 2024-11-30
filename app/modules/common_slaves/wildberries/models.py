@@ -237,6 +237,27 @@ class AdvSetting(BaseTable):
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
     new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
 
+    __table_args__ = (
+        # Составной индекс для основного запроса
+        Index('ix_adv_settings_cabinet_type_update',
+              'wb_cabinet_id', 'type', 'last_update'),
+
+        # Индекс для поиска по cabinet_id
+        Index('ix_adv_settings_cabinet_id', 'wb_cabinet_id'),
+
+        # Индекс для type, если он часто используется в запросах
+        Index('ix_adv_settings_type', 'type'),
+        Index('ix_advsetting_adv_id', 'adv_id'),
+        Index('ix_advsetting_active_status', 'active_status'),
+        Index('ix_advsetting_cabinet_bot_active', 'wb_cabinet_id', 'bot_active'),
+        Index('ix_advsetting_name_pattern',
+              'name',
+              postgresql_using='gin',
+              postgresql_ops={'name': 'gin_trgm_ops'}),
+    )
+
+
+
     @property
     def search_adv_id(self):
         if not self.name:
@@ -302,7 +323,13 @@ class KeywordSetting(BaseTable):
     added_views = Column(Integer)
     auto_block = Column(Boolean)
     __table_args__ = (UniqueConstraint('text', 'adv_setting_id'),
-                      Index('ix_text_adv_setting_id', 'text', 'adv_setting_id'))
+                      Index('ix_text_adv_setting_id', 'text', 'adv_setting_id'),
+                      # Составной индекс для запроса
+                      Index('ix_keywordsetting_status_adv',
+                            'hard_status', 'adv_setting_id'),
+                    Index('ix_keywordsetting_adv_setting_id', 'adv_setting_id'),
+                    Index('ix_keywordsetting_text', 'text'),
+                      )
 
 
 
