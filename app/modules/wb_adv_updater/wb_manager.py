@@ -387,9 +387,6 @@ async def update_keyword_stat(access: WBCabinetAccess,
             AdvSetting.wb_cabinet_id == wb_cabinet.id,
             AdvSetting.type == 8,
         )).order_by(AdvSetting.last_update.desc())
-        explain_stmt = text(f"EXPLAIN ANALYZE {stmt.compile(compile_kwargs={'literal_binds': True})}")
-        explain_result = await session.execute(explain_stmt)
-        logger.info("Query plan:\n" + "\n".join([row[0] for row in explain_result]))
         result = (await session.execute(stmt)).unique()
         adv_settings = result.scalars().all()
     async with get_clickhouse_client() as client:
