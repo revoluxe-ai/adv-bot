@@ -11,10 +11,20 @@ _sm = get_async_session_maker
 
 async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int):
     async with _sm() as session:
+        # Собираем все adv_ids
+        adv_ids = [adv.advertId for adv in advs]
+
+        # Делаем один запрос для получения всех AdvSetting
+        stmt = select(my_types.AdvSetting).where(
+            my_types.AdvSetting.adv_id.in_(adv_ids)
+        )
+        result = await session.execute(stmt)
+        existing_settings = result.scalars().all()
+
+        # Создаем словарь для быстрого поиска
+        settings_by_adv_id = {setting.adv_id: setting for setting in existing_settings}
         for adv in advs:
-            stmt = select(my_types.AdvSetting).where(my_types.AdvSetting.adv_id == adv.advertId)
-            result = await session.execute(stmt)
-            existing_adv = result.scalars().first()
+            existing_adv = settings_by_adv_id.get(adv.advertId, None)
             if existing_adv:
                 existing_adv.active_status = adv.status_native
                 existing_adv.name = adv.name
