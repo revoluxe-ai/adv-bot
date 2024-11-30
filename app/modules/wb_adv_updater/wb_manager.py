@@ -263,6 +263,15 @@ async def update_all_data_in_db_run(tasks):
                 await asyncio.sleep(0)
                 continue
             task = asyncio.create_task(shop_data_updater.update_all_data())
+
+            async def delay():
+                await asyncio.sleep(60*15)
+                return
+
+            def on_complete(finished_task):
+                asyncio.create_task(delay())
+
+            task.add_done_callback(on_complete)
             logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
             tasks[wb_access.wb_cabinet.id] = task
         else:
@@ -322,7 +331,7 @@ async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
             KeywordSetting.adv_setting_id == adv_setting_id
         )
         result = await session.execute(stmt)
-        existing_keyword_settings = result.scalars().all()
+        existing_keyword_settings: list[KeywordSetting] = result.scalars().all()
     return {ks.text for ks in existing_keyword_settings}
 
 
