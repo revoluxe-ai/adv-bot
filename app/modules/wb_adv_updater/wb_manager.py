@@ -262,16 +262,11 @@ async def update_all_data_in_db_run(tasks):
                 logger.debug(f'Нет нужных прав у токена')
                 await asyncio.sleep(0)
                 continue
-            task = asyncio.create_task(shop_data_updater.update_all_data())
 
-            async def delay():
-                await asyncio.sleep(60*15)
-                return
-
-            def on_complete(finished_task):
-                asyncio.create_task(delay())
-
-            task.add_done_callback(on_complete)
+            async def task_with_delay():
+                await shop_data_updater.update_all_data()
+                await asyncio.sleep(15*10)
+            task = asyncio.create_task(task_with_delay())
             logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
             tasks[wb_access.wb_cabinet.id] = task
         else:
@@ -413,8 +408,6 @@ async def update_keyword_stat(access: WBCabinetAccess,
                     logger.debug(f'Установка set для need_update_model')
                     logger.debug(f"Обновление статистики завершено")
             await asyncio.sleep(0)
-
-        await asyncio.sleep(60*15)
     return
 
 
