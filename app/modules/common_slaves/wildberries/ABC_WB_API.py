@@ -4,6 +4,7 @@ from typing import Union
 
 from sqlalchemy import select
 
+from app.core.telegram.event_send_message_manager import events
 from app.utils.db.session_maker import get_async_session_maker as sm
 from . import exceptions
 import json
@@ -11,7 +12,7 @@ import aiohttp
 import logging
 from . import models
 import app
-from .models import WBToken, WBUserCabinet
+from .models import WBToken, WBUserCabinet, WBCabinet
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .super_cabinet_manager import WBCabinetAccess
@@ -111,5 +112,14 @@ class ABC_WB_API(WbRequestApiMixin):
         if self._free_tokens:
             self.headers = Headers(self._free_tokens.pop())
         else:
+            wb_cabinet: WBCabinet = self.__wb_user_cabinet.wb_cabinet
+            async with sm() as session:
+                await session.refresh(wb_cabinet)
+                wb_cabinet.active = False
+                try:
+                    await events.NotValidTokens(wb_cabinet).send_all_users()
+                    await session.commit()
+                except Exception as e:
+                    logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}')
             raise exceptions.ApiForbiddenError('Нет свободных токенов',
                                                wb_user_cabinet=self._wb_user_cabinet)

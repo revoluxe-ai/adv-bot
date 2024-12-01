@@ -90,7 +90,8 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
                                           .selectinload(User.wb_tokens))\
         .where(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
                    WBCabinet.balance > 0,
-                   WBCabinet.bonus > 0))
+                   WBCabinet.bonus > 0,
+                   WBCabinet.active == True))
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
