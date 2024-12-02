@@ -38,7 +38,7 @@ class AnalyticAsyncSession(AsyncSession):
             duration = time() - query_start
 
             if duration > 1.0:
-                logger.error(
+                logger.warning(
                     f"Slow query ({duration:.2f}s)\n"
                     f"Type: {operation_type}\n"
                     f"Location: {caller.filename}:{caller.lineno}\n"
