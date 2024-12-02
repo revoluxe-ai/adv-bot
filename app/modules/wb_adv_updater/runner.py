@@ -77,7 +77,8 @@ async def update_all_data_in_db():
             await wb_manager.update_all_data_in_db_run(tasks=tasks)
         except Exception as exc:
             logger.error(f'Ошибка обновления данных в базе {exc}', exc_info=True)
-            await asyncio.sleep(0)
+        finally:
+            await asyncio.sleep(15)
 
 
 async def demo_subscribe():
@@ -182,10 +183,8 @@ async def main_loop():
     await asyncio.gather(
         payment_for_auto_bidder(),
         payment_for_parsing_keyword(),
-        # .clear_data_for_expired_wb_cabinets(),
         process_payment_for_advs(),
         run_update_vectors_in_redis(),
-        # .update_min_ctr_in_global_wb_category_settings()
         run_vector_update_in_neo4j(),
         update_all_data_in_db(),
         return_exceptions=False
