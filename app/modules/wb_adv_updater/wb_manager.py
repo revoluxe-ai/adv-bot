@@ -463,7 +463,8 @@ async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
         raise exc
     except Exception as exc:
         keywords_from_auto = []
-        logger.error(f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+        logger.error(f'Ошибка получения статистики по ключевым словам для кампании: {adv_setting.name}, '
+                     f'shop_id: {wb_api.wb_cabinet.shop_id}, {exc}', exc_info=True)
     try:
         if not adv_setting.search_adv_id:
             keywords_from_search_adv = []
