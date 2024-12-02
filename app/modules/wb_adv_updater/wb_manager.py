@@ -402,7 +402,7 @@ async def update_keyword_stat(access: WBCabinetAccess,
                         logger.error(
                             f'Ошибка обновления статистики ключей: '
                             f'{adv_update_tasks[adv_id].exception()},'
-                            f' для кабинета {adv_id}'
+                            f' для кабинета {adv_id}', exc_info=True
                         )
 
                     del adv_update_tasks[adv_id]
