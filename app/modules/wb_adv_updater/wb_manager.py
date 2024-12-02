@@ -171,6 +171,8 @@ async def process_payment_for_advs():
                 wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
             else:
                 wb_cabinet.bonus = 0
+                adv_setting.bot_active = False
+
             await session.commit()
 
 
