@@ -58,7 +58,7 @@ class ABC_WB_API(WbRequestApiMixin):
         tokens: list[WBToken]= wb_access.tokens
         self.access = wb_access
         wb_cabinet: Union[WBUserCabinet] = wb_access.wb_cabinet
-        self.cabinet = wb_cabinet
+        self.wb_cabinet = wb_cabinet
         assert wb_cabinet
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
