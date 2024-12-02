@@ -99,12 +99,10 @@ async def clear_data_for_expired_wb_cabinets():
 
 async def process_payment_for_advs():
     while True:
-        hours = datetime.datetime.now().hour
-        if 12 < hours < 18:
-            try:
-                await wb_manager.process_payment_for_advs()
-            except Exception as e:
-                logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
+        try:
+            await wb_manager.process_payment_for_advs()
+        except Exception as e:
+            logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
         await asyncio.sleep(60*60)
 
 async def write_positions_to_db():
