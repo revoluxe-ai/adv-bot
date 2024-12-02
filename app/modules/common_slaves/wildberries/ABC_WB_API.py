@@ -28,11 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class WbRequestApiMixin(ABC):
-
-    @property
-    @abstractmethod
-    def _wb_user_cabinet(self) :
-        pass
+    pass
 
 
 
@@ -60,25 +56,18 @@ class ABC_WB_API(WbRequestApiMixin):
 
     def __init__(self, wb_access: 'WBCabinetAccess'):
         tokens: list[WBToken]= wb_access.tokens
-        wb_user_cabinet: Union[WBUserCabinet] = wb_access.wb_user_cabinet
-        self.__wb_user_cabinet = wb_user_cabinet
+        self.access = wb_access
+        wb_cabinet: Union[WBUserCabinet] = wb_access.wb_cabinet
+        self.cabinet = wb_cabinet
+        assert wb_cabinet
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
-                                               wb_user_cabinet=wb_user_cabinet)
+                                               wb_user_cabinet=wb_access.wb_user_cabinet)
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
         self._free_tokens = tokens
         current_token = self._free_tokens.pop()
         self.headers = Headers(current_token)
         self._shop_id = current_token.shop_id
-
-
-    @property
-    def _wb_user_cabinet(self):
-        return self.__wb_user_cabinet
-
-    @_wb_user_cabinet.setter
-    def _wb_user_cabinet(self, value):
-        self.__wb_user_cabinet = value
 
 
     @property
@@ -102,24 +91,28 @@ class ABC_WB_API(WbRequestApiMixin):
 
 
     async def set_next_token(self):
-        # current_token: WBToken = self.headers.current_token
-        # async with sm() as session:
-        #     stmt = select(WBToken).where(WBToken.id == current_token.id)
-        #     result = await session.execute(stmt)
-        #     token = result.scalar()
-        #     token.active = False
-        #     await session.commit()
         if self._free_tokens:
             self.headers = Headers(self._free_tokens.pop())
         else:
-            wb_cabinet: WBCabinet = self.__wb_user_cabinet.wb_cabinet
-            async with sm() as session:
-                await session.refresh(wb_cabinet)
-                wb_cabinet.active = False
-                try:
-                    await events.NotValidTokens(wb_cabinet).send_all_users()
-                    await session.commit()
-                except Exception as e:
-                    logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}')
+            wb_cabinet: WBCabinet = self.access.wb_cabinet
+            try:
+                async with sm() as session:
+                    fresh_cabinet = await session.get(WBCabinet, wb_cabinet.id)
+                    if fresh_cabinet:
+                        fresh_cabinet.active = False
+                        try:
+                            await session.commit()
+                        except Exception as e:
+                            await session.rollback()
+                            logger.error(f'Ошибка при обновлении кабинета {fresh_cabinet.shop_id}: {e}')
+                            raise e
+            except Exception as e:
+                logger.error(f'Ошибка при обновлении кабинета {wb_cabinet.shop_id}: {e}')
+                raise e
+            try:
+                await events.NotValidTokens(wb_cabinet.id,
+                                            wb_cabinet.shop_id).send_all_users()
+            except Exception as e:
+                logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}')
             raise exceptions.ApiForbiddenError('Нет свободных токенов',
                                                wb_user_cabinet=self._wb_user_cabinet)
