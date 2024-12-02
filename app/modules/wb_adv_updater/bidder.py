@@ -119,7 +119,9 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
                 continue
             promo_positions.append(position)
     if not cpm_from_parsing:
-        logger.error('Не удалось получить ставку из парсинга')
+        logger.error('Не удалось получить ставку из парсинга'
+                     f'Shop ID: {access.wb_cabinet.shop_id}'
+                     f'Adv ID: {adv_id}')
         return
 
     if promo_positions:
