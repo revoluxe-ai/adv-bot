@@ -456,6 +456,16 @@ async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
 
 
 async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
+    try:
+        await _keyword_stat_updater(client, adv_setting, wb_api)
+    except Exception as exc:
+        logger.error(f'Ошибка обновления статистики ключей для кампании: {adv_setting.name}, '
+                          f'adv_id: {adv_setting.adv_id}, '
+                          f'shop_id: {wb_api.wb_cabinet.shop_id}, {exc}', exc_info=True)
+
+
+
+async def _keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
     adv_id = adv_setting.adv_id
     try:
         keywords_from_auto: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_id)
