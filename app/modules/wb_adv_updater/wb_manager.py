@@ -363,7 +363,9 @@ async def update_keywords_in_advs():
                 else:
                     if update_tasks[adv_setting.id].done():
                         if update_tasks[adv_setting.id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}',
+                            logger.error(f'Ошибка обновления ключей  для shop_id: {access.wb_cabinet.shop_id} '
+                                         f'Кампания: {adv_setting.adv_id} '
+                                         f' {update_tasks[adv_setting.id].exception()}',
                                          exc_info=True)
                         del update_tasks[adv_setting.id]
                 await asyncio.sleep(0)
