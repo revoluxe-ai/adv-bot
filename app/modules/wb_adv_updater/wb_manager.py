@@ -463,7 +463,7 @@ async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
     except Exception as exc:
         logger.error(f'Ошибка обновления статистики ключей для кампании: {adv_setting.name}, '
                           f'adv_id: {adv_setting.adv_id}, '
-                          f'shop_id: {wb_api.wb_cabinet.shop_id}, {exc}', exc_info=True)
+                          f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
 
 
 
@@ -476,7 +476,7 @@ async def _keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
     except Exception as exc:
         keywords_from_auto = []
         logger.error(f'Ошибка получения статистики по ключевым словам для кампании: {adv_setting.name}, '
-                     f'shop_id: {wb_api.wb_cabinet.shop_id}, {exc}', exc_info=True)
+                     f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
     try:
         if not adv_setting.search_adv_id:
             keywords_from_search_adv = []
