@@ -100,19 +100,14 @@ class ABC_WB_API(WbRequestApiMixin):
                     fresh_cabinet = await session.get(WBCabinet, wb_cabinet.id)
                     if fresh_cabinet:
                         fresh_cabinet.active = False
-                        try:
-                            await session.commit()
-                        except Exception as e:
-                            await session.rollback()
-                            logger.error(f'Ошибка при обновлении кабинета {fresh_cabinet.shop_id}: {e}')
-                            raise e
+                        await session.commit()
             except Exception as e:
-                logger.error(f'Ошибка при обновлении кабинета {wb_cabinet.shop_id}: {e}')
+                logger.error(f'Ошибка при отключении кабинета {wb_cabinet.shop_id}: {e}', exc_info=True)
                 raise e
             try:
                 await events.NotValidTokens(wb_cabinet.id,
                                             wb_cabinet.shop_id).send_all_users()
             except Exception as e:
-                logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}')
+                logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}', exc_info=True)
             raise exceptions.ApiForbiddenError('Нет свободных токенов',
-                                               wb_user_cabinet=self._wb_user_cabinet)
+                                               wb_user_cabinet=self.access.wb_cabinet)
