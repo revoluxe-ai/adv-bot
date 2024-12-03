@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import typing
 from dataclasses import dataclass
-from sqlalchemy import  or_
+from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
 from app.client_bot.const import MAX_TOKENS
 from . import exceptions
@@ -89,10 +89,11 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
                                           .selectinload(User.wb_tokens))\
-        .where(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
+        .where(and_(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
                    WBCabinet.balance > 0,
-                   WBCabinet.bonus > 0,
-                   WBCabinet.active == True))
+                   WBCabinet.bonus > 0),
+                    WBCabinet.active == True)
+                    )
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
