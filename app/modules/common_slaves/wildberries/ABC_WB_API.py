@@ -104,10 +104,10 @@ class ABC_WB_API(WbRequestApiMixin):
             except Exception as e:
                 logger.error(f'Ошибка при отключении кабинета {wb_cabinet.shop_id}: {e}', exc_info=True)
                 raise e
-            try:
-                await events.NotValidTokens(wb_cabinet.id,
-                                            wb_cabinet.shop_id).send_all_users()
-            except Exception as e:
-                logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}', exc_info=True)
+            # try:
+            #     await events.NotValidTokens(wb_cabinet.id,
+            #                                 wb_cabinet.shop_id).send_all_users()
+            # except Exception as e:
+            #     logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}', exc_info=True)
             raise exceptions.ApiForbiddenError('Нет свободных токенов',
                                                wb_user_cabinet=self.access.wb_cabinet)
