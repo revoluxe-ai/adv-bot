@@ -9,15 +9,26 @@ RUN apt-get update && \
     pkg-config \
     python3-dev \
     libpq-dev \
-    python3-systemd \
-    libsystemd-dev \
-    systemd && \
+    wget \
+    ca-certificates \
+    libsystemd-dev \  # Добавляем эту библиотеку
+    systemd \         # И эту
+    pkg-config && \   # И эту
     rm -rf /var/lib/apt/lists/*
 
-# Копируем только requirements.txt сначала
-COPY requirements.txt .
+# Загружаем и устанавливаем сертификаты Yandex Cloud
+RUN mkdir -p /usr/local/share/ca-certificates/Yandex/ && \
+    wget "https://storage.yandexcloud.net/cloud-certs/RootCA.pem" \
+        -O /usr/local/share/ca-certificates/Yandex/RootCA.crt && \
+    wget "https://storage.yandexcloud.net/cloud-certs/IntermediateCA.pem" \
+        -O /usr/local/share/ca-certificates/Yandex/IntermediateCA.crt && \
+    chmod 655 \
+        /usr/local/share/ca-certificates/Yandex/RootCA.crt \
+        /usr/local/share/ca-certificates/Yandex/IntermediateCA.crt && \
+    update-ca-certificates
 
-# Устанавливаем зависимости
+# Копируем requirements.txt и устанавливаем зависимости
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем остальные файлы проекта
