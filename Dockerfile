@@ -11,9 +11,9 @@ RUN apt-get update && \
     libpq-dev \
     wget \
     ca-certificates \
-    libsystemd-dev \  # Добавляем эту библиотеку
-    systemd \         # И эту
-    pkg-config && \   # И эту
+    libsystemd-dev \
+    systemd \
+    pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
 # Загружаем и устанавливаем сертификаты Yandex Cloud
