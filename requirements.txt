@@ -21,6 +21,7 @@ cloudpickle==3.0.0
 contourpy==1.2.1
 ctyped==0.8.0
 cycler==0.12.1
+cysystemd==1.6.2
 dask==2024.2.1
 decorator==5.1.1
 executing==2.0.1
@@ -110,6 +111,9 @@ six==1.16.0
 smart-open==7.0.1
 SQLAlchemy==2.0.28
 stack-data==0.6.3
+systemd==0.17.1
+systemd-logging==1.0.1
+systemd-python==235
 tabulate==0.9.0
 tensorboard==2.16.2
 tensorboard-data-server==0.7.2
