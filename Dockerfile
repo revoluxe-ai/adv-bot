@@ -6,7 +6,12 @@ WORKDIR /app
 
 # Устанавливаем необходимые пакеты
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc python3-dev libpq-dev && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    libpq-dev \
+    python3-systemd \
+    systemd && \
     rm -rf /var/lib/apt/lists/*
 
 # Копируем только requirements.txt сначала, чтобы лучше использовать кэш
