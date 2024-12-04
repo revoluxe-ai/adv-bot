@@ -1,78 +1,104 @@
 import json
 import logging
-import logging.config
-import textwrap
-import platform
+import logging.handlers
+import os
+from typing import Optional
+import datetime
 
-system_name = platform.system()
-logging_setup_done = False  # Флаг для проверки, было ли уже выполнено настройка логгирования
 
-class CustomFormatter(logging.Formatter):
-    """Логгирование с цветным выводом в зависимости от уровня сообщений."""
-    grey = "\x1b[38;21m"
-    blue = "\x1b[34m"  # Синий цвет
-    white = "\x1b[37m"  # Белый цвет
-    red = "\x1b[31m"  # Красный цвет
-    reset = "\x1b[0m"  # Сброс цвета текста
-    format = "%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s"
+class EnhancedJSONFormatter(logging.Formatter):
+    """Форматтер, который преобразует логи в структурированный JSON"""
 
-    FORMATS = {
-        logging.DEBUG: blue + format + reset,
-        logging.INFO: white + format + reset,
-        logging.WARNING: grey + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: red + format + reset
-    }
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.extra_fields = kwargs
 
     def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno, self.format)
-        formatter = logging.Formatter(log_fmt, "%Y-%m-%d %H:%M:%S")
-        formatted = formatter.format(record)
-        wrapped = textwrap.fill(formatted, width=100)  # Перенос строк
-        return wrapped
+        log_data = {
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'logger': record.name,
+            'level': record.levelname,
+            'message': record.getMessage(),
+            'path': record.pathname,
+            'line_number': record.lineno,
+            'function': record.funcName,
+            'process': record.process,
+            'thread': record.thread,
+            'service': os.getenv('SERVICE_NAME', 'wbgram'),
+            'environment': os.getenv('ENVIRONMENT', 'development')
+        }
 
-def setup_logging():
-    import warnings
-    warnings.filterwarnings("error", category=RuntimeWarning)
-    global logging_setup_done
+        # Добавляем extra поля, если они есть
+        if hasattr(record, 'extra_fields'):
+            log_data.update(record.extra_fields)
 
-    if logging_setup_done:
-        return
+        # Добавляем информацию об исключении, если оно есть
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
 
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+        return json.dumps(log_data)
 
-    if system_name == 'Linux':
-        from systemd.journal import JournalHandler
 
-        class CustomJournalHandler(JournalHandler):
-            priority_map = {
-                logging.DEBUG: 7,
-                logging.INFO: 6,
-                logging.WARNING: 4,
-                logging.ERROR: 3,
-                logging.CRITICAL: 2
-            }
+class LoggerFactory:
+    """Фабрика для создания логгеров с разными обработчиками"""
 
-            def emit(self, record):
-                priority = self.priority_map.get(record.levelno, 6)
-                record.priority = priority
-                super().emit(record)
+    @staticmethod
+    def setup_logger(
+            name: str,
+            log_level: str = 'INFO',
+            console_output: bool = True,
+            file_output: Optional[str] = None,
+            tcp_handler: Optional[dict] = None,
+            udp_handler: Optional[dict] = None
+    ) -> logging.Logger:
+        """
+        Настройка логгера с различными обработчиками
 
-        journal_handler = CustomJournalHandler(SYSLOG_IDENTIFIER='updater')
-        journal_handler.setLevel(logging.DEBUG)
-        formatter = CustomFormatter(
-            fmt="%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S")
-        journal_handler.setFormatter(formatter)
-        logger.addHandler(journal_handler)
-    else:
-        def setup_logging_from_file(path_to_config_file):
-            with open(path_to_config_file, 'r') as file:
-                config = json.load(file)
-            logging.config.dictConfig(config)
+        Args:
+            name: Имя логгера
+            log_level: Уровень логирования
+            console_output: Включить вывод в консоль
+            file_output: Путь к файлу для файлового логирования
+            tcp_handler: Словарь с настройками TCP хендлера (host, port)
+            udp_handler: Словарь с настройками UDP хендлера (host, port)
+        """
+        logger = logging.getLogger(name)
+        logger.setLevel(getattr(logging, log_level.upper()))
 
-        path_to_logging_config = 'logging_config.json'
-        setup_logging_from_file(path_to_logging_config)
+        # Создаем форматтер
+        json_formatter = EnhancedJSONFormatter()
 
-    logging_setup_done = True
+        if console_output:
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(json_formatter)
+            logger.addHandler(console_handler)
+
+        if file_output:
+            # Ротируемый файловый хендлер
+            file_handler = logging.handlers.RotatingFileHandler(
+                file_output,
+                maxBytes=10_000_000,  # 10MB
+                backupCount=5
+            )
+            file_handler.setFormatter(json_formatter)
+            logger.addHandler(file_handler)
+
+        if tcp_handler:
+            socket_handler = logging.handlers.SocketHandler(
+                tcp_handler['host'],
+                tcp_handler['port']
+            )
+            socket_handler.setFormatter(json_formatter)
+            logger.addHandler(socket_handler)
+
+        if udp_handler:
+            datagram_handler = logging.handlers.DatagramHandler(
+                udp_handler['host'],
+                udp_handler['port']
+            )
+            datagram_handler.setFormatter(json_formatter)
+            logger.addHandler(datagram_handler)
+
+        return logger
+
+setup_logging = LoggerFactory.setup_logger
