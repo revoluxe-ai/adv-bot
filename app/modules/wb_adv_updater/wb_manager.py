@@ -302,13 +302,21 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
             data_to_insert.append([kw.text,
                                    date_time,
                                    adv_setting.adv_id,
-                                   kw.views, kw.clicks,
+                                   kw.views,
+                                   kw.clicks,
                                    kw.spend,
                                    new_version])
 
-        await client.insert(table="default_db.advkeyword"
-                                , data=data_to_insert,
-                                column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
+        await client.insert(table="default_db.advkeyword",
+                            data=data_to_insert,
+                                column_names=["text",
+                                              "date",
+                                              "adv_id",
+                                              "views",
+                                              "clicks",
+                                              "spend",
+                                              "version"] )
+
 
 
 
@@ -490,14 +498,15 @@ async def _keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
         logger.debug(f'Пустой список ключевых слов для {adv_setting.adv_id}')
         return
 
-    text_to_keyword_from_auto = {kw.text: kw for kw in keywords_from_auto}
+    text_to_keyword_from_auto = {kw.text + ':' + str(kw.date): kw for kw in keywords_from_auto}
     for kw in keywords_from_search_adv:
-        if kw.text not in text_to_keyword_from_auto:
-            text_to_keyword_from_auto[kw.text] = kw
+        key = kw.text + ':' + str(kw.date)
+        if key not in text_to_keyword_from_auto:
+            text_to_keyword_from_auto[key] = kw
         else:
-            text_to_keyword_from_auto[kw.text].views += kw.views
-            text_to_keyword_from_auto[kw.text].clicks += kw.clicks
-            text_to_keyword_from_auto[kw.text].spend += kw.spend
+            text_to_keyword_from_auto[key].views += kw.views
+            text_to_keyword_from_auto[key].clicks += kw.clicks
+            text_to_keyword_from_auto[key].spend += kw.spend
     full_stat  = list(text_to_keyword_from_auto.values())
 
     keywords = full_stat
