@@ -6,7 +6,7 @@ import faiss
 import joblib
 import numpy as np
 from asyncpg import ProgramLimitExceededError
-from sqlalchemy import not_
+from sqlalchemy import not_, text
 from sqlalchemy.exc import IntegrityError
 from app.utils import redis_manager
 from app.client_bot.bot import bot
@@ -171,6 +171,8 @@ async def process_payment_for_advs():
                 wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
             else:
                 wb_cabinet.bonus = 0
+                adv_setting.bot_active = False
+
             await session.commit()
 
 
@@ -262,7 +264,11 @@ async def update_all_data_in_db_run(tasks):
                 logger.debug(f'Нет нужных прав у токена')
                 await asyncio.sleep(0)
                 continue
-            task = asyncio.create_task(shop_data_updater.update_all_data())
+
+            async def task_with_delay():
+                await shop_data_updater.update_all_data()
+                await asyncio.sleep(15*60)
+            task = asyncio.create_task(task_with_delay())
             logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
             tasks[wb_access.wb_cabinet.id] = task
         else:
@@ -282,7 +288,7 @@ async def update_all_data_in_db_run(tasks):
                         await session.commit()
                     logger.debug('Задача обновления успешно выполнена')
                 del tasks[wb_access.wb_cabinet.id]
-        await asyncio.sleep(0)
+        await asyncio.sleep(15*60)
 
 
 
@@ -322,7 +328,7 @@ async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
             KeywordSetting.adv_setting_id == adv_setting_id
         )
         result = await session.execute(stmt)
-        existing_keyword_settings = result.scalars().all()
+        existing_keyword_settings: list[KeywordSetting] = result.scalars().all()
     return {ks.text for ks in existing_keyword_settings}
 
 
@@ -359,7 +365,9 @@ async def update_keywords_in_advs():
                 else:
                     if update_tasks[adv_setting.id].done():
                         if update_tasks[adv_setting.id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}',
+                            logger.error(f'Ошибка обновления ключей  для shop_id: {access.wb_cabinet.shop_id} '
+                                         f'Кампания: {adv_setting.adv_id} '
+                                         f' {update_tasks[adv_setting.id].exception()}',
                                          exc_info=True)
                         del update_tasks[adv_setting.id]
                 await asyncio.sleep(0)
@@ -396,7 +404,7 @@ async def update_keyword_stat(access: WBCabinetAccess,
                         logger.error(
                             f'Ошибка обновления статистики ключей: '
                             f'{adv_update_tasks[adv_id].exception()},'
-                            f' для кабинета {adv_id}'
+                            f' для кабинета {access.wb_cabinet.shop_id}', exc_info=True
                         )
 
                     del adv_update_tasks[adv_id]
@@ -404,8 +412,6 @@ async def update_keyword_stat(access: WBCabinetAccess,
                     logger.debug(f'Установка set для need_update_model')
                     logger.debug(f"Обновление статистики завершено")
             await asyncio.sleep(0)
-
-        await asyncio.sleep(60*15)
     return
 
 
@@ -452,6 +458,16 @@ async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
 
 
 async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
+    try:
+        await _keyword_stat_updater(client, adv_setting, wb_api)
+    except Exception as exc:
+        logger.error(f'Ошибка обновления статистики ключей для кампании: {adv_setting.name}, '
+                          f'adv_id: {adv_setting.adv_id}, '
+                          f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
+
+
+
+async def _keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
     adv_id = adv_setting.adv_id
     try:
         keywords_from_auto: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_id)
@@ -459,7 +475,8 @@ async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
         raise exc
     except Exception as exc:
         keywords_from_auto = []
-        logger.error(f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+        logger.error(f'Ошибка получения статистики по ключевым словам для кампании: {adv_setting.name}, '
+                     f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
     try:
         if not adv_setting.search_adv_id:
             keywords_from_search_adv = []

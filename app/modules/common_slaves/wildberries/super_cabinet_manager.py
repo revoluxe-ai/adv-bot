@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import typing
 from dataclasses import dataclass
-from sqlalchemy import  or_
+from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
 from app.client_bot.const import MAX_TOKENS
 from . import exceptions
@@ -40,7 +40,8 @@ async def get_accesses_for_bidder(semaphore: asyncio.Semaphore = None)-> typing.
                                           selectinload(WBCabinet.adv_settings))\
         .where(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
                    WBCabinet.balance > 0,
-                   WBCabinet.bonus > 0))
+                   WBCabinet.bonus > 0,
+                   WBCabinet.active == True))
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
@@ -88,9 +89,11 @@ async def get_accesses_for_wb_cabinets()-> typing.AsyncGenerator[WBCabinetAccess
         query = select(WBCabinet).options(selectinload(WBCabinet.wb_user_cabinets) \
                                           .selectinload(WBUserCabinet.user) \
                                           .selectinload(User.wb_tokens))\
-        .where(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
+        .where(and_(or_(WBCabinet.expiration_time >= datetime.datetime.now(),
                    WBCabinet.balance > 0,
-                   WBCabinet.bonus > 0))
+                   WBCabinet.bonus > 0),
+                    WBCabinet.active == True)
+                    )
 
         wb_cabinets = await session.execute(query)
         wb_cabinets = wb_cabinets.scalars().all()
@@ -163,27 +166,27 @@ async def get_access_for_wb_user_cabinet(wb_user_cabinet: WBUserCabinet)-> WBCab
                              wb_cabinet = wb_cabinet)
     return access
 
-
-async def get_super_user_access():
-    leave_tokens = []
-    accesses_gen = get_accesses_for_wb_cabinets()
-    async for access in accesses_gen:
-        tokens = access.tokens
-        for token in tokens:
-                try:
-                    await RightChecker.check_access(token)
-                    leave_tokens.append(token)
-                    if len(leave_tokens) >= MAX_TOKENS:
-                        break
-                except Exception as exc:
-                    logger.debug(f'Токен не прошел проверку: {exc}')
-                    await asyncio.sleep(0)
-
-    super_user_access = WBCabinetAccess(tokens = leave_tokens,
-                                        wb_user_cabinet = None,
-                                        wb_cabinet = None)
-
-    return super_user_access
+#
+# async def get_super_user_access():
+#     leave_tokens = []
+#     accesses_gen = get_accesses_for_wb_cabinets()
+#     async for access in accesses_gen:
+#         tokens = access.tokens
+#         for token in tokens:
+#                 try:
+#                     await RightChecker.check_access(token)
+#                     leave_tokens.append(token)
+#                     if len(leave_tokens) >= MAX_TOKENS:
+#                         break
+#                 except Exception as exc:
+#                     logger.debug(f'Токен не прошел проверку: {exc}')
+#                     await asyncio.sleep(0)
+#
+#     super_user_access = WBCabinetAccess(tokens = leave_tokens,
+#                                         wb_user_cabinet = None,
+#                                         wb_cabinet = None)
+#
+#     return super_user_access
 
 
 

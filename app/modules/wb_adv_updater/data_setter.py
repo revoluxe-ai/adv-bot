@@ -21,8 +21,7 @@ class DataSetter:
         self._wb_api = WBApi(access)
         self._wb_cabinet = access.wb_cabinet
 
-
-    async def update_minus_keywords_in_adv(self, adv_setting: AdvSetting):
+    async def _update_minus_keywords_in_adv(self, adv_setting: AdvSetting):
         logger.debug(f'Обновляю минус слова для {adv_setting.name}')
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
         logger.debug(f'Получил ключи для {adv_setting.name}')
@@ -44,6 +43,20 @@ class DataSetter:
             logger.debug(f'Позитивные слова {good_phrases}')
         else:
             logger.debug(f'Нет минус слов для {adv_setting.name}')
+
+
+
+
+    async def update_minus_keywords_in_adv(self, adv_setting: AdvSetting):
+        try:
+            await self._update_minus_keywords_in_adv(adv_setting)
+        except Exception as e:
+            logger.error(f'Ошибка обновления минус слов для {adv_setting.name},'
+                         f'adv_id: {adv_setting.adv_id},'
+                         f'shop_id: {self._wb_cabinet.shop_id} '
+                         f' {e}', exc_info=True)
+
+
 
 
 

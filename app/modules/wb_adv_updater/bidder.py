@@ -41,7 +41,8 @@ async def _run_bidder_process():
            stmt = select(AdvSetting)\
                .join(AdvSetting.wb_cabinet)\
                .options(selectinload(AdvSetting.wb_cabinet))\
-               .where(AdvSetting.bidder_active == True)
+               .where(AdvSetting.bidder_active == True,
+                      AdvSetting.active_status == 'started',)
            result = await session.execute(stmt)
            adv_settings = result.scalars().all()
            for adv_setting in adv_settings:
@@ -119,7 +120,9 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
                 continue
             promo_positions.append(position)
     if not cpm_from_parsing:
-        logger.error('Не удалось получить ставку из парсинга')
+        logger.error('Не удалось получить ставку из парсинга'
+                     f'Shop ID: {access.wb_cabinet.shop_id}'
+                     f'Adv ID: {adv_id}')
         return
 
     if promo_positions:
