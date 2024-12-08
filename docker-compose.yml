@@ -27,11 +27,8 @@ services:
     networks:
       - wbgram
     command: python client_bot_run.py
-    environment:
-      - CPU_SHARES=512
-      - MEMORY_LIMIT=512M
-    mem_limit: 512m
-    cpus: 2  # Используем 2 процессора
+    mem_limit: 8G
+    cpus: 4
     volumes:
       - .:/app  # Монтируем текущий каталог в контейнер
     logging:
@@ -41,39 +38,26 @@ services:
         max-file: "3"
     restart: always
 
-#  priority_manager:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile.prioritet_container_manager
-#    container_name: priority_manager
-#    command: python priority_manager.py
-#    volumes:
-#      - /var/run/docker.sock:/var/run/docker.sock
-#    security_opt:
-#      - no-new-privileges:true
-#    cpus: 0.5 # Используем 2 процессора
-#    logging:
-#      driver: "json-file"
-#      options:
-#        max-size: "10m"
-#        max-file: "3"
 
   redis:
     image: redis:alpine
-    mem_limit: 2g  # Ограничение максимального использования памяти до 2 гигабайт
-    mem_reservation: 1g  # Рекомендуемое минимальное количество памяти для контейнера
     container_name: wbgram_bot_redis
     networks:
       - wbgram
     volumes:
-      - redis_data:/data  # Монтируем volume для хранения данных
+      - redis_data:/data
+    mem_limit: 2g
+    mem_reservation: 1g
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    command: [ "redis-server", "--slaveof", "<master_redis_host>", "<master_redis_port>" ]  # Указываем основной Redis сервер
+#    command: ["redis-server", "--replicaof", "host", "6379"]
     restart: always
+
+
+
 
 volumes:
   redis_data:
