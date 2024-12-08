@@ -34,4 +34,3 @@ RUN pip install --no-cache-dir -r requirements-ubuntu.txt
 # Копируем остальные файлы проекта
 COPY . .
 
-
