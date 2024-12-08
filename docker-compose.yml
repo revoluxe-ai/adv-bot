@@ -6,7 +6,7 @@ services:
     container_name: adv_wb_bot_backend
     command: python updater.py
     networks:
-      - adv_bot_wbgram
+      - wbgram
     mem_limit: 8G  # Ограничиваем потребление памяти
     cpus: 16       # Используем 16 процессоров
     volumes:
@@ -23,7 +23,7 @@ services:
       dockerfile: Dockerfile
     container_name: wbgram_bot
     networks:
-      - adv_bot_wbgram
+      - wbgram
     command: python client_bot_run.py
     mem_limit: 6G
     cpus: 4
@@ -40,7 +40,7 @@ services:
     image: redis:alpine
     container_name: wbgram_bot_redis
     networks:
-      - adv_bot_wbgram
+      - wbgram
     volumes:
       - redis_data:/data
     mem_limit: 2g
@@ -56,6 +56,6 @@ volumes:
   redis_data:
 
 networks:
-  adv_bot_wbgram:  # Обычная виртуальная сеть для контейнеров
+  wbgram:  # Обычная виртуальная сеть для контейнеров
     driver: bridge
     name: wbgram
