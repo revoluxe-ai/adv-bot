@@ -28,12 +28,10 @@ RUN mkdir -p /usr/local/share/ca-certificates/Yandex/ && \
     update-ca-certificates
 
 # Копируем requirements.txt и устанавливаем зависимости
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-ubuntu.txt .
+RUN pip install --no-cache-dir -r requirements-ubuntu.txt
 
 # Копируем остальные файлы проекта
 COPY . .
 
-EXPOSE 8000
 
-CMD ["python", "updater.py"]
