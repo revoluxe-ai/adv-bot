@@ -10,6 +10,8 @@ RUN apt-get update && \
 RUN pip install docker psutil
 
 COPY priority_manager.py .
-COPY python_modules .
+COPY python_modules/ ./python_modules/
+
+RUN ls -la /app
 
 CMD ["python", "priority_manager.py"]
