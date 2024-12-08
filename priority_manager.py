@@ -51,3 +51,9 @@ class PriorityManager:
             except Exception as e:
                 logger.error(f"Error in run loop: {e}")
                 time.sleep(5)
+
+
+
+if __name__ == "__main__":
+    manager = PriorityManager()
+    manager.run()
