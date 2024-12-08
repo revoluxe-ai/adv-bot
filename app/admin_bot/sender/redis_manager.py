@@ -1,6 +1,6 @@
 import redis
 
-_redis_db = redis.asyncio.Redis(host='localhost', port=6379, db=0)
+_redis_db = redis.asyncio.Redis(host='wbgram_bot_redis', port=6379, db=0)
 
 
 def _get_dhash_key(dhash: str):

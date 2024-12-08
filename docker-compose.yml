@@ -1,0 +1,84 @@
+
+services:
+# backend:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: adv_wb_bot_backend
+#    command: python updater.py
+#    environment:
+#      - CPU_SHARES=4096
+#      - MEMORY_LIMIT=512M
+#    mem_limit: 512m
+#    cpus: 2  # Используем 2 процессора
+#    volumes:
+#      - .:/app  # Монтируем текущий каталог в контейнер
+#    logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "10m"
+#        max-file: "3"
+
+  client_bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wbgram_bot
+    networks:
+      - wbgram
+    command: python client_bot_run.py
+    environment:
+      - CPU_SHARES=512
+      - MEMORY_LIMIT=512M
+    mem_limit: 512m
+    cpus: 2  # Используем 2 процессора
+    volumes:
+      - .:/app  # Монтируем текущий каталог в контейнер
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  priority_manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.prioritet_container_manager
+    container_name: priority_manager
+    command: python priority_manager.py
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    security_opt:
+      - no-new-privileges:true
+    cpus: 2  # Используем 2 процессора
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:alpine
+    mem_limit: 2g  # Ограничение максимального использования памяти до 2 гигабайт
+    mem_reservation: 1g  # Рекомендуемое минимальное количество памяти для контейнера
+    container_name: wbgram_bot_redis
+    networks:
+      - wbgram
+#    ports:
+#      - "6379:6379"  # Открываем порт для подключения к Redis
+    volumes:
+      - redis_data:/data  # Монтируем volume для хранения данных
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  redis_data:
+
+
+networks:
+  wbgram:  # Обычная виртуальная сеть для контейнеров
+    driver: bridge
+

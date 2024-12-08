@@ -29,7 +29,7 @@ RUN mkdir -p /usr/local/share/ca-certificates/Yandex/ && \
 
 # Копируем requirements.txt и устанавливаем зависимости
 COPY requirements-ubuntu.txt .
-RUN pip install --no-cache-dir -r requirements-ubuntu.txt
+RUN pip install --no-cache-dir -q -r requirements-ubuntu.txt
 
 # Копируем остальные файлы проекта
 COPY . .
