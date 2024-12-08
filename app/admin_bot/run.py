@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 # Создание хранилища с Redis
-storage = RedisStorage.from_url('redis://wbgram_bot_redis:6379/5')
+storage = RedisStorage.from_url('redis://wbgram:6379/5')
 
 
 async def run():
