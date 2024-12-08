@@ -6,7 +6,7 @@ import logging
 
 setup_logging()
 
-logging = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 class PriorityManager:
     def __init__(self):
