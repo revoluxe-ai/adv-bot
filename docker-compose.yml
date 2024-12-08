@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: adv_wb_bot_backend
     command: python updater.py
+    networks:
+      - wbgram
     mem_limit: 8G  # Ограничиваем потребление памяти
     cpus: 16       # Используем 16 процессоров
     volumes:
