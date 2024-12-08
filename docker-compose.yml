@@ -1,23 +1,19 @@
-
 services:
-# backend:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    container_name: adv_wb_bot_backend
-#    command: python updater.py
-#    environment:
-#      - CPU_SHARES=4096
-#      - MEMORY_LIMIT=512M
-#    mem_limit: 512m
-#    cpus: 2  # Используем 2 процессора
-#    volumes:
-#      - .:/app  # Монтируем текущий каталог в контейнер
-#    logging:
-#      driver: "json-file"
-#      options:
-#        max-size: "10m"
-#        max-file: "3"
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adv_wb_bot_backend
+    command: python updater.py
+    mem_limit: 8G  # Ограничиваем потребление памяти
+    cpus: 16       # Используем 16 процессоров
+    volumes:
+      - .:/app      # Монтируем текущий каталог в контейнер
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   client_bot:
     build:
@@ -27,17 +23,16 @@ services:
     networks:
       - wbgram
     command: python client_bot_run.py
-    mem_limit: 8G
+    mem_limit: 6G
     cpus: 4
     volumes:
-      - .:/app  # Монтируем текущий каталог в контейнер
+      - .:/app      # Монтируем текущий каталог в контейнер
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
     restart: always
-
 
   redis:
     image: redis:alpine
@@ -53,17 +48,11 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-#    command: ["redis-server", "--replicaof", "host", "6379"]
     restart: always
-
-
-
 
 volumes:
   redis_data:
 
-
 networks:
   wbgram:  # Обычная виртуальная сеть для контейнеров
     driver: bridge
-
