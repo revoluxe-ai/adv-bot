@@ -58,3 +58,4 @@ volumes:
 networks:
   adv_bot_wbgram:  # Обычная виртуальная сеть для контейнеров
     driver: bridge
+    name: wbgram
