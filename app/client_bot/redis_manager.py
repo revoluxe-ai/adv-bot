@@ -22,5 +22,5 @@ class RedisManager:
 
     async def get_connection(self):
         if self._redis_conn is None:
-            self._redis_conn = await Redis.from_url('redis://wbgram/0')
+            self._redis_conn = await Redis.from_url('redis://wbgram_bot_redis/0')
         return self._redis_conn

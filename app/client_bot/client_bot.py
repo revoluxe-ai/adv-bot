@@ -26,7 +26,7 @@ setup_logging()
 
 
 # Создание хранилища с Redis
-storage = RedisStorage.from_url('redis://wbgram:6379/0')
+storage = RedisStorage.from_url('redis://wbgram_bot_redis:6379/0')
 
 path_setting = path_setting_funcs.get_setting_path()
 
