@@ -87,5 +87,9 @@ class Settings:
     def postgres_port(self):
         return get_document_by_key_name(setting_path, 'postgres-port')
 
+    @property
+    def ssl_mode(self):
+        return get_document_by_key_name(setting_path, 'postgres-ssl_mode')
+
 
 settings = Settings()

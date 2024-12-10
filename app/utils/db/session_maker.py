@@ -4,7 +4,7 @@ import asyncio
 import traceback
 from contextlib import asynccontextmanager
 from time import time
-
+import ssl
 from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -20,6 +20,13 @@ conn_counter = 0
 
 pool_size = 20
 max_overflow = 30
+
+#
+# ssl_context = ssl.create_default_context(cafile=RDS_CERT_PATH)
+# ssl_context.verify_mode = ssl.CERT_REQUIRED
+
+
+
 
 
 class AnalyticAsyncSession(AsyncSession):
@@ -78,6 +85,7 @@ async def get_async_session_maker(semaphore=None) -> AsyncSession:
         semaphore = global_semaphore
 
     try:
+        ssl_mode = settings.ssl_mode
         async with semaphore:
             if not hasattr(thread_local, "session_maker"):
                 db_connector = get_alchemy_row()
@@ -88,6 +96,7 @@ async def get_async_session_maker(semaphore=None) -> AsyncSession:
                     pool_size=pool_size,
                     max_overflow=max_overflow,
                     pool_pre_ping=True,
+                    connect_args= {'ssl':ssl_mode},
 
                 )
                 sync_engine = engine.sync_engine
