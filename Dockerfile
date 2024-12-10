@@ -25,7 +25,12 @@ RUN mkdir -p /usr/local/share/ca-certificates/Yandex/ && \
     chmod 655 \
         /usr/local/share/ca-certificates/Yandex/RootCA.crt \
         /usr/local/share/ca-certificates/Yandex/IntermediateCA.crt && \
-    update-ca-certificates
+    update-ca-certificates &&\
+    mkdir -p ~/.postgresql && \
+    wget "https://storage.yandexcloud.net/cloud-certs/CA.pem" \
+    --output-document ~/.postgresql/root.crt && \
+    chmod 0600 ~/.postgresql/root.crt
+
 
 # Копируем requirements.txt и устанавливаем зависимости
 COPY requirements-ubuntu.txt .

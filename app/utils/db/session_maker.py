@@ -80,14 +80,15 @@ async def get_async_session_maker(semaphore=None) -> AsyncSession:
     try:
         async with semaphore:
             if not hasattr(thread_local, "session_maker"):
-                db_connector = path_setting_funcs.get_alchemy_row()
+                db_connector = get_alchemy_row()
                 async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
                 engine = create_async_engine(
                     async_db_connector,
                     echo=False,
                     pool_size=pool_size,
                     max_overflow=max_overflow,
-                    pool_pre_ping=True
+                    pool_pre_ping=True,
+
                 )
                 sync_engine = engine.sync_engine
                 event.listen(sync_engine, "checkout", log_checkout)
@@ -140,3 +141,12 @@ async def get_async_session_maker(semaphore=None) -> AsyncSession:
         )
         raise
 
+def get_alchemy_row():
+    port = settings.postgres_port
+    file_path = path_setting_funcs.get_setting_path()
+    postgres_dbname = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-dbname')
+    postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
+    postgres_password = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-password')
+    postgres_user = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-user')
+    db_connector = f'postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{port}/{postgres_dbname}'
+    return db_connector

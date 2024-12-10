@@ -1,36 +1,22 @@
-services:
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: adv_wb_bot_backend
-    command: python updater.py
-    mem_limit: 8G  # Ограничиваем потребление памяти
-    cpus: 16       # Используем 16 процессоров
-    volumes:
-      - .:/app      # Монтируем текущий каталог в контейнер
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
-  client_bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: wbgram_bot
-    command: python client_bot_run.py
-    mem_limit: 6G
-    cpus: 4
-    volumes:
-      - .:/app      # Монтируем текущий каталог в контейнер
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    restart: always
+#for kubernetes
+services:
+#  backend:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: adv_wb_bot_backend
+#    command: python updater.py
+#    image: adv_wb_bot_backend
+#
+#
+#  client_bot:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: wbgram_bot
+#    command: python client_bot_run.py
+#    image: wbgram_bot
 
   redis:
     image: redis:alpine
