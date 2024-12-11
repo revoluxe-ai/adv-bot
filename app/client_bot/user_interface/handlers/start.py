@@ -242,32 +242,32 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
     return
 
 
-
-
-@router.callback_query(callbacks.DeleteWbUserCabinet.filter())
-async def delete_shop(callback_query: types.CallbackQuery,
-                      callback_data : callbacks.DeleteWbUserCabinet,
-                      bot: aiogram.Bot,
-                      state: FSMContext):
-    await bot.send_message(callback_query.message.chat.id, 'Удаление магазина (кабинета)')
-    wb_cabinet_original_id = callback_data.wb_cabinet_original_id
-    async with sm() as session:
-        stmt = select(WBUserCabinet).options(
-            joinedload(WBUserCabinet.user),
-
-        ).where(WBUserCabinet.wb_cabinet_id == wb_cabinet_original_id)
-        result = await session.execute(stmt)
-        wb_user_cabinet = result.scalars().first()
-        session.delete(wb_user_cabinet)
-        await session.commit()
-        user = wb_user_cabinet.user
-        await session.refresh(user)
-    all_shops = user.wb_user_cabinets
-    chat_id = callback_query.message.chat.id
-    await messages. \
-        ShopChoice(bot, chat_id, all_shops)()
-    return
-
+#
+#
+# @router.callback_query(callbacks.DeleteWbUserCabinet.filter())
+# async def delete_shop(callback_query: types.CallbackQuery,
+#                       callback_data : callbacks.DeleteWbUserCabinet,
+#                       bot: aiogram.Bot,
+#                       state: FSMContext):
+#     await bot.send_message(callback_query.message.chat.id, 'Удаление магазина (кабинета)')
+#     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
+#     async with sm() as session:
+#         stmt = select(WBUserCabinet).options(
+#             joinedload(WBUserCabinet.user),
+#
+#         ).where(WBUserCabinet.wb_cabinet_id == wb_cabinet_original_id)
+#         result = await session.execute(stmt)
+#         wb_user_cabinet = result.scalars().first()
+#         session.delete(wb_user_cabinet)
+#         await session.commit()
+#         user = wb_user_cabinet.user
+#         await session.refresh(user)
+#     all_shops = user.wb_user_cabinets
+#     chat_id = callback_query.message.chat.id
+#     await messages. \
+#         ShopChoice(bot, chat_id, all_shops)()
+#     return
+#
 
 @router.callback_query(callbacks.AddNewToken.filter())
 async def add_app_token(callback_query: types.CallbackQuery,

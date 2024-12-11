@@ -1,38 +1,78 @@
 import json
 import logging
-import logging.config
+import logging.handlers
 import textwrap
 import platform
+import os
+import datetime
 
 system_name = platform.system()
 
-logging_setup_done = False  # Флаг для проверки, было ли уже выполнено настройка логгирования
+logging_setup_done = False
 
-class CustomFormatter(logging.Formatter):
-    """Логгирование с цветным выводом в зависимости от уровня сообщений."""
-    grey = "\x1b[38;21m"
-    blue = "\x1b[34m"  # Синий цвет
-    white = "\x1b[37m"  # Белый цвет
-    red = "\x1b[31m"  # Красный цвет
-    reset = "\x1b[0m"  # Сброс цвета текста
-    format = "%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s"
 
-    FORMATS = {
-        logging.DEBUG: blue + format + reset,
-        logging.INFO: white + format + reset,
-        logging.WARNING: grey + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: red + format + reset
-    }
+class EnhancedJSONFormatter(logging.Formatter):
+    """Форматтер для JSON логов с сохранением цветного вывода в консоль"""
+    def __init__(self, color_output=False, **kwargs):
+        super().__init__()
+        self.color_output = color_output
+        self.extra_fields = kwargs
+        self.colors = {
+            'DEBUG': '\x1b[34m',
+            'INFO': '\x1b[37m',
+            'WARNING': '\x1b[38;21m',
+            'ERROR': '\x1b[31m',
+            'CRITICAL': '\x1b[31m',
+            'RESET': '\x1b[0m'
+        }
 
     def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno, self.format)
-        formatter = logging.Formatter(log_fmt, "%Y-%m-%d %H:%M:%S")
-        formatted = formatter.format(record)
-        wrapped = textwrap.fill(formatted, width=100)  # Перенос строк
-        return wrapped
+        # Базовая структура лога
+        log_data = {
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'logger': record.name,
+            'level': record.levelname,
+            'message': record.getMessage(),
+            'path': record.pathname,
+            'line': record.lineno,
+            'service': os.getenv('SERVICE_NAME', 'updater')
+        }
+
+        # Добавляем информацию об исключении
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
+
+        # Для консоли возвращаем цветной вывод
+        if self.color_output:
+            color = self.colors.get(record.levelname, '')
+            reset = self.colors['RESET']
+            formatted = (f"{color}{log_data['logger']} - {log_data['timestamp']} - "
+                       f"{log_data['path']}:{log_data['line']} - {record.levelname} - "
+                       f"{log_data['message']}{reset}")
+            return textwrap.fill(formatted, width=100)
+
+        return json.dumps(log_data)
+
+class CustomJournalHandler(logging.handlers.SysLogHandler):
+    """Обработчик для системного журнала с поддержкой JSON"""
+    priority_map = {
+        logging.DEBUG: 7,
+        logging.INFO: 6,
+        logging.WARNING: 4,
+        logging.ERROR: 3,
+        logging.CRITICAL: 2
+    }
+
+    def emit(self, record):
+        try:
+            priority = self.priority_map.get(record.levelno, 6)
+            record.priority = priority
+            super().emit(record)
+        except Exception:
+            self.handleError(record)
 
 def setup_logging():
+    """Сохраняем оригинальную сигнатуру, но добавляем новую функциональность"""
     import warnings
     warnings.filterwarnings("error", category=RuntimeWarning)
     global logging_setup_done
@@ -43,37 +83,36 @@ def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
+    # Консольный вывод с цветами
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(EnhancedJSONFormatter(color_output=True))
+    logger.addHandler(console_handler)
+
+    # JSON файловый вывод
+    file_handler = logging.handlers.RotatingFileHandler(
+        'app.log',
+        maxBytes=10_000_000,
+        backupCount=5
+    )
+    file_handler.setFormatter(EnhancedJSONFormatter())
+    logger.addHandler(file_handler)
+
+    # TCP handler для отправки в системы сбора логов
+    if os.getenv('LOG_HOST') and os.getenv('LOG_PORT'):
+        tcp_handler = logging.handlers.SocketHandler(
+            os.getenv('LOG_HOST'),
+            int(os.getenv('LOG_PORT'))
+        )
+        tcp_handler.setFormatter(EnhancedJSONFormatter())
+        logger.addHandler(tcp_handler)
+
     if system_name == 'Linux':
-        from systemd.journal import JournalHandler
-
-        class CustomJournalHandler(JournalHandler):
-            priority_map = {
-                logging.DEBUG: 7,
-                logging.INFO: 6,
-                logging.WARNING: 4,
-                logging.ERROR: 3,
-                logging.CRITICAL: 2
-            }
-
-            def emit(self, record):
-                priority = self.priority_map.get(record.levelno, 6)
-                record.priority = priority
-                super().emit(record)
-
-        journal_handler = CustomJournalHandler(SYSLOG_IDENTIFIER='updater')
-        journal_handler.setLevel(logging.DEBUG)
-        formatter = CustomFormatter(
-            fmt="%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S")
-        journal_handler.setFormatter(formatter)
-        logger.addHandler(journal_handler)
-    else:
-        def setup_logging_from_file(path_to_config_file):
-            with open(path_to_config_file, 'r') as file:
-                config = json.load(file)
-            logging.config.dictConfig(config)
-
-        path_to_logging_config = 'logging_config.json'
-        setup_logging_from_file(path_to_logging_config)
+        try:
+            from systemd.journal import JournalHandler
+            journal_handler = JournalHandler(SYSLOG_IDENTIFIER='updater')
+            journal_handler.setFormatter(EnhancedJSONFormatter())
+            logger.addHandler(journal_handler)
+        except ImportError:
+            pass
 
     logging_setup_done = True

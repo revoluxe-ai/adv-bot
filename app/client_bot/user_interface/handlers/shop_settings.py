@@ -1,6 +1,6 @@
 from aiogram import Router, types
 import aiogram
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken, WBCabinet
 from app.utils.db.models import User
@@ -14,44 +14,22 @@ async def delete_wb_user_cabinet(callback: types.CallbackQuery,
                                  callback_data: callbacks.DeleteWbUserCabinet,
                                  bot: aiogram.Bot,):
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    chat_id = callback.message.chat.id
+    user_telegram_id = callback.from_user.id
     async with sm() as session:
-        wb_user_cabinet = await session.execute(select(WBUserCabinet)\
-            .options(selectinload(WBUserCabinet.wb_cabinet))\
-                                                .where(WBUserCabinet.id == wb_user_cabinet_original_id))
-        wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
-        if wb_user_cabinet:
-            await bot.send_message(chat_id, "Удаляю кабинет...")
-            await session.delete(wb_user_cabinet)
-            await bot.send_message(chat_id,'Кабинет удален, удаляю связанные токены')
-            wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-            shop_id = wb_cabinet.shop_id
-            stmt = select(WBToken).where(WBToken.user_id == wb_user_cabinet.user_id)
-            tokens = await session.execute(stmt)
-            tokens = tokens.scalars().all()
-            for token in tokens:
-                try:
-                    shop_id = token.shop_id
-                except AttributeError:
-                    continue
-                if shop_id == wb_user_cabinet.wb_cabinet.shop_id:
-                    await session.delete(token)
-            await bot.send_message(chat_id, 'Связанные токены удалены')
-            await session.commit()
-        else:
-            await bot.send_message(chat_id, 'Кабинет не найден')
-
-    await bot.send_message(chat_id, 'Отправляю список магазинов...')
-
-    async with sm() as session:
-        stmt = select(User.id)\
-        .filter(User.user_telegram_id == chat_id)
-        user_original_id = await session.execute(stmt)
-        user_original_id = user_original_id.scalar_one()
+        stmt = delete(WBUserCabinet)\
+        .filter(WBUserCabinet.id == wb_user_cabinet_original_id)\
+        .returning(WBUserCabinet)
+        deleted_wb_user_cabinet = await session.execute(stmt)
+        deleted_wb_user_cabinet = deleted_wb_user_cabinet.scalars().first()
         stmt = select(WBUserCabinet)\
-        .filter(WBUserCabinet.user_id == user_original_id)
-        all_shops = await session.execute(stmt)
-        all_shops = all_shops.scalars().all()
+        .join(WBUserCabinet.user)\
+        .filter(User.user_telegram_id == user_telegram_id)
+        wb_user_cabinets = await session.execute(stmt)
+        wb_user_cabinets = wb_user_cabinets.scalars().all()
+        await session.commit()
+    await bot.send_message(callback.message.chat.id,
+                           f'Кабинет {deleted_wb_user_cabinet.name} удален')
 
-    await messages.ShopChoice(bot, chat_id, all_shops)()
+    await messages.ShopChoice(bot, callback.message.chat.id, wb_user_cabinets)()
+
     return
