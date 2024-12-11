@@ -1,44 +1,27 @@
-version: '3'
-
-networks:
-  monitoring:
-    driver: bridge
+version: '3.7'
 
 services:
-  loki:
-    image: grafana/loki:2.9.3
-    ports:
-      - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - monitoring
-
-  grafana:
-    image: grafana/grafana:10.2.3
-    ports:
-      - "3000:3000"
+  elasticsearch:
+    image: elasticsearch:7.9.3  # другая версия
+    container_name: elasticsearch
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-    volumes:
-      - grafana-data:/var/lib/grafana
-    networks:
-      - monitoring
-    depends_on:
-      - loki
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xmx1g -Xms1g
+      - cluster.name=es-docker-cluster
+    network_mode: "host"  # Использование сетевого интерфейса хоста
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    restart: always
 
-  promtail:
-    image: grafana/promtail:2.9.3
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - ./promtail-config.yml:/etc/promtail/config.yml
-    command: -config.file=/etc/promtail/config.yml
-    networks:
-      - monitoring
+  kibana:
+    image: kibana:8.7.1
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_URL=http://localhost:9200  # Подключение к Elasticsearch по localhost
+    network_mode: "host"  # Использование сетевого интерфейса хоста
+    restart: always
     depends_on:
-      - loki
+      - elasticsearch
 
-volumes:
-  grafana-data:
