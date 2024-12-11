@@ -11,6 +11,8 @@ services:
     image: adv_wb_bot_backend
     restart: always
     network_mode: host
+    volumes:
+      - ./work_folder:/app/work_folder
 
 
   client_bot:
