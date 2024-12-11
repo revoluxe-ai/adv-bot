@@ -98,6 +98,7 @@ async def get_async_session_maker(semaphore=None) -> AsyncSession:
                     pool_pre_ping=True,
                     connect_args= {'ssl':ssl_mode},
 
+
                 )
                 sync_engine = engine.sync_engine
                 event.listen(sync_engine, "checkout", log_checkout)

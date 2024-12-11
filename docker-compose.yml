@@ -1,4 +1,3 @@
-
 #for kubernetes
 services:
   backend:
