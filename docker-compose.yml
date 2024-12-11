@@ -7,7 +7,7 @@ services:
     container_name: adv_wb_bot_backend
     command: python updater.py
     mem_limit: 8G
-    cpus: 22
+    cpus: 16
     image: adv_wb_bot_backend
     restart: always
     network_mode: host
