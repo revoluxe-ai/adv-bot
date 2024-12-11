@@ -813,7 +813,10 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                         continue
                     hard_status = keyword_setting.hard_status
                     stat_hard_statuses[hard_status] += 1
-                result_hard_status = max(stat_hard_statuses.items(), key=lambda x: x[1])[0]
+                try:
+                    result_hard_status = max(stat_hard_statuses.items(), key=lambda x: x[1])[0]
+                except:
+                    result_hard_status = 1
                 keyword_setting = KeywordSetting()
                 keyword_setting.text = cluster_name
                 keyword_setting.adv_setting = adv_setting
