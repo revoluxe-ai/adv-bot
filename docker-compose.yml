@@ -1,4 +1,3 @@
-#for kubernetes
 services:
   backend:
     build:
@@ -6,13 +5,29 @@ services:
       dockerfile: Dockerfile
     container_name: adv_wb_bot_backend
     command: python updater.py
-    mem_limit: 8G
-    cpus: 16
+    mem_limit: 6G
+    cpus: 14
     image: adv_wb_bot_backend
     restart: always
     network_mode: host
     volumes:
       - ./work_folder:/app/work_folder
+#    logging:
+#      driver: loki
+#      options:
+#        loki-url: "http://loki:3100/loki/api/v1/push"
+#        loki-pipeline-stages: |
+#          - json:
+#              expressions:
+#                timestamp: timestamp
+#                level: level
+#                logger: logger
+#                message: message
+#                service: service
+#          - labels:
+#              level: level
+#              logger: logger
+#              service: service
 
 
   client_bot:
@@ -24,21 +39,19 @@ services:
     image: wbgram_bot
     restart: always
     network_mode: host
-
-#  redis:
-#    image: redis:alpine
-#    container_name: wbgram_bot_redis
-#    volumes:
-#      - redis_data:/data
-#    mem_limit: 2g
-#    mem_reservation: 1g
 #    logging:
-#      driver: "json-file"
+#      driver: loki
 #      options:
-#        max-size: "10m"
-#        max-file: "3"
-#    restart: always
-#
-#volumes:
-#  redis_data:
-
+#        loki-url: "http://loki:3100/loki/api/v1/push"
+#        loki-pipeline-stages: |
+#          - json:
+#              expressions:
+#                timestamp: timestamp
+#                level: level
+#                logger: logger
+#                message: message
+#                service: service
+#          - labels:
+#              level: level
+#              logger: logger
+#              service: service
