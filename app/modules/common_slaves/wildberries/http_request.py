@@ -52,7 +52,6 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                     state['_current_pause'] = 1
                 except (TooManyRequests,
                         UnknownApiRequestError,
-                        BadRequestError,
                         NotValidDataError,
                         ClientOSError,
                         ServerDisconnectedError,
