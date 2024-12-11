@@ -57,8 +57,8 @@ class ShopDataUpdater:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()
             existing_advs: list[models.AdvSetting] = result.scalars().all()
-            existind_advs_ids = {adv.adv_id for adv in existing_advs}
-            not_existing_adv_ids = set(adv_ids) - set(existind_advs_ids)
+            existind_advs_ids: set[int] = {adv.adv_id for adv in existing_advs}
+            not_existing_adv_ids: set[int] = set(adv_ids) - existind_advs_ids
             if not_existing_adv_ids:
                 await self.__quick_update_advs_in_db(not_existing_adv_ids)
             func = self.__quick_update_advs_in_db(existind_advs_ids)
