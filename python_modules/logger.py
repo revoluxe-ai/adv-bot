@@ -2,7 +2,8 @@ import json
 import logging
 import os
 import datetime
-from logging.handlers import SysLogHandler, RotatingFileHandler
+import platform
+from logging.handlers import SysLogHandler
 
 class EnhancedJSONFormatter(logging.Formatter):
     def format(self, record):
@@ -17,7 +18,12 @@ class EnhancedJSONFormatter(logging.Formatter):
         }
         if record.exc_info:
             log_data['exception'] = self.formatException(record.exc_info)
-        return json.dumps(log_data,  ensure_ascii=False)
+        return json.dumps(log_data, ensure_ascii=False)
+
+
+class SimpleStringFormatter(logging.Formatter):
+    def format(self, record):
+        return f"{record.levelname} - {record.name} - {record.getMessage()} ({record.pathname}:{record.lineno})"
 
 
 def setup_logging():
@@ -29,26 +35,23 @@ def setup_logging():
         # Удаляем все существующие обработчики
         logger.handlers.clear()
 
-        # Добавляем обработчик для вывода в stdout
+        # Проверяем операционную систему
+        is_windows = platform.system() == "Windows"
+
+        # Добавляем обработчик для вывода в stdout с нужным форматом
         stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(EnhancedJSONFormatter())
+        if is_windows:
+            stream_handler.setFormatter(SimpleStringFormatter())
+        else:
+            stream_handler.setFormatter(EnhancedJSONFormatter())
         logger.addHandler(stream_handler)
 
-        # Чтение параметров из окружения для файла логов и его размера
-        log_file = os.getenv('LOG_FILE_PATH', 'app_logs.json')
-        max_log_size = int(os.getenv('MAX_LOG_SIZE', 1024 * 1024 * 10))  # 10MB
-        backup_count = int(os.getenv('BACKUP_COUNT', 3))
-
-        # Добавляем обработчик для записи в файл с ротацией
-        file_handler = RotatingFileHandler(log_file, maxBytes=max_log_size, backupCount=backup_count)
-        file_handler.setFormatter(EnhancedJSONFormatter())
-        logger.addHandler(file_handler)
-
-        # Добавляем обработчик для отправки логов в Syslog
-        syslog_address = os.getenv('SYSLOG_ADDRESS', '/dev/log')
-        syslog_handler = SysLogHandler(address=syslog_address)
-        syslog_handler.setFormatter(EnhancedJSONFormatter())
-        logger.addHandler(syslog_handler)
+        # Добавляем обработчик для отправки логов в Syslog (только для Linux и MacOS)
+        if not is_windows:
+            syslog_address = os.getenv('SYSLOG_ADDRESS', '/dev/log')
+            syslog_handler = SysLogHandler(address=syslog_address)
+            syslog_handler.setFormatter(EnhancedJSONFormatter())
+            logger.addHandler(syslog_handler)
 
         logging.info("Логирование настроено успешно!")
     except Exception as e:
