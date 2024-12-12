@@ -1,5 +1,4 @@
 import asyncio
-import itertools
 import logging
 import os.path
 from collections import defaultdict
@@ -108,80 +107,55 @@ async def _get_df_for_fit() -> pd.DataFrame:
         result = await session.execute(stmt)
         adv_settings = result.scalars().yield_per(100)
 
-        async def process_adv(adv):
-            try:
-                logger.debug(f'Обработка кампании {adv.adv_id}')
-                nmids = adv.nmids
-                if len(nmids) >= 1:
-                    nmid_to_item_features = await get_nmid_to_item_features(nmids)
+        for n, adv in enumerate(adv_settings):
+            logger.debug(f'Обработка кампании {n}')
+            nmids = adv.nmids
 
-                    if nmid_to_item_features:
-                        item_features_list = list(nmid_to_item_features.values())
-                        avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
-                        avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
+            if len(nmids) >= 1:
+                nmid_to_item_features = await get_nmid_to_item_features(nmids)
 
-                        keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(
-                            adv, last_views=500
-                        )
-                        keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
-                        in_clusters = {kw.text for kw in keyword_stats}
+                if nmid_to_item_features:
+                    item_features_list = list(nmid_to_item_features.values())
+                    avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
+                    avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-                        clear_keyword_stat = [
-                            keyword_stat for keyword_stat in keyword_stats if keyword_stat.text not in in_clusters
-                        ]
-                        keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
+                    keyword_stats: list[CalculatedKeyword]\
+                        = await data_manager.get_keywords_statistic_clickhouse(adv,
+                        last_views=500)
 
-                        # Параллельно загружаем фичи для ключевых слов
-                        tasks = [
-                            data_getter.get_keyword_features_from_redis([keyword_stat.text])
-                            for keyword_stat in keyword_stats
-                        ]
-                        keyword_features_list = await asyncio.gather(*tasks, return_exceptions=True)
+                    keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
 
-                        # Собираем строки
-                        rows = []
-                        for keyword_stat, keyword_features in zip(keyword_stats, keyword_features_list):
-                            if isinstance(keyword_features, Exception):
-                                logger.error(f"Ошибка получения фичей для {keyword_stat.text}: {keyword_features}")
-                                continue
+                    in_clusters = {kw.text for kw in keyword_stats}
 
-                            if keyword_features:
-                                keyword_feature = keyword_features[0][1]
-                                row = {
-                                    'adv_id': adv.adv_id,
-                                    'adv_type': adv.type,
-                                    'keyword': keyword_stat.text,
-                                    'views': keyword_stat.views,
-                                    'clicks': keyword_stat.clicks,
-                                    'spend': keyword_stat.spend,
-                                    'nmids': adv.nmids,
-                                    **avg_item_features,
-                                    **{f'keyword_feature_{i}': keyword_feature[i] for i in range(len(keyword_feature))}
-                                }
-                                rows.append(row)
-                        return rows
-            except Exception as e:
-                logger.error(f"Ошибка обработки кампании {adv.adv_id}: {e}")
-                return []
+                    clear_keyword_stat = []
+                    for keyword_stat in keyword_stats:
+                        if keyword_stat.text not in in_clusters:
+                             clear_keyword_stat.append(keyword_stat)
 
-        # Параллельно обрабатываем все кампании с батчами
-        batch_size = 100
-        tasks = [process_adv(adv) for adv in adv_settings]
-        for i, batch_tasks in enumerate(
-            iter(lambda: list(itertools.islice(tasks, batch_size)), [])
-        ):
-            logger.debug(f"Обработка батча {i + 1}")
-            results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error(f"Ошибка в батче {i + 1}: {result}")
-                else:
-                    data_rows.extend(result)
+                    keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
+
+                    for keyword_stat in keyword_stats:
+                        keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
+                        if keyword_features:
+                            keyword_feature = keyword_features[0][1]
+                            row = {
+                                'adv_id': adv.adv_id,
+                                'adv_type': adv.type,
+                                'keyword': keyword_stat.text,
+                                'views': keyword_stat.views,
+                                'clicks': keyword_stat.clicks,
+                                'spend': keyword_stat.spend,
+                                'nmids': adv.nmids,
+                                **avg_item_features,
+                                **{f'keyword_feature_{i}': keyword_feature[i] for i in range(len(keyword_feature))}
+                            }
+                            data_rows.append(row)
+
+                        await asyncio.sleep(0)  # Позволяем другим задачам выполниться
 
     # Преобразуем данные в DataFrame
     df = pd.DataFrame(data_rows)
     return df
-
 
 
 async def __fetch_keyword_features(keywords: list[str])->list[tuple[str, list[float]]]:
