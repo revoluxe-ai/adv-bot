@@ -85,11 +85,13 @@ async def _fit_modelGradientBoosting():
     await asyncio.to_thread(save_model, model, time_stamp= None)
 
 
+
 async def _get_df_for_fit() -> pd.DataFrame:
+    data_rows = []
     logger.debug('Получение данных для обучения')
 
     async with sm() as session:
-        # Оптимизированный подзапрос
+        # Подзапрос для проверки существования WBCabinet с условиями
         subquery = select(WBCabinet.id).where(
             or_(
                 WBCabinet.expiration_time > datetime.now(),
@@ -97,61 +99,45 @@ async def _get_df_for_fit() -> pd.DataFrame:
                 WBCabinet.balance > 0,
             )
         ).exists()
-        logger.debug('Получение данных из базы')
 
-        # Получаем все настройки рекламы одним запросом
+        # Основной запрос
         stmt = select(AdvSetting).options(
             selectinload(AdvSetting.wb_cabinet)
         ).where(subquery, AdvSetting.type == 8)
         result = await session.execute(stmt)
-        adv_settings = result.scalars().all()  # Получаем все записи сразу
-        logger.debug('Данные получены')
-        # Подготавливаем списки для батч-запросов
-        all_nmids = []
-        keywords_for_stats = []
+        adv_settings = result.scalars().yield_per(100)
+
         for n, adv in enumerate(adv_settings):
-            logger.debug(f'Обработка {n + 1} из {len(adv_settings)} кампаний')
-            if len(adv.nmids) >= 1:
-                all_nmids.extend(adv.nmids)
-                keywords_for_stats.append(adv)
+            logger.debug(f'Обработка кампании {n}')
+            nmids = adv.nmids
 
-        # Батч-запросы для получения данных
-        nmid_features_map = await get_nmid_to_item_features(list(set(all_nmids)))
+            if len(nmids) >= 1:
+                nmid_to_item_features = await get_nmid_to_item_features(nmids)
 
-        # Получаем статистику по ключевым словам пачками
-        chunk_size = 50
-        all_keyword_stats = []
-        for i in range(0, len(keywords_for_stats), chunk_size):
-            chunk = keywords_for_stats[i:i + chunk_size]
-            tasks = [
-                data_manager.get_keywords_statistic_clickhouse(adv, last_views=500)
-                for adv in chunk
-            ]
-            chunk_stats = await asyncio.gather(*tasks)
-            all_keyword_stats.extend([item for sublist in chunk_stats for item in sublist])
-
-        # Обработка кластеров
-        keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(all_keyword_stats)
-
-        # Получаем фичи ключевых слов пачками
-        unique_keywords = {kw.text for kw in all_keyword_stats}
-        keyword_features = await data_getter.get_keyword_features_from_redis(list(unique_keywords))
-        keyword_features_dict = dict(keyword_features)
-
-        # Формируем результат
-        data_rows = []
-        for adv in adv_settings:
-            if len(adv.nmids) >= 1 and nmid_features_map:
-                # Вычисляем средние фичи товаров
-                item_features_list = [nmid_features_map[nmid] for nmid in adv.nmids if nmid in nmid_features_map]
-                if item_features_list:
+                if nmid_to_item_features:
+                    item_features_list = list(nmid_to_item_features.values())
                     avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
                     avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
 
-                    # Добавляем строки данных
-                    for keyword_stat in all_keyword_stats:
-                        if keyword_stat.text in keyword_features_dict:
-                            keyword_feature = keyword_features_dict[keyword_stat.text]
+                    keyword_stats: list[CalculatedKeyword]\
+                        = await data_manager.get_keywords_statistic_clickhouse(adv,
+                        last_views=500)
+
+                    keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
+
+                    in_clusters = {kw.text for kw in keyword_stats}
+
+                    clear_keyword_stat = []
+                    for keyword_stat in keyword_stats:
+                        if keyword_stat.text not in in_clusters:
+                             clear_keyword_stat.append(keyword_stat)
+
+                    keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
+
+                    for keyword_stat in keyword_stats:
+                        keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
+                        if keyword_features:
+                            keyword_feature = keyword_features[0][1]
                             row = {
                                 'adv_id': adv.adv_id,
                                 'adv_type': adv.type,
@@ -165,7 +151,11 @@ async def _get_df_for_fit() -> pd.DataFrame:
                             }
                             data_rows.append(row)
 
-    return pd.DataFrame(data_rows)
+                        await asyncio.sleep(0)  # Позволяем другим задачам выполниться
+
+    # Преобразуем данные в DataFrame
+    df = pd.DataFrame(data_rows)
+    return df
 
 
 async def __fetch_keyword_features(keywords: list[str])->list[tuple[str, list[float]]]:
