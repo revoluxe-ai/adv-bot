@@ -61,7 +61,12 @@ async def process_product_data(wbcard: WBCard):
     product_data = wbcard.card_json
     # Обработка характеристик
     characteristics_words = {}
-    for characteristic in product_data["characteristics"]:
+    try:
+        characteristics = product_data["characteristics"]
+    except KeyError:
+        logger.error(f'Карточка {wbcard.nmid} не содержит характеристик')
+        characteristics = []
+    for characteristic in characteristics:
         char_name = characteristic['name'].lower()
         char_value = characteristic['value']
         if not isinstance(char_value, list) or all(
