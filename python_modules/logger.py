@@ -50,7 +50,7 @@ def setup_logging():
         if not is_windows:
             syslog_address = os.getenv('SYSLOG_ADDRESS', '/dev/log')
             syslog_handler = SysLogHandler(address=syslog_address)
-            syslog_handler.setFormatter(EnhancedJSONFormatter())
+            syslog_handler.setFormatter(SimpleStringFormatter())
             logger.addHandler(syslog_handler)
 
         logging.info("Логирование настроено успешно!")
