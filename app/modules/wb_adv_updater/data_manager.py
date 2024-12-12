@@ -340,7 +340,11 @@ def __sort_by_update_keyword(keyword: WBItemPosition):
 async def set_positions(keyword_stats: list[CalculatedKeyword],
                         adv_setting: AdvSetting) -> list[CalculatedKeyword]:
     texts = [keyword.text for keyword in keyword_stats]
-    positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    try:
+       positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    except:
+        logger.warning(f'Ошибка получения позиций из Redis для арк {adv_setting.adv_id}')
+        return keyword_stats
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
