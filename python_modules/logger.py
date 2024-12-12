@@ -43,7 +43,7 @@ def setup_logging():
         if is_windows:
             stream_handler.setFormatter(SimpleStringFormatter())
         else:
-            stream_handler.setFormatter(EnhancedJSONFormatter())
+            stream_handler.setFormatter(SimpleStringFormatter())
         logger.addHandler(stream_handler)
 
         # Добавляем обработчик для отправки логов в Syslog (только для Linux и MacOS)
