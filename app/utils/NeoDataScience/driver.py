@@ -1184,8 +1184,6 @@ UNWIND phrase.words AS word
                 logger.error(f'Ошибка при обновлении векторов товаров в Redis: {exc}', exc_info=True)
             await asyncio.sleep(0)
 
-
-
     async def __update_keywords_vectors(self):
         batch_size = 1000  # Размер порции
         last_processed_id = None  # Начальное значение для курсора
@@ -1194,9 +1192,9 @@ UNWIND phrase.words AS word
             async with sm() as session:
                 # Получаем количество уникальных текстов один раз
                 count_stmt = select(func.count()).select_from(
-                    select(distinct(KeywordSetting.text)).join(KeywordSetting.adv_setting).where(
+                    select(KeywordSetting.text).distinct().join(KeywordSetting.adv_setting).where(
                         AdvSetting.active_status.in_(['started'])
-                    )
+                    ).subquery()
                 )
                 total_count_result = await session.execute(count_stmt)
                 total_count = total_count_result.scalar_one()
@@ -1206,12 +1204,14 @@ UNWIND phrase.words AS word
                 pass_texts = set()
 
                 # Запрос с курсором: если last_processed_id есть, начинаем с него
-                stmt = select(KeywordSetting.id, distinct(KeywordSetting.text)).join(
-                    KeywordSetting.adv_setting
-                ).where(
-                    AdvSetting.active_status.in_(['started'])
-                ).order_by(KeywordSetting.id)  # Убедитесь, что есть поле для сортировки
-
+                stmt = (
+                    select(KeywordSetting.id, KeywordSetting.text)
+                    .distinct(KeywordSetting.text)
+                    .join(KeywordSetting.adv_setting)
+                    .where(AdvSetting.active_status.in_(['started']))
+                    .order_by(KeywordSetting.text, KeywordSetting.id)  # DISTINCT ON требует совпадения с ORDER BY
+                    .limit(batch_size)
+                )
                 if last_processed_id:
                     stmt = stmt.where(KeywordSetting.id > last_processed_id)  # Пагинация по ID
 
@@ -1224,13 +1224,14 @@ UNWIND phrase.words AS word
                 if not rows:
                     break  # Завершаем, если нет данных
 
-                need_keywords_texts = [row.text for row in rows]
+                need_keywords_texts = []
+                for row in rows:
+                    if row.text not in pass_texts:
+                        pass_texts.add(row.text)
+                        need_keywords_texts.append(row.text)
 
                 # Очищаем текстовые данные
-                clear_need_texts = [
-                    text_cleaner.clear(text) for text in need_keywords_texts if
-                    text not in pass_texts and not pass_texts.add(text)
-                ]
+                clear_need_texts = [text_cleaner.clear(text) for text in need_keywords_texts]
 
                 # Обновляем векторы ключевых фраз в Redis
                 await self._update_keywords_vectors_in_redis(clear_need_texts)
