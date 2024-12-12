@@ -178,8 +178,6 @@ async def _get_df_for_fit() -> pd.DataFrame:
 
                             await asyncio.sleep(0)
 
-
-
         except Exception as e:
             logger.error(f'Ошибка при получении данных: {str(e)}', exc_info=True)
             raise

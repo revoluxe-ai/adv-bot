@@ -1176,8 +1176,6 @@ UNWIND phrase.words AS word
                 result = await session.read_transaction(check_phrase, query, text)
         return result
 
-
-
     async def __update_items_vectors(self):
         while True:
             try:
@@ -1185,6 +1183,8 @@ UNWIND phrase.words AS word
             except Exception as exc:
                 logger.error(f'Ошибка при обновлении векторов товаров в Redis: {exc}', exc_info=True)
             await asyncio.sleep(0)
+
+
 
     async def __update_keywords_vectors(self):
         batch_size = 1000  # Размер порции
@@ -1206,7 +1206,7 @@ UNWIND phrase.words AS word
                 pass_texts = set()
 
                 # Запрос с курсором: если last_processed_id есть, начинаем с него
-                stmt = select(distinct(KeywordSetting.text)).join(
+                stmt = select(KeywordSetting.id, distinct(KeywordSetting.text)).join(
                     KeywordSetting.adv_setting
                 ).where(
                     AdvSetting.active_status.in_(['started'])
@@ -1219,10 +1219,12 @@ UNWIND phrase.words AS word
 
                 async with sm() as session:
                     need_keywords_texts_result = await session.execute(stmt)
-                    need_keywords_texts = need_keywords_texts_result.scalars().all()
+                    rows = need_keywords_texts_result.all()
 
-                if not need_keywords_texts:
+                if not rows:
                     break  # Завершаем, если нет данных
+
+                need_keywords_texts = [row.text for row in rows]
 
                 # Очищаем текстовые данные
                 clear_need_texts = [
@@ -1234,7 +1236,7 @@ UNWIND phrase.words AS word
                 await self._update_keywords_vectors_in_redis(clear_need_texts)
 
                 # Обновляем курсор на ID последней строки
-                last_processed_id = need_keywords_texts[-1].id  # Предполагается, что есть поле 'id'
+                last_processed_id = rows[-1].id  # Предполагается, что есть поле 'id'
 
         except Exception as exc:
             logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
@@ -1295,6 +1297,7 @@ UNWIND phrase.words AS word
                 logger.debug('Записал вектор ключа в редис')
             except Exception as exc:
                 logger.error(f'Ошибка при записи вектора ключевой фразы в Redis: {exc}')
+
 
     async def check_wb_card_in_neo(self, nmid):
         query = """
