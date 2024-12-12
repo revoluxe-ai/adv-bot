@@ -21,7 +21,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 from app.modules.common_slaves.wildberries.models import AdvSetting,  KeywordSetting, WBCabinet
 from . import data_manager
 from .data_manager import DataGetter
@@ -100,6 +100,11 @@ async def _get_df_for_fit() -> pd.DataFrame:
             )
         ).exists()
 
+        # Подсчет общего количества записей
+        count_stmt = select(func.count()).select_from(AdvSetting).where(subquery, AdvSetting.type == 8)
+        total_count = await session.scalar(count_stmt)
+        logger.debug(f'Всего найдено кампаний: {total_count}')
+
         # Основной запрос
         stmt = select(AdvSetting).options(
             selectinload(AdvSetting.wb_cabinet)
@@ -108,7 +113,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
         adv_settings = result.scalars().yield_per(100)
 
         for n, adv in enumerate(adv_settings):
-            logger.debug(f'Обработка кампании {n}')
+            logger.debug(f'Обработка кампании {n} из {total_count}')
             nmids = adv.nmids
 
             if len(nmids) >= 1:
