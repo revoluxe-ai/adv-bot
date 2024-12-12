@@ -97,6 +97,7 @@ async def get_async_session_maker(semaphore=None) -> AsyncSession:
                     max_overflow=max_overflow,
                     pool_pre_ping=True,
                     connect_args= {'ssl':ssl_mode},
+                    statement_cache_size=0
 
 
                 )
