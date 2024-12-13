@@ -25,22 +25,25 @@ class DataSetter:
         logger.debug(f'Обновляю минус слова для {adv_setting.name}')
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
         logger.debug(f'Получил ключи для {adv_setting.name}')
-        good_phrases = []
-        bad_phrases = []
+        bad_keywords = []
         for keyword in keywords:
-            if keyword.status == KeywordStatus.GOOD:
-                good_phrases.append(keyword.text)
-            else:
-                bad_phrases.append(keyword.text)
+            if keyword.status == KeywordStatus.BAD:
+                bad_keywords.append(keyword)
                 if clusters := keyword.childs_keywords:
                     for cluster in clusters:
-                        bad_phrases.append(cluster.text)
+                        bad_keywords.append(cluster)
 
+        if len(bad_keywords) > 1000:
+            sorted_bad_keywords = sorted(bad_keywords, key=lambda kw: kw.views, reverse=True)
+            bad_keywords = sorted_bad_keywords[:1000]
+            over_words_in_company = sorted_bad_keywords[1000:]
+            if over_words_in_company:
+                 logger.debug(f'Не смогу заблокировать ключи {len(over_words_in_company)}')
+        bad_phrases = [kw.text for kw in bad_keywords]
         if bad_phrases:
             bad_phrases = list(set(bad_phrases))
             await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
             logger.debug(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
-            logger.debug(f'Позитивные слова {good_phrases}')
         else:
             logger.debug(f'Нет минус слов для {adv_setting.name}')
 

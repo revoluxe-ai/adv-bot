@@ -122,15 +122,14 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
     if not cpm_from_parsing:
         logger.error('Не удалось получить ставку из парсинга'
                      f'Shop ID: {access.wb_cabinet.shop_id}'
-                     f'Adv ID: {adv_id}')
+                     f'Adv ID: {adv_id}',
+                     exc_info=True)
         return
 
     if promo_positions:
         fact_max_position = max(promo_positions, key=lambda x: x.promo_position)
         promo_position = fact_max_position.promo_position
-        if promo_position == 1:
-            new_cpm = cpm_from_parsing - step
-        elif promo_position < max_position_for_adv:
+        if promo_position < max_position_for_adv:
             new_cpm = cpm_from_parsing - step
         elif promo_position > max_position_for_adv:
             new_cpm = cpm_from_parsing + step

@@ -298,7 +298,7 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
         new_version = int(datetime.datetime.now().timestamp())
         data_to_insert = []
         for kw in keyword_stats:
-            date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())
+            date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())#просто добавляем время к дате
             data_to_insert.append([kw.text,
                                    date_time,
                                    adv_setting.adv_id,
@@ -393,6 +393,9 @@ async def update_keyword_stat(access: WBCabinetAccess,
         stmt = select(AdvSetting).where(and_(
             AdvSetting.wb_cabinet_id == wb_cabinet.id,
             AdvSetting.type == 8,
+            AdvSetting.bot_active == True,
+            AdvSetting.active_status == 'started'
+
         )).order_by(AdvSetting.last_update.desc())
         result = (await session.execute(stmt)).unique()
         adv_settings = result.scalars().all()

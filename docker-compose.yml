@@ -1,0 +1,57 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adv_wb_bot_backend
+    command: python updater.py
+    mem_limit: 6G
+    cpus: 14
+    image: adv_wb_bot_backend
+    restart: always
+    network_mode: host
+    volumes:
+      - ./work_folder:/app/work_folder
+#    logging:
+#      driver: loki
+#      options:
+#        loki-url: "http://loki:3100/loki/api/v1/push"
+#        loki-pipeline-stages: |
+#          - json:
+#              expressions:
+#                timestamp: timestamp
+#                level: level
+#                logger: logger
+#                message: message
+#                service: service
+#          - labels:
+#              level: level
+#              logger: logger
+#              service: service
+
+
+  client_bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wbgram_bot
+    command: python client_bot_run.py
+    image: wbgram_bot
+    restart: always
+    network_mode: host
+#    logging:
+#      driver: loki
+#      options:
+#        loki-url: "http://loki:3100/loki/api/v1/push"
+#        loki-pipeline-stages: |
+#          - json:
+#              expressions:
+#                timestamp: timestamp
+#                level: level
+#                logger: logger
+#                message: message
+#                service: service
+#          - labels:
+#              level: level
+#              logger: logger
+#              service: service

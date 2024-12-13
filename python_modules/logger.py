@@ -1,33 +1,15 @@
 import json
 import logging
-import logging.handlers
-import textwrap
-import platform
 import os
 import datetime
 
-system_name = platform.system()
 
-logging_setup_done = False
+import platform
+from logging.handlers import SysLogHandler
 
 
 class EnhancedJSONFormatter(logging.Formatter):
-    """Форматтер для JSON логов с сохранением цветного вывода в консоль"""
-    def __init__(self, color_output=False, **kwargs):
-        super().__init__()
-        self.color_output = color_output
-        self.extra_fields = kwargs
-        self.colors = {
-            'DEBUG': '\x1b[34m',
-            'INFO': '\x1b[37m',
-            'WARNING': '\x1b[38;21m',
-            'ERROR': '\x1b[31m',
-            'CRITICAL': '\x1b[31m',
-            'RESET': '\x1b[0m'
-        }
-
     def format(self, record):
-        # Базовая структура лога
         log_data = {
             'timestamp': datetime.datetime.utcnow().isoformat(),
             'logger': record.name,
@@ -35,84 +17,45 @@ class EnhancedJSONFormatter(logging.Formatter):
             'message': record.getMessage(),
             'path': record.pathname,
             'line': record.lineno,
-            'service': os.getenv('SERVICE_NAME', 'updater')
+            'service': os.getenv('SERVICE_NAME', 'wb_adv_updater')
         }
-
-        # Добавляем информацию об исключении
         if record.exc_info:
             log_data['exception'] = self.formatException(record.exc_info)
+        return json.dumps(log_data, ensure_ascii=False)
 
-        # Для консоли возвращаем цветной вывод
-        if self.color_output:
-            color = self.colors.get(record.levelname, '')
-            reset = self.colors['RESET']
-            formatted = (f"{color}{log_data['logger']} - {log_data['timestamp']} - "
-                       f"{log_data['path']}:{log_data['line']} - {record.levelname} - "
-                       f"{log_data['message']}{reset}")
-            return textwrap.fill(formatted, width=100)
 
-        return json.dumps(log_data)
+class SimpleStringFormatter(logging.Formatter):
+    def format(self, record):
+        return f"{record.levelname} - {record.name} - {record.getMessage()} ({record.pathname}:{record.lineno})"
 
-class CustomJournalHandler(logging.handlers.SysLogHandler):
-    """Обработчик для системного журнала с поддержкой JSON"""
-    priority_map = {
-        logging.DEBUG: 7,
-        logging.INFO: 6,
-        logging.WARNING: 4,
-        logging.ERROR: 3,
-        logging.CRITICAL: 2
-    }
-
-    def emit(self, record):
-        try:
-            priority = self.priority_map.get(record.levelno, 6)
-            record.priority = priority
-            super().emit(record)
-        except Exception:
-            self.handleError(record)
 
 def setup_logging():
-    """Сохраняем оригинальную сигнатуру, но добавляем новую функциональность"""
-    import warnings
-    warnings.filterwarnings("error", category=RuntimeWarning)
-    global logging_setup_done
+    """Настройка логирования"""
+    try:
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
 
-    if logging_setup_done:
-        return
+        # Удаляем все существующие обработчики
+        logger.handlers.clear()
 
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+        # Проверяем операционную систему
+        is_windows = platform.system() == "Windows"
 
-    # Консольный вывод с цветами
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(EnhancedJSONFormatter(color_output=True))
-    logger.addHandler(console_handler)
+        # Добавляем обработчик для вывода в stdout с нужным форматом
+        stream_handler = logging.StreamHandler()
+        if is_windows:
+            stream_handler.setFormatter(SimpleStringFormatter())
+        else:
+            stream_handler.setFormatter(SimpleStringFormatter())
+        logger.addHandler(stream_handler)
 
-    # JSON файловый вывод
-    file_handler = logging.handlers.RotatingFileHandler(
-        'app.log',
-        maxBytes=10_000_000,
-        backupCount=5
-    )
-    file_handler.setFormatter(EnhancedJSONFormatter())
-    logger.addHandler(file_handler)
+        # Добавляем обработчик для отправки логов в Syslog (только для Linux и MacOS)
+        if not is_windows:
+            syslog_address = os.getenv('SYSLOG_ADDRESS', '/dev/log')
+            syslog_handler = SysLogHandler(address=syslog_address)
+            syslog_handler.setFormatter(SimpleStringFormatter())
+            logger.addHandler(syslog_handler)
 
-    # TCP handler для отправки в системы сбора логов
-    if os.getenv('LOG_HOST') and os.getenv('LOG_PORT'):
-        tcp_handler = logging.handlers.SocketHandler(
-            os.getenv('LOG_HOST'),
-            int(os.getenv('LOG_PORT'))
-        )
-        tcp_handler.setFormatter(EnhancedJSONFormatter())
-        logger.addHandler(tcp_handler)
-
-    if system_name == 'Linux':
-        try:
-            from systemd.journal import JournalHandler
-            journal_handler = JournalHandler(SYSLOG_IDENTIFIER='updater')
-            journal_handler.setFormatter(EnhancedJSONFormatter())
-            logger.addHandler(journal_handler)
-        except ImportError:
-            pass
-
-    logging_setup_done = True
+        logging.info("Логирование настроено успешно!")
+    except Exception as e:
+        logging.error(f"Ошибка при настройке логирования: {str(e)}")

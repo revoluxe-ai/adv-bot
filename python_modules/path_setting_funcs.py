@@ -51,17 +51,6 @@ def get_setting_path():
 
 
 
-def get_alchemy_row():
-    file_path = get_setting_path()
-    postgres_dbname = get_document_by_key_name(file_path, 'postgres-dbname')
-    postgres_host = get_document_by_key_name(file_path, 'postgres-host')
-    postgres_password = get_document_by_key_name(file_path, 'postgres-password')
-    postgres_user = get_document_by_key_name(file_path, 'postgres-user')
-    db_connector = f'postgresql://{postgres_user}:{postgres_password}@{postgres_host}:5432/{postgres_dbname}'
-    return db_connector
-
-
-
 async def get_alchemy_row_async():
     file_path = get_setting_path()
     postgres_dbname = await get_document_by_key_name_async(file_path, 'postgres-dbname')

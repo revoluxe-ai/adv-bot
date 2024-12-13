@@ -1,5 +1,12 @@
 import docker
 import time
+from python_modules.logger import setup_logging
+import logging
+
+
+setup_logging()
+
+logger = logging.getLogger(__name__)
 
 class PriorityManager:
     def __init__(self):
@@ -26,7 +33,7 @@ class PriorityManager:
             cpu_usage = self.calculate_cpu_usage(stats)
             return cpu_usage > self.activity_threshold
         except Exception as e:
-            print(f"Error checking activity: {e}")
+            logger.error(f"Error checking activity: {e}", exc_info=True)
             return False
 
     def run(self):
@@ -42,5 +49,11 @@ class PriorityManager:
                     self.backend.update(cpu_shares=8192)  # ~85% CPU
                 time.sleep(self.check_interval)
             except Exception as e:
-                print(f"Error in run loop: {e}")
+                logger.error(f"Error in run loop: {e}")
                 time.sleep(5)
+
+
+
+if __name__ == "__main__":
+    manager = PriorityManager()
+    manager.run()

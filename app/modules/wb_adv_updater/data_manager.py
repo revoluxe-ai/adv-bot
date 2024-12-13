@@ -340,7 +340,11 @@ def __sort_by_update_keyword(keyword: WBItemPosition):
 async def set_positions(keyword_stats: list[CalculatedKeyword],
                         adv_setting: AdvSetting) -> list[CalculatedKeyword]:
     texts = [keyword.text for keyword in keyword_stats]
-    positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    try:
+       positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    except:
+        logger.warning(f'Ошибка получения позиций из Redis для арк {adv_setting.adv_id}')
+        return keyword_stats
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
@@ -457,7 +461,11 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
     preset_to_keywords = defaultdict(list)
     preset_to_cluster_name = {}
     texts = [keyword.text for keyword in keyword_stats]
-    text_to_custer_and_present: dict[str, tuple] = await redis_manager.get_clusters_and_presets(texts)
+    try:
+        text_to_custer_and_present: dict[str, tuple] = await redis_manager.get_clusters_and_presets(texts)
+    except:
+        logger.error('Ошибка получения кластеров и пресетов', exc_info=True)
+        return keyword_stats
     for keyword in keyword_stats:
         text = keyword.text
         cluster_name, preset = text_to_custer_and_present.get(text, (None, None))
@@ -610,7 +618,11 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
         calculate_ctr = (real_baes_ctr + predict_ctr) / 2
         keyword_stat.predict_ctr = calculate_ctr
         if max_position:
-            position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
+            try:
+                 position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
+            except Exception as e:
+                position = None
+                logger.warning(f'Ошибка получения позиции {e} для {keyword_setting.text} adv_id: {adv_setting.adv_id}' )
             if position:
                 organic_position = position.base_position
                 if 0 < organic_position <= max_position:
@@ -813,7 +825,10 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                         continue
                     hard_status = keyword_setting.hard_status
                     stat_hard_statuses[hard_status] += 1
-                result_hard_status = max(stat_hard_statuses.items(), key=lambda x: x[1])[0]
+                try:
+                    result_hard_status = max(stat_hard_statuses.items(), key=lambda x: x[1])[0]
+                except:
+                    result_hard_status = 1
                 keyword_setting = KeywordSetting()
                 keyword_setting.text = cluster_name
                 keyword_setting.adv_setting = adv_setting
