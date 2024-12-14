@@ -58,8 +58,8 @@ async def __run_update_keyword_stat():
 
 
 
-async def run_update_minus_keywords_on_wb():
-    await wb_manager.update_keywords_in_advs()
+async def run_update_all_keywords_on_wb():
+    await wb_manager.update_all_keywords_on_wb()
 
 #
 # async def update_min_ctr_in_global_wb_category_settings():

@@ -2,7 +2,7 @@ from app.modules.wb_adv_updater.search_advs_manager import update_search_advs_mo
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     keywords_parsing_process,
-    run_update_minus_keywords_on_wb,
+    run_update_all_keywords_on_wb,
     run_update_keyword_stat,
     run_update_predict_ctr,
     run_update_model,
@@ -34,8 +34,7 @@ run_own_process_list = [
      run_bidder_process,
      run_hard_processes,
      keywords_parsing_process,
-     run_update_minus_keywords_on_wb,
-     run_update_keyword_stat,
+     run_update_all_keywords_on_wb,
       run_main_coroutines,
      run_update_predict_ctr,
      run_update_model,

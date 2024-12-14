@@ -16,6 +16,7 @@ from app.modules.wb_adv_updater.models import AdvPayment
 from .ABC_manager import AbcManager
 from .data_setter import DataSetter
 from .graph_vector_updater import GraphUpdater
+
 from ..common_slaves.wildberries import super_cabinet_manager
 from app.my_types import KeywordStat
 from app.utils.NeoDataScience.driver import DataScience
@@ -353,12 +354,22 @@ async def update_predict_ctr():
 
 
 
-async def update_keywords_in_advs():
+async def update_all_keywords_on_wb():
+    async def update_all_keyword_data(access, adv_setting):
+        wb_api = WBApi(access)
+        async with get_clickhouse_client() as client:
+            await common_keyword_stat_update(client, adv_setting, wb_api)
+        data_setter = DataSetter(access)
+        await data_setter.update_minus_keywords_in_adv(adv_setting)
+
+        return
+
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
         async with sm() as session:
             stmt = select(AdvSetting) \
-                .where(AdvSetting.bot_active == True)
+                .where(AdvSetting.bot_active == True,
+                       AdvSetting.type == 8)
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
             for adv_setting in adv_settings:
@@ -368,8 +379,7 @@ async def update_keywords_in_advs():
                     if not access:
                         logger.error(f'Нет доступа к кабинету {wb_cabinet_id}')
                         continue
-                    data_setter = DataSetter(access)
-                    task = asyncio.create_task(data_setter.update_minus_keywords_in_adv(adv_setting))
+                    task = asyncio.create_task(update_all_keyword_data(access, adv_setting))
                     update_tasks[adv_setting.id] = task
                 else:
                     if update_tasks[adv_setting.id].done():
@@ -469,17 +479,17 @@ async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
 
 
 
-async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
-    try:
-        await _keyword_stat_updater(client, adv_setting, wb_api)
-    except Exception as exc:
-        logger.error(f'Ошибка обновления статистики ключей для кампании: {adv_setting.name}, '
-                          f'adv_id: {adv_setting.adv_id}, '
-                          f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
+# async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
+#     try:
+#         await keyword_stat_updater(client, adv_setting, wb_api)
+#     except Exception as exc:
+#         logger.error(f'Ошибка обновления статистики ключей для кампании: {adv_setting.name}, '
+#                           f'adv_id: {adv_setting.adv_id}, '
+#                           f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
 
 
 
-async def _keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
+async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
     adv_id = adv_setting.adv_id
     try:
         keywords_from_auto: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_id)

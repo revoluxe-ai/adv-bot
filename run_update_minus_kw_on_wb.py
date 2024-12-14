@@ -20,7 +20,7 @@ semaphore = asyncio.Semaphore(max_sql_thread)
 if __name__ == '__main__':
     while True:
         try:
-            asyncio.run(runner.run_update_minus_keywords_on_wb(semaphore))
+            asyncio.run(runner.run_update_all_keywords_on_wb(semaphore))
         except Exception as e:
             logger.exception(e)
             sleep(70)
