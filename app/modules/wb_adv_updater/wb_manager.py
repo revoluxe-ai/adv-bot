@@ -38,6 +38,7 @@ from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpd
 from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
+from ..wb_update_state_manager import KeywordStatUpdateState
 from ...client_bot import const
 from app.utils.click_house.client import get_clickhouse_client
 
@@ -544,6 +545,11 @@ async def _keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
                 await asyncio.sleep(0)
 
     await update_keywords_stat_in_click_house(client, keywords, adv_setting)
+
+    keyword_stat_update_state = KeywordStatUpdateState()
+
+    await keyword_stat_update_state.set_one(adv_setting.adv_id)
+
     return
 
 

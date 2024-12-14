@@ -14,6 +14,7 @@ from aiogram.utils import deep_linking
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload, joinedload
 
+from app.modules.wb_update_state_manager import KeywordStatUpdateState, AdvActiveKeywordUpdateStateManager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
@@ -280,6 +281,25 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             await NoMainPhotos(self._bot, self._chat_id)(self.adv)
             return
 
+        last_update_keyword_stat: datetime = await self._get_last_update_keyword_stat(self.adv.adv_id)
+        if last_update_keyword_stat:
+           self.last_update_keyword_stat_str = last_update_keyword_stat.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            self.last_update_keyword_stat_str = 'Нет данных'
+
+        self.keywords_status_last_update_auto_adv =  await self._get_last_keywords_status_update_timestamp(self.adv.adv_id)
+
+        if not self.keywords_status_last_update_auto_adv:
+            self.keywords_status_last_update_auto_adv = 'Нет данных'
+
+
+        if (search_adv_id := self.adv.search_adv_id):
+            self.keywords_status_last_update_search_adv = await self._get_last_keywords_status_update_timestamp(search_adv_id)
+            if self.keywords_status_last_update_search_adv is None:
+                self.keywords_status_last_update_search_adv = 'Нет данных'
+        else:
+            self.keywords_status_last_update_search_adv = 'Аукцион не подключен к РК'
+
         await super().__call__()
 
     @property
@@ -296,6 +316,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f'📌 *Статус:* {self.adv.active_status}\n'
             f'🎯 *Минимальный CTR для кампании:* {round(self._min_ctr*100, 2)} %\n'
             f'🔢 *Минимальное количество показов для прогноза CTR:* {self.adv.min_views_for_ml_predict}\n'
+            f'Последнее обновление обобщенной статистики ключевых слов в базе: {self.last_update_keyword_stat_str}\n'
+            f'Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n'
+            f'Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n'
         )
         text += f'{max_cpc_text}'
         return text
@@ -305,6 +328,22 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         return keyboards.get_adv_setting_keyboard(self.wb_user_cabinet,
                                                   self.adv,
                                                   self.in_favorites_user)
+
+    def _get_last_update_keyword_stat(self, adv_id) -> datetime:
+        last_update_keyword_stat_manager = KeywordStatUpdateState()
+        last_update_keyword_stat_for_complex_adv = last_update_keyword_stat_manager.get_one(adv_id)
+        return last_update_keyword_stat_for_complex_adv
+
+    async def _get_last_keywords_status_update_timestamp(self, adv_id: int) -> datetime:
+        last_update_keyword_status_manager = AdvActiveKeywordUpdateStateManager()
+        timestamp = await last_update_keyword_status_manager.get_one(adv_id)
+        return timestamp
+
+
+
+
+
+
 
 
 class CabinetNameExists(Text):
