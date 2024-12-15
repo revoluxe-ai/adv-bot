@@ -10,7 +10,7 @@ test_users_telegram_ids= [352225040 , 5378020690]
 sm = get_async_session_maker()
 
 async def delete_test_users():
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         stmt = select(User).where(User.user_telegram_id.in_(test_users_telegram_ids))
         result = await session.execute(stmt)
         users = result.scalars().all()

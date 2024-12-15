@@ -54,7 +54,7 @@ async def set_min_ctr(message: types.Message, bot: Bot, state: FSMContext):
 
     ctr = get_ctr_from_text(text)
     if ctr:
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
             adv.hard_min_ctr = ctr
@@ -71,7 +71,7 @@ async def turn_on_auto_min_ctr(callback: types.CallbackQuery, bot: Bot, state: F
     data = await state.get_data()
     adv_original_id = data['last_adv_original_id']
     chat_id = callback.message.chat.id
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.hard_min_ctr = None

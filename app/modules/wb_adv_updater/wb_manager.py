@@ -54,7 +54,7 @@ keywords_hashs_in_neo = set()
 
 async def process_payment_for_auto_bidder():
     current_date = datetime.datetime.now().date()
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(AdvSetting).options(
             joinedload(AdvSetting.payments),
             selectinload(AdvSetting.wb_cabinet)
@@ -99,7 +99,7 @@ async def process_payment_for_auto_bidder():
 
 async def process_payment_for_parsing():
     current_date = datetime.datetime.now().date()
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(AdvSetting).options(
             joinedload(AdvSetting.payments),
             selectinload(AdvSetting.wb_cabinet)
@@ -140,7 +140,7 @@ async def process_payment_for_parsing():
 
 async def process_payment_for_advs():
     current_date = datetime.datetime.now().date()
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(AdvSetting).options(
             joinedload(AdvSetting.payments),
             selectinload(AdvSetting.wb_cabinet)
@@ -203,7 +203,7 @@ async def update_vectors_in_redis():
 
 async def shop_subscribe_control():
     while True:
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             stmt = select(WBCabinet) \
                 .options(
                 selectinload(WBCabinet.wb_user_cabinets) \
@@ -281,7 +281,7 @@ async def update_all_data_in_db_run(tasks):
                         f'Ошибка обновления данных для Shop id {wb_access.wb_cabinet.shop_id}: {tasks[wb_access.wb_cabinet.id].exception()}, '
                         f'{tasks[wb_access.wb_cabinet.id].exception()}')
                 else:
-                    async with sm() as session:
+                    async with sm(read_only=False) as session:
                         wb_cabinet = wb_access.wb_cabinet
                         stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet.id)
                         result = await session.execute(stmt)
@@ -318,13 +318,6 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
                                               "clicks",
                                               "spend",
                                               "version"] )
-
-
-
-
-
-
-
 
 
 async def update_keywords_stat_in_click_house(client, keyword_stats: List[KeywordStat],
@@ -545,7 +538,7 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
 
     # Преобразование ключевых слов в объекты KeywordSetting
     keyword_settings = [KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords]
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         # Обработка данных порциями
         for keyword in keyword_settings:
             try:
@@ -752,7 +745,7 @@ class Manager(AbcManager):
                         final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
                     else:
                         final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
                 # if message_counter.check_last_time():
                 #      await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
@@ -774,7 +767,7 @@ class Manager(AbcManager):
 
 
     async def clear_expired_data(self):
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             expired_cabinets: list[WBCabinet] = await data_manager.get_expired_cabinets(session)
             for wb_cabinet in expired_cabinets:
                 adv_settings: list[AdvSetting] = wb_cabinet.adv_settings

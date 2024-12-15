@@ -51,7 +51,7 @@ async def set_min_views_for_predict_ctr(message: types.Message, bot: Bot, state:
 
     min_views = get_min_views_from_text(text)
     if min_views is not None:
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
             adv.min_views_for_ml_predict = min_views

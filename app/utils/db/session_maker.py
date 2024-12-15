@@ -76,8 +76,25 @@ def log_checkin(dbapi_con, con_record):
     logger.debug(f"Количество соединений: {conn_counter}")
 
 
+def get_alchemy_row():
+    port = settings.postgres_port
+    file_path = path_setting_funcs.get_setting_path()
+    postgres_dbname = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-dbname')
+    postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
+    postgres_password = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-password')
+    postgres_user = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-user')
+
+    # Для asyncpg используем ssl вместо sslmode
+    db_connector = (
+        f'postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{port}/{postgres_dbname}'
+        '?ssl=verify-full'
+        '&target_session_attrs=read-write'
+    )
+    return db_connector
+
+
 @asynccontextmanager
-async def get_async_session_maker(semaphore=None) -> AsyncSession:
+async def get_async_session_maker(semaphore=None, read_only=True) -> AsyncSession:
     session_start = time()
     current_task = asyncio.current_task()
 
@@ -85,63 +102,49 @@ async def get_async_session_maker(semaphore=None) -> AsyncSession:
         semaphore = global_semaphore
 
     try:
-        ssl_mode = settings.ssl_mode
         async with semaphore:
             if not hasattr(thread_local, "session_maker"):
                 db_connector = get_alchemy_row()
+                if read_only:
+                    # Для read-only меняем параметр в строке подключения
+                    db_connector = db_connector.replace(
+                        'target_session_attrs=read-write',
+                        'target_session_attrs=any'
+                    )
+
                 async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
+
                 engine = create_async_engine(
                     async_db_connector,
                     echo=False,
                     pool_size=pool_size,
                     max_overflow=max_overflow,
-                    pool_pre_ping=True,
-                    connect_args= {'ssl':ssl_mode},
-
-
+                    pool_pre_ping=False
                 )
+
                 sync_engine = engine.sync_engine
                 event.listen(sync_engine, "checkout", log_checkout)
                 event.listen(sync_engine, "checkin", log_checkin)
 
-                async_session_maker = sessionmaker(engine, expire_on_commit=False,
-                                                   class_=AnalyticAsyncSession)
+                async_session_maker = sessionmaker(
+                    engine,
+                    expire_on_commit=False,
+                    class_=AnalyticAsyncSession
+                )
                 thread_local.session_maker = async_session_maker
 
             session_maker = thread_local.session_maker
 
-            # Логируем время ожидания сессии
-            wait_time = time() - session_start
-            if wait_time > 0.1:  # Если ждали больше 100мс
-                logger.warning(
-                    f"Long session wait time:\n"
-                    f"Wait duration: {wait_time:.3f}s\n"
-                    f"Task: {current_task.get_name()}\n"
-                    f"Active connections: {conn_counter}"
-                )
-
             async with session_maker() as session:
+                # if read_only:
+                #     await session.execute(text("SET TRANSACTION READ ONLY"))
                 try:
                     yield session
                 finally:
                     hold_time = time() - session_start
-                    if hold_time > 1.0:  # Логируем долгие удержания сессии
-                        stack = traceback.extract_stack()
-                        caller = next((frame for frame in reversed(stack[:-1])
-                                       if 'sqlalchemy' not in frame.filename), None)
-
-                        # Собираем больше контекста
-                        stack_trace = ''.join(traceback.format_stack()[:-1])
-
-                        logger.warning(
-                            f"Long session hold detected:\n"
-                            f"Total duration: {hold_time:.3f}s\n"
-                            f"Wait time: {wait_time:.3f}s\n"
-                            f"Task name: {current_task.get_name()}\n"
-                            f"Location: {caller.filename}:{caller.lineno}\n"
-                            f"Active connections: {conn_counter}\n"
-                            f"Stack trace:\n{stack_trace}"
-                        )
+                    if hold_time > 1.0:
+                        # ... код логирования ...
+                        pass
     except Exception as e:
         logger.error(
             f"Session error after {time() - session_start:.3f}s:\n"
@@ -150,13 +153,3 @@ async def get_async_session_maker(semaphore=None) -> AsyncSession:
             exc_info=True
         )
         raise
-
-def get_alchemy_row():
-    port = settings.postgres_port
-    file_path = path_setting_funcs.get_setting_path()
-    postgres_dbname = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-dbname')
-    postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
-    postgres_password = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-password')
-    postgres_user = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-user')
-    db_connector = f'postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{port}/{postgres_dbname}'
-    return db_connector

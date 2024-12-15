@@ -10,7 +10,7 @@ _sm = get_async_session_maker
 
 
 async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int):
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         # Собираем все adv_ids
         adv_ids = [adv.advertId for adv in advs]
 
@@ -51,7 +51,7 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int):
 
 
 async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet):
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         # Получаем все nmid из списка карточек
         nmids = [card.nmid for card in cards]
 

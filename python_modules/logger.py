@@ -23,8 +23,10 @@ class EnhancedJSONFormatter(logging.Formatter):
 
 class SimpleStringFormatter(logging.Formatter):
     def format(self, record):
-        return f"{record.levelname} - {record.name} - {record.getMessage()} ({record.pathname}:{record.lineno})"
-
+        result = f"{record.levelname} - {record.name} - {record.getMessage()} ({record.pathname}:{record.lineno})"
+        if record.exc_info:
+            result += f"\n{self.formatException(record.exc_info)}"
+        return result
 
 def setup_logging():
     """Настройка логирования"""

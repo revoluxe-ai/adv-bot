@@ -39,7 +39,7 @@ redis_manager = RedisManager()
 async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     await state.clear()
     referral_link  = None
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         user_id = message.from_user.id
         if isinstance(message, types.Message) and message.text:
             text = message.text.split(' ')
@@ -175,7 +175,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
     cabinet_name = data_state['cabinet_name'].strip()
     user_id = message.from_user.id
     #получаем юзера
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(User).\
         options(joinedload(User.wb_tokens))\
         .where(User.user_telegram_id == user_id)
@@ -187,7 +187,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             await session.commit()
 
     #проверяем есть ли кабинет именно у этого юзера
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(WBCabinet)\
         .join(WBCabinet.wb_user_cabinets)\
         .join(WBUserCabinet.user)\
@@ -314,7 +314,7 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
             GetApiForrbidenError(bot, chat_id)()
         return
     else:
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             user.wb_tokens.append(wb_token)
             session.add(user)
             await session.commit()

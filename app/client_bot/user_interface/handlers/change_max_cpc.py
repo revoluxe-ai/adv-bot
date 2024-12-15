@@ -50,7 +50,7 @@ async def set_max_cpc(message: types.Message, bot: aiogram.Bot, state: FSMContex
     cpc = get_cpc_from_text(text)
     if cpc:
         adv_original_id = data['last_adv_original_id']
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
             if cpc == 0:
@@ -70,7 +70,7 @@ async def turn_off_max_cpc(callback: types.CallbackQuery,
                            state: FSMContext):
 
     adv_original_id = callback_data.adv_original_id
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_cpc = None

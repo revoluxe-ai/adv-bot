@@ -81,7 +81,7 @@ class GraphUpdater:
             nmids = result.scalars().all()
         nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors(nmids)
 
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             for nmid, vector in nmids_vectors:
                 stmt = (
                     pg_insert(ItemFeature).
@@ -103,7 +103,7 @@ class GraphUpdater:
 
     async def _update_keywords_vectors(self):
         keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors()
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             count = 0  # Счетчик для отслеживания количества обработанных записей
             BATCH_SIZE = 100 # Размер порции для коммита
             for keyword_text, vector in keywords_vectors:

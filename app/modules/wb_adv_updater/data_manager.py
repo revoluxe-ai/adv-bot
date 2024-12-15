@@ -534,7 +534,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
     if adv_setting.clusters_mode:
         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
     keyword_stats = await set_positions(keyword_stats, adv_setting)
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         for keyword_stat in keyword_stats:
             cluster_name = keyword_stat.text
             if not (keyword_setting := texts_to_keyword_setting.get(cluster_name)):
@@ -813,7 +813,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     if adv_setting.clusters_mode:
         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
     keyword_stats = await set_positions(keyword_stats, adv_setting)
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         for keyword_stat in keyword_stats:
             cluster_name = keyword_stat.text
             if not (keyword_setting := texts_to_keyword_setting.get(cluster_name)):
@@ -1332,7 +1332,7 @@ async def _get_new_min_ctr(adv: AdvSetting):
 
 
 async def _get_min_ctr(adv: AdvSetting):
-    async with _sm() as session:
+    async with _sm(read_only=True) as session:
         stmt = select(KeywordSetting)\
         .where(
             KeywordSetting.hard_status == 2,
@@ -1447,7 +1447,7 @@ async def get_all_keywords()-> list[str]:
 
 
 async def clear_cards(need_nmids: list[int]):
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         stmt = select(WBCard).where(WBCard.nmid.notin_(need_nmids))
         result = await session.execute(stmt)
         wb_cards: list[WBCard] = result.unique().scalars().all()
@@ -1456,7 +1456,7 @@ async def clear_cards(need_nmids: list[int]):
 
 
 async def clear_keywords(need_keywords):
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         stmt = select(KeywordSetting).where(KeywordSetting.text.notin_(need_keywords))
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
@@ -1474,7 +1474,7 @@ async def get_expired_cabinets(session):
     return wb_cabinets
 
 async def clear_cards_in_db(nmids: list[int]):
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         stmt = select(WBCard).where(WBCard.nmid.notin_(nmids))
         result = await session.execute(stmt)
         wb_cards: list[WBCard] = result.unique().scalars().all()
@@ -1568,7 +1568,7 @@ async def get_keywords_positions_dict_by_text(adv_setting: AdvSetting, texts: li
 
 
 async def add_white_phrases(keywords: list[str], adv_setting_id: int):
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         for text in keywords:
             stmt = select(KeywordSetting)\
                 .join(KeywordSetting.adv_setting)\
@@ -1596,7 +1596,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int):
 
 async def update_black_phrases(adv_setting_id, keywords: list[str]):
     await redis_manager.set_black_phrases(adv_setting_id, keywords)
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         stmt = select(KeywordSetting)\
             .join(KeywordSetting.adv_setting)\
             .where(AdvSetting.id == adv_setting_id,
@@ -1661,7 +1661,7 @@ async def get_users_from_nmid(nmid: int):
 
 
 async def add_relevant_phrases(keywords, adv_setting_id):
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         for text in keywords:
             stmt = select(KeywordSetting)\
                 .join(KeywordSetting.adv_setting)\

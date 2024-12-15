@@ -36,4 +36,8 @@ class AdvActiveKeywordUpdateStateManager(BaseRedisGetterSetter):
         if datetime_bytes is None:
             return None  # Если значение отсутствует, возвращаем None
         datetime_str = datetime_bytes.decode("utf-8")# Асинхронное получение значения
-        return datetime.strptime(datetime_str, self.time_str_format)  # Преобразование строки в datetime
+        try:
+            d = datetime.strptime(datetime_str, self.time_str_format)
+        except:
+            return None
+        return  d # Преобразование строки в datetime

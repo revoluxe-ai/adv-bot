@@ -556,7 +556,7 @@ class KeywordSettingMessage(TextWithKeyboard):
     async def __call__(self):
         auto_block_status = await redis_manager.get_auto_block_status(self._keyword_original_id)
         self._auto_block_status = auto_block_status
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(KeywordSetting)\
                           .options(selectinload(KeywordSetting.adv_setting))\
                           .where(KeywordSetting.id == self._keyword_original_id)
@@ -761,7 +761,7 @@ class ShopMenu(TextWithKeyboard):
 
 
      async def _is_active_adv(self):
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(AdvSetting)\
                 .where(
                 AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
@@ -777,7 +777,7 @@ class ShopMenu(TextWithKeyboard):
      async def __call__(self):
         wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
         await self._state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(WBUserCabinet)\
                 .options(selectinload(WBUserCabinet.wb_cabinet),
                          selectinload(WBUserCabinet.user)\
@@ -803,7 +803,7 @@ class ShopMenu(TextWithKeyboard):
         self._balance = balance
         self._bonus = bonus
         total_amount_for_day = 0
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(func.count(AdvSetting.id))\
                 .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
                        AdvSetting.bot_active == True)

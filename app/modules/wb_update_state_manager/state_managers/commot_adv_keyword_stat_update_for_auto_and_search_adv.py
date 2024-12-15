@@ -37,4 +37,8 @@ class KeywordStatUpdateState(BaseRedisGetterSetter):
         if datetime_bytes is None:
             return None  # Если значение отсутствует, возвращаем None
         datetime_str = datetime_bytes.decode("utf-8")
-        return datetime.strptime(datetime_str, self.time_str_format)  # Преобразование строки в datetime
+        try:
+            dt =  datetime.strptime(datetime_str, self.time_str_format)
+        except:
+            return None
+        return  dt
