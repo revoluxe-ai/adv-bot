@@ -39,7 +39,6 @@ run_own_process_list = [
       run_main_coroutines,
      run_update_predict_ctr,
      run_update_model,
-    update_search_advs_module_run
 
 ]
 

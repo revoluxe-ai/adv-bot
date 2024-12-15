@@ -355,10 +355,6 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 6)
     async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
-        if len(phrases) > 1000:
-            phrases.sort(key=lambda x: len(x), reverse=True)
-            phrases = phrases[:1000]
-            logger.debug('Больше 1000 минус-фраз, обрезаем до 1000')
         url = f'https://advert-api.wb.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}'
         data = {
             "excluded": phrases
