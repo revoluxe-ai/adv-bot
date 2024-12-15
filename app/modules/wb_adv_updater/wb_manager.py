@@ -345,24 +345,25 @@ async def update_predict_ctr():
             logger.error(f'Ошибка предсказания CTR {exc}')
         await asyncio.sleep(0)
 
+async def update_all_keyword_data(access, adv_setting):
+    try:
+        wb_api = WBApi(access)
+        async with get_clickhouse_client() as client:
+            await common_keyword_stat_update(client, adv_setting, wb_api)
+    except Exception as exc:
+        logger.error('Ошибка обновления статистики ключевых слов', exc_info=True)
+    try:
+        data_setter = DataSetter(access)
+        await data_setter.update_minus_keywords_in_adv(adv_setting)
+    except Exception:
+        logger.error('Ошибка установки активности фраз', exc_info=True)
+
+    return
+
+
 
 
 async def update_all_keywords_on_wb():
-    async def update_all_keyword_data(access, adv_setting):
-        try:
-            wb_api = WBApi(access)
-            async with get_clickhouse_client() as client:
-                await common_keyword_stat_update(client, adv_setting, wb_api)
-        except Exception as exc:
-            logger.error('Ошибка обновления статистики ключевых слов', exc_info=True)
-        try:
-            data_setter = DataSetter(access)
-            await data_setter.update_minus_keywords_in_adv(adv_setting)
-        except Exception:
-            logger.error('Ошибка установки активности фраз', exc_info=True)
-
-        return
-
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
         async with sm() as session:
