@@ -152,6 +152,7 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
     async with sm(read_only=False) as session:
         session.begin()
         stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet)\
+        .options(selectinload(WBUserCabinet.wb_cabinet))\
         .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
