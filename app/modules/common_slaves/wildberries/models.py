@@ -262,8 +262,10 @@ class AdvSetting(BaseTable):
     def search_adv_id(self):
         if not self.name:
             return None
+        name = self.name
+        name = name.replace(' ', '')
         pattern = re.compile(r'<!-\[(\d+)\]-!>') # Изменено на поиск по всей строке
-        match = re.search(pattern, self.name)
+        match = re.search(pattern,  name)
         if not match:
             return None
         else:
