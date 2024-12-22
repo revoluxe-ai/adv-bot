@@ -82,6 +82,8 @@ class Adv:
             return 'started'
         elif self.status == 7:
             return 'done'
+        elif self.status == 8:
+            return 'refused'
         else:
             raise Exception(f'Статус {str(self.status)} не реализован')
 
