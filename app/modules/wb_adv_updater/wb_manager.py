@@ -352,12 +352,13 @@ async def update_all_keyword_data(access, adv_setting):
             await common_keyword_stat_update(client, adv_setting, wb_api)
     except Exception as exc:
         logger.error('Ошибка обновления статистики ключевых слов', exc_info=True)
+        raise exc
     try:
         data_setter = DataSetter(access)
         await data_setter.update_minus_keywords_in_adv(adv_setting)
-    except Exception:
+    except Exception as exc:
         logger.error('Ошибка установки активности фраз', exc_info=True)
-
+        raise exc
     return
 
 
