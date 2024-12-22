@@ -464,7 +464,7 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
     try:
         text_to_custer_and_present: dict[str, tuple] = await redis_manager.get_clusters_and_presets(texts)
     except:
-        logger.error('Ошибка получения кластеров и пресетов', exc_info=True)
+        logger.error(f'Ошибка получения кластеров и пресетов: {texts}', exc_info=True)
         return keyword_stats
     for keyword in keyword_stats:
         text = keyword.text
