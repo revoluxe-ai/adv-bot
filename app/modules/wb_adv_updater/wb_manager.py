@@ -530,7 +530,12 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
     texts_for_adv_setting = {keyword.text for keyword in keywords}
     clusters = set()
     for text in texts_for_adv_setting:
-        cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+        try:
+            cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+        except:
+            logger.error('Не удалось получить кластер')
+            cluster_name = None
+
         if cluster_name:
            clusters.add(cluster_name)
 
