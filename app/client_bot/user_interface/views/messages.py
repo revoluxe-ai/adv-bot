@@ -871,6 +871,7 @@ class ShopMenu(TextWithKeyboard):
         else:
             last_for_days = '∞'
         text = (
+            f"""{'Кабинет активен' if self._wb_cabinet.active else 'Внимание! Кабинет деактивирован, обратитесь к администратору -> @skyline360_1'}\n"""         
             f'📊 *Кампаний на автоуправлении*: {count_active_advs}\n'
             f'🔍 *Включен парсинг у кампаний*: {count_active_parsing}\n'
             f'🔧 *Включено автоуправление ставкой у кампаний*: {count_auto_bidder}\n'
