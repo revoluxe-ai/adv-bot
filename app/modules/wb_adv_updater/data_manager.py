@@ -896,7 +896,11 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         calculate_ctr = (real_baes_ctr + predict_ctr)/2
         keyword_stat.predict_ctr = calculate_ctr
         if max_position:
-            position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
+            try:
+                position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
+            except:
+                logger.error('Не удалось получить позицию')
+                position = None
             if position:
                 organic_position = position.base_position
                 if 0 < organic_position <= max_position:
