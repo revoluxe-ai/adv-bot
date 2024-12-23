@@ -2429,7 +2429,13 @@ class ShowFavoriteAdvs(TextWithKeyboard):
             result = await session.execute(stmt)
             user = result.scalars().first()
             self.user = user
-            advs: list[AdvSetting] = user.favorites_advs
+            try:
+                 advs: list[AdvSetting] = user.favorites_advs
+            except:
+                await self.bot.send_message(self.user_telegram_id, text="У вас нет избранных кампаний,"
+                                                                        " добавить кампании в избранное вы сможете отдельно в каждом магазине"
+                                                                        ". После этого сможете управлять всеми кампаниями ваших магазинов в одном месте.")
+                return
         self.advs = await data_manager.set_worst_promo_position(advs)
         await super().__call__()
 
