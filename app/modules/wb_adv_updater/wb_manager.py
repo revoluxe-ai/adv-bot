@@ -347,24 +347,6 @@ async def update_predict_ctr():
 
 async def update_all_keyword_data(access, adv_setting):
     try:
-        await __update_all_keyword_data(access, adv_setting)
-    except ApiForbiddenError:
-        wb_cabinet_original_id: int =  access.wb_cabinet.id
-        stmt = select(WBCabinet)\
-        .filter(WBCabinet.id == wb_cabinet_original_id)
-        async with sm(read_only=False) as session:
-            result = await session.execute(stmt)
-            wb_cabinet: WBCabinet = result.scalar_one()
-            wb_cabinet.active = False
-            await session.commit()
-    except Exception as exc:
-        raise exc
-
-
-
-
-async def __update_all_keyword_data(access, adv_setting):
-    try:
         wb_api = WBApi(access)
         async with get_clickhouse_client() as client:
             await common_keyword_stat_update(client, adv_setting, wb_api)
@@ -387,11 +369,8 @@ async def update_all_keywords_on_wb():
     while True:
         async with sm() as session:
             stmt = select(AdvSetting) \
-            .join(AdvSetting.wb_cabinet)\
                 .where(AdvSetting.bot_active == True,
-                       AdvSetting.type == 8,
-                       WBCabinet.active == True
-                       )
+                       AdvSetting.type == 8)
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
             for adv_setting in adv_settings:
