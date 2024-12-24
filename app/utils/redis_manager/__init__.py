@@ -433,7 +433,11 @@ async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]
         if value is None:
             continue
         value = value.decode('utf-8')
-        cluster, preset = value.split(':')
+        try:
+            cluster, preset = value.split(':')
+        except Exception as e:
+            logger.error(f'Ошибка при парсинге значения {value} из Redis: {e}')
+            raise e
         clusters_and_presets[texts[i]] = (cluster, int(preset))
     return clusters_and_presets
 
