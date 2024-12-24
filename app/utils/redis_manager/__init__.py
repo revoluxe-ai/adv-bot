@@ -21,6 +21,18 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosit
 # redis_client = redis.asyncio.Redis(host='147.45.151.145', port=6379, db=0)
 redis_client = redis.asyncio.Redis(host='localhost', port=6379, db=0)
 
+
+from urllib.parse import quote, unquote
+
+def encode_key(raw_key):
+    encoded_key = quote(raw_key)
+    return encoded_key
+
+def decode_key(key):
+    decoded_key = unquote(key)
+    return decoded_key
+
+
 class RedisEvent(asyncio.Event):
     def __init__(self, key=None):
         if key:
@@ -358,14 +370,14 @@ async def get(key):
 
 
 async def set_cluster_and_preset(text, cluster: str, preset:  typing.Optional[int]):
-    key = 'cluster_and_preset:' + text
+    key = 'cluster_and_preset:' + encode_key(text)
     if cluster is None or preset is None:
         await redis_client.delete(key)
     else:
         value = cluster + ':' + str(preset)
         await redis_client.set(key, value)
         text = cluster
-        key = 'cluster_and_preset:' + text
+        key = 'cluster_and_preset:' + encode_key(text)
         await redis_client.set(key, value)
     return None
 
@@ -373,7 +385,7 @@ async def set_cluster_and_preset(text, cluster: str, preset:  typing.Optional[in
 
 
 async def get_cluster_and_preset(text)-> (str, int,):
-    key = 'cluster_and_preset:' + text
+    key = 'cluster_and_preset:' + encode_key(text)
     value = await redis_client.get(key)
     if isinstance(value, NoneType):
         return None, None
@@ -427,7 +439,7 @@ async def get_last_views(adv_id, text):
 
 
 async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]]]:
-    result = await redis_client.mget([f'cluster_and_preset:{text}' for text in texts])
+    result = await redis_client.mget([f'cluster_and_preset:{encode_key(text)}' for text in texts])
     clusters_and_presets = {}
     for i, value in enumerate(result):
         if value is None:
