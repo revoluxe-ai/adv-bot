@@ -350,6 +350,10 @@ async def update_all_keyword_data(access, adv_setting):
         wb_api = WBApi(access)
         async with get_clickhouse_client() as client:
             await common_keyword_stat_update(client, adv_setting, wb_api)
+    except ApiForbiddenError:
+        logger.error(f'Нет доступов для обновления данных магазина: {access.wb_cabinet.shop_id}')
+        return
+
     except Exception as exc:
         logger.error('Ошибка обновления статистики ключевых слов', exc_info=True)
         raise exc
