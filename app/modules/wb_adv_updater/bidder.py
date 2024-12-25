@@ -41,8 +41,7 @@ async def _run_bidder_process():
            stmt = select(AdvSetting)\
                .join(AdvSetting.wb_cabinet)\
                .options(selectinload(AdvSetting.wb_cabinet))\
-               .where(AdvSetting.bidder_active == True,
-                      AdvSetting.active_status == 'started',)
+               .where(AdvSetting.bidder_active == True)
            result = await session.execute(stmt)
            adv_settings = result.scalars().all()
            for adv_setting in adv_settings:
