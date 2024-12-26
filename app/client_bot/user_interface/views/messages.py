@@ -848,7 +848,7 @@ class ShopMenu(TextWithKeyboard):
             expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
         else:
             expiration_time = shops_tokens[0].expires
-        if expiration_time < datetime.datetime.now():
+        if expiration_time < datetime.datetime.now() and user.user_telegram_id in const.ADMINS:
             await self.bot.send_message(self.chat_id, 'Срок действия токена истек. Пожалуйста, обновите токен.\n'
                                                 'Для этого добавьте магазин под другим именем с новым токеном')
             return
