@@ -448,8 +448,9 @@ async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]
         try:
             cluster, preset = value.split(':')
         except Exception as e:
-            logger.error(f'Ошибка при парсинге значения {value} из Redis: {e}')
-            raise e
+            logger.error(f'Ошибка при парсинге значения {value} из Redis с ключом {texts[i]}: {e}')
+            clusters_and_presets[texts[i]] = (None, None)
+            continue
         clusters_and_presets[texts[i]] = (cluster, int(preset))
     return clusters_and_presets
 
