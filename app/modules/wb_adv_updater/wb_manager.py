@@ -345,14 +345,15 @@ async def update_predict_ctr():
             logger.error(f'Ошибка предсказания CTR {exc}')
         await asyncio.sleep(0)
 
-async def update_all(access, adv_setting):
+async def update_all_keyword_data(access, adv_setting):
     try:
         wb_api = WBApi(access)
         async with get_clickhouse_client() as client:
             await common_keyword_stat_update(client, adv_setting, wb_api)
-    except ApiForbiddenError as exc:
+    except ApiForbiddenError:
         logger.error(f'Нет доступов для обновления данных магазина: {access.wb_cabinet.shop_id}')
-        raise exc
+        return
+
     except Exception as exc:
         logger.error('Ошибка обновления статистики ключевых слов', exc_info=True)
         raise exc
@@ -383,7 +384,7 @@ async def update_all_on_wb():
                     if not access:
                         logger.error(f'Нет доступа к кабинету {wb_cabinet_id}')
                         continue
-                    task = asyncio.create_task(update_all(access, adv_setting))
+                    task = asyncio.create_task(update_all_keyword_data(access, adv_setting))
                     update_tasks[adv_setting.id] = task
                 else:
                     if update_tasks[adv_setting.id].done():
