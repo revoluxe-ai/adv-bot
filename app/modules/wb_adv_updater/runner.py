@@ -58,10 +58,10 @@ async def __run_update_keyword_stat():
 
 
 
-async def run_update_all_on_wb():
+async def run_update_all_keywords_on_wb():
     while True:
         try:
-            await wb_manager.update_all_on_wb()
+            await wb_manager.update_all_keywords_on_wb()
         except Exception:
             logger.error('Ошибка обновления фраз', exc_info=True)
         await asyncio.sleep(5)
