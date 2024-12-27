@@ -367,7 +367,7 @@ async def update_all(access, adv_setting):
 
 
 
-async def update_all_keywords_on_wb():
+async def update_all_on_wb():
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
         async with sm() as session:
