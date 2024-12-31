@@ -1,5 +1,6 @@
 from app.modules.wb_adv_updater.search_advs_manager import update_search_advs_module_run
 from app.modules.wb_adv_updater.runner import (
+
     run_main_coroutines,
     keywords_parsing_process,
     run_update_all_keywords_on_wb,
@@ -8,6 +9,7 @@ from app.modules.wb_adv_updater.runner import (
     run_update_model,
 
 )
+from app.modules.shops_data_updater import run as run_shop_data_update
 from app.modules.wb_adv_updater.bidder import run_bidder_process
 from python_modules.logger import setup_logging
 import logging
@@ -45,7 +47,7 @@ run_own_process_list = [
       run_main_coroutines,
      run_update_predict_ctr,
      run_update_model,
-
+     run_shop_data_update
 ]
 
 

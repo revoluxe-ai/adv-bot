@@ -8,6 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
+from app.modules.shops_data_updater.types import FullAdvStat
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
@@ -300,6 +301,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self.keywords_status_last_update_search_adv = 'Аукцион не подключен к РК'
 
+
+        adv_stat: FullAdvStat \
+            = await data_manager.get_full_adv_stat_for_adv_id_from_redis(adv_id=self.adv.adv_id)
+
+        self.adv_stat = adv_stat
+
+
         await super().__call__()
 
     @property
@@ -320,7 +328,31 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f'Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n'
             f'Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n'
         )
+
+        adv_stat = self.adv_stat
+
+        if adv_stat:
+
+            days_stat = adv_stat.days
+
+            days_stat = sorted(days_stat, key=lambda x: x.date)
+
+            stat_text = 'Себестоимость заказа за последние дни:\n'
+
+            for day_stat in days_stat[5:]:
+                date = day_stat.date
+                spend = day_stat.sum
+                orders = day_stat.orders
+                if orders:
+                    cost_per_order = spend / orders
+                else:
+                    cost_per_order = 0
+                stat_text += f'{date}: {cost_per_order} р.\n'
+
+            text += stat_text
         text += f'{max_cpc_text}'
+
+
         return text
 
     @property
@@ -1699,12 +1731,11 @@ class Single_message100(Text):
 
 class Single_message101(Text):
     text = """
-    🎉 Ура! Я записал свежее видео с практикой работы с ботом.\n
-    🤖 Также рассказал о самых последних изменениях, улучшениях и доработках, а также проговорил текущую логику работы бота, так что смотреть обязательно не только новичкам, но и старожилам! 📈👥\n
-🎥 Смотрим! 👀\n
-   Видео на канале - https://t.me/auto_wb_master/227 \n\n
-   Жмите /start , запускайте рекламу и забирайте топы продаж!
-    
+    🎉 Внимание! Вопросы и Ответы по продвижению на WB и боту WBGRAM Lite.\n
+    🤖 Сегодня, в 18:00 по МСК я проведу эфир на канале телеграм, где каждый сможет задать свой вопрос по поводу продвижения на WB и работы бота 📈👥\n
+🎥 Заходим! 👀\n
+   Ссылка на канал - https://t.me/auto_wb_master\n\n
+   До встречи! 🚀
     
     """
 

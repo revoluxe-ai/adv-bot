@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import io
+import json
 import logging
 import re
 import time
@@ -744,9 +745,11 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
 
 
 async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullAdvStat]:
+    """Получение Полной статистики из Redis по adv_id"""
     try:
         full_stat_json = await redis_manager.get_full_stat_adv(adv_id)
-        full_stat = FullAdvStat.from_json(full_stat_json)
+        full_stat = json.loads(full_stat_json)
+        full_stat = FullAdvStat.model_validate(full_stat)
         return full_stat
     except  DataNotFoundError:
         return None
@@ -1709,6 +1712,17 @@ async def get_active_search_advs():
     return adv_settings
 
 
+async def get_all_active_shop_ids_with_active_advs():
+    stmt = select(WBCabinet.shop_id)\
+        .join(WBCabinet.adv_settings)\
+    .where(AdvSetting.bot_active == True)
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        shop_ids = result.scalars().all()
+    return shop_ids
+
+
+
 async def get_all_shop_ids()-> list[str]:
     stmt = select(WBCabinet.shop_id).distinct()
     async with _sm() as session:
@@ -1873,3 +1887,4 @@ async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
         positions.append(position)
 
     return positions
+

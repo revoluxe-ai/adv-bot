@@ -24,7 +24,7 @@ class ShopUpdater:
             try:
                 adv_ids = await self._get_active_adv_ids()
                 if adv_ids:
-                    await self._full_update_in_redis_run(adv_ids)
+                    await self._update_for_last_days_in_redis_run(adv_ids)
             except:
                 logger.error(f'Ошибка обновления данных для магазина shop_id={self.shop_id}', exc_info=True)
             finally:
@@ -34,11 +34,12 @@ class ShopUpdater:
     async def __update_full_advs_stats_in_redis(self, adv_ids: list[int]):
         full_stats: list['FullAdvStat'] = await wb_data_getter.get_full_adv_stat_for_adv_ids(self.wb_api,
                                                                                            adv_ids,
-                                                                                           pass_days=30)
-        await redis_manager.set_full_stat_adv(full_stats)
+                                                                                           threshold_dates=30)
+        if full_stats:
+            await redis_manager.set_full_stat_adv(full_stats)
 
 
-    async def _full_update_in_redis_run(self, adv_ids: list[int]):
+    async def _update_for_last_days_in_redis_run(self, adv_ids: list[int]):
         while True:
             try:
                 await self.__update_full_advs_stats_in_redis(adv_ids)
@@ -47,6 +48,8 @@ class ShopUpdater:
                 logger.error(f'Ошибка обновления данных для магазина shop_id={self.shop_id}', exc_info=True)
             finally:
                 await asyncio.sleep(120)
+
+
     async def _get_active_adv_ids(self)-> list[int]:
         adv_ids = await db_data_manager.get_active_adv_ids(self.shop_id)
         return adv_ids
@@ -59,8 +62,8 @@ class ShopUpdater:
 async def async_process_run():
     tasks = {}
     while True:
-        all_shop_ids = await db_data_manager.get_all_shop_ids()
-        all_shop_ids = ['e1b05fca-4c41-471d-be8c-0cba27c96b0a']
+        all_shop_ids = await db_data_manager.get_all_active_shop_ids_with_active_advs()
+        # all_shop_ids = ['84f86c01-137d-5992-8f62-614d5f119bd1']
         for shop_id in all_shop_ids:
             if shop_id not in tasks:
                 access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)

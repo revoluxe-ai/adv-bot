@@ -483,7 +483,7 @@ async def set_full_stat_adv(adv_stats: list['FullAdvStat']):
 
 
 async def get_full_stat_adv(adv_id: int)-> str:
-    key = f'full_stat_adv:{adv_id}:*'
+    key = f'full_stat_adv:{adv_id}'
     json_data = await redis_client.get(key)
     if json_data is None:
         raise DataNotFoundError(f'Данные для объявления с adv_id={adv_id} не найдены в Redis')
