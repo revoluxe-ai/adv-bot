@@ -1,4 +1,6 @@
 import asyncio
+from datetime import datetime
+
 from . import wb_data_getter
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -40,8 +42,9 @@ class ShopUpdater:
                                                                                            threshold_dates=30)
         if full_stats:
             await redis_manager.set_full_stat_adv(full_stats)
+            date_time = datetime.now()
             for stat in full_stats:
-                await data_manager.set_last_full_stat_update(stat.adv_id, stat.date)
+                await data_manager.set_last_full_stat_update(stat.advertId, date_time)
 
 
 

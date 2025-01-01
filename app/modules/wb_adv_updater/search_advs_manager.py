@@ -82,7 +82,7 @@ async def _update_cpm_in_search_advs(adv_settinds: list[AdvSetting]):
             access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
             api = WBApi(access)
             search_adv_id = adv.search_adv_id
-            cpm = await data_manager._get_cpm_by_nmid(adv.nmids[0])
+            cpm = await data_manager.get_cpm_by_nmid(adv.nmids[0])
             if not cpm:
                 cpm = adv.max_cpm
             if cpm < 150:
