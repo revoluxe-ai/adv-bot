@@ -351,7 +351,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 else:
                     raise ValueError("Неправильный формат даты. Ожидается 'дата-месяц-год'.")
 
-            for day_stat in days_stat[5:]:
+            for day_stat in days_stat[-5:]:
                 date = day_stat.date
                 date = reverse_date(date)
                 date = date.replace('T03:00:00+03:00', '')
@@ -361,11 +361,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     cost_per_order = spend / orders
                 else:
                     cost_per_order = 0
-                stat_text += f'{date}: {cost_per_order} ({orders}) ({spend}) р.\n'
+                stat_text += f'{date}: {round(cost_per_order, 0)} ({orders}) ({spend}) р.\n'
 
             text += stat_text
         text += f'{max_cpc_text}'
-
 
         return text
 
