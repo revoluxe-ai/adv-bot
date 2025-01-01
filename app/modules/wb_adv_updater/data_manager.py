@@ -1319,7 +1319,6 @@ async def get_min_ctr(adv: AdvSetting):
 async def get_best_keyword(keywords: list[CalculatedKeyword])-> Optional[CalculatedKeyword]:
     if not keywords:
         return None
-    keywords = filter(lambda x: x.views >= 10, keywords)
     best_keyword = sorted(keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True)[0]
     return best_keyword
 
