@@ -346,6 +346,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
             for day_stat in days_stat[5:]:
                 date = day_stat.date
+                date = date.replace('T03:00:00+03:00', '')
                 spend = day_stat.sum
                 orders = day_stat.orders
                 if orders:
