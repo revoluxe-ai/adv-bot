@@ -1,6 +1,7 @@
 import logging
 
 import aiohttp
+from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
 from app.modules.common_slaves.wildberries.api import WBApi
@@ -41,7 +42,9 @@ async def _run_bidder_process():
            stmt = select(AdvSetting)\
                .join(AdvSetting.wb_cabinet)\
                .options(selectinload(AdvSetting.wb_cabinet))\
-               .where(AdvSetting.bidder_active == True)
+               .where(AdvSetting.bidder_active == True,
+                    or_(AdvSetting.wb_cabinet.has(WBCabinet.balance > 0),
+                        AdvSetting.wb_cabinet.has(WBCabinet.bonus > 0)))
            result = await session.execute(stmt)
            adv_settings = result.scalars().all()
            for adv_setting in adv_settings:
