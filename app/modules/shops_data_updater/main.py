@@ -4,6 +4,9 @@ from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 import typing
 import logging
+
+from ..wb_adv_updater import data_manager
+
 if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.api import FullAdvStat
 from . import db_data_manager
@@ -37,6 +40,10 @@ class ShopUpdater:
                                                                                            threshold_dates=30)
         if full_stats:
             await redis_manager.set_full_stat_adv(full_stats)
+            for stat in full_stats:
+                await data_manager.set_last_full_stat_update(stat.adv_id, stat.date)
+
+
 
 
     async def _update_for_last_days_in_redis_run(self, adv_ids: list[int]):

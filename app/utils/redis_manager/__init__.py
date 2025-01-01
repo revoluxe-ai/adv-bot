@@ -489,3 +489,20 @@ async def get_full_stat_adv(adv_id: int)-> str:
         raise DataNotFoundError(f'Данные для объявления с adv_id={adv_id} не найдены в Redis')
     json_data = json_data.decode('utf-8')
     return json_data
+
+async def set_last_full_stat_update(adv_id: int, last_update: datetime.datetime)-> None:
+    key = f'last_full_stat_update:{adv_id}'
+    await redis_client.set(key, last_update.timestamp())
+    return None
+
+
+async def get_last_full_stat_update(adv_id: int) -> typing.Optional[datetime.datetime]:
+    key = f'last_full_stat_update:{adv_id}'
+    value = await redis_client.get(key)
+    if value is None:
+        return None
+    value = value.decode('utf-8')
+    value = float(value)
+    return datetime.datetime.fromtimestamp(value)
+
+

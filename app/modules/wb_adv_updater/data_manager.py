@@ -1889,3 +1889,10 @@ async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
 
     return positions
 
+
+async  def set_last_full_stat_update(adv_id: int, timestamp: datetime):
+    await redis_manager.set_last_full_stat_update(adv_id, timestamp)
+
+
+async def get_last_full_stat_update(adv_id: int):
+    return await redis_manager.get_last_full_stat_update(adv_id)

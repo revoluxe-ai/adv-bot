@@ -273,6 +273,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(self.adv.id,
                                                                         self.wb_user_cabinet.user_id)
 
+
+        full_stat_update_time = await self._get_last_full_stat_update(self.adv.adv_id)
+        self.full_stat_update_time = full_stat_update_time if full_stat_update_time else 'Нет данных'
+
         try:
             nmids = self.adv.nmids
             images = await data_manager.get_main_photos(nmids[:1])
@@ -327,6 +331,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f'Последнее обновление обобщенной статистики ключевых слов в базе: {self.last_update_keyword_stat_str}\n'
             f'Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n'
             f'Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n'
+            f'Последнее обновление полной статистики: {self.full_stat_update_time}\n'
         )
 
         adv_stat = self.adv_stat
@@ -372,7 +377,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         return timestamp
 
 
-
+    async def _get_last_full_stat_update(self, adv_id: int) -> datetime:
+        last_full_stat_update = await data_manager.get_last_full_stat_update(adv_id)
+        return last_full_stat_update
 
 
 
