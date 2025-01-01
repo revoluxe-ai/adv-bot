@@ -15,11 +15,9 @@ from app.modules.common_slaves.wildberries.models import (
                                                           KeywordSetting)
 
 from app.utils.db.session_maker import get_async_session_maker as sm
-from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from ..common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from ...settings import settings
-from ...utils import redis_manager
-from  app.modules.wb_keywords_parser import parser
-from ...utils.click_house.client import get_clickhouse_client
+
 
 logger = logging.getLogger(__name__)
 
@@ -80,47 +78,11 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
     wb_api = WBApi(access)
     step = settings.BIDDER_STEP
     adv_id = adv_setting.adv_id
-    async with sm() as session:
-        stmt = select(AdvSetting)\
-        .where(AdvSetting.adv_id == adv_id)
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
-        stmt = select(KeywordSetting)\
-        .where(KeywordSetting.adv_setting_id == adv_setting.id,
-               KeywordSetting.hard_status == 2)
-        result = await session.execute(stmt)
-        white_adv_keywords: list[KeywordSetting] = result.scalars().all()
     max_position_for_adv = adv_setting.max_place
     max_cpm = await data_manager.get_max_adv_bid(adv_setting)
     nmid_in_adv = adv_setting.nmids[0]
-    promo_positions = []
-    cpm_from_parsing = None
-    async with  get_clickhouse_client() as client:
-        for keyword in white_adv_keywords:
-            try:
-                _, views, _= await data_manager.get_keyword_statistic_clickhouse(client, keyword.text, adv_id)
-            except Exception as e:
-                logger.error(f'Ошибка при получении статистики по ключевому слову {keyword.text} {e}')
-                continue
-            if views == 0:
-                continue
-            try:
-                text = keyword.text
-                await parser.add_wb_positions(text, {nmid_in_adv}, 3)
-                await redis_manager.set_last_views(adv_id, text, views)
-            except Exception as e:
-                logger.error(f'Ошибка при получении позиции {e}')
-            position = await redis_manager.get_keyword_position(keyword.text, nmid_in_adv)
-            if not position:
-                continue
-            if position.promo_position:
-                cpm_from_parsing: int = position.cpm
-            promo_position = position.promo_position
-            base_position = position.base_position
-            if not promo_position and base_position:
-                logger.debug('Нет буста')
-                continue
-            promo_positions.append(position)
+    cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
+
     if not cpm_from_parsing:
         logger.error('Не удалось получить ставку из парсинга'
                      f'Shop ID: {access.wb_cabinet.shop_id}'
@@ -128,9 +90,13 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
                      exc_info=True)
         return
 
-    if promo_positions:
-        fact_max_position = max(promo_positions, key=lambda x: x.promo_position)
-        promo_position = fact_max_position.promo_position
+    keywords = await data_manager.get_good_bad_phrases(adv_setting)
+    white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
+    best_white_keyword = await data_manager.get_best_keyword(white_keywords)
+
+    promo_position = best_white_keyword.real_position
+
+    if promo_position:
         if promo_position < max_position_for_adv:
             new_cpm = cpm_from_parsing - step
         elif promo_position > max_position_for_adv:
@@ -138,16 +104,16 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
         else:
             new_cpm = cpm_from_parsing
 
-        if new_cpm > max_cpm:
+        if new_cpm >= max_cpm:
             new_cpm = max_cpm
             async with sm() as session:
                 adv_setting = await session.get(AdvSetting, adv_setting.id)
-                adv_setting.max_place = max_position_for_adv + 1
+                adv_setting.max_place = promo_position + 1
                 await session.commit()
         if new_cpm == cpm_from_parsing:
             return
-        if new_cpm < 100:
-            new_cpm = 100
+        if new_cpm < 125:
+            new_cpm = 125
         await wb_api.advert.update_cpm(adv_id, new_cpm)
         if new_cpm < 150:
             new_cpm = 150

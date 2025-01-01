@@ -490,7 +490,7 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
     return keyword_stats
 
 
-async def _get_cpm_by_nmid(nmid)-> Optional[int]:
+async def get_cpm_by_nmid(nmid)-> Optional[int]:
     try:
         cpm = await __get_cpm_from_positions(nmid)
     except Exception:
@@ -588,7 +588,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
     sum_views = 0
     sum_clicks = 0
     try:
-        cpm_now = await _get_cpm_by_nmid(adv_setting.nmids[0])
+        cpm_now = await get_cpm_by_nmid(adv_setting.nmids[0])
     except Exception as e:
         logger.error(f'Ошибка при получении cpm {e}')
         cpm_now = None
@@ -768,7 +768,7 @@ async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
     max_pay_for_order: Optional[int]  = adv.max_pay_for_order
     if not max_pay_for_order:
         return None
-    cpm_now = await _get_cpm_by_nmid(adv.nmids[0])
+    cpm_now = await get_cpm_by_nmid(adv.nmids[0])
     if not cpm_now:
         return None
     full_stat: FullAdvStat = await get_full_adv_stat_for_adv_id_from_redis(adv.adv_id)
@@ -806,7 +806,7 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
 async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                                            max_cpc = None,
                                            pass_time = timedelta(days=7))->list[CalculatedKeyword]:
-    cpm_now = await _get_cpm_by_nmid(adv_setting.nmids[0])
+    cpm_now = await get_cpm_by_nmid(adv_setting.nmids[0])
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
