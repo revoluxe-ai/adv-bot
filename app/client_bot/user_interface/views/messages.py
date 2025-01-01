@@ -342,7 +342,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
             days_stat = sorted(days_stat, key=lambda x: x.date)
 
-            stat_text = 'Себестоимость заказа за последние дни:\n'
+            stat_text = 'Себестоимость заказа за последние дни (заказы) (затраты):\n'
 
             for day_stat in days_stat[5:]:
                 date = day_stat.date
@@ -352,7 +352,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     cost_per_order = spend / orders
                 else:
                     cost_per_order = 0
-                stat_text += f'{date}: {cost_per_order} р.\n'
+                stat_text += f'{date}: {cost_per_order} ({orders}) ({spend}) р.\n'
 
             text += stat_text
         text += f'{max_cpc_text}'
