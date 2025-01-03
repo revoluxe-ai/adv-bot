@@ -220,19 +220,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             access.wb_cabinet = wb_cabinet
             wb_user_cabinet = WBUserCabinet(name=cabinet_name)
             wb_user_cabinet.user = user
-            stmt = select(WBToken).where(
-                WBToken.api_key == wb_token.api_key,
-                WBToken.user_id == wb_token.user_id
-            )
-            existing_token = (await session.execute(stmt)).scalar()
-
-            if existing_token:
-                # Если токен уже существует, обновляем существующий объект, если это требуется
-                wb_token = existing_token
-            else:
-                # Если токен не найден, добавляем новый
-                user.wb_tokens.append(wb_token)
-
+            user.wb_tokens.append(wb_token)
             wb_user_cabinet.wb_cabinet = wb_cabinet
             session.add(wb_user_cabinet)
             await session.commit()
