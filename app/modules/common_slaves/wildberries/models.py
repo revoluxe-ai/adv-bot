@@ -236,6 +236,7 @@ class AdvSetting(BaseTable):
     hide_small_query_keywords = mapped_column(Integer, nullable=True, default=0)
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
     new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
+    reset_place = mapped_column(Boolean, nullable=True, default=True)
 
     __table_args__ = (
         # Составной индекс для основного запроса

@@ -220,8 +220,18 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
                                                                                     page=1).pack()))
 
 
+    if adv_setting.reset_place:
+        button = InlineKeyboardButton(text='Выключить сброс позиций',
+                                        callback_data=callbacks.ResetPlace(
+                                            action = 'off',
+                                            adv_setting_original_id=adv_setting.id).pack())
+    else:
+        button = InlineKeyboardButton(text='Включить сброс позиций',
+                                        callback_data=callbacks.ResetPlace(
+                                            action = 'on',
+                                            adv_setting_original_id=adv_setting.id).pack())
 
-
+    builder.row(button)
 
     return builder.as_markup()
 
