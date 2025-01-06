@@ -525,7 +525,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
         for keyword in keywords:
             text = keyword.text
             last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
-            if last_position.timestamp < datetime.datetime.now() - datetime.timedelta(days=1)\
+            if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(days=1)\
                     and keyword.hard_status != 0:
                 logger.debug(f"Последняя позиция для ключевого слова '{text}' устарела. Перезапуск парсинга.")
                 await redis_manager.set_last_views(adv_id, text, 0)
