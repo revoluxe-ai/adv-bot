@@ -170,7 +170,8 @@ class AdvertApi(ABC_WB_API):
         for i in range(0, len(adv_ids), part_len):
             part_of_adv_ids = adv_ids[i:i + part_len]
             part_stats = await self._get_adv_full_state(part_of_adv_ids, dates)
-            full_stats.extend(part_stats)
+            if part_stats:
+                full_stats.extend(part_stats)
         return full_stats
 
 
