@@ -17,14 +17,14 @@ from app.client_bot.user_interface.views import callbacks
 @router.callback_query(callbacks.ResetPlace.filter(F.action=='on'))
 async def on_reset_place( callback: types.CallbackQuery,
                                callback_data: callbacks.ResetPlace,
-bot, Bot,
+bot: Bot,
                                ):
 
     adv_original_id: int = callback_data.adv_setting_original_id
     async with sm() as session:
         async with session.begin():
             adv_setting = await session.execute(select(AdvSetting)\
-                                                .where(AdvSetting.adv_original_id == adv_original_id))
+                                                .where(AdvSetting.id == adv_original_id))
             adv_setting = adv_setting.scalars().first()
             adv_setting.place = False
             await session.commit()
