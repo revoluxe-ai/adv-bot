@@ -1,4 +1,3 @@
-from app.modules.wb_adv_updater.search_advs_manager import update_search_advs_module_run
 from app.modules.wb_adv_updater.runner import (
 
     run_main_coroutines,
