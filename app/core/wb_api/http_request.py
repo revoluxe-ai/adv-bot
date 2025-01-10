@@ -35,15 +35,15 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                 current_time = time.time()
                 time_since_last_query = current_time - state['_last_query_time']
                 time_to_wait = max(state['_current_pause'] - time_since_last_query, 0)
-                if state['_first_request']:
+                if not state['_first_request']:
                     logger.debug(f'Пауза между запросами: {time_to_wait} секунд')
                     await asyncio.sleep(time_to_wait)
-                    state['_first_request'] = False
-
                 try:
-                    result = await func(instance, *args, **kwargs)
-                    logger.debug(f'Запрос {method_name} выполнен успешно')
                     state['_last_query_time'] = time.time()
+                    state['_first_request'] = False
+                    result = await func(instance, *args, **kwargs)
+                    state['_first_request'] = False
+                    logger.debug(f'Запрос {method_name} выполнен успешно')
                     state['_current_pause'] = (interval_seconds / requests_per_interval + state['_current_pause']) / 2
                     state['_attempts'] = 0  # Сброс попыток после успешного выполнения
                     return result
@@ -95,5 +95,4 @@ async def requests(session, method, url, data=None, json_data=None, headers=None
                 if code := json_answer.get('code'):
                     raise ApiErrorWithCode(code, \
                                                       json_answer.get('message'), json_answer.get('rejection'))
-
         return text
