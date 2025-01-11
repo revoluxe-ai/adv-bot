@@ -69,6 +69,17 @@ class ShopUpdater:
     #     await asyncio.gather(*[self._update_adv_data(adv_id) for adv_id in adv_ids])
     #
 
+
+async def _async_process_run():
+    while True:
+        try:
+            await async_process_run()
+        except:
+            logger.error('Ошибка асинхронного процесса', exc_info=True)
+            await asyncio.sleep(60)
+
+
+
 async def async_process_run():
     tasks = {}
     while True:
