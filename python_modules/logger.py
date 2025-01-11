@@ -1,61 +1,60 @@
 import json
 import logging
-import logging.config
-import textwrap
+import os
+import datetime
 import platform
+from logging.handlers import SysLogHandler
 
-system_name = platform.system()
-print(system_name)
-logging_setup_done = False  # Флаг для проверки, было ли уже выполнено настройка логгирования
-
-class CustomFormatter(logging.Formatter):
-    """Логгирование с цветным выводом в зависимости от уровня сообщений."""
-    grey = "\x1b[38;21m"
-    blue = "\x1b[34m"  # Синий цвет
-    white = "\x1b[37m"  # Белый цвет
-    red = "\x1b[31m"  # Красный цвет
-    reset = "\x1b[0m"  # Сброс цвета текста
-    format = "%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s"
-
-    FORMATS = {
-        logging.DEBUG: blue + format + reset,
-        logging.INFO: white + format + reset,
-        logging.WARNING: grey + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: red + format + reset
-    }
-
+class EnhancedJSONFormatter(logging.Formatter):
     def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno, self.format)
-        formatter = logging.Formatter(log_fmt, "%Y-%m-%d %H:%M:%S")
-        formatted = formatter.format(record)
-        wrapped = textwrap.fill(formatted, width=100)  # Перенос строк
-        return wrapped
+        log_data = {
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'logger': record.name,
+            'level': record.levelname,
+            'message': record.getMessage(),
+            'path': record.pathname,
+            'line': record.lineno,
+            'service': os.getenv('SERVICE_NAME', 'wb_adv_updater')
+        }
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
+        return json.dumps(log_data, ensure_ascii=False)
+
+
+class SimpleStringFormatter(logging.Formatter):
+    def format(self, record):
+        result = f"{record.levelname} - {record.name} - {record.getMessage()} ({record.pathname}:{record.lineno})"
+        if record.exc_info:
+            result += f"\n{self.formatException(record.exc_info)}"
+        return result
 
 def setup_logging():
-    global logging_setup_done
+    """Настройка логирования"""
+    try:
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
 
-    if logging_setup_done:
-        return
+        # Удаляем все существующие обработчики
+        logger.handlers.clear()
 
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+        # Проверяем операционную систему
+        is_windows = platform.system() == "Windows"
 
-    if system_name == 'Linux':
-        from systemd.journal import JournalHandler
-        journal_handler = JournalHandler()
-        journal_handler.setLevel(logging.DEBUG)
-        formatter = CustomFormatter(fmt="%(name)s - %(asctime)s - %(pathname)s:%(lineno)d - %(levelname)s - %(message)s",
-                                    datefmt="%Y-%m-%d %H:%M:%S")
-        journal_handler.setFormatter(formatter)
-        logger.addHandler(journal_handler)
-    else:
-        def setup_logging_from_file(path_to_config_file):
-            with open(path_to_config_file, 'r') as file:
-                config = json.load(file)
-            logging.config.dictConfig(config)
+        # Добавляем обработчик для вывода в stdout с нужным форматом
+        stream_handler = logging.StreamHandler()
+        if is_windows:
+            stream_handler.setFormatter(SimpleStringFormatter())
+        else:
+            stream_handler.setFormatter(SimpleStringFormatter())
+        logger.addHandler(stream_handler)
 
-        path_to_logging_config = 'logging_config.json'
-        setup_logging_from_file(path_to_logging_config)
+        # Добавляем обработчик для отправки логов в Syslog (только для Linux и MacOS)
+        if not is_windows:
+            syslog_address = os.getenv('SYSLOG_ADDRESS', '/dev/log')
+            syslog_handler = SysLogHandler(address=syslog_address)
+            syslog_handler.setFormatter(SimpleStringFormatter())
+            logger.addHandler(syslog_handler)
 
-    logging_setup_done = True
+        logging.info("Логирование настроено успешно!")
+    except Exception as e:
+        logging.error(f"Ошибка при настройке логирования: {str(e)}")

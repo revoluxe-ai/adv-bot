@@ -37,11 +37,11 @@ async def consumer():
 class ShopDataUpdater:
 
     def __repr__(self):
-        return f'{self._wb_cabinet.shop_id}'
+        return f'{self.wb_cabinet.shop_id}'
 
     def __init__(self, wb_access:  'WBCabinetAccess'):
         self.wb_api = WBApi(wb_access)
-        self._wb_cabinet: WBCabinet = wb_access.wb_cabinet
+        self.wb_cabinet: WBCabinet = wb_access.wb_cabinet
         pass
 
 
@@ -57,8 +57,8 @@ class ShopDataUpdater:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             result = (await session.execute(stmt)).unique()
             existing_advs: list[models.AdvSetting] = result.scalars().all()
-            existind_advs_ids = {adv.adv_id for adv in existing_advs}
-            not_existing_adv_ids = set(adv_ids) - set(existind_advs_ids)
+            existind_advs_ids: set[int] = {adv.adv_id for adv in existing_advs}
+            not_existing_adv_ids: set[int] = set(adv_ids) - existind_advs_ids
             if not_existing_adv_ids:
                 await self.__quick_update_advs_in_db(not_existing_adv_ids)
             func = self.__quick_update_advs_in_db(existind_advs_ids)
@@ -69,7 +69,7 @@ class ShopDataUpdater:
         wb_api = self.wb_api
         advs = await wb_api.advert.get_advs(list(adv_ids))
         nmids_collection = set()
-        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet.id)
+        await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
         for adv in advs:
             nmids = adv.nmids
             if nmids:
@@ -77,19 +77,19 @@ class ShopDataUpdater:
                     nmids_collection.add(nmid)
         async def update_cards():
             cards = await wb_api.content.get_cards_by_text(nmids_collection)
-            await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+            await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
         func = update_cards()
         await _coroutine_parallel_run_queue.put(func)
 
 
     async def update_all_data(self):
-        logger.debug(f'Обновление данных для кабинета {self._wb_cabinet.shop_id}')
+        logger.debug(f'Обновление данных для кабинета {self.wb_cabinet.shop_id}')
         wb_api: WBApi = self.wb_api
         advert_api = wb_api.advert
         adv_ids = await advert_api.get_advertIds()
         logger.debug(f'Получены adv_ids: {len(adv_ids)} штук')
         advs: list[Adv] = await advert_api.get_advs()
-        await wb_db_manager.update_advs_in_db(advs, self._wb_cabinet.id)
+        await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
         logger.debug(f'Обновление в базе advs завершено')
         async with sm() as session:
             stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
@@ -99,7 +99,7 @@ class ShopDataUpdater:
         for adv in existing_advs:
             nmids.update(adv.nmids)
         cards = await wb_api.content.get_cards_by_text(nmids)
-        await wb_db_manager.update_cards_in_db(cards, self._wb_cabinet)
+        await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
         logger.debug(f'Обновление карточек в базе завершено')
 
 

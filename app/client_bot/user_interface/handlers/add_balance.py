@@ -36,7 +36,7 @@ async def add_balance(callback: types.CallbackQuery,
                       callback_data: callbacks.AddBalance,
                       state: FSMContext,
                       bot: aiogram.Bot):
-    await callback.answer()
+
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
     await state.update_data(wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id)
     await state.set_state(states.AddBalance.awaiting_amount)
@@ -171,7 +171,7 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
     bonus = 0
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         async with session.begin():
             stmt = select(User).where(User.user_telegram_id == message.chat.id)
             user = await session.execute(stmt)

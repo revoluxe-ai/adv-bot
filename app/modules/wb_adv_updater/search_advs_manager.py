@@ -1,11 +1,12 @@
 import asyncio
+import datetime
 import logging
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater import data_manager
-
+from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +41,14 @@ async def _update_search_advs_keywords_statistics(adv_settinds):
 
 
 
-async def _set_keyword_phrases_for_search_adv(adv_setting):
+async def set_keyword_phrases_for_search_adv(adv_setting, keywords):
+    search_adv_id = adv_setting.search_adv_id
+    if not search_adv_id:
+        return None
+    adv_update_state_manager = AdvActiveKeywordUpdateStateManager()
     wb_cabinet_id = adv_setting.wb_cabinet_id
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
     api = WBApi(access)
-    keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
     if not keywords:
         return
     keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
@@ -52,9 +56,9 @@ async def _set_keyword_phrases_for_search_adv(adv_setting):
 
     texts = [text.replace('"', '') for text in texts]
     try:
-        search_adv_id = adv_setting.search_adv_id
         await api.advert.set_pluse_status_in_search_adv(search_adv_id, True)
         await api.advert.set_search_keywords(search_adv_id, texts)
+        await adv_update_state_manager.set_one(search_adv_id)
     except Exception as e:
         logger.error(f'Ошибка установки фраз для {adv_setting.name}: {e}', exc_info=True)
         return
@@ -62,7 +66,7 @@ async def _set_keyword_phrases_for_search_adv(adv_setting):
 async def _set_keyword_phrases_for_search_advs(adv_settinds):
     tasks = []
     for adv_setting in adv_settinds:
-        task = asyncio.create_task(_set_keyword_phrases_for_search_adv(adv_setting))
+        task = asyncio.create_task(set_keyword_phrases_for_search_adv(adv_setting))
         tasks.append(task)
     for task in tasks:
         try:
@@ -78,7 +82,7 @@ async def _update_cpm_in_search_advs(adv_settinds: list[AdvSetting]):
             access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
             api = WBApi(access)
             search_adv_id = adv.search_adv_id
-            cpm = await data_manager._get_cpm_by_nmid(adv.nmids[0])
+            cpm = await data_manager.get_cpm_by_nmid(adv.nmids[0])
             if not cpm:
                 cpm = adv.max_cpm
             if cpm < 150:
@@ -100,7 +104,6 @@ async def update_search_advs_module_run():
             adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
             await asyncio.gather(
                 _set_keyword_phrases_for_search_advs(adv_settinds),
-                # _update_cpm_in_search_advs(adv_settinds)
             )
         except:
             logger.error('Ошибка обновления статистики по ключам для поисковых РК', exc_info=True)

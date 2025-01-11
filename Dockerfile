@@ -1,12 +1,41 @@
-FROM python:3.11
+FROM python:3.11.8-slim
 
 WORKDIR /app
 
-# Копируем файл requirements.txt в текущую директорию внутри контейнера
-COPY requirements.txt .
+# Устанавливаем необходимые пакеты
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    pkg-config \
+    python3-dev \
+    libpq-dev \
+    wget \
+    ca-certificates \
+    libsystemd-dev \
+    systemd \
+    pkg-config && \
+    rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем зависимости из requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Загружаем и устанавливаем сертификаты Yandex Cloud
+RUN mkdir -p /usr/local/share/ca-certificates/Yandex/ && \
+    wget "https://storage.yandexcloud.net/cloud-certs/RootCA.pem" \
+        -O /usr/local/share/ca-certificates/Yandex/RootCA.crt && \
+    wget "https://storage.yandexcloud.net/cloud-certs/IntermediateCA.pem" \
+        -O /usr/local/share/ca-certificates/Yandex/IntermediateCA.crt && \
+    chmod 655 \
+        /usr/local/share/ca-certificates/Yandex/RootCA.crt \
+        /usr/local/share/ca-certificates/Yandex/IntermediateCA.crt && \
+    update-ca-certificates &&\
+    mkdir -p ~/.postgresql && \
+    wget "https://storage.yandexcloud.net/cloud-certs/CA.pem" \
+    --output-document ~/.postgresql/root.crt && \
+    chmod 0600 ~/.postgresql/root.crt
 
-# Копируем все файлы из текущего контекста сборки внутрь контейнера (но не перезаписываем старые)
+
+# Копируем requirements.txt и устанавливаем зависимости
+COPY requirements-ubuntu.txt .
+RUN pip install --no-cache-dir -q -r requirements-ubuntu.txt
+
+# Копируем остальные файлы проекта
 COPY . .
+

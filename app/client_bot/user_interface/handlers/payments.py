@@ -31,7 +31,7 @@ async def order_subscribe(
     callback_data: callbacks.OrderSubscribe,
     bot: aiogram.Bot,
 ):
-    await callback.answer()
+
     user_telegram_id = callback.message.chat.id
     path_setting = path_setting_funcs.get_setting_path()
     provider_token = path_setting_funcs.get_document_by_key_name(path_setting, 'yookassa_token')
@@ -108,7 +108,7 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
 
     await sender_manager.send_message_to_admin(message_for_admin)
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
         result = await session.execute(stmt)
 

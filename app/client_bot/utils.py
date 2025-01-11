@@ -126,7 +126,7 @@ async def get_csv_file(adv_setting: AdvSetting):
 
 async def create_ref_link(ref_link_name, user_telegram_id):
     stmt = select(RefLink).where(and_(RefLink.name == ref_link_name, RefLink.referrer_id == user_telegram_id))
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         result = await session.execute(stmt)
         ref_link = result.scalar_one_or_none()
         if ref_link:

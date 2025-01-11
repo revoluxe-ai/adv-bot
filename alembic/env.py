@@ -10,14 +10,18 @@ from app.modules.common_slaves.wildberries.models import *
 from app.utils.db.models import *
 from app.admin_bot.sender.utils.db.models import *
 from app.payments.db.models import *
-from app.utils.alchemy_row import row
+from app.utils.db.session_maker import get_alchemy_row
 from app.utils.db.base import BaseTable as Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
+row = get_alchemy_row()
+
 config.set_main_option('sqlalchemy.url', row)
+
+
 
 
 # Interpret the config file for Python logging.

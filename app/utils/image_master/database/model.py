@@ -30,18 +30,6 @@ Base = declarative_base()
 
 
 
-
-
-
-
-def create_new_tables():
-    db_connector = path_setting_funcs.get_alchemy_row()
-    engine = create_engine(
-        db_connector)
-    Base.metadata.create_all(engine)
-
-
-
 def get_Image(name:str, vector, keyword:str, width, height, is_background = False, good_for_poster = None):
     Img = Image(name=name,
                 vector=vector,

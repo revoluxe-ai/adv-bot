@@ -6,7 +6,7 @@ import faiss
 import joblib
 import numpy as np
 from asyncpg import ProgramLimitExceededError
-from sqlalchemy import not_
+from sqlalchemy import not_, text
 from sqlalchemy.exc import IntegrityError
 from app.utils import redis_manager
 from app.client_bot.bot import bot
@@ -16,6 +16,7 @@ from app.modules.wb_adv_updater.models import AdvPayment
 from .ABC_manager import AbcManager
 from .data_setter import DataSetter
 from .graph_vector_updater import GraphUpdater
+
 from ..common_slaves.wildberries import super_cabinet_manager
 from app.my_types import KeywordStat
 from app.utils.NeoDataScience.driver import DataScience
@@ -38,6 +39,7 @@ from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpd
 from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
+from ..wb_update_state_manager import KeywordStatUpdateState
 from ...client_bot import const
 from app.utils.click_house.client import get_clickhouse_client
 
@@ -52,7 +54,7 @@ keywords_hashs_in_neo = set()
 
 async def process_payment_for_auto_bidder():
     current_date = datetime.datetime.now().date()
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(AdvSetting).options(
             joinedload(AdvSetting.payments),
             selectinload(AdvSetting.wb_cabinet)
@@ -97,7 +99,7 @@ async def process_payment_for_auto_bidder():
 
 async def process_payment_for_parsing():
     current_date = datetime.datetime.now().date()
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(AdvSetting).options(
             joinedload(AdvSetting.payments),
             selectinload(AdvSetting.wb_cabinet)
@@ -138,7 +140,7 @@ async def process_payment_for_parsing():
 
 async def process_payment_for_advs():
     current_date = datetime.datetime.now().date()
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(AdvSetting).options(
             joinedload(AdvSetting.payments),
             selectinload(AdvSetting.wb_cabinet)
@@ -171,6 +173,8 @@ async def process_payment_for_advs():
                 wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
             else:
                 wb_cabinet.bonus = 0
+                adv_setting.bot_active = False
+
             await session.commit()
 
 
@@ -199,7 +203,7 @@ async def update_vectors_in_redis():
 
 async def shop_subscribe_control():
     while True:
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             stmt = select(WBCabinet) \
                 .options(
                 selectinload(WBCabinet.wb_user_cabinets) \
@@ -262,7 +266,11 @@ async def update_all_data_in_db_run(tasks):
                 logger.debug(f'Нет нужных прав у токена')
                 await asyncio.sleep(0)
                 continue
-            task = asyncio.create_task(shop_data_updater.update_all_data())
+
+            async def task_with_delay():
+                await shop_data_updater.update_all_data()
+                await asyncio.sleep(15*60)
+            task = asyncio.create_task(task_with_delay())
             logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
             tasks[wb_access.wb_cabinet.id] = task
         else:
@@ -273,7 +281,7 @@ async def update_all_data_in_db_run(tasks):
                         f'Ошибка обновления данных для Shop id {wb_access.wb_cabinet.shop_id}: {tasks[wb_access.wb_cabinet.id].exception()}, '
                         f'{tasks[wb_access.wb_cabinet.id].exception()}')
                 else:
-                    async with sm() as session:
+                    async with sm(read_only=False) as session:
                         wb_cabinet = wb_access.wb_cabinet
                         stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet.id)
                         result = await session.execute(stmt)
@@ -282,7 +290,7 @@ async def update_all_data_in_db_run(tasks):
                         await session.commit()
                     logger.debug('Задача обновления успешно выполнена')
                 del tasks[wb_access.wb_cabinet.id]
-        await asyncio.sleep(0)
+        await asyncio.sleep(15*60)
 
 
 
@@ -292,23 +300,24 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
         new_version = int(datetime.datetime.now().timestamp())
         data_to_insert = []
         for kw in keyword_stats:
-            date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())
+            date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())#просто добавляем время к дате
             data_to_insert.append([kw.text,
                                    date_time,
                                    adv_setting.adv_id,
-                                   kw.views, kw.clicks,
+                                   kw.views,
+                                   kw.clicks,
                                    kw.spend,
                                    new_version])
 
-        await client.insert(table="default_db.advkeyword"
-                                , data=data_to_insert,
-                                column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"] )
-
-
-
-
-
-
+        await client.insert(table="default_db.advkeyword",
+                            data=data_to_insert,
+                                column_names=["text",
+                                              "date",
+                                              "adv_id",
+                                              "views",
+                                              "clicks",
+                                              "spend",
+                                              "version"] )
 
 
 async def update_keywords_stat_in_click_house(client, keyword_stats: List[KeywordStat],
@@ -322,7 +331,7 @@ async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
             KeywordSetting.adv_setting_id == adv_setting_id
         )
         result = await session.execute(stmt)
-        existing_keyword_settings = result.scalars().all()
+        existing_keyword_settings: list[KeywordSetting] = result.scalars().all()
     return {ks.text for ks in existing_keyword_settings}
 
 
@@ -336,14 +345,36 @@ async def update_predict_ctr():
             logger.error(f'Ошибка предсказания CTR {exc}')
         await asyncio.sleep(0)
 
+async def update_all_keyword_data(access, adv_setting):
+    try:
+        wb_api = WBApi(access)
+        async with get_clickhouse_client() as client:
+            await common_keyword_stat_update(client, adv_setting, wb_api)
+    except ApiForbiddenError:
+        logger.error(f'Нет доступов для обновления данных магазина: {access.wb_cabinet.shop_id}')
+        return
+
+    except Exception as exc:
+        logger.error('Ошибка обновления статистики ключевых слов', exc_info=True)
+        raise exc
+    try:
+        data_setter = DataSetter(access)
+        await data_setter.update_minus_keywords_in_adv(adv_setting)
+    except Exception as exc:
+        logger.error('Ошибка установки активности фраз', exc_info=True)
+        raise exc
+    return
 
 
-async def update_keywords_in_advs():
+
+
+async def update_all_keywords_on_wb():
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
         async with sm() as session:
             stmt = select(AdvSetting) \
-                .where(AdvSetting.bot_active == True)
+                .where(AdvSetting.bot_active == True,
+                       AdvSetting.type == 8)
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
             for adv_setting in adv_settings:
@@ -353,13 +384,14 @@ async def update_keywords_in_advs():
                     if not access:
                         logger.error(f'Нет доступа к кабинету {wb_cabinet_id}')
                         continue
-                    data_setter = DataSetter(access)
-                    task = asyncio.create_task(data_setter.update_minus_keywords_in_adv(adv_setting))
+                    task = asyncio.create_task(update_all_keyword_data(access, adv_setting))
                     update_tasks[adv_setting.id] = task
                 else:
                     if update_tasks[adv_setting.id].done():
                         if update_tasks[adv_setting.id].exception():
-                            logger.error(f'Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}',
+                            logger.error(f'Ошибка обновления ключей  для shop_id: {access.wb_cabinet.shop_id} '
+                                         f'Кампания: {adv_setting.adv_id} '
+                                         f' {update_tasks[adv_setting.id].exception()}',
                                          exc_info=True)
                         del update_tasks[adv_setting.id]
                 await asyncio.sleep(0)
@@ -377,6 +409,9 @@ async def update_keyword_stat(access: WBCabinetAccess,
         stmt = select(AdvSetting).where(and_(
             AdvSetting.wb_cabinet_id == wb_cabinet.id,
             AdvSetting.type == 8,
+            AdvSetting.bot_active == True,
+            AdvSetting.active_status == 'started'
+
         )).order_by(AdvSetting.last_update.desc())
         result = (await session.execute(stmt)).unique()
         adv_settings = result.scalars().all()
@@ -396,7 +431,7 @@ async def update_keyword_stat(access: WBCabinetAccess,
                         logger.error(
                             f'Ошибка обновления статистики ключей: '
                             f'{adv_update_tasks[adv_id].exception()},'
-                            f' для кабинета {adv_id}'
+                            f' для кабинета {access.wb_cabinet.shop_id}', exc_info=True
                         )
 
                     del adv_update_tasks[adv_id]
@@ -404,8 +439,6 @@ async def update_keyword_stat(access: WBCabinetAccess,
                     logger.debug(f'Установка set для need_update_model')
                     logger.debug(f"Обновление статистики завершено")
             await asyncio.sleep(0)
-
-        await asyncio.sleep(60*15)
     return
 
 
@@ -451,7 +484,17 @@ async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
 
 
 
-async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
+# async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
+#     try:
+#         await keyword_stat_updater(client, adv_setting, wb_api)
+#     except Exception as exc:
+#         logger.error(f'Ошибка обновления статистики ключей для кампании: {adv_setting.name}, '
+#                           f'adv_id: {adv_setting.adv_id}, '
+#                           f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
+
+
+
+async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
     adv_id = adv_setting.adv_id
     try:
         keywords_from_auto: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_id)
@@ -459,7 +502,8 @@ async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
         raise exc
     except Exception as exc:
         keywords_from_auto = []
-        logger.error(f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
+        logger.error(f'Ошибка получения статистики по ключевым словам для кампании: {adv_setting.name}, '
+                     f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
     try:
         if not adv_setting.search_adv_id:
             keywords_from_search_adv = []
@@ -473,14 +517,15 @@ async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
         logger.debug(f'Пустой список ключевых слов для {adv_setting.adv_id}')
         return
 
-    text_to_keyword_from_auto = {kw.text: kw for kw in keywords_from_auto}
+    text_to_keyword_from_auto = {kw.text + ':' + str(kw.date): kw for kw in keywords_from_auto}
     for kw in keywords_from_search_adv:
-        if kw.text not in text_to_keyword_from_auto:
-            text_to_keyword_from_auto[kw.text] = kw
+        key = kw.text + ':' + str(kw.date)
+        if key not in text_to_keyword_from_auto:
+            text_to_keyword_from_auto[key] = kw
         else:
-            text_to_keyword_from_auto[kw.text].views += kw.views
-            text_to_keyword_from_auto[kw.text].clicks += kw.clicks
-            text_to_keyword_from_auto[kw.text].spend += kw.spend
+            text_to_keyword_from_auto[key].views += kw.views
+            text_to_keyword_from_auto[key].clicks += kw.clicks
+            text_to_keyword_from_auto[key].spend += kw.spend
     full_stat  = list(text_to_keyword_from_auto.values())
 
     keywords = full_stat
@@ -489,7 +534,12 @@ async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
     texts_for_adv_setting = {keyword.text for keyword in keywords}
     clusters = set()
     for text in texts_for_adv_setting:
-        cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+        try:
+            cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+        except:
+            logger.error('Не удалось получить кластер')
+            cluster_name = None
+
         if cluster_name:
            clusters.add(cluster_name)
 
@@ -499,7 +549,7 @@ async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
 
     # Преобразование ключевых слов в объекты KeywordSetting
     keyword_settings = [KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords]
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         # Обработка данных порциями
         for keyword in keyword_settings:
             try:
@@ -515,6 +565,11 @@ async def keyword_stat_updater(client, adv_setting: AdvSetting, wb_api):
                 await asyncio.sleep(0)
 
     await update_keywords_stat_in_click_house(client, keywords, adv_setting)
+
+    keyword_stat_update_state = KeywordStatUpdateState()
+
+    await keyword_stat_update_state.set_one(adv_setting.adv_id)
+
     return
 
 
@@ -701,7 +756,7 @@ class Manager(AbcManager):
                         final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
                     else:
                         final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
                 # if message_counter.check_last_time():
                 #      await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
@@ -723,7 +778,7 @@ class Manager(AbcManager):
 
 
     async def clear_expired_data(self):
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             expired_cabinets: list[WBCabinet] = await data_manager.get_expired_cabinets(session)
             for wb_cabinet in expired_cabinets:
                 adv_settings: list[AdvSetting] = wb_cabinet.adv_settings

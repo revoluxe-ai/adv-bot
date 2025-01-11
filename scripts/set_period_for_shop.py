@@ -18,7 +18,7 @@ period = 38
 
 
 async def set_period_for_shop(shop_id: str, period: int):
-     async with sm() as session:
+     async with sm(read_only=False) as session:
           stmt = select(WBCabinet) \
                .where(WBCabinet.shop_id == shop_id)
           result = await session.execute(stmt)

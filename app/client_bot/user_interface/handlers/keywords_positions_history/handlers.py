@@ -31,10 +31,8 @@ async def keyword_position_history(callback: types.CallbackQuery,
                                    callback_data: callbacks.KeywordPositionHistory,
                                    bot: aiogram.Bot,
                                    state: FSMContext):
-    await callback.answer()
     await state.set_state(state = None)
     adv_original_id: int = callback_data.adv_original_id
-    await callback.answer()
     try:
           graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id))
     except Exception as e:
@@ -52,10 +50,10 @@ async def keyword_position_history(callback: types.CallbackQuery,
 async def turn_parsing_on(callback: types.CallbackQuery,
                             callback_data: callbacks.TurnParsing,
                             bot: aiogram.Bot):
-        await callback.answer()
+
         adv_setting_original_id = callback_data.adv_original_id
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-        async with _sm() as session:
+        async with _sm(read_only=False) as session:
             stmt = select(AdvSetting)\
                 .options(joinedload(AdvSetting.payments))\
                 .where(AdvSetting.id == adv_setting_original_id)
@@ -103,7 +101,6 @@ async def turn_parsing_on(callback: types.CallbackQuery,
 async def turn_parsing_off(callback: types.CallbackQuery,
                             callback_data: callbacks.TurnParsing,
                             bot: aiogram.Bot):
-        await callback.answer()
         adv_setting_original_id = callback_data.adv_original_id
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         async with _sm() as session:

@@ -20,7 +20,7 @@ async def to_page_for_cpm_setting(callback: types.CallbackQuery,
                                bot: aiogram.Bot,
                                ):
 
-    await callback.answer()
+
     adv_original_id = callback_data.adv_original_id
     await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
     return
@@ -67,7 +67,7 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
 
     state_data = await state.get_data()
     adv_original_id = state_data['last_adv_original_id']
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_place = data['min_position']
@@ -86,7 +86,7 @@ async def set_manual_cpm(callback: types.CallbackQuery,
                                  bot: aiogram.Bot,
                                  state: FSMContext):
 
-    await callback.answer()
+
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_manual_cpm)
@@ -111,7 +111,7 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
     state_data = await state.get_data()
     adv_original_id = state_data['last_adv_original_id']
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_cpm = manual_cpm
@@ -128,7 +128,7 @@ async def set_max_position(callback: types.CallbackQuery,
                                     bot: aiogram.Bot,
                                     state: FSMContext):
 
-        await callback.answer()
+
         adv_original_id = callback_data.adv_original_id
         await state.update_data(last_adv_original_id=adv_original_id)
         await state.set_state(states.CPMSetting.waiting_for_max_position)
@@ -152,7 +152,7 @@ async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMC
         return
     state_data = await state.get_data()
     adv_original_id = state_data['last_adv_original_id']
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_place = max_position

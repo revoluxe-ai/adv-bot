@@ -4,7 +4,7 @@ from .data_classes.card_from_wb import CardFromWB
 import asyncio
 import datetime
 import logging
-from typing import Union
+from typing import Union, Optional
 import aiohttp
 from .ABC_WB_API import ABC_WB_API
 from .data_classes.adv import Adv
@@ -138,7 +138,7 @@ class AdvertApi(ABC_WB_API):
 
 
     @try_except_decorator(1, 60)
-    async def get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None)-> list[FullAdvStat]:
+    async def get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None)-> Optional[list[FullAdvStat]]:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
         """Пример даты [
@@ -217,8 +217,10 @@ class AdvertApi(ABC_WB_API):
             """
 
             full_stats = []
+            if not answer:
+                return None
             for data in answer:
-                full_stat = FullAdvStat(data)
+                full_stat = FullAdvStat(**data)
                 full_stats.append(full_stat)
 
             return full_stats

@@ -35,7 +35,7 @@ async def update_minus_keywords(callback: types.CallbackQuery,
                                 callback_data: callbacks.WBUpdate,
                                 bot: aiogram.Bot,
                                 state: FSMContext):
-    await callback.answer()
+
     adv_original_id = callback_data.adv_setting_original_id
     async with sm() as session:
         adv = await session.execute(select(AdvSetting)\
@@ -64,7 +64,7 @@ async def update_keyword_stat(callback: types.CallbackQuery,
                                 callback_data: callbacks.WBUpdate,
                                 bot: aiogram.Bot,
                                 state: FSMContext):
-        await callback.answer()
+
         """"
         нужно обновить статистику ключевых слов из Wildberreis, а для этого нужен access
         
@@ -84,10 +84,8 @@ async def update_keyword_stat(callback: types.CallbackQuery,
         access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
         if not access:
             raise ApiForbiddenError('Не удалось получить доступ к Wildberries')
-        wb_api = WBApi(access)
         await messages.LongTimeOperation(bot, callback.message.chat.id)()
-        async with get_clickhouse_client() as ch_client:
-            await wb_manager.keyword_stat_updater(ch_client, adv, wb_api)
+        await wb_manager.update_all_keyword_data(access, adv)
         chat_id = callback.message.chat.id
         await messages.KeywordStatUpdated(bot, chat_id)()
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()

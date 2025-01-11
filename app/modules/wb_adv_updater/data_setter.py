@@ -1,9 +1,11 @@
+import asyncio
 import logging
 import pandas as pd
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
-from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_adv_updater import data_manager, search_advs_manager
+from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.my_types import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -21,29 +23,48 @@ class DataSetter:
         self._wb_api = WBApi(access)
         self._wb_cabinet = access.wb_cabinet
 
-
-    async def update_minus_keywords_in_adv(self, adv_setting: AdvSetting):
+    async def _update_minus_keywords_in_adv(self, adv_setting: AdvSetting, keywords):
         logger.debug(f'Обновляю минус слова для {adv_setting.name}')
-        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
         logger.debug(f'Получил ключи для {adv_setting.name}')
-        good_phrases = []
-        bad_phrases = []
+        bad_keywords = []
         for keyword in keywords:
-            if keyword.status == KeywordStatus.GOOD:
-                good_phrases.append(keyword.text)
-            else:
-                bad_phrases.append(keyword.text)
+            if keyword.status == KeywordStatus.BAD:
+                bad_keywords.append(keyword)
                 if clusters := keyword.childs_keywords:
                     for cluster in clusters:
-                        bad_phrases.append(cluster.text)
+                        bad_keywords.append(cluster)
 
+        if len(bad_keywords) > 1000:
+            sorted_bad_keywords = sorted(bad_keywords, key=lambda kw: kw.views, reverse=True)
+            bad_keywords = sorted_bad_keywords[:1000]
+            over_words_in_company = sorted_bad_keywords[1000:]
+            if over_words_in_company:
+                 logger.debug(f'Не смогу заблокировать ключи {len(over_words_in_company)}')
+        bad_phrases = [kw.text for kw in bad_keywords]
         if bad_phrases:
             bad_phrases = list(set(bad_phrases))
             await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
+            adv_active_keyword_update_state_manager = AdvActiveKeywordUpdateStateManager()
             logger.debug(f'Обновил минус слова {adv_setting.name} {bad_phrases}')
-            logger.debug(f'Позитивные слова {good_phrases}')
+            await adv_active_keyword_update_state_manager.set_one(adv_setting.adv_id)
         else:
             logger.debug(f'Нет минус слов для {adv_setting.name}')
+
+
+
+
+    async def update_minus_keywords_in_adv(self, adv_setting: AdvSetting):
+        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
+        try:
+            await asyncio.gather(self._update_minus_keywords_in_adv(adv_setting, keywords),
+                                 search_advs_manager.set_keyword_phrases_for_search_adv(adv_setting, keywords),)
+        except Exception as e:
+            logger.error(f'Ошибка обновления минус слов для {adv_setting.name},'
+                         f'adv_id: {adv_setting.adv_id},'
+                         f'shop_id: {self._wb_cabinet.shop_id} '
+                         f' {e}', exc_info=True)
+
+
 
 
 

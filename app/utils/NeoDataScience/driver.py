@@ -1176,8 +1176,6 @@ UNWIND phrase.words AS word
                 result = await session.read_transaction(check_phrase, query, text)
         return result
 
-
-
     async def __update_items_vectors(self):
         while True:
             try:
@@ -1187,52 +1185,62 @@ UNWIND phrase.words AS word
             await asyncio.sleep(0)
 
     async def __update_keywords_vectors(self):
-        batch_size = 1000  # Определите размер порции
-        offset = 0
-        while True:
-            pass_texts = set()
-            try:
-                async with sm() as session:
-                    # Сначала подсчитайте общее количество записей
-                    count_stmt = select(func.count()).select_from(
-                        select(distinct(KeywordSetting.text)).join(KeywordSetting.adv_setting).where(
-                            AdvSetting.active_status.in_(['started'])
-                        )
-                    )
-                    total_count_result = await session.execute(count_stmt)
-                    total_count = total_count_result.scalar_one()
-                    logger.debug(f'Всего {total_count} кампаний')
+        batch_size = 1000  # Размер порции
+        last_processed_id = None  # Начальное значение для курсора
 
-                    # Если обработали все данные, выйдите из цикла
-                    if offset >= total_count:
-                        break
-
-                    # Получите следующую порцию данных
-                    stmt = select(distinct(KeywordSetting.text)).join(
-                        KeywordSetting.adv_setting
-                    ).where(
+        try:
+            async with sm() as session:
+                # Получаем количество уникальных текстов один раз
+                count_stmt = select(func.count()).select_from(
+                    select(KeywordSetting.text).distinct().join(KeywordSetting.adv_setting).where(
                         AdvSetting.active_status.in_(['started'])
-                    ).offset(offset).limit(batch_size)
+                    ).subquery()
+                )
+                total_count_result = await session.execute(count_stmt)
+                total_count = total_count_result.scalar_one()
+                logger.debug(f'Всего {total_count} уникальных текстов')
 
+            while True:
+                pass_texts = set()
+
+                # Запрос с курсором: если last_processed_id есть, начинаем с него
+                stmt = (
+                    select(KeywordSetting.id, KeywordSetting.text)
+                    .distinct(KeywordSetting.text)
+                    .join(KeywordSetting.adv_setting)
+                    .where(AdvSetting.active_status.in_(['started']))
+                    .order_by(KeywordSetting.text, KeywordSetting.id)  # DISTINCT ON требует совпадения с ORDER BY
+                    .limit(batch_size)
+                )
+                if last_processed_id:
+                    stmt = stmt.where(KeywordSetting.id > last_processed_id)  # Пагинация по ID
+
+                stmt = stmt.limit(batch_size)
+
+                async with sm() as session:
                     need_keywords_texts_result = await session.execute(stmt)
-                    need_keywords_texts = need_keywords_texts_result.scalars().all()
+                    rows = need_keywords_texts_result.all()
 
-                    clear_neend_texts = []
-                    for text in need_keywords_texts:
-                        if text in pass_texts:
-                            continue
-                        pass_texts.add(text)
-                        text = text_cleaner.clear(text)
-                        clear_neend_texts.append(text)
-                    need_keywords_texts = clear_neend_texts
-                    await self._update_keywords_vectors_in_redis(need_keywords_texts)
-                    # Увеличьте смещение для следующей порции
-                    offset += batch_size
+                if not rows:
+                    break  # Завершаем, если нет данных
 
-            except Exception as exc:
-                logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
+                need_keywords_texts = []
+                for row in rows:
+                    if row.text not in pass_texts:
+                        pass_texts.add(row.text)
+                        need_keywords_texts.append(row.text)
 
+                # Очищаем текстовые данные
+                clear_need_texts = [text_cleaner.clear(text) for text in need_keywords_texts]
 
+                # Обновляем векторы ключевых фраз в Redis
+                await self._update_keywords_vectors_in_redis(clear_need_texts)
+
+                # Обновляем курсор на ID последней строки
+                last_processed_id = rows[-1].id  # Предполагается, что есть поле 'id'
+
+        except Exception as exc:
+            logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
 
     async def update_vectors_in_redis(self):
         await asyncio.gather(self.__update_items_vectors(),
@@ -1290,6 +1298,7 @@ UNWIND phrase.words AS word
                 logger.debug('Записал вектор ключа в редис')
             except Exception as exc:
                 logger.error(f'Ошибка при записи вектора ключевой фразы в Redis: {exc}')
+
 
     async def check_wb_card_in_neo(self, nmid):
         query = """

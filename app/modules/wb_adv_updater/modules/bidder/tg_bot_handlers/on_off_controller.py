@@ -22,7 +22,7 @@ async def get_min_position(callback: types.CallbackQuery,
                                  bot: aiogram.Bot,
                                  state: FSMContext):
 
-     await callback.answer()
+
      adv_original_id = callback_data.adv_original_id
      await state.update_data(last_adv_original_id=adv_original_id)
      await state.set_state(states.CPMSetting.waiting_for_min_position)
@@ -37,9 +37,9 @@ async def off_auto_cpm(callback: types.CallbackQuery,
                                     bot: aiogram.Bot,
                                     state: FSMContext):
 
-        await callback.answer()
+
         adv_original_id = callback_data.adv_original_id
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
             adv.bidder_active = False

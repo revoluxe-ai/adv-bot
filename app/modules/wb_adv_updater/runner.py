@@ -58,8 +58,15 @@ async def __run_update_keyword_stat():
 
 
 
-async def run_update_minus_keywords_on_wb():
-    await wb_manager.update_keywords_in_advs()
+async def run_update_all_keywords_on_wb():
+    while True:
+        try:
+            await wb_manager.update_all_keywords_on_wb()
+        except Exception:
+            logger.error('Ошибка обновления фраз', exc_info=True)
+        await asyncio.sleep(5)
+
+
 
 #
 # async def update_min_ctr_in_global_wb_category_settings():
@@ -77,7 +84,8 @@ async def update_all_data_in_db():
             await wb_manager.update_all_data_in_db_run(tasks=tasks)
         except Exception as exc:
             logger.error(f'Ошибка обновления данных в базе {exc}', exc_info=True)
-            await asyncio.sleep(0)
+        finally:
+            await asyncio.sleep(15)
 
 
 async def demo_subscribe():
@@ -98,12 +106,10 @@ async def clear_data_for_expired_wb_cabinets():
 
 async def process_payment_for_advs():
     while True:
-        hours = datetime.datetime.now().hour
-        if 12 < hours < 18:
-            try:
-                await wb_manager.process_payment_for_advs()
-            except Exception as e:
-                logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
+        try:
+            await wb_manager.process_payment_for_advs()
+        except Exception as e:
+            logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
         await asyncio.sleep(60*60)
 
 async def write_positions_to_db():
@@ -129,7 +135,12 @@ async def reset_out_positions_in_redis():
 
 
 async def keywords_parsing_process():
-    await __keywords_parsing_process()
+    while True:
+        try:
+            await __keywords_parsing_process()
+        except:
+            logger.error('Ошибка парсинга ключей', exc_info=True)
+        await asyncio.sleep(60)
 
 
 async def __keywords_parsing_process():
@@ -182,10 +193,8 @@ async def main_loop():
     await asyncio.gather(
         payment_for_auto_bidder(),
         payment_for_parsing_keyword(),
-        # .clear_data_for_expired_wb_cabinets(),
         process_payment_for_advs(),
         run_update_vectors_in_redis(),
-        # .update_min_ctr_in_global_wb_category_settings()
         run_vector_update_in_neo4j(),
         update_all_data_in_db(),
         return_exceptions=False

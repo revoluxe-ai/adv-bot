@@ -161,6 +161,18 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
                                         adv_setting_original_id = adv_setting.id).pack())
     builder.row(button)
 
+    if adv_setting.reset_place:
+        button = InlineKeyboardButton(text='Выключить сброс позиций',
+                                      callback_data=callbacks.ResetPlace(
+                                          action='off',
+                                          adv_setting_original_id=adv_setting.id).pack())
+    else:
+        button = InlineKeyboardButton(text='Включить сброс позиций',
+                                      callback_data=callbacks.ResetPlace(
+                                          action='on',
+                                          adv_setting_original_id=adv_setting.id).pack())
+
+    builder.row(button)
 
     if not adv_setting.clusters_mode:
         button = InlineKeyboardButton(text='Включить поддержку кластеров',
@@ -201,6 +213,13 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
                                             action='turn_on_auto_min_ctr',
                                             adv_setting_original_id=adv_setting.id).pack())
         builder.row(button)
+
+
+
+
+
+
+
     if not in_favorites:
         button = InlineKeyboardButton(text='Добавить в избранное',
                                         callback_data=callbacks.AddToFavorites(
@@ -222,7 +241,6 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
 
 
 
-
     return builder.as_markup()
 
 
@@ -236,7 +254,9 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
     loop = asyncio.get_event_loop()
-    adv_settings = [adv for adv in adv_settings if adv.active_status != 'done']
+    if not keyword_filter:
+         adv_settings = [adv for adv in adv_settings if adv.active_status != 'done'\
+                         or any([adv.bot_active, adv.bidder_active, adv.parsing_active])]
     for adv in adv_settings[start_index:end_index]:
         check_last_24_hours = loop.run_until_complete(redis_manager.check_last_24_hours(adv.id))
         check_text = '✅' if check_last_24_hours else '❓'
@@ -328,6 +348,9 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
             keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
             keywords = keywords_with_rating + keywords_without_rating
             return keywords
+
+        elif sort_mode == 'white_list':
+             return sorted(keywords, key=lambda x: x.predict_ctr, reverse=True)
 
         elif sort_mode == 'sort_by_ctr_desc':
             return sorted(keywords, key=lambda x: x.ctr, reverse=True)

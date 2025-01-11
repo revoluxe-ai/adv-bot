@@ -1,13 +1,14 @@
-from app.modules.wb_adv_updater.search_advs_manager import update_search_advs_module_run
 from app.modules.wb_adv_updater.runner import (
+
     run_main_coroutines,
     keywords_parsing_process,
-    run_update_minus_keywords_on_wb,
+    run_update_all_keywords_on_wb,
     run_update_keyword_stat,
     run_update_predict_ctr,
     run_update_model,
 
 )
+from app.modules.shops_data_updater import run as run_shop_data_update
 from app.modules.wb_adv_updater.bidder import run_bidder_process
 from python_modules.logger import setup_logging
 import logging
@@ -24,9 +25,16 @@ logger = logging.getLogger(__name__)
 
 async def run_hard_processes():
     from app.modules.wb_adv_updater import hard_ml_data_updater_process as hard_data_manager
-    await asyncio.gather(
-        hard_data_manager.run_update_data_in_neo4j(),
-                         hard_data_manager.update_keywords_ctr_by_similary())
+
+    while True:
+        try:
+            await asyncio.gather(
+                hard_data_manager.run_update_data_in_neo4j(),
+                                 hard_data_manager.update_keywords_ctr_by_similary())
+        except:
+            logger.error('Ошибка хард процессов', exc_info=True)
+        await asyncio.sleep(60)
+
 
 
 
@@ -34,13 +42,11 @@ run_own_process_list = [
      run_bidder_process,
      run_hard_processes,
      keywords_parsing_process,
-     run_update_minus_keywords_on_wb,
-     run_update_keyword_stat,
+     run_update_all_keywords_on_wb,
       run_main_coroutines,
      run_update_predict_ctr,
      run_update_model,
-    update_search_advs_module_run
-
+     run_shop_data_update
 ]
 
 
