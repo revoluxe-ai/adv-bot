@@ -194,6 +194,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
         adv_setting: AdvSetting = result.scalar()
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.keyword_setting.hard_status == 2]
+    keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=1)
@@ -218,7 +219,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
         adv_choice_last_page,
         main_photos[0],
         page=1,
-    )(state)
+    )(state, 'white_list')
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
     return
