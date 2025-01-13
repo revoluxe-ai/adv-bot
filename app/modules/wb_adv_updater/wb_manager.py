@@ -345,7 +345,7 @@ async def update_predict_ctr():
             logger.error(f'Ошибка предсказания CTR {exc}')
         await asyncio.sleep(0)
 
-async def update_all_keyword_data(access, adv_setting):
+async def update_all_keyword_data(access, adv_setting, wb_cabinet: WBCabinet):
     try:
         wb_api = WBApi(access)
         async with get_clickhouse_client() as client:
@@ -358,7 +358,7 @@ async def update_all_keyword_data(access, adv_setting):
         raise exc
     try:
         data_setter = DataSetter(access)
-        await data_setter.update_minus_keywords_in_adv(adv_setting)
+        await data_setter.update_minus_keywords_in_adv(adv_setting, wb_cabinet)
     except Exception as exc:
         logger.error('Ошибка установки активности фраз', exc_info=True)
         raise exc
@@ -372,8 +372,7 @@ async def update_all_keywords_on_wb():
     while True:
         async with sm() as session:
             stmt = select(AdvSetting) \
-                .where(AdvSetting.bot_active == True,
-                       AdvSetting.type == 8)
+                .where(AdvSetting.bot_active == True)
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
             for adv_setting in adv_settings:
@@ -383,7 +382,9 @@ async def update_all_keywords_on_wb():
                     if not access:
                         logger.error(f'Нет доступа к кабинету {wb_cabinet_id}')
                         continue
-                    task = asyncio.create_task(update_all_keyword_data(access, adv_setting))
+                    task = asyncio.create_task(update_all_keyword_data(access,
+                                                                       adv_setting,
+                                                                       wb_cabinet=access.wb_cabinet))
                     update_tasks[adv_setting.id] = task
                 else:
                     if update_tasks[adv_setting.id].done():

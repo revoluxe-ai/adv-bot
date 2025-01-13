@@ -50,6 +50,7 @@ class WBCabinet(BaseTable):
     demo: Mapped[bool] = Column(Boolean, default=True)
     balance = Column(Float, server_default=text('0'))
     bonus = Column(Float, default=0)
+    white_list_update_active = Column(Boolean, default=False)
 
 
 
@@ -280,6 +281,12 @@ class AdvSetting(BaseTable):
             return None
         else:
            return int(match.group(1))
+
+    @search_adv_id.setter
+    def search_adv_id(self, value: int):
+        assert isinstance(value, int)
+        self._search_adv_id = value
+
 
     @search_adv_id.setter
     def search_adv_id(self, value: int):
