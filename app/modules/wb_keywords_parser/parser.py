@@ -320,8 +320,6 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
         return []
     catch_any_position.set()
     logger.debug(f'Найдено {len(positions)}')
-    positions = [position for position in positions if position.nmid in need_nmids]
-    logger.debug(f'После фильтра осталось {len(positions)}')
     if positions:
         await add_wb_positions_to_all_bases(positions)
         logger.debug('Записали позиции в Редис')
