@@ -212,3 +212,8 @@ class ChangeCPM(CallbackData, prefix="change_cpm"):
 class ResetPlace(CallbackData, prefix="reset_place"):
     action: str
     adv_setting_original_id: int
+
+
+class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
+    action: str
+    wb_cabinet_original_id: int
