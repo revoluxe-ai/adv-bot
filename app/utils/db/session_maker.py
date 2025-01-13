@@ -14,7 +14,6 @@ from python_modules import path_setting_funcs
 
 logger = logging.getLogger(__name__)
 
-thread_local = threading.local()
 lock_counter = threading.Lock()
 conn_counter = 0
 
@@ -109,30 +108,28 @@ async def get_async_session_maker(semaphore=None, read_only=True) -> AsyncSessio
 
     try:
         async with semaphore:
-            if not hasattr(thread_local, "session_maker"):
-                db_connector = get_alchemy_row(read_only)
-                async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
+            db_connector = get_alchemy_row(read_only)
+            async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
 
-                engine = create_async_engine(
-                    async_db_connector,
-                    echo=False,
-                    pool_size=pool_size,
-                    max_overflow=max_overflow,
-                    pool_pre_ping=False
-                )
+            engine = create_async_engine(
+                async_db_connector,
+                echo=False,
+                pool_size=pool_size,
+                max_overflow=max_overflow,
+                pool_pre_ping=False
+            )
 
-                sync_engine = engine.sync_engine
-                event.listen(sync_engine, "checkout", log_checkout)
-                event.listen(sync_engine, "checkin", log_checkin)
+            sync_engine = engine.sync_engine
+            event.listen(sync_engine, "checkout", log_checkout)
+            event.listen(sync_engine, "checkin", log_checkin)
 
-                async_session_maker = sessionmaker(
-                    engine,
-                    expire_on_commit=False,
-                    class_=AnalyticAsyncSession
-                )
-                thread_local.session_maker = async_session_maker
+            async_session_maker = sessionmaker(
+                engine,
+                expire_on_commit=False,
+                class_=AnalyticAsyncSession
+            )
 
-            session_maker = thread_local.session_maker
+            session_maker = async_session_maker
 
             async with session_maker() as session:
                 # if read_only:
