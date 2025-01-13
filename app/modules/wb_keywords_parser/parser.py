@@ -323,9 +323,14 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
     logger.debug(f'Найдено {len(positions)}')
     if positions:
         await add_wb_positions_to_all_bases(positions, need_nmids)
-        positions_for_catch_max_bet = [position for position in positions if position.promo_position >= 40]
-        max_bet = max([position.cpm for position in positions_for_catch_max_bet])
-        await redis_manager.set_max_bet_for_keyword(text, max_bet)
+        positions_for_catch_max_bet = [position for position in positions if position.promo_position\
+                                       and position.promo_position <= 40]
+        cpms = [position.cpm for position in positions_for_catch_max_bet]
+        if cpms:
+            max_bet = max(cpms)
+            await redis_manager.set_max_bet_for_keyword(text, max_bet)
+        else:
+            logger.error(f'Не найдена максимальная ставка для ключа {text}')
         logger.debug('Записали позиции в базы')
         for position in positions:
             nmid: int = position.nmid
