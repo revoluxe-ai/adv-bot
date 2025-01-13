@@ -79,6 +79,9 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
     step = settings.BIDDER_STEP
     adv_id = adv_setting.adv_id
     max_position_for_adv = adv_setting.max_place
+    if max_position_for_adv is None:
+        logger.error('Максимальная позиция не задана!')
+        return
     max_cpm = await data_manager.get_max_adv_bid(adv_setting)
     nmid_in_adv = adv_setting.nmids[0]
     cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
@@ -104,7 +107,9 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
             new_cpm = cpm_from_parsing + step
         else:
             new_cpm = cpm_from_parsing
-
+        if not max_cpm:
+            logger.error('Максимальная ставка не задана!')
+            return
         if new_cpm >= max_cpm:
             new_cpm = max_cpm
             if adv_setting.reset_place:
