@@ -16,7 +16,7 @@ from sqlalchemy import select, and_, not_
 
 
 
-from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting
+from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting, WBCabinet
 from aiogram.client.session import aiohttp
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -296,10 +296,11 @@ async def add_wb_positions_to_clickhouse(positions):
 
 
 
-async def add_wb_positions_to_all_bases(positions: list[WBItemPosition]):
+async def add_wb_positions_to_all_bases(positions: list[WBItemPosition], need_nmids: set[int]):
+    my_positions = [position for position in positions if position.nmid in need_nmids]
     await asyncio.gather(
-        add_wb_positions_to_redis(positions),
-        add_wb_positions_to_clickhouse(positions),
+        add_wb_positions_to_redis(my_positions),
+        add_wb_positions_to_clickhouse(my_positions),
     )
 
 async def _add_positions_from_page(stop_event: asyncio.Event,
@@ -320,11 +321,17 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
         return []
     catch_any_position.set()
     logger.debug(f'Найдено {len(positions)}')
-    positions = [position for position in positions if position.nmid in need_nmids]
-    logger.debug(f'После фильтра осталось {len(positions)}')
     if positions:
-        await add_wb_positions_to_all_bases(positions)
-        logger.debug('Записали позиции в Редис')
+        await add_wb_positions_to_all_bases(positions, need_nmids)
+        positions_for_catch_max_bet = [position for position in positions if position.promo_position\
+                                       and position.promo_position <= 40]
+        cpms = [position.cpm for position in positions_for_catch_max_bet]
+        if cpms:
+            max_bet = max(cpms)
+            await redis_manager.set_max_bet_for_keyword(text, max_bet)
+        else:
+            logger.error(f'Не найдена максимальная ставка для ключа {text}')
+        logger.debug('Записали позиции в базы')
         for position in positions:
             nmid: int = position.nmid
             need_nmids.discard(nmid)

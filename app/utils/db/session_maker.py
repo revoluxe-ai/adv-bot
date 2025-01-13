@@ -14,7 +14,6 @@ from python_modules import path_setting_funcs
 
 logger = logging.getLogger(__name__)
 
-thread_local = threading.local()
 lock_counter = threading.Lock()
 conn_counter = 0
 
@@ -76,19 +75,25 @@ def log_checkin(dbapi_con, con_record):
     logger.debug(f"Количество соединений: {conn_counter}")
 
 
-def get_alchemy_row():
+def get_alchemy_row(read_only):
     port = settings.postgres_port
     file_path = path_setting_funcs.get_setting_path()
     postgres_dbname = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-dbname')
-    postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
+    # postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
     postgres_password = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-password')
     postgres_user = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-user')
+    if not read_only:
+        host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-master-host')
+    else:
+        host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-replica-host')
 
     # Для asyncpg используем ssl вместо sslmode
+
+    target_session = 'read-write' if not read_only else 'any'
     db_connector = (
-        f'postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{port}/{postgres_dbname}'
+        f'postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}'
         '?ssl=verify-full'
-        '&target_session_attrs=read-write'
+        f'&target_session_attrs={target_session}'
     )
     return db_connector
 
@@ -103,37 +108,28 @@ async def get_async_session_maker(semaphore=None, read_only=True) -> AsyncSessio
 
     try:
         async with semaphore:
-            if not hasattr(thread_local, "session_maker"):
-                db_connector = get_alchemy_row()
-                if read_only:
-                    # Для read-only меняем параметр в строке подключения
-                    db_connector = db_connector.replace(
-                        'target_session_attrs=read-write',
-                        'target_session_attrs=any'
-                    )
+            db_connector = get_alchemy_row(read_only)
+            async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
 
-                async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
+            engine = create_async_engine(
+                async_db_connector,
+                echo=False,
+                pool_size=pool_size,
+                max_overflow=max_overflow,
+                pool_pre_ping=False
+            )
 
-                engine = create_async_engine(
-                    async_db_connector,
-                    echo=False,
-                    pool_size=pool_size,
-                    max_overflow=max_overflow,
-                    pool_pre_ping=False
-                )
+            sync_engine = engine.sync_engine
+            event.listen(sync_engine, "checkout", log_checkout)
+            event.listen(sync_engine, "checkin", log_checkin)
 
-                sync_engine = engine.sync_engine
-                event.listen(sync_engine, "checkout", log_checkout)
-                event.listen(sync_engine, "checkin", log_checkin)
+            async_session_maker = sessionmaker(
+                engine,
+                expire_on_commit=False,
+                class_=AnalyticAsyncSession
+            )
 
-                async_session_maker = sessionmaker(
-                    engine,
-                    expire_on_commit=False,
-                    class_=AnalyticAsyncSession
-                )
-                thread_local.session_maker = async_session_maker
-
-            session_maker = thread_local.session_maker
+            session_maker = async_session_maker
 
             async with session_maker() as session:
                 # if read_only:

@@ -159,7 +159,7 @@ async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, 
     return keywords
 
 
-async def add_positions_to_redis(positions: list[WBItemPosition]):
+async def add_positions_to_redis(positions: list[WBItemPosition]) -> object:
     base_key = 'adv_positions'
     for position in positions:
        position.timestamp = datetime.datetime.now()
@@ -506,3 +506,6 @@ async def get_last_full_stat_update(adv_id: int) -> typing.Optional[datetime.dat
     return datetime.datetime.fromtimestamp(value)
 
 
+async def set_max_bet_for_keyword(text: str, max_bet: int):
+    key = f'max_bet:{text}'
+    await redis_client.set(key, max_bet)
