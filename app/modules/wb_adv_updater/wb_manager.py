@@ -353,7 +353,6 @@ async def update_all_keyword_data(access, adv_setting):
     except ApiForbiddenError:
         logger.error(f'Нет доступов для обновления данных магазина: {access.wb_cabinet.shop_id}')
         return
-
     except Exception as exc:
         logger.error('Ошибка обновления статистики ключевых слов', exc_info=True)
         raise exc
@@ -549,20 +548,18 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
 
     # Преобразование ключевых слов в объекты KeywordSetting
     keyword_settings = [KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords]
-    async with sm(read_only=False) as session:
-        # Обработка данных порциями
-        for keyword in keyword_settings:
-            try:
+    try:
+        async with sm(read_only=False) as session:
+            # Обработка данных порциями
+            for keyword in keyword_settings:
                 check_by_black_list_template = await data_manager.check_by_black_list_template(keyword.text, adv_setting.id)
                 if check_by_black_list_template:
                     keyword.hard_status = 0
                 session.add(keyword)
                 await session.commit()
-            except (ProgramLimitExceededError, IntegrityError):
-                logger.error('Ошибка добавления ключей в postgres', exc_info=True)
-
-            finally:
-                await asyncio.sleep(0)
+    except Exception as exc:
+        logger.error(f'Ошибка добавления ключевых слов в базу данных: {exc}', exc_info=True)
+        raise exc
 
     await update_keywords_stat_in_click_house(client, keywords, adv_setting)
 
