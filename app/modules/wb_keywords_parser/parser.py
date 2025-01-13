@@ -299,7 +299,7 @@ async def add_wb_positions_to_clickhouse(positions):
 async def add_wb_positions_to_all_bases(positions: list[WBItemPosition], need_nmids: set[int]):
     my_positions = [position for position in positions if position.nmid in need_nmids]
     await asyncio.gather(
-        add_wb_positions_to_redis(positions),
+        add_wb_positions_to_redis(my_positions),
         add_wb_positions_to_clickhouse(my_positions),
     )
 
@@ -479,7 +479,7 @@ async def limited_add_wb_positions(text:str,
     global max_threads
     async with semaphore:
         try:
-            positions = await add_wb_positions(text, need_nmids, 1, max_page)
+            await add_wb_positions(text, need_nmids, 1, max_page)
             if last_view:
                  await redis_manager.set_last_views(adv_id, text, last_view)
                  max_threads += 1
