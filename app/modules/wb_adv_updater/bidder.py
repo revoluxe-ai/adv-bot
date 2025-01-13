@@ -108,7 +108,7 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
         if new_cpm >= max_cpm:
             new_cpm = max_cpm
             if adv_setting.reset_place:
-                async with sm() as session:
+                async with sm(read_only=False) as session:
                     adv_setting = await session.get(AdvSetting, adv_setting.id)
                     adv_setting.max_place = promo_position + 1
                     await session.commit()
