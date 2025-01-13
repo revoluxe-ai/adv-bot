@@ -556,7 +556,7 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
                 if check_by_black_list_template:
                     keyword.hard_status = 0
                 session.add(keyword)
-                await session.commit()
+            await session.commit()
     except Exception as exc:
         logger.error(f'Ошибка добавления ключевых слов в базу данных: {exc}', exc_info=True)
         raise exc
