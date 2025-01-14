@@ -16,7 +16,7 @@ async def turn_white_list_update_on(callback_query: CallbackQuery,
                                     bot: Bot,):
 
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(WBCabinet)\
             .join(WBCabinet.adv_settings)\
             .options(selectinload(WBCabinet.adv_settings))\
@@ -38,7 +38,7 @@ async def turn_white_list_update_on(callback_query: CallbackQuery,
 async def turn_white_list_update_off(callback_query: CallbackQuery,
                                      callback_data: callbacks.TurnWhiteListUpdate,
                                      bot: Bot,):
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(WBCabinet)\
             .filter(WBCabinet.id == callback_data.wb_cabinet_original_id)
         wb_cabinet = await session.execute(stmt)
