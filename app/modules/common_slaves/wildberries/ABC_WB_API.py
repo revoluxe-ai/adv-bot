@@ -96,7 +96,7 @@ class ABC_WB_API(WbRequestApiMixin):
         else:
             wb_cabinet: WBCabinet = self.access.wb_cabinet
             try:
-                async with sm() as session:
+                async with sm(read_only=False) as session:
                     fresh_cabinet = await session.get(WBCabinet, wb_cabinet.id)
                     if fresh_cabinet:
                         fresh_cabinet.active = False

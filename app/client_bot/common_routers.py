@@ -19,12 +19,13 @@ from .user_interface.handlers import (adv_setting,
                                      start,
                                      strategy_setting,
                                       change_cpm,
-                                      shop_settings
+                                      shop_settings,
+                                       reset_place_setting
 
 )
 
 from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
-from app.modules.phone_getter import router as phone_getter_router
+
 
 from ..settings import settings
 
@@ -38,7 +39,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
     common_router.include_routers(exceptions.admin_router)
 
-common_router.include_routers(phone_getter_router)
+common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)
 common_router.include_routers(favorite_advs_for_users.router)

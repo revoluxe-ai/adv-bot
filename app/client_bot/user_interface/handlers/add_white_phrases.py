@@ -80,7 +80,7 @@ async def reset_white_list(callback: CallbackQuery,
                            callback_data: callbacks.ResetWhiteList):
     await bot.send_message(callback.from_user.id, 'Сброс белого списка...')
     adv_setting_id = callback_data.adv_setting_original_id
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(KeywordSetting)\
             .where(KeywordSetting.adv_setting_id == adv_setting_id,
                    KeywordSetting.hard_status == 2)

@@ -15,7 +15,7 @@ async def delete_wb_user_cabinet(callback: types.CallbackQuery,
                                  bot: aiogram.Bot,):
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     user_telegram_id = callback.from_user.id
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = delete(WBUserCabinet)\
         .filter(WBUserCabinet.id == wb_user_cabinet_original_id)\
         .returning(WBUserCabinet)

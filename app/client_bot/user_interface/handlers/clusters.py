@@ -35,7 +35,7 @@ async def turn_clusters_on(callback: types.CallbackQuery, bot: Bot,
     adv_setting_id = callback_data.adv_original_id
     data = await state.get_data()
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv_setting = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         )
@@ -58,7 +58,7 @@ async def turn_clusters_off(callback: types.CallbackQuery, bot: Bot,
     adv_setting_id = callback_data.adv_original_id
     data = await state.get_data()
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv_setting = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         )

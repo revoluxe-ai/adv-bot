@@ -209,3 +209,6 @@ class ChangeCPM(CallbackData, prefix="change_cpm"):
         wb_user_cabinet_original_id: int
 
 
+class ResetPlace(CallbackData, prefix="reset_place"):
+    action: str
+    adv_setting_original_id: int

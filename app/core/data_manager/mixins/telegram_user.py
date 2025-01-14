@@ -27,7 +27,7 @@ class TelegramUserMixin:
 
     @staticmethod
     async def save_phone(user_telegram_id: int, phone_number: str):
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             stmt = select(User).\
                 filter(User.user_telegram_id == user_telegram_id)
             result = await session.execute(stmt)

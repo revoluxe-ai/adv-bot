@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint, ARRAY
 from sqlalchemy import (Column, Integer, String, ForeignKey,
                         BIGINT, Boolean, Float, DateTime, text)
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -188,6 +188,11 @@ class WBCard(BaseTable): # Изменено название таблицы
             url = photo['big']
             urls.append(url)
         return urls
+    @property
+    def SubjectId(self):
+        return self.card_json['subjectID']
+
+
 
 class AdvSetting(BaseTable):
     def __repr__(self):
@@ -196,7 +201,7 @@ class AdvSetting(BaseTable):
         'User',
         secondary=favorite_advs_association,
         back_populates='favorites_advs')
-    adv_id = Column(BIGINT(), unique=True)
+    adv_id = Column(BIGINT(), unique=True) # Автоматическая рекламная кампания
     name = mapped_column(String, nullable=False)
     wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet: Mapped[WBCabinet] =  relationship('WBCabinet',
@@ -236,6 +241,8 @@ class AdvSetting(BaseTable):
     hide_small_query_keywords = mapped_column(Integer, nullable=True, default=0)
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
     new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
+    reset_place = mapped_column(Boolean, nullable=True, default=True)
+    _search_adv_id = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         # Составной индекс для основного запроса
@@ -254,20 +261,31 @@ class AdvSetting(BaseTable):
               'name',
               postgresql_using='gin',
               postgresql_ops={'name': 'gin_trgm_ops'}),
+        Index('ix_name__nmids__search_adv_id', 'name', 'nmids', '_search_adv_id')
     )
 
 
 
     @property
-    def search_adv_id(self):
+    def search_adv_id(self): #Аукцион
+        if self._search_adv_id:
+            return self._search_adv_id
         if not self.name:
             return None
+        name = self.name
+        name = name.replace(' ', '')
         pattern = re.compile(r'<!-\[(\d+)\]-!>') # Изменено на поиск по всей строке
-        match = re.search(pattern, self.name)
+        match = re.search(pattern,  name)
         if not match:
             return None
         else:
-            return int(match.group(1))
+           return int(match.group(1))
+
+    @search_adv_id.setter
+    def search_adv_id(self, value: int):
+        assert isinstance(value, int)
+        self._search_adv_id = value
+
 
     @property
     def max_pay_for_order(self) -> Optional[int]:

@@ -39,7 +39,7 @@ redis_manager = RedisManager()
 async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     await state.clear()
     referral_link  = None
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         user_id = message.from_user.id
         if isinstance(message, types.Message) and message.text:
             text = message.text.split(' ')
@@ -175,7 +175,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
     cabinet_name = data_state['cabinet_name'].strip()
     user_id = message.from_user.id
     #получаем юзера
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(User).\
         options(joinedload(User.wb_tokens))\
         .where(User.user_telegram_id == user_id)
@@ -187,7 +187,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             await session.commit()
 
     #проверяем есть ли кабинет именно у этого юзера
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(WBCabinet)\
         .join(WBCabinet.wb_user_cabinets)\
         .join(WBUserCabinet.user)\
@@ -220,11 +220,19 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
             access.wb_cabinet = wb_cabinet
             wb_user_cabinet = WBUserCabinet(name=cabinet_name)
             wb_user_cabinet.user = user
-            user.wb_tokens.append(wb_token)
             wb_user_cabinet.wb_cabinet = wb_cabinet
             session.add(wb_user_cabinet)
             await session.commit()
             await session.refresh(wb_user_cabinet)
+            stmt = select(WBToken).where(
+                WBToken.api_key == wb_token.api_key,
+                WBToken.user_id == wb_token.user_id
+            )
+            existing_token = (await session.execute(stmt)).scalar()
+
+            if not existing_token:
+                # Если токен не найден, добавляем новый
+                user.wb_tokens.append(wb_token)
             await messages. \
                 ShopAddedSuccess(bot, chat_id, cabinet_name)()
 
@@ -314,7 +322,7 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
             GetApiForrbidenError(bot, chat_id)()
         return
     else:
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             user.wb_tokens.append(wb_token)
             session.add(user)
             await session.commit()

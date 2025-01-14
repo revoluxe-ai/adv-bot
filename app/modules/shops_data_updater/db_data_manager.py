@@ -10,5 +10,10 @@ async def get_all_shop_ids():
     return await data_manager.get_all_shop_ids()
 
 
+
+async def get_all_active_shop_ids_with_active_advs():
+    return await data_manager.get_all_active_shop_ids_with_active_advs()
+
+
 async def get_active_adv_ids(shop_id):
     return await data_manager.get_active_adv_ids_for_shop(shop_id)

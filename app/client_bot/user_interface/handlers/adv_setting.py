@@ -149,9 +149,10 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
                       bot: aiogram.Bot):
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     adv_original_id = callback_data.adv_original_id
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         session.begin()
         stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet)\
+        .options(selectinload(WBUserCabinet.wb_cabinet))\
         .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
@@ -207,7 +208,7 @@ async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
                            callback_data: callbacks.TurnBot, bot: aiogram.Bot, ):
     await bot.send_message(callback.message.chat.id, 'Отключаю бота от всех кампаний')
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         advs = await session.execute(select(AdvSetting).join(AdvSetting.wb_cabinet)\
         .join(WBCabinet.wb_user_cabinets)\
         .where(WBUserCabinet.id == wb_user_cabinet_original_id))
@@ -230,7 +231,7 @@ async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnB
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv_setting = await session.execute(select(AdvSetting) \
                                             .where(AdvSetting.id == callback_data.adv_original_id))
 
@@ -254,7 +255,7 @@ async def turn_on_auto_min_ctr(call: types.CallbackQuery, callback_data: callbac
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv_setting = await session.execute(select(AdvSetting) \
                                             .where(AdvSetting.id == callback_data.adv_setting_original_id))
 
@@ -271,7 +272,7 @@ async def turn_on_auto_min_ctr(call: types.CallbackQuery, callback_data: callbac
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_off_auto_min_ctr'))
 async def turn_off_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR,
                                 state: FSMContext):
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv_setting = await session.execute(select(AdvSetting) \
                                             .where(AdvSetting.id == callback_data.adv_setting_original_id))
 

@@ -58,8 +58,15 @@ async def __run_update_keyword_stat():
 
 
 
-async def run_update_minus_keywords_on_wb():
-    await wb_manager.update_keywords_in_advs()
+async def run_update_all_keywords_on_wb():
+    while True:
+        try:
+            await wb_manager.update_all_keywords_on_wb()
+        except Exception:
+            logger.error('Ошибка обновления фраз', exc_info=True)
+        await asyncio.sleep(5)
+
+
 
 #
 # async def update_min_ctr_in_global_wb_category_settings():
@@ -128,7 +135,12 @@ async def reset_out_positions_in_redis():
 
 
 async def keywords_parsing_process():
-    await __keywords_parsing_process()
+    while True:
+        try:
+            await __keywords_parsing_process()
+        except:
+            logger.error('Ошибка парсинга ключей', exc_info=True)
+        await asyncio.sleep(60)
 
 
 async def __keywords_parsing_process():

@@ -21,6 +21,18 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosit
 # redis_client = redis.asyncio.Redis(host='147.45.151.145', port=6379, db=0)
 redis_client = redis.asyncio.Redis(host='localhost', port=6379, db=0)
 
+
+from urllib.parse import quote, unquote
+
+def encode_key(raw_key):
+    encoded_key = quote(raw_key)
+    return encoded_key
+
+def decode_key(key):
+    decoded_key = unquote(key)
+    return decoded_key
+
+
 class RedisEvent(asyncio.Event):
     def __init__(self, key=None):
         if key:
@@ -147,7 +159,7 @@ async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, 
     return keywords
 
 
-async def add_positions_to_redis(positions: list[WBItemPosition]):
+async def add_positions_to_redis(positions: list[WBItemPosition]) -> object:
     base_key = 'adv_positions'
     for position in positions:
        position.timestamp = datetime.datetime.now()
@@ -358,14 +370,14 @@ async def get(key):
 
 
 async def set_cluster_and_preset(text, cluster: str, preset:  typing.Optional[int]):
-    key = 'cluster_and_preset:' + text
+    key = 'cluster_and_preset:' + encode_key(text)
     if cluster is None or preset is None:
         await redis_client.delete(key)
     else:
         value = cluster + ':' + str(preset)
         await redis_client.set(key, value)
         text = cluster
-        key = 'cluster_and_preset:' + text
+        key = 'cluster_and_preset:' + encode_key(text)
         await redis_client.set(key, value)
     return None
 
@@ -373,14 +385,18 @@ async def set_cluster_and_preset(text, cluster: str, preset:  typing.Optional[in
 
 
 async def get_cluster_and_preset(text)-> (str, int,):
-    key = 'cluster_and_preset:' + text
+    key = 'cluster_and_preset:' + encode_key(text)
     value = await redis_client.get(key)
     if isinstance(value, NoneType):
         return None, None
     value = value.decode('utf-8')
     value = str(value)
     data = value.split(':')
-    cluster, preset = data
+    try:
+        cluster, preset = data
+    except:
+        logger.error('Ошибка распаковки данных о кластере и пресете')
+        return None, None
     return cluster, preset
 
 
@@ -427,13 +443,18 @@ async def get_last_views(adv_id, text):
 
 
 async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]]]:
-    result = await redis_client.mget([f'cluster_and_preset:{text}' for text in texts])
+    result = await redis_client.mget([f'cluster_and_preset:{encode_key(text)}' for text in texts])
     clusters_and_presets = {}
     for i, value in enumerate(result):
         if value is None:
             continue
         value = value.decode('utf-8')
-        cluster, preset = value.split(':')
+        try:
+            cluster, preset = value.split(':')
+        except Exception as e:
+            logger.error(f'Ошибка при парсинге значения {value} из Redis с ключом {texts[i]}: {e}')
+            clusters_and_presets[texts[i]] = (None, None)
+            continue
         clusters_and_presets[texts[i]] = (cluster, int(preset))
     return clusters_and_presets
 
@@ -453,8 +474,8 @@ async def get_keywords_positions_by_nmid(nmid: int):
 async def set_full_stat_adv(adv_stats: list['FullAdvStat']):
     async with redis_client.pipeline() as pipe:
         for adv_stat in adv_stats:
-            key = f'full_stat_adv:{adv_stat.adv_id}'
-            json_data = adv_stat.to_json()
+            key = f'full_stat_adv:{adv_stat.advertId}'
+            json_data = adv_stat.model_dump_json()
             await pipe.set(key, json_data)
         await pipe.execute()  # Выполняем все команды за один раз
     return None
@@ -468,3 +489,23 @@ async def get_full_stat_adv(adv_id: int)-> str:
         raise DataNotFoundError(f'Данные для объявления с adv_id={adv_id} не найдены в Redis')
     json_data = json_data.decode('utf-8')
     return json_data
+
+async def set_last_full_stat_update(adv_id: int, last_update: datetime.datetime)-> None:
+    key = f'last_full_stat_update:{adv_id}'
+    await redis_client.set(key, last_update.timestamp())
+    return None
+
+
+async def get_last_full_stat_update(adv_id: int) -> typing.Optional[datetime.datetime]:
+    key = f'last_full_stat_update:{adv_id}'
+    value = await redis_client.get(key)
+    if value is None:
+        return None
+    value = value.decode('utf-8')
+    value = float(value)
+    return datetime.datetime.fromtimestamp(value)
+
+
+async def set_max_bet_for_keyword(text: str, max_bet: int):
+    key = f'max_bet:{text}'
+    await redis_client.set(key, max_bet)

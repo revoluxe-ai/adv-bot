@@ -108,7 +108,7 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
 
     await sender_manager.send_message_to_admin(message_for_admin)
 
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
         result = await session.execute(stmt)
 

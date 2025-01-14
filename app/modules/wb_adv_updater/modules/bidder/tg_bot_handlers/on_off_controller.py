@@ -39,7 +39,7 @@ async def off_auto_cpm(callback: types.CallbackQuery,
 
 
         adv_original_id = callback_data.adv_original_id
-        async with sm() as session:
+        async with sm(read_only=False) as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
             adv.bidder_active = False

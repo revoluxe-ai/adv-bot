@@ -8,6 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
+from app.modules.shops_data_updater.types import FullAdvStat
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
@@ -249,7 +250,7 @@ class ShopUpdateInfo(Text):
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
-    parse_mode = ParseMode.MARKDOWN
+    # parse_mode = ParseMode.HTML
 
     def __init__(self, bot: Bot,
                  chat_id: int,
@@ -271,6 +272,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(self.adv.id,
                                                                         self.wb_user_cabinet.user_id)
+
+
+        full_stat_update_time = await self._get_last_full_stat_update(self.adv.adv_id)
+        self.full_stat_update_time = full_stat_update_time if full_stat_update_time else 'Нет данных'
 
         try:
             nmids = self.adv.nmids
@@ -300,6 +305,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self.keywords_status_last_update_search_adv = 'Аукцион не подключен к РК'
 
+
+        adv_stat: FullAdvStat \
+            = await data_manager.get_full_adv_stat_for_adv_id_from_redis(adv_id=self.adv.adv_id)
+
+        self.adv_stat = adv_stat
+
+
         await super().__call__()
 
     @property
@@ -311,16 +323,49 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             max_cpc_text = f'Максимальная стоимость клика: {max_cpc} р.'
 
         text = (
-            f'📢 *Кампания:* {self.adv.name}\n'
-            f'🆔 *ID кампании:* {self.adv.adv_id}\n'
-            f'📌 *Статус:* {self.adv.active_status}\n'
-            f'🎯 *Минимальный CTR для кампании:* {round(self._min_ctr*100, 2)} %\n'
-            f'🔢 *Минимальное количество показов для прогноза CTR:* {self.adv.min_views_for_ml_predict}\n'
+            f'📢 Кампания: {self.adv.name}\n'
+            f'🆔 ID кампании: {self.adv.adv_id}\n'
+            f'📌 Статус: {self.adv.active_status}\n'
+            f'🎯 Минимальный CTR для кампании: {round(self._min_ctr*100, 2)} %\n'
+            f'🔢 Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n'
             f'Последнее обновление обобщенной статистики ключевых слов в базе: {self.last_update_keyword_stat_str}\n'
             f'Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n'
             f'Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n'
+            f'Последнее обновление полной статистики: {self.full_stat_update_time}\n'
         )
+
+        adv_stat = self.adv_stat
+
+        if adv_stat:
+
+            days_stat = adv_stat.days
+
+            days_stat = sorted(days_stat, key=lambda x: x.date)
+
+            stat_text = 'Себестоимость заказа за последние дни (заказы) (затраты):\n'
+
+            def reverse_date(date_str):
+                parts = date_str.split('-')
+                if len(parts) == 3:
+                    return '-'.join(reversed(parts))
+                else:
+                    raise ValueError("Неправильный формат даты. Ожидается 'дата-месяц-год'.")
+
+            for day_stat in days_stat[-5:]:
+                date = day_stat.date
+                date = reverse_date(date)
+                date = date.replace('T03:00:00+03:00', '')
+                spend = day_stat.sum
+                orders = day_stat.orders
+                if orders:
+                    cost_per_order = spend / orders
+                else:
+                    cost_per_order = 0
+                stat_text += f'{date}: {round(cost_per_order, 0)} ({orders}) ({spend}) р.\n'
+
+            text += stat_text
         text += f'{max_cpc_text}'
+
         return text
 
     @property
@@ -340,7 +385,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         return timestamp
 
 
-
+    async def _get_last_full_stat_update(self, adv_id: int) -> datetime:
+        last_full_stat_update = await data_manager.get_last_full_stat_update(adv_id)
+        return last_full_stat_update
 
 
 
@@ -556,7 +603,7 @@ class KeywordSettingMessage(TextWithKeyboard):
     async def __call__(self):
         auto_block_status = await redis_manager.get_auto_block_status(self._keyword_original_id)
         self._auto_block_status = auto_block_status
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(KeywordSetting)\
                           .options(selectinload(KeywordSetting.adv_setting))\
                           .where(KeywordSetting.id == self._keyword_original_id)
@@ -761,7 +808,7 @@ class ShopMenu(TextWithKeyboard):
 
 
      async def _is_active_adv(self):
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(AdvSetting)\
                 .where(
                 AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
@@ -777,7 +824,7 @@ class ShopMenu(TextWithKeyboard):
      async def __call__(self):
         wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
         await self._state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(WBUserCabinet)\
                 .options(selectinload(WBUserCabinet.wb_cabinet),
                          selectinload(WBUserCabinet.user)\
@@ -803,7 +850,7 @@ class ShopMenu(TextWithKeyboard):
         self._balance = balance
         self._bonus = bonus
         total_amount_for_day = 0
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(func.count(AdvSetting.id))\
                 .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
                        AdvSetting.bot_active == True)
@@ -848,7 +895,7 @@ class ShopMenu(TextWithKeyboard):
             expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
         else:
             expiration_time = shops_tokens[0].expires
-        if expiration_time < datetime.datetime.now():
+        if expiration_time < datetime.datetime.now() and user.user_telegram_id in const.ADMINS:
             await self.bot.send_message(self.chat_id, 'Срок действия токена истек. Пожалуйста, обновите токен.\n'
                                                 'Для этого добавьте магазин под другим именем с новым токеном')
             return
@@ -1046,7 +1093,13 @@ class SettingMinCTR(TextWithKeyboard):
             self._min_ctr_type = 'direct'
 
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
-        keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
+
+        keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
+        keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
+        keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
+        keywords_with_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+        keywords = keywords_with_rating + keywords_without_rating
+
         goods = []
         bads = []
         for kw in keywords:
@@ -1699,12 +1752,11 @@ class Single_message100(Text):
 
 class Single_message101(Text):
     text = """
-    🎉 Ура! Я записал свежее видео с практикой работы с ботом.\n
-    🤖 Также рассказал о самых последних изменениях, улучшениях и доработках, а также проговорил текущую логику работы бота, так что смотреть обязательно не только новичкам, но и старожилам! 📈👥\n
-🎥 Смотрим! 👀\n
-   Видео на канале - https://t.me/auto_wb_master/227 \n\n
-   Жмите /start , запускайте рекламу и забирайте топы продаж!
-    
+    🎉 Внимание! Вопросы и Ответы по продвижению на WB и боту WBGRAM Lite.\n
+    🤖 Сегодня, в 18:00 по МСК я проведу эфир на канале телеграм, где каждый сможет задать свой вопрос по поводу продвижения на WB и работы бота 📈👥\n
+🎥 Заходим! 👀\n
+   Ссылка на канал - https://t.me/auto_wb_master\n\n
+   До встречи! 🚀
     
     """
 
@@ -2338,7 +2390,7 @@ class Single_message115(Text):
     """
 
 
-class Single_message116(TextWithImage):
+class Single_message1000(TextWithImage):
     parse_mode='Markdown'
 
     image = 'images_for_sendings/2.jpg'
@@ -2428,7 +2480,13 @@ class ShowFavoriteAdvs(TextWithKeyboard):
             result = await session.execute(stmt)
             user = result.scalars().first()
             self.user = user
-            advs: list[AdvSetting] = user.favorites_advs
+            try:
+                 advs: list[AdvSetting] = user.favorites_advs
+            except:
+                await self.bot.send_message(self.user_telegram_id, text="У вас нет избранных кампаний,"
+                                                                        " добавить кампании в избранное вы сможете отдельно в каждом магазине"
+                                                                        ". После этого сможете управлять всеми кампаниями ваших магазинов в одном месте.")
+                return
         self.advs = await data_manager.set_worst_promo_position(advs)
         await super().__call__()
 

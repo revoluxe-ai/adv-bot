@@ -194,6 +194,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
         adv_setting: AdvSetting = result.scalar()
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.keyword_setting.hard_status == 2]
+    keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=1)
@@ -218,7 +219,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
         adv_choice_last_page,
         main_photos[0],
         page=1,
-    )(state)
+    )(state, 'white_list')
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
     return
@@ -399,7 +400,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
     await state.update_data(last_keyword_setting_page=page)
     state_data = await state.get_data()
     adv_choice_last_page = state_data.get('adv_choice_last_page', 1)
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         stmt = select(WBUserCabinet) \
             .join(User, User.id == WBUserCabinet.user_id) \
             .join(WBCabinet,
@@ -483,7 +484,7 @@ async def change_keyword_hard_status(callback: types.CallbackQuery,
     async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
         new_hard_status = callback_data.new_hard_status
         keyword_setting_original_id = callback_data.keyword_setting_original_id
-        async with _sm() as session:
+        async with _sm(read_only=False) as session:
             keyword_setting = await session.execute(select(KeywordSetting)
              .options(selectinload(KeywordSetting.adv_setting))
                                                    .where(KeywordSetting.id == keyword_setting_original_id))
@@ -574,7 +575,7 @@ async def setting_keywords_filter_by_query(message: types.Message,
     callback_data = await state.get_data()
     adv_original_id = int(callback_data.get('last_adv_original_id'))
     await messages.LongTimeOperation(bot, message.chat.id)()
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         stmt = select(AdvSetting) \
             .where(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
@@ -628,7 +629,7 @@ async def reset_added_clicks(callback: types.CallbackQuery,
                              bot: aiogram.Bot, state: FSMContext):
 
     adv_setting_original_id = callback_data.adv_setting_original_id
-    async with _sm() as session:
+    async with _sm(read_only=False) as session:
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)
         result = await session.execute(stmt)
         keyword_settings = result.scalars().all()

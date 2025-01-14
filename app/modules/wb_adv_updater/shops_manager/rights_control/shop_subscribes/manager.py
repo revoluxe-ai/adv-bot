@@ -56,7 +56,7 @@ async def send_messages_for_shop_subscribes_expire():
                     )
                 )
             )
-            async with _sm() as session:
+            async with _sm(read_only=False) as session:
                 result = await session.execute(stmt)
                 wb_cabinets = result.scalars().all()
 

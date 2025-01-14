@@ -16,7 +16,7 @@ from sqlalchemy import select, and_, not_
 
 
 
-from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting
+from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting, WBCabinet
 from aiogram.client.session import aiohttp
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -296,10 +296,11 @@ async def add_wb_positions_to_clickhouse(positions):
 
 
 
-async def add_wb_positions_to_all_bases(positions: list[WBItemPosition]):
+async def add_wb_positions_to_all_bases(positions: list[WBItemPosition], need_nmids: set[int]):
+    my_positions = [position for position in positions if position.nmid in need_nmids]
     await asyncio.gather(
-        add_wb_positions_to_redis(positions),
-        add_wb_positions_to_clickhouse(positions),
+        add_wb_positions_to_redis(my_positions),
+        add_wb_positions_to_clickhouse(my_positions),
     )
 
 async def _add_positions_from_page(stop_event: asyncio.Event,
@@ -320,11 +321,17 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
         return []
     catch_any_position.set()
     logger.debug(f'Найдено {len(positions)}')
-    positions = [position for position in positions if position.nmid in need_nmids]
-    logger.debug(f'После фильтра осталось {len(positions)}')
     if positions:
-        await add_wb_positions_to_all_bases(positions)
-        logger.debug('Записали позиции в Редис')
+        await add_wb_positions_to_all_bases(positions, need_nmids)
+        positions_for_catch_max_bet = [position for position in positions if position.promo_position\
+                                       and position.promo_position <= 40]
+        cpms = [position.cpm for position in positions_for_catch_max_bet]
+        if cpms:
+            max_bet = max(cpms)
+            await redis_manager.set_max_bet_for_keyword(text, max_bet)
+        else:
+            logger.error(f'Не найдена максимальная ставка для ключа {text}')
+        logger.debug('Записали позиции в базы')
         for position in positions:
             nmid: int = position.nmid
             need_nmids.discard(nmid)
@@ -501,7 +508,6 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
 
         stmt = select(AdvSetting).where(
             AdvSetting.parsing_active == True,
-            AdvSetting.active_status == 'started'
         )
         logger.debug("Формирование запроса для выбора активных рекламных кампаний.")
 
@@ -524,12 +530,18 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
             logger.error('Ошибка получения фраз для парсинга', exc_info=True)
             continue
         for keyword in keywords:
+            text = keyword.text
+            last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
+            if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(days=1)\
+                    and keyword.hard_status != 0:
+                logger.debug(f"Последняя позиция для ключевого слова '{text}' устарела. Перезапуск парсинга.")
+                await redis_manager.set_last_views(adv_id, text, 0)
+                await queue.put((text, adv.adv_id, list(need_nmids), None, 60))
             if keyword.views == 0:
                 logger.debug(f"Ключевое слово '{keyword.text}' не имеет просмотров. Пропуск.")
                 await asyncio.sleep(0)
                 continue
             total_views = keyword.views
-            text = keyword.text
             logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
             cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
             if not cluster_name:
@@ -542,7 +554,6 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
             if keyword.status == KeywordStatus.GOOD:
                 logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
                 last_views = await redis_manager.get_last_views(adv_id, text)
-                last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
                 if not last_views or\
                         (total_views - last_views) > max_views_difference and keyword.hard_status == 2 or\
                         last_views == total_views and keyword.hard_status == 2\
