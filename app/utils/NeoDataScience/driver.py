@@ -1185,6 +1185,15 @@ UNWIND phrase.words AS word
             await asyncio.sleep(0)
 
     async def __update_keywords_vectors(self):
+        while True:
+            try:
+                await self.__update_keywords_vectors_process()
+            except Exception as exc:
+                logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
+            await asyncio.sleep(0)
+
+
+    async def __update_keywords_vectors_process(self):
         batch_size = 1000  # Размер порции
         last_processed_id = None  # Начальное значение для курсора
 
@@ -1193,7 +1202,7 @@ UNWIND phrase.words AS word
                 # Получаем количество уникальных текстов один раз
                 count_stmt = select(func.count()).select_from(
                     select(KeywordSetting.text).distinct().join(KeywordSetting.adv_setting).where(
-                        AdvSetting.active_status.in_(['started'])
+                        AdvSetting.bot_active == True
                     ).subquery()
                 )
                 total_count_result = await session.execute(count_stmt)
