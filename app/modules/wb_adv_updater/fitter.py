@@ -56,34 +56,43 @@ async def _fit_modelGradientBoosting():
         logger.info('Нет данных для обучения')
         return
     df:pd.DataFrame = await _bayesian_apply(df)
-    await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
-    y = df['ctr']
-    X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids'],
-                axis=1)
-    logger.debug('Данные подготовлены')
-    # Создание модели градиентного бустинга
-    model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
-    if settings.cv:
-        logger.debug('Начало кросс-валидации')
-        cv = KFold(n_splits=5, random_state=42, shuffle=True)
-        scores = cross_validate(model, X, y, scoring='neg_mean_squared_error', cv=cv)
-        logger.debug('Кросс-валидация завершена')
-        mse_scores = -scores['test_score']
-        # Вычисление и вывод метрик
-        mean_mse = mse_scores.mean()
-        std_dev_mse = mse_scores.std()
-        max_difference = mse_scores.max() - mse_scores.min()
+    try:
+        await asyncio.to_thread(df.to_csv, 'work_folder/df_for_fit.csv', index=False)
+    except Exception:
+        logger.error('Ошибка при сохранении данных для обучения', exc_info=True)
+    try:
+        y = df['ctr']
+        X = df.drop(['keyword', 'views', 'ctr', 'clicks', 'adv_id', 'spend', 'nmids'],
+                    axis=1)
+        logger.debug('Данные подготовлены')
+        # Создание модели градиентного бустинга
+        model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
+        if settings.cv:
+            logger.debug('Начало кросс-валидации')
+            cv = KFold(n_splits=5, random_state=42, shuffle=True)
+            scores = cross_validate(model, X, y, scoring='neg_mean_squared_error', cv=cv)
+            logger.debug('Кросс-валидация завершена')
+            mse_scores = -scores['test_score']
+            # Вычисление и вывод метрик
+            mean_mse = mse_scores.mean()
+            std_dev_mse = mse_scores.std()
+            max_difference = mse_scores.max() - mse_scores.min()
 
-        logger.info(f"CV MSE scores: {mse_scores}\n"
-        f"Mean CV MSE: {mean_mse}\n"
-        f"Standard Deviation of CV MSE: {std_dev_mse}\n"
-        f"Max difference between CV MSE scores: {max_difference}\n"
-        )
-    logger.debug('Обучение модели на полных данных')
-    model.fit(X, y)
-    logger.debug('Модель обучена')
-    model = typing.cast(xgboost.XGBModel, model.named_steps['xgbregressor'])
-    await asyncio.to_thread(save_model, model, time_stamp= None)
+            logger.info(f"CV MSE scores: {mse_scores}\n"
+            f"Mean CV MSE: {mean_mse}\n"
+            f"Standard Deviation of CV MSE: {std_dev_mse}\n"
+            f"Max difference between CV MSE scores: {max_difference}\n"
+            )
+        logger.debug('Обучение модели на полных данных')
+        model.fit(X, y)
+        logger.debug('Модель обучена')
+        model = typing.cast(xgboost.XGBModel, model.named_steps['xgbregressor'])
+        await asyncio.to_thread(save_model, model, time_stamp= None)
+    except Exception as exc:
+        logger.error(f'Ошибка при обучении модели: {exc}', exc_info=True)
+        raise exc
+
+
 
 
 async def _get_df_for_fit() -> pd.DataFrame:
