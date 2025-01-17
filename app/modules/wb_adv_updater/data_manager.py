@@ -852,7 +852,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
     for keyword_setting in keyword_settings:
         text = keyword_setting.text
-        if text not in texts_in_keyword_stat and keyword_setting.hard_status == 2:
+        if text not in texts_in_keyword_stat:
             keyword_setting = text_to_keyword_setting[text]
 
             keyword = CalculatedKeyword(text=text,
