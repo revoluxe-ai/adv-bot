@@ -140,8 +140,8 @@ class Predictor:
             stmt = select(AdvSetting).options(
                 selectinload(AdvSetting.adv_keywords),
                 selectinload(AdvSetting.keyword_settings)
-            ).where(AdvSetting.bot_active == True,
-                    AdvSetting.active_status == 'started')
+            ).where(AdvSetting.bot_active == True
+                    )
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
         try:
@@ -167,7 +167,7 @@ class Predictor:
                 .join(KeywordSetting.adv_setting)\
                 .options(selectinload(KeywordSetting.adv_setting))\
                 .where(AdvSetting.bot_active == True,
-                       AdvSetting.active_status == 'started')
+                       )
             result = await session.execute(stmt)
             keyword_settings = result.scalars().all()
 
