@@ -216,7 +216,6 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
             if await gds.check_phrase_in_neo(text):
                 logger.debug(f'Фраза {text} уже есть в базе данных')
                 await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
-                await asyncio.sleep(0)
                 continue
             logger.debug(f'Записываем в нео фразу {text}')
             phrase_data = await get_phrase_data(text)
@@ -227,13 +226,11 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
             if len(phrase_data_list) >= batch_size:
                 await gds.add_keyword_phrase(phrase_data_list)
                 phrase_data_list.clear()
-            await asyncio.sleep(0)
 
     # Записываем оставшиеся данные, если они есть
     if phrase_data_list:
         await gds.add_keyword_phrase(phrase_data_list)
-        await asyncio.sleep(0)
-    pass
+
 
 async def update_wb_adv_phrase_in_db():
     while True:
