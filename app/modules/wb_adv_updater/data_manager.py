@@ -1359,59 +1359,64 @@ async def _get_min_ctr(adv: AdvSetting):
     texts = [kw.text for kw in keyword_settings]
     if texts:
         adv_id = adv.adv_id
-        query = f"""
-                  WITH
-        latest_versions AS (
-            SELECT
-                text,
-                date,
-                MAX(version) AS latest_version
-            FROM
-                default_db.advkeyword
-            WHERE
-                adv_id = {adv_id}
-                AND text IN ({', '.join(f"'{text}'" for text in texts)})
-            GROUP BY
-                text, date
-        ),
-        stats AS (
-            SELECT
-                a.text,
-                SUM(a.clicks) AS total_clicks,
-                SUM(a.views) AS total_views
-            FROM
-                default_db.advkeyword a
-            INNER JOIN
-                latest_versions lv
-            ON
-                a.text = lv.text
-                AND a.date = lv.date
-                AND a.version = lv.latest_version
-            WHERE
-                a.adv_id = {adv_id}
-            GROUP BY
-                a.text
-        )
-                    SELECT
-                        text,
-                        total_clicks / CASE
-                            WHEN total_views = 0 THEN 1
-                            ELSE total_views
-                        END AS ctr,
-                        total_views AS views
-                    FROM
-                        stats
-                    WHERE
-                        total_clicks > 0
-    
-    
-                """
+        query = """
+        WITH
+            latest_versions AS (
+                SELECT
+                    text,
+                    date,
+                    MAX(version) AS latest_version
+                FROM
+                    default_db.advkeyword
+                WHERE
+                    adv_id = %(adv_id)s
+                    AND text IN %(texts)s
+                GROUP BY
+                    text, date
+            ),
+            stats AS (
+                SELECT
+                    a.text,
+                    SUM(a.clicks) AS total_clicks,
+                    SUM(a.views) AS total_views
+                FROM
+                    default_db.advkeyword a
+                INNER JOIN
+                    latest_versions lv
+                ON
+                    a.text = lv.text
+                    AND a.date = lv.date
+                    AND a.version = lv.latest_version
+                WHERE
+                    a.adv_id = %(adv_id)s
+                GROUP BY
+                    a.text
+            )
+        SELECT
+            text,
+            total_clicks / CASE
+                WHEN total_views = 0 THEN 1
+                ELSE total_views
+            END AS ctr,
+            total_views AS views
+        FROM
+            stats
+        WHERE
+            total_clicks > 0
+        """
+
+        params = {
+            "adv_id": adv_id,
+            "texts": tuple(texts),
+        }
+
         try:
             async with get_clickhouse_client() as client:
-                result = await client.query(query)
+                result = await client.query(query, params)
                 rows = result.result_rows
         except Exception:
-            logger.error(f'Ошибка получения статистики из ch, {query}', exc_info=True)
+            logger.error(f'Ошибка получения статистики из ch', exc_info=True)
+            raise
 
 
 
