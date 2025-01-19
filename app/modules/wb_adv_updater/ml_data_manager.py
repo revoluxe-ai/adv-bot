@@ -220,6 +220,7 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
                 continue
             logger.debug(f'Записываем в нео фразу {text}')
             phrase_data = await get_phrase_data(text)
+            logger.debug('Phrase Data получена')
             await redis_manager.add_phrase_hash_like_is_in_neo(hash_text)
             phrase_data_list.append(phrase_data)
             # Записываем, если набрался полный батч
