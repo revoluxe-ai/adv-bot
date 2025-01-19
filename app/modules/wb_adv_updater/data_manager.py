@@ -1406,10 +1406,15 @@ async def _get_min_ctr(adv: AdvSetting):
     
     
                 """
+        try:
+            async with get_clickhouse_client() as client:
+                result = await client.query(query)
+                rows = result.result_rows
+        except Exception:
+            logger.error(f'Ошибка получения статистики из ch, {query}', exc_info=True)
 
-        async with get_clickhouse_client() as client:
-            result = await client.query(query)
-            rows = result.result_rows
+
+
         text_to_real_ctr = {row[0]: row[1] for row in rows}
         real_ctrs  = []
         predict_ctrs = []
