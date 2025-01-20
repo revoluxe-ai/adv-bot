@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import re
-
+from app.modules.adv_creator.telegram.telegram_button import get_telegram_button as get_button_for_create_new_complex_adv
 import aiogram
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -194,7 +194,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
             last_wb_user_cabinet_page=self._page
         )
-        self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
+        # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
         await super().__call__()
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
@@ -499,7 +499,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
 
 
-    async def __call__(self, state: FSMContext, sort_mode = 'default'):
+    async def __call__(self, state: FSMContext, sort_mode = 'by_adv'):
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
@@ -973,6 +973,9 @@ class ShopMenu(TextWithKeyboard):
             wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
         builder.row(button)
+        #
+        # button_for_create_new_complex_adv = get_button_for_create_new_complex_adv(wb_user_cabinet.id)
+        # builder.row(button_for_create_new_complex_adv)
 
         button = InlineKeyboardButton(
         text = 'Пополнить баланс',
@@ -980,15 +983,15 @@ class ShopMenu(TextWithKeyboard):
         )
 
         builder.row(button)
-
-        button = InlineKeyboardButton(
-            text = 'Удалить личный кабинет магазина',
-            callback_data\
-                = callbacks.DeleteWbUserCabinet(
-                wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
-        )
-
-        builder.row(button)
+        #
+        # button = InlineKeyboardButton(
+        #     text = 'Удалить личный кабинет магазина',
+        #     callback_data\
+        #         = callbacks.DeleteWbUserCabinet(
+        #         wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
+        # )
+        #
+        # builder.row(button)
 
         if is_active_adv:
             button = InlineKeyboardButton(

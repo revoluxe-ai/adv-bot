@@ -341,7 +341,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
 
     def sorting_keywords(keywords, sort_mode):
-        if sort_mode == 'default':
+        if sort_mode == 'by_adv':
             keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
             keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
             keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
