@@ -186,7 +186,9 @@ async def setting_keywords_white_list(callback: CallbackQuery,
 
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
-
+    page = callback_data.page
+    if not page:
+        page = 1
     async with _sm() as session:
         stmt = select(AdvSetting) \
             .where(AdvSetting.id == adv_original_id,)
@@ -197,7 +199,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
     keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
-    await state.update_data(adv_choice_last_page=1)
+    await state.update_data(adv_choice_last_page=page)
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get('last_wb_user_cabinet_original_id')
     nmids = adv_setting.nmids
@@ -218,7 +220,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
         wb_user_cabinet_original_id,
         adv_choice_last_page,
         main_photos[0],
-        page=1,
+        page=page,
     )(state, 'white_list')
 
     await redis_manager.set_check_last_24_hours(adv_original_id)

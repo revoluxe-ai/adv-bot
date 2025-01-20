@@ -435,7 +435,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         bottoms.append([InlineKeyboardButton(text="⬅️",
                                              callback_data=callbacks.SettingKeywords(
                                                  adv_original_id=adv_setting.id,
-                                                 type='by_adv',
+                                                 type=sort_mode,
                                                  page=prev_page).pack())])
 
     if len(keywords) > end_index:
@@ -443,7 +443,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         bottoms.append([InlineKeyboardButton(text="➡️",
                                              callback_data=callbacks.SettingKeywords(
                                                 adv_original_id=adv_setting.id,
-                                                type='by_adv',
+                                                type=sort_mode,
                                                 page=next_page).pack())])
     bottom = [InlineKeyboardButton(text='Показать фразы для продвижения (белый список)',
                                    callback_data=callbacks.SettingKeywords(
