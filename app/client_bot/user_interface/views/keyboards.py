@@ -350,7 +350,10 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
             return keywords
 
         elif sort_mode == 'white_list':
-             return sorted(keywords, key=lambda x: x.predict_ctr, reverse=True)
+             def sort_func(keyword:CalculatedKeyword):
+                return keyword.baes_ctr
+
+             return sorted(keywords, key=sort_func, reverse=True)
 
         elif sort_mode == 'sort_by_ctr_desc':
             return sorted(keywords, key=lambda x: x.ctr, reverse=True)
