@@ -219,8 +219,6 @@ async def _bayesian_apply(df: pd.DataFrame):
             status = 1
         if status == 0:
             return 0
-        elif status in [2, 3]:
-            return 1
         else:
             if clicks == 0:
                 min_ctr = adv_id_to_min_ctr[adv_id]
