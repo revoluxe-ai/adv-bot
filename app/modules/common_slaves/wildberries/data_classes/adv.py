@@ -42,9 +42,11 @@ class AdvData(BaseModel):
 
 class Balances:
     def __init__(self, data: dict):
-        self.balance = data.get('balance', 0)#Счет
-        self.net = data.get('net', 0)#Баланс
-        self.bonus = data.get('bonus', 0)#Бонусы
+        self.balance = data.get('balance', 0)#Счет 0
+        self.net = data.get('net', 0)#Баланс 1
+        self.bonus = data.get('bonus', 0)#Бонусы 3
+
+
 
 class AdvType:
     NMID_TEST = 'NMID_TEST'
@@ -57,7 +59,7 @@ class Adv:
         return f'Name: {self.name}, Advert ID: {self.advertId},  Status: {self.status_native_ru}, Type: {self.adv_type}'
     def __init__(self, data):
         self._data_model = AdvData(**data)  # Используйте Pydantic для валидации
-        self._data = self._data_model.model_dump()  # Преобразуйте обратно в словарь, если нужно
+        self._data = data
 
     @property
     def category_name(self):
