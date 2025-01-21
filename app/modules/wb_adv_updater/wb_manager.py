@@ -336,10 +336,10 @@ async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
 
 
 async def update_predict_ctr():
-    predictor = Predictor()
     while True:
         try:
             logger.debug('Начинаю прогноз CTR')
+            predictor = Predictor()
             await predictor.predict_ctr_for_keywords()
         except Exception as exc:
             logger.error(f'Ошибка предсказания CTR {exc}')
