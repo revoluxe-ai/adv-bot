@@ -858,24 +858,7 @@ class ShopMenu(TextWithKeyboard):
             count_active_advs = result.scalar()
             if count_active_advs:
                 total_amount_for_day += count_active_advs * const.PRICE_FOR_ADV_FOR_DAY
-            stmt = select(func.count(AdvSetting.id))\
-            .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
-                AdvSetting.parsing_active == True,)
-            result = await session.execute(stmt)
-            count_active_parsing = result.scalar()
-            if count_active_parsing:
-                total_amount_for_day += count_active_parsing * const.PARSING_PRICE
-            stmt = select(func.count(AdvSetting.id)) \
-                .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
-                       AdvSetting.bidder_active == True, )
-            result = await session.execute(stmt)
-            count_auto_bidder = result.scalar()
-            if count_auto_bidder:
-                total_amount_for_day += count_auto_bidder * const.AUTO_BIDDER_PRICE
-
         self.count_active_advs = count_active_advs
-        self.count_active_parsing = count_active_parsing
-        self.count_auto_bidder = count_auto_bidder
         self.total_amount_for_day = total_amount_for_day
         user: User = self._wb_user_cabinet.user
         tokens: list[WBToken] = user.wb_tokens
@@ -909,8 +892,6 @@ class ShopMenu(TextWithKeyboard):
         balance = self._balance
         bonus = self._bonus
         count_active_advs = self.count_active_advs
-        count_active_parsing = self.count_active_parsing
-        count_auto_bidder = self.count_auto_bidder
         total_money = balance + bonus
         total_amount_for_day = self.total_amount_for_day
         if self.total_amount_for_day:
@@ -919,8 +900,6 @@ class ShopMenu(TextWithKeyboard):
             last_for_days = '∞'
         text = (
             f'📊 *Кампаний на автоуправлении*: {count_active_advs}\n'
-            f'🔍 *Включен парсинг у кампаний*: {count_active_parsing}\n'
-            f'🔧 *Включено автоуправление ставкой у кампаний*: {count_auto_bidder}\n'
             f'💸 *Расход в сутки*: {total_amount_for_day} рублей\n'
             f'⏳ *Срок действия токена*: {self.expiration_time}\n'
             f'*Истечет через* {get_day_suffix(self.last_days_for_token)}\n'
