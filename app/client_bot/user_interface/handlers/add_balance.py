@@ -61,11 +61,11 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
         return
     amount = message.text
     if not amount.isdigit():
-        await message.answer("Введите сумму (число) от 10 000 рублей")
+        await message.answer("Введите сумму (число) от 1 000 рублей")
         return
     amount = int(amount)
-    if amount < 10000:
-        await message.answer("Введите сумму (число) от 10000")
+    if amount < 1000:
+        await message.answer("Введите сумму (число) от 1000")
         return
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
@@ -130,24 +130,9 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
 
     """
 Прайс:
-- Работа одной кампании, подключенной к боту: 35 р/сутки
-- Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
-- Автоуправление ставкой: 25 р./сутки
+Одна кампания на автоуправлении - 300 р. в месяц (10 рублей в сутки)
 
-        
-🔥 Внимание! Только до {date_to}(завтра):
-
-💰 Бонус 100 % от суммы пополнения!
-
-🚀 При пополнении счета свыше мастер-суммы: бонус 300 % от суммы пополнения!
-
-👍 Это делает его не только лучшим, но и самым выгодным решением для автоматизации рекламы на WB!
-
-💼 Мастер-сумма (бонус 300%): {self.master_sum} рублей.
-
-📩 Подробности у администратора бота: @skyline360_1 \n
-
-Укажите сумму пополнения (не менее 100 рублей):"""
+"""
 
     # state_data = await state.get_data()
     # try:
