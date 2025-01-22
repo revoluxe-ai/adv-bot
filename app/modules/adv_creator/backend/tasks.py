@@ -28,7 +28,13 @@ async def _create_complex_advs(nmid: int, shop_id: str, hard_mode: bool, user_te
                 logger.error(f"Ошибка при отправке уведомления: {str(e)}", exc_info=True)
 
             finally:
-                await telegram_bot.close()
+                await asyncio.sleep(0.5)
+                try:
+                    await telegram_bot.close()
+                except:
+                    logger.debug('Ошибка закрытия бота после отправки сообщения', exc_info=True)
+
+
             logger.debug(f'Создана РК adv_adv: {adv_adv}')
             break
 
