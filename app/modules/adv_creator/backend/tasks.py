@@ -10,9 +10,7 @@ from app.core.wb_api.mixins.excs import ItemCategoryNotInStockError, AdvNotFound
 from app.modules.adv_creator import backend
 from app.modules.adv_creator.backend import MainAdvManager
 from app.modules.adv_creator.backend.exc import ComplexAdvsExistsError
-from celery_app import app as celery_app
 from celery import shared_task
-from asgiref.sync import async_to_sync
 
 logger = logging.getLogger(__name__)
 
