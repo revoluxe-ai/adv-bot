@@ -46,7 +46,8 @@ async def _create_complex_advs(nmid: int, shop_id: str, hard_mode: bool):
 
 @shared_task(time_limit=12 * 60 * 60)
 def create_complex_advs_task(nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int):
-    send_user_message.delay(f'Начинаю создавать комплекс кампаний для артикула {nmid}')
+    send_user_message.delay(f'Начинаю создавать комплекс кампаний для артикула {nmid}',
+                            user_telegram_id)
     try:
         adv_id = asyncio.run(_create_complex_advs(nmid, shop_id, hard_mode))
         send_user_message.delay(f'Кампания успешно создана, ID авто {adv_id}',
@@ -55,7 +56,7 @@ def create_complex_advs_task(nmid: int, shop_id: str, hard_mode: bool, user_tele
         send_user_message.delay('Нет нужных прав. Добавьте магазин с правильным токеном под новым именем',
                                 user_telegram_id)
     except ItemCategoryNotInStockError:
-        send_user_message.delay(f'Нет остатков у артикула {nmid}')
+        send_user_message.delay(f'Нет остатков у артикула {nmid}', user_telegram_id)
 
     except Exception as e:
         logger.error(f"Task failed: {str(e)}", exc_info=True)
