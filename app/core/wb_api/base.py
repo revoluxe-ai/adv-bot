@@ -1,5 +1,13 @@
 from abc import ABC, abstractmethod
+
+from .exceptions import ApiForbiddenError
 from .interface import InterfaceWBAPI
+from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
+from ...modules.common_slaves.wildberries.models import WBCabinet
+import logging
+from app.utils.db.session_maker import get_async_session_maker as sm
+
+logger = logging.getLogger(__name__)
 
 class BaseAPI(ABC, InterfaceWBAPI):
 
@@ -38,5 +46,5 @@ class BaseAPI(ABC, InterfaceWBAPI):
             #                                 wb_cabinet.shop_id).send_all_users()
             # except Exception as e:
             #     logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}', exc_info=True)
-            raise exceptions.ApiForbiddenError('Нет свободных токенов',
+            raise ApiForbiddenError('Нет свободных токенов',
                                                wb_user_cabinet=self.access.wb_cabinet)
