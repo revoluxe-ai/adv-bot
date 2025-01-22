@@ -1,5 +1,5 @@
-from app import ao
+from aiogram.fsm.state import StatesGroup, State
 
 
-class CreateCompamyStates(ao.state.StatesGroup):
-    waiting_for_get_nmid = ao.state.State()
+class CreateCompamyStates(StatesGroup):
+    waiting_for_get_nmid = State()
