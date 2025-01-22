@@ -46,6 +46,7 @@ async def _create_complex_advs(nmid: int, shop_id: str, hard_mode: bool):
 
 @shared_task(time_limit=12 * 60 * 60)
 def create_complex_advs_task(nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int):
+    send_user_message.delay(f'Начинаю создавать комплекс кампаний для артикула {nmid}')
     try:
         adv_id = asyncio.run(_create_complex_advs(nmid, shop_id, hard_mode))
         send_user_message.delay(f'Кампания успешно создана, ID авто {adv_id}',
