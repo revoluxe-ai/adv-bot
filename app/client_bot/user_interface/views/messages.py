@@ -1,6 +1,8 @@
 import asyncio
 import datetime
 import re
+
+from app.modules.adv_creator import CreateNewAdvs
 from app.modules.adv_creator.telegram.telegram_button import get_telegram_button as get_button_for_create_new_complex_adv
 import aiogram
 from aiogram.types import InlineKeyboardButton
@@ -954,6 +956,17 @@ class ShopMenu(TextWithKeyboard):
             wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
         builder.row(button)
+
+        button = InlineKeyboardButton(
+            text='Создать и настроить кампании',
+            callback_data = CreateNewAdvs(
+                wb_user_cabinet_original_id = wb_user_cabinet.id).pack()
+        )
+
+
+        builder.row(button)
+
+
         #
         # button_for_create_new_complex_adv = get_button_for_create_new_complex_adv(wb_user_cabinet.id)
         # builder.row(button_for_create_new_complex_adv)

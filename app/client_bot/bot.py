@@ -10,3 +10,11 @@ token = path_setting_funcs.get_document_by_key_name(path_setting,
 bot = Bot(token=token,
           # parse_mode='MarkdownV2'
           )
+
+
+
+def get_bot():
+    bot = Bot(token=token)
+    return bot
+
+

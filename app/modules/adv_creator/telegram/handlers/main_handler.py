@@ -1,11 +1,9 @@
-from aiogram import Bot, Router
 from aiogram.filters import StateFilter
-from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 
 from app.client_bot import const
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app import ao
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from ..into_callback import CreateNewAdv as CreateNewAdvCallbackData
 from .states import CreateCompamyStates as states
@@ -15,16 +13,16 @@ from ...backend.tasks import create_complex_advs_task
 logger = logging.getLogger(__name__)
 
 
-router = Router()
+router = ao.Router()
 
 
 
 
 @router.callback_query(CreateNewAdvCallbackData.filter())
-async def create_new_adv(callback: CallbackQuery,
+async def create_new_adv(callback: ao.CallbackQuery,
                          callback_data: CreateNewAdvCallbackData,
-                         bot: Bot,
-                         state: FSMContext):
+                         bot: ao.Bot,
+                         state: ao.FSMContext):
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(states.waiting_for_get_nmid)
@@ -32,9 +30,9 @@ async def create_new_adv(callback: CallbackQuery,
 
 
 @router.message(StateFilter(states.waiting_for_get_nmid))
-async def get_nmid(message: Message,
-                     state: FSMContext,
-                     bot: Bot):
+async def get_nmid(message: ao.Message,
+                     state: ao.FSMContext,
+                     bot: ao.Bot):
      data = await state.get_data()
      wb_user_cabinet_original_id: int = data['wb_user_cabinet_original_id']
      nmid = message.text

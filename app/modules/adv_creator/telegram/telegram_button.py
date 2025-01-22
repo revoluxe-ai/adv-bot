@@ -1,4 +1,4 @@
-from .into_callback import CreateNewAdv as CreateNewAdvCallback
+from .into_callback import CreateNewAdvs as CreateNewAdvCallback
 
 
 __all__ = ['button']

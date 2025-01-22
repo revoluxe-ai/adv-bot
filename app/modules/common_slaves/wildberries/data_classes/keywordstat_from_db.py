@@ -39,6 +39,10 @@ class CalculatedKeyword:
     preset: Optional[int] = None
 
 
+    @property
+    def mean_ctr(self):
+        return (self.predict_ctr + self.baes_ctr)/2
+
 
     @property
     def rating_by_predict_ctr(self):

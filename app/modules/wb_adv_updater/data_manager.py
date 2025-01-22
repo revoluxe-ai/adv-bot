@@ -1747,13 +1747,21 @@ async def get_all_shop_ids()-> list[str]:
 
 
 async def get_active_adv_ids_for_shop(shop_id: str):
-    stmt = select(AdvSetting.adv_id).distinct()\
+    stmt = select(AdvSetting).distinct()\
         .join(AdvSetting.wb_cabinet)\
         .where(WBCabinet.shop_id == shop_id,
-               AdvSetting.bot_active == True)
+               AdvSetting.bot_active == True)\
+    .options(load_only(AdvSetting.adv_id, AdvSetting.name))
     async with _sm() as session:
         result = await session.execute(stmt)
-        adv_ids = result.scalars().all()
+        adv_settings: list[AdvSetting] = result.scalars().all()
+
+    adv_ids = []
+    for adv in adv_settings:
+        adv_ids.append(adv.adv_id)
+        if (search_adv_id := adv.search_adv_id):
+            adv_ids.append(search_adv_id)
+
     return adv_ids
 
 

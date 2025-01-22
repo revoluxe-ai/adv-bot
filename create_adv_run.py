@@ -28,7 +28,7 @@ if __name__ == '__main__':
         #     except Exception:
         #         logger.error(f'Ошибка при создании комплексной рк для артикула {nmid}', exc_info=True)
         #         sleep(60)
-        # create_complex_advs_task.apply_async((nmid, shop_id, False, const.ADMINS[0]))
+        # create_complex_advs_task(nmid, shop_id, False, const.ADMINS[0])
         create_complex_advs_task.apply_async((nmid, shop_id, False, const.ADMINS[0]))
         print(f'Создана задача на создание комплексной рк для артикула {nmid}')
         pass

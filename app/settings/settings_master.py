@@ -92,4 +92,9 @@ class Settings:
         return get_document_by_key_name(setting_path, 'postgres-ssl_mode')
 
 
+    @property
+    def postgres_hosts(self):
+        return get_document_by_key_name(setting_path, 'postgres-hosts')
+
+
 settings = Settings()
