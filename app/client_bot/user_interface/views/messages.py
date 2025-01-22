@@ -1,13 +1,11 @@
 import asyncio
 import datetime
 import re
-
-from app.modules.adv_creator import CreateNewAdvs
-from app.modules.adv_creator.telegram.telegram_button import get_telegram_button as get_button_for_create_new_complex_adv
-import aiogram
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
+
+from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
 from app.modules.shops_data_updater.types import FullAdvStat

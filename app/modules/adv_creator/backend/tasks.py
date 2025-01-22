@@ -1,14 +1,13 @@
 import asyncio
 import logging
 from functools import partial
-
 from celery import shared_task
+
+import celery_app
 from app.client_bot.bot import get_bot
 from app.core.wb_api.mixins.excs import ItemCategoryNotInStockError, AdvNotFoundInWBError
 from app.modules.adv_creator import backend
 from app.modules.adv_creator.backend import MainAdvManager
-from celery import shared_task
-
 logger = logging.getLogger(__name__)
 
 
