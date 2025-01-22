@@ -505,7 +505,26 @@ async def get_last_full_stat_update(adv_id: int) -> typing.Optional[datetime.dat
     value = float(value)
     return datetime.datetime.fromtimestamp(value)
 
-
 async def set_max_bet_for_keyword(text: str, max_bet: int):
     key = f'max_bet:{text}'
     await redis_client.set(key, max_bet)
+
+async def get_all_keywords_positions(text) -> list[WBItemPosition]:
+    key_pattern = f'adv_positions:{text}:*'
+    keys = await redis_client.keys(key_pattern)
+    positions = []
+    for key in keys:
+        json_data = await redis_client.get(key)
+        if json_data:
+            position = WBItemPosition.from_dict(json.loads(json_data))
+            positions.append(position)
+    return positions
+
+
+async def get_max_bet(text: str):
+    key = f'max_bet:{text}'
+    max_bet = await redis_client.get(key)
+    if max_bet is None:
+        return None
+    max_bet = int(max_bet)
+    return max_bet

@@ -25,7 +25,8 @@ from .user_interface.handlers import (adv_setting,
 )
 
 from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
-
+# from app.modules.adv_creator import adv_creator_router
+from app.modules.white_list_updater import router as white_list_updater_router
 
 from ..settings import settings
 
@@ -39,6 +40,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
     common_router.include_routers(exceptions.admin_router)
 
+common_router.include_routers(white_list_updater_router)
 common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)
@@ -47,6 +49,7 @@ common_router.include_routers(clusters.router)
 common_router.include_routers(start.router)
 common_router.include_routers(download_keywords.router)
 common_router.include_routers(adv_setting.router)
+# common_router.include_routers(adv_creator_router)
 common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)

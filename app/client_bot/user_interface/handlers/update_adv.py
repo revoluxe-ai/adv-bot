@@ -53,7 +53,8 @@ async def update_minus_keywords(callback: types.CallbackQuery,
         raise ApiForbiddenError('Не удалось получить доступ к Wildberries')
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     data_setter = DataSetter(access)
-    await data_setter.update_minus_keywords_in_adv(adv)
+    wb_cabinet = adv.wb_cabinet
+    await data_setter.update_minus_keywords_in_adv(adv, wb_cabinet)
     chat_id = callback.message.chat.id
     await messages.MinusKeywordsUpdated(bot, chat_id)()
     await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
@@ -78,6 +79,7 @@ async def update_keyword_stat(callback: types.CallbackQuery,
             wb_cabinet_id: int = adv.wb_cabinet.id
             stmt = select(WBUserCabinet)\
                 .join(WBUserCabinet.wb_cabinet)\
+            .options(selectinload(WBUserCabinet.wb_cabinet))\
             .where(WBCabinet.id == wb_cabinet_id)
             wb_user_cabinet = await session.execute(stmt)
             wb_user_cabinet = wb_user_cabinet.scalar()
@@ -85,7 +87,7 @@ async def update_keyword_stat(callback: types.CallbackQuery,
         if not access:
             raise ApiForbiddenError('Не удалось получить доступ к Wildberries')
         await messages.LongTimeOperation(bot, callback.message.chat.id)()
-        await wb_manager.update_all_keyword_data(access, adv)
+        await wb_manager.update_all_keyword_data(access, adv, wb_user_cabinet.wb_cabinet)
         chat_id = callback.message.chat.id
         await messages.KeywordStatUpdated(bot, chat_id)()
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()

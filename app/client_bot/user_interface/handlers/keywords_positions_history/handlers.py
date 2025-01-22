@@ -103,7 +103,7 @@ async def turn_parsing_off(callback: types.CallbackQuery,
                             bot: aiogram.Bot):
         adv_setting_original_id = callback_data.adv_original_id
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-        async with _sm() as session:
+        async with _sm(read_only=False) as session:
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
             result = await session.execute(stmt)
             adv_setting = result.scalar()

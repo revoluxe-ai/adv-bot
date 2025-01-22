@@ -56,8 +56,8 @@ class Adv:
     def __repr__(self):
         return f'Name: {self.name}, Advert ID: {self.advertId},  Status: {self.status_native_ru}, Type: {self.adv_type}'
     def __init__(self, data):
-        self._data_model = AdvData(**data)  # Используйте Pydantic для валидации
-        self._data = self._data_model.model_dump()  # Преобразуйте обратно в словарь, если нужно
+        self._data = data
+
 
     @property
     def category_name(self):

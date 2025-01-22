@@ -996,6 +996,24 @@ class ShopMenu(TextWithKeyboard):
             callback_data = callbacks.TurnBot(action='off_all',
                                               wb_user_cabinet_original_id=wb_user_cabinet.id).pack())
             builder.row(button)
+
+        if self._wb_cabinet.white_list_update_active:
+            button = InlineKeyboardButton(
+            text = 'Выключить авто-обновление белого списка',
+            callback_data = callbacks.TurnWhiteListUpdate(
+                wb_cabinet_original_id=self._wb_cabinet.id,
+                action='off').pack()
+            )
+        else:
+            button = InlineKeyboardButton(
+            text = 'Включить авто-обновление белого списка',
+            callback_data = callbacks.TurnWhiteListUpdate(
+                wb_cabinet_original_id=self._wb_cabinet.id,
+                action='on').pack()
+            )
+
+        builder.row(button)
+
         button = InlineKeyboardButton(text='Вернуться к списку магазинов',
         callback_data = callbacks.Start().pack())
         builder.row(button)

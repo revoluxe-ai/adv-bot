@@ -19,7 +19,7 @@ from app.exc import CardNotFoundInDB
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
-from sqlalchemy.orm import selectinload, subqueryload, aliased
+from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
@@ -852,7 +852,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
     for keyword_setting in keyword_settings:
         text = keyword_setting.text
-        if text not in texts_in_keyword_stat and keyword_setting.hard_status == 2:
+        if text not in texts_in_keyword_stat:
             keyword_setting = text_to_keyword_setting[text]
 
             keyword = CalculatedKeyword(text=text,
@@ -1198,9 +1198,13 @@ async def get_adv_id_to_min_ctr(adv_ids: list[int])-> dict[int, float]:
 
     for adv_setting in adv_settings:
         logger.debug('Получаю min_ctr')
-        min_ctr = await get_min_ctr(adv_setting)
-        logger.debug('min_ctr получен')
-        adv_id_to_min_ctr[adv_setting.adv_id] = min_ctr
+        try:
+            min_ctr = await get_min_ctr(adv_setting)
+            logger.debug('min_ctr получен')
+            adv_id_to_min_ctr[adv_setting.adv_id] = min_ctr
+        except Exception as e:
+            logger.error(f'Ошибка при получении min_ctr {e}', exc_info=True)
+            adv_id_to_min_ctr[adv_setting.adv_id] = 0.03
     return adv_id_to_min_ctr
 
 
