@@ -39,14 +39,14 @@ async def run_hard_processes():
 
 
 run_own_process_list = [
-     # run_bidder_process,
-     # run_hard_processes,
-     # keywords_parsing_process,
-     # run_update_all_keywords_on_wb,
-     #  run_main_coroutines,
+     run_bidder_process,
+     run_hard_processes,
+     keywords_parsing_process,
+     run_update_all_keywords_on_wb,
+      run_main_coroutines,
      run_update_predict_ctr,
-     # run_update_model,
-     # run_shop_data_update
+     run_update_model,
+     run_shop_data_update
 ]
 
 
