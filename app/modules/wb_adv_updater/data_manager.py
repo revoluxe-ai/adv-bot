@@ -1751,11 +1751,11 @@ async def get_active_adv_ids_for_shop(shop_id: str):
         .join(AdvSetting.wb_cabinet)\
         .where(WBCabinet.shop_id == shop_id,
                AdvSetting.bot_active == True)\
-    .options(load_only(AdvSetting.adv_id, AdvSetting.name))
+    .options(load_only(AdvSetting.adv_id, AdvSetting.name,
+                       AdvSetting._search_adv_id))
     async with _sm() as session:
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
-
     adv_ids = []
     for adv in adv_settings:
         adv_ids.append(adv.adv_id)
