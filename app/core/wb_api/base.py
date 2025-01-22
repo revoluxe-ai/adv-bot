@@ -12,15 +12,15 @@ logger = logging.getLogger(__name__)
 class BaseAPI(ABC, InterfaceWBAPI):
 
 
-    @property
-    @abstractmethod
-    def _rights(self) -> set[str]:
-        pass
-
-    @property
-    @abstractmethod
-    def _only_read(self):
-        pass
+    # @property
+    # @abstractmethod
+    # def _rights(self) -> set[str]:
+    #     pass
+    #
+    # @property
+    # @abstractmethod
+    # def _only_read(self):
+    #     pass
 
     @staticmethod
     def chunks(lst, n):
