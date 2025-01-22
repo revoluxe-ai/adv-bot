@@ -49,15 +49,11 @@ class MainAdvManager:
 
             balance_type_int, balance_property_str = self._get_balance_type(balances)
             subjectID = target_card.subjectID
-            try:
-                auto_adv_id: int = await self._create_auto_adv(
-                    new_adv_name,
-                    subjectID,
-                    balance_type_int,
-                    start_status=False)
-            except ItemCategoryNotInStockError as e:
-                logger.error('Нет остатков в данной категории')
-                raise e
+            auto_adv_id: int = await self._create_auto_adv(
+                new_adv_name,
+                subjectID,
+                balance_type_int,
+                start_status=False)
 
             setattr(balances, balance_property_str, getattr(balances, balance_property_str) - 1000)
 

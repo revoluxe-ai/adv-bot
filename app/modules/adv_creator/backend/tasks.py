@@ -1,61 +1,85 @@
 import asyncio
 import logging
-from functools import partial
-from celery import shared_task
+import time
+from contextlib import contextmanager
 
-import celery_app
+from celery import shared_task
+from aiogram.exceptions import TelegramRetryAfter
 from app.client_bot.bot import get_bot
 from app.core.wb_api.mixins.excs import ItemCategoryNotInStockError, AdvNotFoundInWBError
 from app.modules.adv_creator import backend
 from app.modules.adv_creator.backend import MainAdvManager
+from app.utils.redis_manager import redis_client
+
 logger = logging.getLogger(__name__)
+from app.core.wb_api.mixins.excs  import ItemCategoryNotInStockError
+from app.core.wb_api.exceptions import ApiForbiddenError
 
 
-async def _create_complex_advs(nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int):
+
+
+async def _create_complex_advs(nmid: int, shop_id: str, hard_mode: bool):
     access = await backend.access_manager.get_access_for_wb_cabinet(shop_id)
     manager = MainAdvManager(access)
-
     while True:
         try:
             adv_adv: int = await manager.create_complex_advs(nmid, hard_mode)
-            telegram_bot = get_bot()
-            try:
-                await telegram_bot.send_message(
-                    user_telegram_id,
-                    f'Создана РК adv_adv: {adv_adv}'
-                )
-            except Exception as e:
-                logger.error(f"Ошибка при отправке уведомления: {str(e)}", exc_info=True)
-
-            finally:
-                await asyncio.sleep(0.5)
-                try:
-                    await telegram_bot.close()
-                except:
-                    logger.debug('Ошибка закрытия бота после отправки сообщения', exc_info=True)
-
-
             logger.debug(f'Создана РК adv_adv: {adv_adv}')
-            break
-
+            return  adv_adv
         except backend.CardsNotFoundForShopError as exc:
             raise exc
+
+        except ItemCategoryNotInStockError as e:
+            raise e
+
         except AdvNotFoundInWBError as exc:
             logger.debug(f'Не найдено рк в Wildberries для {nmid} {shop_id}, повтор через 60 сек')
             await asyncio.sleep(60)
+        except ApiForbiddenError:
+            raise
         except Exception as exc:
             logger.error(f'Ошибка при создании комплексной рк для артикула {nmid}', exc_info=True)
             await asyncio.sleep(60 * 3)
 
 
+
+
 @shared_task(time_limit=12 * 60 * 60)
 def create_complex_advs_task(nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int):
-    """
-    Celery task that properly handles the asyncio event loop lifecycle.
-    """
     try:
-        return asyncio.run(_create_complex_advs(nmid, shop_id, hard_mode, user_telegram_id))
+        adv_id = asyncio.run(_create_complex_advs(nmid, shop_id, hard_mode))
+        send_user_message.delay(f'Кампания успешно создана, ID авто {adv_id}',
+                                user_telegram_id)
+    except ApiForbiddenError:
+        send_user_message.delay('Нет нужных прав. Добавьте магазин с правильным токеном под новым именем',
+                                user_telegram_id)
+    except ItemCategoryNotInStockError:
+        send_user_message.delay(f'Нет остатков у артикула {nmid}')
+
     except Exception as e:
         logger.error(f"Task failed: {str(e)}", exc_info=True)
-
         raise
+
+async def _send_user_message(message: str, user_telegram_id: int):
+    bot = get_bot()
+    try:
+        await bot.send_message(user_telegram_id, message)
+        await bot.close()
+    except Exception as e:
+        raise e
+
+
+@shared_task(
+    bind=True,
+    max_retries=5,
+    retry_backoff=True,  # Включает экспоненциальный рост времени повтора
+    retry_backoff_max=600  # Максимум 10 минут
+)
+def send_user_message(self, message: str, user_telegram_id: int):
+    try:
+        asyncio.run(_send_user_message(message, user_telegram_id))
+    except TelegramRetryAfter as e:
+        retry_after = e.retry_after or 600  # Устанавливаем задержку
+        raise self.retry(countdown=retry_after)
+    except Exception as e:
+        raise e
