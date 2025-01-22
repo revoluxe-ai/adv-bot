@@ -97,4 +97,16 @@ class Settings:
         return get_document_by_key_name(setting_path, 'postgres-hosts')
 
 
+    @property
+    def version(self):
+        try:
+            version = get_document_by_key_name(setting_path, 'version')
+        except:
+            version = 'my'
+        return version
+
+
+
+
+
 settings = Settings()
