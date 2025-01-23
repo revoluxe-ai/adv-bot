@@ -1,9 +1,9 @@
 from celery import Celery
-
+import celeryconfig
 # Создайте приложение Celery
 app = Celery()
 
-app.config_from_object("celeryconfig")
+app.config_from_object(celeryconfig)
 
 
 # Настройки (опционально)
