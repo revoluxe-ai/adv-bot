@@ -109,7 +109,6 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
             f"Пополнение баланса магазина \n"
             f" на {amount} рублей. \n"
             f"После оплаты услуга считается оказанной, возврат средств не производится. \n\n"
-            f"В случае проблем с оплатой свяжитесь с администратором бота @skyline360_1"
         ),
         provider_data=provider_data,
         payload=payload,
