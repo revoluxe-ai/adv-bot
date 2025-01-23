@@ -103,8 +103,6 @@ class Predictor:
         df['predicted_ctr'] = y
         return df
 
-
-
     @staticmethod
     async def __update_predict_ctr(client, keyword_setting, predict_df, min_ctr):
         async with update_predict_ctr_process_semaphore:
@@ -113,20 +111,39 @@ class Predictor:
                 keyword = keyword_setting.text
                 if not keyword:
                     return
+
+                # Получаем строку с прогнозом для текущего ключевого слова
                 row = predict_df[(predict_df['adv_id'] == adv_id) & (predict_df['keyword'] == keyword)]
                 if row.empty:
                     return
-                predict_ctr = float(row['predicted_ctr'].values[0])
+
+                # Извлекаем предсказанный CTR
+                predicted_ctr = float(row['predicted_ctr'].values[0])
+
+                # Разделяем предсказанный CTR на клики и показы
+                predicted_views = int(1 / min_ctr)
+                predicted_clicks = predicted_views * predicted_ctr
+
+                # Получаем реальные клики и показы из ClickHouse
                 result = await data_manager.get_keyword_statistic_clickhouse(client, keyword_setting.text, adv_id)
-                clicks, views, _ = result
-                if clicks == 0:
-                    clicks = 1
+                real_clicks, real_views, _ = result
+
+                # Если кликов нет, задаём минимальное значение
+                if real_clicks == 0:
+                    real_clicks = 1
                     enough_views = int(1 / min_ctr)
-                    views += enough_views
-                real_ctr = clicks / views
-                predict_ctr = (real_ctr + predict_ctr) / 2
+                    real_views += enough_views
+
+                # Складываем прогнозируемые и реальные значения
+                total_clicks = real_clicks + predicted_clicks
+                total_views = real_views + predicted_views
+
+                # Вычисляем итоговый CTR
+                final_ctr = total_clicks / total_views
+
+                # Записываем результат в Redis
                 logger.debug('Начинаю запись predict ctr в redis')
-                await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
+                await redis_manager.set_predict_ctr(adv_id, keyword, final_ctr)
                 logger.debug('Записали прогноз в redis')
             except Exception as exc:
                 logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
