@@ -880,7 +880,6 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             predict_ctr = keyword_setting.predict_ctr
         keyword_stat.predict_ctr = predict_ctr
         original_predict_ctr = keyword_stat.predict_ctr
-        predict_ctr = original_predict_ctr
         keyword_stat.hard_status = keyword_setting.hard_status
         if min_ctr == 0:
             enough_views = 100
@@ -894,13 +893,16 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         added_clicks = keyword_setting.added_clicks
         if added_clicks:
             clicks += added_clicks
+        if original_predict_ctr:
+            predict_ctr = original_predict_ctr
+            predicted_views = int(clicks / predict_ctr)
+            predicted_clicks = int(predicted_views * predict_ctr)
+            views += predicted_views
+            clicks += predicted_clicks
         real_baes_ctr = clicks / views
+        keyword_stat.predict_ctr = real_baes_ctr
+        predict_ctr = keyword_stat.predict_ctr
         keyword_stat.baes_ctr = real_baes_ctr
-        if not original_predict_ctr:
-            predict_ctr = real_baes_ctr
-            keyword_stat.predict_ctr = predict_ctr
-        calculate_ctr = (real_baes_ctr + predict_ctr)/2
-        keyword_stat.predict_ctr = calculate_ctr
         if max_position:
             try:
                 position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
@@ -961,7 +963,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             await asyncio.sleep(0)
             continue
 
-        if calculate_ctr >= min_ctr or real_baes_ctr >= min_ctr:
+        if predict_ctr >= min_ctr:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
         else:
