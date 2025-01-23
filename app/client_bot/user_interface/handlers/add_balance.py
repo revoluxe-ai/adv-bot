@@ -10,6 +10,7 @@ from aiogram.types import LabeledPrice
 from sqlalchemy import select, and_, func
 import logging
 from app.admin_bot.sender import sender_manager
+from app.client_bot import const
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers import start
@@ -60,12 +61,13 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
         await start.start_registration(message, bot, state)
         return
     amount = message.text
+    min_sum = const.min_sum
     if not amount.isdigit():
-        await message.answer("Введите сумму (число) от 1 000 рублей")
+        await message.answer(f"Введите сумму (число) от {min_sum} рублей")
         return
     amount = int(amount)
-    if amount < 1000:
-        await message.answer("Введите сумму (число) от 1000")
+    if amount < 300:
+        await message.answer(f"Введите сумму (число) от {min_sum}")
         return
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
