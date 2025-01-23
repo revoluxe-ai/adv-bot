@@ -71,7 +71,10 @@ async def get_nmid(message: Message,
 
     for nmid in nmid_list:
         try:
-            create_complex_advs_task.apply_async((nmid, shop_id, message.from_user.id, const.ADMINS[0]))
+            create_complex_advs_task.apply_async((nmid,
+                                                  shop_id,
+                                                  False,
+                                                  message.from_user.id))
             logger.debug(f'Задача для артикула {nmid} успешно поставлена')
         except Exception as e:
             logger.error(f'Ошибка постановки задачи для артикула {nmid}: {e}')
