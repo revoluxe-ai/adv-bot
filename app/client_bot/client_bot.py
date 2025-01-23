@@ -2,6 +2,7 @@ import asyncio
 import secrets
 import string
 
+from aiogram.types import BotCommand
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from app.client_bot.bot import bot
@@ -114,6 +115,11 @@ async def run_shop_updater():
 
 
 async def run():
+    await bot.set_my_commands([
+        BotCommand(command='start', description='Главное меню/список магазинов/добавить магазин'),
+
+    ]
+    )
     if test_mode or polling_mode:
         try:
             await bot.delete_webhook()
