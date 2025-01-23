@@ -232,6 +232,34 @@ async def get_predict_ctr(adv_id: int, keyword: str):
     return predict_ctr
 
 
+async def set_predict_ctrs(adv_id, keywords: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
+    """
+    Получить предсказанные CTR для списка пар (adv_id, keyword).
+
+    :param pairs: список пар (adv_id, keyword)
+    :return: словарь с ключами вида (adv_id, keyword) и значениями предсказанных CTR
+    """
+    # Формируем список ключей для запроса к Redis
+    keys = [f'predict_ctr:{adv_id}:{keyword.text}' for keyword in keywords]
+
+    # Получаем данные из Redis за один запрос
+    predict_ctr_bytes_list = await redis_client.mget(keys)
+
+    for i, keyword in enumerate(keywords):
+        keyword.predict_ctr = predict_ctr_bytes_list[i]
+
+    return keywords
+
+
+
+
+
+
+
+
+
+
+
 
 async def set_block_position_status(keywordsetting_original_id: int,
                                     block_position_status: str,
