@@ -1,3 +1,5 @@
+from app import settings
+
 # URL брокера сообщений (например, Redis или RabbitMQ)
 broker_url = "redis://localhost:6379/1"
 
@@ -23,3 +25,4 @@ worker_concurrency = 0
 # Лимиты на число задач в одном процессе (None — без ограничений)
 worker_max_tasks_per_child = None
 task_reject_on_worker_lost=True
+broker_transport_options = {'global_keyprefix': f'{settings.CELERY_PREFIX}'}

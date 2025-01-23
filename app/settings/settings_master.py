@@ -106,7 +106,13 @@ class Settings:
         return version
 
 
-
+    @property
+    def CELERY_PREFIX(self)-> str:
+        try:
+            version = get_document_by_key_name(setting_path, 'CELERY_PREFIX')
+        except:
+            version = 'my'
+        return version
 
 
 settings = Settings()
