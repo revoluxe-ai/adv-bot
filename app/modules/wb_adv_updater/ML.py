@@ -119,31 +119,8 @@ class Predictor:
 
                 # Извлекаем предсказанный CTR
                 predicted_ctr = float(row['predicted_ctr'].values[0])
-
-                # Разделяем предсказанный CTR на клики и показы
-                predicted_views = int(1 / min_ctr)
-                predicted_clicks = predicted_views * predicted_ctr
-
-                # Получаем реальные клики и показы из ClickHouse
-                result = await data_manager.get_keyword_statistic_clickhouse(client, keyword_setting.text, adv_id)
-                real_clicks, real_views, _ = result
-
-                # Если кликов нет, задаём минимальное значение
-                if real_clicks == 0:
-                    real_clicks = 1
-                    enough_views = int(1 / min_ctr)
-                    real_views += enough_views
-
-                # Складываем прогнозируемые и реальные значения
-                total_clicks = real_clicks + predicted_clicks
-                total_views = real_views + predicted_views
-
-                # Вычисляем итоговый CTR
-                final_ctr = total_clicks / total_views
-
-                # Записываем результат в Redis
                 logger.debug('Начинаю запись predict ctr в redis')
-                await redis_manager.set_predict_ctr(adv_id, keyword, final_ctr)
+                await redis_manager.set_predict_ctr(adv_id, keyword, predicted_ctr)
                 logger.debug('Записали прогноз в redis')
             except Exception as exc:
                 logger.error(f'Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}')
