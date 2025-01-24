@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 lock_counter = threading.Lock()
 conn_counter = 0
 
-pool_size = 20
-max_overflow = 30
+pool_size = 10
+max_overflow = 20
 
 #
 # ssl_context = ssl.create_default_context(cafile=RDS_CERT_PATH)
@@ -60,19 +60,19 @@ class AnalyticAsyncSession(AsyncSession):
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
 global_semaphore = asyncio.Semaphore(count_sem)
 
-def log_checkout(dbapi_con, con_record, con_proxy):
-    logger.debug("Соединение взято из пула")
-    global conn_counter
-    with lock_counter:
-        conn_counter += 1
-    logger.debug(f"Количество соединений: {conn_counter}")
-
-def log_checkin(dbapi_con, con_record):
-    logger.debug("Соединение возвращено в пул")
-    global conn_counter
-    with lock_counter:
-        conn_counter -= 1
-    logger.debug(f"Количество соединений: {conn_counter}")
+# def log_checkout(dbapi_con, con_record, con_proxy):
+#     logger.debug("Соединение взято из пула")
+#     global conn_counter
+#     with lock_counter:
+#         conn_counter += 1
+#     logger.debug(f"Количество соединений: {conn_counter}")
+#
+# def log_checkin(dbapi_con, con_record):
+#     logger.debug("Соединение возвращено в пул")
+#     global conn_counter
+#     with lock_counter:
+#         conn_counter -= 1
+#     logger.debug(f"Количество соединений: {conn_counter}")
 
 
 def get_alchemy_row(read_only):
@@ -141,12 +141,6 @@ read_write_engine = create_async_engine(
     pool_pre_ping=True
 )
 
-# События логирования для соединений
-event.listen(read_only_engine.sync_engine, "checkout", log_checkout)
-event.listen(read_only_engine.sync_engine, "checkin", log_checkin)
-
-event.listen(read_write_engine.sync_engine, "checkout", log_checkout)
-event.listen(read_write_engine.sync_engine, "checkin", log_checkin)
 
 # Фабрики сессий
 read_only_session_maker = sessionmaker(
