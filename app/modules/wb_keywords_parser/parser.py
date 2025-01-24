@@ -133,7 +133,11 @@ class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int, total_pages: TotalPages) -> list[WBItemPosition]:
         first_place = page*100 - 99
         try:
-            products, cluster, preset, total_items = await self.__parse_keywords_from_wb(text, page)
+            data = await self.__parse_keywords_from_wb(text, page)
+            if data:
+                 products, cluster, preset, total_items = data
+            else:
+                return []
             if total_items:
                 total_pages.total_pages = total_items // 100 + 1
         except Exception as e:
