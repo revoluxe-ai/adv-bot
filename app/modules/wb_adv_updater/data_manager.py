@@ -498,19 +498,20 @@ async def get_cpm_by_nmid(nmid)-> Optional[int]:
     return cpm
 
 
-async def __get_cpm_from_positions(nmid: int):
+async def __get_cpm_from_positions(nmid: int) -> Optional[int]:
     positions = await redis_manager.get_keywords_positions_by_nmid(nmid)
     if not positions:
         return None
 
     positions = [position for position in positions if position.cpm]
-
+    if not positions:
+        return None
     def __get_last_update(position: WBItemPosition):
         # Выводим значение timestamp для отладки
         print(f"Timestamp: {position.timestamp}")
         return position.timestamp
 
-    # Сортируем позиции по последнему обновлению
+
     last_position = sorted(positions, key=__get_last_update, reverse=True)[0]
     cpm = last_position.cpm
 

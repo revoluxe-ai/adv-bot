@@ -1,0 +1,4 @@
+
+
+class CpmNotFoundError(Exception):
+    pass

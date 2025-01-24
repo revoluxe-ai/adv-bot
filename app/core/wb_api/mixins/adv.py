@@ -209,6 +209,7 @@ class AdvMixin(InterfaceWBAPI):
             return None
 
 
+
     @try_except_decorator(1, 3)
     async def get_all_adv_ids(self) -> list[int]:
         advertIds = []
@@ -227,3 +228,38 @@ class AdvMixin(InterfaceWBAPI):
                     advertIds.append(advertId)
 
         return advertIds
+
+    @try_except_decorator(1, 1)
+    async def update_cpm(self, adv_id, new_cpm):
+        url = 'https://advert-api.wildberries.ru/adv/v0/cpm'
+        data = {
+            "advertId": adv_id,
+            "type": 8,
+            "cpm": int(new_cpm),
+            # "param": None
+        }
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(session,
+                                           'POST',
+                                           url,
+                                           json_data=data,
+                                           headers=self.headers.standart)
+
+            assert response_text == ''
+            pass
+
+    @try_except_decorator(1, 1)
+    async def set_search_cpm(self, search_adv_id: int, cpm: int):
+        url = 'https://advert-api.wildberries.ru/adv/v0/cpm'
+        data = {
+            "advertId": search_adv_id,
+            "type": 9,
+            "cpm": cpm
+        }
+        async with aiohttp.ClientSession() as session:
+            response = await requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
+            if response == '':
+                logger.debug(f'CPM для поисковой кампании {search_adv_id} установлен')
+                return
+            else:
+                logger.error(f'Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}')
