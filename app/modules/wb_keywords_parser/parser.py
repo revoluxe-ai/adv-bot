@@ -493,6 +493,7 @@ async def limited_add_wb_positions(text:str,
 
 async def get_phrases_for_parsing():
     max_views_difference = 10
+    pass_keywords_texts = set()
     async with sm() as session:
         logger.debug("Открытие сессии для выполнения запросов к базе данных.")
 
@@ -521,6 +522,12 @@ async def get_phrases_for_parsing():
             continue
         for keyword in keywords:
             text = keyword.text
+            if text in pass_keywords_texts:
+                logger.debug(f"Ключевое слово '{text}' уже обработано. Пропуск.")
+                await asyncio.sleep(0)
+                continue
+            else:
+                pass_keywords_texts.add(text)
             last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
             if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(days=1)\
                     and keyword.hard_status != 0:
@@ -557,7 +564,7 @@ async def get_phrases_for_parsing():
 async def parser_all_white_phrase():
     while True:
         logger.debug('Получаем фразы для парсинга')
-        generator =  get_phrases_for_parsing()
+        generator = get_phrases_for_parsing()
         async for data in generator:
             text, adv_id, need_nmids, last_views,  max_page = data
             await limited_add_wb_positions(text,
