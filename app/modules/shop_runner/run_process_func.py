@@ -63,7 +63,7 @@ async def shop_update_run():
         except:
             logger.error('Ошибка обновления магазина', exc_info=True)
         finally:
-            await asyncio.sleep(1)
+            await asyncio.sleep(60)
 
 def run():
     asyncio.run(shop_update_run())
