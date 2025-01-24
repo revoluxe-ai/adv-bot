@@ -31,7 +31,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
         logger.debug('Парсим ключ')
         await parser.limited_add_wb_positions(text,
                                               {nmid_in_adv},
-                                        best_white_keyword.views,
+                                            best_white_keyword.views,
                                               adv_id,
                                               60)
         logger.debug('Парсинг ключа успешно завершен')
@@ -45,8 +45,8 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
     logger.debug('Получаю позицию бест ключа из белого списка')
     wb_position = await redis_manager.get_keyword_position(text, nmid_in_adv)
     logger.debug('Позиция ключа из белого списка получена')
-    promo_position = wb_position.promo_position
-    if promo_position:
+    if wb_position:
+        promo_position = wb_position.promo_position
         if promo_position < max_position_for_adv:
             new_cpm = cpm_from_parsing - step
         elif promo_position > max_position_for_adv:
