@@ -1,5 +1,7 @@
 from app import settings
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.wb_keywords_parser import parser
+from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
 
@@ -21,18 +23,25 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
         return
     max_cpm = await data_manager.get_max_adv_bid(adv_setting)
     nmid_in_adv = adv_setting.nmids[0]
+    keywords = await data_manager.get_good_bad_phrases(adv_setting)
+    white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
+    best_white_keyword = data_manager.get_best_keyword(white_keywords)
+    if best_white_keyword:
+        text = best_white_keyword.text
+        await parser.limited_add_wb_positions(text,
+                                              {nmid_in_adv},
+                                        best_white_keyword.views,
+                                              adv_id,
+                                              60)
+    else:
+        logger.error('Нет ключа в белом списке')
+        return
     cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
-
     if not cpm_from_parsing:
         logger.error(f'Не удалось получить ставку для биддера для кампании {adv_id}')
         return
-    keywords = await data_manager.get_good_bad_phrases(adv_setting)
-    white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
-    best_white_keyword = await data_manager.get_best_keyword(white_keywords)
-    if best_white_keyword:
-         promo_position = best_white_keyword.real_position
-    else:
-        promo_position = None
+    wb_position = await redis_manager.get_keyword_position(text, nmid_in_adv)
+    promo_position = wb_position.promo_position
     if promo_position:
         if promo_position < max_position_for_adv:
             new_cpm = cpm_from_parsing - step
