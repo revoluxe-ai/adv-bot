@@ -28,11 +28,13 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
     best_white_keyword = data_manager.get_best_keyword(white_keywords)
     if best_white_keyword:
         text = best_white_keyword.text
+        logger.debug('Парсим ключ')
         await parser.limited_add_wb_positions(text,
                                               {nmid_in_adv},
                                         best_white_keyword.views,
                                               adv_id,
                                               60)
+        logger.debug('Парсинг ключа успешно завершен')
     else:
         logger.error('Нет ключа в белом списке')
         return
@@ -40,7 +42,9 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
     if not cpm_from_parsing:
         logger.error(f'Не удалось получить ставку для биддера для кампании {adv_id}')
         return
+    logger.debug('Получаю позицию бест ключа из белого списка')
     wb_position = await redis_manager.get_keyword_position(text, nmid_in_adv)
+    logger.debug('Позиция ключа из белого списка получена')
     promo_position = wb_position.promo_position
     if promo_position:
         if promo_position < max_position_for_adv:
@@ -60,6 +64,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
                     adv_setting.max_place = promo_position + 1
                     await session.commit()
         if new_cpm == cpm_from_parsing:
+            logger.debug('Новая ставка равна старой')
             return
         if new_cpm < 125:
             new_cpm = 125
@@ -70,7 +75,6 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
         if adv_id:
             await wb_api.set_search_cpm(adv_id, new_cpm)
         logger.debug(f'Ставки для {adv_id} обновлены')
-
     else:
         logger.error(f'Не найден мастер ключ для биддера для рк {adv_setting.adv_id}')
         return
