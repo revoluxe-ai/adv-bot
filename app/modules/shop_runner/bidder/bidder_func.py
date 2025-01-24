@@ -47,6 +47,9 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
     logger.debug('Позиция ключа из белого списка получена')
     if wb_position:
         promo_position = wb_position.promo_position
+        if not promo_position:
+            logger.error(f'У объекта позиции нет промопозиции в adv_id: {adv_id}')
+            return
         if promo_position < max_position_for_adv:
             new_cpm = cpm_from_parsing - step
         elif promo_position > max_position_for_adv:
