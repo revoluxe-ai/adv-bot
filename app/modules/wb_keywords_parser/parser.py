@@ -334,7 +334,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
             max_bet = max(cpms)
             await redis_manager.set_max_bet_for_keyword(text, max_bet)
         else:
-            logger.error(f'Не найдена максимальная ставка для ключа {text}')
+            logger.debug(f'Не найдена максимальная ставка для ключа {text}')
         logger.debug('Записали позиции в базы')
         for position in positions:
             nmid: int = position.nmid
