@@ -85,6 +85,7 @@ class WBShop:
         wb_api = WBApi(self.__access)
         try:
             await asyncio.gather(*[run_bidder_process_for_adv(adv, wb_api) for adv in adv_settings])
+            logger.debug(f'Все ставки обновлены для магазина {self.shop_id}')
         except ApiForbiddenError:
             raise ApiForbiddenError('Нет доступов для выполнения задачи')
 
