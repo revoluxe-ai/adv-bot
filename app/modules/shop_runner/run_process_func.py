@@ -33,7 +33,7 @@ async def _run_shop_async(shop_id):
 
 async def __shop_update():
     active_tasks = {}
-    with Pool() as pool:
+    with Pool(processes=os.cpu_count()) as pool:
         while True:
             stmt = select(WBCabinet.shop_id).filter(
                 or_(
