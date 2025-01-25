@@ -312,7 +312,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
                                   text: str,
                                   page: int,
                                   need_nmids: set[int],
-                                  total_pages: TotalPages) -> (list[WBItemPosition], int,):
+                                  total_pages: TotalPages) -> (list[WBItemPosition],):
     if stop_event.is_set():
         return []
     try:
@@ -327,6 +327,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
     logger.debug(f'Найдено {len(positions)}')
     if positions:
         await add_wb_positions_to_all_bases(positions, need_nmids)
+        logger.debug('Записали позиции в базы')
         positions_for_catch_max_bet = [position for position in positions if position.promo_position\
                                        and position.promo_position <= 40]
         cpms = [position.cpm for position in positions_for_catch_max_bet]
@@ -335,7 +336,6 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
             await redis_manager.set_max_bet_for_keyword(text, max_bet)
         else:
             logger.debug(f'Не найдена максимальная ставка для ключа {text}')
-        logger.debug('Записали позиции в базы')
         for position in positions:
             nmid: int = position.nmid
             need_nmids.discard(nmid)
