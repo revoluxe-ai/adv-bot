@@ -19,9 +19,6 @@ class InterfaceWBAPI:
     def __init__(self, wb_access: 'WBCabinetAccess'):
         tokens: list[WBToken] = wb_access.tokens
         self.access = wb_access
-        wb_cabinet: Union[WBUserCabinet] = wb_access.wb_cabinet
-        self.wb_cabinet = wb_cabinet
-        assert wb_cabinet
         if not tokens:
             raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_access.wb_user_cabinet)

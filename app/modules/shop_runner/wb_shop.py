@@ -123,7 +123,6 @@ class WBShop:
        await self._update_cpm_bid()
 
     async def run(self):
-        logger.debug(f'Запускаю обновление доступов для магазина {self.shop_id}')
         await self._run()
 
 
