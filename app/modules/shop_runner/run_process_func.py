@@ -19,6 +19,7 @@ import asyncio
 
 
 def run_shop(shop_id):
+    logger.debug(f'Запускаю асинхронную функцию старта обновления магазина с shop_id: {shop_id}')
     asyncio.run(_run_shop_async(shop_id))
 
 

@@ -78,12 +78,15 @@ class WBShop:
 
 
     async def __update_cpm_bid(self):
+        logger.debug(f'Обновляю модели для магазина {self.shop_id}')
         await self._update_advs_models()
+        logger.debug(f'Модели обновлены для магазина {self.shop_id}')
         assert hasattr(self, '_adv_settings')
         adv_settings = self._adv_settings
         adv_settings = filter(lambda adv: adv.bidder_active == True, adv_settings)
         wb_api = WBApi(self.__access)
         try:
+            logger.debug(f'Обновляю ставки для магазина {self.shop_id}')
             await asyncio.gather(*[run_bidder_process_for_adv(adv, wb_api) for adv in adv_settings])
             logger.debug(f'Все ставки обновлены для магазина {self.shop_id}')
         except ApiForbiddenError:
@@ -93,7 +96,9 @@ class WBShop:
     async def _update_cpm_bid(self):
         while True:
             try:
+                logger.debug(f'Обновляю ставку для магазина {self.shop_id}')
                 await self.__update_cpm_bid()
+                logger.debug(f'Ставка обновлена для магазина {self.shop_id}')
             except ApiForbiddenError:
                 logger.error(f'Нет прав для обновления ставки у магазина {self.shop_id}, обновляю токены')
                 await asyncio.sleep(60*3)
@@ -108,7 +113,9 @@ class WBShop:
        await self._update_cpm_bid()
 
     async def run(self):
+        logger.debug(f'Запускаю обновление доступов для магазина {self.shop_id}')
         await self._update_access()
+        logger.debug("Доступы для магазина {self.shop_id} обновлены")
         await self._run()
 
 
