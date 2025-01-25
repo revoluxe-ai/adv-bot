@@ -299,6 +299,25 @@ async def set_keyword_vector(keyword: str, vector: list[float]) -> None:
     key = 'keyword_vector:' + keyword
     await redis_client.set(key, json.dumps(vector))
 
+
+async def get_keyword_features_from_redis(keywords) -> list[tuple[str, list[float]]]:
+    # Формируем список ключей
+    keys = [f"keyword_vector:{keyword}" for keyword in keywords]
+
+    # Получаем все вектора сразу с помощью MGET
+    vectors_bytes = await redis_client.mget(*keys)
+
+    result = []
+    for keyword, vector_bytes in zip(keywords, vectors_bytes):
+        if vector_bytes:
+            vector_str = vector_bytes.decode('utf-8')
+            vector = json.loads(vector_str)
+            result.append((keyword, vector))
+
+    return result
+
+
+
 async def get_keyword_vector(keyword: str) -> list[float]:
     key = 'keyword_vector:' + keyword
     vector_bytes = await redis_client.get(key)
@@ -312,11 +331,7 @@ async def get_keyword_vector(keyword: str) -> list[float]:
 
 
 async def get_keywords_vectors(keywords)->list[tuple[str, list[float]]]:
-    vectors = []
-    for keyword in keywords:
-       vector = await get_keyword_vector(keyword)
-       if vector:
-              vectors.append((keyword, vector))
+    vectors = await get_keyword_features_from_redis(keywords)
     return vectors
 
 
