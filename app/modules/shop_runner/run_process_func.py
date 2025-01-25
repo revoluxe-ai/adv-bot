@@ -54,6 +54,7 @@ async def __shop_update():
                 process.start()
                 active_tasks[shop_id] = process
                 logger.debug(f"Процесс обновления магазина {shop_id} запущен")
+                await asyncio.sleep(1)
             else:
                 process = active_tasks[shop_id]
                 if not process.is_alive():
