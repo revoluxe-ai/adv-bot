@@ -18,40 +18,42 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
     shop_id = wb_api.access.wb_cabinet.shop_id
     logger.debug(f'Непосредственная задача обновления ставок для магазина {shop_id} начата')
     step = 2
-    logger.debug('Получил ставку из настроек')
+    logger.debug(f'Получил ставку из настроек')
     adv_id = adv_setting.adv_id
     max_position_for_adv = adv_setting.max_place
     if max_position_for_adv is None:
-        logger.error('Максимальная позиция не задана!')
+        logger.error(f'Максимальная позиция не задана!')
         return
-    logger.debug('Получаю максимальную ставку для биддера')
+    logger.debug(f'Получаю максимальную ставку для биддера для {shop_id}')
     max_cpm = await data_manager.get_max_adv_bid(adv_setting)
-    logger.debug('Максимальная ставка получена')
+    logger.debug(f'Максимальная ставка получена для {shop_id}')
     nmid_in_adv = adv_setting.nmids[0]
-    logger.debug('Получаю ключи для биддера')
+    logger.debug(f'Получаю ключи для биддера для {shop_id}')
     keywords = await data_manager.get_good_bad_phrases(adv_setting)
-    logger.debug('Ключи получены')
+    logger.debug(f'Ключи получены для {shop_id}')
     white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
     best_white_keyword = data_manager.get_best_keyword(white_keywords)
     if best_white_keyword:
         text = best_white_keyword.text
-        logger.debug('Парсим ключ')
+        logger.debug(f'Парсим ключ для {shop_id}')
         await parser.limited_add_wb_positions(text,
                                               {nmid_in_adv},
                                               best_white_keyword.views,
                                               adv_id,
                                               60)
-        logger.debug('Парсинг ключа успешно завершен')
+        logger.debug(f'Парсинг ключа успешно завершен для {shop_id}')
     else:
-        logger.error('Нет ключа в белом списке')
+        logger.error(f'Нет ключа в белом списке для {shop_id}')
         return
+    logger.debug(f'Получаю ставку для биддера для {shop_id}')
     cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
+    logger.debug('Ставка получена для {shop_id}')
     if not cpm_from_parsing:
         logger.error(f'Не удалось получить ставку для биддера для кампании {adv_id}')
         return
-    logger.debug('Получаю позицию бест ключа из белого списка')
+    logger.debug(f'Получаю позицию бест ключа из белого списка для {shop_id}')
     wb_position = await redis_manager.get_keyword_position(text, nmid_in_adv)
-    logger.debug('Позиция ключа из белого списка получена')
+    logger.debug(f'Позиция ключа из белого списка получена для {shop_id}')
     if wb_position:
         promo_position = wb_position.promo_position
         if not promo_position:
@@ -74,7 +76,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
                     adv_setting.max_place = promo_position + 1
                     await session.commit()
         if new_cpm == cpm_from_parsing:
-            logger.debug('Новая ставка равна старой')
+            logger.debug(f'Новая ставка равна старой для {shop_id}')
             return
         if new_cpm < 125:
             new_cpm = 125
@@ -84,7 +86,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
         adv_id = adv_setting.search_adv_id
         if adv_id:
             await wb_api.set_search_cpm(adv_id, new_cpm)
-        logger.debug(f'Ставки для {adv_id} обновлены')
+        logger.debug(f'Ставки для {adv_id} магазина {shop_id} обновлены')
     else:
         logger.error(f'Не найден мастер ключ для биддера для рк {adv_setting.adv_id}')
         return
