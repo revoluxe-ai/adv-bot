@@ -31,7 +31,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
         logger.debug('Парсим ключ')
         await parser.limited_add_wb_positions(text,
                                               {nmid_in_adv},
-                                            best_white_keyword.views,
+                                              best_white_keyword.views,
                                               adv_id,
                                               60)
         logger.debug('Парсинг ключа успешно завершен')

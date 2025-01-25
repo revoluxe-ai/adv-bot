@@ -94,20 +94,18 @@ class WBShop:
         while True:
             try:
                 await self.__update_cpm_bid()
-                await asyncio.sleep(3*60)
             except ApiForbiddenError:
                 logger.error(f'Нет прав для обновления ставки у магазина {self.shop_id}, обновляю токены')
-                await asyncio.sleep(10)
+                await asyncio.sleep(60*3)
                 await self._update_access()
             except Exception:
                 logger.error(f'Ошибка обновления ставки для {self.shop_id}', exc_info=True)
+            finally:
                 await asyncio.sleep(10)
 
 
     async def _run(self):
-        await asyncio.gather(
-            self._update_cpm_bid()
-        )
+       await self._update_cpm_bid()
 
     async def run(self):
         await self._update_access()
