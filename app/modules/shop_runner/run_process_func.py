@@ -28,7 +28,7 @@ async def _run_shop_async(shop_id):
         wb_shop = WBShop(shop_id)
         await wb_shop.run()
     except Exception as e:
-        logger.error(f"Ошибка в процессе обновления магазина {shop_id}: {e}")
+        logger.error(f"Ошибка в процессе обновления магазина {shop_id}", exc_info=True)
 
 
 async def __shop_update():
