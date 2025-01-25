@@ -6,7 +6,7 @@ from typing import Optional
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.shop_runner.bidder.wb_api import WBApi
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBToken
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -49,9 +49,19 @@ def single_run():
 
 class WBShop:
 
-    def __init__(self, shop_id: str):
+    def __init__(self, shop_id: str, all_api_keys: list[str]):
         self.shop_id = shop_id
-        self.__access: Optional[WBCabinetAccess] = None
+        tokens_objs = []
+        for key in all_api_keys:
+            token = WBToken()
+            token.api_key = key
+            tokens_objs.append(token)
+        access = WBCabinetAccess(
+            tokens=tokens_objs,
+            wb_cabinet=None,
+            wb_user_cabinet=None,
+        )
+        self.__access = access
 
     @single_run()
     async def _update_access(self):
@@ -65,10 +75,10 @@ class WBShop:
     async def _update_advs_models(self):
         if not self.__access:
             await self._update_access()
-        wb_cabinet_id: int = self.__access.wb_cabinet.id
+        shop_id = self.shop_id
         stmt = select(AdvSetting)\
         .join(AdvSetting.wb_cabinet)\
-        .filter(AdvSetting.wb_cabinet_id == wb_cabinet_id,
+        .filter(WBCabinet.shop_id == shop_id,
                 AdvSetting.bot_active == True)
         async with sm() as session:
             result = await session.execute(stmt)
@@ -114,8 +124,6 @@ class WBShop:
 
     async def run(self):
         logger.debug(f'Запускаю обновление доступов для магазина {self.shop_id}')
-        await self._update_access()
-        logger.debug("Доступы для магазина {self.shop_id} обновлены")
         await self._run()
 
 
