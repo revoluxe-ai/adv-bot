@@ -101,6 +101,11 @@ async def _get_df_for_fit() -> pd.DataFrame:
     logger.info('Начало получения данных для обучения')
 
     async with sm() as session:
+        stmt = select(AdvSetting)\
+            .filter(AdvSetting.bot_active == True)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+        nmids_in_active_adv = set([nmid for adv in adv_settings for nmid in adv.nmids])
         try:
             logger.debug('Формирование подзапроса для WBCabinet')
             subquery = select(WBCabinet.id).where(
@@ -128,64 +133,73 @@ async def _get_df_for_fit() -> pd.DataFrame:
             for n, adv in enumerate(adv_settings):
                 logger.info(f'Обработка кампании {n + 1} из {total_count} (ID: {adv.adv_id})')
                 nmids = adv.nmids
+                if len(nmids) > 1:
+                    logger.debug(f'Кампания {adv.adv_id} содержит более одного артикула, происходит пропуск')
+                    continue
+                if len(nmids) == 0:
+                    logger.debug(f'Кампания {adv.adv_id} не содержит артикулов, происходит пропуск')
+                    continue
 
-                if len(nmids) >= 1:
-                    logger.debug(f'Получение features для {len(nmids)} nmids кампании {adv.adv_id}')
-                    nmid_to_item_features = await get_nmid_to_item_features(nmids)
+                nmid_in_adv = nmids[0]
+                if nmid_in_adv not in nmids_in_active_adv:
+                    logger.debug(f'Артикулы данной рк не участвуют в активных кампаниях')
+                    continue
+                logger.debug(f'Получение features для {len(nmids)} nmids кампании {adv.adv_id}')
+                nmid_to_item_features = await get_nmid_to_item_features(nmids)
 
-                    if nmid_to_item_features:
-                        logger.debug(f'Расчет средних features для кампании {adv.adv_id}')
-                        item_features_list = list(nmid_to_item_features.values())
-                        avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
-                        avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in
-                                             avg_item_features.keys()}
+                if nmid_to_item_features:
+                    logger.debug(f'Расчет средних features для кампании {adv.adv_id}')
+                    item_features_list = list(nmid_to_item_features.values())
+                    avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
+                    avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in
+                                         avg_item_features.keys()}
 
-                        logger.debug(f'Получение статистики ключевых слов из ClickHouse для кампании {adv.adv_id}')
-                        keyword_stats: list[CalculatedKeyword] \
-                            = await data_manager.get_keywords_statistic_clickhouse(adv,
-                                                                                   last_views=500)
-                        logger.debug(f'Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}')
+                    logger.debug(f'Получение статистики ключевых слов из ClickHouse для кампании {adv.adv_id}')
+                    keyword_stats: list[CalculatedKeyword] \
+                        = await data_manager.get_keywords_statistic_clickhouse(adv,
+                                                                               last_views=500)
+                    logger.debug(f'Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}')
 
-                        logger.debug('Конвертация статистики ключевых слов в кластеры')
-                        keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
-                        logger.debug(f'Получено {len(keywords_stats_by_clusters)} кластеров')
+                    logger.debug('Конвертация статистики ключевых слов в кластеры')
+                    keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
+                    logger.debug(f'Получено {len(keywords_stats_by_clusters)} кластеров')
 
-                        in_clusters = {kw.text for kw in keyword_stats}
+                    in_clusters = {kw.text for kw in keyword_stats}
 
-                        clear_keyword_stat = []
-                        for keyword_stat in keyword_stats:
-                            if keyword_stat.text not in in_clusters:
-                                clear_keyword_stat.append(keyword_stat)
+                    clear_keyword_stat = []
+                    for keyword_stat in keyword_stats:
+                        if keyword_stat.text not in in_clusters:
+                            clear_keyword_stat.append(keyword_stat)
 
-                        logger.debug(f'Найдено {len(clear_keyword_stat)} ключевых слов вне кластеров')
+                    logger.debug(f'Найдено {len(clear_keyword_stat)} ключевых слов вне кластеров')
 
-                        keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
+                    keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
 
-                        logger.debug(f'Получение features для {len(keyword_stats)} ключевых слов из Redis')
-                        processed_keywords = 0
-                        for keyword_stat in keyword_stats:
-                            keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
-                            if keyword_features:
-                                keyword_feature = keyword_features[0][1]
-                                row = {
-                                    'adv_id': adv.adv_id,
-                                    'adv_type': adv.type,
-                                    'keyword': keyword_stat.text,
-                                    'views': keyword_stat.views,
-                                    'clicks': keyword_stat.clicks,
-                                    'spend': keyword_stat.spend,
-                                    'nmids': adv.nmids,
-                                    **avg_item_features,
-                                    **{f'keyword_feature_{i}': keyword_feature[i] for i in range(len(keyword_feature))}
-                                }
-                                data_rows.append(row)
-                                processed_keywords += 1
+                    logger.debug(f'Получение features для {len(keyword_stats)} ключевых слов из Redis')
+                    processed_keywords = 0
+                    for keyword_stat in keyword_stats:
+                        keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
+                        if keyword_features:
+                            keyword_feature = keyword_features[0][1]
+                            row = {
+                                'adv_id': adv.adv_id,
+                                'adv_type': adv.type,
+                                'keyword': keyword_stat.text,
+                                'views': keyword_stat.views,
+                                'clicks': keyword_stat.clicks,
+                                'spend': keyword_stat.spend,
+                                'nmids': adv.nmids,
+                                **avg_item_features,
+                                **{f'keyword_feature_{i}': keyword_feature[i] for i in range(len(keyword_feature))}
+                            }
+                            data_rows.append(row)
+                            processed_keywords += 1
 
-                                if processed_keywords % 100 == 0:
-                                    logger.debug(
-                                        f'Обработано {processed_keywords} ключевых слов из {len(keyword_stats)}')
+                            if processed_keywords % 100 == 0:
+                                logger.debug(
+                                    f'Обработано {processed_keywords} ключевых слов из {len(keyword_stats)}')
 
-                            await asyncio.sleep(0)
+                        await asyncio.sleep(0)
 
         except Exception as e:
             logger.error(f'Ошибка при получении данных: {str(e)}', exc_info=True)
