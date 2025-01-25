@@ -18,14 +18,19 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
     shop_id = wb_api.access.wb_cabinet.shop_id
     logger.debug(f'Непосредственная задача обновления ставок для магазина {shop_id} начата')
     step = settings.BIDDER_STEP
+    logger.debug('Получил ставку из настроек')
     adv_id = adv_setting.adv_id
     max_position_for_adv = adv_setting.max_place
     if max_position_for_adv is None:
         logger.error('Максимальная позиция не задана!')
         return
+    logger.debug('Получаю максимальную ставку для биддера')
     max_cpm = await data_manager.get_max_adv_bid(adv_setting)
+    logger.debug('Максимальная ставка получена')
     nmid_in_adv = adv_setting.nmids[0]
+    logger.debug('Получаю ключи для биддера')
     keywords = await data_manager.get_good_bad_phrases(adv_setting)
+    logger.debug('Ключи получены')
     white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
     best_white_keyword = data_manager.get_best_keyword(white_keywords)
     if best_white_keyword:
