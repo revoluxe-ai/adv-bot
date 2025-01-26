@@ -1,18 +1,22 @@
 {
-  "name": "postgres-source-connector",
-  "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
-  "tasks.max": "1",
-  "database.hostname": "${DATABASE_HOST}",
-  "database.port": "5432",
-  "database.user": "${DATABASE_USER}",
-  "database.password": "${DATABASE_PASSWORD}",
-  "database.dbname": "${DATABASE_NAME}",
-  "database.ssl": "true",
-  "database.sslmode": "verify-full",
-  "database.sslrootcert": "/etc/ssl/certs/root.crt",
-  "database.sslcert": "/etc/ssl/certs/client.crt",
-  "database.sslkey": "/etc/ssl/certs/client.key",
-  "database.server.name": "postgres",
-  "database.history.kafka.bootstrap.servers": "${BOOTSTRAP_SERVERS}",
-  "database.history.kafka.topic": "dbhistory.fullfillment"
+  "name": "pg-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "database.hostname": "c-c9qe1st5pevjrqa10kaq.rw.mdb.yandexcloud.net",
+    "database.port": "6432",
+    "database.user": "adv_updater",
+    "database.password": "IYUIOhi67858tgrew",
+    "database.dbname" : "adv_updater",
+    "database.server.name": "pg-dev",
+    "table.include.list": "public.(.*)",
+    "heartbeat.interval.ms": "5000",
+    "slot.name": "dbname_debezium",
+    "publication.name": "dbname_publication",
+    "transforms": "AddPrefix",
+    "transforms.AddPrefix.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.AddPrefix.regex": "pg-dev.public.(.*)",
+    "transforms.AddPrefix.replacement": "data.cdc.dbname",
+    "topic.prefix": "data.cdc."
+  }
 }
