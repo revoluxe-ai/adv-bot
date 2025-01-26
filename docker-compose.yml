@@ -1,6 +1,4 @@
-version: '3.7'
 services:
-
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     hostname: zookeeper
@@ -9,6 +7,8 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - 2181:2181
+    networks:
+      - kafka-net
 
   kafka:
     image: confluentinc/cp-kafka:latest
@@ -24,29 +24,37 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - kafka-net
 
   kconnect:
     image: debezium/connect:2.7.3.Final
     ports:
       - 8083:8083
     environment:
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}              # Пароль для подключения к PostgreSQL
-      POSTGRES_USER: ${DATABASE_USER}                      # Имя пользователя для подключения
-      POSTGRES_DB: ${DATABASE_NAME}                        # Название базы данных
-      POSTGRES_HOST: ${DATABASE_HOST}                      # Хост PostgreSQL
-      POSTGRES_SSL: "true"                                 # Включаем SSL
-      POSTGRES_SSL_MODE: "verify-full"                     # Полная проверка сертификатов
-      POSTGRES_SSL_ROOT_CERT: "/etc/ssl/certs/root.crt"    # Путь к корневому сертификату в контейнере
-      POSTGRES_SSL_CLIENT_CERT: "/etc/ssl/certs/client.crt" # Путь к клиентскому сертификату (если требуется)
-      POSTGRES_SSL_CLIENT_KEY: "/etc/ssl/certs/client.key"  # Путь к клиентскому ключу (если требуется)
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_HOST: ${DATABASE_HOST}
+      POSTGRES_SSL: "true"
+      POSTGRES_SSL_MODE: "verify-full"
+      POSTGRES_SSL_ROOT_CERT: "/etc/ssl/certs/root.crt"
+      POSTGRES_SSL_CLIENT_CERT: "/etc/ssl/certs/client.crt"
+      POSTGRES_SSL_CLIENT_KEY: "/etc/ssl/certs/client.key"
       CONFIG_STORAGE_TOPIC: my_connect_configs
       OFFSET_STORAGE_TOPIC: my_connect_offsets
       STATUS_STORAGE_TOPIC: my_connect_statuses
       BOOTSTRAP_SERVERS: kafka:29092
     volumes:
-      - ~/.postgresql:/etc/ssl/certs  # Монтируем локальный каталог с сертификатами в контейнер
+      - ~/.postgresql:/etc/ssl/certs
     links:
       - zookeeper
     depends_on:
       - kafka
       - zookeeper
+    networks:
+      - kafka-net
+
+networks:
+  kafka-net:
+    driver: bridge
