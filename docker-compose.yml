@@ -11,6 +11,7 @@ services:
     image: wurstmeister/kafka:latest
     ports:
       - "9093:9093"
+      - "9092:9092"  # Для внешнего доступа
     environment:
       KAFKA_ADVERTISED_LISTENER: INSIDE-KAFKA:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
@@ -20,7 +21,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_NAME_EXTERNAL: OUTSIDE
       KAFKA_LISTENER_PORT_EXTERNAL: 9092
-
+      KAFKA_LISTENER_EXTERIOR_HOSTNAME: localhost  # Добавление хоста для внешнего доступа
 
   connect:
     image: debezium/postgres:latest
@@ -42,12 +43,4 @@ services:
       - DATABASE_HOST=${DATABASE_HOST}
       - DATABASE_PORT=${DATABASE_PORT}
       - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_DBNAME=${DATABASE_DBNAME}
-      - DATABASE_SERVER_NAME=${DATABASE_SERVER_NAME}
-      - SLOT_NAME=${SLOT_NAME}
-      - PLUGIN_NAME=${PLUGIN_NAME}
-      - DATABASE_WHITELIST=${DATABASE_WHITELIST}
-      - DATABASE_HISTORY_KAFKA_TOPIC=${DATABASE_HISTORY_KAFKA_TOPIC}
-    depends_on:
-      - kafka
+      - DATABASE_PASSWORD=${DATABASE_PASSWO
