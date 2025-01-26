@@ -1,57 +1,53 @@
+version: '3'
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: adv_wb_bot_backend
-    command: python updater.py
-    mem_limit: 6G
-    cpus: 14
-    image: adv_wb_bot_backend
-    restart: always
-    network_mode: host
+  zookeeper:
+    image: wurstmeister/zookeeper:3.4.6
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    ports:
+      - "9093:9093"
+    environment:
+      KAFKA_ADVERTISED_LISTENER: INSIDE-KAFKA:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
+      KAFKA_LISTENER_NAME_INTERNAL: INSIDE
+      KAFKA_LISTENER_INTERNAL_PORT: 9093
+      KAFKA_LISTENER_PORT: 9093
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_NAME_EXTERNAL: OUTSIDE
+      KAFKA_LISTENER_PORT_EXTERNAL: 9092
+
+
+  connect:
+    image: debezium/connect:latest
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9093
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: my_connect_configs
+      OFFSET_STORAGE_TOPIC: my_connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
     volumes:
-      - ./work_folder:/app/work_folder
-#    logging:
-#      driver: loki
-#      options:
-#        loki-url: "http://loki:3100/loki/api/v1/push"
-#        loki-pipeline-stages: |
-#          - json:
-#              expressions:
-#                timestamp: timestamp
-#                level: level
-#                logger: logger
-#                message: message
-#                service: service
-#          - labels:
-#              level: level
-#              logger: logger
-#              service: service
+      - /tmp/bind_mount:/tmp/bind_mount
 
-
-  client_bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: wbgram_bot
-    command: python client_bot_run.py
-    image: wbgram_bot
-    restart: always
-    network_mode: host
-#    logging:
-#      driver: loki
-#      options:
-#        loki-url: "http://loki:3100/loki/api/v1/push"
-#        loki-pipeline-stages: |
-#          - json:
-#              expressions:
-#                timestamp: timestamp
-#                level: level
-#                logger: logger
-#                message: message
-#                service: service
-#          - labels:
-#              level: level
-#              logger: logger
-#              service: service
+  debezium-postgresql-connector:
+    image: debezium/debezium-connector-postgres:latest
+    environment:
+      - CONNECTOR_CLASS=io.debezium.connector.postgresql.PostgresConnector
+      - DATABASE_HOST=${DATABASE_HOST}
+      - DATABASE_PORT=${DATABASE_PORT}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_DBNAME=${DATABASE_DBNAME}
+      - DATABASE_SERVER_NAME=${DATABASE_SERVER_NAME}
+      - SLOT_NAME=${SLOT_NAME}
+      - PLUGIN_NAME=${PLUGIN_NAME}
+      - DATABASE_WHITELIST=${DATABASE_WHITELIST}
+      - DATABASE_HISTORY_KAFKA_TOPIC=${DATABASE_HISTORY_KAFKA_TOPIC}
+    depends_on:
+      - kafka
