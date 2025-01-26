@@ -1,7 +1,7 @@
 version: '3'
 services:
   zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
+    image: wurstmeister/zookeeper:latest
     ports:
       - "2181:2181"
     environment:
@@ -23,7 +23,7 @@ services:
 
 
   connect:
-    image: debezium/connect:latest
+    image: debezium/postgres:latest
     ports:
       - "8083:8083"
     environment:
@@ -36,7 +36,7 @@ services:
       - /tmp/bind_mount:/tmp/bind_mount
 
   debezium-postgresql-connector:
-    image: debezium/debezium-connector-postgres:latest
+    image: debezium/postgres:latest
     environment:
       - CONNECTOR_CLASS=io.debezium.connector.postgresql.PostgresConnector
       - DATABASE_HOST=${DATABASE_HOST}
