@@ -1,0 +1,18 @@
+{
+  "name": "postgres-source-connector",
+  "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+  "tasks.max": "1",
+  "database.hostname": "${DATABASE_HOST}",
+  "database.port": "5432",
+  "database.user": "${DATABASE_USER}",
+  "database.password": "${DATABASE_PASSWORD}",
+  "database.dbname": "${DATABASE_NAME}",
+  "database.ssl": "true",
+  "database.sslmode": "verify-full",
+  "database.sslrootcert": "/etc/ssl/certs/root.crt",
+  "database.sslcert": "/etc/ssl/certs/client.crt",
+  "database.sslkey": "/etc/ssl/certs/client.key",
+  "database.server.name": "postgres",
+  "database.history.kafka.bootstrap.servers": "${BOOTSTRAP_SERVERS}",
+  "database.history.kafka.topic": "dbhistory.fullfillment"
+}
