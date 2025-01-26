@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -9,6 +11,12 @@ services:
       - 2181:2181
     networks:
       - kafka-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 10s
 
   kafka:
     image: confluentinc/cp-kafka:latest
@@ -47,8 +55,6 @@ services:
       BOOTSTRAP_SERVERS: kafka:29092
     volumes:
       - ~/.postgresql:/etc/ssl/certs
-    links:
-      - zookeeper
     depends_on:
       - kafka
       - zookeeper
