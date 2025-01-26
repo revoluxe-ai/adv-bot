@@ -27,6 +27,8 @@ services:
 
   kconnect:
     image: debezium/connect:2.7.3.Final
+    ports:
+      - 8083:8083
     environment:
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}              # Пароль для подключения к PostgreSQL
       POSTGRES_USER: ${DATABASE_USER}                      # Имя пользователя для подключения
@@ -40,6 +42,7 @@ services:
       CONFIG_STORAGE_TOPIC: my_connect_configs
       OFFSET_STORAGE_TOPIC: my_connect_offsets
       STATUS_STORAGE_TOPIC: my_connect_statuses
+      BOOTSTRAP_SERVERS: kafka:29092
     ports:
       - "8083:8083"  # Порт для подключения к Debezium Connect
     volumes:
