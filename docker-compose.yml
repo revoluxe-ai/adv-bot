@@ -9,8 +9,6 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - 2181:2181
-    networks:
-      - kafka-net
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "2181"]
       interval: 30s
@@ -32,8 +30,6 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    networks:
-      - kafka-net
 
   kconnect:
     image: debezium/connect:2.7.3.Final
@@ -58,9 +54,4 @@ services:
     depends_on:
       - kafka
       - zookeeper
-    networks:
-      - kafka-net
 
-networks:
-  kafka-net:
-    driver: bridge
