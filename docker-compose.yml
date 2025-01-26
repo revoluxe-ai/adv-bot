@@ -1,46 +1,51 @@
-version: '3'
+version: '3.7'
 services:
+
   zookeeper:
-    image: wurstmeister/zookeeper:latest
-    ports:
-      - "2181:2181"
+    image: confluentinc/cp-zookeeper:latest
+    hostname: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 2181:2181
 
   kafka:
-    image: wurstmeister/kafka:latest
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
     ports:
-      - "9093:9093"
-      - "9092:9092"  # Для внешнего доступа
+      - 29092:29092
+    hostname: kafka
     environment:
-      KAFKA_ADVERTISED_LISTENER: INSIDE-KAFKA:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
-      KAFKA_LISTENER_NAME_INTERNAL: INSIDE
-      KAFKA_LISTENER_INTERNAL_PORT: 9093
-      KAFKA_LISTENER_PORT: 9093
+      KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_NAME_EXTERNAL: OUTSIDE
-      KAFKA_LISTENER_PORT_EXTERNAL: 9092
-      KAFKA_LISTENER_EXTERIOR_HOSTNAME: localhost  # Добавление хоста для внешнего доступа
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  connect:
-    image: debezium/postgres:latest
-    ports:
-      - "8083:8083"
+  kconnect:
+    image: debezium/connect:2.7.3.Final
     environment:
-      BOOTSTRAP_SERVERS: kafka:9093
-      GROUP_ID: 1
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}              # Пароль для подключения к PostgreSQL
+      POSTGRES_USER: ${DATABASE_USER}                      # Имя пользователя для подключения
+      POSTGRES_DB: ${DATABASE_NAME}                        # Название базы данных
+      POSTGRES_HOST: ${DATABASE_HOST}                      # Хост PostgreSQL
+      POSTGRES_SSL: "true"                                 # Включаем SSL
+      POSTGRES_SSL_MODE: "verify-full"                     # Полная проверка сертификатов
+      POSTGRES_SSL_ROOT_CERT: "/etc/ssl/certs/root.crt"    # Путь к корневому сертификату в контейнере
+      POSTGRES_SSL_CLIENT_CERT: "/etc/ssl/certs/client.crt" # Путь к клиентскому сертификату (если требуется)
+      POSTGRES_SSL_CLIENT_KEY: "/etc/ssl/certs/client.key"  # Путь к клиентскому ключу (если требуется)
       CONFIG_STORAGE_TOPIC: my_connect_configs
       OFFSET_STORAGE_TOPIC: my_connect_offsets
       STATUS_STORAGE_TOPIC: my_connect_statuses
+    ports:
+      - "8083:8083"  # Порт для подключения к Debezium Connect
     volumes:
-      - /tmp/bind_mount:/tmp/bind_mount
-
-  debezium-postgresql-connector:
-    image: debezium/postgres:latest
-    environment:
-      - CONNECTOR_CLASS=io.debezium.connector.postgresql.PostgresConnector
-      - DATABASE_HOST=${DATABASE_HOST}
-      - DATABASE_PORT=${DATABASE_PORT}
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWO
+      - ~/.postgresql:/etc/ssl/certs  # Монтируем локальный каталог с сертификатами в контейнер
+    links:
+      - zookeeper
+    depends_on:
+      - kafka
+      - zookeeper
