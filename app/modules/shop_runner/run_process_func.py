@@ -34,7 +34,7 @@ async def _run_shop_async(shop_id, all_api_keys):
 async def __shop_update():
     active_tasks = {}
     while True:
-        stmt = select(WBCabinet.shop_id)\
+        stmt = select(WBCabinet.shop_id).distinct()\
             .join(WBCabinet.adv_settings)\
         .filter(
            WBCabinet.adv_settings.any(AdvSetting.bot_active == True)
