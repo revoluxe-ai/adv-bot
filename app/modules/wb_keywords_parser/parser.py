@@ -540,10 +540,6 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
                 logger.debug(f"Последняя позиция для ключевого слова '{text}' устарела. Перезапуск парсинга.")
                 await redis_manager.set_last_views(adv_id, text, 0)
                 await queue.put((text, adv.adv_id, list(need_nmids), None, 60))
-            if keyword.views == 0:
-                logger.debug(f"Ключевое слово '{keyword.text}' не имеет просмотров. Пропуск.")
-                await asyncio.sleep(0)
-                continue
             total_views = keyword.views
             logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
             cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
