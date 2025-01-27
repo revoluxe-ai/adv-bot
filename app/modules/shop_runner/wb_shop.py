@@ -114,7 +114,7 @@ class WBShop:
                 logger.debug(f'Ставка обновлена для магазина {self.shop_id}')
             except ApiForbiddenError:
                 logger.error(f'Нет прав для обновления ставки у магазина {self.shop_id}, обновляю токены')
-                await asyncio.sleep(60*3)
+                await asyncio.sleep(1)
                 await self._update_access()
             except Exception:
                 logger.error(f'Ошибка обновления ставки для {self.shop_id}', exc_info=True)
