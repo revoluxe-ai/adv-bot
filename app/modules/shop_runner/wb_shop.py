@@ -49,8 +49,11 @@ def single_run():
 
 class WBShop:
 
-    def __init__(self, shop_id: str, all_api_keys: list[str]):
+    def __init__(self, shop_id: str,
+                 wb_cabinet_original_id: int,
+                 all_api_keys: list[str]):
         self.shop_id = shop_id
+        self._wb_cabinet_original_id = wb_cabinet_original_id
         tokens_objs = []
         for key in all_api_keys:
             token = WBToken()
@@ -97,7 +100,7 @@ class WBShop:
         wb_api = WBApi(self.__access)
         try:
             logger.debug(f'Обновляю ставки для магазина {self.shop_id}')
-            await asyncio.gather(*[run_bidder_process_for_adv(adv, wb_api) for adv in adv_settings])
+            await asyncio.gather(*[run_bidder_process_for_adv(adv, wb_api, self.shop_id) for adv in adv_settings])
             logger.debug(f'Все ставки обновлены для магазина {self.shop_id}')
         except ApiForbiddenError:
             raise ApiForbiddenError('Нет доступов для выполнения задачи')
@@ -123,6 +126,7 @@ class WBShop:
        await self._update_cpm_bid()
 
     async def run(self):
+        await self._update_access()
         await self._run()
 
 

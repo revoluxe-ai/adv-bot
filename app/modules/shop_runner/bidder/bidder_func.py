@@ -14,8 +14,7 @@ from app.modules.wb_adv_updater import data_manager
 logger = logging.getLogger(__name__)
 
 
-async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi):
-    shop_id = wb_api.access.wb_cabinet.shop_id
+async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, shop_id: str):
     logger.debug(f'Непосредственная задача обновления ставок для магазина {shop_id} начата')
     step = 2
     logger.debug(f'Получил ставку из настроек')
