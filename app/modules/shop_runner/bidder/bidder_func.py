@@ -42,7 +42,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
                                               60)
         logger.debug(f'Парсинг ключа успешно завершен для {shop_id}')
     else:
-        logger.error(f'Нет ключа в белом списке для {shop_id}')
+        logger.error(f'Нет ключа в белом списке для {shop_id}  adv_id: {adv_id}')
         return
     logger.debug(f'Получаю ставку для биддера для {shop_id}')
     cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
