@@ -494,6 +494,9 @@ async def limited_add_wb_positions(text:str,
              await redis_manager.set_last_views(adv_id, text, last_view)
     except ErrorParsingPositions as e:
         logger.error(f'По запросу {text} не найдено ни одной позиции', exc_info=True)
+    except Exception as e:
+        logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
+
 
 
 
