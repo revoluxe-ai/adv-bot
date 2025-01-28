@@ -24,11 +24,13 @@ async def run_shop(shop_id, wb_cabinet_original_id,  all_api_keys: list[str]):
 
 
 async def _run_shop_async(shop_id, wb_cabinet_original_id, all_api_keys):
-    try:
-        wb_shop = WBShop(shop_id, wb_cabinet_original_id, all_api_keys)
-        await wb_shop.run()
-    except Exception as e:
-        logger.error(f"Ошибка в процессе обновления магазина {shop_id}", exc_info=True)
+    while True:
+        try:
+            wb_shop = WBShop(shop_id, wb_cabinet_original_id, all_api_keys)
+            await wb_shop.run()
+        except Exception as e:
+            logger.error(f"Ошибка в процессе обновления магазина {shop_id}", exc_info=True)
+        await asyncio.sleep(1)
 
 
 async def __shop_update():
