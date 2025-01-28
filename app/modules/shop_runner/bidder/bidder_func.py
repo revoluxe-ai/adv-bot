@@ -24,7 +24,14 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
         logger.error(f'Максимальная позиция не задана для {adv_id} adv_id {adv_id} !')
         return
     logger.debug(f'Получаю максимальную ставку для биддера для {shop_id} adv_id {adv_id}')
-    max_cpm = await data_manager.get_max_adv_bid(adv_setting)
+    try:
+        max_cpm = await data_manager.get_max_adv_bid(adv_setting)
+    except CpmNotFoundError:
+        logger.error(f'Максимальная ставка не найдена для {shop_id} adv_id {adv_id}')
+        return
+    except Exception as e:
+        logger.error(f'Ошибка при получении максимальной ставки для {shop_id} adv_id {adv_id}', exc_info=True)
+        return
     logger.debug(f'Максимальная ставка получена для {shop_id} adv_id {adv_id}')
     nmid_in_adv = adv_setting.nmids[0]
     logger.debug(f'Получаю ключи для биддера для {shop_id}  adv_id {adv_id}')
