@@ -107,7 +107,7 @@ class WBShop:
 
 
     async def _update_cpm_bid(self):
-        max_pause = 60*3 + 30
+        max_pause = 60*3 + 60
         while True:
             try:
                 start_time = datetime.now()
