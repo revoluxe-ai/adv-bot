@@ -52,15 +52,12 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
         return
     white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
     best_white_keyword = data_manager.get_best_keyword(white_keywords)
+    nmid = adv_setting.nmids[0]
     if best_white_keyword:
         text = best_white_keyword.text
         logger.debug(f'Парсим ключ для {shop_id} adv_id {adv_id}')
         try:
-            await parser.limited_add_wb_positions(text,
-                                                  {nmid_in_adv},
-                                                  best_white_keyword.views,
-                                                  adv_id,
-                                                  60)
+            await parser.add_wb_positions(text, {nmid}, delay=3)
         except Exception as e:
             logger.error(f'Ошибка парсинга ключа для {shop_id} adv_id {adv_id}', exc_info=True)
             return
