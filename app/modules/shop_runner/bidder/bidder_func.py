@@ -35,8 +35,12 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
     logger.debug(f'Максимальная ставка получена для {shop_id} adv_id {adv_id}')
     nmid_in_adv = adv_setting.nmids[0]
     logger.debug(f'Получаю ключи для биддера для {shop_id}  adv_id {adv_id}')
-    keywords = await data_manager.get_good_bad_phrases(adv_setting)
-    logger.debug(f'Ключи получены для {shop_id}')
+    try:
+        keywords = await data_manager.get_good_bad_phrases(adv_setting)
+        logger.debug(f'Ключи получены для {shop_id}, adv_id {adv_id}')
+    except Exception as e:
+        logger.error(f'Ошибка при получении ключей для {shop_id} adv_id {adv_id}', exc_info=True)
+        return
     white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
     best_white_keyword = data_manager.get_best_keyword(white_keywords)
     if best_white_keyword:
