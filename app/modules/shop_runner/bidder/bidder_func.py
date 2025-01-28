@@ -59,7 +59,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
         try:
             await parser.add_wb_positions(text, {nmid}, delay=3)
         except Exception as e:
-            logger.error(f'Ошибка парсинга ключа для {shop_id} adv_id {adv_id}', exc_info=True)
+            logger.error(f'Ошибка парсинга ключа {text} для {shop_id} adv_id {adv_id} артикул {nmid}', exc_info=True)
             return
         logger.debug(f'Парсинг ключа успешно завершен для {shop_id} adv_id {adv_id}')
     else:
