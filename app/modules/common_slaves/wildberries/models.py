@@ -246,6 +246,8 @@ class AdvSetting(BaseTable):
     new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
     reset_place = mapped_column(Boolean, nullable=True, default=True)
     _search_adv_id = mapped_column(Integer, nullable=True)
+    bidder_step = mapped_column(Integer, nullable=True, default=2)
+
 
     __table_args__ = (
         # Составной индекс для основного запроса
