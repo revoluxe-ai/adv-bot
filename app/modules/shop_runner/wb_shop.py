@@ -2,7 +2,7 @@ import asyncio
 import logging
 from functools import wraps
 from typing import Optional
-
+from datetime import datetime
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.shop_runner.bidder.wb_api import WBApi
@@ -90,7 +90,7 @@ class WBShop:
         assert hasattr(self, '_adv_settings')
 
 
-    async def __update_cpm_bid(self):
+    async def __update_cpm_bid(self)-> datetime:
         logger.debug(f'Обновляю модели для магазина {self.shop_id}')
         await self._update_advs_models()
         logger.debug(f'Модели обновлены для магазина {self.shop_id}')
@@ -107,19 +107,23 @@ class WBShop:
 
 
     async def _update_cpm_bid(self):
+        max_pause = 60*3
         while True:
             try:
+                start_time = datetime.now()
                 logger.debug(f'Обновляю ставку для магазина {self.shop_id}')
                 await self.__update_cpm_bid()
                 logger.debug(f'Ставка обновлена для магазина {self.shop_id}')
+                pause = max_pause - (datetime.now() - start_time).seconds
+                pause = max(1, pause)
+                await asyncio.sleep(pause)
             except ApiForbiddenError:
                 logger.error(f'Нет прав для обновления ставки у магазина {self.shop_id}, обновляю токены')
                 await asyncio.sleep(1)
                 await self._update_access()
             except Exception as e:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
-            finally:
-                await asyncio.sleep(10)
+                await asyncio.sleep(1)
 
 
     async def _run(self):
