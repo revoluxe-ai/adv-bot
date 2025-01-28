@@ -35,11 +35,15 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
     if best_white_keyword:
         text = best_white_keyword.text
         logger.debug(f'Парсим ключ для {shop_id}')
-        await parser.limited_add_wb_positions(text,
-                                              {nmid_in_adv},
-                                              best_white_keyword.views,
-                                              adv_id,
-                                              60)
+        try:
+            await parser.limited_add_wb_positions(text,
+                                                  {nmid_in_adv},
+                                                  best_white_keyword.views,
+                                                  adv_id,
+                                                  60)
+        except Exception as e:
+            logger.error(f'Ошибка парсинга ключа для {shop_id}', exc_info=True)
+            return
         logger.debug(f'Парсинг ключа успешно завершен для {shop_id}')
     else:
         logger.error(f'Нет ключа в белом списке для {shop_id}  adv_id: {adv_id}')
