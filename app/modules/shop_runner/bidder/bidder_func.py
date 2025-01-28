@@ -16,6 +16,20 @@ logger = logging.getLogger(__name__)
 
 async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, shop_id: str):
     adv_id = adv_setting.adv_id
+    try:
+        logger.debug(f'Получаю максимальную ставку для биддера для {shop_id} adv_id {adv_id}')
+        max_cpm = await data_manager.get_max_adv_bid(adv_setting)
+        logger.debug(f'Максимальная ставка получена для {shop_id} adv_id {adv_id}')
+    except CpmNotFoundError:
+        logger.error(f'Максимальная ставка не найдена для {shop_id} adv_id {adv_id}')
+        return
+    except Exception as e:
+        logger.error(f'Ошибка при получении максимальной ставки для {shop_id} adv_id {adv_id}', exc_info=True)
+        return
+
+    if not max_cpm:
+        logger.error(f'Максимальная ставка не задана для shop_id {shop_id} adv_id {adv_id}!')
+        return
     logger.debug(f'Непосредственная задача обновления ставок для магазина {shop_id} adv_id {adv_id} начата')
     step = 2
     logger.debug(f'Получил ставку из настроек для {shop_id} adv_id {adv_id}')
@@ -23,15 +37,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
     if max_position_for_adv is None:
         logger.error(f'Максимальная позиция не задана для {adv_id} adv_id {adv_id} !')
         return
-    logger.debug(f'Получаю максимальную ставку для биддера для {shop_id} adv_id {adv_id}')
-    try:
-        max_cpm = await data_manager.get_max_adv_bid(adv_setting)
-    except CpmNotFoundError:
-        logger.error(f'Максимальная ставка не найдена для {shop_id} adv_id {adv_id}')
-        return
-    except Exception as e:
-        logger.error(f'Ошибка при получении максимальной ставки для {shop_id} adv_id {adv_id}', exc_info=True)
-        return
+
     logger.debug(f'Максимальная ставка получена для {shop_id} adv_id {adv_id}')
     nmid_in_adv = adv_setting.nmids[0]
     logger.debug(f'Получаю ключи для биддера для {shop_id}  adv_id {adv_id}')
@@ -79,9 +85,6 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
             new_cpm = cpm_from_parsing + step
         else:
             new_cpm = cpm_from_parsing
-        if not max_cpm:
-            logger.error(f'Максимальная ставка не задана для shop_id {shop_id} adv_id {adv_id}!')
-            return
         if new_cpm >= max_cpm:
             new_cpm = max_cpm
             if adv_setting.reset_place:
