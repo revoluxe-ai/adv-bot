@@ -1,4 +1,5 @@
 from app import settings
+from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.wb_keywords_parser import parser
 from app.utils import redis_manager
@@ -31,7 +32,9 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
         logger.error(f'Максимальная ставка не задана для shop_id {shop_id} adv_id {adv_id}!')
         return
     logger.debug(f'Непосредственная задача обновления ставок для магазина {shop_id} adv_id {adv_id} начата')
-    step = 2
+    step = adv_setting.bidder_step
+    if not step:
+        step = DEFAULT_BIDDER_STEP
     logger.debug(f'Получил ставку из настроек для {shop_id} adv_id {adv_id}')
     max_position_for_adv = adv_setting.max_place
     if max_position_for_adv is None:

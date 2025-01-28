@@ -11,6 +11,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 import jwt
 from sqlalchemy.dialects.postgresql import JSONB
 import datetime
+
+from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.utils.db.base import BaseTable
 from . import exceptions
 from ...wb_adv_updater.models import AdvPayment
@@ -246,7 +248,7 @@ class AdvSetting(BaseTable):
     new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
     reset_place = mapped_column(Boolean, nullable=True, default=True)
     _search_adv_id = mapped_column(Integer, nullable=True)
-    bidder_step = mapped_column(Integer, nullable=True, default=2)
+    bidder_step = mapped_column(Integer, nullable=True, default=DEFAULT_BIDDER_STEP)
 
 
     __table_args__ = (
