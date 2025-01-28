@@ -147,7 +147,6 @@ async def process_payment_for_advs():
         ).filter(
             and_(
                 AdvSetting.bot_active == True,
-                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
                 AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
                 # условие на истекший срок действия
