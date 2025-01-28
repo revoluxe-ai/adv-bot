@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, shop_id: str):
+    adv_id = adv_setting.adv_id
     logger.debug(f'Непосредственная задача обновления ставок для магазина {shop_id} adv_id {adv_id} начата')
     step = 2
     logger.debug(f'Получил ставку из настроек для {shop_id} adv_id {adv_id}')
-    adv_id = adv_setting.adv_id
     max_position_for_adv = adv_setting.max_place
     if max_position_for_adv is None:
         logger.error(f'Максимальная позиция не задана для {adv_id} adv_id {adv_id} !')

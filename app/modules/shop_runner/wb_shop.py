@@ -116,8 +116,8 @@ class WBShop:
                 logger.error(f'Нет прав для обновления ставки у магазина {self.shop_id}, обновляю токены')
                 await asyncio.sleep(1)
                 await self._update_access()
-            except Exception:
-                logger.error(f'Ошибка обновления ставки для {self.shop_id}', exc_info=True)
+            except Exception as e:
+                logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
             finally:
                 await asyncio.sleep(10)
 
