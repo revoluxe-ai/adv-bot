@@ -341,7 +341,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
 
     def sorting_keywords(keywords, sort_mode):
-        if sort_mode == 'default':
+        if sort_mode == 'by_adv':
             keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
             keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
             keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
@@ -350,7 +350,10 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
             return keywords
 
         elif sort_mode == 'white_list':
-             return sorted(keywords, key=lambda x: x.predict_ctr, reverse=True)
+             def sort_func(keyword:CalculatedKeyword):
+                return keyword.baes_ctr
+
+             return sorted(keywords, key=sort_func, reverse=True)
 
         elif sort_mode == 'sort_by_ctr_desc':
             return sorted(keywords, key=lambda x: x.ctr, reverse=True)
@@ -435,7 +438,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         bottoms.append([InlineKeyboardButton(text="⬅️",
                                              callback_data=callbacks.SettingKeywords(
                                                  adv_original_id=adv_setting.id,
-                                                 type='by_adv',
+                                                 type=sort_mode,
                                                  page=prev_page).pack())])
 
     if len(keywords) > end_index:
@@ -443,7 +446,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         bottoms.append([InlineKeyboardButton(text="➡️",
                                              callback_data=callbacks.SettingKeywords(
                                                 adv_original_id=adv_setting.id,
-                                                type='by_adv',
+                                                type=sort_mode,
                                                 page=next_page).pack())])
     bottom = [InlineKeyboardButton(text='Показать фразы для продвижения (белый список)',
                                    callback_data=callbacks.SettingKeywords(

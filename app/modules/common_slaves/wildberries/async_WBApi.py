@@ -294,15 +294,6 @@ class async_WBApi(ABC_WB_API):
         return cards
 
 
-
-    async def get_adv_balances(self):
-        url = 'https://advert-api.wb.ru/adv/v1/balance'
-        async with aiohttp.ClientSession() as session:
-            response = await session.get(url, headers=self.headers.standart)
-            answer = await response.json()
-            balance = Balances(answer)
-            return balance
-
     async def cards_to_queue(self, queue_for_adv:asyncio.Queue,
                              queue_for_cards:asyncio.Queue,
                              success_event: asyncio.Event, error_event: asyncio.Event):

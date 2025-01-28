@@ -133,7 +133,11 @@ class Parser:
     async def parse_keywords_from_wb(self, text: str, page: int, total_pages: TotalPages) -> list[WBItemPosition]:
         first_place = page*100 - 99
         try:
-            products, cluster, preset, total_items = await self.__parse_keywords_from_wb(text, page)
+            data = await self.__parse_keywords_from_wb(text, page)
+            if data:
+                 products, cluster, preset, total_items = data
+            else:
+                return []
             if total_items:
                 total_pages.total_pages = total_items // 100 + 1
         except Exception as e:
@@ -308,7 +312,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
                                   text: str,
                                   page: int,
                                   need_nmids: set[int],
-                                  total_pages: TotalPages) -> (list[WBItemPosition], int,):
+                                  total_pages: TotalPages) -> (list[WBItemPosition],):
     if stop_event.is_set():
         return []
     try:
@@ -323,6 +327,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
     logger.debug(f'Найдено {len(positions)}')
     if positions:
         await add_wb_positions_to_all_bases(positions, need_nmids)
+        logger.debug('Записали позиции в базы')
         positions_for_catch_max_bet = [position for position in positions if position.promo_position\
                                        and position.promo_position <= 40]
         cpms = [position.cpm for position in positions_for_catch_max_bet]
@@ -330,8 +335,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
             max_bet = max(cpms)
             await redis_manager.set_max_bet_for_keyword(text, max_bet)
         else:
-            logger.error(f'Не найдена максимальная ставка для ключа {text}')
-        logger.debug('Записали позиции в базы')
+            logger.debug(f'Не найдена максимальная ставка для ключа {text}')
         for position in positions:
             nmid: int = position.nmid
             need_nmids.discard(nmid)
@@ -484,26 +488,22 @@ async def limited_add_wb_positions(text:str,
                                    last_view,
                                    adv_id,
                                    max_page: int):
-    global max_threads
-    async with semaphore:
-        try:
-            await add_wb_positions(text, need_nmids, 1, max_page)
-            if last_view:
-                 await redis_manager.set_last_views(adv_id, text, last_view)
-                 max_threads += 1
-                 semaphore.release()
-        except ErrorParsingPositions as e:
-            logger.error(f'По запросу {text} не найдено ни одной позиции')
-            max_threads -= 1
-            await semaphore.acquire()
-        finally:
-            logger.debug(f'Максимум потоков {max_threads}')
+    try:
+        await add_wb_positions(text, need_nmids, 1, max_page)
+        if last_view:
+             await redis_manager.set_last_views(adv_id, text, last_view)
+    except ErrorParsingPositions as e:
+        logger.error(f'По запросу {text} не найдено ни одной позиции', exc_info=True)
+    except Exception as e:
+        logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
+
 
 
 
 async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
     max_views_difference = 10
-    async with sm(semaphore) as session:
+    pass_keywords_texts = set()
+    async with sm() as session:
         logger.debug("Открытие сессии для выполнения запросов к базе данных.")
 
         stmt = select(AdvSetting).where(
@@ -531,16 +531,18 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
             continue
         for keyword in keywords:
             text = keyword.text
+            if text in pass_keywords_texts:
+                logger.debug(f"Ключевое слово '{text}' уже обработано. Пропуск.")
+                await asyncio.sleep(0)
+                continue
+            else:
+                pass_keywords_texts.add(text)
             last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
             if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(days=1)\
                     and keyword.hard_status != 0:
                 logger.debug(f"Последняя позиция для ключевого слова '{text}' устарела. Перезапуск парсинга.")
                 await redis_manager.set_last_views(adv_id, text, 0)
                 await queue.put((text, adv.adv_id, list(need_nmids), None, 60))
-            if keyword.views == 0:
-                logger.debug(f"Ключевое слово '{keyword.text}' не имеет просмотров. Пропуск.")
-                await asyncio.sleep(0)
-                continue
             total_views = keyword.views
             logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
             cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
@@ -560,7 +562,6 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
                         or not last_position:
                         await queue.put((text, adv.adv_id, list(need_nmids), last_views, 60))
                         logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
-
 
 
 
@@ -594,7 +595,6 @@ async def parser_all_white_phrase():
                             if task.exception():
                                 logger.error(f'Ошибка при выполнении задачи {task.exception()}')
                         del tasks[key]
-
 
 
 

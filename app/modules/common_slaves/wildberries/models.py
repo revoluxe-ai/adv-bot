@@ -51,7 +51,9 @@ class WBCabinet(BaseTable):
     balance = Column(Float, server_default=text('0'))
     bonus = Column(Float, default=0)
     white_list_update_active = Column(Boolean, default=False)
-
+    __table_args__ = (
+        Index('idx_balance_bonus', 'balance', 'bonus'),
+    )
 
 
 class WBToken(BaseTable):

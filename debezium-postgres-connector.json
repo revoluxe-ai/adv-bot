@@ -1,0 +1,22 @@
+{
+  "name": "pg-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "database.hostname": "c-c9qe1st5pevjrqa10kaq.rw.mdb.yandexcloud.net",
+    "database.port": "6432",
+    "database.user": "adv_updater",
+    "database.password": "IYUIOhi67858tgrew",
+    "database.dbname" : "adv_updater",
+    "database.server.name": "pg-dev",
+    "table.include.list": "public.(.*)",
+    "heartbeat.interval.ms": "5000",
+    "slot.name": "dbname_debezium",
+    "publication.name": "dbname_publication",
+    "transforms": "AddPrefix",
+    "transforms.AddPrefix.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.AddPrefix.regex": "pg-dev.public.(.*)",
+    "transforms.AddPrefix.replacement": "data.cdc.dbname",
+    "topic.prefix": "data.cdc."
+  }
+}

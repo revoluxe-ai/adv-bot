@@ -1,3 +1,4 @@
+#alembic/env.py
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -10,14 +11,14 @@ from app.modules.common_slaves.wildberries.models import *
 from app.utils.db.models import *
 from app.admin_bot.sender.utils.db.models import *
 from app.payments.db.models import *
-from app.utils.db.session_maker import get_alchemy_row
+from app.utils.db.session_maker import get_alchemy_row_for_migration
 from app.utils.db.base import BaseTable as Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-row = get_alchemy_row()
+row = get_alchemy_row_for_migration(read_only=False)
 
 config.set_main_option('sqlalchemy.url', row)
 

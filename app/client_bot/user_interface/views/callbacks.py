@@ -62,7 +62,7 @@ class DeleteWbUserCabinet(CallbackData, prefix="delete_wb_user_cabinet"):
 
 class SettingKeywords(CallbackData, prefix="setting_keywords"):
     adv_original_id: int
-    type: str
+    type: str = 'by_adv'
     page: int = 1
     reset_filter: bool = False
 

@@ -39,6 +39,10 @@ class CalculatedKeyword:
     preset: Optional[int] = None
 
 
+    @property
+    def mean_ctr(self):
+        return (self.predict_ctr + self.baes_ctr)/2
+
 
     @property
     def rating_by_predict_ctr(self):
@@ -47,7 +51,8 @@ class CalculatedKeyword:
         if self.predict_ctr is None:
             return 0
         # Рейтинг с учетом уверенности
-        rating = self.predict_ctr**2 * self.views /self.base_position
+        rating = self.predict_ctr**3\
+                 * self.views /self.base_position
         return rating
 
 

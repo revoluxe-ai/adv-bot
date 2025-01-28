@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 lock_counter = threading.Lock()
 conn_counter = 0
 
-pool_size = 20
-max_overflow = 30
+pool_size = 10
+max_overflow = 20
 
 #
 # ssl_context = ssl.create_default_context(cafile=RDS_CERT_PATH)
@@ -60,19 +60,19 @@ class AnalyticAsyncSession(AsyncSession):
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
 global_semaphore = asyncio.Semaphore(count_sem)
 
-def log_checkout(dbapi_con, con_record, con_proxy):
-    logger.debug("Соединение взято из пула")
-    global conn_counter
-    with lock_counter:
-        conn_counter += 1
-    logger.debug(f"Количество соединений: {conn_counter}")
-
-def log_checkin(dbapi_con, con_record):
-    logger.debug("Соединение возвращено в пул")
-    global conn_counter
-    with lock_counter:
-        conn_counter -= 1
-    logger.debug(f"Количество соединений: {conn_counter}")
+# def log_checkout(dbapi_con, con_record, con_proxy):
+#     logger.debug("Соединение взято из пула")
+#     global conn_counter
+#     with lock_counter:
+#         conn_counter += 1
+#     logger.debug(f"Количество соединений: {conn_counter}")
+#
+# def log_checkin(dbapi_con, con_record):
+#     logger.debug("Соединение возвращено в пул")
+#     global conn_counter
+#     with lock_counter:
+#         conn_counter -= 1
+#     logger.debug(f"Количество соединений: {conn_counter}")
 
 
 def get_alchemy_row(read_only):
@@ -98,6 +98,65 @@ def get_alchemy_row(read_only):
     return db_connector
 
 
+
+def get_alchemy_row_for_migration(read_only):
+    port = settings.postgres_port
+    file_path = path_setting_funcs.get_setting_path()
+    postgres_dbname = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-dbname')
+    # postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
+    postgres_password = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-password')
+    postgres_user = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-user')
+    if not read_only:
+        host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-master-host')
+    else:
+        host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-replica-host')
+
+    # Для asyncpg используем ssl вместо sslmode
+
+    target_session = 'read-write' if not read_only else 'any'
+    db_connector = (
+        f'postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}'
+        '?sslmode=verify-full'
+        f'&target_session_attrs={target_session}'
+    )
+    return db_connector
+
+
+read_only_db_connector = get_alchemy_row(read_only=True).replace("postgresql://", "postgresql+asyncpg://")
+read_write_db_connector = get_alchemy_row(read_only=False).replace("postgresql://", "postgresql+asyncpg://")
+
+read_only_engine = create_async_engine(
+    read_only_db_connector,
+    echo=False,
+    pool_size=pool_size,
+    max_overflow=max_overflow,
+    pool_pre_ping=True
+)
+
+read_write_engine = create_async_engine(
+    read_write_db_connector,
+    echo=False,
+    pool_size=pool_size,
+    max_overflow=max_overflow,
+    pool_pre_ping=True
+)
+
+
+# Фабрики сессий
+read_only_session_maker = sessionmaker(
+    read_only_engine,
+    expire_on_commit=False,
+    class_=AnalyticAsyncSession,
+)
+
+read_write_session_maker = sessionmaker(
+    read_write_engine,
+    expire_on_commit=False,
+    class_=AnalyticAsyncSession,
+)
+
+
+
 @asynccontextmanager
 async def get_async_session_maker(semaphore=None, read_only=True) -> AsyncSession:
     session_start = time()
@@ -106,41 +165,18 @@ async def get_async_session_maker(semaphore=None, read_only=True) -> AsyncSessio
     if semaphore is None:
         semaphore = global_semaphore
 
+    # Выбор нужной фабрики сессий
+    session_maker = read_only_session_maker if read_only else read_write_session_maker
+
     try:
         async with semaphore:
-            db_connector = get_alchemy_row(read_only)
-            async_db_connector = db_connector.replace("postgresql://", "postgresql+asyncpg://")
-
-            engine = create_async_engine(
-                async_db_connector,
-                echo=False,
-                pool_size=pool_size,
-                max_overflow=max_overflow,
-                pool_pre_ping=False
-            )
-
-            sync_engine = engine.sync_engine
-            event.listen(sync_engine, "checkout", log_checkout)
-            event.listen(sync_engine, "checkin", log_checkin)
-
-            async_session_maker = sessionmaker(
-                engine,
-                expire_on_commit=False,
-                class_=AnalyticAsyncSession
-            )
-
-            session_maker = async_session_maker
-
             async with session_maker() as session:
-                # if read_only:
-                #     await session.execute(text("SET TRANSACTION READ ONLY"))
                 try:
                     yield session
                 finally:
                     hold_time = time() - session_start
                     if hold_time > 1.0:
-                        # ... код логирования ...
-                        pass
+                        logger.warning(f"Session held for too long: {hold_time:.2f}s by task {current_task.get_name()}")
     except Exception as e:
         logger.error(
             f"Session error after {time() - session_start:.3f}s:\n"

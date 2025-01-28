@@ -70,18 +70,16 @@ class ABC_WB_API(WbRequestApiMixin):
         self._shop_id = current_token.shop_id
 
 
-    @property
-    @abstractmethod
-    def _rights(self) -> set[str]:
-        pass
+    # @property
+    # @abstractmethod
+    # def _rights(self) -> set[str]:
+    #     pass
 
-    @property
-    @abstractmethod
-    def _only_read(self):
-        pass
-
-
-
+    # @property
+    # @abstractmethod
+    # def _only_read(self):
+    #     pass
+    #
 
     @staticmethod
     def chunks(lst, n):

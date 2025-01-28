@@ -10,6 +10,7 @@ from aiogram.types import LabeledPrice
 from sqlalchemy import select, and_, func
 import logging
 from app.admin_bot.sender import sender_manager
+from app.client_bot import const
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers import start
@@ -60,12 +61,13 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
         await start.start_registration(message, bot, state)
         return
     amount = message.text
+    min_sum = const.min_sum
     if not amount.isdigit():
-        await message.answer("Введите сумму (число) от 10 000 рублей")
+        await message.answer(f"Введите сумму (число) от {min_sum} рублей")
         return
     amount = int(amount)
-    if amount < 10000:
-        await message.answer("Введите сумму (число) от 10000")
+    if amount < 300:
+        await message.answer(f"Введите сумму (число) от {min_sum}")
         return
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
@@ -107,7 +109,6 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
             f"Пополнение баланса магазина \n"
             f" на {amount} рублей. \n"
             f"После оплаты услуга считается оказанной, возврат средств не производится. \n\n"
-            f"В случае проблем с оплатой свяжитесь с администратором бота @skyline360_1"
         ),
         provider_data=provider_data,
         payload=payload,
@@ -130,24 +131,9 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
 
     """
 Прайс:
-- Работа одной кампании, подключенной к боту: 35 р/сутки
-- Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
-- Автоуправление ставкой: 25 р./сутки
+Одна кампания на автоуправлении - 300 р. в месяц (10 рублей в сутки)
 
-        
-🔥 Внимание! Только до {date_to}(завтра):
-
-💰 Бонус 100 % от суммы пополнения!
-
-🚀 При пополнении счета свыше мастер-суммы: бонус 300 % от суммы пополнения!
-
-👍 Это делает его не только лучшим, но и самым выгодным решением для автоматизации рекламы на WB!
-
-💼 Мастер-сумма (бонус 300%): {self.master_sum} рублей.
-
-📩 Подробности у администратора бота: @skyline360_1 \n
-
-Укажите сумму пополнения (не менее 100 рублей):"""
+"""
 
     # state_data = await state.get_data()
     # try:

@@ -164,8 +164,7 @@ async def get_keywords_statistic_clickhouse(
             )
             keywords.append(keyword)
 
-    for keyword in keywords:
-        keyword.predict_ctr = await redis_manager.get_predict_ctr(adv_setting.adv_id, keyword.text)
+    keywords = await redis_manager.set_predict_ctrs(adv_setting.adv_id, keywords)
     return keywords
 
 
@@ -499,19 +498,20 @@ async def get_cpm_by_nmid(nmid)-> Optional[int]:
     return cpm
 
 
-async def __get_cpm_from_positions(nmid: int):
+async def __get_cpm_from_positions(nmid: int) -> Optional[int]:
     positions = await redis_manager.get_keywords_positions_by_nmid(nmid)
     if not positions:
         return None
 
     positions = [position for position in positions if position.cpm]
-
+    if not positions:
+        return None
     def __get_last_update(position: WBItemPosition):
         # Выводим значение timestamp для отладки
         print(f"Timestamp: {position.timestamp}")
         return position.timestamp
 
-    # Сортируем позиции по последнему обновлению
+
     last_position = sorted(positions, key=__get_last_update, reverse=True)[0]
     cpm = last_position.cpm
 
@@ -881,7 +881,6 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             predict_ctr = keyword_setting.predict_ctr
         keyword_stat.predict_ctr = predict_ctr
         original_predict_ctr = keyword_stat.predict_ctr
-        predict_ctr = original_predict_ctr
         keyword_stat.hard_status = keyword_setting.hard_status
         if min_ctr == 0:
             enough_views = 100
@@ -895,13 +894,16 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         added_clicks = keyword_setting.added_clicks
         if added_clicks:
             clicks += added_clicks
+        if original_predict_ctr:
+            predict_ctr = original_predict_ctr
+            predicted_views = int(clicks / predict_ctr)
+            predicted_clicks = int(predicted_views * predict_ctr)
+            views += predicted_views
+            clicks += predicted_clicks
         real_baes_ctr = clicks / views
+        keyword_stat.predict_ctr = real_baes_ctr
+        predict_ctr = keyword_stat.predict_ctr
         keyword_stat.baes_ctr = real_baes_ctr
-        if not original_predict_ctr:
-            predict_ctr = real_baes_ctr
-            keyword_stat.predict_ctr = predict_ctr
-        calculate_ctr = (real_baes_ctr + predict_ctr)/2
-        keyword_stat.predict_ctr = calculate_ctr
         if max_position:
             try:
                 position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
@@ -962,7 +964,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             await asyncio.sleep(0)
             continue
 
-        if calculate_ctr >= min_ctr or real_baes_ctr >= min_ctr:
+        if predict_ctr >= min_ctr:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
         else:
@@ -1320,7 +1322,7 @@ async def get_min_ctr(adv: AdvSetting):
     return min_ctr
 
 
-async def get_best_keyword(keywords: list[CalculatedKeyword])-> Optional[CalculatedKeyword]:
+def get_best_keyword(keywords: list[CalculatedKeyword])-> Optional[CalculatedKeyword]:
     if not keywords:
         return None
     best_keyword = sorted(keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True)[0]
@@ -1359,57 +1361,67 @@ async def _get_min_ctr(adv: AdvSetting):
     texts = [kw.text for kw in keyword_settings]
     if texts:
         adv_id = adv.adv_id
-        query = f"""
-                  WITH
-        latest_versions AS (
-            SELECT
-                text,
-                date,
-                MAX(version) AS latest_version
-            FROM
-                default_db.advkeyword
-            WHERE
-                adv_id = {adv_id}
-                AND text IN ({', '.join(f"'{text}'" for text in texts)})
-            GROUP BY
-                text, date
-        ),
-        stats AS (
-            SELECT
-                a.text,
-                SUM(a.clicks) AS total_clicks,
-                SUM(a.views) AS total_views
-            FROM
-                default_db.advkeyword a
-            INNER JOIN
-                latest_versions lv
-            ON
-                a.text = lv.text
-                AND a.date = lv.date
-                AND a.version = lv.latest_version
-            WHERE
-                a.adv_id = {adv_id}
-            GROUP BY
-                a.text
-        )
-                    SELECT
-                        text,
-                        total_clicks / CASE
-                            WHEN total_views = 0 THEN 1
-                            ELSE total_views
-                        END AS ctr,
-                        total_views AS views
-                    FROM
-                        stats
-                    WHERE
-                        total_clicks > 0
-    
-    
-                """
+        query = """
+        WITH
+            latest_versions AS (
+                SELECT
+                    text,
+                    date,
+                    MAX(version) AS latest_version
+                FROM
+                    default_db.advkeyword
+                WHERE
+                    adv_id = %(adv_id)s
+                    AND text IN %(texts)s
+                GROUP BY
+                    text, date
+            ),
+            stats AS (
+                SELECT
+                    a.text,
+                    SUM(a.clicks) AS total_clicks,
+                    SUM(a.views) AS total_views
+                FROM
+                    default_db.advkeyword a
+                INNER JOIN
+                    latest_versions lv
+                ON
+                    a.text = lv.text
+                    AND a.date = lv.date
+                    AND a.version = lv.latest_version
+                WHERE
+                    a.adv_id = %(adv_id)s
+                GROUP BY
+                    a.text
+            )
+        SELECT
+            text,
+            total_clicks / CASE
+                WHEN total_views = 0 THEN 1
+                ELSE total_views
+            END AS ctr,
+            total_views AS views
+        FROM
+            stats
+        WHERE
+            total_clicks > 0
+        """
 
-        async with get_clickhouse_client() as client:
-            result = await client.query(query)
-            rows = result.result_rows
+        params = {
+            "adv_id": adv_id,
+            "texts": tuple(texts),
+        }
+
+        try:
+            async with get_clickhouse_client() as client:
+                result = await client.query(query, params)
+                rows = result.result_rows
+        except Exception:
+            logger.error(f'Ошибка получения статистики из ch', exc_info=True)
+            raise
+
+
+
         text_to_real_ctr = {row[0]: row[1] for row in rows}
         real_ctrs  = []
         predict_ctrs = []
@@ -1737,13 +1749,21 @@ async def get_all_shop_ids()-> list[str]:
 
 
 async def get_active_adv_ids_for_shop(shop_id: str):
-    stmt = select(AdvSetting.adv_id).distinct()\
+    stmt = select(AdvSetting).distinct()\
         .join(AdvSetting.wb_cabinet)\
         .where(WBCabinet.shop_id == shop_id,
-               AdvSetting.bot_active == True)
+               AdvSetting.bot_active == True)\
+    .options(load_only(AdvSetting.adv_id, AdvSetting.name,
+                       AdvSetting._search_adv_id))
     async with _sm() as session:
         result = await session.execute(stmt)
-        adv_ids = result.scalars().all()
+        adv_settings: list[AdvSetting] = result.scalars().all()
+    adv_ids = []
+    for adv in adv_settings:
+        adv_ids.append(adv.adv_id)
+        if (search_adv_id := adv.search_adv_id):
+            adv_ids.append(search_adv_id)
+
     return adv_ids
 
 

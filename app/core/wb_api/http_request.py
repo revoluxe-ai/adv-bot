@@ -80,7 +80,6 @@ async def requests(session, method, url, data=None, json_data=None, headers=None
                 logger.debug(f'Превышен лимит запросов к API: {url}')
                 raise TooManyRequests(e) from e
             else:
-                logger.error(f'Ошибка при запросе к {url}: {text}', exc_info=True)
                 raise BadRequestError(e) from e
         except NotValidDataError as e:
             raise NotValidDataError(e) from e

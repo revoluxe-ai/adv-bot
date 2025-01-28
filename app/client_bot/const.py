@@ -23,7 +23,7 @@ WHITE_LIST = 2
 TURN_OFF = 3
 
 
-PRICE_FOR_ADV_FOR_DAY = 35
+PRICE_FOR_ADV_FOR_DAY = 10
 
 
 PARSING_PRICE = 15
@@ -36,7 +36,10 @@ MIN_CPM  = 100
 
 
 ADMINS = [373435337, #я
-         1603000351, #Леля
+         # 1603000351, #Леля
          707068503, #Лена
          261235974, #Витя
  ]
+
+
+min_sum = 300

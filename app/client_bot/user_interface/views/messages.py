@@ -1,11 +1,11 @@
 import asyncio
 import datetime
 import re
-
-import aiogram
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
+
+from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
 from app.modules.shops_data_updater.types import FullAdvStat
@@ -25,6 +25,7 @@ from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           KeywordSetting, WBCabinet)
 from app.utils import redis_manager
 from app.utils.suffixes import get_day_suffix
+from .get_main_text import get_main_text
 from .. import states
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
@@ -78,44 +79,12 @@ class ShopChoice(TextWithKeyboard):
 
     @property
     def text(self):
-        return ("""
-🤖 Я - специализированный бот для автоматизации АРК (автоматические рекламы) - базового и самого выгодного инструмента продвижения товаров на Wildberries.
+        return get_main_text()
 
-Что я умею:
-📈 Управлять ключевыми словами в автоматических рекламных кампаниях с помощью искусственного интеллекта
-
-💰 Экономить до 90% рекламного бюджета на автоматические рекламные кампании
-
-🚀 Увеличивать конверсию и снижать стоимость клика
-
-🕒 Многократно экономить личное время и время менеджеров на чистку ключей в АРК
-
-🔍 Автоматически подбирать фразы-спутники для вывода основных ключей в топ
-
-📊 Продвигать товары с помощью АРК на полном автомате
-
-Настройки:
-⚙️ У меня достаточно настроек, чтобы тонко и под себя настроить управление АРК вплоть до полного отключения ИИ.
-
-Начало работы:
-🛒 Если у вас еще нет магазинов, то жмите "Добавить магазин" и следуйте инструкциям.
-
-📋 Бот крайне прост в использовании: достаточно один раз его настроить, нажав несколько кнопок.
-Каждый раздел снабжен подробными инструкциями и подсказками.
-
-Дополнительные ресурсы:
-🆕 Самая актуальная информация о боте на канале - https://t.me/auto_wb_master
-
-👥 Группа поддержки и обсуждений бота - https://t.me/wbgram_disc
-
-📩 Связь с админом: @skyline360_1
-"""
-        )
 
     @property
     def keyboard(self):
         return keyboards.get_shop_keyboard(self.__all_shops)
-
 
 
 class ShopNameGet(Text):
@@ -194,7 +163,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
             last_wb_user_cabinet_page=self._page
         )
-        self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
+        # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
         await super().__call__()
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
@@ -499,7 +468,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
 
 
-    async def __call__(self, state: FSMContext, sort_mode = 'default'):
+    async def __call__(self, state: FSMContext, sort_mode = 'by_adv'):
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
@@ -858,24 +827,7 @@ class ShopMenu(TextWithKeyboard):
             count_active_advs = result.scalar()
             if count_active_advs:
                 total_amount_for_day += count_active_advs * const.PRICE_FOR_ADV_FOR_DAY
-            stmt = select(func.count(AdvSetting.id))\
-            .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
-                AdvSetting.parsing_active == True,)
-            result = await session.execute(stmt)
-            count_active_parsing = result.scalar()
-            if count_active_parsing:
-                total_amount_for_day += count_active_parsing * const.PARSING_PRICE
-            stmt = select(func.count(AdvSetting.id)) \
-                .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
-                       AdvSetting.bidder_active == True, )
-            result = await session.execute(stmt)
-            count_auto_bidder = result.scalar()
-            if count_auto_bidder:
-                total_amount_for_day += count_auto_bidder * const.AUTO_BIDDER_PRICE
-
         self.count_active_advs = count_active_advs
-        self.count_active_parsing = count_active_parsing
-        self.count_auto_bidder = count_auto_bidder
         self.total_amount_for_day = total_amount_for_day
         user: User = self._wb_user_cabinet.user
         tokens: list[WBToken] = user.wb_tokens
@@ -909,8 +861,6 @@ class ShopMenu(TextWithKeyboard):
         balance = self._balance
         bonus = self._bonus
         count_active_advs = self.count_active_advs
-        count_active_parsing = self.count_active_parsing
-        count_auto_bidder = self.count_auto_bidder
         total_money = balance + bonus
         total_amount_for_day = self.total_amount_for_day
         if self.total_amount_for_day:
@@ -919,8 +869,6 @@ class ShopMenu(TextWithKeyboard):
             last_for_days = '∞'
         text = (
             f'📊 *Кампаний на автоуправлении*: {count_active_advs}\n'
-            f'🔍 *Включен парсинг у кампаний*: {count_active_parsing}\n'
-            f'🔧 *Включено автоуправление ставкой у кампаний*: {count_auto_bidder}\n'
             f'💸 *Расход в сутки*: {total_amount_for_day} рублей\n'
             f'⏳ *Срок действия токена*: {self.expiration_time}\n'
             f'*Истечет через* {get_day_suffix(self.last_days_for_token)}\n'
@@ -975,20 +923,34 @@ class ShopMenu(TextWithKeyboard):
         builder.row(button)
 
         button = InlineKeyboardButton(
+            text='Создать и настроить кампании',
+            callback_data = CreateNewAdvs(
+                wb_user_cabinet_original_id = wb_user_cabinet.id).pack()
+        )
+
+
+        builder.row(button)
+
+
+        #
+        # button_for_create_new_complex_adv = get_button_for_create_new_complex_adv(wb_user_cabinet.id)
+        # builder.row(button_for_create_new_complex_adv)
+
+        button = InlineKeyboardButton(
         text = 'Пополнить баланс',
         callback_data = callbacks.AddBalance(wb_cabinet_original_id=wb_cabinet_original_id).pack(),
         )
 
         builder.row(button)
-
-        button = InlineKeyboardButton(
-            text = 'Удалить личный кабинет магазина',
-            callback_data\
-                = callbacks.DeleteWbUserCabinet(
-                wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
-        )
-
-        builder.row(button)
+        #
+        # button = InlineKeyboardButton(
+        #     text = 'Удалить личный кабинет магазина',
+        #     callback_data\
+        #         = callbacks.DeleteWbUserCabinet(
+        #         wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
+        # )
+        #
+        # builder.row(button)
 
         if is_active_adv:
             button = InlineKeyboardButton(
@@ -1264,11 +1226,10 @@ class WaitingForAmount(Text):
 
         text = f"""
 Прайс:
-- Работа одной кампании, подключенной к боту: 35 р/сутки
-- Парсинг активных ключей для одной кампании (включается отдельной кнопой): 15 р/сутки
-- Биддер (управление ставками) - 25 р. в сутки за кампанию
+- Работа одной кампании, подключенной к боту: 299р./мес.
+- Парсинг активных ключей для кампании и Биддер (управление ставками) входят в стоимость
 
-Минимальная сумма пополнения: 10 т.р.        
+Минимальная сумма пополнения: 300 р.       
 
 Укажите сумму пополнения:"""
 

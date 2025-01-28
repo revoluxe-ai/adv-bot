@@ -1,0 +1,1 @@
+from app.modules.shop_runner.run_process_func import run
