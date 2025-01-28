@@ -66,7 +66,11 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
         logger.error(f'Нет ключа в белом списке для {shop_id}  adv_id: {adv_id}')
         return
     logger.debug(f'Получаю ставку для биддера для {shop_id} adv_id {adv_id}')
-    cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
+    try:
+        cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
+    except Exception as e:
+        logger.error(f'Ошибка при получении ставки для {shop_id} adv_id {adv_id}', exc_info=True)
+        return
     logger.debug(f'Ставка получена для {shop_id} adv_id {adv_id}')
     if not cpm_from_parsing:
         logger.error(f'Не удалось получить ставку для биддера для кампании {adv_id} для {shop_id}')
