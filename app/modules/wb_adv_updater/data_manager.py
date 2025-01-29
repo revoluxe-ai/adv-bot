@@ -796,7 +796,11 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
 async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                                            max_cpc = None,
                                            pass_time = timedelta(days=7))->list[CalculatedKeyword]:
-    cpm_now = await get_cpm_by_nmid(adv_setting.nmids[0])
+    try:
+        cpm_now = await get_cpm_by_nmid(adv_setting.nmids[0])
+    except Exception as e:
+        logger.error(f'Ошибка при получении cpm {e}', exc_info=True)
+        cpm_now = None
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
