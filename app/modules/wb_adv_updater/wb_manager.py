@@ -347,9 +347,12 @@ async def update_predict_ctr():
 async def update_all_keyword_data(access,
                                   adv_setting,
                                   wb_cabinet: WBCabinet,
-                                  keywords: list[KeywordStat] = None):
+                                  keywords: list[KeywordStat] = None,
+                                  wb_api: WBApi = None):
+
     try:
-        wb_api = WBApi(access)
+        if not wb_api:
+             wb_api = WBApi(access)
         async with get_clickhouse_client() as client:
             await common_keyword_stat_update(client, adv_setting, wb_api)
     except ApiForbiddenError:
