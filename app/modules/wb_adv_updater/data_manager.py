@@ -15,7 +15,7 @@ from typing import Any, Union, Optional, List, Callable
 import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
-from app.exc import CardNotFoundInDB
+from app.exc import CardNotFoundInDB, PositionNotFoundError, NotFoundPositionWithCMPError
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
@@ -497,11 +497,11 @@ async def get_cpm_by_nmid(nmid)-> Optional[int]:
 async def __get_cpm_from_positions(nmid: int) -> Optional[int]:
     positions = await redis_manager.get_keywords_positions_by_nmid(nmid)
     if not positions:
-        return None
+        raise PositionNotFoundError(f'Позиции не найдены для nmid в редис {nmid}')
 
     positions = [position for position in positions if position.cpm]
     if not positions:
-        return None
+        raise NotFoundPositionWithCMPError(f'Позиции не найдены с cpm для nmid в редис {nmid}')
     def __get_last_update(position: WBItemPosition):
         # Выводим значение timestamp для отладки
         print(f"Timestamp: {position.timestamp}")
@@ -510,13 +510,7 @@ async def __get_cpm_from_positions(nmid: int) -> Optional[int]:
 
     last_position = sorted(positions, key=__get_last_update, reverse=True)[0]
     cpm = last_position.cpm
-
-    # Выводим последний cpm для отладки
-    print(f"Last CPM: {cpm}")
     return cpm
-
-
-
 
 
 async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
