@@ -344,7 +344,10 @@ async def update_predict_ctr():
             logger.error(f'Ошибка предсказания CTR {exc}')
         await asyncio.sleep(0)
 
-async def update_all_keyword_data(access, adv_setting, wb_cabinet: WBCabinet):
+async def update_all_keyword_data(access,
+                                  adv_setting,
+                                  wb_cabinet: WBCabinet,
+                                  keywords: list[KeywordStat] = None):
     try:
         wb_api = WBApi(access)
         async with get_clickhouse_client() as client:
@@ -357,7 +360,9 @@ async def update_all_keyword_data(access, adv_setting, wb_cabinet: WBCabinet):
         raise exc
     try:
         data_setter = DataSetter(access)
-        await data_setter.update_minus_keywords_in_adv(adv_setting, wb_cabinet)
+        await data_setter.update_minus_keywords_in_adv(adv_setting,
+                                                       wb_cabinet,
+                                                       keywords)
     except Exception as exc:
         logger.error('Ошибка установки активности фраз', exc_info=True)
         raise exc
