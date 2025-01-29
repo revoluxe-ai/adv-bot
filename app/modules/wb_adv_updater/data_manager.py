@@ -490,11 +490,7 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
 
 
 async def get_cpm_by_nmid(nmid)-> Optional[int]:
-    try:
-        cpm = await __get_cpm_from_positions(nmid)
-    except Exception:
-        logger.debug('Ошибка получения cmp из позиции', exc_info=True)
-        cpm = None
+    cpm = await __get_cpm_from_positions(nmid)
     return cpm
 
 
