@@ -46,7 +46,7 @@ run_own_process_list = [
      run_update_predict_ctr,
      run_update_model,
      run_shop_data_update,
-     shop_runner.run
+
 ]
 
 
