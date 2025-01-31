@@ -1876,10 +1876,6 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
 
 
 
-
-<<<<<<< HEAD
-
-=======
 async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
     query = f"""
     SELECT
