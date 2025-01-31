@@ -41,6 +41,7 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 from ... import const
+from ...const import DEFAULT_BIDDER_STEP
 
 if TYPE_CHECKING:
     from ...utils import KeywordForKeyboard
@@ -1868,7 +1869,14 @@ class CPMSetting(TextWithKeyboard):
                                           adv_original_id = self.adv_setting.id).pack())
 
         builder.row(bottom)
+        step = self.adv_setting.bidder_step
+        step = step if step else DEFAULT_BIDDER_STEP
+        bottom = InlineKeyboardButton(text=f'Изменить шаг ставки ({step})',
+                                        callback_data=callbacks.CPMSettingMenu(
+                                            action='change_cpm_step',
+                                            adv_original_id=self.adv_setting.id).pack())
 
+        builder.row(bottom)
 
         if self.adv_setting.bidder_active:
             bottom = InlineKeyboardButton(text="Изменить целевую позицию",

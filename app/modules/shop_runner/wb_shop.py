@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import typing
 from functools import wraps
 from typing import Optional
 from datetime import datetime
@@ -65,6 +66,7 @@ class WBShop:
             wb_user_cabinet=None,
         )
         self.__access = access
+        self.__first_bidder_update_time: Optional[datetime] = None
 
     @single_run()
     async def _update_access(self):
@@ -90,31 +92,43 @@ class WBShop:
         assert hasattr(self, '_adv_settings')
 
 
-    async def __update_cpm_bid(self)-> datetime:
+    async def __update_cpm_bid(self):
         logger.debug(f'Обновляю модели для магазина {self.shop_id}')
         await self._update_advs_models()
         logger.debug(f'Модели обновлены для магазина {self.shop_id}')
         assert hasattr(self, '_adv_settings')
         adv_settings = self._adv_settings
-        adv_settings = filter(lambda adv: adv.bidder_active == True, adv_settings)
+        adv_settings = list(filter(lambda adv: adv.bidder_active == True, adv_settings))
+        if self._adv_settings == []:
+            logger.debug(f'Модели не обновлены для магазина {self.shop_id}')
+            self.__first_bidder_update_time = datetime.now()
+            return
         wb_api = WBApi(self.__access)
         try:
             logger.debug(f'Обновляю ставки для магазина {self.shop_id}')
-            await asyncio.gather(*[run_bidder_process_for_adv(adv, wb_api, self.shop_id) for adv in adv_settings])
+            await asyncio.gather(*[self.__run_bidder_process_for_adv(adv, wb_api, self.shop_id) for adv in adv_settings])
             logger.debug(f'Все ставки обновлены для магазина {self.shop_id}')
         except ApiForbiddenError:
             raise ApiForbiddenError('Нет доступов для выполнения задачи')
+
+    async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: WBApi, shop_id: str):
+        await run_bidder_process_for_adv(adv_setting, wb_api, shop_id)
+        if self.__first_bidder_update_time is None:
+            self.__first_bidder_update_time = datetime.now()
 
 
     async def _update_cpm_bid(self):
         max_pause = 60*3 + 60
         while True:
             try:
-                start_time = datetime.now()
+                self.__first_bidder_update_time = None
                 logger.debug(f'Обновляю ставку для магазина {self.shop_id}')
                 await self.__update_cpm_bid()
                 logger.debug(f'Ставка обновлена для магазина {self.shop_id}')
-                pause = max_pause - (datetime.now() - start_time).seconds
+                first_update_time = self.__first_bidder_update_time
+                if not first_update_time:
+                    first_update_time = datetime.now()
+                pause = max_pause - (datetime.now() - first_update_time).seconds
                 pause = max(1, pause)
                 await asyncio.sleep(pause)
             except ApiForbiddenError:
@@ -125,9 +139,9 @@ class WBShop:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
                 await asyncio.sleep(1)
 
-
     async def _run(self):
-       await self._update_cpm_bid()
+         await self._update_cpm_bid()
+
 
     async def run(self):
         await self._update_access()
