@@ -147,7 +147,6 @@ async def process_payment_for_advs():
         ).filter(
             and_(
                 AdvSetting.bot_active == True,
-                AdvSetting.active_status == 'started',
                 not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
                 AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
                 # условие на истекший срок действия
@@ -345,9 +344,15 @@ async def update_predict_ctr():
             logger.error(f'Ошибка предсказания CTR {exc}')
         await asyncio.sleep(0)
 
-async def update_all_keyword_data(access, adv_setting, wb_cabinet: WBCabinet):
+async def update_all_keyword_data(access,
+                                  adv_setting,
+                                  wb_cabinet: WBCabinet,
+                                  keywords: list[KeywordStat] = None,
+                                  wb_api: WBApi = None):
+
     try:
-        wb_api = WBApi(access)
+        if not wb_api:
+             wb_api = WBApi(access)
         async with get_clickhouse_client() as client:
             await common_keyword_stat_update(client, adv_setting, wb_api)
     except ApiForbiddenError:
@@ -358,7 +363,9 @@ async def update_all_keyword_data(access, adv_setting, wb_cabinet: WBCabinet):
         raise exc
     try:
         data_setter = DataSetter(access)
-        await data_setter.update_minus_keywords_in_adv(adv_setting, wb_cabinet)
+        await data_setter.update_minus_keywords_in_adv(adv_setting,
+                                                       wb_cabinet,
+                                                       keywords)
     except Exception as exc:
         logger.error('Ошибка установки активности фраз', exc_info=True)
         raise exc

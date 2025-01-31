@@ -57,7 +57,12 @@ async def change_cpm(message: aiogram.types.Message,
             shop_id = adv_setting.wb_cabinet.shop_id
             access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
             wb_api = WBApi(access)
-            await wb_api.advert.update_cpm(adv_setting.adv_id, cpm)
+            try:
+                await wb_api.advert.update_cpm(adv_setting.adv_id, cpm)
+            except Exception as e:
+                await message.answer(f'Ошибка при обновлении ставки на стороне WB (error: {e})')
+                return
+
             await message.answer('CPM Авто на {}'.format(cpm))
             if adv_id := adv_setting.search_adv_id:
                 await wb_api.advert.update_cpm(adv_id, cpm)

@@ -344,8 +344,15 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
                 break
     return positions
 
-
 async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60):
+    try:
+        await _add_wb_positions(text, need_nmids, delay, page_limit)
+    except Exception as e:
+        logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
+    return
+
+
+async def _add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60):
     total_pages = TotalPages()
     stop_event = asyncio.Event()
     catch_any_position = asyncio.Event()
@@ -466,6 +473,8 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60
             for nmid in need_nmids
         ]
         await add_wb_positions_to_redis(not_found_positions)
+
+
 
 async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
     # for position in positions:

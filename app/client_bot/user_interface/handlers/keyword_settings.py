@@ -448,18 +448,18 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
     await redis_manager.set_check_last_24_hours(adv_original_id)
     return
 
-@router.callback_query(callbacks.SettingKeywords.filter())
-async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,
-                           state: FSMContext):
-
-    keyword_original_id: int = callback_data.keyword_original_id
-    chat_id = callback.message.chat.id
-
-    data = await state.get_data()
-    page = data.get('last_keyword_setting_page', 1)
-    await messages.KeywordSettingMessage(bot, chat_id, keyword_original_id, page)()
-
-    return
+# @router.callback_query(callbacks.SettingKeywords.filter())
+# async def setting_keywords(callback: types.CallbackQuery, callback_data: callbacks.SettingKeyword, bot: aiogram.Bot,
+#                            state: FSMContext):
+#
+#     keyword_original_id: int = callback_data.keyword_original_id
+#     chat_id = callback.message.chat.id
+#
+#     data = await state.get_data()
+#     page = data.get('last_keyword_setting_page', 1)
+#     await messages.KeywordSettingMessage(bot, chat_id, keyword_original_id, page)()
+#
+#     return
 
 
 @router.callback_query(callbacks.SettingKeyword.filter())
@@ -639,4 +639,52 @@ async def reset_added_clicks(callback: types.CallbackQuery,
             keyword_setting.added_clicks = 0
         await session.commit()
     await bot.send_message(callback.message.chat.id, "Добавленные клики сброшены")
+    return
+
+
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == 'only_out_index'))
+async def show_only_on_out_index(callback: CallbackQuery,
+                                 callback_data: callbacks.SettingKeywords,
+                                 bot: aiogram.Bot,
+                                 state: FSMContext):
+    await state.update_data(keywords_filter=None)
+    adv_original_id = callback_data.adv_original_id
+    page = callback_data.page
+    if not page:
+        page = 1
+    async with _sm() as session:
+        stmt = select(AdvSetting) \
+            .where(AdvSetting.id == adv_original_id, )
+        result = await session.execute(stmt)
+        adv_setting: AdvSetting = result.scalar()
+    keywords = await utils.get_keywords_for_keyboard(adv_setting)
+    keywords = [keyword for keyword in keywords if keyword.base_position == 0]
+    keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
+    keyword_texts = [keyword.text for keyword in keywords]
+    await state.update_data(keywords_filter=keyword_texts)
+    await state.update_data(adv_choice_last_page=page)
+    state_data = await state.get_data()
+    wb_user_cabinet_original_id = state_data.get('last_wb_user_cabinet_original_id')
+    nmids = adv_setting.nmids
+    chat_id = callback.message.chat.id
+    adv_choice_last_page = 1
+
+    try:
+        main_photos = await data_manager.get_main_photos(nmids[:1])
+    except:
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
+        return
+    await redis_manager.set_check_last_24_hours(adv_original_id)
+    await messages.AdvKeywordsSetting(
+        bot,
+        chat_id,
+        keywords,
+        adv_setting,
+        wb_user_cabinet_original_id,
+        adv_choice_last_page,
+        main_photos[0],
+        page=page,
+    )(state, 'only_out_index')
+
+    await redis_manager.set_check_last_24_hours(adv_original_id)
     return

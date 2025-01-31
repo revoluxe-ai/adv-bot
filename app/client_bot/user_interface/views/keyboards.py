@@ -341,7 +341,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
 
     def sorting_keywords(keywords, sort_mode):
-        if sort_mode == 'by_adv':
+        if sort_mode in ['by_adv', 'only_out_index']:
             keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
             keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
             keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
@@ -460,6 +460,16 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                        adv_original_id=adv_setting.id,
                                        type='active_keywords',
                                        page=page).pack())]
+    bottoms.append(bottom)
+
+
+    bottom = [InlineKeyboardButton(text='Показать ключи вне индекса',
+                                       callback_data=callbacks.SettingKeywords(
+                                        adv_original_id=adv_setting.id,
+                                        type='only_out_index',
+                                        page=page).pack())]
+
+
     bottoms.append(bottom)
 
     if not hide_keywords_is_not_relevant:

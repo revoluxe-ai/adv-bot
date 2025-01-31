@@ -55,8 +55,12 @@ class DataSetter:
 
 
 
-    async def update_minus_keywords_in_adv(self, adv_setting: AdvSetting, wb_cabinet: WBCabinet):
-        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
+    async def update_minus_keywords_in_adv(self,
+                                           adv_setting: AdvSetting,
+                                           wb_cabinet: WBCabinet,
+                                           keywords: list[CalculatedKeyword] = None):
+        if not keywords:
+             keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
         if wb_cabinet.white_list_update_active:
             white_list_updater = WhiteListUpdater()
             try:
@@ -83,9 +87,6 @@ class DataSetter:
                          f'adv_id: {adv_setting.adv_id},'
                          f'shop_id: {self._wb_cabinet.shop_id} '
                          f' {e}', exc_info=True)
-
-
-
 
 
 
