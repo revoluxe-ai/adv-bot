@@ -46,6 +46,7 @@ async def update_wb_adv_phrases_in_neo():
                    AdvSetting.bot_active == True)
         adv_ids = await session.execute(stmt)
         adv_ids = adv_ids.scalars().all()
+    adv_ids = [adv for adv in adv_ids if adv]
 
     async with get_clickhouse_client() as ch_client:
         query = f'SELECT DISTINCT text FROM default_db.advkeyword WHERE adv_id IN {adv_ids}'
