@@ -40,13 +40,12 @@ async def off_reset_place(
                                ):
 
     adv_original_id: int = callback_data.adv_setting_original_id
-    async with sm() as session:
-        async with session.begin():
-            adv_setting = await session.execute(select(AdvSetting)\
-                                                .where(AdvSetting.id == adv_original_id))
-            adv_setting = adv_setting.scalars().first()
-            adv_setting.place = True
-            await session.commit()
+    async with sm(read_only=False) as session:
+        adv_setting = await session.execute(select(AdvSetting)\
+                                            .where(AdvSetting.id == adv_original_id))
+        adv_setting: AdvSetting = adv_setting.scalars().first()
+        adv_setting.reset_place = False
+        await session.commit()
     await bot.send_message(callback.message.chat.id, 'Сброс места выключен')
 
 
