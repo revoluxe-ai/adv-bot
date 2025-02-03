@@ -25,10 +25,14 @@ jobs:
           yc config set token ${{ secrets.YC_OAUTH_TOKEN }}
           yc container registry configure-docker
 
-      - name: Build and Push
+      - name: Сборка Docker-образа
         run: |
+          COMMIT_SHA=${{ github.sha }}
           REGISTRY_PATH=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/${{ secrets.YC_REPOSITORY_NAME }}
-          docker build -f dockers/client_bot/Dockerfile \
-            -t $REGISTRY_PATH:${{ github.sha }} \
-            -t $REGISTRY_PATH:latest .
-          docker push $REGISTRY_PATH --all-tags
+
+          echo "Собираем образ с тегом: $REGISTRY_PATH:$COMMIT_SHA"
+
+          docker build -t $REGISTRY_PATH:$COMMIT_SHA -t $REGISTRY_PATH:latest .
+
+          docker push $REGISTRY_PATH:$COMMIT_SHA
+          docker push $REGISTRY_PATH:latest
