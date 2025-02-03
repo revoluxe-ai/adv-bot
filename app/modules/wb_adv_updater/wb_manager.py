@@ -1,7 +1,5 @@
 import logging
 from typing import List
-from itertools import product
-import dask.dataframe as dd
 import faiss
 import joblib
 import numpy as np
@@ -404,49 +402,49 @@ async def update_all_keywords_on_wb():
                 await asyncio.sleep(0)
 
 
-
-
-async def update_keyword_stat(access: WBCabinetAccess,
-                              adv_update_tasks: dict[int, asyncio.Task]):
-    wb_api = WBApi(access)
-    wb_cabinet = access.wb_cabinet
-    logger.debug(f"Начало обновления статистики для кабинета {wb_cabinet.id}")
-
-    async with sm() as session:
-        stmt = select(AdvSetting).where(and_(
-            AdvSetting.wb_cabinet_id == wb_cabinet.id,
-            AdvSetting.type == 8,
-            AdvSetting.bot_active == True,
-            AdvSetting.active_status == 'started'
-
-        )).order_by(AdvSetting.last_update.desc())
-        result = (await session.execute(stmt)).unique()
-        adv_settings = result.scalars().all()
-    async with get_clickhouse_client() as client:
-        for adv_setting in adv_settings:
-            adv_id = adv_setting.adv_id
-            if adv_id not in adv_update_tasks:
-                task = asyncio.create_task(keyword_stat_updater(client, adv_setting, wb_api))
-                adv_update_tasks[adv_id] = task
-            else:
-                if adv_update_tasks[adv_id].done():
-                    logger.info(
-                        f'Задача обновления статистики ключей завершена для adv_id '
-                        f'{adv_id}'
-                    )
-                    if adv_update_tasks[adv_id].exception():
-                        logger.error(
-                            f'Ошибка обновления статистики ключей: '
-                            f'{adv_update_tasks[adv_id].exception()},'
-                            f' для кабинета {access.wb_cabinet.shop_id}', exc_info=True
-                        )
-
-                    del adv_update_tasks[adv_id]
-                    logger.info(f'Статистика ключевых слов для {adv_id} обновлена')
-                    logger.debug(f'Установка set для need_update_model')
-                    logger.debug(f"Обновление статистики завершено")
-            await asyncio.sleep(0)
-    return
+#
+#
+# async def update_keyword_stat(access: WBCabinetAccess,
+#                               adv_update_tasks: dict[int, asyncio.Task]):
+#     wb_api = WBApi(access)
+#     wb_cabinet = access.wb_cabinet
+#     logger.debug(f"Начало обновления статистики для кабинета {wb_cabinet.id}")
+#
+#     async with sm() as session:
+#         stmt = select(AdvSetting).where(and_(
+#             AdvSetting.wb_cabinet_id == wb_cabinet.id,
+#             AdvSetting.type == 8,
+#             AdvSetting.bot_active == True,
+#             AdvSetting.active_status == 'started'
+#
+#         )).order_by(AdvSetting.last_update.desc())
+#         result = (await session.execute(stmt)).unique()
+#         adv_settings = result.scalars().all()
+#     async with get_clickhouse_client() as client:
+#         for adv_setting in adv_settings:
+#             adv_id = adv_setting.adv_id
+#             if adv_id not in adv_update_tasks:
+#                 task = asyncio.create_task(keyword_stat_updater(client, adv_setting, wb_api))
+#                 adv_update_tasks[adv_id] = task
+#             else:
+#                 if adv_update_tasks[adv_id].done():
+#                     logger.info(
+#                         f'Задача обновления статистики ключей завершена для adv_id '
+#                         f'{adv_id}'
+#                     )
+#                     if adv_update_tasks[adv_id].exception():
+#                         logger.error(
+#                             f'Ошибка обновления статистики ключей: '
+#                             f'{adv_update_tasks[adv_id].exception()},'
+#                             f' для кабинета {access.wb_cabinet.shop_id}', exc_info=True
+#                         )
+#
+#                     del adv_update_tasks[adv_id]
+#                     logger.info(f'Статистика ключевых слов для {adv_id} обновлена')
+#                     logger.debug(f'Установка set для need_update_model')
+#                     logger.debug(f"Обновление статистики завершено")
+#             await asyncio.sleep(0)
+#     return
 
 
 
@@ -617,55 +615,55 @@ class Manager(AbcManager):
 
 
 
-
-
-    def save_full_predict(self):
-        # Загрузка данных с помощью Dask
-        nmids_vectors = dd.read_csv(self.nmids_vectors_path)
-        keyword_vectors = dd.read_csv(self.keywords_vectors_path)
-        # nmid_offer_id_df = dd.read_csv(self.nmid_offer_id_shop_name_df_path)
-
-        # Получение уникальных значений
-        nmids = nmids_vectors['nmid'].unique().compute()
-        keywords = keyword_vectors['keyword'].unique().compute()
-
-        # Загрузка модели
-        model = joblib.load(self.model_path)
-
-        # Инициализация пустого DataFrame для результатов
-        final_result = pd.DataFrame()
-
-        # Прямая генерация и обработка комбинаций
-        batch_size = 10000  # Определение размера партии для обработки
-        total_combinations = len(nmids) * len(keywords)
-        num_batches = (total_combinations + batch_size - 1) // batch_size  # Вычисление необходимого количества партий
-
-        for i in range(num_batches):
-            # Генерация части комбинаций
-            start_idx = i * batch_size
-            end_idx = min(start_idx + batch_size, total_combinations)
-            batch_combs = list(product(nmids, keywords))[start_idx:end_idx]
-
-            # Преобразование в DataFrame
-            df_batch = pd.DataFrame(batch_combs, columns=['nmid', 'keyword'])
-            ddf_batch = dd.from_pandas(df_batch, npartitions=10)
-
-            # Объединение данных с помощью Dask
-            df_with_feature = ddf_batch.merge(nmids_vectors, how='left', on=['nmid'])
-            df_with_feature = df_with_feature.merge(keyword_vectors, how='left', on=['keyword']).dropna()
-
-            # Выбор признаков для модели и выполнение предсказаний
-            X_batch = df_with_feature.drop(['nmid', 'keyword'],
-                                           axis=1).compute()  # Перевод в pandas DataFrame для модели
-            y_batch = model.predict(X_batch)
-
-            # Сохранение результатов
-            result_batch = pd.concat([df_batch.reset_index(drop=True), pd.Series(y_batch, name='prediction')], axis=1)
-            final_result = pd.concat([final_result, result_batch], ignore_index=True)
-
-
-        # Вывод итогового DataFrame
-        print(final_result)
+    #
+    #
+    # def save_full_predict(self):
+    #     # Загрузка данных с помощью Dask
+    #     nmids_vectors = dd.read_csv(self.nmids_vectors_path)
+    #     keyword_vectors = dd.read_csv(self.keywords_vectors_path)
+    #     # nmid_offer_id_df = dd.read_csv(self.nmid_offer_id_shop_name_df_path)
+    #
+    #     # Получение уникальных значений
+    #     nmids = nmids_vectors['nmid'].unique().compute()
+    #     keywords = keyword_vectors['keyword'].unique().compute()
+    #
+    #     # Загрузка модели
+    #     model = joblib.load(self.model_path)
+    #
+    #     # Инициализация пустого DataFrame для результатов
+    #     final_result = pd.DataFrame()
+    #
+    #     # Прямая генерация и обработка комбинаций
+    #     batch_size = 10000  # Определение размера партии для обработки
+    #     total_combinations = len(nmids) * len(keywords)
+    #     num_batches = (total_combinations + batch_size - 1) // batch_size  # Вычисление необходимого количества партий
+    #
+    #     for i in range(num_batches):
+    #         # Генерация части комбинаций
+    #         start_idx = i * batch_size
+    #         end_idx = min(start_idx + batch_size, total_combinations)
+    #         batch_combs = list(product(nmids, keywords))[start_idx:end_idx]
+    #
+    #         # Преобразование в DataFrame
+    #         df_batch = pd.DataFrame(batch_combs, columns=['nmid', 'keyword'])
+    #         ddf_batch = dd.from_pandas(df_batch, npartitions=10)
+    #
+    #         # Объединение данных с помощью Dask
+    #         df_with_feature = ddf_batch.merge(nmids_vectors, how='left', on=['nmid'])
+    #         df_with_feature = df_with_feature.merge(keyword_vectors, how='left', on=['keyword']).dropna()
+    #
+    #         # Выбор признаков для модели и выполнение предсказаний
+    #         X_batch = df_with_feature.drop(['nmid', 'keyword'],
+    #                                        axis=1).compute()  # Перевод в pandas DataFrame для модели
+    #         y_batch = model.predict(X_batch)
+    #
+    #         # Сохранение результатов
+    #         result_batch = pd.concat([df_batch.reset_index(drop=True), pd.Series(y_batch, name='prediction')], axis=1)
+    #         final_result = pd.concat([final_result, result_batch], ignore_index=True)
+    #
+    #
+    #     # Вывод итогового DataFrame
+    #     print(final_result)
 
     @staticmethod
     def __load_ml_model(model_path,):

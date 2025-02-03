@@ -24,10 +24,12 @@ from python_modules.logger import setup_logging
 from .global_router import global_router
 
 setup_logging()
+import os
 
+redis_host = os.environ.get("REDIS_HOST")
 
 # Создание хранилища с Redis
-storage = RedisStorage.from_url('redis://localhost:6379/0')
+storage = RedisStorage.from_url(f'redis://{redis_host}:6379/0')
 
 path_setting = path_setting_funcs.get_setting_path()
 
@@ -128,7 +130,7 @@ async def run():
         # Запускаем бота с пулингом вместо вебхука
         await dp.storage.close()  # Закрываем хранилище перед запуском, чтобы избежать конфликтов
         await asyncio.gather(
-             run_shop_updater(),
+             # run_shop_updater(),
              dp.start_polling(bot, on_startup=on_startup, on_shutdown=on_shutdown)
         )
 

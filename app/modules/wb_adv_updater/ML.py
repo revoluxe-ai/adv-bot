@@ -216,40 +216,43 @@ class Predictor:
     async def _get_df_for_predict(self, adv_settings: list[AdvSetting])-> pd.DataFrame:
        data_rows = []
        for adv in adv_settings:
-           logger.debug(f'Обработка кампании {adv.name}')
-           if not adv.nmids:
-               logger.debug('Нет nmids: %s', adv.name)
-               continue
-           nmids = adv.nmids
-           item_features = await self.get_nmid_to_item_features(nmids)
-
-           item_features = [row[1] for row in item_features.items()]
-           avg_item_features = pd.DataFrame(item_features).mean().to_dict()
-           avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
-
-           if not avg_item_features:
-                 logger.debug('Нет item_features: %s', adv.name)
-                 continue
-           clear_keywords = [text_cleaner.clear(keyword.text) for keyword in adv.keyword_settings]
-           # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
-           keyword_features_result = await self.get_keyword_features(clear_keywords)
-           keyword_features_result = {row[0]: row[1] for row in keyword_features_result}
-           for keyword in adv.keyword_settings:
-               text = keyword.text.replace('_', ' ')
-               keyword_features = keyword_features_result.get(text, [])
-               keyword_features = list(keyword_features)
-               if not keyword_features:
+           try:
+               logger.debug(f'Обработка кампании {adv.name}')
+               if not adv.nmids:
+                   logger.debug('Нет nmids: %s', adv.name)
                    continue
+               nmids = adv.nmids
+               item_features = await self.get_nmid_to_item_features(nmids)
 
-               # Собираем данные для строки
-               row = {
-                   'adv_id': adv.adv_id,
-                   'adv_type': adv.type if adv.type else 0,
-                   'keyword': keyword.text,
-                   **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
-                   **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
-               }
-               data_rows.append(row)
+               item_features = [row[1] for row in item_features.items()]
+               avg_item_features = pd.DataFrame(item_features).mean().to_dict()
+               avg_item_features = {f'item_feature_{i}': avg_item_features[i] for i in avg_item_features.keys()}
+
+               if not avg_item_features:
+                     logger.debug('Нет item_features: %s', adv.name)
+                     continue
+               clear_keywords = [text_cleaner.clear(keyword.text) for keyword in adv.keyword_settings]
+               # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
+               keyword_features_result = await self.get_keyword_features(clear_keywords)
+               keyword_features_result = {row[0]: row[1] for row in keyword_features_result}
+               for keyword in adv.keyword_settings:
+                   text = keyword.text.replace('_', ' ')
+                   keyword_features = keyword_features_result.get(text, [])
+                   keyword_features = list(keyword_features)
+                   if not keyword_features:
+                       continue
+
+                   # Собираем данные для строки
+                   row = {
+                       'adv_id': adv.adv_id,
+                       'adv_type': adv.type if adv.type else 0,
+                       'keyword': keyword.text,
+                       **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
+                       **{f'keyword_feature_{i}': keyword_features[i] for i in range(len(keyword_features))},
+                   }
+                   data_rows.append(row)
+           except Exception as e:
+               logger.error('Ошибка обработки РК', exc_info=True)
        logger.debug('Формирование df')
        df = pd.DataFrame(data_rows)
        logger.debug('Df готов')

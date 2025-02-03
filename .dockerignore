@@ -1,40 +1,58 @@
-# Python окружение
-venv/
-env/
-.venv/
+# Игнорировать все .txt файлы, кроме requirements.txt
+*.txt
+!requirements.txt
 
-# Python кэш
-__pycache__/
+# Убедимся, что корень не игнорируется
+!./
+
+# Остальные правила оставляем
+node_modules/
+dist/
+.idea/
+__pycache__
+wb/keyword_async_ml_updater/data/*
+app/utils/faiss_manager/indexes/*
+*.pickle
+*.zip
+*.rar
+*.ipynb
+celery_venv
+*.class
+venv
+/image_master/image_sources/*
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.tif
+*.ico
+*.jfif
+*.webp
+.mypy_cache
+*.heic
+*.heif
+*.raw
+*.indd
+*.ai
+*.eps
+*.pdf
+*.svg
+*.psd
+*.xlsx
+*.db
+.~lock.*
 *.pyc
 *.pyo
 *.pyd
-.Python
-*.py[cod]
-
-# Логи
+*.pyw
+*.pyz
+*.pywz
+*.csv#
+*.spec
 *.log
-
-# Локальные конфиги
-.env
-.env.local
-*.cfg
-
-# IDE файлы
-.idea/
-.vscode/
-*.swp
-*.swo
-app.log.*
-# Временные файлы
-tmp/
-temp/
-
-# Git файлы
-.git/
-
-# Node.js зависимости
-node_modules/
-
-# Резервные файлы редакторов
-*.bak
-*.tmp
+app/utils/text_master/w2v_cc_300d_ru/*
+app/keword_async_ml_updater/model/*
+*.index
+logs

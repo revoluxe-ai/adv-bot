@@ -36,17 +36,12 @@ async def run_hard_processes():
         await asyncio.sleep(60)
 
 
-
-
 run_own_process_list = [
      run_hard_processes,
      keywords_parsing_process,
      run_update_all_keywords_on_wb,
       run_main_coroutines,
      run_update_predict_ctr,
-     run_update_model,
-     # run_shop_data_update,
-
 ]
 
 

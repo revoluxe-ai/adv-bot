@@ -281,7 +281,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         self.adv_stat = adv_stat
 
-
+        # self.bid_update_time: datetime  = await redis_manager.get_last_bid_update(self.adv.adv_id)
+        # self.bid_update_time = self.bid_update_time.timestamp()
         await super().__call__()
 
     @property
@@ -302,6 +303,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f'Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n'
             f'Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n'
             f'Последнее обновление полной статистики: {self.full_stat_update_time}\n'
+            # f'Последнее обновление ставки: {self.bid_update_time}'
         )
 
         adv_stat = self.adv_stat

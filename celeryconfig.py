@@ -1,10 +1,14 @@
 from app import settings
+import os
+
+
+redis_master_host = os.environ.get('REDIS_HOST')
 
 # URL брокера сообщений (например, Redis или RabbitMQ)
-broker_url = "redis://localhost:6379/1"
+broker_url = f"redis://{redis_master_host}:6379/1"
 
 # Бэкэнд для хранения результатов
-result_backend = "redis://localhost:6379/1"
+result_backend = f"redis://{redis_master_host}:6379/1"
 
 # Форматы данных и общие настройки
 task_serializer = "json"

@@ -4,6 +4,8 @@ import typing
 from functools import wraps
 from typing import Optional
 from datetime import datetime
+
+from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.shop_runner.bidder.wb_api import WBApi
@@ -113,6 +115,7 @@ class WBShop:
 
     async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: WBApi, shop_id: str):
         await run_bidder_process_for_adv(adv_setting, wb_api, shop_id)
+        # await redis_manager.set_last_bid_update(adv_setting.adv_id)
         if self.__first_bidder_update_time is None:
             self.__first_bidder_update_time = datetime.now()
 

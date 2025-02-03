@@ -1,5 +1,5 @@
 from python_modules.path_setting_funcs import get_document_by_key_name, get_setting_path
-
+import os
 setting_path = get_setting_path()
 
 
@@ -108,6 +108,9 @@ class Settings:
 
     @property
     def CELERY_PREFIX(self)-> str:
+        celery_prefix = os.environ.get('CELERY_PREFIX')
+        if celery_prefix:
+            return celery_prefix
         try:
             version = get_document_by_key_name(setting_path, 'CELERY_PREFIX')
         except:

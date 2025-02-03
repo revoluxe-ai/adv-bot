@@ -1,75 +1,49 @@
-version: '3.8'
-
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    hostname: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
-      interval: 30s
-      retries: 3
-      start_period: 10s
-      timeout: 10s
-    networks:
-      - kafka-net
 
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    depends_on:
-      - zookeeper
-    ports:
-      - 29092:29092
-    hostname: kafka
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
-      KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
-      KAFKA_LISTENER_NAME_INSIDE: INSIDE
-      KAFKA_LISTENER_PORT_INSIDE: 29092
-      KAFKA_LISTENER_HOSTNAME_INSIDE: kafka
-      KAFKA_LISTENER_SECURITY_PROTOCOL_INSIDE: PLAINTEXT
-      KAFKA_LISTENER_NAME_PLAINTEXT: PLAINTEXT
-      KAFKA_LISTENER_PORT_PLAINTEXT: 9092
-      KAFKA_LISTENER_HOSTNAME_PLAINTEXT: kafka
-      KAFKA_LISTENER_SECURITY_PROTOCOL_PLAINTEXT: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    networks:
-      - kafka-net
+  bidder:
+    build:
+      context: .
+      dockerfile: ./dockers/bidder/Dockerfile
+    container_name: bidder
 
-  kconnect:
-    image: debezium/connect:2.7.3.Final
-    ports:
-      - "8083:8083"
+  bot:
+    build:
+      context: .
+      dockerfile: ./dockers/client_bot/Dockerfile
     environment:
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_DB: ${DATABASE_NAME}
-      POSTGRES_HOST: ${DATABASE_HOST}
-      POSTGRES_SSL: "true"
-      POSTGRES_SSL_MODE: "verify-full"
-      POSTGRES_SSL_ROOT_CERT: "/etc/ssl/certs/root.crt"
-      POSTGRES_SSL_CLIENT_CERT: "/etc/ssl/certs/client.crt"
-      POSTGRES_SSL_CLIENT_KEY: "/etc/ssl/certs/client.key"
-      CONFIG_STORAGE_TOPIC: my_connect_configs
-      OFFSET_STORAGE_TOPIC: my_connect_offsets
-      STATUS_STORAGE_TOPIC: my_connect_statuses
-      BOOTSTRAP_SERVERS: kafka:29092
-    volumes:
-      - "~/.postgresql:/etc/ssl/certs"
-    depends_on:
-      - kafka
-      - zookeeper
-    networks:
-      - kafka-net
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}  # Пример использования переменной из окружения
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_CLUSTER_HOST: ${REDIS_CLUSTER_HOST}
 
-networks:
-  kafka-net:
-    driver: bridge
+  updater:
+    build:
+      context: .
+      dockerfile: ./dockers/updater/Dockerfile
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      REDIS_HOST: ${REDIS_HOST}
+
+  celery:
+    build:
+      context: .
+      dockerfile: ./dockers/celery/Dockerfile
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      REDIS_HOST: ${REDIS_HOST}
+      CELERY_PREFIX: ${CELERY_PREFIX}
+
+
+  model_updater:
+    build:
+      context: .
+      dockerfile: ./dockers/model_updater/Dockerfile
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      REDIS_HOST: ${REDIS_HOST}
+
+
+  redis_copy_script:
+    build:
+      context: .
+      dockerfile: ./dockers/copy_redis_script/Dockerfile
+

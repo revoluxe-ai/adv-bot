@@ -1,15 +1,20 @@
+import os
+
 from aiogram import Bot
 
 from python_modules import path_setting_funcs
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 
-path_setting = path_setting_funcs.get_setting_path()
+token = os.environ.get('TELEGRAM_BOT_TOKEN')
 
-token = path_setting_funcs.get_document_by_key_name(path_setting,
-                                                        'client_bot_token',)
-bot = Bot(token=token,
-          # parse_mode='MarkdownV2'
-          )
+bot = Bot(token=token)
+
+# token = path_setting_funcs.get_document_by_key_name(path_setting,
+#                                                         'client_bot_token',)
+
 
 
 

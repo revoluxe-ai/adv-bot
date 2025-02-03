@@ -155,11 +155,14 @@ async def _get_df_for_fit() -> pd.DataFrame:
                                          avg_item_features.keys()}
 
                     logger.debug(f'Получение статистики ключевых слов из ClickHouse для кампании {adv.adv_id}')
-                    keyword_stats: list[CalculatedKeyword] \
-                        = await data_manager.get_keywords_statistic_clickhouse(adv,
+                    try:
+                        keyword_stats: list[CalculatedKeyword] \
+                               = await data_manager.get_keywords_statistic_clickhouse(adv,
                                                                                last_views=500)
-                    logger.debug(f'Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}')
-
+                        logger.debug(f'Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}')
+                    except:
+                        logger.error('Ошибка получения ключей из Клик-хаус', exc_info=True)
+                        continue
                     logger.debug('Конвертация статистики ключевых слов в кластеры')
                     keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
                     logger.debug(f'Получено {len(keywords_stats_by_clusters)} кластеров')

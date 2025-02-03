@@ -415,26 +415,16 @@ async def  set_position(keyword_stat: CalculatedKeyword,
 
 def __calculate_clusters(preset_to_keywords, preset_to_cluster_name):
     keyword_stats = []
-    start_time = time.time()
-
     for preset in preset_to_keywords:
-        logger.debug(f'Обрабатываю кластер {preset}')
         keywords = preset_to_keywords[preset]
         keyword_cluster_name = preset_to_cluster_name[preset]
-
-        cluster_start_time = time.time()
         views = clicks = spend = query = 0
         for keyword in keywords:
-            logger.debug(f'Обрабатываю ключевое слово {keyword.text}')
             views += keyword.views
             clicks += keyword.clicks
             spend += keyword.spend
             if isinstance(keyword.query, int):
-                logger.debug(f'Пишу прогноз показов')
                 query += keyword.query
-
-        cluster_end_time = time.time()
-        logger.debug(f'Время обработки кластера {preset}: {cluster_end_time - cluster_start_time} секунд')
 
         cluster_keyword = CalculatedKeyword(
             text=keyword_cluster_name,
@@ -445,9 +435,6 @@ def __calculate_clusters(preset_to_keywords, preset_to_cluster_name):
         cluster_keyword.query = query if query else "<50"
         cluster_keyword.childs_keywords = keywords
         keyword_stats.append(cluster_keyword)
-
-    end_time = time.time()
-    logger.debug(f'Общее время выполнения: {end_time - start_time} секунд')
 
     return keyword_stats
 
