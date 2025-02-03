@@ -28,11 +28,11 @@ jobs:
       - name: Сборка Docker-образа
         run: |
           COMMIT_SHA=${{ github.sha }}
-          REGISTRY_PATH=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/${{ secrets.YC_REPOSITORY_NAME }}
+          REGISTRY_PATH=cr.yandex/crp8gok4kl514qunoimr/test_bot:latest
 
           echo "Собираем образ с тегом: $REGISTRY_PATH:test_image"
 
-          docker build -t $REGISTRY_PATH:test_image -t $REGISTRY_PATH:latest .
+          docker build -t cr.yandex/crp8gok4kl514qunoimr/test_bot:latest -t cr.yandex/crp8gok4kl514qunoimr/test_bot:latest ./dockers/client_bot/
 
           docker push $REGISTRY_PATH:test_image
           docker push $REGISTRY_PATH:latest
