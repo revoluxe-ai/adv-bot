@@ -30,9 +30,9 @@ jobs:
           COMMIT_SHA=${{ github.sha }}
           REGISTRY_PATH=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/${{ secrets.YC_REPOSITORY_NAME }}
 
-          echo "Собираем образ с тегом: $REGISTRY_PATH:$COMMIT_SHA"
+          echo "Собираем образ с тегом: $REGISTRY_PATH:test_image"
 
-          docker build -t $REGISTRY_PATH:$COMMIT_SHA -t $REGISTRY_PATH:latest .
+          docker build -t $REGISTRY_PATH:test_image -t $REGISTRY_PATH:latest .
 
-          docker push $REGISTRY_PATH:$COMMIT_SHA
+          docker push $REGISTRY_PATH:test_image
           docker push $REGISTRY_PATH:latest
