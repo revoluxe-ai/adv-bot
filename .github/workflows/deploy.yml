@@ -10,11 +10,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout репозиторий
+      - name: Checkout репозитория
         uses: actions/checkout@v4
 
       - name: Устанавливаем Yandex Cloud CLI
-        run: curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local/bin
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local/bin
 
       - name: Логинимся в Yandex Cloud
         run: |
@@ -27,9 +28,11 @@ jobs:
           yc container registry configure-docker
           docker login --username oauth --password ${{ secrets.YC_OAUTH_TOKEN }} cr.yandex
 
-      - name: Сборка и пуш Docker-образа
+      - name: Сборка и пуш Docker-образа с тегами
         run: |
-          docker build -t cr.yandex/your-registry/your-app:latest .
+          # Получаем SHA коммита
+          COMMIT_SHA=${{ github.sha }}
+          # Тегируем образ с использованием SHA и latest
+          docker build -t cr.yandex/your-registry/your-app:$COMMIT_SHA -t cr.yandex/your-registry/your-app:latest .
+          docker push cr.yandex/your-registry/your-app:$COMMIT_SHA
           docker push cr.yandex/your-registry/your-app:latest
-
-
