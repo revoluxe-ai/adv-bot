@@ -26,7 +26,7 @@ jobs:
       - name: Сборка Docker-образа
         env:
           CR_REGISTRY: crp8gok4kl514qunoimr
-          CR_REPOSITORY: test-bot
+          CR_REPOSITORY: test-bot_1
           IMAGE_TAG: ${{ github.sha }}
         run: |
           COMMIT_SHA=${{ github.sha }}
