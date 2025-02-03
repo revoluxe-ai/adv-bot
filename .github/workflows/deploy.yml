@@ -34,5 +34,6 @@ jobs:
           docker build --cache-from=${CR_REPOSITORY}:latest -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} -f ./dockers/client-bot/Dockerfile .
           
           # Пуш образ в реестр
+          docker tag cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest
           docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}
           docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest
