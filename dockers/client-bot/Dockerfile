@@ -23,6 +23,7 @@ RUN pip install --upgrade pip && pip install virtualenv
 # Создание виртуального окружения
 RUN python -m venv /app/venv
 
+
 # Активируем виртуальное окружение и устанавливаем зависимости
 RUN /bin/bash -c "source /app/venv/bin/activate && pip install -r requirements.txt"
 

@@ -11,28 +11,28 @@ jobs:
       image: atnartur/yc:latest
 
     steps:
+      # 1. Логин в Yandex Cloud Container Registry
+      - name: Login to Yandex Cloud Container Registry
+        run: |
+          echo ${{ secrets.YC_OAUTH_TOKEN }}|docker login \
+            --username oauth \
+            --password-stdin \
+           cr.yandex
+
+      # 4. Клонирование репозитория
       - uses: actions/checkout@v4
 
-      - name: Set Docker config dir
-        run: |
-          mkdir -p /root/.docker
-          echo '{"auths": {"cr.yandex": {}}}' > /root/.docker/config.json
-
-      - name: Configure YC
-        run: |
-          yc config set cloud-id ${{ secrets.YC_CLOUD_ID }}
-          yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
-          yc config set token ${{ secrets.YC_OAUTH_TOKEN }}
-          yc container registry configure-docker
-
+      # 5. Сборка Docker-образа
       - name: Сборка Docker-образа
+        env:
+          CR_REGISTRY: crp8gok4kl514qunoimr
+          CR_REPOSITORY: test-bot
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           COMMIT_SHA=${{ github.sha }}
-          REGISTRY_PATH=cr.yandex/crp8gok4kl514qunoimr/test_bot:latest
-
-          echo "Собираем образ с тегом: $REGISTRY_PATH:test_image"
-
-          docker build -t cr.yandex/crp8gok4kl514qunoimr/test_bot:latest -t cr.yandex/crp8gok4kl514qunoimr/test_bot:latest ./dockers/client_bot/
-
-          docker push $REGISTRY_PATH:test_image
-          docker push $REGISTRY_PATH:latest
+          echo "Собираем образ с тегом: cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}"
+          docker build --cache-from=${CR_REPOSITORY}:latest -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} -f ./dockers/client-bot/Dockerfile .
+          
+          # Пуш образ в реестр
+          docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}
+          docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest
