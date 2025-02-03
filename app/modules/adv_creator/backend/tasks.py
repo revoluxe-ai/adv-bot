@@ -1,15 +1,11 @@
 import asyncio
 import logging
-import time
-from contextlib import contextmanager
-
 from celery import shared_task
 from aiogram.exceptions import TelegramRetryAfter
 from app.client_bot.bot import get_bot
-from app.core.wb_api.mixins.excs import ItemCategoryNotInStockError, AdvNotFoundInWBError
+from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
 from app.modules.adv_creator import backend
 from app.modules.adv_creator.backend import MainAdvManager
-from app.utils.redis_manager import redis_client
 
 logger = logging.getLogger(__name__)
 from app.core.wb_api.mixins.excs  import ItemCategoryNotInStockError

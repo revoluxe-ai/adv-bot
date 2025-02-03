@@ -18,12 +18,7 @@ from app.modules.keywords_query import keywords_query
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 import os
-
 from urllib.parse import quote, unquote
-# redis_client = redis.asyncio.Redis(host='147.45.151.145', port=6379, db=0)
-# redis_client_write = redis.asyncio.Redis(host='10.98.19.254', port=6379, db=0)
-# redis_client_read= redis.asyncio.Redis(host='10.103.185.93', port=6379, db=0)
-
 
 redis_host = os.environ.get('REDIS_HOST')
 
@@ -52,18 +47,20 @@ class RedisEvent(asyncio.Event):
             return redis_client
         elif type == 'white':
             return redis_client
+
+
     async def set(self):
-        redis = await self._get_redis()
+        redis = await self._get_redis('white')
         await redis.set(self.key, 1)
         super().set()
 
     async def clear(self):
-        redis = await self._get_redis()
+        redis = await self._get_redis('white')
         await redis.delete(self.key)
         super().clear()
 
     async def wait(self):
-        redis = await self._get_redis()
+        redis = await self._get_redis('read')
         while True:
             result = await redis.get(self.key)
             if result:
@@ -72,7 +69,7 @@ class RedisEvent(asyncio.Event):
         await super().wait()
 
     async def is_set(self):
-        redis = await self._get_redis()
+        redis = await self._get_redis('read')
         result = await redis.get(self.key)
         return result is not None
 
@@ -404,7 +401,6 @@ async def get_cluster_name(text):
         return None
     return answer.decode('utf-8')
 
-
 async def get_all_keywords_positions(text) -> list[WBItemPosition]:
     key_pattern = f'adv_positions:{text}:*'
     cursor = b'0'
@@ -432,6 +428,18 @@ async def get_keys(pattern):
         keys.extend(batch)
 
     return keys
+   
+async def get_all_cluster_names()-> set[str]:
+    pattern = 'keyword_cluster:*'
+    keys = await redis_client.keys(pattern)
+    cluster_names = set()
+    for key in keys:
+        name = await redis_client.get(key)
+        if name is not None:
+            cluster_names.add(name.decode('utf-8'))
+    return cluster_names
+
+    
 
 
 
@@ -514,6 +522,7 @@ async def get_last_views(adv_id, text):
 
 
 async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]]]:
+    result = await redis_client.mget([f'cluster_and_preset:{encode_key(text)}' for text in texts])
     clusters_and_presets = {}
     for text in texts:
         key = f'cluster_and_preset:{encode_key(text)}'
@@ -535,7 +544,6 @@ async def get_keywords_positions_by_nmid(nmid: int):
     key_pattern = f'adv_positions:*:{nmid}*'
     cursor = b'0'
     positions = []
-
     while cursor != b'0':  # Ожидаем, пока курсор не вернется к начальной позиции
         cursor, keys = await redis_client.scan(cursor, match=key_pattern)
 
