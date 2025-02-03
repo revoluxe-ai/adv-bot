@@ -15,7 +15,9 @@ jobs:
 
       - name: Устанавливаем Yandex Cloud CLI
         run: |
-          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i /usr/local/bin
+          source ~/.bashrc
+          yc --version
       - name: Логинимся в Yandex Cloud
         run: |
           yc config set cloud-id ${{ secrets.YC_CLOUD_ID }}
