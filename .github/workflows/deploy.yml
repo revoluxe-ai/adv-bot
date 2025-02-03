@@ -12,8 +12,7 @@ jobs:
     steps:
       - name: Checkout репозитория
         uses: actions/checkout@v4
-
-      - name: Устанавливаем и настраиваем Yandex Cloud CLI
+      - name: Устанавливаем Yandex Cloud CLI
         uses: nikita-volkov/yc-cli.github-action@v1.0.0
         with:
           key: ${{ secrets.YC_SERVICE_ACCOUNT_KEY }}
