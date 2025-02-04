@@ -1,12 +1,8 @@
 import asyncio
-from app.utils.db.session_maker import get_async_session_maker as sm
-from . import rel_db as pg
-from .. import data_manager
 from ...common_slaves.wildberries import super_cabinet_manager
 from ...common_slaves.wildberries.api import WBApi
 from ...common_slaves.wildberries.models import AdvSetting
 import logging
-from .types import FullAdvStat
 logger = logging.getLogger(__name__)
 
 
