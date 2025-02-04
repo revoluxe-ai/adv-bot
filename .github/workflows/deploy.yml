@@ -20,8 +20,12 @@ jobs:
     container:
       image: atnartur/yc:latest
 
+    env:
+      CR_REGISTRY: crp8gok4kl514qunoimr
+      CR_REPOSITORY: ${{ matrix.repo_name }}
+      IMAGE_TAG: ${{ github.sha }}
+
     steps:
-      # 1. Логин в Yandex Cloud Container Registry
       - name: Login to Yandex Cloud Container Registry
         run: |
           echo ${{ secrets.YC_OAUTH_TOKEN }} | docker login \
@@ -29,10 +33,8 @@ jobs:
             --password-stdin \
             cr.yandex
 
-      # 2. Клонирование репозитория
       - uses: actions/checkout@v4
 
-      # 3. Кэширование слоев Docker
       - name: Cache Docker layers
         uses: actions/cache@v4
         with:
@@ -41,25 +43,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-docker-
 
-      # 4. Сборка Docker-образа
       - name: Build Docker image
-        env:
-          DOCKER_BUILDKIT: 1
-          CR_REGISTRY: crp8gok4kl514qunoimr
-          CR_REPOSITORY: ${{ matrix.repo_name }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          COMMIT_SHA=${{ github.sha }}
-          echo "Собираем образ с тегом: cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}"
-
-          # Сборка с использованием кэша из удаленного реестра
+          echo "Building image: cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}"
+          
           docker build --cache-from=cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest \
             -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} \
             -f ${{ matrix.dockerfile }} .
 
-      # 5. Пуш Docker-образов в реестр
-      - name: Push Docker image to Yandex Cloud Container Registry
+      - name: Push Docker images to Registry
         run: |
-          docker tag cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest
-          docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}
-          docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest
+          # Tag the image as latest
+          docker tag "cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}" \
+            "cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest"
+            
+          # Push both tags
+          docker push "cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}"
+          docker push "cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest"
