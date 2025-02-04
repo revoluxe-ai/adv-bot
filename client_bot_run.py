@@ -1,10 +1,12 @@
-import asyncio
-from app.client_bot.client_bot import run
+import dotenv
+dotenv.load_dotenv()
+
 from python_modules.logger import setup_logging
 setup_logging()
-import dotenv
 
-dotenv.load_dotenv('.env')
+import asyncio
+from app.client_bot.client_bot import run
+
 
 
 if __name__ == "__main__":
