@@ -78,14 +78,14 @@ global_semaphore = asyncio.Semaphore(count_sem)
 def get_alchemy_row(read_only):
     port = settings.postgres_port
     file_path = path_setting_funcs.get_setting_path()
-    postgres_dbname = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-dbname')
+    postgres_dbname = settings.postgres_dbname
     # postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
-    postgres_password = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-password')
-    postgres_user = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-user')
+    postgres_password = settings.postgres_password
+    postgres_user = settings.postgres_user
     if not read_only:
-        host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-master-host')
+        host = settings.postgres_master_host
     else:
-        host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-replica-host')
+        host = settings.postgres_replica_host
 
     # Для asyncpg используем ssl вместо sslmode
 

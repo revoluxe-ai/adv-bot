@@ -62,13 +62,11 @@ class AsyncMeta(type):
 
 class DataScience(metaclass=AsyncMeta):
     def __init__(self):
+        import os
         self.MAIN_GRAPH_NAME = 'main'
-        setting_path = get_setting_path()
-        with open(setting_path, 'r', encoding='utf-8') as file:
-            setting  = yaml.safe_load(file)
-        name = setting['neo4j']['name']
-        password = setting['neo4j']['password']
-        self.__uri: str = setting['neo4j']['uri']
+        name = os.environ.get('NEO4J_NAME')
+        password = os.environ.get('NEO4J_PASSWORD')
+        self.__uri: str = os.environ.get('NEO4j_URI')
         self.__auth: tuple[str, str] = (name, password)
         self.__driver = neo4j.GraphDatabase.driver(self.__uri, auth=self.__auth)
 

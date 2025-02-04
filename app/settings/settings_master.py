@@ -5,6 +5,33 @@ setting_path = get_setting_path()
 
 class Settings:
 
+
+    @property
+    def postgres_replica_host(selfs) -> str:
+        value = os.environ.get('POSTGRES_REPLICA_HOST')
+        return value
+
+    @property
+    def postgres_master_host(self):
+        value = os.environ.get('POSTGRES_MASTER_HOST')
+        return value
+
+
+    @property
+    def postgres_user(self) -> str:
+        value = os.environ.get('POSTGRES_USER')
+        return value
+    @property
+    def postgres_password(self) -> str:
+        value = os.environ.get('POSTGRES_PASSWORD')
+        return value
+
+
+    @property
+    def postgres_dbname(self) -> str:
+        value = os.environ.get('POSTGRES_DBNAME')
+        return value
+
     @property
     def cv(self)->bool:
         value = os.environ.get('CV')
