@@ -64,8 +64,7 @@ dp = Dispatcher(storage=storage)
 dp.include_router(global_router)
 
 try:
-    test_mode = path_setting_funcs.get_document_by_key_name(path_setting,
-                                                        'test_mode')
+    test_mode = os.environ.get('TEST_MODE')
 except:
     test_mode = False
 
@@ -87,14 +86,12 @@ webhook_requests_handler = SimpleRequestHandler(
                             secret_token=WEBHOOK_SECRET
 )
 
-
-
 app = web.Application()
-webhook_requests_handler.register(app, path=WEBHOOK_PATH)
-setup_application(app, dp, bot=bot)
 
 
 async def start_web_server():
+    webhook_requests_handler.register(app, path=WEBHOOK_PATH)
+    setup_application(app, dp, bot=bot)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, WEB_SERVER_HOST, WEB_SERVER_PORT)
@@ -122,6 +119,8 @@ async def run():
 
     ]
     )
+
+
     if test_mode or polling_mode:
         try:
             await bot.delete_webhook()
