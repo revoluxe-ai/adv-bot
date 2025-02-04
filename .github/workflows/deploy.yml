@@ -39,7 +39,7 @@ jobs:
         run: |
           COMMIT_SHA=${{ github.sha }}
           echo "Собираем образ с тегом: cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}"
-          docker build --cache-from=${CR_REPOSITORY}:latest -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} -f \
+          docker build --cache-from=cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} -f \
           ${{ matrix.dockerfile }}   .
           
           # Пуш образ в реестр
