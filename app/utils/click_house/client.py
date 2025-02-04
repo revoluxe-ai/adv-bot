@@ -110,7 +110,7 @@ class get_clickhouse_client:
             global function_count_lock
 
         if self.client is not None:
-            await self.client.close()
+            self.client.close()
 
         if system_name == 'Linux':
             with connection_lock:
