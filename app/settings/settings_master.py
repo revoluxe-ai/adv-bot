@@ -121,6 +121,8 @@ class Settings:
     @property
     def clickhouse_password(self):
         value = os.environ.get('CLICK_HOUSE_PASSWORD')
+        assert value
+        assert isinstance(value, str)
         return value
 
     @property
