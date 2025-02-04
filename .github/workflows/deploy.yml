@@ -13,6 +13,9 @@ jobs:
           - service: client-telegram-bot
             repo_name: client-telegram-bot
             dockerfile: ./dockers/client-bot/Dockerfile
+          - service: wb-adv-updater
+            repo_name: wb-adv-updater
+            dockerfile: ./dockers/updater/Dockerfile
 
     container:
       image: atnartur/yc:latest
