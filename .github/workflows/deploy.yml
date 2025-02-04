@@ -21,16 +21,25 @@ jobs:
       # 1. Логин в Yandex Cloud Container Registry
       - name: Login to Yandex Cloud Container Registry
         run: |
-          echo ${{ secrets.YC_OAUTH_TOKEN }}|docker login \
+          echo ${{ secrets.YC_OAUTH_TOKEN }} | docker login \
             --username oauth \
             --password-stdin \
-           cr.yandex
+            cr.yandex
 
-      # 4. Клонирование репозитория
+      # 2. Клонирование репозитория
       - uses: actions/checkout@v4
 
-      # 5. Сборка Docker-образа
-      - name: Сборка Docker-образа
+      # 3. Кэширование слоев Docker
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-docker-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      # 4. Сборка Docker-образа
+      - name: Build Docker image
         env:
           DOCKER_BUILDKIT: 1
           CR_REGISTRY: crp8gok4kl514qunoimr
@@ -39,10 +48,15 @@ jobs:
         run: |
           COMMIT_SHA=${{ github.sha }}
           echo "Собираем образ с тегом: cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}"
-          docker build --cache-from=cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} -f \
-          ${{ matrix.dockerfile }}   .
-          
-          # Пуш образ в реестр
+
+          # Сборка с использованием кэша из удаленного реестра
+          docker build --cache-from=cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest \
+            -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} \
+            -f ${{ matrix.dockerfile }} .
+
+      # 5. Пуш Docker-образов в реестр
+      - name: Push Docker image to Yandex Cloud Container Registry
+        run: |
           docker tag cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest
           docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}
           docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest
