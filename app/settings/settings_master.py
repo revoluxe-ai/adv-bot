@@ -8,7 +8,7 @@ class Settings:
     @property
     def cv(self):
         value = os.environ.get('CV')
-        return value
+        return int(value)
 
     @property
     def test_mode(self):
@@ -31,13 +31,13 @@ class Settings:
     @property
     def COUNT_SEMAPHORE_TO_POSTGRES(self):
         value = os.environ.get('COUNT_SEMAPHORE_TO_POSTGRES')
-        return value
+        return int(value)
 
 
     @property
     def MAX_THREAD_FOR_PROXY(self):
         value = os.environ.get('MAX_THREAD_FOR_PROXY')
-        return value
+        return int(value)
 
 
     @property
@@ -45,19 +45,19 @@ class Settings:
         value = os.environ.get('MAX_THREAD_PARSER')
         if value is None:
             return 30
-        return value
+        return int(value)
 
 
     @property
     def MAX_THREAD_PARSER(self):
         value = os.environ.get('MAX_THREAD_PARSER')
-        return value
+        return int(value)
 
 
     @property
     def MAX_MINUS_KW_THREAD(self):
         value = os.environ.get('MAX_MINUS_KW_THREAD')
-        return value
+        return int(value)
 
     @property
     def clickhouse_host(self):
@@ -89,12 +89,12 @@ class Settings:
     @property
     def CH_MAX_THREAD(self):
         value = os.environ.get('CH_MAX_THREAD')
-        return value
+        return int(value)
 
     @property
     def BIDDER_STEP(self):
         value = os.environ.get('BIDDER_STEP_RUB')
-        return value
+        return int(value)
 
 
     @property
