@@ -6,9 +6,16 @@ setting_path = get_setting_path()
 class Settings:
 
     @property
-    def cv(self):
+    def cv(self)->bool:
         value = os.environ.get('CV')
-        return int(value)
+        if value is None:
+            return False
+        value = value.lower()
+        if value == 'false':
+            return False
+        elif value == 'true':
+            return True
+        raise Exception('Не верное значение в CV')
 
     @property
     def test_mode(self):
@@ -17,9 +24,23 @@ class Settings:
 
 
     @property
-    def polling_mode(self):
+    def polling_mode(self)-> bool:
         value = os.environ.get('POLLING_MODE')
+        if value is None:
+            return False
+        value = value.lower()
+        if value == 'false':
+            return False
+        elif value == 'true':
+            return True
+        raise Exception('Не верное значение в POLLING_MODE')
+
+
+    @property
+    def version(self) -> str:
+        value = os.environ.get('VERSION')
         return value
+
 
 
     @property
@@ -84,7 +105,7 @@ class Settings:
     @property
     def TELEGRAM_WEB_PORT(self):
         value = os.environ.get('TELEGRAM_WEB_PORT')
-        return value
+        return int(value)
 
     @property
     def CH_MAX_THREAD(self):
@@ -100,13 +121,13 @@ class Settings:
     @property
     def CLICKHOUSE_PORT(self):
         value  = os.environ.get('CLICKHOUSE_PORT')
-        return value
+        return int(value)
 
 
     @property
     def postgres_port(self):
         value  = os.environ.get('POSTGRES_PORT')
-        return value
+        return int(value)
 
 
     @property
