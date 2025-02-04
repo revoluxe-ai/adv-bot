@@ -16,6 +16,15 @@ jobs:
           - service: wb-adv-updater
             repo_name: wb-adv-updater
             dockerfile: ./dockers/updater/Dockerfile
+          - service: wb-bidder
+            repo_name: wb-bidder
+            dockerfile: ./dockers/bidder/Dockerfile
+          - service: wb-bidder
+            repo_name: wb-adv-model-updater
+            dockerfile: ./dockers/model-updater/Dockerfile
+          - service: celery
+            repo_name: celery
+            dockerfile: ./dockers/celery/Dockerfile
 
     container:
       image: atnartur/yc:latest
