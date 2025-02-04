@@ -7,115 +7,123 @@ class Settings:
 
     @property
     def cv(self):
-        return get_document_by_key_name(setting_path, 'cv')
+        value = os.environ.get('CV')
+        return value
 
     @property
     def test_mode(self):
-        return get_document_by_key_name(setting_path, 'test_mode')
+        value = os.environ.get('TEST_MODE')
+        return value
 
 
     @property
     def polling_mode(self):
-        return get_document_by_key_name(setting_path, 'polling_mode')
+        value = os.environ.get('POLLING_MODE')
+        return value
+
 
     @property
     def WEBHOOK_URL(self):
-        return get_document_by_key_name(setting_path, 'WEBHOOK_URL')
+        value = os.environ.get('WEBHOOK_URL')
+        return value
+
 
     @property
     def COUNT_SEMAPHORE_TO_POSTGRES(self):
-        return get_document_by_key_name(setting_path, 'COUNT_SEMAPHORE_TO_POSTGRES')
+        value = os.environ.get('COUNT_SEMAPHORE_TO_POSTGRES')
+        return value
+
 
     @property
     def MAX_THREAD_FOR_PROXY(self):
-        return get_document_by_key_name(setting_path, 'MAX_THREAD_FOR_PROXY')
+        value = os.environ.get('MAX_THREAD_FOR_PROXY')
+        return value
 
 
     @property
     def COUNT_THREAD_SQL_KW_STAT_LOAD(self):
-        try:
-            return get_document_by_key_name(setting_path, 'COUNT_THREAD_SQL_KW_STAT_LOAD')
-        except:
+        value = os.environ.get('MAX_THREAD_PARSER')
+        if value is None:
             return 30
+        return value
 
 
     @property
     def MAX_THREAD_PARSER(self):
-        return get_document_by_key_name(setting_path, 'MAX_THREAD_PARSER')
+        value = os.environ.get('MAX_THREAD_PARSER')
+        return value
 
 
     @property
     def MAX_MINUS_KW_THREAD(self):
-        return get_document_by_key_name(setting_path, 'MAX_MINUS_KW_THREAD')
-
+        value = os.environ.get('MAX_MINUS_KW_THREAD')
+        return value
 
     @property
     def clickhouse_host(self):
-        return get_document_by_key_name(setting_path, 'click-house-host')
+        value = os.environ.get('CLICK_HOUSE_HOST')
+        return value
+
+
     @property
     def clickhouse_user(self):
-        return get_document_by_key_name(setting_path, 'click-house-user')
+        value = os.environ.get('CLICK_HOUSE_USER')
+        return value
 
     @property
     def clickhouse_password(self):
-        return get_document_by_key_name(setting_path, 'click-house-password')
+        value = os.environ.get('CLICK_HOUSE_PASSWORD')
+        return value
 
     @property
     def WEBHOOK_PATH(self):
-        return get_document_by_key_name(setting_path, 'WEBHOOK_PATH')
-
+        value = os.environ.get('WEBHOOK_PATH')
+        return value
 
 
     @property
     def TELEGRAM_WEB_PORT(self):
-        return get_document_by_key_name(setting_path, 'TELEGRAM_WEB_PORT')
+        value = os.environ.get('TELEGRAM_WEB_PORT')
+        return value
 
     @property
     def CH_MAX_THREAD(self):
-        return get_document_by_key_name(setting_path, 'CH_MAX_THREAD')
-
+        value = os.environ.get('CH_MAX_THREAD')
+        return value
 
     @property
     def BIDDER_STEP(self):
-        return get_document_by_key_name(setting_path, 'BIDDER_STEP_RUB')
+        value = os.environ.get('BIDDER_STEP_RUB')
+        return value
+
 
     @property
     def CLICKHOUSE_PORT(self):
-        return get_document_by_key_name(setting_path, 'CLICKHOUSE_PORT')
+        value  = os.environ.get('CLICKHOUSE_PORT')
+        return value
+
 
     @property
     def postgres_port(self):
-        return get_document_by_key_name(setting_path, 'postgres-port')
+        value  = os.environ.get('POSTGRES_PORT')
+        return value
+
 
     @property
     def ssl_mode(self):
-        return get_document_by_key_name(setting_path, 'postgres-ssl_mode')
-
+        value  = os.environ.get('POSTGRES_SSL_MODE')
+        return value
 
     @property
     def postgres_hosts(self):
-        return get_document_by_key_name(setting_path, 'postgres-hosts')
-
-
-    @property
-    def version(self):
-        try:
-            version = get_document_by_key_name(setting_path, 'version')
-        except:
-            version = 'my'
-        return version
+        value = os.environ.get('POSTGRES_HOST')
+        return value
 
 
     @property
     def CELERY_PREFIX(self)-> str:
-        celery_prefix = os.environ.get('CELERY_PREFIX')
-        if celery_prefix:
-            return celery_prefix
-        try:
-            version = get_document_by_key_name(setting_path, 'CELERY_PREFIX')
-        except:
-            version = 'my'
-        return version
+        value  = os.environ.get('CELERY_PREFIX')
+        return value
 
 
 settings = Settings()
