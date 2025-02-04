@@ -66,7 +66,7 @@ class DataScience(metaclass=AsyncMeta):
         self.MAIN_GRAPH_NAME = 'main'
         name = os.environ.get('NEO4J_NAME')
         password = os.environ.get('NEO4J_PASSWORD')
-        self.__uri: str = os.environ.get('NEO4j_URI')
+        self.__uri: str = os.environ.get('NEO4J_URI')
         self.__auth: tuple[str, str] = (name, password)
         self.__driver = neo4j.GraphDatabase.driver(self.__uri, auth=self.__auth)
 
