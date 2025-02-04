@@ -109,7 +109,7 @@ class get_clickhouse_client:
             global grand_caller_function_connection_count
             global function_count_lock
 
-        if self.client:
+        if self.client is not None:
             await self.client.close()
 
         if system_name == 'Linux':
