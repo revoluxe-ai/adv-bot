@@ -35,7 +35,7 @@ common_router = Router()
 
 setting_path = path_setting_funcs.get_setting_path()
 
-admin_bot_api = path_setting_funcs.get_document_by_key_name(setting_path, 'admin_telegram_bot_api')
+# admin_bot_api = path_setting_funcs.get_document_by_key_name(setting_path, 'admin_telegram_bot_api')
 common_router.include_routers(keywords_positions_history.handlers.router)
 if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
