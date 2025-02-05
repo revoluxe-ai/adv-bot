@@ -852,12 +852,16 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             keyword_stats.append(keyword)
 
     keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
+    adv_id = adv_setting.adv_id
+    texts = [kw.text for kw in keyword_stats]
+    text_to_predict_ctr: dict[str, float]\
+        = await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
 
     for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
         keyword_stat.keyword_setting = keyword_setting
-        predict_ctr = await redis_manager.get_predict_ctr(adv_setting.adv_id, keyword_stat.text)
+        predict_ctr = text_to_predict_ctr.get(keyword_stat.text, None)
         if not predict_ctr:
             predict_ctr = keyword_setting.predict_ctr
         keyword_stat.predict_ctr = predict_ctr

@@ -240,6 +240,25 @@ async def set_predict_ctr(adv_id, keyword, predict_ctr):
     await redis_client.set(key, predict_ctr)
 
 
+async def get_adv_id_to_text_predict_ctr_dict(adv_id: int, texts: list[str]) -> dict[str, float]:
+    # Шаблон для поиска всех ключей, связанных с данным adv_id
+    keys = [f'predict_ctr:{adv_id}:{keyword}' for keyword in texts]
+
+    # Получаем все значения за один запрос
+    values = await redis_client.mget(keys)
+
+    # Собираем результат
+    result = {}
+    for keyword, value in zip(texts, values):
+        if value is not None:
+            try:
+                result[keyword] = float(value.decode('utf-8'))
+            except (ValueError, AttributeError):
+                continue
+
+    return result
+
+
 async def get_predict_ctr(adv_id: int, keyword: str):
     key = f'predict_ctr:{adv_id}:{keyword}'
     predict_ctr_bytes = await redis_client.get(key)
@@ -616,3 +635,5 @@ async def get_last_bid_update(adv_id) -> datetime:
     value = await redis_client.get(key)
     value = datetime.datetime.fromtimestamp(value)
     return value
+
+
