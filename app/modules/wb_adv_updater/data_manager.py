@@ -360,6 +360,7 @@ async def set_positions(keyword_stats: list[CalculatedKeyword],
             keyword_stat.promo_position = position.promo_position
             keyword_stat.real_position = position.real_position
             keyword_stat.cpm = position.cpm
+            keyword_stat.position = position
         else:
             keywords = keyword_stat.childs_keywords
             if keywords:
@@ -797,9 +798,13 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
+        logger.debug('Получил ключи')
     texts_to_keyword_setting = {kws.text: kws for kws in keyword_settings}
     if adv_setting.clusters_mode:
+        logger.debug('Начинаю конвертацию в кластеры')
         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
+        logger.debug('В кластеры сконвертировали')
+    logger.debug('Начинаю установку позиций')
     keyword_stats = await set_positions(keyword_stats, adv_setting)
     async with _sm(read_only=False) as session:
         for keyword_stat in keyword_stats:
@@ -856,9 +861,11 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     texts = [kw.text for kw in keyword_stats]
     text_to_predict_ctr: dict[str, float]\
         = await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
-    keyword_positions = await redis_manager.get_keywords_positions(adv_setting, texts)
-    text_to_keyword_position: dict[str, WBItemPosition]\
-        = {position.keyword_text: position for position in keyword_positions}
+    # keyword_positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    # text_to_keyword_position: dict[str, WBItemPosition]\
+    #     = {position.keyword_text: position for position in keyword_positions}
+
+    new_statuses = []
     for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
@@ -891,10 +898,9 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         keyword_stat.predict_ctr = real_baes_ctr
         predict_ctr = keyword_stat.predict_ctr
         keyword_stat.baes_ctr = real_baes_ctr
-        text = keyword_stat.text
         if max_position:
             try:
-                position = text_to_keyword_position.get(text, None)
+                position = keyword_stat.position
             except:
                 logger.error('Не удалось получить позицию')
                 position = None
@@ -903,9 +909,11 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 if 0 < organic_position <= max_position:
                     keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = 'max_position'
-                    await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                    new_statuses.append((keyword_setting.id, False, ))
                     await asyncio.sleep(0)
                     continue
+
+        await redis_manager.set_auto_block_statuses(new_statuses)
 
         if max_cpc:
             if cpm_now:
