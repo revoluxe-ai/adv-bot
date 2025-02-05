@@ -856,7 +856,9 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     texts = [kw.text for kw in keyword_stats]
     text_to_predict_ctr: dict[str, float]\
         = await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
-
+    keyword_positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    text_to_keyword_position: dict[str, WBItemPosition]\
+        = {position.keyword_text: position for position in keyword_positions}
     for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
@@ -891,7 +893,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         keyword_stat.baes_ctr = real_baes_ctr
         if max_position:
             try:
-                position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
+                position = text_to_keyword_position.get(text, None)
             except:
                 logger.error('Не удалось получить позицию')
                 position = None
