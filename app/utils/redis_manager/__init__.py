@@ -98,6 +98,14 @@ async def check_last_24_hours(adv_original_id):
     return answer
 
 
+async def set_auto_block_statuses(new_statuses: list[tuple[int, bool]]):
+    data = {
+        f'auto_block_status:{keywordsetting_original_id}': 1 if auto_block_status else 0
+        for keywordsetting_original_id, auto_block_status in new_statuses
+    }
+    if data:
+        await redis_client.mset(data)
+
 
 async def set_auto_block_status(keywordsetting_original_id: int, auto_block_status: bool) -> None:
     key = 'auto_block_status:' + str(keywordsetting_original_id)
