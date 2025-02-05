@@ -891,6 +891,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         keyword_stat.predict_ctr = real_baes_ctr
         predict_ctr = keyword_stat.predict_ctr
         keyword_stat.baes_ctr = real_baes_ctr
+        text = keyword_stat.text
         if max_position:
             try:
                 position = text_to_keyword_position.get(text, None)
