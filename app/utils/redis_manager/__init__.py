@@ -403,18 +403,18 @@ async def get_cluster_name(text):
 
 async def get_all_keywords_positions(text) -> list[WBItemPosition]:
     key_pattern = f'adv_positions:{text}:*'
-    cursor = b'0'
+
+    # Получаем все ключи по шаблону (например, с использованием другой команды Redis или до этого шага)
+    keys = await redis_client.keys(key_pattern)
+
+    # Получаем данные по всем ключам за один запрос с использованием mget
+    json_data_list = await redis_client.mget(*keys)
+
     positions = []
-
-    while cursor != b'0':  # Ожидаем, пока курсор не вернется к начальной позиции
-        cursor, keys = await redis_client.scan(cursor, match=key_pattern)
-
-        # Получаем данные по ключам
-        for key in keys:
-            json_data = await redis_client.get(key)
-            if json_data:
-                position = WBItemPosition.from_dict(json.loads(json_data))
-                positions.append(position)
+    for json_data in json_data_list:
+        if json_data:
+            position = WBItemPosition.from_dict(json.loads(json_data))
+            positions.append(position)
 
     return positions
 
