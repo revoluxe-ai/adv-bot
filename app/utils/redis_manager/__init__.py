@@ -548,15 +548,19 @@ async def get_last_views(adv_id, text):
     return int(total_views)
 
 
-async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]]]:
-    result = await redis_client.mget([f'cluster_and_preset:{encode_key(text)}' for text in texts])
+async def get_clusters_and_presets(texts: list[str]) -> dict[str, [tuple[str, int]]]:
+    keys = [f'cluster_and_preset:{encode_key(text)}' for text in texts]
+    values = await redis_client.mget(keys)
+
     clusters_and_presets = {}
-    for text in texts:
+
+    for text, value in zip(texts, values):
         key = f'cluster_and_preset:{encode_key(text)}'
-        value = await redis_client.get(key)
+
         if value is None:
             clusters_and_presets[text] = (None, None)
             continue
+
         value = value.decode('utf-8')
         try:
             cluster, preset = value.split(':')
@@ -564,6 +568,7 @@ async def get_clusters_and_presets(texts: list[str])->dict[str, [tuple[str, int]
         except Exception as e:
             logger.error(f'Ошибка при парсинге значения {value} из Redis с ключом {key}: {e}')
             clusters_and_presets[text] = (None, None)
+
     return clusters_and_presets
 
 
