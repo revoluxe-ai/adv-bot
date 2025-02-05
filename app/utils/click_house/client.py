@@ -1,6 +1,4 @@
 import clickhouse_connect
-from clickhouse_connect.driver import AsyncClient
-
 from app.settings import settings
 from multiprocessing import Value, Lock, Manager
 import logging
@@ -112,11 +110,7 @@ class get_clickhouse_client:
             global function_count_lock
 
         if self.client is not None:
-            if isinstance(self.client, AsyncClient):
-                await self.client.close()
-            else:
-                self.client.close()
-
+            self.client.close()
 
         if system_name == 'Linux':
             with connection_lock:
