@@ -5,7 +5,7 @@ from typing import Union, Optional
 from sqlalchemy import DateTime
 
 from app.modules.keywords_query import keywords_query
-from app.modules.common_slaves.wildberries.models import KeywordSetting
+from app.modules.common_slaves.wildberries.models import KeywordSetting, WBItemPosition
 
 
 @dataclass
@@ -37,6 +37,7 @@ class CalculatedKeyword:
     _query_static: Optional[int] = None
     cluster_name: Optional[str] = None
     preset: Optional[int] = None
+    position: Optional[WBItemPosition] = None
 
 
     @property
