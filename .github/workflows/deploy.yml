@@ -25,6 +25,9 @@ jobs:
           - service: celery
             repo_name: celery
             dockerfile: ./dockers/celery/Dockerfile
+          - service: predict-ctr-updater
+            repo_name: predict-ctr-updater
+            dockerfile: ./dockers/predict_ctr_updater/Dockerfile
 
     container:
       image: atnartur/yc:latest
