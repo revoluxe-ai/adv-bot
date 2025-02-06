@@ -1,6 +1,8 @@
 import redis
+from app import settings
 
-_redis_db = redis.asyncio.Redis(host='localhost', port=6379, db=0)
+redis_host = settings.REDIS_MASTER_HOST
+_redis_db = redis.asyncio.Redis(host=redis_host, port=6379, db=0)
 
 
 def _get_dhash_key(dhash: str):

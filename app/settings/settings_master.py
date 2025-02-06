@@ -175,5 +175,15 @@ class Settings:
         value  = os.environ.get('CELERY_PREFIX')
         return value
 
+    @property
+    def REDIS_MASTER_HOST(self):
+        value = os.environ.get('REDIS_MASTER_HOST')
+        return value
+
+    @property
+    def REDIS_REPLICA_HOST(self):
+       value = os.environ.get('REDIS_REPLICA_HOST')
+       return value
+
 
 settings = Settings()
