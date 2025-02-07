@@ -2,7 +2,7 @@ from app import settings
 import os
 
 
-redis_master_host = os.environ.get('REDIS_HOST')
+redis_master_host = settings.REDIS_MASTER_HOST
 
 # URL брокера сообщений (например, Redis или RabbitMQ)
 broker_url = f"redis://{redis_master_host}:6379/1"
