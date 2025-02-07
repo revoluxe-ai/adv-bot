@@ -13,18 +13,23 @@ jobs:
           - service: client-telegram-bot
             repo_name: client-telegram-bot
             dockerfile: ./dockers/client-bot/Dockerfile
+
           - service: wb-adv-updater
             repo_name: wb-adv-updater
             dockerfile: ./dockers/updater/Dockerfile
+
           - service: wb-bidder
             repo_name: wb-bidder
             dockerfile: ./dockers/bidder/Dockerfile
-          - service: wb-bidder
+
+          - service: wb-adv-model-updater
             repo_name: wb-adv-model-updater
             dockerfile: ./dockers/model-updater/Dockerfile
+
           - service: celery
             repo_name: celery
             dockerfile: ./dockers/celery/Dockerfile
+
           - service: predict-ctr-updater
             repo_name: predict-ctr-updater
             dockerfile: ./dockers/predict_ctr_updater/Dockerfile
