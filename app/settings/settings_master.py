@@ -185,5 +185,10 @@ class Settings:
        value = os.environ.get('REDIS_REPLICA_HOST')
        return value
 
+    @property
+    def YOOKASSA_TOKEN(self):
+        value = os.environ.get('YOOKASSA_TOKEN')
+        return value
+
 
 settings = Settings()

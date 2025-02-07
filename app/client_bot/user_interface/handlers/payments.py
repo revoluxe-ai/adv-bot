@@ -33,8 +33,7 @@ async def order_subscribe(
 ):
 
     user_telegram_id = callback.message.chat.id
-    path_setting = path_setting_funcs.get_setting_path()
-    provider_token = path_setting_funcs.get_document_by_key_name(path_setting, 'yookassa_token')
+    provider_token = settings.YOOKASSA_TOKEN
     days = callback_data.period_days
     total_price = TEST_SUBSCRIBE_COST if settings.test_mode else callback_data.price
     prices = [LabeledPrice(label=f'Подписка на бота', amount=total_price * 100)]

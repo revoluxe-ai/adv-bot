@@ -79,7 +79,7 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
     )
 
     path_setting = path_setting_funcs.get_setting_path()
-    provider_token = path_setting_funcs.get_document_by_key_name(path_setting, 'yookassa_token')
+    provider_token = settings.YOOKASSA_TOKEN
 
     provider_data = json.dumps(
         {
