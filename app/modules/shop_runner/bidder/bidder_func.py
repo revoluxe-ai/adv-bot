@@ -67,7 +67,8 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, sho
         return
     logger.debug(f'Получаю ставку для биддера для {shop_id} adv_id {adv_id}')
     try:
-        cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
+        texts = [kw.text for kw in keywords]
+        cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv,  texts)
     except Exception as e:
         logger.error(f'Ошибка {e} при получении ставки для {shop_id} adv_id {adv_id}', exc_info=True)
         return

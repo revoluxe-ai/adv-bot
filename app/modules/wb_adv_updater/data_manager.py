@@ -469,21 +469,18 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
             cluster_name = text
             preset_to_keywords[preset].append(keyword)
             preset_to_cluster_name[preset] = cluster_name
-    # loop = asyncio.get_event_loop()
-    # task = loop.run_in_executor(None, profile_function, __calculate_clusters, preset_to_keywords, preset_to_cluster_name)
-    # await task
     keyword_stats = __calculate_clusters(preset_to_keywords, preset_to_cluster_name)
 
     return keyword_stats
 
 
-async def get_cpm_by_nmid(nmid)-> Optional[int]:
-    cpm = await __get_cpm_from_positions(nmid)
+async def get_cpm_by_nmid(nmid, texts)-> Optional[int]:
+    cpm = await __get_cpm_from_positions(nmid, texts)
     return cpm
 
 
-async def __get_cpm_from_positions(nmid: int) -> Optional[int]:
-    positions = await redis_manager.get_keywords_positions_by_nmid(nmid)
+async def __get_cpm_from_positions(nmid: int, texts) -> Optional[int]:
+    positions = await redis_manager.get_keywords_positions_by_nmid(nmid, texts)
     if not positions:
         raise PositionNotFoundError(f'Позиции не найдены для nmid в редис {nmid}')
 
@@ -732,37 +729,39 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullA
     except  DataNotFoundError:
         return None
 
-async def get_max_cpc(adv: AdvSetting)-> Optional[int]:
-    max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
-    if max_cpc and adv.max_cpc:
-        return min(max_cpc, adv.max_cpc)
-    if not max_cpc:
-        return adv.max_cpc
-    if not adv.max_cpc:
-        return max_cpc
+# async def get_max_cpc(adv: AdvSetting)-> Optional[int]:
+#     max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
+#     if max_cpc and adv.max_cpc:
+#         return min(max_cpc, adv.max_cpc)
+#     if not max_cpc:
+#         return adv.max_cpc
+#     if not adv.max_cpc:
+#         return max_cpc
 
-
-async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
-    max_pay_for_order: Optional[int]  = adv.max_pay_for_order
-    if not max_pay_for_order:
-        return None
-    cpm_now = await get_cpm_by_nmid(adv.nmids[0])
-    if not cpm_now:
-        return None
-    full_stat: FullAdvStat = await get_full_adv_stat_for_adv_id_from_redis(adv.adv_id)
-    if not full_stat:
-        return None
-    else:
-        clicks = full_stat.clicks + 1
-        orders = full_stat.orders + 1
-        need_clicks_for_order = clicks/orders
-        max_cpc = max_pay_for_order / need_clicks_for_order
-        return max_cpc
+#
+# async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
+#     max_pay_for_order: Optional[int]  = adv.max_pay_for_order
+#     if not max_pay_for_order:
+#         return None
+#     all_keywords = await data_manager
+#     cpm_now = await get_cpm_by_nmid(adv.nmids[0])
+#     if not cpm_now:
+#         return None
+#     full_stat: FullAdvStat = await get_full_adv_stat_for_adv_id_from_redis(adv.adv_id)
+#     if not full_stat:
+#         return None
+#     else:
+#         clicks = full_stat.clicks + 1
+#         orders = full_stat.orders + 1
+#         need_clicks_for_order = clicks/orders
+#         max_cpc = max_pay_for_order / need_clicks_for_order
+#         return max_cpc
 
 
 
 async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
-    max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
+    # max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
+    max_cpc = None
     if not max_cpc:
         max_cpc = adv.max_cpc
     else:
@@ -784,11 +783,7 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
 async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                                            max_cpc = None,
                                            pass_time = timedelta(days=7))->list[CalculatedKeyword]:
-    try:
-        cpm_now = await get_cpm_by_nmid(adv_setting.nmids[0])
-    except Exception as e:
-        logger.error(f'Ошибка при получении cpm {e}', exc_info=True)
-        cpm_now = None
+
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')
@@ -864,7 +859,11 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     # keyword_positions = await redis_manager.get_keywords_positions(adv_setting, texts)
     # text_to_keyword_position: dict[str, WBItemPosition]\
     #     = {position.keyword_text: position for position in keyword_positions}
-
+    try:
+        cpm_now = await get_cpm_by_nmid(adv_setting.nmids[0], texts)
+    except Exception as e:
+        logger.error(f'Ошибка при получении cpm {e}', exc_info=True)
+        cpm_now = None
     new_statuses = []
     for keyword_stat in keyword_stats:
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
@@ -1328,7 +1327,7 @@ def get_best_keyword(keywords: list[CalculatedKeyword])-> Optional[CalculatedKey
 async def _get_new_min_ctr(adv: AdvSetting):
     keywords: list[CalculatedKeyword] = await get_keywords_statistic_clickhouse(adv,
                                                                       timedelta(days=7))
-    best_keyword = await get_best_keyword(keywords)
+    best_keyword = get_best_keyword(keywords)
     if not keywords:
         return 0.05
 

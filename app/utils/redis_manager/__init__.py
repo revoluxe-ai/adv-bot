@@ -176,7 +176,7 @@ async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: Union[int, 
     return keywords
 
 
-async def add_positions_to_redis(positions: list[WBItemPosition]) -> object:
+async def add_positions_to_redis(positions: list[WBItemPosition]) -> None:
     base_key = 'adv_positions'
     for position in positions:
        position.timestamp = datetime.datetime.now()
@@ -599,20 +599,15 @@ async def get_clusters_and_presets(texts: list[str]) -> dict[str, [tuple[str, in
     return clusters_and_presets
 
 
-async def get_keywords_positions_by_nmid(nmid: int):
-    key_pattern = f'adv_positions:*:{nmid}*'
-    cursor = b'0'
+async def get_keywords_positions_by_nmid(nmid: int, texts: list[str]) -> list[WBItemPosition]:
+    keys = [f'adv_positions:{text}:{nmid}' for text in texts]
+    results = await redis_replica_client.mget(keys)
     positions = []
-    while cursor != b'0':  # Ожидаем, пока курсор не вернется к начальной позиции
-        cursor, keys = await redis_replica_client.scan(cursor, match=key_pattern)
-
-        # Получаем данные по ключам
-        for key in keys:
-            json_data = await redis_replica_client.get(key)
-            if json_data:
-                position = WBItemPosition.from_dict(json.loads(json_data))
-                positions.append(position)
-
+    for text, json_data in zip(texts, results):
+        if json_data:
+            position = WBItemPosition.from_dict(json.loads(json_data))
+            position.keyword_text = text
+            positions.append(position)
     return positions
 
 

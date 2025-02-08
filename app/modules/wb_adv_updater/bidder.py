@@ -84,7 +84,10 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
         return
     max_cpm = await data_manager.get_max_adv_bid(adv_setting)
     nmid_in_adv = adv_setting.nmids[0]
-    cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv)
+
+    keywords = await data_manager.get_good_bad_phrases(adv_setting)
+    texts = [kw.text for kw in keywords]
+    cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv, texts)
 
     if not cpm_from_parsing:
         logger.error('Не удалось получить ставку из парсинга'
@@ -92,10 +95,8 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
                      f'Adv ID: {adv_id}',
                      exc_info=True)
         return
-
-    keywords = await data_manager.get_good_bad_phrases(adv_setting)
     white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
-    best_white_keyword = await data_manager.get_best_keyword(white_keywords)
+    best_white_keyword = data_manager.get_best_keyword(white_keywords)
     if best_white_keyword:
          promo_position = best_white_keyword.real_position
     else:
