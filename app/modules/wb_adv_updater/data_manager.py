@@ -869,11 +869,9 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
         keyword_stat.keyword_setting = keyword_setting
-        predict_ctr = text_to_predict_ctr.get(keyword_stat.text, None)
-        if not predict_ctr:
-            predict_ctr = keyword_setting.predict_ctr
-        keyword_stat.predict_ctr = predict_ctr
-        original_predict_ctr = keyword_stat.predict_ctr
+        original_predict_ctr = text_to_predict_ctr.get(keyword_stat.text, None)
+        if not original_predict_ctr:
+            original_predict_ctr = keyword_setting.predict_ctr
         keyword_stat.hard_status = keyword_setting.hard_status
         if min_ctr == 0:
             enough_views = 100
@@ -890,13 +888,11 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         if original_predict_ctr:
             predict_ctr = original_predict_ctr
             predicted_views = int(clicks / predict_ctr)
-            predicted_clicks = int(predicted_views * predict_ctr)
+            predicted_clicks = int(predicted_views * predict_ctr) + 1
             views += predicted_views
             clicks += predicted_clicks
-        real_baes_ctr = clicks / views
-        keyword_stat.predict_ctr = real_baes_ctr
-        predict_ctr = keyword_stat.predict_ctr
-        keyword_stat.baes_ctr = real_baes_ctr
+        baes_predict_ctr = clicks / views
+        keyword_stat.predict_ctr = baes_predict_ctr
         if max_position:
             try:
                 position = keyword_stat.position
@@ -912,8 +908,8 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                     await asyncio.sleep(0)
                     continue
 
-        await redis_manager.set_auto_block_statuses(new_statuses)
 
+        keyword_stat.predict_ctr = baes_predict_ctr
         if max_cpc:
             if cpm_now:
                 cpc = (cpm_now / 1000) / keyword_stat.predict_ctr
@@ -928,7 +924,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 await asyncio.sleep(0)
                 continue
 
-        if not  original_predict_ctr and enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and  keyword_setting.hard_status in [1, 2]:
+        if not original_predict_ctr and enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and  keyword_setting.hard_status in [1, 2]:
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
             await redis_manager.set_auto_block_status(keyword_setting.id, True)
@@ -959,7 +955,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             await asyncio.sleep(0)
             continue
 
-        if predict_ctr >= min_ctr:
+        if baes_predict_ctr >= min_ctr:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
         else:
@@ -973,7 +969,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 await redis_manager.set_auto_block_status(keyword_setting.id, True)
         assert keyword_stat.predict_ctr
         await asyncio.sleep(0)
-
+    await redis_manager.set_auto_block_statuses(new_statuses)
     logger.debug('Проверяю статусы ключевых слов с assert')
 
     for keyword_stat in keyword_stats:
@@ -982,10 +978,6 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     logger.debug('Слова по assert проверены')
     logger.debug('Возвращаю итоговую статистику')
     return keyword_stats
-
-
-
-
 
 
 

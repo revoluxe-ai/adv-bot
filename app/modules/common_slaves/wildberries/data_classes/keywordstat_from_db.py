@@ -38,7 +38,7 @@ class CalculatedKeyword:
     cluster_name: Optional[str] = None
     preset: Optional[int] = None
     position: Optional[WBItemPosition] = None
-
+    original_predict_ctr: [float] = None
 
     @property
     def mean_ctr(self):
