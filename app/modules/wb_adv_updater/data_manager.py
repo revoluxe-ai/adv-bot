@@ -879,8 +879,9 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             enough_views = int(1 / min_ctr)
         views = keyword_stat.views
         clicks = keyword_stat.clicks
-        clicks += 1
-        views += enough_views
+        if clicks == 0:
+             clicks += 1
+             views += enough_views
         added_clicks = keyword_setting.added_clicks
         if added_clicks:
             clicks += added_clicks
