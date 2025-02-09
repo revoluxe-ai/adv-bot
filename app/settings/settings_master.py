@@ -7,7 +7,7 @@ class Settings:
 
 
     @property
-    def postgres_replica_host(selfs) -> str:
+    def postgres_replica_host(self) -> str:
         value = os.environ.get('POSTGRES_REPLICA_HOST')
         return value
 
