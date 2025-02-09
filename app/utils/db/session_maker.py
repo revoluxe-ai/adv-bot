@@ -89,11 +89,19 @@ def get_alchemy_row(read_only):
 
     # Для asyncpg используем ssl вместо sslmode
 
+    ssl_mode = settings.ssl_mode
+
     target_session = 'read-write' if not read_only else 'any'
+
+    row_connector = f'postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}'
+    # if ssl_mode:
+    #     row_connector += f'?sslmode={ssl_mode}'
+    # row_connector += f'&target_session_attrs={target_session}'
+
+
+
     db_connector = (
-        f'postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}'
-        '?ssl=verify-full'
-        f'&target_session_attrs={target_session}'
+        row_connector
     )
     return db_connector
 
@@ -158,7 +166,7 @@ read_write_session_maker = sessionmaker(
 
 
 @asynccontextmanager
-async def get_async_session_maker(semaphore=None, read_only=True) -> AsyncSession:
+async def get_async_session_maker(semaphore=None, read_only=False) -> AsyncSession:
     session_start = time()
     current_task = asyncio.current_task()
 
