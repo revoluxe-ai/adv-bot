@@ -885,9 +885,8 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         if added_clicks:
             clicks += added_clicks
         if original_predict_ctr:
-            predict_ctr = original_predict_ctr
-            predicted_views = int(clicks / predict_ctr)
-            predicted_clicks = int(predicted_views * predict_ctr) + 1
+            predicted_views = int(clicks / original_predict_ctr)
+            predicted_clicks = int(predicted_views * original_predict_ctr) + 1
             views += predicted_views
             clicks += predicted_clicks
         baes_predict_ctr = clicks / views
@@ -906,9 +905,6 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                     new_statuses.append((keyword_setting.id, False, ))
                     await asyncio.sleep(0)
                     continue
-
-
-        keyword_stat.predict_ctr = baes_predict_ctr
         if max_cpc:
             if cpm_now:
                 cpc = (cpm_now / 1000) / keyword_stat.predict_ctr
