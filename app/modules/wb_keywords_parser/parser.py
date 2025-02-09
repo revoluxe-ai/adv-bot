@@ -440,7 +440,7 @@ async def _add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=6
         if (page_limit <= len(checked_pages)
                 or total_pages.total_pages >= len(checked_pages)
                 or stop_event.is_set()):
-            logger.debug(f'Достигнут лимит страниц {page_limit}')
+            logger.debug(f'Достигнут лимит страниц {page_limit}, ключ {text}, артикулы {need_nmids}')
             break
         else:
             logger.debug(f'Не достигнут лимит страниц {page_limit}')
