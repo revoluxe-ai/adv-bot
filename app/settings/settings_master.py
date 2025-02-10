@@ -45,10 +45,13 @@ class Settings:
         raise Exception('Не верное значение в CV')
 
     @property
-    def test_mode(self):
+    def test_mode(self)-> bool:
         value = os.environ.get('TEST_MODE')
-        return value
-
+        value = value.lower()
+        if value == 'false':
+            return False
+        elif value == 'true':
+            return True
 
     @property
     def polling_mode(self)-> bool:
