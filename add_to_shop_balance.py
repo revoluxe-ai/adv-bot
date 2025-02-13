@@ -1,11 +1,12 @@
 from sqlalchemy import select
-
+import dotenv
+dotenv.load_dotenv()
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-shop_id = 'b1f6b9d2-7722-59ba-a37a-6d5fbcc6b165'
-add_balance = 1000
-add_bonus = +50000
+shop_id = ''
+add_balance = 0
+add_bonus = 0
 async def add_balance_and_bonus():
     async with sm(read_only=False) as session:
         stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id)

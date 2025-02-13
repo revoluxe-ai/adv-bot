@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 lock_counter = threading.Lock()
 conn_counter = 0
 
-pool_size = 10
-max_overflow = 20
+pool_size = 50
+max_overflow = 100
 
 #
 # ssl_context = ssl.create_default_context(cafile=RDS_CERT_PATH)
