@@ -44,7 +44,7 @@ RUN echo "*/5 * * * * /usr/sbin/logrotate /etc/logrotate.conf" > /etc/cron.d/log
 RUN chmod 0644 /etc/cron.d/logrotate
 
 # Копирование всего проекта
-COPY ../../ ./
+COPY ./ ./
 
 # Запуск rsyslog, cron и твоего приложения
 CMD ["bash", "-c", "service cron start && python run_update_keyword_vectors_in_redis.py"]
