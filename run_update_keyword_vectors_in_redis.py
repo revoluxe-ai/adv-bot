@@ -1,6 +1,9 @@
 from app.utils.NeoDataScience.driver import DataScience
 import asyncio
 
+from python_modules.logger import setup_logging
+
+setup_logging()
 
 
 gds = DataScience()
@@ -8,4 +11,4 @@ gds = DataScience()
 
 
 if __name__ == '__main__':
-    asyncio.run(gds.update_vectors_in_redis())
+    asyncio.run(gds.update_keywords_vectors())
