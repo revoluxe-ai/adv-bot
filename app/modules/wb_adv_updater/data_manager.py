@@ -889,7 +889,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             clicks += added_clicks
         if original_predict_ctr:
             predicted_views = int(clicks / original_predict_ctr)
-            predicted_clicks = int(predicted_views * original_predict_ctr) + 1
+            predicted_clicks = int(predicted_views * original_predict_ctr)
             views += predicted_views
             clicks += predicted_clicks + 1
         baes_predict_ctr = clicks / views
