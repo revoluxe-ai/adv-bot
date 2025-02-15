@@ -1249,6 +1249,14 @@ UNWIND phrase.words AS word
         except Exception as exc:
             logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
 
+    async def update_keywords_vectors(self):
+        await self.__update_keywords_vectors()
+
+
+    async def update_items_vectors(self):
+        await self.__update_items_vectors()
+
+
     async def update_vectors_in_redis(self):
         await asyncio.gather(self.__update_items_vectors(),
                              self.__update_keywords_vectors())
