@@ -1903,3 +1903,15 @@ async  def set_last_full_stat_update(adv_id: int, timestamp: datetime):
 
 async def get_last_full_stat_update(adv_id: int):
     return await redis_manager.get_last_full_stat_update(adv_id)
+
+
+async def get_all_keywords_from_ch(last_days=7) -> set[str]:
+    ch_query = f"""
+    SELECT DISTINCT text FROM default_db.advkeyword 
+    WHERE date >= today() - %(last_days)s
+    """
+
+    async with get_clickhouse_client() as client:
+        result = await client.query(ch_query, parameters={"last_days": last_days})
+        keywords = result.result_rows
+    return set([keyword[0] for keyword in keywords if keyword])
