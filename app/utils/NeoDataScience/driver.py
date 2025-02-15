@@ -1215,7 +1215,7 @@ UNWIND phrase.words AS word
                     select(KeywordSetting.id, KeywordSetting.text)
                     .distinct(KeywordSetting.text)
                     .join(KeywordSetting.adv_setting)
-                    .where(AdvSetting.active_status.in_(['started']))
+                    # .where(AdvSetting.active_status.in_(['started']))
                     .order_by(KeywordSetting.text, KeywordSetting.id)  # DISTINCT ON требует совпадения с ORDER BY
                     .limit(batch_size)
                 )
