@@ -1263,8 +1263,9 @@ UNWIND phrase.words AS word
 
 
     async def update_vectors_in_redis(self):
-        await asyncio.gather(self.__update_items_vectors(),
-                             self.__update_keywords_vectors())
+        """Удалили добавление ключей (вынесено в отдельную точку входа)"""
+        await asyncio.gather(self.__update_items_vectors()
+                             )
 
 
 
