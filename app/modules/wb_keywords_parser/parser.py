@@ -544,14 +544,13 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
                 logger.debug(f"Ключевое слово '{text}' уже обработано. Пропуск.")
                 await asyncio.sleep(0)
                 continue
-            else:
-                pass_keywords_texts.add(text)
             last_position = await redis_manager.get_keyword_position(text, adv.nmids[0])
             if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(days=1)\
                     and keyword.hard_status != 0:
                 logger.debug(f"Последняя позиция для ключевого слова '{text}' устарела. Перезапуск парсинга.")
                 await redis_manager.set_last_views(adv_id, text, 0)
                 await queue.put((text, adv.adv_id, list(need_nmids), None, 60))
+                pass_keywords_texts.add(text)
             total_views = keyword.views
             logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
             cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
@@ -560,6 +559,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
                     f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
                 max_page = 1
                 await queue.put((text, adv.adv_id, list(need_nmids), None, max_page,))
+                pass_keywords_texts.add(text)
                 continue
 
             if keyword.status == KeywordStatus.GOOD:
@@ -570,6 +570,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
                         last_views == total_views and keyword.hard_status == 2\
                         or not last_position:
                         await queue.put((text, adv.adv_id, list(need_nmids), last_views, 60))
+                        pass_keywords_texts.add(text)
                         logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
 
 
