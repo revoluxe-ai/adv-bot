@@ -70,6 +70,8 @@ class MainMenu(TextWithKeyboard):
 
 
 class ShopChoice(TextWithKeyboard):
+    parse_mode = ParseMode.HTML
+
     def __init__(self, bot:Bot, chat_id: int,
                  all_shops: list[WBUserCabinet]):
         super().__init__(bot, chat_id)
@@ -771,7 +773,7 @@ class RefProgramSelect(TextWithKeyboard):
 
 
 class ShopMenu(TextWithKeyboard):
-     parse_mode = ParseMode.MARKDOWN
+     parse_mode = ParseMode.HTML
 
      def __init__(self, bot: Bot, chat_id: int, state: FSMContext, wb_user_cabinet_original_id: int):
        self._state = state
@@ -871,13 +873,12 @@ class ShopMenu(TextWithKeyboard):
         else:
             last_for_days = '∞'
         text = (
-            f'📊 *Кампаний на автоуправлении*: {count_active_advs}\n'
-            f'💸 *Расход в сутки*: {total_amount_for_day} рублей\n'
-            f'⏳ *Срок действия токена*: {self.expiration_time}\n'
-            f'*Истечет через* {get_day_suffix(self.last_days_for_token)}\n'
+            f'📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n'
+            f'💸 <b>Расход в сутки</b>: {total_amount_for_day} рублей\n'
+            f'⏳ <b>Срок действия токена</b>: {self.expiration_time}\n'
+            f'<b>Истечет через</b> {get_day_suffix(self.last_days_for_token)}\n'
 
         )
-
 
         if isinstance(last_for_days, int):
             if last_for_days > 7:
@@ -905,6 +906,10 @@ class ShopMenu(TextWithKeyboard):
             f'💰 Баланс магазина: {balance} рублей\n'
             f'🎁 Бонусы: {self._bonus} рублей\n'
         )
+
+        text += """
+<a href="https://telegra.ph/Bystryj-start-02-11">Инструкция по быстрому старту работы</a>. Подходит для базовой автоматизации.
+                """
 
         return text
 

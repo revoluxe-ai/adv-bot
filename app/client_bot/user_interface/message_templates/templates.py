@@ -74,7 +74,8 @@ class TextWithKeyboard(Base):
         last_message = await self.bot.send_message(chat_id=self.chat_id,
                                                     text= text,
                                                     reply_markup=self.keyboard,
-                                                    parse_mode=self.parse_mode)
+                                                    parse_mode=self.parse_mode,
+                                                   disable_web_page_preview=True)
         return last_message, self.get_content_type()
 
 
