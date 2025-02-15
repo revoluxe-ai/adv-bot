@@ -34,6 +34,10 @@ jobs:
             repo_name: predict-ctr-updater
             dockerfile: ./dockers/predict_ctr_updater/Dockerfile
 
+          - service: update_keywords_vectors_in_redis_from_neo4j
+            repo_name: update_keywords_vectors_in_redis_from_neo4j
+            dockerfile: ./dockers/update_keywords_vectors_in_redis_from_neo4j/Dockerfile
+
     container:
       image: atnartur/yc:latest
 
