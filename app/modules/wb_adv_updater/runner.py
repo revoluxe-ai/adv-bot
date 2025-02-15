@@ -191,8 +191,6 @@ async def run_update_model():
 
 async def main_loop():
     await asyncio.gather(
-        # payment_for_auto_bidder(),
-        # payment_for_parsing_keyword(),
         process_payment_for_advs(),
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),
