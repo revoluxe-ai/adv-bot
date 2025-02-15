@@ -11,6 +11,7 @@ from sqlalchemy import select, distinct, func
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordPhrase
 from app.modules.common_slaves.wildberries.models import WBCard, WBCategory, KeywordSetting, AdvSetting
+from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager, text_cleaner
 from python_modules.path_setting_funcs import get_setting_path
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -1190,64 +1191,68 @@ UNWIND phrase.words AS word
                 logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
             await asyncio.sleep(0)
 
-
     async def __update_keywords_vectors_process(self):
-        batch_size = 1000  # Размер порции
-        last_processed_id = None  # Начальное значение для курсора
+        texts: set[str] = await data_manager.get_all_keywords_from_ch(last_days = 7)
+        clear_texts = [text_cleaner.clear(text) for text in texts]
+        await self._update_keywords_vectors_in_redis(clear_texts)
 
-        try:
-            async with sm() as session:
-                # Получаем количество уникальных текстов один раз
-                count_stmt = select(func.count()).select_from(
-                    select(KeywordSetting.text).distinct().join(KeywordSetting.adv_setting).where(
-                        AdvSetting.bot_active == True
-                    ).subquery()
-                )
-                total_count_result = await session.execute(count_stmt)
-                total_count = total_count_result.scalar_one()
-                logger.debug(f'Всего {total_count} уникальных текстов')
-
-            while True:
-                pass_texts = set()
-
-                # Запрос с курсором: если last_processed_id есть, начинаем с него
-                stmt = (
-                    select(KeywordSetting.id, KeywordSetting.text)
-                    .distinct(KeywordSetting.text)
-                    .join(KeywordSetting.adv_setting)
-                    # .where(AdvSetting.active_status.in_(['started']))
-                    .order_by(KeywordSetting.text, KeywordSetting.id)  # DISTINCT ON требует совпадения с ORDER BY
-                    .limit(batch_size)
-                )
-                if last_processed_id:
-                    stmt = stmt.where(KeywordSetting.id > last_processed_id)  # Пагинация по ID
-
-                stmt = stmt.limit(batch_size)
-
-                async with sm() as session:
-                    need_keywords_texts_result = await session.execute(stmt)
-                    rows = need_keywords_texts_result.all()
-
-                if not rows:
-                    break  # Завершаем, если нет данных
-
-                need_keywords_texts = []
-                for row in rows:
-                    if row.text not in pass_texts:
-                        pass_texts.add(row.text)
-                        need_keywords_texts.append(row.text)
-
-                # Очищаем текстовые данные
-                clear_need_texts = [text_cleaner.clear(text) for text in need_keywords_texts]
-
-                # Обновляем векторы ключевых фраз в Redis
-                await self._update_keywords_vectors_in_redis(clear_need_texts)
-
-                # Обновляем курсор на ID последней строки
-                last_processed_id = rows[-1].id  # Предполагается, что есть поле 'id'
-
-        except Exception as exc:
-            logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
+    # async def __update_keywords_vectors_process(self):
+    #     batch_size = 1000  # Размер порции
+    #     last_processed_id = None  # Начальное значение для курсора
+    #
+    #     try:
+    #         async with sm() as session:
+    #             # Получаем количество уникальных текстов один раз
+    #             count_stmt = select(func.count()).select_from(
+    #                 select(KeywordSetting.text).distinct().join(KeywordSetting.adv_setting).where(
+    #                     AdvSetting.bot_active == True
+    #                 ).subquery()
+    #             )
+    #             total_count_result = await session.execute(count_stmt)
+    #             total_count = total_count_result.scalar_one()
+    #             logger.debug(f'Всего {total_count} уникальных текстов')
+    #
+    #         while True:
+    #             pass_texts = set()
+    #
+    #             # Запрос с курсором: если last_processed_id есть, начинаем с него
+    #             stmt = (
+    #                 select(KeywordSetting.id, KeywordSetting.text)
+    #                 .distinct(KeywordSetting.text)
+    #                 .join(KeywordSetting.adv_setting)
+    #                 # .where(AdvSetting.active_status.in_(['started']))
+    #                 .order_by(KeywordSetting.text, KeywordSetting.id)  # DISTINCT ON требует совпадения с ORDER BY
+    #                 .limit(batch_size)
+    #             )
+    #             if last_processed_id:
+    #                 stmt = stmt.where(KeywordSetting.id > last_processed_id)  # Пагинация по ID
+    #
+    #             stmt = stmt.limit(batch_size)
+    #
+    #             async with sm() as session:
+    #                 need_keywords_texts_result = await session.execute(stmt)
+    #                 rows = need_keywords_texts_result.all()
+    #
+    #             if not rows:
+    #                 break  # Завершаем, если нет данных
+    #
+    #             need_keywords_texts = []
+    #             for row in rows:
+    #                 if row.text not in pass_texts:
+    #                     pass_texts.add(row.text)
+    #                     need_keywords_texts.append(row.text)
+    #
+    #             # Очищаем текстовые данные
+    #             clear_need_texts = [text_cleaner.clear(text) for text in need_keywords_texts]
+    #
+    #             # Обновляем векторы ключевых фраз в Redis
+    #             await self._update_keywords_vectors_in_redis(clear_need_texts)
+    #
+    #             # Обновляем курсор на ID последней строки
+    #             last_processed_id = rows[-1].id  # Предполагается, что есть поле 'id'
+    #
+    #     except Exception as exc:
+    #         logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
 
     async def update_keywords_vectors(self):
         await self.__update_keywords_vectors()
