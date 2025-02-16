@@ -15,6 +15,8 @@ from typing import Any, Union, Optional, List, Callable
 import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
+from sqlalchemy.sql.functions import coalesce
+
 from app.exc import CardNotFoundInDB, PositionNotFoundError, NotFoundPositionWithCMPError
 import pandas as pd
 from PIL import Image
@@ -1915,3 +1917,12 @@ async def get_all_keywords_from_ch(last_days=7) -> set[str]:
         result = await client.query(ch_query, parameters={"last_days": last_days})
         keywords = result.result_rows
     return set([keyword[0] for keyword in keywords if keyword])
+
+
+async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(shop_id: str):
+    stmt = select(func.sum(coalesce(WBCabinet.balance, 0)\
+                           + coalesce(WBCabinet.bonus, 0))) \
+        .where(WBCabinet.shop_id  == shop_id)
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        return result.scalar_one()
