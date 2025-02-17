@@ -55,6 +55,8 @@ class WBCabinet(BaseTable):
     white_list_update_active = Column(Boolean, default=False)
     __table_args__ = (
         Index('idx_balance_bonus', 'balance', 'bonus'),
+        Index('idx_balance', 'balance'),
+        Index('idx_bonus', 'bonus'),
     )
 
 
