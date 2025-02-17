@@ -676,3 +676,40 @@ async def get_last_bid_update(adv_id) -> datetime:
     return value
 
 
+
+async def set_last_user_use_time(user_telegram_id: int):
+    key = 'last_user_use_time:' + str(user_telegram_id)
+    now = datetime.datetime.now()
+    now = str(now.timestamp())
+    await redis_master_client.set(key, now)
+
+async def get_last_user_use_time(user_telegram_id: int):
+    key = 'last_user_use_time:' + str(user_telegram_id)
+    value = await redis_replica_client.get(key)
+    if value is None:
+        return None
+    value = value.decode('utf-8')
+    value = float(value)
+    datetime_object = datetime.datetime.fromtimestamp(value)
+    return datetime_object
+
+
+async def get_last_users_use_time(user_telegram_ids: list[int]):
+    keys = ['last_user_use_time:' + str(user_telegram_id) for user_telegram_id in user_telegram_ids]
+    values = await redis_replica_client.mget(keys)
+    results = []
+    for user_telegram_id, value in zip(user_telegram_ids, values):
+        if value is None:
+            results.append(None)
+        else:
+            value = value.decode('utf-8')
+            value = float(value)
+            datetime_object = datetime.datetime.fromtimestamp(value)
+            results.append(datetime_object)
+    return results
+
+
+async def reset_last_user_use_time(telegram_user_id: int):
+    key = 'last_user_use_time:' + str(telegram_user_id)
+    await redis_master_client.delete(key)
+    return None

@@ -24,12 +24,10 @@ from .user_interface.handlers import (adv_setting,
                                        reset_place_setting
 
 )
-
 from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
-
 from app.modules.white_list_updater import router as white_list_updater_router
-
 from ..settings import settings
+from app.modules.user_message_sender import middleware_for_adding_task
 
 common_router = Router()
 
@@ -64,4 +62,5 @@ common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.include_routers(update_adv.router)
 common_router.include_routers(strategy_setting.router)
 common_router.include_routers(shop_settings.router)
-# common_router.callback_query.middleware(check_subscribe_on_shop.CheckSubscribeOnShop())
+common_router.callback_query.middleware(middleware_for_adding_task.AddingMessageTaskMiddleWare())
+common_router.message.middleware(middleware_for_adding_task.AddingMessageTaskMiddleWare())

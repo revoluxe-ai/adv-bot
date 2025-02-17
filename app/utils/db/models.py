@@ -17,6 +17,12 @@ class User(BaseTable):
     payments: Mapped[list['Payment']] = relationship('Payment', back_populates='user')
     wb_tokens: Mapped[list['WBToken']] = relationship('WBToken', back_populates='user', cascade="all, delete-orphan")
     favorites_advs: Mapped[list['AdvSetting']] = relationship('AdvSetting', secondary=favorite_advs_association)
+    __table_args__ = (
+        Index('user_telegram_id_index', user_telegram_id),
+    )
+
+
+
 
 class RefLink(BaseTable):
     name = Column(String, nullable=False)

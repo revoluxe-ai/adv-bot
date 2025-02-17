@@ -1,0 +1,92 @@
+import dotenv
+dotenv.load_dotenv()
+from datetime import datetime
+from app.client_bot.bot import get_bot
+from app.utils import redis_manager
+from python_modules.logger import setup_logging
+setup_logging()
+import asyncio
+from app.modules.user_message_sender import messages
+from sqlalchemy import select, not_, or_, and_, distinct, exists
+from sqlalchemy.sql.functions import coalesce
+setup_logging()
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.utils.db.models import User
+from app.utils.db.session_maker import get_async_session_maker as sm
+import logging
+
+logger = logging.getLogger(__name__)
+
+delay = 60*60*24  # 1 day
+
+async def send_message_to_user(bot, user_telegram_id: int):
+    message = messages.NotAnyUsesAndNotMoneyOnBalance(bot, user_telegram_id)
+    await message()
+    await redis_manager.reset_last_user_use_time(user_telegram_id)
+
+
+async def send_messages_to_users():
+    all_user_telegram_ids = await get_all_user_telegram_ids_with_not_balance()
+    all_user_telegram_ids = list(set(all_user_telegram_ids))
+    user_telegram_ids = await get_user_telegram_ids_for_condition(all_user_telegram_ids)
+    bot = get_bot()
+
+    try:
+        # Цикл для последовательной отправки сообщений
+        for user_telegram_id in user_telegram_ids:
+            try:
+                await send_message_to_user(bot, user_telegram_id)
+                await redis_manager.reset_last_user_use_time(user_telegram_id)
+            except Exception as e:
+                logger.error(f"Error sending message to {user_telegram_id}: {e}")
+            await asyncio.sleep(1)  # Если нужно добавить задержку между отправками
+    except Exception as e:
+        logger.error(f"Error in the process: {e}")
+    try:
+        await bot.session.close()
+    except Exception as e:
+        logger.error(f"Error closing bot session: {e}")
+
+async def get_user_telegram_ids_for_condition(user_telegram_ids: list[int]):
+    last_users_used = await redis_manager.get_last_users_use_time(user_telegram_ids)
+    condition_users_ids = []
+    now = datetime.now()
+    for user_id, last_use_time in zip(user_telegram_ids, last_users_used):
+        if last_use_time:
+            pass_seconds = (now - last_use_time).seconds
+            if pass_seconds > delay:
+                condition_users_ids.append(user_id)
+    return condition_users_ids
+
+
+async def get_all_user_telegram_ids_with_not_balance():
+        # Подзапрос для проверки наличия магазинов
+    no_shops = select(1).where(WBUserCabinet.user_id == User.id).correlate(User)
+    # Подзапрос для проверки баланса
+    has_balance = select(1).where(
+        and_(
+            WBUserCabinet.user_id == User.id,
+            WBUserCabinet.wb_cabinet_id == WBCabinet.id,
+            or_(
+                coalesce(WBCabinet.balance, 0) > 0,
+                coalesce(WBCabinet.bonus, 0) > 0
+            )
+        )
+    ).correlate(User)
+
+    stmt = select(distinct(User.user_telegram_id)) \
+        .outerjoin(User.wb_user_cabinets) \
+        .outerjoin(WBUserCabinet.wb_cabinet) \
+        .where(
+        or_(
+            # Случай 1: У пользователя нет привязанных магазинов
+            ~exists(no_shops),
+            # Случай 2: Все магазины пользователя имеют нулевой баланс и бонус
+            ~exists(has_balance)
+        )
+    )
+
+    async with sm() as session:
+        result = await session.execute(stmt)
+        result = result.scalars().all()
+    return result

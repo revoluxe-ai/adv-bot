@@ -1,6 +1,7 @@
 import datetime
 from app.utils.redis_func_cache import set_config
 from .ml_data_manager import update_model
+from ..user_message_sender import message_for_not_pay_user_sender
 from ..wb_keywords_parser import parser
 set_config()
 import asyncio
@@ -104,6 +105,17 @@ async def clear_data_for_expired_wb_cabinets():
             logger.error(f'Ошибка очистки данных для просроченных кабинетов {e}', exc_info=True)
             await asyncio.sleep(0)
 
+
+async def sender_message_to_not_pay_users():
+    while True:
+        try:
+            await message_for_not_pay_user_sender.send_messages_to_users()
+        except Exception as e:
+            logger.error(f'Ошибка отправки сообщений {e}', exc_info=True)
+        await asyncio.sleep(60*5)
+
+
+
 async def process_payment_for_advs():
     while True:
         try:
@@ -191,6 +203,7 @@ async def run_update_model():
 
 async def main_loop():
     await asyncio.gather(
+        sender_message_to_not_pay_users(),
         process_payment_for_advs(),
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),
