@@ -109,23 +109,15 @@ def get_alchemy_row(read_only):
 
 def get_alchemy_row_for_migration(read_only):
     port = settings.postgres_port
-    file_path = path_setting_funcs.get_setting_path()
-    postgres_dbname = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-dbname')
-    # postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
-    postgres_password = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-password')
-    postgres_user = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-user')
-    if not read_only:
-        host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-master-host')
-    else:
-        host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-replica-host')
-
+    postgres_dbname = settings.postgres_dbname
+    postgres_password = settings.postgres_password
+    postgres_user = settings.postgres_user
+    host = settings.postgres_master_host
     # Для asyncpg используем ssl вместо sslmode
 
     target_session = 'read-write' if not read_only else 'any'
     db_connector = (
         f'postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}'
-        '?sslmode=verify-full'
-        f'&target_session_attrs={target_session}'
     )
     return db_connector
 
