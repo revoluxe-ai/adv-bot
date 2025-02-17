@@ -1,15 +1,13 @@
+import dotenv
+dotenv.load_dotenv()
+
 from app.modules.wb_adv_updater.runner import (
 
     run_main_coroutines,
     keywords_parsing_process,
     run_update_all_keywords_on_wb,
-    run_update_keyword_stat,
-    run_update_predict_ctr,
-    run_update_model,
 
 )
-from app.modules.shops_data_updater import run as run_shop_data_update
-from app.modules.wb_adv_updater.bidder import run_bidder_process
 from python_modules.logger import setup_logging
 import logging
 import asyncio
@@ -41,7 +39,8 @@ run_own_process_list = [
      keywords_parsing_process,
      run_update_all_keywords_on_wb,
       run_main_coroutines,
-     # run_update_predict_ctr,
+     shop_runner.run,
+
 ]
 
 
