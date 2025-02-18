@@ -56,14 +56,14 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                         ClientOSError,
                         ServerDisconnectedError,
                         ClientResponseError) as e:
-                    state['_attempts'] += 1
-                    state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:
                         raise e
+                    state['_attempts'] += 1
+                    state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
+                    logger.debug(f'Следующая пауза между запросами: {state["_current_pause"]} секунд')
+
         return wrapper
     return decorator
-
-
 
 
 async def requests(session, method, url, data=None, json_data=None, headers=None):
