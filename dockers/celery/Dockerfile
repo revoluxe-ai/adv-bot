@@ -52,4 +52,4 @@ COPY ../../ ./
 
 
 # Запуск rsyslog, cron и твоего приложения
-CMD ["bash", "-c", "service cron start && celery -A celery_app worker -l debug --pool=threads --concurrency=2"]
+CMD ["bash", "-c", "service cron start && celery -A celery_app worker -l debug --pool=threads"]
