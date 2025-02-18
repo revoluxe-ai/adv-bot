@@ -1,3 +1,5 @@
+import dotenv
+dotenv.load_dotenv()
 from celery import Celery
 import celeryconfig
 # Создайте приложение Celery
