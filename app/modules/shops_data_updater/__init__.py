@@ -1,11 +1,2 @@
-from .main import async_process_run
-import asyncio
-import logging
-
-logger = logging.getLogger(__name__)
-
-def run():
-    try:
-        asyncio.run(async_process_run())
-    except Exception as e:
-        logger.error(f'Произошла ошибка: {e}')
+__all__ = ['new_update_shop_loop']
+from app.modules.shops_data_updater.main import new_update_shop_loop

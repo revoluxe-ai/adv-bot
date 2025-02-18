@@ -1,6 +1,7 @@
 import datetime
 from app.utils.redis_func_cache import set_config
 from .ml_data_manager import update_model
+from ..shops_data_updater import new_update_shop_loop
 from ..user_message_sender import message_for_not_pay_user_sender
 from ..wb_keywords_parser import parser
 set_config()
@@ -208,6 +209,7 @@ async def main_loop():
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),
         update_all_data_in_db(),
+        new_update_shop_loop(),
         return_exceptions=False
     )
 

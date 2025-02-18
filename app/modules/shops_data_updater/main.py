@@ -47,15 +47,13 @@ class ShopUpdater:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
 
 
-
-
     async def _update_for_last_days_in_redis_run(self, adv_ids: list[int]):
         while True:
             try:
                 await self.__update_full_advs_stats_in_redis(adv_ids)
                 logger.debug(f'Данные для магазина shop_id={self.shop_id} обновлены')
-            except:
-                logger.error(f'Ошибка обновления данных для магазина shop_id={self.shop_id}', exc_info=True)
+            except Exception as exc:
+                logger.error(f'Ошибка обновления данных для магазина shop_id={self.shop_id}, ошибка: {exc}')
             finally:
                 await asyncio.sleep(120)
 
@@ -70,7 +68,7 @@ class ShopUpdater:
     #
 
 
-async def _async_process_run():
+async def new_update_shop_loop():
     while True:
         try:
             await async_process_run()
@@ -84,7 +82,6 @@ async def async_process_run():
     tasks = {}
     while True:
         all_shop_ids = await db_data_manager.get_all_active_shop_ids_with_active_advs()
-        # all_shop_ids = ['84f86c01-137d-5992-8f62-614d5f119bd1']
         for shop_id in all_shop_ids:
             if shop_id not in tasks:
                 access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
