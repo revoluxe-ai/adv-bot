@@ -63,7 +63,6 @@ async def _send_user_message(message: str, user_telegram_id: int):
     try:
         await bot.send_message(user_telegram_id, message)
         await asyncio.sleep(0.5)
-        await bot.close()
     except Exception as e:
         raise e
 
