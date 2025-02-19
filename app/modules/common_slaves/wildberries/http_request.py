@@ -31,6 +31,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                 }
 
             state = instance._api_call_state[method_name]
+            shop_id = instance.shop_id
             while state['_attempts'] < max_attempts:
                 last_query_time: Optional[float] = state['_last_query_time']
                 if last_query_time:
@@ -42,7 +43,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                 try:
                     state['_last_query_time'] = time.time()
                     result = await func(instance, *args, **kwargs)
-                    logger.debug(f'Запрос {method_name} выполнен успешно')
+                    logger.debug(f'Запрос {method_name} выполнен успешно для {shop_id}')
                     next_pause = (interval_seconds / requests_per_interval + state['_current_pause']) / 2
                     state['_current_pause'] = next_pause
                     state['_attempts'] = 0  # Сброс попыток после успешного выполнения
@@ -61,7 +62,7 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
                     state['_attempts'] += 1
                     new_next_pause = min(max(state['_current_pause'], 1) * 2, max_delay)
                     state['_current_pause'] = new_next_pause
-                    logger.debug(f'Следующая пауза между запросами: {state["_current_pause"]} секунд')
+                    logger.debug(f'Следующая пауза между запросами: {state["_current_pause"]} секунд для shop_id: {shop_id}')
 
         return wrapper
     return decorator

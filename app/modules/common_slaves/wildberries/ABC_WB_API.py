@@ -60,7 +60,9 @@ class ABC_WB_API(WbRequestApiMixin):
         self._free_tokens = tokens
         current_token = self._free_tokens.pop()
         self.headers = Headers(current_token)
-        self._shop_id = current_token.shop_id
+        shop_id = current_token.shop_id
+        self._shop_id = shop_id
+        self.shop_id = shop_id
 
 
     # @property
