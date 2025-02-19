@@ -1,3 +1,5 @@
+import dotenv
+dotenv.load_dotenv()
 from datetime import datetime, timedelta
 
 import aiofiles
@@ -23,9 +25,11 @@ async def get_total_spend(adv_ids: list[int]) -> float:
             WHERE date BETWEEN '{start_date_str}' AND '{end_date_str}'
             AND adv_id IN {adv_ids}
         """
-
-        # Выполнение запроса с параметрами
-        result = await ch_client.query(query)
+        try:
+            result = await ch_client.query(query)
+        except Exception as e:
+            print(e)
+            return 0.0
         result = result.result_rows
 
     # Возврат суммы расходов
@@ -70,6 +74,7 @@ async def get_clients_to_file():
 
                         adv_ids = await session.execute(stmt)
                         adv_ids = adv_ids.scalars().all()
+                        adv_ids = [adv_id for adv_id in adv_ids if adv_id]
 
                         spend = await get_total_spend(adv_ids)
                         total_spend += spend
