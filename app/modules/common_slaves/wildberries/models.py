@@ -50,8 +50,8 @@ class WBCabinet(BaseTable):
     expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
-    balance = Column(Float, server_default=text('0'))
-    bonus = Column(Float, default=0)
+    balance = Column(Float, default=0, server_default=text('0'), nullable=False)
+    bonus = Column(Float, default=0, server_default=text('0'), nullable=False)
     white_list_update_active = Column(Boolean, default=False)
     __table_args__ = (
         Index('idx_balance_bonus', 'balance', 'bonus'),
