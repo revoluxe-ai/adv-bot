@@ -14,6 +14,9 @@ from app.core.wb_api.mixins.excs import CardNotFoundInWB
 logger = logging
 
 class ContentMixin(InterfaceWBAPI):
+
+    HOST = 'https://content-api.wildberries.ru'
+
     async def get_cards_by_text(self, texts):
         cards = []
         for text in texts:
@@ -28,7 +31,7 @@ class ContentMixin(InterfaceWBAPI):
 
     @try_except_decorator(1, 2)
     async def get_card_by_text(self, text: Union[str, int]):
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        url = f'{self.HOST}/content/v2/get/cards/list'
         text = str(text)
         data_for_req = {
             "settings": {
@@ -60,7 +63,7 @@ class ContentMixin(InterfaceWBAPI):
 
     @try_except_decorator(1, 2)
     async def get_all_cards(self, text: Union[str, int])-> list[CardFromWB]:
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        url = f'{self.HOST}/content/v2/get/cards/list'
         text = str(text)
         data_for_req = {
             "settings": {
@@ -92,7 +95,7 @@ class ContentMixin(InterfaceWBAPI):
 
     @try_except_decorator(1, 2)
     async def get_all_cards(self):
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        url = f'{self.HOST}/content/v2/get/cards/list'
 
         # Начальные параметры для запроса
         data_for_req = {

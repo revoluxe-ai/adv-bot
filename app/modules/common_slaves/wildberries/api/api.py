@@ -352,7 +352,7 @@ class AdvertApi(ABC_WB_API):
 class ContentApi(ABC_WB_API):
     _only_read = api_rights.OnlyRead.FALSE
     _rights: set = {api_rights.Rights.CONTENT}
-
+    HOST = 'https://content-api.wildberries.ru'
 
     async def get_subcategories(self):
         @try_except_decorator(1, 1)
@@ -374,7 +374,7 @@ class ContentApi(ABC_WB_API):
         all_categories = []
         async with aiohttp.ClientSession() as session:
             while True:
-                url = f'https://suppliers-api.wildberries.ru/content/v2/object/all?offset={offset}&limit={limit}'
+                url = f'{self.HOST}/content/v2/object/all?offset={offset}&limit={limit}'
                 categories = await request(session, url)
                 if categories:
                      all_categories.extend(categories)
@@ -388,7 +388,7 @@ class ContentApi(ABC_WB_API):
 
 
     async def get_patent_categories(self):
-        url = 'https://suppliers-api.wildberries.ru/content/v2/object/parent/all'
+        url = f'{self.HOST}/content/v2/object/parent/all'
         async with aiohttp.ClientSession() as session:
             response_text = await requests(session, 'GET', url,
                                                 headers=self.headers.standart)
@@ -410,7 +410,7 @@ class ContentApi(ABC_WB_API):
 
     @try_except_decorator(1, 2)
     async def get_card_by_text(self, text: Union[str, int]):
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        url = f'{self.HOST}/content/v2/get/cards/list'
         text = str(text)
         data_for_req = {
             "settings": {
@@ -448,7 +448,7 @@ class ContentApi(ABC_WB_API):
     ) -> dict:
         """Возвращает список товаров на Wildberries. """
 
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        url = f'{self.HOST}/content/v2/get/cards/list'
 
         limit = 100
 
