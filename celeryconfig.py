@@ -30,3 +30,8 @@ worker_concurrency = 0
 worker_max_tasks_per_child = None
 task_reject_on_worker_lost=True
 broker_transport_options = {'global_keyprefix': f'{settings.CELERY_PREFIX}'}
+
+
+task_acks_late=True,  # Задачи подтверждаются только после их успешного выполнения
+task_retries=5,  # Количество повторных попыток выполнения задачи
+task_retry_delay=30,  # Задержка между повторными попытками
