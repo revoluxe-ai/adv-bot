@@ -45,3 +45,6 @@ ADMINS = [373435337, #я
 DEFAULT_BIDDER_STEP = 2
 
 min_sum = 300
+
+
+SUPPORT_LINK = 'https://t.me/Vadyanc'
