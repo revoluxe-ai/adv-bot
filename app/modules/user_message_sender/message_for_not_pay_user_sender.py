@@ -8,7 +8,8 @@ setup_logging()
 import asyncio
 from app.modules.user_message_sender import messages
 from sqlalchemy import select, not_, or_, and_, distinct, exists
-from sqlalchemy.sql.functions import coalesce
+from sqlalchemy.sql.functions import coalesce, func
+
 setup_logging()
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
 from app.utils.db.models import User
@@ -60,33 +61,20 @@ async def get_user_telegram_ids_for_condition(user_telegram_ids: list[int]):
 
 
 async def get_all_user_telegram_ids_with_not_balance():
-        # Подзапрос для проверки наличия магазинов
-    no_shops = select(1).where(WBUserCabinet.user_id == User.id).correlate(User)
-    # Подзапрос для проверки баланса
-    has_balance = select(1).where(
-        and_(
-            WBUserCabinet.user_id == User.id,
-            WBUserCabinet.wb_cabinet_id == WBCabinet.id,
+    stmt = (
+        select(User.user_telegram_id)
+        .outerjoin(User.wb_user_cabinets)
+        .outerjoin(WBUserCabinet.wb_cabinet)
+        .group_by(User.id)
+        .having(
             or_(
-                coalesce(WBCabinet.balance, 0) > 0,
-                coalesce(WBCabinet.bonus, 0) > 0
+                func.count(WBUserCabinet.id) == 0,  # Нет кабинетов
+                func.coalesce(func.sum(WBCabinet.balance + WBCabinet.bonus), 0) == 0  # Баланс всех магазинов = 0
             )
-        )
-    ).correlate(User)
-
-    stmt = select(distinct(User.user_telegram_id)) \
-        .outerjoin(User.wb_user_cabinets) \
-        .outerjoin(WBUserCabinet.wb_cabinet) \
-        .where(
-        or_(
-            # Случай 1: У пользователя нет привязанных магазинов
-            ~exists(no_shops),
-            # Случай 2: Все магазины пользователя имеют нулевой баланс и бонус
-            ~exists(has_balance)
         )
     )
 
     async with sm() as session:
         result = await session.execute(stmt)
         result = result.scalars().all()
-    return result
+        return result
