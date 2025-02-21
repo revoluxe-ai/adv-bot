@@ -62,7 +62,7 @@ class WBCabinet(BaseTable):
 
 class WBToken(BaseTable):
     def __repr__(self):
-        return f'user_id: {self.user_id}, shop_id: {self.shop_id}'
+        return f'user_id: {self.user_id}'
     api_key = Column(String, nullable=False)
     user_id = Column(Integer, ForeignKey('user.id'))
     user = relationship('User', back_populates='wb_tokens',

@@ -4,7 +4,7 @@ import re
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
-
+from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
@@ -835,14 +835,17 @@ class ShopMenu(TextWithKeyboard):
         self.count_active_advs = count_active_advs
         self.total_amount_for_day = total_amount_for_day
         user: User = self._wb_user_cabinet.user
-        tokens: list[WBToken] = user.wb_tokens
+        stmt = select(WBToken)
+        async with _sm(read_only=True) as session:
+            result = await session.execute(stmt)
+            tokens: list[WBToken] = result.scalars().all()
         wb_cabinet: WBCabinet = self._wb_cabinet
         work_tokens = []
         for token in tokens:
             try:
                 if token.shop_id == wb_cabinet.shop_id:
                     work_tokens.append(token)
-            except NotValideToken:
+            except NotValidTokenError:
                 logger.debug(f'Токен {token} не валиден')
                 continue
 
