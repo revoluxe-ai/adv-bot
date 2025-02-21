@@ -3,6 +3,7 @@ import datetime
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.client_bot import const
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
@@ -748,7 +749,7 @@ def get_return_to_adv_setting_keyboard(adv_original_id):
 def get_call_me_keyboard():
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text='Получить консультацию и тест-драйв бота',
-                                 url='https://t.me/skyline360_1')
+                                 url=f'{const.SUPPORT_LINK}')
     builder.row(button)
     return builder.as_markup()
 
@@ -756,7 +757,7 @@ def get_call_me_keyboard():
 def get_call_me_keyboard0():
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text='Связаться с разработчиком бота для консультации',
-                                  url='https://t.me/skyline360_1')
+                                  url=const.SUPPORT_LINK)
     builder.row(button)
     return builder.as_markup()
 
@@ -764,7 +765,7 @@ def get_call_me_keyboard0():
 def get_call_me_keyboard1():
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text='Заказать демо-доступ к боту',
-                                  url='https://t.me/skyline360_1')
+                                  url=const.SUPPORT_LINK)
     builder.row(button)
     return builder.as_markup()
 

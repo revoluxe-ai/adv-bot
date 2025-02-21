@@ -75,7 +75,7 @@ async def error_parsing_positions_handler(error_event: ErrorEvent, state: FSMCon
         chat_id = message.chat.id
     await bot.send_message(chat_id=chat_id,
                            text='Ошибка парсинга позиций. Попробуйте через время еще раз. '
-                            'Если ошибка будет повторяться, то обратитесь к администратору бота @skyline360_1')
+                            'Если ошибка будет повторяться, то обратитесь в поддержку -> ')
     await bot.send_message(admin_telegram_id, str(exception))
 
     async with sm() as session:
@@ -120,7 +120,7 @@ async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMCon
     else:
         chat_id = message.chat.id
     await bot.send_message(chat_id=chat_id,
-                           text='Ошибка получения карточки, обратитесь к администратору бота @skyline360_1')
+                           text=f'Ошибка получения карточки, обратитесь в поддержку -> {const.SUPPORT_LINK}')
     await bot.send_message(admin_telegram_id, str(exception))
     return
 
@@ -142,7 +142,7 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
                                 'и по прежнему выполняет свои функции. Проблема только в интерфейсе, а администратор'
                                 ' уже уведомлен о ней. Попробуйте выполнить нужное вам действие еще раз или вернитесь'
                                 ' в главное меню, через команду /start . Связаться с разработчиком вы можете по '
-                                'этому контакту: @skyline360_1')
+                                f'этому контакту: {const.SUPPORT_LINK}')
     trace_error = traceback.format_exc()
     logger.error(trace_error)
 

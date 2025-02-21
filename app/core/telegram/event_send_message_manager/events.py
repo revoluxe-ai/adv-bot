@@ -1,5 +1,7 @@
 from aiogram.exceptions import TelegramForbiddenError
 from sqlalchemy import select
+
+from app.client_bot import const
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
 from app.client_bot.bot import bot
@@ -28,7 +30,7 @@ class NotValidTokens:
                                            f' не действителен. Для продолжения работы обновите его в настройках бота. '
                                            f'Чтобы обновить токен, добавьте магазин заново под новым именем и введите новый токен.'
                                            f'Новый магазин создан не будет, а у старого магазина токен будет обновлен. '
-                                           f'Если возникли вопросы или вы считаете, что произошла ошибка и ваш токен в порядке, обратитесь к разработчику бота - > @skyline360_1')
+                                           f'Если возникли вопросы или вы считаете, что произошла ошибка и ваш токен в порядке, обратитесь в поддержку -> {const.SUPPORT_LINK}')
                 except TelegramForbiddenError:
                     continue
                 except Exception as e:
