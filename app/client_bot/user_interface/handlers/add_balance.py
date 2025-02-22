@@ -66,7 +66,7 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
         await message.answer(f"Введите сумму (число) от {min_sum} рублей")
         return
     amount = int(amount)
-    if amount < 300:
+    if amount < const.MIN_SUM:
         await message.answer(f"Введите сумму (число) от {min_sum}")
         return
     state_data = await state.get_data()

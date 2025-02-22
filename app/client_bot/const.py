@@ -2,7 +2,7 @@ PRICE_PER_MONTH = 4500
 EMAIL_FOR_PAYMENT_RECEIPT = 'revoluxe@gmail.com'
 
 CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'
-
+import os
 
 MAX_MESSAGE_LENGTH = 4096
 
@@ -45,7 +45,10 @@ ADMINS = [373435337, #я
 
 DEFAULT_BIDDER_STEP = 2
 
-min_sum = 300
+min_sum = int(os.getenv('MIN_SUM'))
+
+
+MIN_SUM = min_sum
 
 
 SUPPORT_LINK = 'https://t.me/Vadyanc'
