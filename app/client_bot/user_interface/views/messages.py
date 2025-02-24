@@ -775,7 +775,13 @@ class RefProgramSelect(TextWithKeyboard):
 class ShopMenu(TextWithKeyboard):
      parse_mode = ParseMode.HTML
 
-     def __init__(self, bot: Bot, chat_id: int, state: FSMContext, wb_user_cabinet_original_id: int):
+     def __init__(self, bot: Bot,
+                  chat_id: int,
+                  state: FSMContext,
+                  wb_user_cabinet_original_id: int,
+                  user_telegram_id: int
+                  ):
+       self._user_telegram_id = user_telegram_id
        self._state = state
        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
        super().__init__(bot, chat_id)
@@ -918,6 +924,7 @@ class ShopMenu(TextWithKeyboard):
 
      @property
      def keyboard(self):
+        user_telegram_id = self._user_telegram_id
         wb_user_cabinet = self._wb_user_cabinet
         wb_cabinet  = self._wb_cabinet
         is_active_adv = self.is_active_adv
@@ -954,14 +961,16 @@ class ShopMenu(TextWithKeyboard):
 
         builder.row(button)
         #
-        # button = InlineKeyboardButton(
-        #     text = 'Удалить личный кабинет магазина',
-        #     callback_data\
-        #         = callbacks.DeleteWbUserCabinet(
-        #         wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
-        # )
-        #
-        # builder.row(button)
+
+        if user_telegram_id in const.ADMINS:
+            button = InlineKeyboardButton(
+                text = 'Удалить личный кабинет магазина',
+                callback_data\
+                    = callbacks.DeleteWbUserCabinet(
+                    wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
+            )
+
+        builder.row(button)
 
         if is_active_adv:
             button = InlineKeyboardButton(

@@ -1,4 +1,8 @@
 from typing import Union
+
+from arq import create_pool
+from arq.connections import RedisSettings
+
 from . import messages
 from aiogram import Bot
 from aiogram.filters import StateFilter
@@ -14,7 +18,6 @@ from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabine
 from ..into_callback import CreateNewAdvs as CreateNewAdvsCallbackData
 from .states import CreateCompamyStates as states
 import logging
-from ...backend.tasks import create_complex_advs_task
 
 logger = logging.getLogger(__name__)
 
@@ -84,15 +87,19 @@ async def get_nmid(message: Message,
     async with sm() as session:
         result = await session.execute(stmt)
         shop_id = result.scalar()
-
+    redis_task_pool = await create_pool(RedisSettings())
     for nmid in nmid_list:
         try:
-            create_complex_advs_task.apply_async((nmid,
-                                                  shop_id,
-                                                  False,
-                                                  message.from_user.id))
+            await redis_task_pool.enqueue_job(
+                'create_complex_advs',
+                nmid,
+                shop_id,
+                False,
+                message.from_user.id
+
+            )
             logger.debug(f'Задача для артикула {nmid} успешно поставлена')
         except Exception as e:
             logger.error(f'Ошибка постановки задачи для артикула {nmid}: {e}')
-
+            raise e
     await bot.send_message(message.from_user.id, 'Задачи на создание рекламы добавлены в очередь. Ждите.')

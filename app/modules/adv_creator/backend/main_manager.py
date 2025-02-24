@@ -1,11 +1,12 @@
 import asyncio
+import functools
 
 from aiogram import Bot
-from sqlalchemy import select, or_, and_, exists
+from sqlalchemy import select, or_, and_
+from app.client_bot import const
 from app.utils.db.session_maker import get_async_session_maker as sm
-from app.core.wb_api.data_classes.card_from_wb import CardFromWB
-from app.core.wb_api.mixins.excs import NotCanDeleteAllProductsError, ItemCategoryNotInStockError, NotChangeError, \
-    AdvNotFoundInWBError
+from app.core.wb_api.mixins.excs import NotChangeError, \
+    AdvNotFoundInWBError, CardNotFoundInWB
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.core.wb_api.data_classes.adv import Balances
 from .exc import CardsNotFoundForShopError, ComplexAdvsExistsError, NotEnoughBalanceOnShopError, StartComplexAdvError
@@ -35,19 +36,70 @@ class MainAdvManager:
         return await self.wb_api.create_auto_adv(name, SubjectID, balance_type, start_status)
 
 
-    async def create_complex_advs(self, nmid: int, hard_mode) -> (int, int):
-        exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
-        if not exist_adv or hard_mode is True:
-            balances = await self.wb_api.get_adv_balances()
+    async def upcast_auto_adv(self, nmid: int, auto_adv_id, user_telegram_id: int):
+        await bot.send_message(user_telegram_id, f'Пытаюсь найти и настроить Авто-РК для артикула {nmid}')
+        start_delay = 10*60
+        global_max_attempts = 10
+        for attempt in range(global_max_attempts):
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    advs = (await self.wb_api.get_advs([auto_adv_id]))
+                    break
+                except AdvNotFoundInWBError:
+                    logger.info(f'Кампания {auto_adv_id} не найдена после создания, следующая попытка через {start_delay} секунд')
+                    await asyncio.sleep(start_delay)
+                    start_delay *= 2
+            else:
+                raise AdvNotFoundInWBError(f'Кампания {auto_adv_id} не найдена после создания в API,'
+                                           f' проверьте ее наличие в рекламном кабинете WB')
 
-            target_card = await self.wb_api.get_card_by_text(nmid)
+            adv = advs[0]
+            nmids_in_adv = adv.nmids
+            if  nmids_in_adv != [nmid]:
+                await bot.send_message(user_telegram_id, f'Артикулы в РК {adv.advertId},'
+                                                         f' не соответствуют артикулу {nmid}, '
+                                                         f' обновляю артикулы в РК {adv.advertId}')
+                nmids_for_add = list({nmid} - set(nmids_in_adv))
+                nmids_for_del = list(set(nmids_in_adv) - {nmid})
+                if nmid not in nmids_in_adv:
+                    try:
+                        await self.wb_api.update_nmids_in_adv(auto_adv_id, nmids_for_add, [])
+                    except Exception as exc:
+                        logger.error(exc, exc_info=True)
+                        pass
+                try:
+                    await self.wb_api.update_nmids_in_adv(auto_adv_id, [], nmids_for_del)
+                except Exception as exc:
+                    logger.error(exc, exc_info=True)
+                    pass
+                await asyncio.sleep(60 * 3)
+            else:
+                await bot.send_message(user_telegram_id, f'Артикулы в РК {adv.advertId},'
+                                                         f' соответствуют артикулу {nmid} согласно данным API '
+                                       f'Проверьте правильность в кабинете WB')
+                break
+
+
+    async def create_complex_advs(self, bot: Bot, user_telegram_id, nmid: int, hard_mode) -> (int, int):
+        exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
+        if not exist_adv or hard_mode is True or exist_adv.active_status in ['refused', 'done']:
+            balances = await self.wb_api.get_adv_balances()
+            try:
+                target_card = await self.wb_api.get_card_by_text(nmid)
+            except CardNotFoundInWB:
+                raise CardsNotFoundForShopError(f'Карточка с артикулом {nmid} не найдена на Wildberries')
+
             await wb_db_manager.update_cards_in_db([target_card], self.access.wb_cabinet)
 
             name = target_card.name
             new_adv_name = str(nmid) + ' ' + name
             new_adv_name = new_adv_name[:128]
+            try:
+                balance_type_int, balance_property_str = self._get_balance_type(balances)
+            except NotEnoughBalanceOnShopError:
+                raise NotEnoughBalanceOnShopError('Недостаточно средств на балансе')
 
-            balance_type_int, balance_property_str = self._get_balance_type(balances)
             subjectID = target_card.subjectID
             auto_adv_id: int = await self._create_auto_adv(
                 new_adv_name,
@@ -70,10 +122,10 @@ class MainAdvManager:
                 new_adv.search_adv_id = search_adv_id
                 new_adv.max_place = 1
                 new_adv.name = new_adv_name
-                new_adv.bidder_active = True
+                new_adv.bidder_active = False
                 new_adv.wb_cabinet = wb_cabinet
-                new_adv.parsing_active = True
-                new_adv.bot_active = True
+                new_adv.parsing_active = False
+                new_adv.bot_active = False
                 new_adv.active_status = 'created_by_bot'
                 new_adv.type = 8
                 new_adv.nmids = [nmid]
@@ -86,36 +138,28 @@ class MainAdvManager:
         else:
             auto_adv_id = exist_adv.adv_id
             search_adv_id = exist_adv.search_adv_id
-            logger.info(f'Кампания {auto_adv_id}, {search_adv_id} уже существует')
-
+            await bot.send_message(user_telegram_id, f'Кампания для артикула {nmid} уже существует :'
+                                                     f' Авто: {auto_adv_id}, Аукцион {search_adv_id},'
+                                                      f'Делаю попытку правильно настроить и запустить РК')
         try:
-             advs = (await self.wb_api.get_advs([auto_adv_id]))
-        except AdvNotFoundInWBError:
-            logger.info(f'Кампания {auto_adv_id} не найдена после создания')
-            raise AdvNotFoundInWBError(f'Кампания {auto_adv_id} не найдена после создания')
-        adv = advs[0]
-        nmids_in_adv = adv.nmids
-        if nmids_in_adv != [nmid]:
-            logger.error(f'Не соответствует цель ({nmid}) и факт: {nmids_in_adv}' )
-            nmids_for_add = list({nmid} - set(nmids_in_adv))
-            nmids_for_del = list(set(nmids_in_adv) - {nmid})
-            if nmid not in nmids_in_adv:
-                try:
-                    await self.wb_api.update_nmids_in_adv(auto_adv_id, nmids_for_add, [])
-                except Exception as exc:
-                    logger.error(exc, exc_info=True)
-                    pass
-            try:
-                await self.wb_api.update_nmids_in_adv(auto_adv_id, [], nmids_for_del)
-            except Exception as exc:
-                logger.error(exc, exc_info=True)
-                pass
-            await asyncio.sleep(60*3)
+            await self.upcast_auto_adv(nmid, auto_adv_id, user_telegram_id)
+        except AdvNotFoundInWBError as exc:
+            exc.auto_adv_id = auto_adv_id
+            exc.search_adv_id = search_adv_id
+            raise exc
+
+        await bot.send_message(user_telegram_id, f'Авто-РК для артикула {nmid} настроен, запускаю комплексную кампанию')
+        try:
             await self.start_complex_advs(nmid, auto_adv_id, search_adv_id)
-            return advs
-        else:
-            await self.start_complex_advs(nmid, auto_adv_id, search_adv_id)
-            return advs
+            await bot.send_message(user_telegram_id,
+            f'Отправлены запросы на запуск РК для артикула {nmid}, проверьте правильность запуска в кабинете WB: '
+            f'ID Авто-РК: {auto_adv_id}, ID Поисковой РК: {search_adv_id}')
+        except StartComplexAdvError as exc:
+            exc.auto_adv_id = auto_adv_id
+            exc.search_adv_id = search_adv_id
+            raise exc
+        return auto_adv_id, search_adv_id
+
 
 
     async def start_complex_advs(self, nmid,  auto_adv_id, search_adv_id):
@@ -130,18 +174,12 @@ class MainAdvManager:
             except:
                 logger.error('Ошибка запуска РК', exc_info=True)
                 continue
-        advs = await self.wb_api.get_advs([auto_adv_id, search_adv_id])
-
-        if any([adv.status_native != 'started' for adv in advs]):
-            raise StartComplexAdvError(f'Не удалось запустить Комплекс РК для артикула {nmid}'
-                                 f'Кампания {auto_adv_id}, {search_adv_id} не запущена')
-        else:
-            async with sm(read_only=False) as session:
-                stmt = select(AdvSetting).where(AdvSetting.adv_id == auto_adv_id)
-                result = await session.execute(stmt)
-                adv_setting: AdvSetting = result.scalar()
-                adv_setting.active_status = 'started'
-                await session.commit()
+        async with sm(read_only=False) as session:
+            stmt = select(AdvSetting).where(AdvSetting.adv_id == auto_adv_id)
+            result = await session.execute(stmt)
+            adv_setting: AdvSetting = result.scalar()
+            adv_setting.active_status = 'started'
+            await session.commit()
 
 
 

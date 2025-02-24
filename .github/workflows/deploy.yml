@@ -23,6 +23,7 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
 
     steps:
+
       - name: Login to Yandex Cloud Container Registry
         run: |
           echo ${{ secrets.YC_OAUTH_TOKEN }} | docker login \
@@ -32,20 +33,16 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-docker-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-docker-
+
+      - name: List repository files
+        run: ls -la
 
       - name: Build Docker image
         run: |
           echo "Building image: cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}"
           docker build --cache-from=cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest \
             -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} \
-            -f ${{ matrix.dockerfile }} .
+            -f ${{ matrix.dockerfile }} ./dockers
 
       - name: Push Docker image to Registry
         run: |
