@@ -21,32 +21,24 @@ jobs:
       CR_REGISTRY: crp8gok4kl514qunoimr
       CR_REPOSITORY: ${{ matrix.repo_name }}
       IMAGE_TAG: ${{ github.sha }}
+      LATEST_TAG: latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Login to Yandex Cloud Container Registry
         run: |
-          echo ${{ secrets.YC_OAUTH_TOKEN }} | docker login \
-            --username oauth \
-            --password-stdin \
-            cr.yandex
+          echo "${{ secrets.YC_OAUTH_TOKEN }}" | docker login --username oauth --password-stdin cr.yandex
 
-      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-docker-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-docker-
-
-      - name: Build Docker image
+      - name: Build and push Docker image
         run: |
-          echo "Building image: cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}"
-          docker build --cache-from=cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:latest \
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
             -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} \
+            -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${LATEST_TAG} \
             -f ${{ matrix.dockerfile }} .
-
-      - name: Push Docker image to Registry
-        run: |
-          docker push cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG}
