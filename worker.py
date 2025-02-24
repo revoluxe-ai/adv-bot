@@ -1,8 +1,7 @@
 import dotenv
-
+dotenv.load_dotenv()
 from app.settings import settings
 
-dotenv.load_dotenv()
 import logging
 from python_modules.logger import setup_logging
 from arq.connections import RedisSettings
@@ -13,6 +12,11 @@ from app.modules.adv_creator.backend.tasks import create_complex_advs
 # Настраиваем логирование
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+arq_redis_settings = RedisSettings(
+        host=settings.REDIS_MASTER_HOST
+    )
 
 async def startup(ctx):
     """Инициализация бота при запуске воркера."""
@@ -32,12 +36,9 @@ class WorkerSettings:
     functions = [
         create_complex_advs,
     ]
-    redis_settings = RedisSettings(
-        host=settings.REDIS_MASTER_HOST
-    )
+    redis_settings = arq_redis_settings
     on_startup = startup
     on_shutdown = shutdown
     keep_jobs = 86400  # Храним задачи в Redis 24 часа
     max_tries = 10 # Максимальное число попыток
     job_timeout = 86400   #максимальное время на выполнение задачи
-

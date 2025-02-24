@@ -1,7 +1,7 @@
 from typing import Union
 
 from arq import create_pool
-from arq.connections import RedisSettings
+from worker import arq_redis_settings
 
 from . import messages
 from aiogram import Bot
@@ -87,7 +87,7 @@ async def get_nmid(message: Message,
     async with sm() as session:
         result = await session.execute(stmt)
         shop_id = result.scalar()
-    redis_task_pool = await create_pool(RedisSettings())
+    redis_task_pool = await create_pool(arq_redis_settings)
     for nmid in nmid_list:
         try:
             await redis_task_pool.enqueue_job(
