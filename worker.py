@@ -1,4 +1,7 @@
 import dotenv
+
+from app.settings import settings
+
 dotenv.load_dotenv()
 import logging
 from python_modules.logger import setup_logging
@@ -29,7 +32,9 @@ class WorkerSettings:
     functions = [
         create_complex_advs,
     ]
-    redis_settings = RedisSettings()
+    redis_settings = RedisSettings(
+        host=settings.REDIS_MASTER_HOST
+    )
     on_startup = startup
     on_shutdown = shutdown
     keep_jobs = 86400  # Храним задачи в Redis 24 часа
