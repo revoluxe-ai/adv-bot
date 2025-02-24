@@ -3,7 +3,8 @@ FROM python:3.11
 # Установка рабочего каталога
 WORKDIR /app
 
-COPY linux_requirements.txt ./
+# Копирование только файла зависимостей (requirements.txt)
+COPY requirements.txt ./
 
 # Установка необходимых библиотек
 RUN apt-get update && apt-get install -y \
@@ -31,7 +32,7 @@ RUN apt-get update && apt-get install -y \
 RUN python -m venv /app/venv
 
 # Активируем виртуальное окружение и устанавливаем зависимости
-RUN /bin/bash -c "source /app/venv/bin/activate && pip install -r linux_requirements.txt"
+RUN /bin/bash -c "source /app/venv/bin/activate && pip install -r requirements.txt"
 
 # Настройка cron для запуска logrotate
 RUN echo "*/5 * * * * /usr/sbin/logrotate /etc/logrotate.conf" > /etc/cron.d/logrotate && \
