@@ -1,103 +1,61 @@
-import asyncio
 import logging
-from celery import shared_task
-from aiogram.exceptions import TelegramRetryAfter
-from app.client_bot.bot import get_bot
+from app.client_bot import const
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
 from app.modules.adv_creator import backend
-from app.modules.adv_creator.backend import MainAdvManager
+from app.modules.adv_creator.backend import MainAdvManager, CardsNotFoundForShopError
+from arq import Retry
+from app.modules.adv_creator.backend.exc import NotEnoughBalanceOnShopError, StartComplexAdvError
 
 logger = logging.getLogger(__name__)
-from app.core.wb_api.mixins.excs  import ItemCategoryNotInStockError
-from app.core.wb_api.mixins.excs import CardNotFoundInWB
-from app.core.wb_api.exceptions import ApiForbiddenError, TooManyRequests
 
 
-async def _create_complex_advs(nmid: int, shop_id: str, hard_mode: bool):
+async def create_complex_advs(ctx, nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int):
+    try:
+        await _create_complex_advs(ctx, nmid, shop_id, hard_mode, user_telegram_id)
+    except Exception:
+        delay = 1
+        logger.error(f'Ошибка задачи create_complex_advs, повтор через {delay} сек')
+        raise Retry(defer=delay)
+
+
+
+async def _create_complex_advs(ctx, nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int):
+    bot = ctx["bot"]
     access = await backend.access_manager.get_access_for_wb_cabinet(shop_id)
     manager = MainAdvManager(access)
-    while True:
-        try:
-            adv_adv: int = await manager.create_complex_advs(nmid, hard_mode)
-            logger.debug(f'Создана РК adv_adv: {adv_adv}')
-            return  adv_adv
-        except backend.CardsNotFoundForShopError as exc:
-            raise exc
-        except ItemCategoryNotInStockError as e:
-            raise e
-        except AdvNotFoundInWBError as exc:
-            logger.debug(f'Не найдено рк в Wildberries для {nmid} {shop_id}, повтор через 60 сек')
-            await asyncio.sleep(60)
-        except ApiForbiddenError:
-            raise
-        except TooManyRequests:
-            logger.error(f'Слишком много запросов к Wildberries, повтор через 1 минуту')
-            await asyncio.sleep(60)
-        except CardNotFoundInWB:
-            logger.error(f'Карточка с артикулом {nmid} не найдена на Wildberries')
-            raise
-        except Exception as exc:
-            logger.error(f'Ошибка при создании комплексной рк для артикула {nmid}', exc_info=True)
-            await asyncio.sleep(60 * 3)
-
-
-def get_event_loop():
+    await bot.send_message(user_telegram_id, f'Создаю комплексную кампанию для артикула {nmid}')
     try:
-        return asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop
+        auto_adv_id, search_adv_id =  await manager.create_complex_advs(bot,
+                                                     user_telegram_id,
+                                                     nmid,
+                                                     hard_mode)
+
+        await bot.send_message(user_telegram_id, f'Комплексная кампания для артикула {nmid} создана,'
+                                                 f' ID Авто-РК: {auto_adv_id},'
+                                                 f' ID Поисковой РК: {search_adv_id}'
+                                                 f' Проверьте: нет ли в Авто-кампании артикулов больше, чем должно быть. '
+                                                 f'Если это так, то пожалуйста, удалите лишние артикулы сами и сообщите '
+                                                 f'об этом инциденте в поддержку {const.SUPPORT_LINK}  Спасибо!',
+                                                disable_web_page_preview=True)
+    except CardsNotFoundForShopError:
+        await bot.send_message(user_telegram_id, f'Карточка с артикулом {nmid} не найдена на Wildberries,'
+                                                 f'проверьте правильность артикула!')
+
+    except NotEnoughBalanceOnShopError:
+        await bot.send_message(user_telegram_id, 'Недостаточно средств на балансе для пополнения РК при создании')
 
 
-
-@shared_task(time_limit=12 * 60 * 60)
-def create_complex_advs_task(nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int):
-    send_user_message.delay(f'Начинаю создавать комплекс кампаний для артикула {nmid}',
-                            user_telegram_id)
-    try:
-        loop = get_event_loop()
-        adv_id = loop.run_until_complete(_create_complex_advs(nmid, shop_id, hard_mode))
-        send_user_message.delay(f'Кампания успешно создана, ID авто {adv_id}',
-                                user_telegram_id)
-    except CardNotFoundInWB:
-        send_user_message.delay(f'Карточка с артикулом {nmid} не найдена на Wildberries',
-                                user_telegram_id)
-        return
-    except ApiForbiddenError:
-        send_user_message.delay('Нет нужных прав. Добавьте магазин с правильным токеном под новым именем',
-                                user_telegram_id)
-    except ItemCategoryNotInStockError:
-        send_user_message.delay(f'Нет остатков у артикула {nmid}', user_telegram_id)
-    except backend.CardsNotFoundForShopError:
-        logger.error(f'Карточка с артикулом {nmid} не найдена на Wildberries')
-        send_user_message.delay(f'Карточка с артикулом {nmid} не найдена на Wildberries')
-    except Exception as e:
-        logger.error(f"Task failed: {str(e)}", exc_info=True)
-        raise
-
-async def _send_user_message(message: str, user_telegram_id: int):
-    bot = get_bot()
-    try:
-        await bot.send_message(user_telegram_id, message)
-        await asyncio.sleep(0.5)
-        await bot.session.close()
-    except Exception as e:
-        raise e
+    except AdvNotFoundInWBError as exc:
+        auto_adv_id = exc.auto_adv_id
+        await bot.send_message(user_telegram_id, f'Не удалось правильно настроить авто-РК для {nmid}, '
+                                                 f'ID Авто {auto_adv_id} не найден после создания. Попробуйте '
+                                                 f'самостоятельно найти нет ли новой РК в кабинете WB и '
+                                                 f'обратитесь в поддержку -> {const.SUPPORT_LINK}')
 
 
-@shared_task(
-    bind=True,
-    max_retries=5,
-    retry_backoff=True,  # Включает экспоненциальный рост времени повтора
-    retry_backoff_max=600  # Максимум 10 минут
-)
-def send_user_message(self, message: str, user_telegram_id: int):
-    loop = get_event_loop()
-    try:
-        loop.run_until_complete(_send_user_message(message, user_telegram_id))
-    except TelegramRetryAfter as e:
-        retry_after = e.retry_after or 600  # Устанавливаем задержку
-        raise self.retry(countdown=retry_after)
-    except Exception as e:
-        raise e
+    except StartComplexAdvError as exc:
+        auto_adv_id = exc.auto_adv_id
+        search_adv_id = exc.search_adv_id
+        await bot.send_message(user_telegram_id, f'Произошла ошибка при попытке запустить РК (Авто - {auto_adv_id} и Аукцион - {search_adv_id}) проверьте'
+                                                 f' самостоятельно запустились ли кампании и правильность их создания,'
+                                                 f' а также при необходимости обратитесь в поддержку -> {const.SUPPORT_LINK}')

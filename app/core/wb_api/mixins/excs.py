@@ -1,3 +1,4 @@
+from typing import Optional
 
 
 class StartAdvError(Exception):
@@ -28,4 +29,5 @@ class NotChangeError(Exception):
 
 
 class AdvNotFoundInWBError(Exception):
-    pass
+    auto_adv_id: Optional[int] = None
+    search_adv_id: Optional[int] = None

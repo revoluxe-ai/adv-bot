@@ -4,7 +4,7 @@ FROM python:3.11
 WORKDIR /app
 
 # Копирование только файла зависимостей (requirements.txt)
-COPY requirements.txt ./
+COPY linux_requirements.txt  ./requirements.txt
 
 # Установка необходимых библиотек
 RUN apt-get update && apt-get install -y \
