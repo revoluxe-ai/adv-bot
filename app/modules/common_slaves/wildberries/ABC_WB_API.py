@@ -37,7 +37,6 @@ class Headers:
 
 
 class ABC_WB_API(WbRequestApiMixin):
-    HOST = 'https://suppliers-api.wildberries.ru/'
     current_path = os.path.dirname(os.path.abspath(__file__))
 
     ORDERS_REPORTS_FOLDER = os.path.join(current_path, 'WB_orders_reports')

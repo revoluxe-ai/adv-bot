@@ -449,7 +449,7 @@ class ContentApi(ABC_WB_API):
     _only_read = api_rights.OnlyRead.FALSE
     _rights: set = {api_rights.Rights.CONTENT}
 
-
+    HOST = 'https://content-api.wildberries.ru'
     async def get_subcategories(self):
         @try_except_decorator(1, 1)
         async def request(session, url)-> list[Subcategory]:
