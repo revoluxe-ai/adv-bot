@@ -239,7 +239,7 @@ class async_WBApi(ABC_WB_API):
     async def get_cards(self, success_event:asyncio.Event = None,
                         error_event: asyncio.Event = None ) -> list[CardFromWB]:
         limit = 1000
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        url = f'{self.HOST}/content/v2/get/cards/list'
         data_for_req = {
             "settings": {
                 "sort": {
