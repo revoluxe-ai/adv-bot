@@ -506,7 +506,7 @@ class ContentApi(ABC_WB_API):
 
     @try_except_decorator(1, 2)
     async def get_card_by_text(self, text: Union[str, int]):
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        url = f'{self.HOST}/content/v2/get/cards/list'
         text = str(text)
         data_for_req = {
             "settings": {
@@ -544,7 +544,7 @@ class ContentApi(ABC_WB_API):
     ) -> dict:
         """Возвращает список товаров на Wildberries. """
 
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+        url = f'{self.HOST}/content/v2/get/cards/list'
 
         limit = 100
 
