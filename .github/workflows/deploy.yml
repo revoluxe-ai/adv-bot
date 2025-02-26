@@ -37,6 +37,7 @@ jobs:
       - name: Build and push Docker image
         run: |
           docker buildx build \
+            --no-cache \
             --platform=linux/amd64 \
             --push \
             -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} \
