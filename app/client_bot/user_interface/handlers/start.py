@@ -1,3 +1,4 @@
+import asyncio
 from operator import and_
 from typing import Union
 import aiogram
@@ -399,7 +400,7 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
     shop_updater = ShopDataUpdater(access)
     try:
-        await shop_updater.update_all_data()
+        await asyncio.wait_for(shop_updater.update_all_data(), timeout=10*60)
     except:
         await bot.send_message(callback_query.message.chat.id,
                                f'Ошибка при обновлении данных, обратитесь в поддержку {const.SUPPORT_LINK}')
