@@ -41,8 +41,12 @@ async def _create_complex_advs(ctx, nmid: int, shop_id: str, hard_mode: bool, us
         await bot.send_message(user_telegram_id, f'Карточка с артикулом {nmid} не найдена на Wildberries,'
                                                  f'проверьте правильность артикула!')
 
-    except NotEnoughBalanceOnShopError:
-        await bot.send_message(user_telegram_id, 'Недостаточно средств на балансе для пополнения РК при создании')
+    except NotEnoughBalanceOnShopError as exc:
+        adv_id = exc.adv_id
+        await bot.send_message(user_telegram_id, f'Недостаточно средств на балансе shop id: {shop_id}'
+                                                 f' для пополнения РК для артикула {nmid} '
+                                                 f'ADV ID кампанию, которую не смогли пополнить: {adv_id}'
+)
 
 
     except AdvNotFoundInWBError as exc:

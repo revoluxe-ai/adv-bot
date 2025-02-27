@@ -13,7 +13,7 @@ class ComplexAdvsExistsError(Exception):
 
 
 class NotEnoughBalanceOnShopError(Exception):
-    pass
+    adv_id: Optional[int] = None
 
 
 class StartComplexAdvError(Exception):

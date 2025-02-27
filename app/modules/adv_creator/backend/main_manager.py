@@ -97,8 +97,8 @@ class MainAdvManager:
             new_adv_name = new_adv_name[:128]
             try:
                 balance_type_int, balance_property_str = self._get_balance_type(balances)
-            except NotEnoughBalanceOnShopError:
-                raise NotEnoughBalanceOnShopError('Недостаточно средств на балансе')
+            except NotEnoughBalanceOnShopError as exc:
+                raise exc
 
             subjectID = target_card.subjectID
             auto_adv_id: int = await self._create_auto_adv(

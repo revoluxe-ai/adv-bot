@@ -71,33 +71,33 @@ class TokenRightChecker(WbRequestApiMixin):
         logger.debug('Проверка прав на рекламу завершена')
 
 
-     @try_except_decorator(1, 1, max_attempts=50, max_delay=120)
-     async def content(self):
-        logger.debug('Проверка прав на контент')
-        limit = 1
-        url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
-        data_for_req = {
-            "settings": {
-                "sort": {
-                    "ascending": False
-                },
-                "cursor": {
-                    "limit": limit
-                },
-                "filter": {
-                    "withPhoto": -1,
-                }
-            }
-        }
-        async with aiohttp.ClientSession() as session:
-            await requests(
-                session,
-                'POST',
-                url,
-                json_data=data_for_req,
-                headers=self.headers.standart
-            )
-
-        logger.debug('Проверка прав на контент завершена')
+     # @try_except_decorator(1, 1, max_attempts=50, max_delay=120)
+     # async def content(self):
+     #    logger.debug('Проверка прав на контент')
+     #    limit = 1
+     #    url = 'https://suppliers-api.wildberries.ru/content/v2/get/cards/list'
+     #    data_for_req = {
+     #        "settings": {
+     #            "sort": {
+     #                "ascending": False
+     #            },
+     #            "cursor": {
+     #                "limit": limit
+     #            },
+     #            "filter": {
+     #                "withPhoto": -1,
+     #            }
+     #        }
+     #    }
+     #    async with aiohttp.ClientSession() as session:
+     #        await requests(
+     #            session,
+     #            'POST',
+     #            url,
+     #            json_data=data_for_req,
+     #            headers=self.headers.standart
+     #        )
+     #
+     #    logger.debug('Проверка прав на контент завершена')
 
 
