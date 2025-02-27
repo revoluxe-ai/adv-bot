@@ -21,21 +21,22 @@ from app.modules import shop_runner
 logger = logging.getLogger(__name__)
 
 
-async def run_hard_processes():
+async def update_cards_in_neo4j_and_update_keywords_ctr_by_similary_run():
     from app.modules.wb_adv_updater import hard_ml_data_updater_process as hard_data_manager
 
     while True:
         try:
             await asyncio.gather(
-                hard_data_manager.run_update_data_in_neo4j(),
-                                 hard_data_manager.update_keywords_ctr_by_similary())
+                hard_data_manager.run_update_cards_data_in_neo4j(),
+                                 hard_data_manager.update_keywords_ctr_by_similary()
+            )
         except:
             logger.error('Ошибка хард процессов', exc_info=True)
         await asyncio.sleep(60)
 
 
 run_own_process_list = [
-     run_hard_processes,
+     update_cards_in_neo4j_and_update_keywords_ctr_by_similary_run,
      keywords_parsing_process,
      run_update_all_keywords_on_wb,
       run_main_coroutines,

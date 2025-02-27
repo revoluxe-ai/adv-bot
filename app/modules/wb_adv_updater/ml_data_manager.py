@@ -175,7 +175,7 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
 
 
 
-async def update_wb_adv_phrase_in_db():
+async def update_wb_adv_phrase_in_neo4j():
     while True:
        try:
            await update_wb_adv_phrase_in_neo_small_cycle()

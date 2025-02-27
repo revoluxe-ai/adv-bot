@@ -5,12 +5,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-async def run_update_data_in_neo4j():
-    from . import ml_data_manager
+async def run_update_cards_data_in_neo4j():
     await asyncio.gather(
             update_cards_in_graph_small_cycle(),
             update_cards_in_graph_big_cycle(),
-            ml_data_manager.update_wb_adv_phrase_in_db(),
 
         )
 
