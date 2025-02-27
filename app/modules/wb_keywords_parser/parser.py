@@ -494,8 +494,8 @@ semaphore = asyncio.Semaphore(max_threads)
 
 async def limited_add_wb_positions(text:str,
                                    need_nmids: set[int],
-                                   last_view,
-                                   adv_id,
+                                   last_view: typing.Optional[int],
+                                   adv_id: int,
                                    max_page: int):
     try:
         await add_wb_positions(text, need_nmids, 1, max_page)
