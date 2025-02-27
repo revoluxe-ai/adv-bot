@@ -193,5 +193,12 @@ class Settings:
         value = os.environ.get('YOOKASSA_TOKEN')
         return value
 
+    @property
+    def MIN_SUM(self):
+        value = int(os.getenv('MIN_SUM'))
+        return value
+
+
+
 
 settings = Settings()

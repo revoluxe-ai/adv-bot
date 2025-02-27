@@ -1,3 +1,5 @@
+from app import settings
+
 PRICE_PER_MONTH = 4500
 EMAIL_FOR_PAYMENT_RECEIPT = 'revoluxe@gmail.com'
 
@@ -45,7 +47,7 @@ ADMINS = [373435337, #я
 
 DEFAULT_BIDDER_STEP = 2
 
-min_sum = int(os.getenv('MIN_SUM'))
+min_sum = settings.MIN_SUM
 
 
 MIN_SUM = min_sum
