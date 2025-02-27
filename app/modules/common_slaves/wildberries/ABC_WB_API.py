@@ -38,7 +38,6 @@ class Headers:
 
 class ABC_WB_API(WbRequestApiMixin):
     current_path = os.path.dirname(os.path.abspath(__file__))
-
     ORDERS_REPORTS_FOLDER = os.path.join(current_path, 'WB_orders_reports')
     DISCOUNT_REPORTS_FOLDER = os.path.join(current_path, 'WB_discount_reports')
     DB_NAME = os.path.join(current_path, 'stoks_from_site.db')
