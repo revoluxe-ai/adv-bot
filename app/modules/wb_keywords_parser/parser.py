@@ -516,7 +516,7 @@ async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
         logger.debug("Открытие сессии для выполнения запросов к базе данных.")
 
         stmt = select(AdvSetting).where(
-            AdvSetting.parsing_active == True,
+            AdvSetting.bot_active == True,
         )
         logger.debug("Формирование запроса для выбора активных рекламных кампаний.")
 
