@@ -204,7 +204,6 @@ async def run_update_model():
 
 async def main_loop():
     await asyncio.gather(
-        sender_message_to_not_pay_users(),
         process_payment_for_advs(),
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),

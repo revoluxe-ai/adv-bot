@@ -22,8 +22,10 @@ delay = 60*60*24  # 1 day
 
 async def send_message_to_user(bot, user_telegram_id: int):
     message = messages.NotAnyUsesAndNotMoneyOnBalance(bot, user_telegram_id)
+    logger.debug(f'Отправляю сообщение для {user_telegram_id}')
     await message()
     await redis_manager.reset_last_user_use_time(user_telegram_id)
+    logger.debug(f'Отправил сообщение сбросил использование для {user_telegram_id}')
 
 
 async def send_messages_to_users():
