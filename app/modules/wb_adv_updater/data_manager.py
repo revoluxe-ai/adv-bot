@@ -773,6 +773,8 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
         keywords =  await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
     else:
         keywords =  await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
+    for kw in keywords:
+        kw.predict_ctr_exponent = adv.exponent_predict_ctr
     keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
     keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
     keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]

@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
+from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingCallback
 from app.client_bot import const
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
@@ -504,10 +504,14 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                        page=page,).pack())]
     bottoms.append(bottom)
 
-    # botton = [InlineKeyboardButton(text='Обновить статистику',
-    #           ]
+    adv_id = adv_setting.adv_id
 
+    button = [InlineKeyboardButton(
+        text='Изменить экспоненту прог. ctr',
+        callback_data=ChangeExponentSettinginAdvSettingCallback(adv_id=adv_id).pack()
+    )]
 
+    bottoms.append(button)
 
     botton = [InlineKeyboardButton(text='Фильтр по прогнозируемым показам'
                                    , callback_data=callbacks.SettingKeywords(

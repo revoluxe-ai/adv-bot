@@ -251,6 +251,10 @@ class AdvSetting(BaseTable):
     reset_place = mapped_column(Boolean, nullable=True, default=True)
     _search_adv_id = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=DEFAULT_BIDDER_STEP)
+    exponent_predict_ctr = mapped_column(Float,
+                                         nullable=False,
+                                         default=3,
+                                         server_default='3')
 
 
     __table_args__ = (
