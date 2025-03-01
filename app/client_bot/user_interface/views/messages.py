@@ -76,13 +76,14 @@ class ShopChoice(TextWithKeyboard):
                  all_shops: list[WBUserCabinet]):
         super().__init__(bot, chat_id)
         self.__all_shops = all_shops
+        self.user_telegram_id = chat_id
 
 
 
 
     @property
     def text(self):
-        return get_main_text()
+        return get_main_text(self.user_telegram_id)
 
 
     @property
