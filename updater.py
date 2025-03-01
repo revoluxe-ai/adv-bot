@@ -39,7 +39,6 @@ run_own_process_list = [
      update_cards_in_neo4j_and_update_keywords_ctr_by_similary_run,
      run_update_all_keywords_on_wb,
       run_main_coroutines,
-     shop_runner.run,
 
 ]
 
