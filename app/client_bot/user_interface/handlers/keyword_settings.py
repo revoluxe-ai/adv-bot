@@ -75,7 +75,6 @@ async def setting_keywords_active_keywords(callback: CallbackQuery,
         await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
         return
 
-    await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(
         bot,
         chat_id,
