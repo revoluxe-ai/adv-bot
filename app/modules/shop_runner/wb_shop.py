@@ -142,13 +142,25 @@ class WBShop:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
                 await asyncio.sleep(1)
 
-    async def _run(self):
+    async def _update_cpm_run(self):
         while True:
            try:
                await self._update_cpm_bid()
            except Exception as e:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
                 await asyncio.sleep(1)
+
+
+
+    async def _run(self):
+        await asyncio.gather(self._update_cpm_run(),)
+
+
+
+
+
+
+
 
 
     async def run(self):
