@@ -14,10 +14,10 @@ jobs:
             repo_name: wb-adv-bot
             dockerfile: ./dockers/Dockerfile
     env:
-      CR_REPOSITORY: wb-adv-bot  # Здесь указывается сам репозиторий, в вашем случае 'wb-adv-bot'
+      CR_REPOSITORY: ${{ matrix.repo_name }}   # Название репозитория, например, wb-adv-bot
       IMAGE_TAG: ${{ github.sha }}
       LATEST_TAG: latest
-      HARBOR_REGISTRY: harbor.skyline360.ru  # Ваш Harbor Registry
+      HARBOR_REGISTRY: harbor.skyline360.ru       # Ваш Harbor Registry
 
     steps:
       - name: Checkout repository
@@ -34,8 +34,10 @@ jobs:
         run: |
           docker buildx build \
             --no-cache \
+            --progress=plain \
             --platform=linux/amd64 \
             --push \
             -t ${{ env.HARBOR_REGISTRY }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
             -t ${{ env.HARBOR_REGISTRY }}/${{ env.CR_REPOSITORY }}:${{ env.LATEST_TAG }} \
             -f ${{ matrix.dockerfile }} .
+      
