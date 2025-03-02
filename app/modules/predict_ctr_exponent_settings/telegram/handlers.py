@@ -2,7 +2,7 @@ from aiogram import Router, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from sqlalchemy import update, select
+from sqlalchemy import select
 
 from app.client_bot import utils
 from app.client_bot.user_interface.handlers.start import start_registration

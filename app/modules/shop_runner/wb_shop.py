@@ -1,11 +1,9 @@
 import asyncio
 import logging
-import typing
 from functools import wraps
 from typing import Optional
 from datetime import datetime
-
-from app.utils import redis_manager
+from app.modules.shop_runner.wb_statistic_manager.backend.stat_manager import WBCommonStatManager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.shop_runner.bidder.wb_api import WBApi
@@ -150,30 +148,30 @@ class WBShop:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
                 await asyncio.sleep(1)
 
+    async def __update_common_sale_stat(self):
+        await self._update_advs_models()
+        all_nmids = [adv.nmids[0] for adv in self._adv_settings]
+        await self._update_access()
+        wb_stat_manager =  WBCommonStatManager(self.__access)
+        await wb_stat_manager.update_common_statistic(all_nmids)
 
+
+    async def _update_common_sale_stat(self):
+        while True:
+            try:
+               await self.__update_common_sale_stat()
+            except Exception:
+                logger.error('Ошибка обновления общей статистики', exc_info=True)
+            finally:
+                await asyncio.sleep(60*15)
 
     async def _run(self):
-        await asyncio.gather(self._update_cpm_run(),)
-
-
-
-
-
-
-
+        await asyncio.gather(
+            # self._update_cpm_run(),
+            self._update_common_sale_stat()
+        )
 
 
     async def run(self):
         await self._update_access()
         await self._run()
-
-
-
-
-
-
-
-
-
-
-

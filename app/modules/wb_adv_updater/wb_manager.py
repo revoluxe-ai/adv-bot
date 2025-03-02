@@ -20,7 +20,6 @@ from app.my_types import KeywordStat
 from app.utils.NeoDataScience.driver import DataScience
 from app.modules.common_slaves.wildberries.models import WBCabinet
 import asyncio
-from app.admin_bot.sender import messages
 import pandas as pd
 from sqlalchemy import and_
 from sqlalchemy.orm import joinedload, selectinload

@@ -1,0 +1,82 @@
+import json
+
+import aiohttp
+from app.core.wb_api.interface import InterfaceWBAPI
+from app.core.wb_api.http_request import try_except_decorator, requests
+from datetime import datetime, timedelta
+from .wb_statistic_obj import CommonStat
+
+
+class CommonStatMinix(InterfaceWBAPI):
+
+    HOST = 'https://seller-analytics-api.wildberries.ru'
+
+    async def _get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int):
+        """
+        Получить статистику по карточкам товаров за указанный промежуток времени.
+
+        :param nmIDs: Список идентификаторов товаров (nmID).
+        :param pass_days: Количество дней, за которые нужна статистика.
+        :return: Статистика по товарам.
+        """
+
+        assert len(nmIDs) <= 20  # Ограничение по количеству товаров
+
+        # Определим дату начала и окончания для периода
+        end_date = datetime.today().date()
+        start_date = end_date - timedelta(days=pass_days)
+
+        data_for_req = {
+            "nmIDs": nmIDs,
+            "period": {
+                "begin": start_date.isoformat(),
+                "end": end_date.isoformat(),
+            },
+            "timezone": "Europe/Moscow",
+            "aggregationLevel": "day"
+        }
+
+        url = f'{self.HOST}/api/v2/nm-report/detail/history'
+
+        async with aiohttp.ClientSession() as session:
+            response = await requests(session, 'POST', url=url,
+
+                                      json_data=data_for_req,
+                                      headers=self.headers.standart)
+
+            response = json.loads(response)
+            stats = []
+            for data in response['data']:
+                for history in data['history']:
+                    stat = CommonStat(
+                        nmid=data['nmID'],
+                        date=datetime.strptime(history['dt'], '%Y-%m-%d'),
+                        open_card=history['openCardCount'],
+                        add_to_cart=history['addToCartCount'],
+                        orders=history['ordersCount'],
+                        orders_sum=history['ordersSumRub'],
+                        buy_outs=history['buyoutsCount'],
+                        )
+                    stats.append(stat)
+        return stats
+
+    @try_except_decorator(3, 60)
+    async def get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int) -> list[CommonStat]:
+        """
+        Разбивает запрос на несколько частей, если nmIDs больше 20, и вызывает _get_cards_stats_by_days.
+
+        :param nmIDs: Список идентификаторов товаров (nmID).
+        :param pass_days: Количество дней, за которые нужно получить статистику.
+        :return: Статистика по товарам.
+        """
+
+        part = 20  # Максимальное количество товаров в одном запросе
+        results = []
+
+        # Разделение nmIDs на части по 20 товаров
+        for i in range(0, len(nmIDs), part):
+            part_nmids = nmIDs[i:i + part]
+            result: list[CommonStat] = await self._get_cards_stats_by_days(part_nmids, pass_days)
+            results.extend(result)
+
+        return results
