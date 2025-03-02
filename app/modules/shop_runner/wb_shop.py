@@ -167,7 +167,7 @@ class WBShop:
 
     async def _run(self):
         await asyncio.gather(
-            # self._update_cpm_run(),
+            self._update_cpm_run(),
             self._update_common_sale_stat()
         )
 
