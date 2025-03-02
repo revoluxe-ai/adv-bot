@@ -11,25 +11,21 @@ jobs:
       matrix:
         include:
           - service: common-wb-adv-bot
-            repo_name: common-wb-adv-bot
+            repo_name: wb-adv-bot
             dockerfile: ./dockers/Dockerfile
-
-    container:
-      image: atnartur/yc:latest
-
     env:
-      CR_REGISTRY: crp8gok4kl514qunoimr
-      CR_REPOSITORY: ${{ matrix.repo_name }}
+      CR_REPOSITORY: wb-adv-bot  # Здесь указывается сам репозиторий, в вашем случае 'wb-adv-bot'
       IMAGE_TAG: ${{ github.sha }}
       LATEST_TAG: latest
+      HARBOR_REGISTRY: harbor.skyline360.ru  # Ваш Harbor Registry
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Login to Yandex Cloud Container Registry
+      - name: Login to Harbor registry
         run: |
-          echo "${{ secrets.YC_OAUTH_TOKEN }}" | docker login --username oauth --password-stdin cr.yandex
+          echo "${{ secrets.HARBOR_PASSWORD }}" | docker login ${{ env.HARBOR_REGISTRY }} --username ${{ secrets.HARBOR_USERNAME }} --password-stdin
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -40,6 +36,6 @@ jobs:
             --no-cache \
             --platform=linux/amd64 \
             --push \
-            -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${IMAGE_TAG} \
-            -t cr.yandex/${CR_REGISTRY}/${CR_REPOSITORY}:${LATEST_TAG} \
+            -t ${{ env.HARBOR_REGISTRY }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
+            -t ${{ env.HARBOR_REGISTRY }}/${{ env.CR_REPOSITORY }}:${{ env.LATEST_TAG }} \
             -f ${{ matrix.dockerfile }} .
