@@ -40,18 +40,19 @@ async def set_new_exponent_for_predict_ctr(message: Message,
         await state.set_state(None)
         await start_registration(message, bot, state)
         return
-    if not text.isdigit():
-        await message.answer('Введите число')
+    # Заменяем запятую на точку, если есть
+    text = text.replace(',', '.')
+    if not text.replace('.', '', 1).isdigit() or text.count('.') > 1:
+        await message.answer('Введите число в правильном формате (например, 1.23 или 1,23)')
         return
     exponent_predict_ctr = float(text)
     async with sm(read_only=False) as session:
-        query = select(AdvSetting)\
-            .filter(AdvSetting.adv_id == adv_id)
+        query = select(AdvSetting).filter(AdvSetting.adv_id == adv_id)
         result = await session.execute(query)
         adv_setting: AdvSetting = result.scalar_one()
         adv_setting.exponent_predict_ctr = exponent_predict_ctr
         await session.commit()
-    await message.answer(f'Экспонента прогнозируемого CTR изменена на  {exponent_predict_ctr}')
+    await message.answer(f'Экспонента прогнозируемого CTR изменена на {exponent_predict_ctr}')
     await state.set_state(None)
 
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
@@ -78,3 +79,4 @@ async def set_new_exponent_for_predict_ctr(message: Message,
         page=1,
     )(state)
     return
+
