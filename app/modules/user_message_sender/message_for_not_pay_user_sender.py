@@ -24,8 +24,7 @@ async def send_message_to_user(bot, user_telegram_id: int):
     message = messages.NotAnyUsesAndNotMoneyOnBalance(bot, user_telegram_id)
     logger.debug(f'Отправляю сообщение для {user_telegram_id}')
     await message()
-    await redis_manager.reset_last_user_use_time(user_telegram_id)
-    logger.debug(f'Отправил сообщение и сбросил использование для {user_telegram_id}')
+
 
 
 async def send_messages_to_users():
@@ -39,6 +38,7 @@ async def send_messages_to_users():
         for user_telegram_id in user_telegram_ids:
             try:
                 await send_message_to_user(bot, user_telegram_id)
+                logger.debug(f'Отправил сообщение и сбрасываю использование для {user_telegram_id}')
                 await redis_manager.reset_last_user_use_time(user_telegram_id)
             except Exception as e:
                 logger.error(f"Error sending message to {user_telegram_id}: {e}")
