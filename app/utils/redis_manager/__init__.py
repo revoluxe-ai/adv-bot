@@ -694,7 +694,7 @@ async def get_last_user_use_time(user_telegram_id: int):
     return datetime_object
 
 
-async def get_last_users_use_time(user_telegram_ids: list[int]):
+async def get_last_users_use_time(user_telegram_ids: list[int]) -> list[float]:
     keys = ['last_user_use_time:' + str(user_telegram_id) for user_telegram_id in user_telegram_ids]
     values = await redis_replica_client.mget(keys)
     results = []
@@ -704,8 +704,7 @@ async def get_last_users_use_time(user_telegram_ids: list[int]):
         else:
             value = value.decode('utf-8')
             value = float(value)
-            datetime_object = datetime.datetime.fromtimestamp(value)
-            results.append(datetime_object)
+            results.append(value)
     return results
 
 
