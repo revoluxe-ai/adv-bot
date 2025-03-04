@@ -216,6 +216,7 @@ class MainAdvManager:
         net = balances.net
         bonus = balances.bonus
         full_balance: list[int] = [balance, net, bonus]
+        logger.debug(f'Балансы: {full_balance}')
         if sum(full_balance) >= 2000 or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2:
             return True
         return False
