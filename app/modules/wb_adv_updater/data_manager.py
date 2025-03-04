@@ -36,7 +36,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBItemPosition,
 )
 from app.modules.keywords_query import keywords_query
-from app.modules.shops_data_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.my_types import AdvSetting, WBUserCabinet
