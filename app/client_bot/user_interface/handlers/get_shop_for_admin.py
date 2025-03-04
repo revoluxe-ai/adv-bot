@@ -60,9 +60,7 @@ async def getting_shop_for_admin(message: types.Message, bot: Bot, state: FSMCon
         wb_user_cabinet_original_id = await session.execute(stmt)
         wb_user_cabinet_original_id = wb_user_cabinet_original_id.scalar()
     await state.update_data(last_wb_user_cabinet_original_id = wb_user_cabinet_original_id)
-    user_telegram_id = message.from_user.id
-    await messages.ShopMenu(bot, message.chat.id, state, wb_user_cabinet_original_id,
-                            user_telegram_id)()
+    await messages.ShopMenu(bot, message.chat.id, state, wb_user_cabinet_original_id,)()
 
 
 @router.message(AdminsGetAdvByIdFilter())

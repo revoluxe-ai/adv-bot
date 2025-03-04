@@ -781,9 +781,8 @@ class ShopMenu(TextWithKeyboard):
                   chat_id: int,
                   state: FSMContext,
                   wb_user_cabinet_original_id: int,
-                  user_telegram_id: int
                   ):
-       self._user_telegram_id = user_telegram_id
+       self._user_telegram_id = chat_id
        self._state = state
        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
        super().__init__(bot, chat_id)

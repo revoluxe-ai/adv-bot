@@ -217,7 +217,10 @@ async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
             adv.bot_active = False
         await session.commit()
     chat_id = callback.message.chat.id
-    await messages.ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
+    await messages.ShopMenu(bot,
+                            chat_id,
+                            state,
+                            wb_user_cabinet_original_id)()
     return
 
 

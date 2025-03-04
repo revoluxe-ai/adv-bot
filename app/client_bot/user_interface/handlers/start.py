@@ -369,12 +369,10 @@ async def shop_menu_process(
     await state.update_data(last_wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id)
     logger.debug('Текущее состояние: %s', await state.get_data())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    user_telegram_id = callback.from_user.id
     await messages.ShopMenu(bot,
                             callback.message.chat.id,
                             state,
                             wb_user_cabinet_original_id,
-                            user_telegram_id
                             )()
 
 
