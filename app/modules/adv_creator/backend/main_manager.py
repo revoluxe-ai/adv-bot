@@ -121,11 +121,13 @@ class MainAdvManager:
                 new_adv.adv_id = auto_adv_id
                 new_adv.search_adv_id = search_adv_id
                 new_adv.max_place = 1
+                new_adv.max_cpm = 150
+                new_adv.reset_place = False
                 new_adv.name = new_adv_name
                 new_adv.bidder_active = False
                 new_adv.wb_cabinet = wb_cabinet
                 new_adv.parsing_active = False
-                new_adv.bot_active = False
+                new_adv.bot_active = True
                 new_adv.active_status = 'created_by_bot'
                 new_adv.type = 8
                 new_adv.nmids = [nmid]
