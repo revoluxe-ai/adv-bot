@@ -53,7 +53,6 @@ class CalculatedKeyword:
             return 0
         if self.predict_ctr is None:
             return 0
-        # Рейтинг с учетом уверенности
         rating = self.predict_ctr**predict_ctr_exponent\
                  * self.views /self.base_position
         return rating
