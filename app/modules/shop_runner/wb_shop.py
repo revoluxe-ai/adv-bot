@@ -3,7 +3,8 @@ import logging
 from functools import wraps
 from typing import Optional
 from datetime import datetime
-from app.modules.shop_runner.wb_statistic_manager.backend.stat_manager import WBCommonStatManager
+
+from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.shop_runner.bidder.wb_api import WBApi
@@ -149,9 +150,9 @@ class WBShop:
                 await asyncio.sleep(1)
 
     async def __update_common_sale_stat(self):
+        await self._update_access()
         await self._update_advs_models()
         all_nmids = [adv.nmids[0] for adv in self._adv_settings]
-        await self._update_access()
         wb_stat_manager =  WBCommonStatManager(self.__access)
         await wb_stat_manager.update_common_statistic(all_nmids)
 
