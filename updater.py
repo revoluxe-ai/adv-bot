@@ -2,9 +2,7 @@ import dotenv
 dotenv.load_dotenv()
 
 from app.modules.wb_adv_updater.runner import (
-
     run_main_coroutines,
-    keywords_parsing_process,
     run_update_all_keywords_on_wb,
 
 )
@@ -15,7 +13,7 @@ from multiprocessing import Process
 from functools import partial
 import time
 import psutil
-from app.modules import shop_runner
+
 
 
 logger = logging.getLogger(__name__)
