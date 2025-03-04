@@ -155,7 +155,7 @@ class WBShop:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
                 await asyncio.sleep(1)
 
-    async def _update_cpm_run(self):
+    async def update_cpm_run(self):
         while True:
            try:
                await self._update_cpm_bid()
@@ -170,7 +170,7 @@ class WBShop:
         await wb_stat_manager.update_common_statistic(all_nmids)
 
 
-    async def _update_common_sale_stat(self):
+    async def update_common_sale_stat(self):
         while True:
             try:
                await self.__update_common_sale_stat()
@@ -181,8 +181,8 @@ class WBShop:
 
     async def _run(self):
         await asyncio.gather(
-            self._update_cpm_run(),
-            self._update_common_sale_stat()
+            self.update_cpm_run(),
+            self.update_common_sale_stat()
         )
 
 
