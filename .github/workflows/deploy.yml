@@ -21,7 +21,7 @@ jobs:
       CR_REPOSITORY: ${{ matrix.repo_name }}
       IMAGE_TAG: ${{ github.sha }}
       LATEST_TAG: latest
-      HARBOR_REGISTRY: https://harbor.skyline360.ru  # Адрес Harbor
+      HARBOR_REGISTRY: harbor.skyline360.ru  # Адрес Harbor
 
     steps:
       - name: Checkout repository
