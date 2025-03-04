@@ -17,6 +17,22 @@ from app.modules.common_slaves.wildberries import super_cabinet_manager
 logger = logging.getLogger(__name__)
 
 
+
+
+
+def update_data():
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            await self._update_access()
+            await self._update_advs_models()
+            result = await func(self, *args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+
+
+
 def single_run():
     def decorator(func):
         @wraps(func)
@@ -92,14 +108,11 @@ class WBShop:
         self._adv_settings = adv
         assert hasattr(self, '_adv_settings')
 
-
+    @update_data()
     async def __update_cpm_bid(self):
-        logger.debug(f'Обновляю модели для магазина {self.shop_id}')
-        await self._update_advs_models()
-        logger.debug(f'Модели обновлены для магазина {self.shop_id}')
         assert hasattr(self, '_adv_settings')
         adv_settings = self._adv_settings
-        adv_settings = list(filter(lambda adv: adv.bidder_active == True, adv_settings))
+        adv_settings = list(filter(lambda adv: adv.bot_active == True, adv_settings))
         if self._adv_settings == []:
             logger.debug(f'Модели не обновлены для магазина {self.shop_id}')
             self.__first_bidder_update_time = datetime.now()
@@ -112,6 +125,7 @@ class WBShop:
         except ApiForbiddenError:
             raise ApiForbiddenError('Нет доступов для выполнения задачи')
 
+    @update_data()
     async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: WBApi, shop_id: str):
         await run_bidder_process_for_adv(adv_setting, wb_api, shop_id)
         # await redis_manager.set_last_bid_update(adv_setting.adv_id)
@@ -149,10 +163,9 @@ class WBShop:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
                 await asyncio.sleep(1)
 
+    @update_data()
     async def __update_common_sale_stat(self):
-        await self._update_access()
-        await self._update_advs_models()
-        all_nmids = [adv.nmids[0] for adv in self._adv_settings]
+        all_nmids = [adv.nmids[0] for adv in self._adv_settings if adv.bot_active == True]
         wb_stat_manager =  WBCommonStatManager(self.__access)
         await wb_stat_manager.update_common_statistic(all_nmids)
 
@@ -174,5 +187,4 @@ class WBShop:
 
 
     async def run(self):
-        await self._update_access()
         await self._run()
