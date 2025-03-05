@@ -73,6 +73,7 @@ async def requests(session, method, url, data=None, json_data=None, headers=None
         try:
             logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
             text = await response.text()
+            logger.debug(f'Ответ от сервера: {text}')
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:

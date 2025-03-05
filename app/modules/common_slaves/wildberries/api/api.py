@@ -2,7 +2,7 @@ from ..data_classes.card_from_wb import CardFromWB
 import asyncio
 import datetime
 import logging
-from typing import Union, Optional
+from typing import Union, Optional, Iterable
 import aiohttp
 from ..ABC_WB_API import ABC_WB_API
 from ..data_classes.adv import Adv
@@ -129,12 +129,25 @@ class AdvertApi(ABC_WB_API):
             logger.debug('Плюс-фразы установлены')
 
     @try_except_decorator(1, 1)
+    async def set_minus_phrase_for_search_adv(self,
+                                              search_adv_id,
+                                              texts: Iterable[str]):
+        url = f'https://advert-api.wildberries.ru/adv/v1/search/set-excluded?id={search_adv_id}'
+        data = {
+                "excluded": list(texts)
+                }
+        async with aiohttp.ClientSession() as session:
+            await requests(session, 'POST', url, json_data=data, headers=self.headers.standart)
+            logger.debug('Минус-фразы в Аукцион установлены')
+
+
+    @try_except_decorator(1, 1)
     async def set_pluse_status_in_search_adv(self, adv_id: int, status: bool):
         status = 'true' if status else 'false'
         url = f'https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={adv_id}&fixed={status}'
         async with aiohttp.ClientSession() as session:
-            await requests(session, 'GET', url, headers=self.headers.standart)
-            logger.debug('Статус фиксированных фраз установлен')
+            response = await requests(session, 'GET', url, headers=self.headers.standart)
+            logger.debug(f'Статус фиксированных фраз установлен: {response}')
 
     async def _get_adv_full_state(self, adv_ids: list[int], dates: list[datetime.date] = None)-> Optional[list[FullAdvStat]]:
         dates = [date.isoformat() for date in dates]

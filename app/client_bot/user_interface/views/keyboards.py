@@ -7,6 +7,7 @@ from app.client_bot import const
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
+from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import SettingAuctionBoostMode
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
 from app.client_bot.user_interface.views import callbacks
@@ -109,6 +110,22 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
                                   callback_data=callbacks.DownloadCSV(adv_setting_original_id =adv_setting.id).pack()
                                   )
 
+    builder.row(button)
+
+    if adv_setting.auction_boost_all_phrase_mode:
+        text = 'Включить фикс. в аукционе'
+        new_mode = False
+    else:
+        text = 'Включить все фразы в аукционе'
+        new_mode = True
+
+    button = InlineKeyboardButton(
+        text=text,
+        callback_data\
+        =SettingAuctionBoostMode(
+            new_mode=new_mode,
+           adv_id\
+                =adv_setting.adv_id).pack())
     builder.row(button)
 
     button = InlineKeyboardButton(text='История позиций ключевых слов',

@@ -1,6 +1,8 @@
 import asyncio
 import datetime
 import logging
+from typing import Iterable
+
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
@@ -40,11 +42,8 @@ async def _update_search_advs_keywords_statistics(adv_settinds):
 
 
 
-
-async def set_keyword_phrases_for_search_adv(adv_setting, keywords):
+async def set_fix_keywords_phrases_for_search_adv(adv_setting, keywords):
     search_adv_id = adv_setting.search_adv_id
-    if not search_adv_id:
-        return None
     adv_update_state_manager = AdvActiveKeywordUpdateStateManager()
     wb_cabinet_id = adv_setting.wb_cabinet_id
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
@@ -63,10 +62,46 @@ async def set_keyword_phrases_for_search_adv(adv_setting, keywords):
         logger.error(f'Ошибка установки фраз для {adv_setting.name}: {e}', exc_info=True)
         return
 
+
+async def set_minus_keywords_for_search_adv(adv_setting, keywords):
+    search_adv_id = adv_setting.search_adv_id
+    adv_update_state_manager = AdvActiveKeywordUpdateStateManager()
+    wb_cabinet_id = adv_setting.wb_cabinet_id
+    access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
+    api = WBApi(access)
+    if not keywords:
+        return
+    keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=False)
+    texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.BAD]
+    texts = texts[:1000]
+    if texts:
+        texts = [text.replace('"', '') for text in texts]
+        texts = set(texts)
+        try:
+            await api.advert.set_pluse_status_in_search_adv(search_adv_id, False)
+            await api.advert.set_minus_phrase_for_search_adv(search_adv_id, texts)
+            await adv_update_state_manager.set_one(search_adv_id)
+        except Exception as e:
+            logger.error(f'Ошибка установки минус-фраз для аукциона'
+                         f' {adv_setting.adv_id}: {e}', exc_info=True)
+            return
+
+
+async def update_keyword_phrases_for_search_adv(adv_setting: AdvSetting,
+                                                keywords: Iterable[CalculatedKeyword]):
+    search_adv_id = adv_setting.search_adv_id
+    if not search_adv_id:
+        return None
+    if adv_setting.auction_boost_all_phrase_mode is False:
+        await set_fix_keywords_phrases_for_search_adv(adv_setting, keywords)
+    else:
+        await set_minus_keywords_for_search_adv(adv_setting, keywords)
+
+
 async def _set_keyword_phrases_for_search_advs(adv_settinds):
     tasks = []
     for adv_setting in adv_settinds:
-        task = asyncio.create_task(set_keyword_phrases_for_search_adv(adv_setting))
+        task = asyncio.create_task(update_keyword_phrases_for_search_adv(adv_setting))
         tasks.append(task)
     for task in tasks:
         try:

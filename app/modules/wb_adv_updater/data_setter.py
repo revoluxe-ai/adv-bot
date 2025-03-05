@@ -81,7 +81,7 @@ class DataSetter:
                              f' {e}', exc_info=True)
         try:
             await asyncio.gather(self._update_minus_keywords_in_adv(adv_setting, keywords),
-                                 search_advs_manager.set_keyword_phrases_for_search_adv(adv_setting, keywords),)
+                                 search_advs_manager.update_keyword_phrases_for_search_adv(adv_setting, keywords))
         except Exception as e:
             logger.error(f'Ошибка обновления минус слов для {adv_setting.name},'
                          f'adv_id: {adv_setting.adv_id},'

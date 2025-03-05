@@ -1,4 +1,5 @@
 from aiogram import Router
+from app.modules.shop_runner.auction_boost_mode_settings import AuctionBoostModeSettingsRouter
 from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingRouter
 from app.modules.bidder_step_setting.telegram_handler import router as bidder_step_setting_router
 from app.modules.adv_creator.telegram.handlers.main_handler import router as adv_creator_router
@@ -41,6 +42,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 
+common_router.include_routers(AuctionBoostModeSettingsRouter)
 common_router.include_routers(ChangeExponentSettinginAdvSettingRouter)
 common_router.include_routers(bidder_step_setting_router)
 common_router.include_routers(adv_creator_router)
