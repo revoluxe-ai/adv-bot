@@ -17,7 +17,7 @@ from app.utils import redis_manager
 
 logger = logging.getLogger(__name__)
 
-class ShopUpdater:
+class FullStatAdvUpdater:
     def __init__(self, access: WBCabinetAccess):
         from app.modules.common_slaves.wildberries.api import WBApi
         self.access = access
@@ -85,7 +85,7 @@ async def async_process_run():
         for shop_id in all_shop_ids:
             if shop_id not in tasks:
                 access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
-                shop_updater = ShopUpdater(access)
+                shop_updater = FullStatAdvUpdater(access)
                 tasks[shop_id] = asyncio.create_task(shop_updater())
             else:
                 if tasks[shop_id].done():

@@ -6,7 +6,7 @@ from types import NoneType
 from typing import Union
 import logging
 
-from app.modules.shops_data_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.utils import text_cleaner
 from app.utils.redis_manager.exc import DataNotFoundError
 

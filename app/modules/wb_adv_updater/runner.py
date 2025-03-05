@@ -1,7 +1,7 @@
 import datetime
 from app.utils.redis_func_cache import set_config
 from .ml_data_manager import update_model
-from ..shops_data_updater import new_update_shop_loop
+from ..full_stat_adv_updater import new_update_shop_loop
 from ..user_message_sender import message_for_not_pay_user_sender
 from ..wb_keywords_parser import parser
 set_config()

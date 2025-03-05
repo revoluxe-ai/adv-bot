@@ -20,12 +20,10 @@ router = Router()
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action=='change_cpm_step'))
 async def change_cpm_step(callback: CallbackQuery,
                             callback_data: callbacks.CPMSettingMenu,
-                            bot: Bot,
                             state: FSMContext):
 
     adv_original_id = callback_data.adv_original_id
     await state.update_data(adv_original_id=adv_original_id)
-    user_telegram_id = callback.message.from_user.id
     await state.set_state('waiting_for_new_step')
     message = callback.message
     await message.answer(f'Введите новое значение шага ставки (до {MAX_STEP}):')
