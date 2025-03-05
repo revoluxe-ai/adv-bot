@@ -14,7 +14,7 @@ from ..http_request import requests, try_except_decorator
 from ..models import AdvSetting
 from .. import api_rights
 from ..super_cabinet_manager import WBCabinetAccess
-from app.modules.shops_data_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types import FullAdvStat
 
 """
 
