@@ -179,25 +179,22 @@ class WBShop:
             finally:
                 await asyncio.sleep(60*15)
 
-
-
-
-
-    async def _update_full_adv_stat(self):
-        while True:
-            try:
-                await self.__update_full_adv_stat()
-            except Exception:
-                logger.error('Ошибка обновления полной статистики обновления', exc_info=True)
-            finally:
-                await asyncio.sleep(60 * 15)
+    #
+    # async def _update_full_adv_stat(self):
+    #     while True:
+    #         try:
+    #             await self.__update_full_adv_stat()
+    #         except Exception:
+    #             logger.error('Ошибка обновления полной статистики обновления', exc_info=True)
+    #         finally:
+    #             await asyncio.sleep(60 * 15)
 
 
     async def _run(self):
         await asyncio.gather(
             self.update_cpm_run(),
             self.update_common_sale_stat(),
-            self._update_full_adv_stat(),
+            # self._update_full_adv_stat(),
         )
 
 
