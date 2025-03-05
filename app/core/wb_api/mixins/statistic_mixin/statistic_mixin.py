@@ -48,9 +48,10 @@ class CommonStatMinix(InterfaceWBAPI):
             stats = []
             for data in response['data']:
                 for history in data['history']:
+                    date = datetime.strptime(history['dt'], '%Y-%m-%d')
                     stat = CommonStat(
                         nmid=data['nmID'],
-                        date=datetime.strptime(history['dt'], '%Y-%m-%d'),
+                        date=date,
                         open_card=history['openCardCount'],
                         add_to_cart=history['addToCartCount'],
                         orders=history['ordersCount'],
