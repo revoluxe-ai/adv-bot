@@ -8,7 +8,7 @@ from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
-from app.modules.shops_data_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
