@@ -1,3 +1,5 @@
+import time
+
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
 from app.utils.click_house.client import get_clickhouse_client
@@ -24,7 +26,7 @@ class WBCommonStatManager:
         values = [
             (
                 stat.nmid,
-                stat.date.strftime('%Y-%m-%d'),  # Преобразуем дату в строковый формат
+                f"'{stat.date.strftime('%Y-%m-%d')}'",  # Преобразуем дату в строковый формат и добавляем кавычки
                 stat.open_card,
                 stat.add_to_cart,
                 stat.orders,
@@ -34,15 +36,17 @@ class WBCommonStatManager:
             for stat in statistics
         ]
 
+        version = time.time()
+
         # Формируем запрос на вставку данных
         query = """
         INSERT INTO wb_common_stat
-        (nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs)
+        (nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs, version)
         VALUES
         """
 
         # Добавляем значения для вставки
-        query += ",".join([f"({', '.join(map(str, value))})" for value in values])
+        query += ",".join([f"({', '.join(map(str, value))}, {version})" for value in values])
 
         async with get_clickhouse_client() as client:
             await client.query(query)
