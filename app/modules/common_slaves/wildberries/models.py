@@ -256,6 +256,11 @@ class AdvSetting(BaseTable):
                                          default=3,
                                          server_default='3')
 
+    auction_boost_all_phrase_mode = mapped_column(Boolean,
+                                                  nullable=False,
+                                                  default=False,
+                                                  server_default='false')
+
 
     __table_args__ = (
         # Составной индекс для основного запроса
