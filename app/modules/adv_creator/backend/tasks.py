@@ -14,7 +14,8 @@ async def create_complex_advs(ctx, nmid: int, shop_id: str, hard_mode: bool, use
         await _create_complex_advs(ctx, nmid, shop_id, hard_mode, user_telegram_id)
     except Exception:
         delay = 1
-        logger.error(f'Ошибка задачи create_complex_advs, повтор через {delay} сек')
+        logger.error(f'Ошибка задачи create_complex_advs, повтор через {delay} сек',
+                     exc_info=True)
         raise Retry(defer=delay)
 
 

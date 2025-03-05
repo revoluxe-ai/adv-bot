@@ -113,9 +113,10 @@ class AdvMixin(InterfaceWBAPI):
     async def get_adv_balances(self):
         url = 'https://advert-api.wb.ru/adv/v1/balance'
         async with aiohttp.ClientSession() as session:
-            response = await session.get(url, headers=self.headers.standart)
-            answer = await response.json()
-            balance = Balances(answer)
+            response = await requests(session, 'GET', url=url, headers=self.headers.standart)
+            response = json.loads(response)
+            logger.debug(f'Ответ на получение баланса: {response}')
+            balance = Balances(response)
             return balance
 
 
@@ -142,21 +143,13 @@ class AdvMixin(InterfaceWBAPI):
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=data, headers=self.headers.standart) as response:
-                response_text = await response.text()
-                if response_text == '':
-                    return None
-                response_text = json.loads(response_text)
-                if 'error' in response_text:
-                    error_text = response_text['error']
-                    if error_text == 'Invalid Params: cannot delete all products from a campaign':
-                        raise NotCanDeleteAllProductsError(f'Ошибка при обновлении nmids в adv {adv_id}. {response_text}')
-                    if error_text == 'Invalid Params: there are no items to change':
-                        raise NotChangeError('Этот запрос ничего не меняет в РК')
+            await requests(session,
+                           'POST',
+                           url,
+                           json_data=data,
+                           headers=self.headers.standart)
 
 
-
-                    raise UnknownApiRequestError(f'Ошибка при обновлении nmids в adv {adv_id}. {response_text}')
 
 
 
@@ -179,10 +172,11 @@ class AdvMixin(InterfaceWBAPI):
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=data, headers=self.headers.standart) as response:
-                response_text = await response.text()
-                logger.debug(response_text)
-                return None
+            await requests(session,
+                                'POST',
+                                 url, json_data=data,
+                                  headers=self.headers.standart)
+
 
     async def add_to_balance(self, adv_id: int, balance_type: int, sum: int):
         url = f'https://advert-api.wildberries.ru/adv/v1/budget/deposit?id={adv_id}'
