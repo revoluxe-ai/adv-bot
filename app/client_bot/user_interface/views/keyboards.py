@@ -154,7 +154,7 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
                                              adv_original_id=adv_setting.id).pack()))
 
     else:
-        builder.row(InlineKeyboardButton(text='Ручной режим управления CTR',
+        builder.row(InlineKeyboardButton(text='Режим управления CTR',
                                              callback_data=callbacks.ChangeMinCTR(
                                                  action='change_min_ctr',
                                                  adv_original_id=adv_setting.id).pack()))
@@ -218,24 +218,6 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
                                     callback_data=callbacks.ResetWhiteList(
                                         adv_setting_original_id=adv_setting.id).pack())
     builder.row(button)
-
-    if adv_setting.new_auto_min_ctr_mode:
-        button = InlineKeyboardButton(text='Отключить новый режим управления CTR',
-                                        callback_data=callbacks.ChangeAutoMinCTR(
-                                            action='turn_off_auto_min_ctr',
-                                            adv_setting_original_id=adv_setting.id).pack())
-        builder.row(button)
-    else:
-        button = InlineKeyboardButton(text='Включить новый режим управления CTR',
-                                        callback_data=callbacks.ChangeAutoMinCTR(
-                                            action='turn_on_auto_min_ctr',
-                                            adv_setting_original_id=adv_setting.id).pack())
-        builder.row(button)
-
-
-
-
-
 
 
     if not in_favorites:
@@ -727,12 +709,18 @@ def get_setting_min_ctr_keyboard(adv: AdvSetting):
     builder.row(InlineKeyboardButton(text='Назад',
                                              callback_data=callbacks.Adv(
                                                  adv_original_id=adv.id).pack()))
-    if adv.hard_min_ctr:
+    if adv.new_auto_min_ctr_mode:
+        button = InlineKeyboardButton(text=f'Выключить автоматическое управление CTR',
+                                      callback_data=callbacks.ChangeAutoMinCTR(
+                                          action='turn_off_auto_min_ctr',
+                                          adv_setting_original_id=adv.id).pack())
+    else:
         button = InlineKeyboardButton(text=f'Включить автоматическое управление CTR',
-                                      callback_data=callbacks.ChangeMinCTR(
+                                      callback_data=callbacks.ChangeAutoMinCTR(
                                           action='turn_on_auto_min_ctr',
-                                          adv_original_id=adv.id).pack())
-        builder.row(button)
+                                          adv_setting_original_id=adv.id).pack())
+
+    builder.row(button)
 
     return builder.as_markup()
 

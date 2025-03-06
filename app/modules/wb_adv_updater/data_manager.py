@@ -634,7 +634,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
             await asyncio.sleep(0)
             continue
-        if keyword_setting.hard_status == 2 and not adv_setting.new_auto_min_ctr_mode:
+        if keyword_setting.hard_status == 2:
             keyword_stat.status = KeywordStatus.GOOD
             keyword_setting.auto_block = False
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
@@ -939,7 +939,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
             await asyncio.sleep(0)
             continue
-        if keyword_setting.hard_status == 2 and not adv_setting.new_auto_min_ctr_mode:
+        if keyword_setting.hard_status == 2:
            keyword_stat.status = KeywordStatus.GOOD
            keyword_setting.auto_block = False
            await redis_manager.set_auto_block_status(keyword_setting.id, False)
@@ -1302,12 +1302,15 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 async def get_min_ctr(adv: AdvSetting):
-    # if not adv.new_auto_min_ctr_mode:
+    if not adv.new_auto_min_ctr_mode:
+        hard_min_ctr = adv.hard_min_ctr
+        if not hard_min_ctr:
+            return 0.1
+        else:
+            return adv.hard_min_ctr
     min_ctr = await _get_min_ctr(adv)
     # else:
     #     min_ctr = await _get_new_min_ctr(adv)
-    if adv.hard_min_ctr and min_ctr < adv.hard_min_ctr:
-        min_ctr = adv.hard_min_ctr
     return min_ctr
 
 
@@ -1828,6 +1831,36 @@ async def set_worst_promo_position(adv_settings: list[AdvSetting]):
 def __calculate_version(position):
     return int(position.timestamp.timestamp())
 
+
+import asyncio
+from datetime import datetime
+from dataclasses import dataclass
+
+
+async def get_avg_base_positions(nmid: int, start_date: str, end_date: str):
+    query = """
+    SELECT toDate(timestamp) as date, 
+       text,
+       AVG(base_position) as avg_base_position
+FROM default_db.wbitemposition
+WHERE nmid = %(nmid)s 
+  AND timestamp >= toDateTime(%(start_date)s)
+  AND timestamp <= toDateTime(%(end_date)s)
+GROUP BY date, text
+ORDER BY date, text
+
+    """  # Removed the semicolon
+
+    parameters = {
+        "nmid": nmid,
+        "start_date": start_date,
+        "end_date": end_date
+    }
+
+    async with get_clickhouse_client() as client:
+        result = await client.query(query, parameters=parameters)
+        result = result.result_rows
+        return [WBItemPosition(nmid=nmid, base_position=row[1], timestamp=row[0]) for row in result]
 
 
 async def add_positions_to_clickhouse(positions: list[WBItemPosition]):

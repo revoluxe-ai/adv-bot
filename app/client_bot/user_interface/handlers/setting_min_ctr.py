@@ -66,16 +66,16 @@ async def set_min_ctr(message: types.Message, bot: Bot, state: FSMContext):
     return
 
 
-@router.callback_query(callbacks.ChangeMinCTR.filter(F.action == 'turn_on_auto_min_ctr'))
-async def turn_on_auto_min_ctr(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
-    data = await state.get_data()
-    adv_original_id = data['last_adv_original_id']
-    chat_id = callback.message.chat.id
-    async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv = adv.scalar()
-        adv.hard_min_ctr = None
-        await session.commit()
-    await messages.SettingMinCTR(bot,
-                                 chat_id)(adv_original_id)
-    return
+# @router.callback_query(callbacks.ChangeMinCTR.filter(F.action == 'turn_on_auto_min_ctr'))
+# async def turn_on_auto_min_ctr(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
+#     data = await state.get_data()
+#     adv_original_id = data['last_adv_original_id']
+#     chat_id = callback.message.chat.id
+#     async with sm(read_only=False) as session:
+#         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+#         adv = adv.scalar()
+#         adv.hard_min_ctr = None
+#         await session.commit()
+#     await messages.SettingMinCTR(bot,
+#                                  chat_id)(adv_original_id)
+#     return

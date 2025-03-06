@@ -247,7 +247,11 @@ class AdvSetting(BaseTable):
     target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
     hide_small_query_keywords = mapped_column(Integer, nullable=True, default=0)
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
-    new_auto_min_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
+    new_auto_min_ctr_mode = mapped_column(Boolean,
+                                          nullable=False,
+                                          default=False,
+                                          server_default='false'
+                                          )
     reset_place = mapped_column(Boolean, nullable=True, default=True)
     _search_adv_id = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=DEFAULT_BIDDER_STEP)

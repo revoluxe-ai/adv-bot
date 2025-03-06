@@ -1084,13 +1084,12 @@ class SettingMinCTR(TextWithKeyboard):
     async def __call__(self,  adv_original_id):
         async with _sm() as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-            adv = adv.scalar()
-        self._adv = adv
-        if not adv.hard_min_ctr:
-            self._min_ctr = await data_manager.get_min_ctr(adv)
+            adv: AdvSetting = adv.scalar()
+        self._adv: AdvSetting = adv
+        self._min_ctr = await data_manager.get_min_ctr(adv)
+        if  adv.new_auto_min_ctr_mode:
             self._min_ctr_type = "auto"
         else:
-            self._min_ctr = adv.hard_min_ctr
             self._min_ctr_type = 'direct'
 
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
@@ -1121,7 +1120,8 @@ class SettingMinCTR(TextWithKeyboard):
     def text(self):
         text = (f'Минимальный CTR для кампании {self._adv.name}'
                 f' равен {round(self._min_ctr*100, 1)} %,'
-                f"""тип минимального CTR: {"Задан в ручную"  if self._min_ctr_type == 'direct' else "Определен автоматически"}\n""")
+                f"""тип минимального CTR: {"Задан в ручную"  if not self._adv.new_auto_min_ctr_mode
+                    else "Определен автоматически"}\n""")
 
         # keywords = self._goods + self._bads
         goods = self._goods

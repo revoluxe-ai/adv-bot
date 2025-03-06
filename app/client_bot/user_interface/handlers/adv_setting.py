@@ -7,6 +7,7 @@ import aiogram
 from aiogram import Router, types, F, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
@@ -249,50 +250,41 @@ async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnB
 
 
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_on_auto_min_ctr'))
-async def turn_on_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR, state: FSMContext):
-    data = await state.get_data()
-    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
-    async with sm() as session:
-        stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet) \
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
+async def turn_on_auto_min_ctr(callback: types.CallbackQuery,
+                               bot: Bot,
+                               callback_data: callbacks.ChangeAutoMinCTR,
+                               state: FSMContext):
+    adv_setting_original_id = callback_data.adv_setting_original_id
+    stmt = update(AdvSetting) \
+        .where(AdvSetting.id == callback_data.adv_setting_original_id) \
+        .values({
+        AdvSetting.new_auto_min_ctr_mode: True
+    })
 
     async with sm(read_only=False) as session:
-        adv_setting = await session.execute(select(AdvSetting) \
-                                            .where(AdvSetting.id == callback_data.adv_setting_original_id))
-
-        adv_setting: AdvSetting = adv_setting.scalars().first()
-        adv_setting.new_auto_min_ctr_mode = True
+        await session.execute(stmt)
         await session.commit()
-
-    await messages.AdvSettingMenu(call.bot,
-                                  call.message.chat.id,
-                                  wb_user_cabinet,
-                                  adv_setting,)()
+    await messages.SettingMinCTR(bot,
+                                 callback.message.chat.id)(adv_setting_original_id)
 
 
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == 'turn_off_auto_min_ctr'))
-async def turn_off_auto_min_ctr(call: types.CallbackQuery, callback_data: callbacks.ChangeAutoMinCTR,
-                                state: FSMContext):
-    async with sm(read_only=False) as session:
-        adv_setting = await session.execute(select(AdvSetting) \
-                                            .where(AdvSetting.id == callback_data.adv_setting_original_id))
+async def turn_off_auto_min_ctr(callback: types.CallbackQuery,
+                                callback_data: callbacks.ChangeAutoMinCTR,
+                                bot: Bot,):
+    adv_setting_original_id = callback_data.adv_setting_original_id
 
-        adv_setting: AdvSetting = adv_setting.scalars().first()
-        adv_setting.new_auto_min_ctr_mode = False
+    stmt = update(AdvSetting) \
+           .where(AdvSetting.id == adv_setting_original_id )\
+    .values({
+        AdvSetting.new_auto_min_ctr_mode : False
+    })
+
+    async with sm(read_only=False) as session:
+        await session.execute(stmt)
         await session.commit()
-    data = await state.get_data()
-    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
-    async with sm() as session:
-        stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet) \
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
-    await messages.AdvSettingMenu(call.bot,
-                                  call.message.chat.id,
-                                  wb_user_cabinet,
-                                  adv_setting, )()
+    await messages.SettingMinCTR(bot,
+                                 callback.message.chat.id)(adv_setting_original_id )
 
 #
 #
