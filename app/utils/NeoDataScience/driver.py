@@ -770,6 +770,8 @@ RETURN graphName
         # Сериализация phrase_data в формат, подходящий для Cypher запроса
         data_list = []
         for phrase_data in phrase_data_list:
+            if len(phrase_data.words) == 0:
+                logger.error('Ошибка в фразе: нет слов')
             phrase_dict = {
                 'text': phrase_data.text,
                 'words': [{'text': kw.text, 'word2vec': kw.vector} for kw in phrase_data.words],
