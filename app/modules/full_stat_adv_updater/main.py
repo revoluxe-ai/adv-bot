@@ -4,9 +4,10 @@ from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabine
 
 import logging
 
+from ..wb_adv_cpm_manager.wb_api import WBApi
+
 from . import db_data_manager
 
-from app.utils import redis_manager
 from ..common_slaves.wildberries.api import WBApi
 
 logger = logging.getLogger(__name__)

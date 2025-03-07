@@ -17,9 +17,8 @@ from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 
+
 logger = logging.getLogger(__name__)
-
-
 
 
 
