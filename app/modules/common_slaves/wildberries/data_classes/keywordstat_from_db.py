@@ -1,4 +1,5 @@
 import json
+import math
 from dataclasses import dataclass
 from typing import Union, Optional
 
@@ -40,6 +41,7 @@ class CalculatedKeyword:
     position: Optional[WBItemPosition] = None
     original_predict_ctr: Optional[float] = None
     predict_ctr_exponent: Optional[float] = None
+    k: Optional[float] = None
 
     @property
     def mean_ctr(self):
@@ -48,20 +50,14 @@ class CalculatedKeyword:
 
     @property
     def rating_by_predict_ctr(self):
+        k = 1
         predict_ctr_exponent = self.predict_ctr_exponent
         if not self.base_position:
             return 0
         if self.predict_ctr is None:
             return 0
-        rating = self.predict_ctr**predict_ctr_exponent\
-                 * self.views /self.base_position
+        rating = self.predict_ctr ** predict_ctr_exponent * self.views / (k * math.log(1 + self.base_position))
         return rating
-
-
-
-
-
-
 
     @property
     def query(self):
