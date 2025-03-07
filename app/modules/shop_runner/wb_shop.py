@@ -3,6 +3,7 @@ import logging
 from functools import wraps
 from typing import Optional, Iterable
 from datetime import datetime
+from app.modules.common_slaves.wildberries.api import AdvertApi
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
@@ -10,7 +11,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager im
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
-from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi, AdvertApi
+from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBToken
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.core.wb_api.exceptions import ApiForbiddenError
