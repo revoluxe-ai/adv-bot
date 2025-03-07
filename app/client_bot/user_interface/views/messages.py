@@ -1,6 +1,6 @@
-import asyncio
-import datetime
+from datetime import datetime
 import re
+from datetime import timedelta
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
@@ -9,6 +9,8 @@ from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
 from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.modules.shop_runner.wb_statistic_manager.backend import  common_stat_manager
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
@@ -517,32 +519,77 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
                      clear_keywords.append(keyword)
             self._keywords = clear_keywords
-
-
-
+        await self._set_statistics()
         await super().__call__()
+
+
+
+    async def _set_statistics(self):
+        adv: AdvSetting = self._adv_setting
+        advs: list[int] = []
+        auto_adv_id = adv.adv_id
+        advs.append(auto_adv_id)
+        auction_adv_id = adv.search_adv_id
+        if auction_adv_id:
+            advs.append(auction_adv_id)
+        last_days = 3
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=last_days)
+        full_adv_stat_for_last_3_days = await full_wb_adv_stat.get_stats_by_last_days(advs,
+                                                                                      start_date,
+                                                                                      end_date)
+        self._orders_by_adv_for_last_3_days = full_adv_stat_for_last_3_days.orders
+        common_stat = await common_stat_manager.get_stats_for_last_period(adv.nmids[0], last_days)
+        if common_stat:
+             self._all_orders_for_last_3_days = common_stat.orders
+             spend_for_inner_adv_for_3_days = full_adv_stat_for_last_3_days.spend
+             self._spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days
+             now = datetime.now()
+             hours_passed = now.hour + now.minute / 60 + now.second / 3600  # Количество часов, прошедших в текущих сутках
+             fraction_of_day = hours_passed / 24  + last_days - 1 # Доля суток
+             mean_price_for_order  = common_stat.orders/fraction_of_day
+             self._mean_price_for_order = mean_price_for_order
+             self._mean_spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days/fraction_of_day
+        else:
+            self._all_orders_for_last_3_days = None
+            self._spend_for_inner_adv_for_3_days = None
+        pass
+
 
     @property
     def text(self):
         total_page = len(self._keywords) // self._on_page
-
         text = (
-                 'Название кампании: ' + str(self._adv_setting.name) + '\n'
-                 f'Статус: {self._adv_setting.active_status}\n'
-                 f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """                                                      
-                  'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'                                                  
-                 'Статистика и настройка ключевых слов \n'
-                 f'Минимальный CRT для кампании: {self.min_ctr*100}%\n'
-                 'Расшифровка: \n'
-                 '✅  - ключевое слово активно \n'
-                 '❌  - ключевое слово не активно \n'
-                 ' БС - ключевое слово в белом списке \n'
-                 'ЧС   - ключевое слово в черном списке \n'
-                 'Авто  - ключевое слово на автоуправлении \n'                                                   
-                 'Информация перед ключевым словом: клики/показы/CTR \n'
-                 f'Страница: {self._page}/{total_page+1}\n'
-                 f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}'
+                'Название кампании: ' + str(self._adv_setting.name) + '\n'
+                                                                      f'Статус: {self._adv_setting.active_status}\n'
+                                                                      f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """
+                                                                      'ID кампании: ' + str(
+            self._adv_setting.adv_id) + '\n'
+                                        f'Минимальный CRT для кампании: {self.min_ctr * 100}%\n'
+                                        f'Страница: {self._page}/{total_page + 1}\n'
+                                        f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n'
         )
+
+
+        if self._spend_for_inner_adv_for_3_days is not None and self._all_orders_for_last_3_days is not None:
+             order_cost = self._spend_for_inner_adv_for_3_days/self._all_orders_for_last_3_days if self._all_orders_for_last_3_days\
+                                                                           else self._spend_for_inner_adv_for_3_days
+
+             text +=  (
+                 f'Общий расход на вн.рекламу за 3 дня: {round(self._spend_for_inner_adv_for_3_days)}\n'
+                 f'Средний расход на вн.рекламу за 3 дня: {round(self._mean_spend_for_inner_adv_for_3_days)}\n'
+                 f'Заказы за 3 дня: {self._all_orders_for_last_3_days}\n'
+                 f'Себестоимость заказа {round(order_cost)}\n'
+                 f'Среднее число заказов за 3 дня: {round(self._mean_price_for_order, 1)}\n'
+             )
+
+        else:
+            if self._spend_for_inner_adv_for_3_days is None:
+                text += "Нет данных по полной статистике РК\n"
+            if self._all_orders_for_last_3_days is None:
+                text += "Нет данных по полной статистике карточки\n"
+
+
         return text
 
     @property
@@ -814,8 +861,8 @@ class ShopMenu(TextWithKeyboard):
             result = await session.execute(stmt)
             self._wb_user_cabinet: WBUserCabinet = result.scalar_one()
             self._wb_cabinet: WBCabinet = self._wb_user_cabinet.wb_cabinet
-        self._now = datetime.datetime.now()
-        self._expiration_time: datetime.datetime = self._wb_cabinet.expiration_time
+        self._now = datetime.now()
+        self._expiration_time: datetime = self._wb_cabinet.expiration_time
         self._expiration_time_str = self._expiration_time.strftime('%d-%m-%Y-%H:%M')
         self.days_left = (self._expiration_time - self._now).days + 1
         self.bonus_days = self.days_left * 2

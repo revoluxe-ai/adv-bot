@@ -612,7 +612,7 @@ async def get_keywords_positions_by_nmid(nmid: int, texts: list[str]) -> list[WB
     return positions
 
 
-async def set_full_stat_adv(adv_stats: list['FullAdvStat']):
+async def set_full_stat_adv(adv_stats: typing.Iterable['FullAdvStat']):
     # Создаем словарь для ключей и значений
     data = {}
     for adv_stat in adv_stats:

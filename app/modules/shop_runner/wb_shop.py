@@ -1,13 +1,16 @@
 import asyncio
 import logging
 from functools import wraps
-from typing import Optional
+from typing import Optional, Iterable
 from datetime import datetime
-
+from app.modules.full_stat_adv_updater import wb_data_getter
+from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
+from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
-from app.modules.shop_runner.bidder.wb_api import WBApi
+from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi, WBApi
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBToken
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.core.wb_api.exceptions import ApiForbiddenError
@@ -179,24 +182,55 @@ class WBShop:
             finally:
                 await asyncio.sleep(60*15)
 
-    #
-    # async def _update_full_adv_stat(self):
-    #     while True:
-    #         try:
-    #             await self.__update_full_adv_stat()
-    #         except Exception:
-    #             logger.error('Ошибка обновления полной статистики обновления', exc_info=True)
-    #         finally:
-    #             await asyncio.sleep(60 * 15)
+    async def _update_full_stat_in_click_house(self, stats: Iterable[FullAdvStat]):
+        await full_wb_adv_stat.insert(stats)
+
+
+    @update_data()
+    async def _update_full_adv_stat(self, wb_api: CommonWBApi):
+        auto_adv_ids = {adv.adv_id for adv in self._adv_settings}
+        auction_adv_ids = {adv.search_adv_id for adv in self._adv_settings if adv.search_adv_id}
+        all_adv_ids = auto_adv_ids | auction_adv_ids
+        full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(wb_api,
+                                                                                       all_adv_ids,
+                                                                                       threshold_dates=30)
+        if full_stats:
+            await self._update_full_stat_in_click_house(full_stats)
+            date_time = datetime.now()
+            for stat in full_stats:
+                await data_manager.set_last_full_stat_update(stat.advertId, date_time)
+
+
+    @update_data()
+    async def update_full_adv_stat(self):
+        access = self.__access
+        wb_api = CommonWBApi(access)
+        while True:
+            try:
+                await self._update_full_adv_stat(wb_api)
+            except ApiForbiddenError:
+                logger.error('Нет доступов для обновления общей статистики', exc_info=True)
+                await self._update_access()
+                access = self.__access
+                wb_api = CommonWBApi(access)
+            except Exception:
+                logger.error('Ошибка обновления полной статистики обновления', exc_info=True)
+            finally:
+                await asyncio.sleep(60 * 15)
 
 
     async def _run(self):
+        await self._update_access()
         await asyncio.gather(
             self.update_cpm_run(),
             self.update_common_sale_stat(),
-            # self._update_full_adv_stat(),
+            self.update_full_adv_stat(),
         )
 
 
     async def run(self):
         await self._run()
+
+    # async def _update_full_stat_in_redis(self, full_stats: Iterable[FullAdvStat]):
+    #     await redis_manager.set_full_stat_adv(full_stats)
+

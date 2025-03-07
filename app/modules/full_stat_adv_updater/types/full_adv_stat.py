@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
@@ -30,7 +32,7 @@ class AppStats(BaseModel):
     nm: List[NmStats] = Field(..., description="Информация о товаре")
 
 class DayStats(BaseModel):
-    date: str = Field(..., description="Дата, за которую представлены данные")
+    date: datetime = Field(..., description="Дата, за которую представлены данные")
     views: int = Field(..., description="Количество просмотров")
     clicks: int = Field(..., description="Количество кликов")
     ctr: float = Field(..., description="Показатель кликабельности, %")
@@ -47,6 +49,17 @@ class BoosterStats(BaseModel):
     date: str = Field(..., description="Дата, за которую предоставлены данные")
     nm: int = Field(..., description="Артикул WB")
     avg_position: int = Field(..., description="Средняя позиция товара на страницах поисковой выдачи и каталога")
+
+@dataclass
+class SmallFullAdvStat:
+    views: int
+    clicks: int
+    spend: float
+    added_to_cart: int
+    orders: int
+    sum_price: float
+
+
 
 class FullAdvStat(BaseModel):
     dates: List[str] = Field(..., description="Даты, за которые необходимо выдать информацию")

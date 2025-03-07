@@ -1,25 +1,19 @@
 import asyncio
-from datetime import datetime
-
-from . import wb_data_getter
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
-import typing
+
 import logging
 
-from ..wb_adv_updater import data_manager
-
-if typing.TYPE_CHECKING:
-    from app.modules.common_slaves.wildberries.api import FullAdvStat
 from . import db_data_manager
 
 from app.utils import redis_manager
+from ..common_slaves.wildberries.api import WBApi
 
 logger = logging.getLogger(__name__)
 
 class FullStatAdvUpdater:
     def __init__(self, access: WBCabinetAccess):
-        from app.modules.common_slaves.wildberries.api import WBApi
+
         self.access = access
         self.shop_id = access.wb_cabinet.shop_id
         self.wb_api = WBApi(access)
@@ -36,15 +30,7 @@ class FullStatAdvUpdater:
                 await asyncio.sleep(120)
 
 
-    async def __update_full_advs_stats_in_redis(self, adv_ids: list[int]):
-        full_stats: list['FullAdvStat'] = await wb_data_getter.get_full_adv_stat_for_adv_ids(self.wb_api,
-                                                                                           adv_ids,
-                                                                                           threshold_dates=30)
-        if full_stats:
-            await redis_manager.set_full_stat_adv(full_stats)
-            date_time = datetime.now()
-            for stat in full_stats:
-                await data_manager.set_last_full_stat_update(stat.advertId, date_time)
+
 
 
     async def _update_for_last_days_in_redis_run(self, adv_ids: list[int]):

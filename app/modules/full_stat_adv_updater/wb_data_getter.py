@@ -5,7 +5,7 @@ if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.api import WBApi
 
 
-async def get_full_adv_stat_for_adv_ids(wb_api: 'WBApi', adv_ids: list[int],    threshold_dates: int):
+async def get_full_adv_stat_for_adv_ids(wb_api: 'WBApi', adv_ids: typing.Iterable[int], threshold_dates: int):
     dates  = []
     today = datetime.now().date()
     last_days =  threshold_dates
