@@ -1,9 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.core.wb_api.data_classes.keywordstat_from_db import CalculatedKeyword
-from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting, WBCard
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting
 from app.modules.white_list_updater.backend.excs import NotEnoughKeywordsError
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm

@@ -16,45 +16,6 @@ class KeywordStatus:
     BAD = 'bad'
 
 
-@dataclass
-class CalculatedKeyword:
-    text: str
-    clicks: int
-    views: int
-    spend: float
-    baes_ctr: Optional[float] = None
-    predict_ctr: Optional[float] = None
-    status: Union[str, None] = None
-    keyword_setting: Union[KeywordSetting, None] = None
-    hard_status: Union[str, None] = None
-    reason: Optional[str] = None
-    cpm: Optional[int] = None
-    real_position: Optional[int] = None
-    base_position: Optional[int] = None
-    promo_position: Optional[int] = None
-    position_update: Optional[DateTime] = None
-    childs_keywords: Optional[list] = None
-    _query_static: Optional[int] = None
-    cluster_name: Optional[str] = None
-    preset: Optional[int] = None
-
-
-
-    @property
-    def rating_by_predict_ctr(self):
-        if not self.base_position:
-            return 0
-        if self.predict_ctr is None:
-            return 0
-        # Рейтинг с учетом уверенности
-        rating = self.predict_ctr**2 * self.views /self.base_position
-        return rating
-
-
-
-
-
-
 
     @property
     def query(self):
