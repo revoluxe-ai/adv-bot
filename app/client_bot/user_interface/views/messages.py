@@ -579,8 +579,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  f'Общий расход на вн.рекламу за 3 дня: {round(self._spend_for_inner_adv_for_3_days)}\n'
                  f'Средний расход на вн.рекламу за 3 дня: {round(self._mean_spend_for_inner_adv_for_3_days)}\n'
                  f'Заказы за 3 дня: {self._all_orders_for_last_3_days}\n'
-                 f'Себестоимость заказа (серд за 3 дня) {round(order_cost)}\n'
-                 f'Среднее число заказов за 3 дня: {round(self._mean_price_for_order, 1)}\n'
+                 f'Себестоимость заказа {round(order_cost)}\n'
+                 f'Среднее число заказов в день (срез за 3 дня): {round(self._mean_price_for_order, 1)}\n'
              )
 
         else:
@@ -906,15 +906,15 @@ class ShopMenu(TextWithKeyboard):
         shops_tokens = work_tokens
         shops_tokens.sort(key=lambda token:  token.expires, reverse=True)
         if user.user_telegram_id in const.ADMINS:
-            expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
+            expiration_time = datetime.now() +timedelta(days=30)
         else:
             expiration_time = shops_tokens[0].expires
-        if expiration_time < datetime.datetime.now() and user.user_telegram_id in const.ADMINS:
+        if expiration_time < datetime.now() and user.user_telegram_id in const.ADMINS:
             await self.bot.send_message(self.chat_id, 'Срок действия токена истек. Пожалуйста, обновите токен.\n'
                                                 'Для этого добавьте магазин под другим именем с новым токеном')
             return
         self.expiration_time = expiration_time
-        self.last_days_for_token = (expiration_time - datetime.datetime.now()).days
+        self.last_days_for_token = (expiration_time - datetime.now()).days
         await super().__call__()
 
 
