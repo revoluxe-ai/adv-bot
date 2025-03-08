@@ -1777,7 +1777,7 @@ async def get_max_adv_bid(adv_setting: AdvSetting):
             return setting_max_bid
         views = full_keyword_stat.views + 1
         orders = full_keyword_stat.orders + 1
-        best_keyword: CalculatedKeyword = await get_best_keyword(keywords)
+        best_keyword: CalculatedKeyword = get_best_keyword(keywords)
         convert_views_to_order = views / orders
         ctr = best_keyword.predict_ctr
         max_bid_for_1000_views = (max_pay_for_order / convert_views_to_order) * ctr * 1000
