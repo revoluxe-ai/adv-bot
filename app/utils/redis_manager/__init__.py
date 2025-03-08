@@ -252,13 +252,13 @@ async def set_position_to_out_index(position):
 
 
 async def set_predict_ctr(adv_id, keyword, predict_ctr):
-    key = f'predict_ctr:{adv_id}:{keyword}'
+    key = f'predict_ctr:{adv_id}:{text_cleaner.clear(keyword)}'
     await redis_master_client.set(key, predict_ctr)
 
 
 async def get_adv_id_to_text_predict_ctr_dict(adv_id: int, texts: list[str]) -> dict[str, float]:
     # Шаблон для поиска всех ключей, связанных с данным adv_id
-    keys = [f'predict_ctr:{adv_id}:{keyword}' for keyword in texts]
+    keys = [f'predict_ctr:{adv_id}:{text_cleaner.clear(keyword)}' for keyword in texts]
 
     # Получаем все значения за один запрос
     values = await redis_replica_client.mget(keys)
@@ -276,6 +276,7 @@ async def get_adv_id_to_text_predict_ctr_dict(adv_id: int, texts: list[str]) -> 
 
 
 async def get_predict_ctr(adv_id: int, keyword: str):
+    keyword = text_cleaner.clear(keyword)
     key = f'predict_ctr:{adv_id}:{keyword}'
     predict_ctr_bytes = await redis_replica_client.get(key)
     if predict_ctr_bytes is None:
@@ -294,7 +295,7 @@ async def set_predict_ctrs(adv_id, keywords: list[CalculatedKeyword]) -> list[Ca
     :return: Список объектов CalculatedKeyword с обновленными предсказанными CTR.
     """
     # Формируем список ключей для запроса к Redis
-    keys = [f'predict_ctr:{adv_id}:{keyword.text}' for keyword in keywords]
+    keys = [f'predict_ctr:{adv_id}:{text_cleaner.clear(keyword.text)}' for keyword in keywords]
 
     # Получаем данные из Redis за один запрос
     predict_ctr_bytes_list = await redis_replica_client.mget(keys)
