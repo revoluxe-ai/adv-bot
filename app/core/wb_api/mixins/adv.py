@@ -18,9 +18,6 @@ logger = logging.getLogger(__name__)
 
 class AdvMixin(InterfaceWBAPI):
 
-
-
-
     @try_except_decorator(1, 2)
     async def get_advs(self, adv_ids: list[int]) -> list[Adv]:
         advs = []
