@@ -10,8 +10,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager im
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
-from .bidder.wb_api import WBApi as BidderWBApi
-from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi
+from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi, AdvertApi
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBToken
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.core.wb_api.exceptions import ApiForbiddenError
@@ -120,7 +119,7 @@ class WBShop:
             logger.debug(f'Модели не обновлены для магазина {self.shop_id}')
             self.__first_bidder_update_time = datetime.now()
             return
-        wb_api = BidderWBApi(self.__access)
+        wb_api = AdvertApi(self.__access)
         try:
             logger.debug(f'Обновляю ставки для магазина {self.shop_id}')
             await asyncio.gather(*[self.__run_bidder_process_for_adv(adv, wb_api, self.shop_id) for adv in adv_settings])
@@ -129,7 +128,7 @@ class WBShop:
             raise ApiForbiddenError('Нет доступов для выполнения задачи')
 
     @update_data()
-    async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: BidderWBApi, shop_id: str):
+    async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: AdvertApi, shop_id: str):
         await run_bidder_process_for_adv(adv_setting, wb_api, shop_id)
         # await redis_manager.set_last_bid_update(adv_setting.adv_id)
         if self.__first_bidder_update_time is None:
@@ -223,8 +222,8 @@ class WBShop:
         await self._update_access()
         await asyncio.gather(
             self.update_cpm_run(),
-            # self.update_common_sale_stat(),
-            # self.update_full_adv_stat(),
+            self.update_common_sale_stat(),
+            self.update_full_adv_stat(),
         )
 
 

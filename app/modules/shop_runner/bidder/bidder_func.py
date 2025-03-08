@@ -1,7 +1,6 @@
-from app import settings
 from app.client_bot.const import DEFAULT_BIDDER_STEP
+from app.modules.common_slaves.wildberries.api import AdvertApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.wb_keywords_parser import parser
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -15,7 +14,7 @@ from app.modules.wb_adv_updater import data_manager
 logger = logging.getLogger(__name__)
 
 
-async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, shop_id: str):
+async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi, shop_id: str):
     adv_id = adv_setting.adv_id
     try:
         logger.debug(f'Получаю максимальную ставку для биддера для {shop_id} adv_id {adv_id}')
