@@ -579,7 +579,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  f'Общий расход на вн.рекламу за 3 дня: {round(self._spend_for_inner_adv_for_3_days)}\n'
                  f'Средний расход на вн.рекламу за 3 дня: {round(self._mean_spend_for_inner_adv_for_3_days)}\n'
                  f'Заказы за 3 дня: {self._all_orders_for_last_3_days}\n'
-                 f'Себестоимость заказа {round(order_cost)}\n'
+                 f'Себестоимость заказа (серд за 3 дня) {round(order_cost)}\n'
                  f'Среднее число заказов за 3 дня: {round(self._mean_price_for_order, 1)}\n'
              )
 
