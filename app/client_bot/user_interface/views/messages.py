@@ -1289,9 +1289,6 @@ class WaitingForAmount(Text):
 
     @property
     def text(self):
-        date_to = datetime.datetime.now() + datetime.timedelta(days=1)
-        date_to = date_to.strftime('%d-%m-%Y')
-
         text = f"""
 Прайс:
 - Работа одной кампании, подключенной к боту: 299р./мес.
