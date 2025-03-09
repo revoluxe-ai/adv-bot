@@ -14,10 +14,8 @@ from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabine
 from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
 from   .. import states
-from app.modules.wb_adv_updater.right_checker import RightChecker
 from aiogram.types import Message, CallbackQuery
 from ..views.callbacks import Action
-from ... import const
 from ...redis_manager import RedisManager
 import logging
 from ..views import callbacks, messages
@@ -160,18 +158,6 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
     wb_token = wb_models.WBToken(api_key=api)
     access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
     chat_id = message.chat.id
-    try:
-        await RightChecker.check_access(wb_token)
-    except NotValidTokenError:
-        await messages. \
-            NotValideToken(bot, chat_id)()
-        return
-    except ApiForbiddenError:
-        await messages. \
-            GetApiForrbidenError(bot, chat_id)()
-        return
-    except Exception as e:
-        logger.error('Ошибка при проверке токена, токен пропускаем: %s', e)
     await messages.ShopUpdateInfo(bot, chat_id)()
     data_state: dict = await state.get_data()
     cabinet_name = data_state['cabinet_name'].strip()
@@ -314,29 +300,18 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
     wb_token = wb_models.WBToken(api_key=api)
     user.wb_tokens.append(wb_token)
     chat_id = message.chat.id
-    try:
-         check_right = await RightChecker.check_access(wb_user_cabinet)
-    except NotValidTokenError:
-         await messages. \
-            NotValideToken(bot, chat_id)()
-         return
-    if not check_right:
-        await messages. \
-            GetApiForrbidenError(bot, chat_id)()
-        return
-    else:
-        async with sm(read_only=False) as session:
-            user.wb_tokens.append(wb_token)
-            session.add(user)
-            await session.commit()
-            await session.refresh(user)
-        await messages. \
-            ShopAddedSuccess(bot, chat_id, wb_user_cabinet.name)()
-        all_shops = wb_user_cabinet.user.wb_user_cabinets
-        await messages. \
-            ShopChoice(bot, chat_id, all_shops)()
-        await state.set_state(state=None)
-        return
+    async with sm(read_only=False) as session:
+        user.wb_tokens.append(wb_token)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    await messages. \
+        ShopAddedSuccess(bot, chat_id, wb_user_cabinet.name)()
+    all_shops = wb_user_cabinet.user.wb_user_cabinets
+    await messages. \
+        ShopChoice(bot, chat_id, all_shops)()
+    await state.set_state(state=None)
+    return
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
