@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+from typing import Optional
 
 import aiohttp
 from aiohttp import ClientOSError, ServerDisconnectedError, ClientResponseError
@@ -24,54 +25,57 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
             method_name = func.__name__
             if method_name not in instance._api_call_state:
                 instance._api_call_state[method_name] = {
-                    '_last_query_time': 0,
+                    '_last_query_time': None,
                     '_current_pause': interval_seconds / requests_per_interval,
                     '_attempts': 0,
-                     '_first_request': True
                 }
 
             state = instance._api_call_state[method_name]
+            shop_id = instance.shop_id
             while state['_attempts'] < max_attempts:
-                current_time = time.time()
-                time_since_last_query = current_time - state['_last_query_time']
-                time_to_wait = max(state['_current_pause'] - time_since_last_query, 0)
-                if not state['_first_request']:
-                    logger.debug(f'Пауза между запросами: {time_to_wait} секунд')
+                last_query_time: Optional[float] = state['_last_query_time']
+                if last_query_time:
+                    current_time = time.time()
+                    time_since_last_query = current_time - last_query_time
+                    time_to_wait = max(state['_current_pause'] - time_since_last_query, 0)
                     await asyncio.sleep(time_to_wait)
+
                 try:
                     state['_last_query_time'] = time.time()
-                    state['_first_request'] = False
                     result = await func(instance, *args, **kwargs)
-                    state['_first_request'] = False
-                    logger.debug(f'Запрос {method_name} выполнен успешно')
-                    state['_current_pause'] = (interval_seconds / requests_per_interval + state['_current_pause']) / 2
+                    logger.debug(f'Запрос {method_name} выполнен успешно для {shop_id}')
+                    next_pause = (interval_seconds / requests_per_interval + state['_current_pause']) / 2
+                    state['_current_pause'] = next_pause
                     state['_attempts'] = 0  # Сброс попыток после успешного выполнения
                     return result
                 except ApiForbiddenError:
                     await instance.set_next_token()
                     state['_current_pause'] = 0
                 except (TooManyRequests,
-                        UnknownApiRequestError,
                         BadRequestError,
+                        UnknownApiRequestError,
                         NotValidDataError,
                         ClientOSError,
                         ServerDisconnectedError,
                         ClientResponseError) as e:
-                    state['_attempts'] += 1
-                    state['_current_pause'] = min(state['_current_pause'] * 2, max_delay)
                     if state['_attempts'] >= max_attempts:
                         raise e
+                    state['_attempts'] += 1
+                    new_next_pause = min(max(state['_current_pause'], 1) * 2, max_delay)
+                    state['_current_pause'] = new_next_pause
+                    logger.debug(f'Следующая пауза между запросами: {state["_current_pause"]} секунд для shop_id: {shop_id}')
+                except Exception as e:
+                    raise e
         return wrapper
     return decorator
 
 
 
 
-async def requests(session, method, url, data=None, json_data=None, headers=None):
+async def requests(session, method, url, data=None, json_data=None, headers=None) -> str:
     async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
         try:
             logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
-            text = await response.text()
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
