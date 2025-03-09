@@ -9,7 +9,7 @@ from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
 from app.modules.full_stat_adv_updater.types import FullAdvStat
-from app.modules.shop_runner.wb_statistic_manager.backend import full_adv_stats_manager
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import  common_stat_manager
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
@@ -532,21 +532,21 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         auction_adv_id = adv.search_adv_id
         if auction_adv_id:
             advs.append(auction_adv_id)
-        last_days = 3
+        pass_days = 2
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=last_days)
-        full_adv_stat_for_last_3_days = await full_adv_stats_manager.get_stats_by_last_days(advs,
+        start_date = end_date - timedelta(days=pass_days)
+        full_adv_stat_for_last_3_days = await full_wb_adv_stat.get_stats_by_last_days(advs,
                                                                                       start_date,
                                                                                       end_date)
         self._orders_by_adv_for_last_3_days = full_adv_stat_for_last_3_days.orders
-        common_stat = await common_stat_manager.get_stats_for_last_period(adv.nmids[0], last_days)
+        common_stat = await common_stat_manager.get_stats_for_last_period(adv.nmids[0], pass_days)
         if common_stat:
              self._all_orders_for_last_3_days = common_stat.orders
              spend_for_inner_adv_for_3_days = full_adv_stat_for_last_3_days.spend
              self._spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days
              now = datetime.now()
              hours_passed = now.hour + now.minute / 60 + now.second / 3600  # Количество часов, прошедших в текущих сутках
-             fraction_of_day = hours_passed / 24  + last_days - 1 # Доля суток
+             fraction_of_day = hours_passed / 24  + pass_days # Доля суток
              mean_price_for_order  = common_stat.orders/fraction_of_day
              self._mean_price_for_order = mean_price_for_order
              self._mean_spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days/fraction_of_day
