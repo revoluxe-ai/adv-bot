@@ -1,17 +1,13 @@
-import asyncio
-import hashlib
 import io
 import json
 import logging
-import re
 import time
 import cProfile
 import pstats
-import zlib
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Any, Union, Optional, List, Callable
+from datetime import timedelta
+from typing import Union, Optional, List, Callable
 import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
@@ -22,10 +18,8 @@ import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
 from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
-from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
-from app.modules.common_slaves.wildberries.data_classes.subcategories import Subcategory
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
     AdvKeyword,
