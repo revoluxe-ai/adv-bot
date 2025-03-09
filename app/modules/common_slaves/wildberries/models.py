@@ -264,6 +264,19 @@ class AdvSetting(BaseTable):
                                                   nullable=False,
                                                   default=False,
                                                   server_default='false')
+    plan_for_sales_for_day = mapped_column(Integer,
+                                           nullable=True,
+                                           default=None,)
+    target_price_for_order = mapped_column(Float,
+                                           nullable=True,
+                                           default=None,)
+
+    max_price_for_order = mapped_column(Float,
+                                           nullable=True,
+                                           default=None,)
+
+
+
 
 
     __table_args__ = (
