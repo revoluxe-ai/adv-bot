@@ -16,15 +16,5 @@ class Headers:
 
 
 class InterfaceWBAPI:
-    def __init__(self, wb_access: 'WBCabinetAccess'):
-        tokens: list[WBToken] = wb_access.tokens
-        self.access = wb_access
-        if not tokens:
-            raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
-                                               wb_user_cabinet=wb_access.wb_user_cabinet)
-        tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
-        self._free_tokens = tokens
-        current_token = self._free_tokens.pop()
-        self.headers = Headers(current_token)
-        self._shop_id = current_token.shop_id
+    pass
 

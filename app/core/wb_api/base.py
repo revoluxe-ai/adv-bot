@@ -1,26 +1,29 @@
 from abc import ABC, abstractmethod
 
+from . import exceptions
 from .exceptions import ApiForbiddenError
 from .interface import InterfaceWBAPI
 from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
-from ...modules.common_slaves.wildberries.models import WBCabinet
+from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
 import logging
 from app.utils.db.session_maker import get_async_session_maker as sm
+from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 logger = logging.getLogger(__name__)
 
-class BaseAPI(ABC, InterfaceWBAPI):
+class BaseAPI(ABC):
 
-
-    # @property
-    # @abstractmethod
-    # def _rights(self) -> set[str]:
-    #     pass
-    #
-    # @property
-    # @abstractmethod
-    # def _only_read(self):
-    #     pass
+    def __init__(self, wb_access: WBCabinetAccess):
+        tokens: list[WBToken] = wb_access.tokens
+        self.access = wb_access
+        if not tokens:
+            raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
+                                               wb_user_cabinet=wb_access.wb_user_cabinet)
+        tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
+        self._free_tokens = tokens
+        current_token = self._free_tokens.pop()
+        self.headers = Headers(current_token)
+        self.shop_id = current_token.shop_id
 
     @staticmethod
     def chunks(lst, n):

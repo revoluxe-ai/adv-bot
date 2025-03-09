@@ -5,12 +5,15 @@ from app.core.wb_api.interface import InterfaceWBAPI
 from app.core.wb_api.http_request import try_except_decorator, requests
 from datetime import datetime, timedelta
 from .wb_statistic_obj import CommonStat
+from ...base import BaseAPI
 
 
-class CommonStatMinix(InterfaceWBAPI):
+class CommonStatMinix(InterfaceWBAPI, BaseAPI):
 
     HOST = 'https://seller-analytics-api.wildberries.ru'
 
+
+    @try_except_decorator(1, 60)
     async def _get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int):
         """
         Получить статистику по карточкам товаров за указанный промежуток времени.

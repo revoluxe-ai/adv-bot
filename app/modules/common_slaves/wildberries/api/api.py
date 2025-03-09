@@ -10,7 +10,7 @@ import json
 from ..data_classes.keywordstat import KeywordStat
 from ..data_classes.subcategories import Subcategory
 from ..exceptions import CardNotFoundInWB
-from ..http_request import requests, try_except_decorator
+from app.core.wb_api.http_request import requests, try_except_decorator
 from ..models import AdvSetting
 from .. import api_rights
 from ..super_cabinet_manager import WBCabinetAccess
