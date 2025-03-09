@@ -1,5 +1,5 @@
 import time
-
+import logging
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
 from app.utils.click_house.client import get_clickhouse_client
@@ -7,7 +7,9 @@ from .types.common_card_stat import CommonCardStat
 from .wb_api import WBApi
 from datetime import datetime, timedelta
 from typing import List, Optional
+from app.core.wb_api.exceptions import ApiForbiddenError
 
+logger = logging.getLogger(__name__)
 
 async def get_stats_for_last_period(nmid: int, days: int) -> Optional[CommonCardStat]:
     """
@@ -23,9 +25,16 @@ async def get_stats_for_last_period(nmid: int, days: int) -> Optional[CommonCard
     # Формируем запрос для получения данных с параметрами
     query = """
     SELECT  SUM(open_card), SUM(add_to_cart), SUM(orders), SUM(orders_sum), SUM(buy_outs)
-    FROM wb_common_stat
-    WHERE nmid = %(nmid)s
-      AND date BETWEEN %(start_date)s AND %(end_date)s
+            FROM wb_common_stat
+            WHERE nmid = %(nmid)s
+              AND date BETWEEN %(start_date)s AND %(end_date)s
+              AND version = (
+                SELECT MAX(version)
+                FROM wb_common_stat
+                WHERE nmid = %(nmid)s
+                  AND date BETWEEN %(start_date)s AND %(end_date)s
+  )
+
     """
 
     # Параметры для запроса
@@ -61,9 +70,14 @@ class WBCommonStatManager:
         self.wb_api = WBApi(wb_access=wb_access)
 
     async def update_common_statistic(self, nmids: List[int]):
-        # Получаем статистику для каждого nmid
-        statistics: List[CommonStat] = await self.wb_api.get_cards_stats_by_days(nmids, 30)
-
+        try:
+          statistics: List[CommonStat] = await self.wb_api.get_cards_stats_by_days(nmids, 6)
+        except ApiForbiddenError as exc:
+            logger.error('Нет доступов к статистике')
+            raise exc
+        except Exception as e:
+            logger.error('Ошибка получения общей статистики', exc_info=True)
+            raise e
         # Добавляем статистику в ClickHouse
         await self._add_common_statistic_to_clickhouse(statistics)
 

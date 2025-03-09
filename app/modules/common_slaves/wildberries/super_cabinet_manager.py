@@ -15,8 +15,6 @@ from sqlalchemy import select
 from app.utils.db.models import User
 import logging
 
-from ...wb_adv_updater.right_checker import RightChecker
-
 sm = get_async_session_maker
 
 logger = logging.getLogger(__name__)
