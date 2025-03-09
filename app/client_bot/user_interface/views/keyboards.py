@@ -1,8 +1,8 @@
 import asyncio
 import datetime
+from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingCallback
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingCallback
 from app.client_bot import const
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
