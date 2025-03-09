@@ -3,6 +3,8 @@ import logging
 from functools import wraps
 from typing import Optional, Iterable
 from datetime import datetime
+
+from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.api import AdvertApi
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
@@ -174,12 +176,15 @@ class WBShop:
 
     async def update_common_sale_stat(self):
         access = self.__access
+        ping_manager = PingManager(access)
         wb_stat_manager = WBCommonStatManager(access)
         while True:
             try:
+               await ping_manager.ping_analytics_rights_and_connect()
                await self.__update_common_sale_stat(wb_stat_manager)
             except ApiForbiddenError:
                 logger.error('Ошибка доступа, пауза час и  обновление доступов с повторной попыткой')
+                await asyncio.sleep(60*60)
                 await self._update_access()
                 access = self.__access
                 wb_stat_manager = WBCommonStatManager(access)
