@@ -64,7 +64,7 @@ class CommonStatMinix(InterfaceWBAPI, BaseAPI):
                     stats.append(stat)
         return stats
 
-    @try_except_decorator(3, 60)
+
     async def get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int) -> list[CommonStat]:
         """
         Разбивает запрос на несколько частей, если nmIDs больше 20, и вызывает _get_cards_stats_by_days.
