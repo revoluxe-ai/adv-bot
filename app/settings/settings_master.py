@@ -191,6 +191,7 @@ class Settings:
     @property
     def YOOKASSA_TOKEN(self):
         value = os.environ.get('YOOKASSA_TOKEN')
+        assert value
         return value
 
     @property
