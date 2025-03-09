@@ -40,7 +40,7 @@ async def __shop_update():
         stmt = select(WBCabinet.shop_id, WBCabinet.id).distinct()\
             .join(WBCabinet.adv_settings)\
             .filter(
-                WBCabinet.adv_settings.any(AdvSetting.bot_active == True)
+                WBCabinet.adv_settings.any(AdvSetting.bot_active == True),
             )
         async with sm() as session:
             result = await session.execute(stmt)
