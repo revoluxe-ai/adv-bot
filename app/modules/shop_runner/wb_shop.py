@@ -4,9 +4,9 @@ from functools import wraps
 from typing import Optional, Iterable
 from datetime import datetime
 from app.modules.common_slaves.wildberries.api import AdvertApi
+from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -27,6 +27,7 @@ def update_data():
     def decorator(func):
         @wraps(func)
         async def wrapper(self, *args, **kwargs):
+            await self._update_access()
             await self._update_advs_models()
             result = await func(self, *args, **kwargs)
             return result
@@ -92,12 +93,13 @@ class WBShop:
         access = await super_cabinet_manager.get_access_for_wb_cabinet(self.shop_id)
         if access:
             self.__access = access
-            return access
         else:
             raise ApiForbiddenError(f'Нет доступов для Shop ID {self.shop_id}')
 
     @single_run()
     async def _update_advs_models(self):
+        if not self.__access:
+            await self._update_access()
         shop_id = self.shop_id
         stmt = select(AdvSetting)\
         .join(AdvSetting.wb_cabinet)\
@@ -105,12 +107,12 @@ class WBShop:
                 AdvSetting.bot_active == True)
         async with sm() as session:
             result = await session.execute(stmt)
-            advs: list[AdvSetting] = result.scalars().all()
-        self._adv_settings = advs
+            adv: list[AdvSetting] = result.scalars().all()
+        self._adv_settings = adv
         assert hasattr(self, '_adv_settings')
 
     @update_data()
-    async def __update_cpm_bid(self,  wb_api: AdvertApi):
+    async def __update_cpm_bid(self):
         assert hasattr(self, '_adv_settings')
         adv_settings = self._adv_settings
         adv_settings = list(filter(lambda adv: adv.bot_active == True, adv_settings))
@@ -118,6 +120,7 @@ class WBShop:
             logger.debug(f'Модели не обновлены для магазина {self.shop_id}')
             self.__first_bidder_update_time = datetime.now()
             return
+        wb_api = AdvertApi(self.__access)
         try:
             logger.debug(f'Обновляю ставки для магазина {self.shop_id}')
             await asyncio.gather(*[self.__run_bidder_process_for_adv(adv, wb_api, self.shop_id) for adv in adv_settings])
@@ -135,13 +138,11 @@ class WBShop:
 
     async def _update_cpm_bid(self):
         max_pause = 60*3 + 60
-        access = self.__access
-        wb_api = AdvertApi(access)
         while True:
             try:
                 self.__first_bidder_update_time = None
                 logger.debug(f'Обновляю ставку для магазина {self.shop_id}')
-                await self.__update_cpm_bid(wb_api)
+                await self.__update_cpm_bid()
                 logger.debug(f'Ставка обновлена для магазина {self.shop_id}')
                 first_update_time = self.__first_bidder_update_time
                 if not first_update_time:
@@ -151,38 +152,31 @@ class WBShop:
                 await asyncio.sleep(pause)
             except ApiForbiddenError:
                 logger.error(f'Нет прав для обновления ставки у магазина {self.shop_id}, обновляю токены')
-                await asyncio.sleep(60*60)
+                await asyncio.sleep(1)
                 await self._update_access()
-                access = self.__access
-                wb_api = CommonWBApi(access)
             except Exception as e:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
-                await asyncio.sleep(60)
-
-
+                await asyncio.sleep(1)
 
     async def update_cpm_run(self):
-        await self._update_cpm_bid()
-
-
+        while True:
+           try:
+               await self._update_cpm_bid()
+           except Exception as e:
+                logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
+                await asyncio.sleep(1)
 
     @update_data()
-    async def __update_common_sale_stat(self, wb_stat_manager: WBCommonStatManager):
+    async def __update_common_sale_stat(self):
         all_nmids = [adv.nmids[0] for adv in self._adv_settings if adv.bot_active == True]
+        wb_stat_manager =  WBCommonStatManager(self.__access)
         await wb_stat_manager.update_common_statistic(all_nmids)
 
 
     async def update_common_sale_stat(self):
-        access = self.__access
-        wb_stat_manager = WBCommonStatManager(access)
         while True:
             try:
-               await self.__update_common_sale_stat(wb_stat_manager)
-            except ApiForbiddenError:
-                logger.error('Ошибка доступа, пауза час и  обновление доступов с повторной попыткой')
-                await self._update_access()
-                access = self.__access
-                wb_stat_manager = WBCommonStatManager(access)
+               await self.__update_common_sale_stat()
             except Exception:
                 logger.error('Ошибка обновления общей статистики', exc_info=True)
             finally:
@@ -205,6 +199,7 @@ class WBShop:
             date_time = datetime.now()
             for stat in full_stats:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
+
 
     @update_data()
     async def update_full_adv_stat(self):
@@ -231,13 +226,6 @@ class WBShop:
             self.update_common_sale_stat(),
             self.update_full_adv_stat(),
         )
-
-
-
-
-
-
-
 
 
     async def run(self):

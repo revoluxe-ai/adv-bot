@@ -9,7 +9,7 @@ from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
 from app.modules.full_stat_adv_updater.types import FullAdvStat
-from app.modules.shop_runner.wb_statistic_manager.backend import full_adv_stats_manager
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import  common_stat_manager
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
@@ -535,7 +535,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         last_days = 3
         end_date = datetime.now()
         start_date = end_date - timedelta(days=last_days)
-        full_adv_stat_for_last_3_days = await full_adv_stats_manager.get_stats_by_last_days(advs,
+        full_adv_stat_for_last_3_days = await full_wb_adv_stat.get_stats_by_last_days(advs,
                                                                                       start_date,
                                                                                       end_date)
         self._orders_by_adv_for_last_3_days = full_adv_stat_for_last_3_days.orders
@@ -1289,8 +1289,6 @@ class WaitingForAmount(Text):
 
     @property
     def text(self):
-        date_to = datetime.now() + timedelta(days=1)
-        date_to = date_to.strftime('%d-%m-%Y')
         text = f"""
 Прайс:
 - Работа одной кампании, подключенной к боту: 299р./мес.
