@@ -16,10 +16,10 @@ from ...wb_adv_updater import data_manager
 router = Router()
 
 
-@router.callback_query(callbacks.SalesPlanSettingsMenu.filter())
+@router.callback_query(callbacks.ChangeExponentSettinginAdvSetting.filter())
 async def change_exponent_setting(
                             callback: CallbackQuery,
-                            callback_data: callbacks.SalesPlanSettingsMenu,
+                            callback_data: callbacks.ChangeExponentSettinginAdvSetting,
                             bot: Bot,
                             state: FSMContext):
 

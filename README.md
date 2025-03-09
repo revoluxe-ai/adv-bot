@@ -33,4 +33,3 @@ alembic upgrade head
 python admin_bot_run.py
 python client_bot_run.py
 ```
-# adv-bot
