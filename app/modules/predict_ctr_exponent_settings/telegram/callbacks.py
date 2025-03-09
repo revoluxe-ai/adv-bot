@@ -1,5 +1,5 @@
 from aiogram.filters.callback_data import CallbackData
 
 
-class ChangeExponentSettinginAdvSetting(CallbackData, prefix="change_exponent_setting"):
+class SalesPlanSettingsMenu(CallbackData, prefix="salesplansettingsmenu"):
     adv_id: int

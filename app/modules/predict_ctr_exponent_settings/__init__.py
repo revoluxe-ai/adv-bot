@@ -1,2 +1,2 @@
-from .telegram.callbacks import ChangeExponentSettinginAdvSetting as ChangeExponentSettinginAdvSettingCallback
+from .telegram.callbacks import SalesPlanSettingsMenu as ChangeExponentSettinginAdvSettingCallback
 from .telegram.handlers import router as ChangeExponentSettinginAdvSettingRouter
