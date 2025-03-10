@@ -13,31 +13,13 @@ from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetti
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action
 from app.utils.db.session_maker import get_async_session_maker
+from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
+
 
 sm = get_async_session_maker
 
 
-def get_shop_keyboard(all_shops: list[WBUserCabinet]):
-    # Создаем список для строк кнопок
-    keyboard_buttons = []
 
-
-    button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
-    keyboard_buttons.append([button])
-
-    for wb_user_cabinet in all_shops:
-        shop_name = wb_user_cabinet.name
-        wb_user_cabinet_original_id = wb_user_cabinet.id
-        button = InlineKeyboardButton(text=shop_name, callback_data=callbacks \
-                                      .Shop(action=Action.select,
-                                            wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack())
-        # Добавляем кнопку в список строк кнопок
-        keyboard_buttons.append([button])  # Каждая кнопка в своем списке, т.е. каждая в новой строке
-    button = InlineKeyboardButton(text='Добавить магазин', callback_data=callbacks.ShopNew().pack())
-
-    keyboard_buttons.append([button])
-    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-    return keyboard
 
 
 def get_budget_type_keyboard(balances):
@@ -68,6 +50,15 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
     builder.row(InlineKeyboardButton(text='Контроль ключевых слов по кампании',
                               callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id,
                                                                       type='by_adv').pack()))
+
+    button = InlineKeyboardButton(text="План продаж",
+                                  callback_data=\
+                                      SalesPlanSettingsMenuCallback(
+                                          adv_id = adv_setting.adv_id
+                                      ).pack())
+
+    builder.row(button)
+
     if adv_setting.bot_active:
         builder.row(
             InlineKeyboardButton(text='Выключить автоматическое управление', callback_data=TurnBot(action='off',

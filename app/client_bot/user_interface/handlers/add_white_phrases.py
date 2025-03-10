@@ -1,12 +1,8 @@
-import asyncio
-
 from aiogram import Router, Bot
 from aiogram.filters import StateFilter
-from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from sqlalchemy import select
-
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.start import start_registration
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
@@ -33,9 +29,6 @@ async def add_white_phrases(callback: CallbackQuery,
 @router.message(StateFilter(states.AddWhitePhrases.waiting_for_white_phrases))
 async def waiting_for_white_phrases(message, bot: Bot, state: FSMContext):
     text = message.text
-    if '/start' in text:
-        await start_registration(message, bot, state)
-        return
     keywords = text.split('\n')
     keywords = [keyword.strip().lower() for keyword in keywords]
     data = await state.get_data()
@@ -60,9 +53,6 @@ async def add_relevant_phrases(callback: CallbackQuery,
 @router.message(StateFilter(states.AddRelevantPhrases.waiting_for_relevant_phrases))
 async def waiting_for_relevant_phrases(message, bot: Bot, state: FSMContext):
     text = message.text
-    if '/start' in text:
-        await start_registration(message, bot, state)
-        return
     keywords = text.split('\n')
     keywords = [keyword.strip().lower() for keyword in keywords]
     data = await state.get_data()

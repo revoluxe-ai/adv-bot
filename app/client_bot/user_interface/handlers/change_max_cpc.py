@@ -33,10 +33,6 @@ async def to_page_for_cpc_setting(callback: types.CallbackQuery,
 async def set_max_cpc(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     data = await state.get_data()
     text = message.text
-    if '/start' in text:
-        await state.set_state(state=None)
-        await start.start_registration(message, bot, state)
-        return
     chat_id = message.chat.id
 
     def get_cpc_from_text(text):

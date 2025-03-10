@@ -129,6 +129,8 @@ class WBShop:
 
     @update_data()
     async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: AdvertApi, shop_id: str):
+        if adv_setting.adv_id != 23553803:
+            return
         await run_bidder_process_for_adv(adv_setting, wb_api, shop_id)
         # await redis_manager.set_last_bid_update(adv_setting.adv_id)
         if self.__first_bidder_update_time is None:
@@ -193,7 +195,9 @@ class WBShop:
             finally:
                 await asyncio.sleep(60*15)
 
-    async def _update_full_stat_in_click_house(self, stats: Iterable[FullAdvStat]):
+
+    @staticmethod
+    async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]):
         await full_wb_adv_stat.insert(stats)
 
 

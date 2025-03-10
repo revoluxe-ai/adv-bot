@@ -4,7 +4,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from app.client_bot.user_interface import states
-from app.client_bot.user_interface.handlers.start import start_registration
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.wb_adv_updater import data_manager
 
@@ -26,9 +25,6 @@ async def add_white_phrases(callback: CallbackQuery,
 @router.message(StateFilter(states.AddBlackPhrasesTemplates.waiting_for_black_phrases))
 async def waiting_for_black_phrases(message, bot: Bot, state: FSMContext):
     text = message.text
-    if '/start' in text:
-        await start_registration(message, bot, state)
-        return
     keywords = text.split('\n')
     keywords = [keyword.strip().lower() for keyword in keywords]
     data = await state.get_data()

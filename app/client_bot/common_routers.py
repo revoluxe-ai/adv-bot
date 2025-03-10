@@ -4,6 +4,7 @@ from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdv
 from app.modules.bidder_step_setting.telegram_handler import router as bidder_step_setting_router
 from app.modules.adv_creator.telegram.handlers.main_handler import router as adv_creator_router
 from python_modules import path_setting_funcs
+from .middlewars.return_to_start_from_state import ReturnToStart
 from .user_interface.handlers import (adv_setting,
                                       exceptions,
                                       keyword_settings,
@@ -30,6 +31,7 @@ from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
 from app.modules.white_list_updater import router as white_list_updater_router
 from ..settings import settings
 from app.modules.user_message_sender import middleware_for_adding_task
+from app.modules.sales_plan_settings  import SalesPlanSettingsMenuRouter
 
 common_router = Router()
 
@@ -41,7 +43,8 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
     common_router.include_routers(exceptions.admin_router)
 
-
+common_router.message.middleware.register(ReturnToStart())
+common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)
 common_router.include_routers(ChangeExponentSettinginAdvSettingRouter)
 common_router.include_routers(bidder_step_setting_router)

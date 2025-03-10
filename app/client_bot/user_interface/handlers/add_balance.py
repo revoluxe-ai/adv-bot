@@ -56,10 +56,6 @@ async def add_balance(callback: types.CallbackQuery,
 
 @router.message(StateFilter(states.AddBalance.awaiting_amount))
 async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot):
-    text = message.text
-    if '/start' in text:
-        await start.start_registration(message, bot, state)
-        return
     amount = message.text
     min_sum = const.min_sum
     if not amount.isdigit():

@@ -7,12 +7,11 @@ from aiogram.filters import StateFilter, CommandStart
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.orm import joinedload, selectinload
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken
-from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError, ApiForbiddenError
 from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
-from app.utils.db.models import RefLink
 from app.utils.db.session_maker import get_async_session_maker
+from .start_registration_func import start_registration
 from   .. import states
 from aiogram.types import Message, CallbackQuery
 from ..views.callbacks import Action
@@ -33,50 +32,6 @@ router = Router()
 
 redis_manager = RedisManager()
 
-
-
-
-async def start_registration(message: types.Message, bot: aiogram.Bot, state: FSMContext):
-    await state.clear()
-    referral_link  = None
-    async with sm(read_only=False) as session:
-        user_id = message.from_user.id
-        if isinstance(message, types.Message) and message.text:
-            text = message.text.split(' ')
-            if len(text) > 1 and text[1].isdigit():
-                referral_link_id = int(text[1])
-                stmt = select(RefLink) \
-                    .options(selectinload(RefLink.referred_users)) \
-                    .where(RefLink.id == referral_link_id)
-                referral_link = (await session.execute(stmt)).scalar()
-
-        stmt = select(User)\
-            .options(joinedload(User.wb_user_cabinets).joinedload(
-            WBUserCabinet.wb_cabinet)) \
-            .where(User.user_telegram_id == user_id)
-        result = await session.execute(stmt)
-        user: User = result.scalar()
-        if not user:
-            user = User(user_telegram_id=user_id,
-                        username=message.from_user.username,
-                        adv_updater_user_chat_id = message.chat.id,
-                        wb_tokens=[])
-            session.add(user)
-            if referral_link:
-                referral_link.referred_users.append(user)
-            await session.commit()
-            await session.refresh(user)
-            wb_user_cabinets = []
-        else:
-            wb_user_cabinets = user.wb_user_cabinets
-        if isinstance(message, types.Message):
-            chat_id = message.chat.id
-        else:
-            chat_id = message.message.chat.id
-
-        await messages. \
-                ShopChoice(bot, chat_id, wb_user_cabinets)()
-    return
 
 
 
@@ -149,9 +104,6 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 @router.message(StateFilter(states.CabinetRegistration.api))
 async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMContext):
     text = message.text
-    if '/start' in text:
-        await start_registration(message, bot, state)
-        return
     api = message.text
     api = api.strip()
     user_telegram_id = message.from_user.id

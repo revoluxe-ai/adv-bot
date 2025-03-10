@@ -15,7 +15,6 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, 
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-from .start import start_registration
 from .. import states
 from ..views import messages
 from ..views import callbacks
@@ -48,10 +47,6 @@ async def reset_filter(callback: types.CallbackQuery, callback_data: callbacks.C
 async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, state: FSMContext):
     chat_id = message.chat.id
     text = message.text
-    if '/start' in text:
-        await state.clear()
-        await start_registration(message, bot, state)
-        return
     filter_advs = text.splitlines()
     filter_advs = [keyword.strip().lower() for keyword in filter_advs if keyword]
     await state.update_data(filter_advs=filter_advs)

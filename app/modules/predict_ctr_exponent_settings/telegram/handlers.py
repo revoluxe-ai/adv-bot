@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 
 from app.client_bot import utils
-from app.client_bot.user_interface.handlers.start import start_registration
+from app.client_bot.user_interface.handlers.start_registration_func import start_registration
 from app.client_bot.user_interface.views import messages
 from app.utils.db.session_maker import get_async_session_maker as sm
 

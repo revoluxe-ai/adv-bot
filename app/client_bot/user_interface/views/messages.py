@@ -71,26 +71,7 @@ class MainMenu(TextWithKeyboard):
 
 
 
-class ShopChoice(TextWithKeyboard):
-    parse_mode = ParseMode.HTML
 
-    def __init__(self, bot:Bot, chat_id: int,
-                 all_shops: list[WBUserCabinet]):
-        super().__init__(bot, chat_id)
-        self.__all_shops = all_shops
-        self.user_telegram_id = chat_id
-
-
-
-
-    @property
-    def text(self):
-        return get_main_text(self.user_telegram_id)
-
-
-    @property
-    def keyboard(self):
-        return keyboards.get_shop_keyboard(self.__all_shops)
 
 
 class ShopNameGet(Text):
@@ -574,13 +555,34 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if self._spend_for_inner_adv_for_3_days is not None and self._all_orders_for_last_3_days is not None:
              order_cost = self._spend_for_inner_adv_for_3_days/self._all_orders_for_last_3_days if self._all_orders_for_last_3_days\
                                                                            else self._spend_for_inner_adv_for_3_days
+             target_price_for_order = self._adv_setting.target_price_for_order
+             if target_price_for_order:
+                 target_price_for_order = str(round(target_price_for_order))
+             else:
+                 target_price_for_order = "Не задано"
+
+             max_price_for_order = self._adv_setting.max_price_for_order
+             if max_price_for_order:
+                 max_price_for_order = str(round(max_price_for_order))
+             else:
+                 max_price_for_order = "Не задано"
+
+             plan_for_sales_for_day  = self._adv_setting.plan_for_sales_for_day
+             if plan_for_sales_for_day:
+                 plan_for_sales_for_day = str(round(plan_for_sales_for_day))
+             else:
+                 plan_for_sales_for_day = 'Не задано'
 
              text +=  (
-                 f'Общий расход на вн.рекламу за 3 дня: {round(self._spend_for_inner_adv_for_3_days)}\n'
-                 f'Средний расход на вн.рекламу за 3 дня: {round(self._mean_spend_for_inner_adv_for_3_days)}\n'
-                 f'Заказы за 3 дня: {self._all_orders_for_last_3_days}\n'
-                 f'Себестоимость заказа {round(order_cost)}\n'
-                 f'Среднее число заказов в день (срез за 3 дня): {round(self._mean_price_for_order, 1)}\n'
+                 f'Срезы за 3 дня(сегодня, вчера, позавчера):\n'
+                 f'Общий расход на вн.рекламу: {round(self._spend_for_inner_adv_for_3_days)}\n'
+                 f'Средний расход на вн.рекламу: {round(self._mean_spend_for_inner_adv_for_3_days)}\n'
+                 f'Заказы всего: {self._all_orders_for_last_3_days}\n'
+                 
+                 f'Среднее число заказов в день: {round(self._mean_price_for_order, 1)}'
+                 f'({plan_for_sales_for_day})\n'
+                 f'Себестоимость заказа (цель) (максимум): {round(order_cost)} ({target_price_for_order})'
+                 f' ({max_price_for_order})\n'
              )
 
         else:
