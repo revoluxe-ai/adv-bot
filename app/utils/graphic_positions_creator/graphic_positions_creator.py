@@ -103,11 +103,12 @@ async def get_keyword_history_graphic(adv_original_id):
         df = pd.concat(frames, ignore_index=True)
         # Построение графика без легенды
         plt.figure(figsize=(10, 6))
+        title_text = "Динамика Органики за 7 дней"
         if len(common_keywords) > 5:
             def get_graphic_and_legend():
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=False)
                 plt.xticks(rotation=45)
-                plt.title("Позиции за последние 7 дней")
+                plt.title(title_text)
                 plt.tight_layout()
                 plt.gca().invert_yaxis()
                 ax = plt.gca()  # Получение текущего осевого объекта
@@ -134,7 +135,7 @@ async def get_keyword_history_graphic(adv_original_id):
             def get_graphic():
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=True)
                 plt.xticks(rotation=45)
-                plt.title("Позиции за последние 7 дней")
+                plt.title(title_text)
                 plt.tight_layout()
                 plt.gca().invert_yaxis()
                 ax = plt.gca()  # Получение текущего осевого объекта

@@ -4,6 +4,8 @@ from datetime import timedelta
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
+
+from app import utils
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
@@ -458,6 +460,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
 
     async def __call__(self, state: FSMContext, sort_mode = 'by_adv'):
+        graphic = await self._graphic_injection()
+        self._image = graphic
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
@@ -613,6 +617,23 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                        self.min_ctr,
                                                        self.hide_keywords_is_not_relevant,
                                                        sort_mode=self.sort_mode)
+
+    async def _graphic_injection(self):
+        bot = self.bot
+        user_telegram_id = self.chat_id
+        adv_original_id = self._adv_setting.id
+        try:
+            graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id))
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            await NotKeywordHistoryPositions(bot, user_telegram_id)()
+            return
+        if legend:
+            await KeywordGraphicPart_1(bot, user_telegram_id, graphic, adv_original_id)()
+            return legend
+        else:
+            return graphic
+
 
 
 class KeywordSettingMessage(TextWithKeyboard):
