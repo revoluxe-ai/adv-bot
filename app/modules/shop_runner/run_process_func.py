@@ -41,7 +41,6 @@ async def __shop_update():
             .join(WBCabinet.adv_settings)\
             .filter(
                 WBCabinet.adv_settings.any(AdvSetting.bot_active == True),
-            WBCabinet.shop_id == '3fdab078-986c-410b-b4a4-bff35621fcd8'
             )
         async with sm() as session:
             result = await session.execute(stmt)
