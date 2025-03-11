@@ -83,7 +83,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
         if not promo_position:
             logger.error(f'У объекта позиции нет промопозиции shop_id {shop_id} в adv_id: {adv_id}')
             return
-        if promo_position < max_position_for_adv:
+        if promo_position < max_position_for_adv or promo_position == 1:
             new_cpm = cpm_from_parsing - step
         elif promo_position > max_position_for_adv:
             new_cpm = cpm_from_parsing + step
