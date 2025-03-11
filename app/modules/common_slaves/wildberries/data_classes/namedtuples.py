@@ -13,6 +13,9 @@ class KeywordPhrase(NamedTuple):
 
     @property
     def dist_to_word(self):
-        return 1/len(self.words)
-
+        count_words = len(self.words)
+        if count_words:
+            return 1/count_words
+        else:
+            return 0
 
