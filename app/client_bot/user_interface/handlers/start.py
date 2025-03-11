@@ -11,6 +11,7 @@ from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.utils.db.session_maker import get_async_session_maker
+from .shop_choice_message import ShopChoice
 from .start_registration_func import start_registration
 from   .. import states
 from aiogram.types import Message, CallbackQuery
@@ -51,8 +52,7 @@ async def callback_start_registration(callback: CallbackQuery,
 
         wb_user_cabinets = user.wb_user_cabinets
         chat_id = callback.message.chat.id
-        await messages. \
-                ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await  ShopChoice(bot, chat_id, wb_user_cabinets)()
     return
 
 
@@ -186,8 +186,7 @@ async def process_cabinet_api( message: Message, bot: aiogram.Bot, state: FSMCon
         result = await session.execute(stmt)
         wb_user_cabinets = result.scalars().all()
 
-    await messages. \
-        ShopChoice(bot, chat_id, wb_user_cabinets)()
+    await ShopChoice(bot, chat_id, wb_user_cabinets)()
     return
 
 
@@ -260,8 +259,7 @@ async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContex
     await messages. \
         ShopAddedSuccess(bot, chat_id, wb_user_cabinet.name)()
     all_shops = wb_user_cabinet.user.wb_user_cabinets
-    await messages. \
-        ShopChoice(bot, chat_id, all_shops)()
+    await ShopChoice(bot, chat_id, all_shops)()
     await state.set_state(state=None)
     return
 
