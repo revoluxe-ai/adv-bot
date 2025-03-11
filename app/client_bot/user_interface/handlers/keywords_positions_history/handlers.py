@@ -11,6 +11,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBUserCabinet,
 )
+from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.session_maker import get_async_session_maker
 from app.client_bot.user_interface.views import messages, callbacks
@@ -33,8 +34,18 @@ async def keyword_position_history(callback: types.CallbackQuery,
                                    state: FSMContext):
     await state.set_state(state = None)
     adv_original_id: int = callback_data.adv_original_id
+
+    stmt = select(AdvSetting)\
+    .filter(AdvSetting.id == adv_original_id)
+
+    async with _sm() as session:
+        result = await session.execute(stmt)
+        adv: AdvSetting = result.scalar_one()
+    keywords = await data_manager.get_good_bad_phrases(adv)
+
     try:
-          graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id))
+          graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id,
+                                                                     keywords))
     except Exception as e:
         logger.error(e, exc_info=True)
         await messages.NotKeywordHistoryPositions(bot, callback.message.chat.id)()

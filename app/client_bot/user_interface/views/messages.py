@@ -460,8 +460,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
 
     async def __call__(self, state: FSMContext, sort_mode = 'by_adv'):
-        graphic = await self._graphic_injection()
-        self._image = graphic
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
@@ -505,9 +503,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                      clear_keywords.append(keyword)
             self._keywords = clear_keywords
         await self._set_statistics()
+        graphic = await self._graphic_injection()
+        if not graphic:
+            graphic = 'app/core/telegram/static_images/not_keywords_position_graphic.jpg'
+        self._image = graphic
         await super().__call__()
-
-
 
     async def _set_statistics(self):
         adv: AdvSetting = self._adv_setting
@@ -622,17 +622,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         bot = self.bot
         user_telegram_id = self.chat_id
         adv_original_id = self._adv_setting.id
-        try:
-            graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id))
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            await NotKeywordHistoryPositions(bot, user_telegram_id)()
-            return
+        result = (await utils.get_keyword_history_graphic(adv_original_id,
+                                                          self._keywords))
+        if not result:
+            graphic = None
+            legend = None
+        else:
+            graphic, legend = result
         if legend:
             await KeywordGraphicPart_1(bot, user_telegram_id, graphic, adv_original_id)()
             return legend
-        else:
-            return graphic
+        return graphic
 
 
 

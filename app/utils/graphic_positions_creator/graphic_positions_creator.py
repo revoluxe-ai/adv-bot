@@ -32,7 +32,7 @@ async def get_common_keywords_with_positions(nmid)-> Optional[list[CommonKeyword
         return common_keywords
 
 
-async def get_keyword_history_graphic(adv_original_id):
+async def get_keyword_history_graphic(adv_original_id, keywords):
     import matplotlib
     from matplotlib.ticker import MaxNLocator
     import seaborn as sns
@@ -51,8 +51,6 @@ async def get_keyword_history_graphic(adv_original_id):
         async with sm() as session:
             result = await session.execute(stmt)
             adv_setting = result.scalar()
-
-        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
         first_keywords = keywords[:5]
         texts = {keyword.text for keyword in first_keywords}
         common_keywords: list[CommonKeyword] = await get_common_keywords_with_positions(nmid)
