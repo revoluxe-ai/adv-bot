@@ -64,21 +64,21 @@ class DataSetter:
         if wb_cabinet.white_list_update_active:
             white_list_updater = WhiteListUpdater()
             try:
-                best_keyword = await white_list_updater.update_white_list(keywords, 20)
+                await white_list_updater.update_white_list(keywords, 20)
             except Exception as e:
                 logger.error(f'Ошибка обновления белого списка для {adv_setting.name},'
                              f'adv_id: {adv_setting.adv_id},'
                              f'shop_id: {self._wb_cabinet.shop_id} '
                              f' {e}', exc_info=True)
-                best_keyword = None
-            try:
-                if best_keyword:
-                    await white_list_updater.update_max_bid(adv_setting, best_keyword)
-            except Exception as e:
-                logger.error(f'Ошибка обновления максимальной ставки для {adv_setting.name},'
-                             f'adv_id: {adv_setting.adv_id},'
-                             f'shop_id: {self._wb_cabinet.shop_id} '
-                             f' {e}', exc_info=True)
+
+            # try:
+            #     if best_keyword:
+            #         await white_list_updater.update_max_bid(adv_setting, best_keyword)
+            # except Exception as e:
+            #     logger.error(f'Ошибка обновления максимальной ставки для {adv_setting.name},'
+            #                  f'adv_id: {adv_setting.adv_id},'
+            #                  f'shop_id: {self._wb_cabinet.shop_id} '
+            #                  f' {e}', exc_info=True)
         try:
             await asyncio.gather(self._update_minus_keywords_in_adv(adv_setting, keywords),
                                  search_advs_manager.update_keyword_phrases_for_search_adv(adv_setting, keywords))
