@@ -7,7 +7,7 @@ import pstats
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Union, Optional, List, Callable
+from typing import Union, Optional, List, Callable, Iterable
 import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
@@ -777,6 +777,43 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
     return keywords
 
 
+def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
+                      min_ctr,
+                      adv_setting:AdvSetting)->list[CalculatedKeyword]:
+    for keyword_stat in keyword_stats:
+        keyword_stat.predict_ctr_exponent = adv_setting.exponent_predict_ctr
+        original_predict_ctr = keyword_stat.original_predict_ctr
+        keyword_setting = keyword_stat.keyword_setting
+        if not original_predict_ctr:
+            original_predict_ctr = keyword_setting.predict_ctr
+        logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
+        if min_ctr == 0:
+            enough_views = 100
+        else:
+            enough_views = int(1 / min_ctr)
+        keyword_stat.enough_views = enough_views
+        views = keyword_stat.views
+        clicks = keyword_stat.clicks
+        if clicks == 0:
+             clicks += 1
+             views += enough_views
+        original_baes_ctr = clicks / views
+        keyword_stat.baes_ctr = original_baes_ctr
+        added_clicks = keyword_setting.added_clicks
+        if added_clicks:
+            clicks += added_clicks
+        if original_predict_ctr:
+            predicted_views = int(clicks / original_predict_ctr)
+            predicted_clicks = int(predicted_views * original_predict_ctr)
+            views += predicted_views
+            clicks += predicted_clicks + 1
+        baes_predict_ctr = clicks / views
+        keyword_stat.predict_ctr = baes_predict_ctr
+        keyword_stat.baes_predict_ctr = baes_predict_ctr
+        keyword_stat.calculated_clicks = clicks
+        keyword_stat.calculated_views = views
+    return keyword_stats
+
 
 async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                                            max_cpc = None,
@@ -866,9 +903,14 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
 
     for keyword_stat in keyword_stats:
-        keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
+        text = keyword_stat.text
+        keyword_setting = keyword_text_to_keyword_setting[text]
         keyword_stat.keyword_setting = keyword_setting
         keyword_stat.hard_status = keyword_setting.hard_status
+        original_predict_ctr = text_to_predict_ctr.get(text, None)
+        keyword_stat.original_predict_ctr = original_predict_ctr
+
+    keyword_stats: list[CalculatedKeyword] = __set_predict_ctr(keyword_stats, min_ctr, adv_setting)
 
     best_keyword = get_best_keyword(keyword_stats)
     best_keyword.best_keyword_status = True
@@ -876,32 +918,10 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         best_keyword.hard_status = 2
 
     for keyword_stat in keyword_stats:
-        original_predict_ctr = text_to_predict_ctr.get(keyword_stat.text, None)
-        keyword_setting = keyword_stat.keyword_setting
-        if not original_predict_ctr:
-            original_predict_ctr = keyword_setting.predict_ctr
-        logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
-        if min_ctr == 0:
-            enough_views = 100
-        else:
-            enough_views = int(1 / min_ctr)
-        views = keyword_stat.views
-        clicks = keyword_stat.clicks
-        if clicks == 0:
-             clicks += 1
-             views += enough_views
-        original_baes_ctr = clicks / views
-        keyword_stat.baes_ctr = original_baes_ctr
-        added_clicks = keyword_setting.added_clicks
-        if added_clicks:
-            clicks += added_clicks
-        if original_predict_ctr:
-            predicted_views = int(clicks / original_predict_ctr)
-            predicted_clicks = int(predicted_views * original_predict_ctr)
-            views += predicted_views
-            clicks += predicted_clicks + 1
-        baes_predict_ctr = clicks / views
-        keyword_stat.predict_ctr = baes_predict_ctr
+        clicks = keyword_stat.calculated_clicks
+        views = keyword_stat.calculated_views
+        enough_views = keyword_stat.enough_views
+        original_predict_ctr = keyword_stat.original_predict_ctr
         if max_position:
             try:
                 position = keyword_stat.position
@@ -960,7 +980,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
             await asyncio.sleep(0)
             continue
-
+        baes_predict_ctr = keyword_stat.baes_predict_ctr
         if baes_predict_ctr >= min_ctr:
             keyword_stat.status = KeywordStatus.GOOD
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
