@@ -64,7 +64,7 @@ class DataSetter:
         if wb_cabinet.white_list_update_active:
             white_list_updater = WhiteListUpdater()
             try:
-                best_keyword = await white_list_updater.update_white_list(keywords, 10)
+                best_keyword = await white_list_updater.update_white_list(keywords, 20)
             except Exception as e:
                 logger.error(f'Ошибка обновления белого списка для {adv_setting.name},'
                              f'adv_id: {adv_setting.adv_id},'
