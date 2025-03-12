@@ -239,14 +239,6 @@ class WBShop:
             self.update_full_adv_stat(),
         )
 
-
-
-
-
-
-
-
-
     async def run(self):
         await self._run()
 
