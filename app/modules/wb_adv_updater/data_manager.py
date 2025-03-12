@@ -922,6 +922,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         views = keyword_stat.calculated_views
         enough_views = keyword_stat.enough_views
         original_predict_ctr = keyword_stat.original_predict_ctr
+        hard_status = keyword_stat.hard_status
         if max_position:
             try:
                 position = keyword_stat.position
@@ -957,19 +958,19 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             await asyncio.sleep(0)
             continue
 
-        if keyword_setting.hard_status == 3:
+        if hard_status == 3:
             keyword_stat.status = KeywordStatus.BAD
             keyword_stat.reason = 'turn_off'
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
             await asyncio.sleep(0)
             continue
-        if keyword_setting.hard_status == 2:
+        if hard_status == 2:
            keyword_stat.status = KeywordStatus.GOOD
            keyword_setting.auto_block = False
            await redis_manager.set_auto_block_status(keyword_setting.id, False)
            await asyncio.sleep(0)
            continue
-        elif keyword_setting.hard_status == 0:
+        elif hard_status == 0:
             keyword_stat.status = KeywordStatus.BAD
             keyword_stat.reason = 'black_list'
             await redis_manager.set_auto_block_status(keyword_setting.id, False)
