@@ -367,25 +367,28 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         views = keyword.views
         ctr = keyword.ctr
         if keyword.reason == 'max_position':
-            hard_status = 'ЦП'
+            message_status = "БС-" if keyword.hard_status == 2 else ""
+            message_status = message_status + 'ЦП'
         elif keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
-            hard_status = 'МП'
+            message_status = "БС-" if keyword.hard_status == 2 else ""
+            message_status = message_status + 'МП'
         elif keyword.hard_status == BLACK_LIST:
-            hard_status = 'НРФ'
+            message_status = 'НРФ'
         elif keyword.reason == 'max_cpc':
-            hard_status = 'МС'
+            message_status = 'МС'
         elif keyword.hard_status == TURN_OFF:
-            hard_status = 'О'
+            message_status = 'О'
         elif keyword.hard_status == WHITE_LIST:
-            hard_status = 'БС'
+            message_status = 'БС'
         elif keyword.hard_status == AUTO_MODE:
-            hard_status = 'А'
+            message_status = 'А'
         else:
             raise ValueError(f'Unknown hard_status: {keyword.hard_status}')
 
         turn_on = '✅' if keyword.status == KeywordStatus.GOOD else '❌'
         cluster_name = keyword.cluster_name
-        text = f"""{clicks}/{views}/{round(ctr *100,2)}%"""
+        text = "🌟" if keyword.best_keyword_status else ""
+        text += f"""{clicks}/{views}/{round(ctr *100,2)}%"""
         text = text + '|'
         if keyword.cpm:
             first_position = keyword.base_position
@@ -400,7 +403,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         else:
             first_position = '?'
             text += f'{first_position}'
-        text += f'{turn_on}({hard_status}) {keyword.text}'
+        text += f'{turn_on}({message_status}) {keyword.text}'
 
         text += f'({keyword.query})'
 

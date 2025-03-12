@@ -863,14 +863,24 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         logger.error(f'Ошибка при получении cpm {e}', exc_info=True)
         cpm_now = None
     new_statuses = []
+
+
     for keyword_stat in keyword_stats:
-        logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
         keyword_stat.keyword_setting = keyword_setting
+        keyword_stat.hard_status = keyword_setting.hard_status
+
+    best_keyword = get_best_keyword(keyword_stats)
+    best_keyword.best_keyword_status = True
+    if best_keyword.hard_status == 1:
+        best_keyword.hard_status = 2
+
+    for keyword_stat in keyword_stats:
         original_predict_ctr = text_to_predict_ctr.get(keyword_stat.text, None)
+        keyword_setting = keyword_stat.keyword_setting
         if not original_predict_ctr:
             original_predict_ctr = keyword_setting.predict_ctr
-        keyword_stat.hard_status = keyword_setting.hard_status
+        logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         if min_ctr == 0:
             enough_views = 100
         else:
