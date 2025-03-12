@@ -42,6 +42,7 @@ class CalculatedKeyword:
     original_predict_ctr: Optional[float] = None
     predict_ctr_exponent: Optional[float] = None
     k: Optional[float] = None
+    best_keyword_status: [bool] = None
 
     @property
     def mean_ctr(self):
