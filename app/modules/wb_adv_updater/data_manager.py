@@ -914,8 +914,6 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
     best_keyword = get_best_keyword(keyword_stats)
     best_keyword.best_keyword_status = True
-    if best_keyword.hard_status == 1:
-        best_keyword.hard_status = 2
 
     for keyword_stat in keyword_stats:
         clicks = keyword_stat.calculated_clicks
