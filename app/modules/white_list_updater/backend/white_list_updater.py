@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
@@ -14,16 +14,14 @@ class WhiteListUpdater:
         assert [isinstance(keyword, CalculatedKeyword) for keyword in keywords]
         keywords.sort(key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
         top_keyword: CalculatedKeyword = keywords[0]
-        stmt = select(KeywordSetting)\
-        .options(selectinload(KeywordSetting.adv_setting))\
-            .where(KeywordSetting.id == top_keyword.keyword_setting.id)
+        stmt = update(KeywordSetting)\
+            .where(KeywordSetting.id == top_keyword.keyword_setting.id)\
+        .values({
+            KeywordSetting.hard_status: 2
+
+        })
         async with sm(read_only=False) as session:
-            result = await session.execute(stmt)
-            keyword_setting: KeywordSetting = result.scalar()
-            keyword_setting.hard_status = 2
-            adv_setting: AdvSetting = keyword_setting.adv_setting
-            adv_setting.hard_min_ctr = None
-            adv_setting.bidder_active = True
+            await session.execute(stmt)
             await session.commit()
         return top_keyword
 
