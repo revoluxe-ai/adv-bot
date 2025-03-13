@@ -912,8 +912,9 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
     keyword_stats: list[CalculatedKeyword] = __set_predict_ctr(keyword_stats, min_ctr, adv_setting)
 
-    best_keyword = get_best_keyword(keyword_stats)
-    best_keyword.best_keyword_status = True
+    best_keyword: Optional[KeywordSetting] = get_best_keyword(keyword_stats)
+    if best_keyword:
+        best_keyword.best_keyword_status = True
 
     for keyword_stat in keyword_stats:
         clicks = keyword_stat.calculated_clicks
