@@ -1,8 +1,8 @@
 from abc import ABC
 import os
 from typing import Union
+from app.core.wb_api.exceptions import ApiForbiddenError
 from app.utils.db.session_maker import get_async_session_maker as sm
-from . import exceptions
 import logging
 from . import models
 from .models import WBToken, WBUserCabinet, WBCabinet
@@ -52,7 +52,7 @@ class ABC_WB_API(WbRequestApiMixin):
         self.wb_cabinet = wb_cabinet
         assert wb_cabinet
         if not tokens:
-            raise exceptions.ApiForbiddenError('Нет токенов для доступа к API',
+            raise ApiForbiddenError('Нет токенов для доступа к API',
                                                wb_user_cabinet=wb_access.wb_user_cabinet)
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
         self._free_tokens = tokens
@@ -100,5 +100,5 @@ class ABC_WB_API(WbRequestApiMixin):
             #                                 wb_cabinet.shop_id).send_all_users()
             # except Exception as e:
             #     logger.error(f'Ошибка при отправке сообщения о невалидных токенах: {e}', exc_info=True)
-            raise exceptions.ApiForbiddenError('Нет свободных токенов',
+            raise ApiForbiddenError('Нет свободных токенов',
                                                wb_user_cabinet=self.access.wb_cabinet)

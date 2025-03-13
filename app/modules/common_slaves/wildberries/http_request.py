@@ -1,17 +1,12 @@
-import asyncio
 import json
-import time
-from typing import Optional
-
 import aiohttp
-from aiohttp import ClientOSError, ServerDisconnectedError, ClientResponseError
-
-from .exceptions import (ApiForbiddenError,
+from app.core.wb_api.exceptions import ApiForbiddenError
+from .exceptions import (
                          TooManyRequests,
                          UnknownApiRequestError,
                          BadRequestError,
                          NotValidDataError,
-                         CardNotFoundInWB, ApiErrorWithCode)
+                         ApiErrorWithCode)
 import logging
 
 logger = logging.getLogger(__name__)
