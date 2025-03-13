@@ -39,12 +39,6 @@ class TokensFromDifferentShopsError(BaseException):
 
 
 
-class ApiForbiddenError(Exception):
-   def __init__(self, text, wb_user_cabinet: Union['new.types.WBUserCabinet', None] = None):
-       self.text = text
-       self.wb_user_cabinet = wb_user_cabinet
-       m = 'API доступ запрещен'
-       super().__init__(f'{m} text: {self.text}')
 
 
 class TooManyRequests(Exception):
