@@ -3,7 +3,7 @@ import logging
 from functools import wraps
 from typing import Optional, Iterable
 from datetime import datetime
-
+from app.core.wb_api import exceptions
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.api import AdvertApi
 from app.modules.full_stat_adv_updater.types import FullAdvStat
@@ -129,11 +129,16 @@ class WBShop:
 
     @update_data()
     async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: AdvertApi, shop_id: str):
-        await run_bidder_process_for_adv(adv_setting, wb_api, shop_id)
-        # await redis_manager.set_last_bid_update(adv_setting.adv_id)
-        if self.__first_bidder_update_time is None:
-            self.__first_bidder_update_time = datetime.now()
-
+        try:
+            await run_bidder_process_for_adv(adv_setting, wb_api, shop_id)
+            # await redis_manager.set_last_bid_update(adv_setting.adv_id)
+            if self.__first_bidder_update_time is None:
+                self.__first_bidder_update_time = datetime.now()
+        except exceptions.ApiForbiddenError as exc:
+            raise exc
+        except Exception as exc:
+            logger.error('Ошибка обновления ставок в РК', exc_info=True)
+            raise exc
 
     async def _update_cpm_bid(self):
         max_pause = 60*3 + 60

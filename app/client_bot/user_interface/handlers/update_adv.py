@@ -1,26 +1,16 @@
-import asyncio
 import logging
-
 from sqlalchemy.orm import selectinload
-
-from app.client_bot.user_interface.handlers import start
 import aiogram
-from aiogram import F, Router, types, Bot
-from aiogram.filters import StateFilter
+from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
-
+from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
 from app.modules.wb_adv_updater import wb_manager
 from app.modules.wb_adv_updater.data_setter import DataSetter
-from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker
-from .. import states
-
 from ..views import callbacks, messages
-from app.exc import ApiForbiddenError
 
 sm = get_async_session_maker
 

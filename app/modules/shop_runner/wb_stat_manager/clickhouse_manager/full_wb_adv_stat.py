@@ -125,3 +125,35 @@ async def insert(stats: Iterable[FullAdvStat]):
                 await client.query(query, parameters=row)
         except Exception:
             logger.error('Ошибка вставки в кликхаус', exc_info=True)
+
+
+async def get_keywords_spend(adv_ids: list[int], start_date: datetime, end_date: datetime) -> float:
+    end_date_str = end_date.strftime('%Y-%m-%d')
+    start_date_str = start_date.strftime('%Y-%m-%d')
+
+    async with get_clickhouse_client() as client:
+        query = """
+        WITH max_versions AS (
+            SELECT *, 
+                   ROW_NUMBER() OVER (PARTITION BY adv_id, date, text ORDER BY version DESC) AS row_num
+            FROM default_db.advkeyword
+            WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
+            AND adv_id IN %(adv_ids)s
+        )
+        SELECT SUM(spend) AS total_spend
+        FROM max_versions
+        WHERE row_num = 1
+        """
+        try:
+            res = await client.query(query, parameters={
+                "start_date": start_date_str,
+                "end_date": end_date_str,
+                "adv_ids": adv_ids
+            })
+            result = res.first_item
+
+            return result["total_spend"] if result and result["total_spend"] is not None else 0.0
+
+        except Exception:
+            logger.error('Ошибка получения суммы трат по ключам из ClickHouse', exc_info=True)
+            return 0.0

@@ -2,6 +2,7 @@ import typing
 
 from sqlalchemy import select
 
+from app.core.wb_api.exceptions import ApiForbiddenError
 from app.exc import CardNotFoundInDB
 from aiogram import Router
 from aiogram.exceptions import TelegramForbiddenError
@@ -17,7 +18,6 @@ from aiogram.fsm.context import FSMContext
 import logging
 from app import client_bot as tb
 from app.client_bot import const
-from app.modules.common_slaves.wildberries.exceptions import ApiForbiddenError
 from app.modules.wb_keywords_parser.parser import ErrorParsingPositions
 
 logger = logging.getLogger(__name__)

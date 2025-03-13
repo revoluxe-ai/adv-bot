@@ -33,12 +33,12 @@ from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
-from ..common_slaves.wildberries.exceptions import ApiForbiddenError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from .shops_manager import rights_control
 from ..wb_update_state_manager import KeywordStatUpdateState
 from ...client_bot import const
 from app.utils.click_house.client import get_clickhouse_client
+from ...core.wb_api.exceptions import ApiForbiddenError
 
 logger = logging.getLogger(__name__)
 
