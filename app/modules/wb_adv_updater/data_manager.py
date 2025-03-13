@@ -763,10 +763,10 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
     else:
         if max_cpc > adv.max_cpc:
             max_cpc = adv.max_cpc
-    if adv.target_ctr_mode:
-        keywords =  await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
-    else:
-        keywords =  await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
+    # if adv.target_ctr_mode:
+    #     keywords =  await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
+    # else:
+    keywords =  await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
     keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
