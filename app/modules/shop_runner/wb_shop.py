@@ -243,8 +243,8 @@ class WBShop:
         await self._update_access()
         await asyncio.gather(
             self.update_cpm_run(),
-            # self.update_common_sale_stat(),
-            # self.update_full_adv_stat(),
+            self.update_common_sale_stat(),
+            self.update_full_adv_stat(),
         )
 
     async def run(self):
