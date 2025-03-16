@@ -1,5 +1,7 @@
 import logging
 from app.client_bot import const
+from app.client_bot.bot import get_bot
+from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
 from app.modules.adv_creator import backend
 from app.modules.adv_creator.backend import MainAdvManager, CardsNotFoundForShopError
@@ -12,6 +14,10 @@ logger = logging.getLogger(__name__)
 async def create_complex_advs(ctx, nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int):
     try:
         await _create_complex_advs(ctx, nmid, shop_id, hard_mode, user_telegram_id)
+    except  ApiForbiddenError:
+        bot = get_bot()
+        await bot.send_message(user_telegram_id, f"Нет токенов с нужными правами. Обратитесь в поддержку {const.SUPPORT_LINK}")
+        return
     except Exception:
         delay = 1
         logger.error(f'Ошибка задачи create_complex_advs, повтор через {delay} сек',
