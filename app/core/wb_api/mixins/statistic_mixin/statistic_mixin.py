@@ -1,14 +1,12 @@
 import json
-
 import aiohttp
-from app.core.wb_api.interface import InterfaceWBAPI
 from app.core.wb_api.http_request import try_except_decorator, requests
 from datetime import datetime, timedelta
 from .wb_statistic_obj import CommonStat
 from ...base import BaseAPI
 
 
-class CommonStatMinix(InterfaceWBAPI, BaseAPI):
+class CommonStatMinix(BaseAPI):
 
     HOST = 'https://seller-analytics-api.wildberries.ru'
 
