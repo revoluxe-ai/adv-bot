@@ -70,15 +70,16 @@ def try_except_decorator(requests_per_interval, interval_seconds, max_attempts=5
     return decorator
 
 
-
-
 async def requests(session, method, url, data=None, json_data=None, headers=None) -> str:
     async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
         try:
             logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
+            text = await response.text()
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
+                text = json.loads(text)
+                logger.error(f"{text['title']}: {text['detail']}")
                 raise ApiForbiddenError('Неверный API ключ') from e
             if e.status == 429:
                 logger.debug(f'Превышен лимит запросов к API: {url}')

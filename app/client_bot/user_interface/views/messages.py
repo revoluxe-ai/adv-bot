@@ -515,6 +515,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         auto_adv_id = adv.adv_id
         advs.append(auto_adv_id)
         auction_adv_id = adv.search_adv_id
+        keywords = self._keywords
+        fact_cpm = await data_manager.get_cpm(adv, keywords)
+        self._fact_cpm = fact_cpm
         if auction_adv_id:
             advs.append(auction_adv_id)
         pass_days = 2
@@ -587,6 +590,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                  f'({plan_for_sales_for_day})\n'
                  f'Себестоимость заказа (цель) (максимум): {round(order_cost)} ({target_price_for_order})'
                  f' ({max_price_for_order})\n'
+                 f'Текущая вычисляемая ставка: {self._fact_cpm}\n'
+                 f'Целевая позиция: {self._adv_setting.max_place}\n'
+                 f'Максимальная ставка: {self._adv_setting.max_cpm}\n'
              )
 
         else:
@@ -696,7 +702,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         if self.position:
             text += (f'🏆 *Органическая позиция:* {self.position.base_position}\n'
                      f"""🚀 *Буст-позиция:* {self.position.promo_position if self.position.promo_position else "Нет"}\n"""
-                     f"""💰 *Ставка на момент сбора данных:* {self.position.cpm if self.position.cpm else "Нет"}\n"""
+                     f"""💰 *Ставка из выдачи WB :* {self.position.cpm if self.position.cpm else "Нет"}\n"""
                      f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n"""
                      f"""Тип кампании: {self.position.type_native if self.position.type_native else "Нет"}\n""")
 

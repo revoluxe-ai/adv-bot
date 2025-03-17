@@ -274,6 +274,12 @@ class AdvSetting(BaseTable):
     max_price_for_order = mapped_column(Float,
                                            nullable=True,
                                            default=None,)
+    cpm = mapped_column(Integer, nullable=True, default=None)
+
+    # auto_adv_target_status = mapped_column(Boolean,
+    #                                        nullable=True,
+    #                                        default=None)
+    # auction_adv_target_status = mapped_column(Boolean)
 
 
 

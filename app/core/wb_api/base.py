@@ -1,8 +1,5 @@
-from abc import ABC, abstractmethod
-
-from . import exceptions
+from abc import ABC
 from .exceptions import ApiForbiddenError
-from .interface import InterfaceWBAPI
 from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
 import logging

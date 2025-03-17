@@ -12,6 +12,7 @@ from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_a
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
 from app.modules.wb_adv_updater import data_manager
+from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi
@@ -132,7 +133,6 @@ class WBShop:
     async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: AdvertApi, shop_id: str):
         try:
             await run_bidder_process_for_adv(adv_setting, wb_api, shop_id)
-            # await redis_manager.set_last_bid_update(adv_setting.adv_id)
             if self.__first_bidder_update_time is None:
                 self.__first_bidder_update_time = datetime.now()
         except exceptions.ApiForbiddenError as exc:

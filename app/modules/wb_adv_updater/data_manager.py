@@ -7,12 +7,12 @@ import pstats
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Union, Optional, List, Callable, Iterable
+from typing import Union, Optional, List, Callable
 import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.sql.functions import coalesce
-
+from collections import Counter
 from app.exc import CardNotFoundInDB, PositionNotFoundError, NotFoundPositionWithCMPError
 import pandas as pd
 from PIL import Image
@@ -471,8 +471,16 @@ async def convert_keyword_stats_in_clusters(keyword_stats: list[CalculatedKeywor
 
 
 async def get_cpm_by_nmid(nmid, texts)-> Optional[int]:
-    cpm = await __get_cpm_from_positions(nmid, texts)
+    try:
+        cpm = await __get_cpm_from_positions(nmid, texts)
+    except (NotFoundPositionWithCMPError, PositionNotFoundError):
+        logger.debug(f'Не найдены позиции из выдачи для {nmid} - {texts}')
+        cpm = None
     return cpm
+
+
+
+
 
 
 async def __get_cpm_from_positions(nmid: int, texts) -> Optional[int]:
@@ -559,7 +567,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
     sum_views = 0
     sum_clicks = 0
     try:
-        cpm_now = await get_cpm_by_nmid(adv_setting.nmids[0])
+        cpm_now = await get_cpm(adv_setting, keyword_stats)
     except Exception as e:
         logger.error(f'Ошибка при получении cpm {e}')
         cpm_now = None
@@ -817,7 +825,7 @@ def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
 
 async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                                            max_cpc = None,
-                                           pass_time = timedelta(days=7))->list[CalculatedKeyword]:
+                                           pass_time = timedelta(days=7)) -> list[CalculatedKeyword]:
 
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
@@ -895,7 +903,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     # text_to_keyword_position: dict[str, WBItemPosition]\
     #     = {position.keyword_text: position for position in keyword_positions}
     try:
-        cpm_now = await get_cpm_by_nmid(adv_setting.nmids[0], texts)
+        cpm_now = await get_cpm(adv_setting, keyword_stats)
     except Exception as e:
         logger.error(f'Ошибка при получении cpm {e}', exc_info=True)
         cpm_now = None
@@ -1985,3 +1993,46 @@ async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(shop_id: str):
     async with _sm() as session:
         result = await session.execute(stmt)
         return result.scalar_one()
+
+
+
+async def get_cpm(auto_adv: AdvSetting, keywords):
+    nmid = auto_adv.nmids[0]
+    texts = [kw.text for kw in keywords]
+
+    # Получаем CPM из парсинга
+    cpm_from_parsing = await get_cpm_by_nmid(nmid, texts)
+    # Проверяем, есть ли CPM из аукциона
+    auction_adv_id: int = auto_adv.search_adv_id
+    cpm_from_auction = None
+    if auction_adv_id:
+        stmt = select(AdvSetting) \
+            .options(load_only(AdvSetting.cpm)) \
+            .where(AdvSetting.adv_id == auction_adv_id)
+        async with _sm() as session:
+            result = await session.execute(stmt)
+            auction_adv: AdvSetting = result.scalar_one_or_none()
+            if auction_adv:
+                cpm_from_auction = auction_adv.cpm
+
+    # CPM из настроек рекламного объявления
+    cpm_from_auto = auto_adv.cpm
+    auto_adv_id = auto_adv.adv_id
+    last_auto_bid: int | None = await redis_manager.get_last_adv_bid(auto_adv_id)
+    auction_adv_id = auto_adv.search_adv_id
+    last_auction_bid: int | None = await redis_manager.get_last_adv_bid(auction_adv_id)
+    # Собираем только непустые значения
+    cpm_values = [cpm for cpm in [cpm_from_parsing, cpm_from_auction, cpm_from_auto, last_auto_bid, last_auction_bid] if cpm is not None]
+
+    if not cpm_values:
+        return None  # Если нет данных, возвращаем None
+
+    # Находим наиболее частое значение (кворум)
+    counter = Counter(cpm_values)
+    most_common = counter.most_common(1)[0]  # (значение, частота)
+
+    if most_common[1] > 1:  # Если какое-то значение встречается больше 1 раза, возвращаем его
+        return most_common[0]
+
+    # Иначе возвращаем максимум
+    return max(cpm_values)

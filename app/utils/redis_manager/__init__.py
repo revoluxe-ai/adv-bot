@@ -713,3 +713,20 @@ async def reset_last_user_use_time(telegram_user_id: int):
     key = 'last_user_use_time:' + str(telegram_user_id)
     await redis_master_client.delete(key)
     return None
+
+
+async def get_last_adv_bid(adv_id: int) -> int | None:
+    key = f'last_adv_bid:{adv_id}'
+    value = await redis_replica_client.get(key)
+    if not value:
+        return None
+    value = value.decode('utf-8')
+    if value is None:
+        return None
+    return int(value)
+
+
+
+async def set_last_adv_bid(adv_id: int, bid: int):
+    key = f'last_adv_bid:{adv_id}'
+    await redis_master_client.set(key, bid)

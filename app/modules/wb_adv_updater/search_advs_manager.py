@@ -109,27 +109,27 @@ async def _set_keyword_phrases_for_search_advs(adv_settinds):
         except:
             logger.error('Ошибка установки фраз для поисковых РК', exc_info=True)
 
-
-async def _update_cpm_in_search_advs(adv_settinds: list[AdvSetting]):
-    for adv in adv_settinds:
-        try:
-            wb_cabinet_id = adv.wb_cabinet_id
-            access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
-            api = WBApi(access)
-            search_adv_id = adv.search_adv_id
-            cpm = await data_manager.get_cpm_by_nmid(adv.nmids[0])
-            if not cpm:
-                cpm = adv.max_cpm
-            if cpm < 150:
-                cpm = 150
-        except Exception as e:
-             logger.error(f'Ошибка получения CPM для {adv.name}: {e}', exc_info=True)
-             return
-        try:
-             await api.advert.set_search_cpm(search_adv_id, cpm)
-        except Exception as e:
-             logger.error(f'Ошибка установки CPM для {adv.name}: {e}', exc_info=True)
-             return
+#
+# async def _update_cpm_in_search_advs(adv_settinds: list[AdvSetting]):
+#     for adv in adv_settinds:
+#         try:
+#             wb_cabinet_id = adv.wb_cabinet_id
+#             access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
+#             api = WBApi(access)
+#             search_adv_id = adv.search_adv_id
+#             cpm = await data_manager.get_cpm()
+#             if not cpm:
+#                 cpm = adv.max_cpm
+#             if cpm < 150:
+#                 cpm = 150
+#         except Exception as e:
+#              logger.error(f'Ошибка получения CPM для {adv.name}: {e}', exc_info=True)
+#              return
+#         try:
+#              await api.advert.set_search_cpm(search_adv_id, cpm)
+#         except Exception as e:
+#              logger.error(f'Ошибка установки CPM для {adv.name}: {e}', exc_info=True)
+#              return
 
 
 
