@@ -8,6 +8,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.future import select
 from app.client_bot import utils, const
+from app.core.wb_api.data_classes.keywordstat_from_db import KeywordStatus
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -175,6 +176,62 @@ async def setting_keywords_show_keywords_is_hard(callback: CallbackQuery,
 
         await redis_manager.set_check_last_24_hours(adv_original_id)
         return
+
+
+
+
+
+
+
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == 'phrase_for_adding_to_white_list'))
+async def setting_keywords_white_list(callback: CallbackQuery,
+                                      callback_data: callbacks.SettingKeywords,
+                                        bot: aiogram.Bot,
+                                        state: FSMContext):
+
+    await state.update_data(keywords_filter=None)
+    adv_original_id = callback_data.adv_original_id
+    page = callback_data.page
+    if not page:
+        page = 1
+    async with _sm() as session:
+        stmt = select(AdvSetting) \
+            .where(AdvSetting.id == adv_original_id,)
+        result = await session.execute(stmt)
+        adv_setting: AdvSetting = result.scalar()
+    keywords = await utils.get_keywords_for_keyboard(adv_setting)
+    keywords = [keyword for keyword in keywords if keyword.keyword_setting.hard_status == 1\
+                and keyword.status == KeywordStatus.BAD]
+    keywords.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
+    keyword_texts = [keyword.text for keyword in keywords]
+    await state.update_data(keywords_filter=keyword_texts)
+    await state.update_data(adv_choice_last_page=page)
+    state_data = await state.get_data()
+    wb_user_cabinet_original_id = state_data.get('last_wb_user_cabinet_original_id')
+    nmids = adv_setting.nmids
+    chat_id = callback.message.chat.id
+    adv_choice_last_page = 1
+
+    try:
+       main_photos = await data_manager.get_main_photos(nmids[:1])
+    except:
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
+        return
+    await redis_manager.set_check_last_24_hours(adv_original_id)
+    await messages.AdvKeywordsSetting(
+        bot,
+        chat_id,
+        keywords,
+        adv_setting,
+        wb_user_cabinet_original_id,
+        adv_choice_last_page,
+        main_photos[0],
+        page=page,
+    )(state, 'by_adv')
+
+    await redis_manager.set_check_last_24_hours(adv_original_id)
+    return
+
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'white_list'))

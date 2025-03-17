@@ -19,9 +19,6 @@ from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
 sm = get_async_session_maker
 
 
-
-
-
 def get_budget_type_keyboard(balances):
     buttons = [
         [InlineKeyboardButton(text=f'Счет: {balances.balance} руб.', callback_data=BudgetForCreatingAdv(type='balance').pack())],
@@ -446,6 +443,13 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                    callback_data=callbacks.SettingKeywords(
                                        adv_original_id=adv_setting.id,
                                        type='white_list',
+                                       page=page).pack())]
+    bottoms.append(bottom)
+
+    bottom = [InlineKeyboardButton(text='Показать фразы-кандидаты на включение в БС',
+                                   callback_data=callbacks.SettingKeywords(
+                                       adv_original_id=adv_setting.id,
+                                       type='phrase_for_adding_to_white_list',
                                        page=page).pack())]
     bottoms.append(bottom)
 
