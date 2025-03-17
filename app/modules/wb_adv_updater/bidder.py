@@ -83,13 +83,9 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
         logger.error('Максимальная позиция не задана!')
         return
     max_cpm = await data_manager.get_max_adv_bid(adv_setting)
-    nmid_in_adv = adv_setting.nmids[0]
-
     keywords = await data_manager.get_good_bad_phrases(adv_setting)
-    texts = [kw.text for kw in keywords]
-    cpm_from_parsing = await data_manager.get_cpm_by_nmid(nmid_in_adv, texts)
-
-    if not cpm_from_parsing:
+    fact_cpm = await data_manager.get_cpm(adv_setting, keywords)
+    if not fact_cpm:
         logger.error('Не удалось получить ставку из парсинга'
                      f'Shop ID: {access.wb_cabinet.shop_id}'
                      f'Adv ID: {adv_id}',
@@ -103,11 +99,11 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
         promo_position = None
     if promo_position:
         if promo_position < max_position_for_adv:
-            new_cpm = cpm_from_parsing - step
+            new_cpm = fact_cpm - step
         elif promo_position > max_position_for_adv:
-            new_cpm = cpm_from_parsing + step
+            new_cpm = fact_cpm + step
         else:
-            new_cpm = cpm_from_parsing
+            new_cpm = fact_cpm
         if not max_cpm:
             logger.error('Максимальная ставка не задана!')
             return
@@ -118,7 +114,7 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
                     adv_setting = await session.get(AdvSetting, adv_setting.id)
                     adv_setting.max_place = promo_position + 1
                     await session.commit()
-        if new_cpm == cpm_from_parsing:
+        if new_cpm == fact_cpm:
             return
         if new_cpm < 125:
             new_cpm = 125

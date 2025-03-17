@@ -276,7 +276,7 @@ class WBShop:
             except Exception:
                 logger.error('Ошибка обновления данных', exc_info=True)
             finally:
-                await asyncio.sleep(60)
+                await asyncio.sleep(60*3)
 
 
     async def _run(self):
