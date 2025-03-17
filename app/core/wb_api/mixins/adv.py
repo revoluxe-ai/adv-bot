@@ -8,7 +8,6 @@ from .excs import (StartAdvError,
 import aiohttp
 from ..interface import InterfaceWBAPI
 from ..http_request import try_except_decorator, requests
-from ..data_classes import AdvFromWBApi as Adv
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv, Balances
 
 import logging
@@ -41,7 +40,7 @@ class AdvMixin(InterfaceWBAPI):
                 raise AdvNotFoundInWBError(f'Не найдены РК с id {adv_ids}')
 
         return advs
-
+    @try_except_decorator(5, 60)
     async def create_search_adv(self, nmids: list[int], adv_name: str) -> int:
         assert len(nmids) <= 50
 

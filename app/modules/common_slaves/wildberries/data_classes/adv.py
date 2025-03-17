@@ -187,8 +187,6 @@ class Adv:
 
 
 
-
-
 class Statistic:
     def __init__(self, data):
         assert isinstance(data, list)

@@ -343,9 +343,8 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
 
         await bot.send_message(chat_id,
                                "Загрузка кампаний завершена. Начинаю обновление карточек, процесс может занять длительное время.")
-        adv_ids = [adv.advertId for adv in advs]
         try:
-            await asyncio.wait_for(shop_updater.update_cards_data(adv_ids), timeout=10 * 60)
+            await asyncio.wait_for(shop_updater.update_cards_data(), timeout=10 * 60)
         except ApiForbiddenError:
             await bot.send_message(chat_id,
                                    f"Нет прав для доступа в РК, обновите токен, в случае проблем обратитесь в поддержку -> ")

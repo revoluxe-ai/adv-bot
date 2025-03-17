@@ -6,6 +6,7 @@ from datetime import datetime
 from app.core.wb_api import exceptions
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.api import AdvertApi
+from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.full_stat_adv_updater import wb_data_getter
@@ -229,7 +230,7 @@ class WBShop:
             try:
                 await self._update_full_adv_stat(wb_api)
             except ApiForbiddenError:
-                logger.error('Нет доступов для обновления общей статистики', exc_info=True)
+                logger.debug('Нет доступов для обновления общей статистики')
                 await self._update_access()
                 access = self.__access
                 wb_api = CommonWBApi(access)
@@ -239,9 +240,50 @@ class WBShop:
                 await asyncio.sleep(60 * 15)
 
 
+    @staticmethod
+    async def _update_adv_data_from_wb_to_pg(shop_data_updater: ShopDataUpdater):
+        try:
+            await shop_data_updater.update_advs_data()
+        except ApiForbiddenError as exc:
+            raise exc
+        except Exception as exc:
+            logger.error('Ошибка обновления данных', exc_info=True)
+            raise exc
+
+    @update_data()
+    async def _update_cards_data_from_wb_to_pg(self, shop_data_updater: ShopDataUpdater):
+        adv_ids = [adv.adv_id for adv in self._adv_settings]
+        try:
+            await shop_data_updater.update_cards_data()
+        except ApiForbiddenError as exc:
+            raise exc
+        except Exception as exc:
+            logger.error('Ошибка обновления данных', exc_info=True)
+            raise exc
+
+
+
+    async def update_advs_data_from_wb_to_pg(self):
+        wb_access = self.__access
+        shop_data_updater = ShopDataUpdater(wb_access)
+        while True:
+            try:
+                await self._update_adv_data_from_wb_to_pg(shop_data_updater)
+            except ApiForbiddenError:
+                await self._update_access()
+                wb_access = self.__access
+                shop_data_updater = ShopDataUpdater(wb_access)
+            except Exception:
+                logger.error('Ошибка обновления данных', exc_info=True)
+            finally:
+                await asyncio.sleep(60)
+
+
     async def _run(self):
         await self._update_access()
         await asyncio.gather(
+            self.update_advs_data_from_wb_to_pg(),
+            self.update_cards_data_from_wb_to_pf(),
             self.update_cpm_run(),
             self.update_common_sale_stat(),
             self.update_full_adv_stat(),
@@ -252,4 +294,21 @@ class WBShop:
 
     # async def _update_full_stat_in_redis(self, full_stats: Iterable[FullAdvStat]):
     #     await redis_manager.set_full_stat_adv(full_stats)
+    async def update_cards_data_from_wb_to_pf(self):
+        access = self.__access
+        shop_data_updater = ShopDataUpdater(access)
+        while True:
+            try:
+                await self._update_cards_data_from_wb_to_pg(shop_data_updater)
+            except ApiForbiddenError:
+                logger.debug('Нет доступов для обновления общей статистики')
+                await self._update_access()
+                access = self.__access
+                shop_data_updater = ShopDataUpdater(access)
+            except Exception:
+                logger.error('Ошибка обновления полной статистики обновления', exc_info=True)
+            finally:
+                await asyncio.sleep(60 * 15)
+
+
 
