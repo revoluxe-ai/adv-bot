@@ -1,3 +1,5 @@
+from app.core.wb_api.data_classes.advs import adv_fabric
+from app.core.wb_api.mixins.content import ContentMixin
 from ..data_classes.card_from_wb import CardFromWB
 import asyncio
 import datetime
@@ -305,8 +307,9 @@ class AdvertApi(ABC_WB_API):
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             for advert in answer:
-                adv = Adv(advert)
-                advs.append(adv)
+                adv: Optional[Adv] = adv_fabric.get_adv_data_class(advert)
+                if adv:
+                     advs.append(adv)
         return advs
 
     @try_except_decorator(1, 1)
@@ -363,7 +366,7 @@ class AdvertApi(ABC_WB_API):
 
 
 
-class ContentApi(ABC_WB_API):
+class ContentApi(ABC_WB_API, ContentMixin):
     _only_read = api_rights.OnlyRead.FALSE
     _rights: set = {api_rights.Rights.CONTENT}
     HOST = 'https://content-api.wildberries.ru'
@@ -395,7 +398,7 @@ class ContentApi(ABC_WB_API):
                 if not categories:
                     break
                 else:
-                    offset = offset + limit
+                    offset += limit
 
         return all_categories
 
@@ -483,6 +486,7 @@ class ContentApi(ABC_WB_API):
         async with aiohttp.ClientSession() as session:
             response = await requests(session, 'POST', url=url, data=data, headers=self.headers.standart)
             return json.loads(response)
+
 
 
 

@@ -1,4 +1,4 @@
-__all__ = ['cv']
+__all__ = ['cv', 'settings']
 
 from .settings_master import settings
 

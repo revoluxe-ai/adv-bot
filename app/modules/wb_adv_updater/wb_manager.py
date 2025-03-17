@@ -264,7 +264,7 @@ async def update_all_data_in_db_run(tasks):
                 continue
 
             async def task_with_delay():
-                await shop_data_updater.update_all_data()
+                await shop_data_updater.update_all_shop_data()
                 await asyncio.sleep(15*60)
             task = asyncio.create_task(task_with_delay())
             logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')

@@ -1,7 +1,7 @@
 import json
 from sqlalchemy import select
 from app import my_types
-from app.modules.common_slaves.wildberries.data_classes.adv import Adv
+from app.core.wb_api.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
@@ -30,6 +30,7 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int):
                 existing_adv.name = adv.name
                 existing_adv.type = adv.type
                 nmids = adv.nmids
+                existing_adv.cpm = adv.cpm
                 if nmids:
                     existing_adv.nmids = adv.nmids
             else:
@@ -44,6 +45,7 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int):
                 adv_in_db.nmids = adv.nmids
                 adv_in_db.active_status = adv.status_native
                 adv_in_db.type = adv.type
+                adv_in_db.cpm = adv.cpm
                 session.add(adv_in_db)
             await session.commit()
     return

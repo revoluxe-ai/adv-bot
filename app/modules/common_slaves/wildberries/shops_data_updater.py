@@ -1,4 +1,3 @@
-
 import asyncio
 from sqlalchemy import select
 from . import models
@@ -6,6 +5,7 @@ from app.utils.db.session_maker import get_async_session_maker
 import logging
 from . import wb_db_manager
 import typing
+
 if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.common_slaves.wildberries.api import WBApi
@@ -45,6 +45,11 @@ class ShopDataUpdater:
         pass
 
 
+    async def update_all_shop_data(self):
+        await asyncio.gather(self.update_advs_data(),
+                             self.update_advs_data())
+
+
     async def quick_update_all_data(self):
         await self.__quick_update_advs()
 
@@ -76,13 +81,13 @@ class ShopDataUpdater:
                 for nmid in nmids:
                     nmids_collection.add(nmid)
         async def update_cards():
-            cards = await wb_api.content.get_cards_by_text(nmids_collection)
+            cards = await wb_api.content.get_all_cards()
             await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
         func = update_cards()
         await _coroutine_parallel_run_queue.put(func)
 
 
-    async def update_all_data(self):
+    async def update_advs_data(self) -> list[Adv]:
         logger.debug(f'Обновление данных для кабинета {self.wb_cabinet.shop_id}')
         wb_api: WBApi = self.wb_api
         advert_api = wb_api.advert
@@ -91,24 +96,12 @@ class ShopDataUpdater:
         advs: list[Adv] = await advert_api.get_advs()
         await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
         logger.debug(f'Обновление в базе advs завершено')
-        async with sm() as session:
-            stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
-            result = (await session.execute(stmt)).unique()
-            existing_advs: list[models.AdvSetting] = result.scalars().all()
-        nmids = set()
-        for adv in existing_advs:
-            nmids.update(adv.nmids)
-        cards = await wb_api.content.get_cards_by_text(nmids)
+        return advs
+
+
+
+    async def update_cards_data(self):
+        wb_api = self.wb_api
+        cards = await wb_api.content.get_all_cards()
         await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
         logger.debug(f'Обновление карточек в базе завершено')
-
-
-
-
-
-
-
-
-
-
-

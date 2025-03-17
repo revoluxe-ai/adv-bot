@@ -1,3 +1,5 @@
+import typing
+from abc import ABC
 from typing import Union
 
 from app.core.wb_api import exceptions
@@ -16,5 +18,5 @@ class Headers:
 
 
 class InterfaceWBAPI:
-    pass
+    headers: Headers
 

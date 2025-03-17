@@ -6,6 +6,9 @@ from aiogram import Router, types
 from aiogram.filters import StateFilter, CommandStart
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.orm import joinedload, selectinload
+
+from app.core.wb_api.data_classes.adv import Adv
+from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken
 from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import WBCabinet
@@ -322,10 +325,49 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
     wb_cabinet = wb_user_cabinet.wb_cabinet
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
     shop_updater = ShopDataUpdater(access)
+    chat_id = callback_query.message.chat.id
     try:
-        await asyncio.wait_for(shop_updater.update_all_data(), timeout=10*60)
+        await bot.send_message(chat_id,
+                               "Начинаю обновление РК, процесс может занять длительное время."
+                               )
+        try:
+            advs: list[Adv] =await asyncio.wait_for(shop_updater.update_advs_data(), timeout=10 * 60)
+        except ApiForbiddenError:
+            await bot.send_message(chat_id, f"Нет прав для доступа в РК, обновите токен, в случае проблем обратитесь в поддержку -> ")
+            return
+        except TimeoutError:
+            await bot.send_message(chat_id, f"Тайм-аут обновления кампаний, обратитесь в поддержку: {const.SUPPORT_LINK}")
+            return
+
+
+
+        await bot.send_message(chat_id,
+                               "Загрузка кампаний завершена. Начинаю обновление карточек, процесс может занять длительное время.")
+        try:
+            await asyncio.wait_for(shop_updater.update_cards_data(), timeout=10 * 60)
+        except ApiForbiddenError:
+            await bot.send_message(chat_id,
+                                   f"Нет прав для доступа в РК, обновите токен, в случае проблем обратитесь в поддержку -> ")
+            return
+        except TimeoutError:
+            await bot.send_message(chat_id,
+                                   f"Тайм-аут обновления кампаний, обратитесь в поддержку: {const.SUPPORT_LINK}")
+            return
+        except Exception:
+            logger.error('Ошибка обновления карточек', exc_info=True)
+            pass
+
+
+
+        await bot.send_message(chat_id,
+                               "Загрузка карточек завершена завершена"
+                               )
+
+
+
+
     except:
-        await bot.send_message(callback_query.message.chat.id,
+        await bot.send_message(chat_id,
                                f'Ошибка при обновлении данных, обратитесь в поддержку {const.SUPPORT_LINK}')
 
     await messages.AdvCompanyChoicing(bot,
