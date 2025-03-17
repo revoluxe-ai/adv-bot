@@ -803,7 +803,7 @@ def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
         if added_clicks:
             clicks += added_clicks
         if original_predict_ctr:
-            predicted_views = int(clicks / original_predict_ctr)
+            predicted_views = int(clicks + 1 / original_predict_ctr)
             predicted_clicks = int(predicted_views * original_predict_ctr)
             views += predicted_views
             clicks += predicted_clicks + 1
