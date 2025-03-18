@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import typing
 from collections import defaultdict
 from functools import wraps
 from typing import Optional, Iterable, List
@@ -353,8 +354,15 @@ class WBShop:
             advs = self._adv_settings
             for adv in advs:
                 adv_original_id = adv.id
+
+                async def implement_pause(func: typing.Awaitable):
+                    try:
+                        await asyncio.wait_for(func, timeout=60*60)
+                    except TimeoutError:
+                        logger.debug(f'Истек срок проверки парсинга магазина {self.shop_id}')
+                    await asyncio.sleep(60*60)
                 if not adv_original_id in adv_parsing_update_tasks:
-                    new_adv_parsing_task = asyncio.create_task(self._parsing_keywords_update(adv))
+                    new_adv_parsing_task = asyncio.create_task(implement_pause(self._parsing_keywords_update(adv)))
                     adv_parsing_update_tasks[adv_original_id] = new_adv_parsing_task
                 else:
                     old_task = adv_parsing_update_tasks[adv_original_id]
