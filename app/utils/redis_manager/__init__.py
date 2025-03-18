@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import json
+import time
 import typing
 from types import NoneType
 from typing import Union
@@ -29,7 +30,6 @@ redis_master_client = redis.asyncio.StrictRedis(host=redis_host_master, port=637
 
 redis_host_replica = settings.REDIS_REPLICA_HOST
 redis_replica_client = redis.asyncio.StrictRedis(host=redis_host_replica, port=6379, db=0)
-
 
 
 
@@ -278,7 +278,11 @@ async def get_adv_id_to_text_predict_ctr_dict(adv_id: int, texts: list[str]) -> 
 async def get_predict_ctr(adv_id: int, keyword: str):
     keyword = text_cleaner.clear(keyword)
     key = f'predict_ctr:{adv_id}:{keyword}'
-    predict_ctr_bytes = await redis_replica_client.get(key)
+    try:
+        predict_ctr_bytes = await redis_replica_client.get(key)
+    except Exception as exc:
+        raise exc
+
     if predict_ctr_bytes is None:
         return None
     predict_ctr_str = predict_ctr_bytes.decode('utf-8')
@@ -730,3 +734,23 @@ async def get_last_adv_bid(adv_id: int) -> int | None:
 async def set_last_adv_bid(adv_id: int, bid: int):
     key = f'last_adv_bid:{adv_id}'
     await redis_master_client.set(key, bid)
+
+
+async def set_last_parsing_position_time(text: str, nmids: set[int]):
+    time_now = time.time()
+    pipeline = redis_master_client.pipeline()
+    for nmid in nmids:
+        key = f'last_start_parsing_position_time:{nmid}:{text}'  # Ключ включает nmid и text
+        value = time_now
+        await pipeline.set(key, value)
+    await pipeline.execute()
+
+
+async def get_last_parsing_position_time(text: str, nmid: int) -> int | None:
+    key = f'last_start_parsing_position_time:{nmid}:{text}'  # Формируем ключ с nmid и text
+    value = await redis_replica_client.get(key)
+    if value is None:
+        return None
+    time_now = float(value.decode('utf-8'))  # Получаем time_now как float
+    return int(time_now)  # Возвращаем время и текст
+

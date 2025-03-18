@@ -774,7 +774,7 @@ async def get_good_bad_phrases(adv: AdvSetting)-> list[CalculatedKeyword]:
     # if adv.target_ctr_mode:
     #     keywords =  await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
     # else:
-    keywords =  await get_good_bad_phrases_for_min_ctr(adv,  max_cpc )
+    keywords =  await get_good_bad_phrases_for_min_ctr(adv,  max_cpc)
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
     keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
@@ -825,8 +825,7 @@ def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
 
 async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                                            max_cpc = None,
-                                           pass_time = timedelta(days=7)) -> list[CalculatedKeyword]:
-
+                                           pass_time = timedelta(days=7),) -> list[CalculatedKeyword]:
     min_ctr = await get_min_ctr(adv_setting)
     max_position = adv_setting.max_place
     logger.debug('Минимальный ctr получен')

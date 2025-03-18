@@ -1,3 +1,5 @@
+import re
+
 from python_modules.path_setting_funcs import get_document_by_key_name, get_setting_path
 import os
 setting_path = get_setting_path()
@@ -199,6 +201,14 @@ class Settings:
         value = int(os.getenv('MIN_SUM'))
         return value
 
-
+    @property
+    def SHOP_FILTER_LIST(self):
+        value = os.getenv('SHOP_FILTER_LIST')
+        if value:
+            shops_ids = value.split(',')
+            shops_ids = [shop_id.strip() for shop_id in shops_ids]
+            return shops_ids
+        else:
+            return []
 
 settings = Settings()

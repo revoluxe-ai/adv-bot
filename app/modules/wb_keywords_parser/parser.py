@@ -492,11 +492,11 @@ max_threads = settings.MAX_THREAD_PARSER
 semaphore = asyncio.Semaphore(max_threads)
 
 
-async def limited_add_wb_positions(text:str,
-                                   need_nmids: set[int],
-                                   last_view: typing.Optional[int],
-                                   adv_id: int,
-                                   max_page: int):
+async def add_wb_positions_from_wb_search(text:str,
+                                          need_nmids: set[int],
+                                          last_view: typing.Optional[int],
+                                          adv_id: int,
+                                          max_page: int):
     try:
         await add_wb_positions(text, need_nmids, 1, max_page)
         if last_view:
@@ -587,11 +587,11 @@ async def parser_all_white_phrase():
                     text, adv_id, need_nmids, last_views,  max_page = data
                     key = hashlib.md5(f'{text}{adv_id}'.encode()).hexdigest()
                     if not key in tasks:
-                        tasks[key] = asyncio.create_task(limited_add_wb_positions(text,
-                                                                                  set(need_nmids),
-                                                                                  last_views,
-                                                                                  adv_id,
-                                                                                  max_page))
+                        tasks[key] = asyncio.create_task(add_wb_positions_from_wb_search(text,
+                                                                                         set(need_nmids),
+                                                                                         last_views,
+                                                                                         adv_id,
+                                                                                         max_page))
                     queue.task_done()
                 except asyncio.TimeoutError:
                     logger.debug('Очередь пуста в течение 5 секунд, проверяем завершение генерации задач.')

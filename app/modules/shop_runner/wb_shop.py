@@ -1,18 +1,20 @@
 import asyncio
 import logging
+from collections import defaultdict
 from functools import wraps
-from typing import Optional, Iterable
+from typing import Optional, Iterable, List
 from datetime import datetime
 from app.core.wb_api import exceptions
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.api import AdvertApi
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.shop_runner.modules.keywords_parser.keywords_parser import KeywordsParser
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
 from app.modules.wb_adv_updater import data_manager
-from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi
@@ -32,6 +34,7 @@ def update_data():
         @wraps(func)
         async def wrapper(self, *args, **kwargs):
             await self._update_advs_models()
+            await self._update_advs_keywords()
             result = await func(self, *args, **kwargs)
             return result
         return wrapper
@@ -75,7 +78,9 @@ class WBShop:
 
     def __init__(self, shop_id: str,
                  wb_cabinet_original_id: int,
-                 all_api_keys: list[str]):
+                 all_api_keys: list[str],
+                 parsing_queue_dict: dict[str, set]):
+        self._parsing_queue_dict = parsing_queue_dict
         self.shop_id = shop_id
         self._wb_cabinet_original_id = wb_cabinet_original_id
         tokens_objs = []
@@ -90,6 +95,16 @@ class WBShop:
         )
         self.__access = access
         self.__first_bidder_update_time: Optional[datetime] = None
+        self.__keywords_for_advs = defaultdict(list[CalculatedKeyword])
+
+    @single_run()
+    async def _update_advs_keywords(self):
+        advs = self._adv_settings
+        for adv in advs:
+            keywords = await data_manager.get_good_bad_phrases(adv)
+            self.__keywords_for_advs[adv.adv_id] = keywords
+            await asyncio.sleep(0)
+
 
     @single_run()
     async def _update_access(self):
@@ -287,6 +302,7 @@ class WBShop:
             self.update_cpm_run(),
             self.update_common_sale_stat(),
             self.update_full_adv_stat(),
+            self.parsing_keywords_run()
         )
 
     async def run(self):
@@ -309,6 +325,49 @@ class WBShop:
                 logger.error('Ошибка обновления полной статистики обновления', exc_info=True)
             finally:
                 await asyncio.sleep(60 * 15)
+
+
+    async def _parsing_keywords(self, adv: AdvSetting):
+        keywords = await data_manager.get_good_bad_phrases(adv)
+        parser = KeywordsParser(self._parsing_queue_dict, self.shop_id, adv, keywords)
+        try:
+           parser.create_tasks_for_keywords_parser()
+        except Exception as exc:
+            raise exc
+        try:
+           await parser.parsing_all_keywords()
+        except Exception as exc:
+            raise exc
+
+    async def _parsing_keywords_update(self, adv: AdvSetting):
+        try:
+            await self._parsing_keywords(adv)
+        except Exception as exc:
+            logger.error('Ошибка парсинга фраз', exc_info=True)
+            await asyncio.sleep(60)
+
+    async def parsing_keywords_run(self):
+        adv_parsing_update_tasks = {}
+        while True:
+            await self._update_advs_models()
+            advs = self._adv_settings
+            for adv in advs:
+                adv_original_id = adv.id
+                if not adv_original_id in adv_parsing_update_tasks:
+                    new_adv_parsing_task = asyncio.create_task(self._parsing_keywords_update(adv))
+                    adv_parsing_update_tasks[adv_original_id] = new_adv_parsing_task
+                else:
+                    old_task = adv_parsing_update_tasks[adv_original_id]
+                    if old_task.done():
+                        if old_task.exception():
+                            logger.error(f'Ошибка парсинга ключей', exc_info=True)
+                    del adv_parsing_update_tasks[adv_original_id]
+                await asyncio.sleep(1)
+
+            await asyncio.sleep(60)
+
+
+
 
 
 
