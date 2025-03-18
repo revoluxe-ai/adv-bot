@@ -211,4 +211,22 @@ class Settings:
         else:
             return []
 
+    @property
+    def PAUSE_AFTER_PARSING(self):
+        value = os.getenv('PAUSE_AFTER_PARSING')
+        if not value:
+            return None
+        return int(value)
+
+    @property
+    def TIME_OUT_FOR_PARSER(self):
+        value = os.getenv('TIME_OUT_FOR_PARSER')
+        if not value:
+            return None
+        return int(value)
+
+
+
+
+
 settings = Settings()

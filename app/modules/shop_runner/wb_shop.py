@@ -16,6 +16,7 @@ from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_a
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
 from app.modules.wb_adv_updater import data_manager
+from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi
@@ -356,11 +357,18 @@ class WBShop:
                 adv_original_id = adv.id
 
                 async def implement_pause(func: typing.Awaitable):
+                    time_out = settings.TIME_OUT_FOR_PARSER
+                    if not time_out:
+                        time_out = 60 * 10
+                    pause_after = settings.PAUSE_AFTER_PARSING
+                    if not pause_after:
+                        pause_after = 60*60
                     try:
-                        await asyncio.wait_for(func, timeout=60*60)
+                        await asyncio.wait_for(func, timeout=time_out)
                     except TimeoutError:
                         logger.debug(f'Истек срок проверки парсинга магазина {self.shop_id}')
-                    await asyncio.sleep(60*60)
+
+                    await asyncio.sleep(pause_after)
                 if not adv_original_id in adv_parsing_update_tasks:
                     new_adv_parsing_task = asyncio.create_task(implement_pause(self._parsing_keywords_update(adv)))
                     adv_parsing_update_tasks[adv_original_id] = new_adv_parsing_task
