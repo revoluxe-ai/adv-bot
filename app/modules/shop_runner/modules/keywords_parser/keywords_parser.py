@@ -1,5 +1,7 @@
 import asyncio
 import time
+from multiprocessing import Lock
+
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_keywords_parser.parser import add_wb_positions_from_wb_search
@@ -7,11 +9,12 @@ from app.utils import redis_manager
 
 
 class KeywordsParser:
-    def __init__(self,  parsing_queue_dict: dict[str, set],
+    def __init__(self,  parsing_queue_dict: dict[str, list],
                  shop_id: str,
                  adv: AdvSetting,
                  keywords: list[CalculatedKeyword],
                  ):
+        self._shop_id = shop_id
         self._parsing_queue_dict = parsing_queue_dict
         self.__target_nmids = set(adv.nmids)
         self.__keywords = keywords
@@ -24,8 +27,10 @@ class KeywordsParser:
             text = kw.text
             for nmid in nmids:
                 if not text in parsing_queue_dict:
-                    parsing_queue_dict[text] = set()
-                parsing_queue_dict[text].add(nmid)
+                    parsing_queue_dict[text] = []
+                with Lock:
+                    parsing_queue_dict[text].append(nmid)
+                    pass
 
 
 
@@ -33,7 +38,8 @@ class KeywordsParser:
         parsing_queue_dict = self._parsing_queue_dict
         for kw in self.__keywords:
             text = kw.text
-            need_nmids = parsing_queue_dict.pop(text, None)
+            with Lock:
+                need_nmids = parsing_queue_dict.pop(text, None)
             if not need_nmids:
                 continue
             else:
