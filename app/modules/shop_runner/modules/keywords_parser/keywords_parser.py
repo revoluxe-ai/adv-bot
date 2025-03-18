@@ -8,6 +8,9 @@ from app.modules.wb_keywords_parser.parser import add_wb_positions_from_wb_searc
 from app.utils import redis_manager
 
 
+process_lock = Lock()
+
+
 class KeywordsParser:
     def __init__(self,  parsing_queue_dict: dict[str, list],
                  shop_id: str,
@@ -28,7 +31,7 @@ class KeywordsParser:
             for nmid in nmids:
                 if not text in parsing_queue_dict:
                     parsing_queue_dict[text] = []
-                with Lock:
+                with process_lock:
                     parsing_queue_dict[text].append(nmid)
                     pass
 
@@ -38,7 +41,7 @@ class KeywordsParser:
         parsing_queue_dict = self._parsing_queue_dict
         for kw in self.__keywords:
             text = kw.text
-            with Lock:
+            with process_lock:
                 need_nmids = parsing_queue_dict.pop(text, None)
             if not need_nmids:
                 continue
