@@ -249,8 +249,8 @@ class AdvSetting(BaseTable):
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default='forward') # forward, keep
     new_auto_min_ctr_mode = mapped_column(Boolean,
                                           nullable=False,
-                                          default=False,
-                                          server_default='false'
+                                          default=True,
+                                          server_default='true'
                                           )
     reset_place = mapped_column(Boolean, nullable=True, default=True)
     _search_adv_id = mapped_column(Integer, nullable=True)
