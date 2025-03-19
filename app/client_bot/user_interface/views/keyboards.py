@@ -708,12 +708,12 @@ def get_setting_min_ctr_keyboard(adv: AdvSetting):
                                              callback_data=callbacks.Adv(
                                                  adv_original_id=adv.id).pack()))
     if adv.new_auto_min_ctr_mode:
-        button = InlineKeyboardButton(text=f'Выключить автоматическое управление CTR',
+        button = InlineKeyboardButton(text=f'Выключить управление CTR по белому списку',
                                       callback_data=callbacks.ChangeAutoMinCTR(
                                           action='turn_off_auto_min_ctr',
                                           adv_setting_original_id=adv.id).pack())
     else:
-        button = InlineKeyboardButton(text=f'Включить автоматическое управление CTR',
+        button = InlineKeyboardButton(text=f'Включить управление CTR по белому списку',
                                       callback_data=callbacks.ChangeAutoMinCTR(
                                           action='turn_on_auto_min_ctr',
                                           adv_setting_original_id=adv.id).pack())
