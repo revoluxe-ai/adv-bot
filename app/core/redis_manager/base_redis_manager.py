@@ -4,16 +4,16 @@ from typing import TypeVar, Generic, Any
 
 T = TypeVar('T', )
 
-class BaseRedisGetterSetter(ABC, Generic[T]):
+class BaseRedis(ABC, Generic[T]):
     _client = redis_client
 
-    @abstractmethod
-    def _get_key(self, *args, **kwargs) -> str:
-        pass
-
-    @abstractmethod
-    async def get_one(self, *arg, **kwarg) -> T:
-        pass
+    # @abstractmethod
+    # def _get_key(self, *args, **kwargs) -> str:
+    #     pass
+    #
+    # @abstractmethod
+    # async def get_one(self, *arg, **kwarg) -> T:
+    #     pass
 
     # @abstractmethod
     # async def get_many(self, *args, **kwargs) -> list[T]:

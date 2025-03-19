@@ -304,7 +304,7 @@ class WBShop:
             self.update_cpm_run(),
             self.update_common_sale_stat(),
             self.update_full_adv_stat(),
-            self.parsing_keywords_run()
+
         )
 
     async def run(self):

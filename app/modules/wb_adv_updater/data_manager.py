@@ -1032,28 +1032,28 @@ class DataGetter(AbcManager):
     #     return df
 
 
-    @staticmethod
-    def __get_df_from_date_answer(answer, company):
-        data_dict = defaultdict(list)
-        for date_data in answer:
-            stat = date_data['stat']
-            for keyword_stat in stat:
-                keyword = keyword_stat['keyword']
-                views = keyword_stat['views']
-                clicks = keyword_stat['clicks']
-                spend = keyword_stat['sum']
-                if views > 0:
-                    data_dict['keyword'].append(keyword)
-                    data_dict['views'].append(views)
-                    data_dict['clicks'].append(clicks)
-                    data_dict['spend'].append(spend)
-
-        df = pd.DataFrame(data_dict)
-        df = df.groupby(['keyword']).agg({'views': 'sum', 'clicks': 'sum', 'spend': 'sum'})
-        df = df.reset_index()
-        df['adv_id'] = company.advertId
-        df['nmids'] = [company.nmids] * (len(df))
-        return df
+    # @staticmethod
+    # def __get_df_from_date_answer(answer, company):
+    #     data_dict = defaultdict(list)
+    #     for date_data in answer:
+    #         stat = date_data['stat']
+    #         for keyword_stat in stat:
+    #             keyword = keyword_stat['keyword']
+    #             views = keyword_stat['views']
+    #             clicks = keyword_stat['clicks']
+    #             spend = keyword_stat['sum']
+    #             if views > 0:
+    #                 data_dict['keyword'].append(keyword)
+    #                 data_dict['views'].append(views)
+    #                 data_dict['clicks'].append(clicks)
+    #                 data_dict['spend'].append(spend)
+    #
+    #     df = pd.DataFrame(data_dict)
+    #     df = df.groupby(['keyword']).agg({'views': 'sum', 'clicks': 'sum', 'spend': 'sum'})
+    #     df = df.reset_index()
+    #     df['adv_id'] = company.advertId
+    #     df['nmids'] = [company.nmid] * (len(df))
+    #     return df
 
 
     # async def get_df_for_shop(self, shop: WBUserCabinet) -> pd.DataFrame:

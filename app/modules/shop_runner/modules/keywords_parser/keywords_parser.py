@@ -37,7 +37,6 @@ class KeywordsParser:
             if not need_nmids:
                 continue
             else:
-                adv_id = self._adv.adv_id
                 last_views = kw.views
                 new_nmids = set()
                 for nmid in new_nmids:
@@ -53,7 +52,6 @@ class KeywordsParser:
                     await add_wb_positions_from_wb_search(text,
                                                          set(need_nmids),
                                                          last_views,
-                                                         adv_id,
                                                          60)
                     await asyncio.sleep(0)
 

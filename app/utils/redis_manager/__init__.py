@@ -50,7 +50,8 @@ class RedisEvent(asyncio.Event):
             self.key = 'event:' + str(id(self))
         super().__init__()
 
-    async def _get_redis(self, type: str = 'read'):
+    @staticmethod
+    async def _get_redis(type: str = 'read'):
         if type == 'read':
             return redis_replica_client
         elif type == 'white':
@@ -203,7 +204,7 @@ async def get_keyword_position(keyword: str, nmid: int)->Union[WBItemPosition, N
 
 
 async def get_keywords_positions(adv_setting, texts):
-    keys = ['adv_positions:' + text + ':' + str(adv_setting.nmids[0]) for text in texts]
+    keys = ['adv_positions:' + text + ':' + str(adv_setting.nmid[0]) for text in texts]
     results = await redis_replica_client.mget(keys)
     positions = []
     missing_texts = []
@@ -223,7 +224,7 @@ async def get_keywords_positions(adv_setting, texts):
         for text in missing_texts:
             cluster, _ = await get_cluster_and_preset(text)
             if cluster:
-                key = 'adv_positions:' + cluster + ':' + str(adv_setting.nmids[0])
+                key = 'adv_positions:' + cluster + ':' + str(adv_setting.nmid[0])
                 cluster_keys.append(key)
                 cluster_map[key] = text
 
@@ -316,7 +317,7 @@ async def set_block_position_status(keywordsetting_original_id: int,
     value = block_position_status + ':' + str(new_time.timestamp())
     await redis_master_client.set(key, value)
 
-async def get_block_position_status(keywordsetting_original_id: int) -> tuple[str, datetime]:
+async def get_block_position_status(keywordsetting_original_id: int) -> tuple[str, datetime] | None:
     key = 'block_position_status:' + str(keywordsetting_original_id)
     value = await redis_replica_client.get(key)
     if value is None:
@@ -333,7 +334,7 @@ async def set_item_vector(nmid: int, vector: list[float]) -> None:
     await redis_master_client.set(key, json.dumps(vector))
 
 
-async def get_item_vector(nmid: int) -> list[float]:
+async def get_item_vector(nmid: int) -> list[float] | None:
     key = 'item_vector:' + str(nmid)
     vector_bytes = await redis_replica_client.get(key)
     if vector_bytes is None:
