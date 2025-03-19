@@ -362,6 +362,9 @@ async def _add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=6
     last_positions = []
     checked_pages = set()
     # Получаем последние позиции для всех артикулов
+
+
+
     for nmid in need_nmids:
         last_position: WBItemPosition = await redis_manager.get_keyword_position(text, nmid)
         if last_position:
@@ -608,11 +611,11 @@ class Parser:
             ALIVE_GENERATOR_FLAG = False
             for generator in generators:
                 try:
-                    async for task in generator:  # Используем 'async for' для асинхронных генераторов
-                        ALIVE_GENERATOR_FLAG = True
-                        yield task
+                    next_task = await generator.__anext__()
+                    yield next_task
+                    ALIVE_GENERATOR_FLAG = True
                 except StopAsyncIteration:
-                    pass
+                    continue
 
 
     async def generate_parsing_tasks_dict(self):
@@ -638,6 +641,7 @@ class Parser:
                     else:
                         complex_task = ComplexTask(text, {nmid}, {adv_id})
                         self._parsing_tasks[text] = complex_task
+                    await asyncio.sleep(0)
 
 
     async def parsing_by_dict(self):
@@ -646,9 +650,9 @@ class Parser:
             if not self._parsing_tasks:
                 await asyncio.sleep(0)
                 continue
-            parsing_tasks = self._parsing_tasks
+            parsing_tasks: dict[str, ComplexTask] = self._parsing_tasks
             self._parsing_tasks = {}
-            all_adv_ids = self._all_adv_ids
+            all_adv_ids = [adv_id for task in parsing_tasks.values()  for adv_id in task.adv_ids]
             self._all_adv_ids = set()
             limit_for_adv = 60*60/len(all_adv_ids)
             for text in parsing_tasks:
@@ -678,8 +682,8 @@ class Parser:
                         max_limit_for_this_limit = min(ext_limit, max_limit)
                         limit.add_parsing_time(max_limit_for_this_limit)
                         ext_limit -= max_limit_for_this_limit
-                        pass
-
+                        await asyncio.sleep(0)
+                    pass
 
 
 
