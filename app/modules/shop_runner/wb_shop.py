@@ -81,7 +81,7 @@ class WBShop:
     def __init__(self, shop_id: str,
                  wb_cabinet_original_id: int,
                  all_api_keys: list[str],
-                 parsing_queue_dict: dict[str, list]):
+                 parsing_queue_dict: dict[str, set]):
         self._parsing_queue_dict = parsing_queue_dict
         self.shop_id = shop_id
         self._wb_cabinet_original_id = wb_cabinet_original_id
