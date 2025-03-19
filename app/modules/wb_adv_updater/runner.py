@@ -4,6 +4,8 @@ from .ml_data_manager import update_model
 from ..full_stat_adv_updater import new_update_shop_loop
 from ..user_message_sender import message_for_not_pay_user_sender
 from ..wb_keywords_parser import parser
+from ..wb_keywords_parser.parser import Parser
+
 set_config()
 import asyncio
 import logging
@@ -133,8 +135,10 @@ async def write_positions_to_db():
             logger.error(f'Ошибка добавления позиций в базу {e}', exc_info=True)
         await asyncio.sleep(0)
 
-async def parser_all_white_phrase():
-   await parser.parser_all_white_phrase()
+async def __keywords_parsing_process():
+   parser = Parser()
+   await asyncio.gather(parser.generate_parsing_tasks_dict(),
+                        parser.parsing_by_dict())
 
 
 async def reset_out_positions_in_redis():
@@ -150,14 +154,12 @@ async def reset_out_positions_in_redis():
 async def keywords_parsing_process():
     while True:
         try:
-            await __keywords_parsing_process()
+            await asyncio.wait_for(__keywords_parsing_process(),
+                                     timeout=60*60)
         except:
             logger.error('Ошибка парсинга ключей', exc_info=True)
-        await asyncio.sleep(60)
+        await asyncio.sleep(0)
 
-
-async def __keywords_parsing_process():
-    await  parser_all_white_phrase()
 
 async def payment_for_parsing_keyword():
     while True:

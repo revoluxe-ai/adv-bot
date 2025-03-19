@@ -1,12 +1,12 @@
 from typing import Optional
 
-from app.core.redis_manager.base_redis_manager import BaseRedisGetterSetter
+from app.core.redis_manager.base_redis_manager import BaseRedis
 from datetime import datetime
 
-class AdvActiveKeywordUpdateStateManager(BaseRedisGetterSetter):
+class AdvActiveKeywordUpdateStateManager(BaseRedis):
     time_str_format = "%d-%m-%Y %H:%M:%S"
-
-    def _get_key(self, adv_id: int) -> str:
+    @staticmethod
+    def _get_key(adv_id: int) -> str:
         """
         Формирует ключ для хранения данных в Redis.
         """
