@@ -329,59 +329,6 @@ class WBShop:
                 await asyncio.sleep(60 * 15)
 
 
-    async def _parsing_keywords(self, adv: AdvSetting):
-        keywords = await data_manager.get_good_bad_phrases(adv)
-        parser = KeywordsParser(self._parsing_queue_dict, self.shop_id, adv, keywords)
-        try:
-           parser.create_tasks_for_keywords_parser()
-        except Exception as exc:
-            raise exc
-        try:
-           await parser.parsing_all_keywords()
-        except Exception as exc:
-            raise exc
-
-    async def _parsing_keywords_update(self, adv: AdvSetting):
-        try:
-            await self._parsing_keywords(adv)
-        except Exception as exc:
-            logger.error('Ошибка парсинга фраз', exc_info=True)
-            await asyncio.sleep(60)
-
-    async def parsing_keywords_run(self):
-        adv_parsing_update_tasks = {}
-        while True:
-            await self._update_advs_models()
-            advs = self._adv_settings
-            for adv in advs:
-                adv_original_id = adv.id
-
-                async def implement_pause(func: typing.Awaitable):
-                    time_out = settings.TIME_OUT_FOR_PARSER
-                    if not time_out:
-                        time_out = 60 * 10
-                    pause_after = settings.PAUSE_AFTER_PARSING
-                    if not pause_after:
-                        pause_after = 60*60
-                    try:
-                        await asyncio.wait_for(func, timeout=time_out)
-                    except TimeoutError:
-                        logger.debug(f'Истек срок проверки парсинга магазина {self.shop_id}')
-
-                    await asyncio.sleep(pause_after)
-                if not adv_original_id in adv_parsing_update_tasks:
-                    new_adv_parsing_task = asyncio.create_task(implement_pause(self._parsing_keywords_update(adv)))
-                    adv_parsing_update_tasks[adv_original_id] = new_adv_parsing_task
-                else:
-                    old_task = adv_parsing_update_tasks[adv_original_id]
-                    if old_task.done():
-                        if old_task.exception():
-                            logger.error(f'Ошибка парсинга ключей', exc_info=True)
-                    del adv_parsing_update_tasks[adv_original_id]
-                await asyncio.sleep(1)
-
-            await asyncio.sleep(60)
-
 
 
 
