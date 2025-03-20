@@ -2024,14 +2024,6 @@ async def get_cpm(auto_adv: AdvSetting, keywords):
     cpm_values = [cpm for cpm in [cpm_from_parsing, cpm_from_auction, cpm_from_auto, last_auto_bid, last_auction_bid] if cpm is not None]
 
     if not cpm_values:
-        return None  # Если нет данных, возвращаем None
+        return None
 
-    # Находим наиболее частое значение (кворум)
-    counter = Counter(cpm_values)
-    most_common = counter.most_common(1)[0]  # (значение, частота)
-
-    if most_common[1] > 1:  # Если какое-то значение встречается больше 1 раза, возвращаем его
-        return most_common[0]
-
-    # Иначе возвращаем максимум
     return max(cpm_values)
