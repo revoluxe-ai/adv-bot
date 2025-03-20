@@ -2016,12 +2016,7 @@ async def get_cpm(auto_adv: AdvSetting, keywords):
 
     # CPM из настроек рекламного объявления
     cpm_from_auto = auto_adv.cpm
-    auto_adv_id = auto_adv.adv_id
-    last_auto_bid: int | None = await redis_manager.get_last_adv_bid(auto_adv_id)
-    auction_adv_id = auto_adv.search_adv_id
-    last_auction_bid: int | None = await redis_manager.get_last_adv_bid(auction_adv_id)
-    # Собираем только непустые значения
-    cpm_values = [cpm for cpm in [cpm_from_parsing, cpm_from_auction, cpm_from_auto, last_auto_bid, last_auction_bid] if cpm is not None]
+    cpm_values = [cpm for cpm in [cpm_from_parsing, cpm_from_auction, cpm_from_auto] if cpm is not None]
 
     if not cpm_values:
         return None
