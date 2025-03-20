@@ -242,9 +242,11 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
     loop = asyncio.get_event_loop()
-    if not keyword_filter:
-         adv_settings = [adv for adv in adv_settings if adv.active_status != 'done'\
-                         or any([adv.bot_active, adv.bidder_active, adv.parsing_active])]
+    filtred_advs = []
+    for adv in adv_settings:
+        if  adv.active_status == 'done' and adv.bot_active or adv.type == 8:
+            filtred_advs.append(adv)
+    adv_settings = filtred_advs
     for adv in adv_settings[start_index:end_index]:
         check_last_24_hours = loop.run_until_complete(redis_manager.check_last_24_hours(adv.id))
         check_text = '✅' if check_last_24_hours else '❓'
