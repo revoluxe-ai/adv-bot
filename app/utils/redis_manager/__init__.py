@@ -204,7 +204,7 @@ async def get_keyword_position(keyword: str, nmid: int)->Union[WBItemPosition, N
 
 
 async def get_keywords_positions(adv_setting, texts):
-    keys = ['adv_positions:' + text + ':' + str(adv_setting.nmid[0]) for text in texts]
+    keys = ['adv_positions:' + text + ':' + str(adv_setting.nmids[0]) for text in texts]
     results = await redis_replica_client.mget(keys)
     positions = []
     missing_texts = []
@@ -224,7 +224,7 @@ async def get_keywords_positions(adv_setting, texts):
         for text in missing_texts:
             cluster, _ = await get_cluster_and_preset(text)
             if cluster:
-                key = 'adv_positions:' + cluster + ':' + str(adv_setting.nmid[0])
+                key = 'adv_positions:' + cluster + ':' + str(adv_setting.nmids[0])
                 cluster_keys.append(key)
                 cluster_map[key] = text
 
