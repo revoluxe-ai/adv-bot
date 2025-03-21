@@ -42,6 +42,7 @@ async def send_messages_to_users():
                 await redis_manager.reset_last_user_use_time(user_telegram_id)
             except Exception as e:
                 logger.error(f"Error sending message to {user_telegram_id}: {e}", exc_info=True)
+                await redis_manager.reset_last_user_use_time(user_telegram_id)
             await asyncio.sleep(1)  # Если нужно добавить задержку между отправками
     except Exception as e:
         logger.error(f"Error in the process: {e}")
