@@ -123,13 +123,6 @@ async def pre_checkout_query_handler(pre_checkout_query: types.PreCheckoutQuery,
 async def successful_payment_handler(message: types.Message, state: FSMContext, bot: aiogram.Bot):
     successful_payment = message.successful_payment
     cost = successful_payment.total_amount / 100
-
-    """
-Прайс:
-Одна кампания на автоуправлении - 300 р. в месяц (10 рублей в сутки)
-
-"""
-
     # state_data = await state.get_data()
     # try:
     #     master_sum = state_data['master_sum']
