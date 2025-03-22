@@ -6,7 +6,6 @@ from typing import Optional
 import asyncio
 from sqlalchemy import select
 import pandas as pd
-
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 from app.modules.wb_adv_updater import data_manager
@@ -103,7 +102,7 @@ async def get_keyword_history_graphic(adv_original_id, keywords):
         plt.figure(figsize=(10, 6))
         title_text = "Динамика Органики за 7 дней"
         if len(common_keywords) > 5:
-            def get_graphic_and_legend():
+            def get_graphic_and_legend(plt, df, title_text):
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=False)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
@@ -127,10 +126,14 @@ async def get_keyword_history_graphic(adv_original_id, keywords):
                 plt.close()
                 return image_stream, legend_stream
             loop = asyncio.get_event_loop()
-            image_stream, legend_stream = await loop.run_in_executor(None, get_graphic_and_legend)
+            image_stream, legend_stream = await loop.run_in_executor(None,
+                                                                     get_graphic_and_legend,
+                                                                     plt,
+                                                                     df,
+                                                                     title_text)
             return image_stream, legend_stream
         else:
-            def get_graphic():
+            def get_graphic(plt, df, title_text):
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=True)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
@@ -144,5 +147,9 @@ async def get_keyword_history_graphic(adv_original_id, keywords):
                 plt.close()
                 return image_stream
             loop = asyncio.get_event_loop()
-            image_stream = await loop.run_in_executor(None, get_graphic)
+            image_stream = await loop.run_in_executor(None,
+                                                      get_graphic,
+                                                      plt,
+                                                      df,
+                                                      title_text)
             return image_stream, None
