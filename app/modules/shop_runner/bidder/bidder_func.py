@@ -102,8 +102,9 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
                     await session.commit()
         if new_cpm < 125:
             new_cpm = 125
-        await wb_api.update_cpm(adv_id, new_cpm)
-        await redis_manager.set_last_adv_bid(adv_id, new_cpm)
+        if not adv_setting.bidder_for_auto:
+            await wb_api.update_cpm(adv_id, new_cpm)
+            await redis_manager.set_last_adv_bid(adv_id, new_cpm)
         if new_cpm < 150:
             new_cpm = 150
         adv_id = adv_setting.search_adv_id
