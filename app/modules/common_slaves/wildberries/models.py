@@ -302,7 +302,9 @@ class AdvSetting(BaseTable):
               'name',
               postgresql_using='gin',
               postgresql_ops={'name': 'gin_trgm_ops'}),
-        Index('ix_name__nmids__search_adv_id', 'name', 'nmids', '_search_adv_id')
+        Index('ix_name__nmids__search_adv_id', 'name', 'nmids', '_search_adv_id'),
+        Index('ix_advsetting_bot_active', 'bot_active')
+
     )
 
 
