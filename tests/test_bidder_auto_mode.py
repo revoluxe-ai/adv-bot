@@ -6,6 +6,7 @@ from app.client_bot.user_interface.views.callbacks import CPMSettingMenu
 from app.client_bot.user_interface.views.messages import CPMSetting
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import NoResultFound
 
 @pytest.fixture
 def callback_query():
@@ -41,7 +42,7 @@ async def test_on_bidder_for_auto(callback_query, adv_setting, mock_session):
         
         # Setup execute result
         execute_result = MagicMock()
-        execute_result.scalar_one_or_none.return_value = adv_setting
+        execute_result.scalar_one.return_value = adv_setting
         mock_session.execute.return_value = execute_result
 
         # Setup CPMSetting mock
@@ -71,7 +72,7 @@ async def test_off_bidder_for_auto(callback_query, adv_setting, mock_session):
         
         # Setup execute result
         execute_result = MagicMock()
-        execute_result.scalar_one_or_none.return_value = adv_setting
+        execute_result.scalar_one.return_value = adv_setting
         mock_session.execute.return_value = execute_result
 
         # Setup CPMSetting mock
@@ -99,7 +100,7 @@ async def test_bidder_not_found(callback_query, mock_session):
         
         # Setup execute result to return None
         execute_result = MagicMock()
-        execute_result.scalar_one_or_none.return_value = None
+        execute_result.scalar_one.side_effect = NoResultFound()
         mock_session.execute.return_value = execute_result
 
         # Act

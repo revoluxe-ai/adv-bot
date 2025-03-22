@@ -275,6 +275,10 @@ class AdvSetting(BaseTable):
                                            nullable=True,
                                            default=None,)
     cpm = mapped_column(Integer, nullable=True, default=None)
+    bidder_for_auto = mapped_column(Boolean,
+                                    nullable=True,
+                                    default=True,
+                                    server_default='true')
 
     # auto_adv_target_status = mapped_column(Boolean,
     #                                        nullable=True,
