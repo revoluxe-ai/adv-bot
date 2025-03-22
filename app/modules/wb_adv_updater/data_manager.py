@@ -1024,63 +1024,6 @@ class DataGetter(AbcManager):
         min_ = df[param_for_norm].min()
         return (df[param_for_norm] - min_) / (max_ - min_)
 
-
-    # async def get_full_df(self, shops: list[WBUserCabinet]):
-    #     shops_df_tasks = [self.get_df_for_shop(shop) for shop in shops]
-    #     shops_dfs = await asyncio.gather(*shops_df_tasks)
-    #     df = pd.concat(shops_dfs)
-    #     return df
-
-
-    # @staticmethod
-    # def __get_df_from_date_answer(answer, company):
-    #     data_dict = defaultdict(list)
-    #     for date_data in answer:
-    #         stat = date_data['stat']
-    #         for keyword_stat in stat:
-    #             keyword = keyword_stat['keyword']
-    #             views = keyword_stat['views']
-    #             clicks = keyword_stat['clicks']
-    #             spend = keyword_stat['sum']
-    #             if views > 0:
-    #                 data_dict['keyword'].append(keyword)
-    #                 data_dict['views'].append(views)
-    #                 data_dict['clicks'].append(clicks)
-    #                 data_dict['spend'].append(spend)
-    #
-    #     df = pd.DataFrame(data_dict)
-    #     df = df.groupby(['keyword']).agg({'views': 'sum', 'clicks': 'sum', 'spend': 'sum'})
-    #     df = df.reset_index()
-    #     df['adv_id'] = company.advertId
-    #     df['nmids'] = [company.nmid] * (len(df))
-    #     return df
-
-
-    # async def get_df_for_shop(self, shop: WBUserCabinet) -> pd.DataFrame:
-    #     wb_api = WBApi(shop)
-    #     companies = await wb_api.advert.get_all_adv_companies()
-    #     keywords_dfs = []
-    #     for company in companies:
-    #         logger.debug('Начинаю получать ключи')
-    #         answer = await wb_api.advert.get_keywords_stat(company)
-    #         logger.debug('Ключи получены')
-    #         await asyncio.sleep(10)
-    #         if answer == []:
-    #             continue
-    #         df = self.__get_df_from_date_answer(answer, company)
-    #         keywords_dfs.append(df)
-    #     if keywords_dfs == []:
-    #         return pd.DataFrame()
-    #     df = pd.concat(keywords_dfs)
-    #     return df
-
-    # async def get_cards_for_shop(self, shop: WBUserCabinet):
-    #     wb_api = WBApi(shop)
-    #     cards: list[CardFromWB] = await wb_api.advert.get_cards()
-    #     for card in cards:
-    #         card.shop_name = shop.name
-    #     return cards
-
     @staticmethod
     def get_nmid_offer_id_df(cards: list[CardFromWB]) -> pd.DataFrame:
         dict_ = defaultdict(list)
