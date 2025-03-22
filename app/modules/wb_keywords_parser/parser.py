@@ -313,7 +313,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
                                   text: str,
                                   page: int,
                                   need_nmids: set[int],
-                                  total_pages: TotalPages) -> list[WBItemPosition] | None:
+                                  total_pages: TotalPages) -> (list[WBItemPosition],):
     if stop_event.is_set():
         return []
     try:
@@ -507,6 +507,71 @@ async def add_wb_positions_from_wb_search(text:str,
         logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
 
 
+
+
+async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
+    max_views_difference = 10
+    pass_keywords_texts = set()
+    async with sm() as session:
+        logger.debug("Открытие сессии для выполнения запросов к базе данных.")
+
+        stmt = select(AdvSetting).where(
+            AdvSetting.bot_active == True,
+        )
+        logger.debug("Формирование запроса для выбора активных рекламных кампаний.")
+
+        advs = await session.execute(stmt)
+        advs = advs.scalars().all()
+    logger.debug(f"Получено {len(advs)} активных рекламных кампаний для парсинга.")
+
+    adv_ids = [adv.adv_id for adv in advs]
+    logger.debug(f"Список ID рекламных кампаний: {adv_ids}. Перемешивание списка для случайного порядка обработки.")
+
+    random.shuffle(advs)
+    for adv in advs:
+        logger.debug(f'Обработка кампании {adv.name}')
+        need_nmids = set(adv.nmid)
+        adv_id = adv.adv_id
+        logger.debug(f"Обработка рекламной кампании ID: {adv_id}. Получение ключевых слов.")
+        try:
+             keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
+        except Exception as exc:
+            logger.error('Ошибка получения фраз для парсинга', exc_info=True)
+            continue
+        for keyword in keywords:
+            text = keyword.text
+            if text in pass_keywords_texts:
+                logger.debug(f"Ключевое слово '{text}' уже обработано. Пропуск.")
+                await asyncio.sleep(0)
+                continue
+            last_position = await redis_manager.get_keyword_position(text, adv.nmid[0])
+            if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(days=1)\
+                    and keyword.hard_status != 0:
+                logger.debug(f"Последняя позиция для ключевого слова '{text}' устарела. Перезапуск парсинга.")
+                await redis_manager.set_last_views(adv_id, text, 0)
+                await queue.put((text, adv.adv_id, list(need_nmids), None, 60))
+                pass_keywords_texts.add(text)
+            total_views = keyword.views
+            logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
+            cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+            if not cluster_name:
+                logger.debug(
+                    f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
+                max_page = 1
+                await queue.put((text, adv.adv_id, list(need_nmids), None, max_page,))
+                pass_keywords_texts.add(text)
+                continue
+
+            if keyword.status == KeywordStatus.GOOD:
+                logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
+                last_views = await redis_manager.get_last_views(adv_id, text)
+                if not last_views or\
+                        (total_views - last_views) > max_views_difference and keyword.hard_status == 2 or\
+                        last_views == total_views and keyword.hard_status == 2\
+                        or not last_position:
+                        await queue.put((text, adv.adv_id, list(need_nmids), last_views, 60))
+                        pass_keywords_texts.add(text)
+                        logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
 @dataclass
 class ComplexTask:
     text: str
@@ -621,61 +686,9 @@ class Parser:
 
 
 
-class TimeAdvLimit:
-    def __init__(self, limit: float | int):
-        self._limit = limit
-        self._parsing_time = 0
 
-    def add_parsing_time(self, value: float |  int):
-        self._parsing_time += value
 
-    @property
-    def limit(self):
-        return self._limit - self._parsing_time
 
-async def parse_all_phrase():
-    async with sm() as session:
-        stmt = select(AdvSetting)\
-        .where(AdvSetting.bot_active == True)
-        result = await session.execute(stmt)
-        advs: list[AdvSetting] = result.scalars().all()
-        random.shuffle(advs)
-        tasks_generators = []
-        for adv in advs:
-            parser_tasks_generator = ParserTasksGenerator(adv)
-            tasks_generators.append(parser_tasks_generator)
 
-        parsing_tasks: dict[str, ComplexTask]  = {}
-        all_adv_ids = set()
-        for task_row in zip(tasks_generators):
-            async for parser_task in task_row:
-                parser_task = typing.cast(ParsingTask, parser_task)
-                nmid = parser_task.nmid
-                text = parser_task.keyword
-                adv_id = adv.adv_id
-                all_adv_ids.add(adv_id)
-                if complex_parsing_task := parsing_tasks.get(text):
-                    complex_parsing_task.nmids.add(nmid)
-                    complex_parsing_task.adv_ids.add(adv_id)
-                else:
-                    complex_task =  ComplexTask(text, {nmid}, {adv_id})
-                    parsing_tasks[text] = complex_task
-        count_advs = len(all_adv_ids)
-        time_limit_for_adv = 60*60/count_advs
-        limits = {}
-        for text in parsing_tasks:
-           complex_task = parsing_tasks[text]
-           need_nmids = complex_task.nmids
-           if not (limit := limits.get(adv_id)):
-               limit = TimeAdvLimit(time_limit_for_adv)
-               limits[adv_id] = limit
 
-           if limit.limit > 0:
-               time_start = time.time()
-               await add_wb_positions_from_wb_search(text,
-                                          set(need_nmids),
-                                          60)
-               stop_time = time.time()
-               delta_time_sec = stop_time - time_start
-               limit.add_parsing_time(delta_time_sec)
-               pass
+
