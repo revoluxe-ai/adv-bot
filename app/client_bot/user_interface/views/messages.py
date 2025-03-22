@@ -4,7 +4,6 @@ from datetime import timedelta
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
-
 from app import utils
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
@@ -132,7 +131,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     async def __call__(self):
         await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
                 .join(WBCabinet.wb_user_cabinets) \
