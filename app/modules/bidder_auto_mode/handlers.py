@@ -1,7 +1,5 @@
 from aiogram import Router, F
-from aiogram.filters import Command
 from aiogram.types import CallbackQuery
-from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -18,7 +16,7 @@ async def on_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSettingM
         # Получаем настройки рекламной кампании
         stmt = select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         result = await session.execute(stmt)
-        adv_setting = result.scalar_one_or_none()
+        adv_setting = result.scalar_one()
         
         if not adv_setting:
             await callback.answer("Рекламная кампания не найдена")
@@ -40,7 +38,7 @@ async def off_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSetting
         # Получаем настройки рекламной кампании
         stmt = select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         result = await session.execute(stmt)
-        adv_setting = result.scalar_one_or_none()
+        adv_setting = result.scalar_one()
         
         if not adv_setting:
             await callback.answer("Рекламная кампания не найдена")
