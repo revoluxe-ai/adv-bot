@@ -39,6 +39,7 @@ from ..wb_update_state_manager import KeywordStatUpdateState
 from ...client_bot import const
 from app.utils.click_house.client import get_clickhouse_client
 from ...core.wb_api.exceptions import ApiForbiddenError
+from ...utils.pricer.pricer import Pricer
 
 logger = logging.getLogger(__name__)
 
@@ -152,21 +153,23 @@ async def process_payment_for_advs():
 
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.unique().scalars().all()
-
+        pricer = Pricer()
         for adv_setting in adv_settings:
-            wb_cabinet = adv_setting.wb_cabinet
+            wb_cabinet: WBCabinet = adv_setting.wb_cabinet
+            shop_id = wb_cabinet.shop_id
+            PRICE_FOR_ADV_FOR_DAY = await pricer.get_price_for_day_for_shop(shop_id)
             if not (bonus := wb_cabinet.bonus):
                 bonus = 0
             if not (balance := wb_cabinet.balance):
                 balance = 0
-            if bonus >= const.PRICE_FOR_ADV_FOR_DAY:
+            if bonus >= PRICE_FOR_ADV_FOR_DAY:
                 payment = AdvPayment(date=current_date)
                 adv_setting.payments.append(payment)
-                wb_cabinet.bonus -= const.PRICE_FOR_ADV_FOR_DAY
+                wb_cabinet.bonus -= PRICE_FOR_ADV_FOR_DAY
             elif balance > 0:
                 payment = AdvPayment(date=current_date)
                 adv_setting.payments.append(payment)
-                wb_cabinet.balance -= const.PRICE_FOR_ADV_FOR_DAY
+                wb_cabinet.balance -= PRICE_FOR_ADV_FOR_DAY
             else:
                 wb_cabinet.bonus = 0
                 adv_setting.bot_active = False
@@ -197,54 +200,56 @@ async def update_vectors_update_in_graph():
 async def update_vectors_in_redis():
     await gds.update_vectors_in_redis()
 
-async def shop_subscribe_control():
-    while True:
-        async with sm(read_only=False) as session:
-            stmt = select(WBCabinet) \
-                .options(
-                selectinload(WBCabinet.wb_user_cabinets) \
-                    .selectinload(WBUserCabinet.user),
-                selectinload(WBCabinet.adv_settings)
-            ) \
-                .where(
-                and_(
-                    WBCabinet.expiration_time < datetime.datetime.now(),
-                    WBCabinet.active == True,
-                    WBCabinet.balance < 0
-                )
-            )
-            result = await session.execute(stmt)
-            wb_cabinets_expirated_and_active = result.scalars().all()
-            for wb_cabinet in wb_cabinets_expirated_and_active:
-                access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
-                if not access:
-                    logger.error('Нет доступа для кабинета')
-                wb_api = WBApi(access)
-                adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
-                for adv_setting in adv_settings:
-                    if adv_setting.bot_active is True and adv_setting.active_status == 'started':
-                        try:
-                            await wb_api.advert.pause_company(adv_setting.adv_id)
-                        except:
-                            logger.error(f'Ошибка при попытке остановить кампанию {adv_setting.adv_id}')
-                            continue
-                        adv_setting.bot_active = False
-                wb_cabinet.active = False
-                await session.commit()
-                wb_user_cabinets = wb_cabinet.wb_user_cabinets
-                for wb_user_cabinet in wb_user_cabinets:
-                    user = wb_user_cabinet.user
-                    try:
-                        await messages.ShopExpiredSubscriptionMessage(
-                            bot,
-                            wb_user_cabinet.user.user_telegram_id,
-                            wb_user_cabinet)()
-                        logger.debug(f'Сообщение о просроченной подписке отправлено для юзера {user.username}')
-                    except Exception as exc:
-                        logger.error(f'Ошибка при отправке сообщения о просроченной подписке '
-                                     f'для юзера {user.username}: {exc}')
-                        await asyncio.sleep(1)
-        await asyncio.sleep(60 * 60)
+
+
+# async def shop_subscribe_control():
+#     while True:
+#         async with sm(read_only=False) as session:
+#             stmt = select(WBCabinet) \
+#                 .options(
+#                 selectinload(WBCabinet.wb_user_cabinets) \
+#                     .selectinload(WBUserCabinet.user),
+#                 selectinload(WBCabinet.adv_settings)
+#             ) \
+#                 .where(
+#                 and_(
+#                     WBCabinet.expiration_time < datetime.datetime.now(),
+#                     WBCabinet.active == True,
+#                     WBCabinet.balance < 0
+#                 )
+#             )
+#             result = await session.execute(stmt)
+#             wb_cabinets_expirated_and_active = result.scalars().all()
+#             for wb_cabinet in wb_cabinets_expirated_and_active:
+#                 access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
+#                 if not access:
+#                     logger.error('Нет доступа для кабинета')
+#                 wb_api = WBApi(access)
+#                 adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
+#                 for adv_setting in adv_settings:
+#                     if adv_setting.bot_active is True and adv_setting.active_status == 'started':
+#                         try:
+#                             await wb_api.advert.pause_company(adv_setting.adv_id)
+#                         except:
+#                             logger.error(f'Ошибка при попытке остановить кампанию {adv_setting.adv_id}')
+#                             continue
+#                         adv_setting.bot_active = False
+#                 wb_cabinet.active = False
+#                 await session.commit()
+#                 wb_user_cabinets = wb_cabinet.wb_user_cabinets
+#                 for wb_user_cabinet in wb_user_cabinets:
+#                     user = wb_user_cabinet.user
+#                     try:
+#                         await messages.ShopExpiredSubscriptionMessage(
+#                             bot,
+#                             wb_user_cabinet.user.user_telegram_id,
+#                             wb_user_cabinet)()
+#                         logger.debug(f'Сообщение о просроченной подписке отправлено для юзера {user.username}')
+#                     except Exception as exc:
+#                         logger.error(f'Ошибка при отправке сообщения о просроченной подписке '
+#                                      f'для юзера {user.username}: {exc}')
+#                         await asyncio.sleep(1)
+#         await asyncio.sleep(60 * 60)
 
 
 async def check_accesses():
