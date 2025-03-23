@@ -66,4 +66,4 @@ jobs:
       - name: Health check
         run: |
           sleep 30
-          curl -f https://${{ secrets.STAGE_SERVER }}/health || exit 1
+          curl -f http://${{ secrets.STAGE_SERVER }}/health || exit 1

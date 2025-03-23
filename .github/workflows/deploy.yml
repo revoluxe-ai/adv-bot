@@ -81,4 +81,4 @@ jobs:
       - name: Health check
         run: |
           sleep 30
-          curl -f https://${{ secrets.PROD_SERVER }}/health || exit 1
+          curl -f http://${{ secrets.PROD_SERVER }}/health || exit 1
