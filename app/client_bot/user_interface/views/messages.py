@@ -1,3 +1,4 @@
+import typing
 from datetime import datetime
 import re
 from datetime import timedelta
@@ -11,7 +12,6 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat import KeywordStat
 from app.modules.shop_runner.wb_statistic_manager.backend import  common_stat_manager
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
@@ -514,9 +514,20 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         auto_adv_id = adv.adv_id
         advs.append(auto_adv_id)
         auction_adv_id = adv.search_adv_id
-        keywords = self._keywords
-        fact_cpm = await data_manager.get_cpm(adv, keywords)
-        self._fact_cpm = fact_cpm
+        self.auto_adv_cpm = self._adv_setting.cpm
+        if search_adv_id := self._adv_setting.search_adv_id:
+            assert isinstance(search_adv_id, int)
+            search_adv_id = typing.cast(int, search_adv_id)
+            stmt = select(AdvSetting.cpm)\
+            .where(AdvSetting.adv_id == search_adv_id)
+            async with _sm() as session:
+                result = await session.execute(stmt)
+                auction_cpm: int | None = result.scalar_one()
+            self.auction_cpm = auction_cpm
+        else:
+            self.auction_cpm = None
+        auto_cpm = self._adv_setting.cpm
+        self.auto_cpm = auto_cpm
         if auction_adv_id:
             advs.append(auction_adv_id)
         pass_days = 2
@@ -613,8 +624,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f'Себестоимость: {round(order_cost, 2)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
             )
             
-        if hasattr(self, '_fact_cpm') and self._fact_cpm is not None:
-            text += f'\nФактический CPM: {self._fact_cpm} р.\n'
+
+        text += f'\nСтавка из Авто: {self.auto_cpm} р. '
+        text += f"""(Биддер для Авто: {' Включен' if self._adv_setting.bidder_for_auto else ' Выключен'})\n"""
+        text += f"""Ставка из Аукциона: {self.auction_cpm}"""
+        text += f""""""
         return text
 
     @property

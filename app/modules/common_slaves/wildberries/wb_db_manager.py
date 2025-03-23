@@ -1,5 +1,7 @@
 import json
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+
 from app import my_types
 from app.core.wb_api.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
@@ -11,44 +13,37 @@ _sm = get_async_session_maker
 
 async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int):
     async with _sm(read_only=False) as session:
-        # Собираем все adv_ids
-        adv_ids = [adv.advertId for adv in advs]
+        # Преобразуем в список словарей
+        adv_data = [
+            {
+                "adv_id": adv.advertId,
+                "name": adv.name,
+                "wb_cabinet_id": wb_cabinet_id,
+                "nmids": adv.nmids,
+                "active_status": adv.status_native,
+                "type": adv.type,
+                "cpm": adv.cpm
+            }
+            for adv in advs
+        ]
 
-        # Делаем один запрос для получения всех AdvSetting
-        stmt = select(my_types.AdvSetting).where(
-            my_types.AdvSetting.adv_id.in_(adv_ids)
+        # Выполняем UPSERT
+        stmt = insert(my_types.AdvSetting).values(adv_data)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["adv_id"],  # Указываем, по какому полю искать дубликаты
+            set_={
+                "name": stmt.excluded.name,
+                "wb_cabinet_id": stmt.excluded.wb_cabinet_id,
+                "nmids": stmt.excluded.nmids,
+                "active_status": stmt.excluded.active_status,
+                "type": stmt.excluded.type,
+                "cpm": stmt.excluded.cpm,
+            }
         )
-        result = await session.execute(stmt)
-        existing_settings = result.scalars().all()
 
-        # Создаем словарь для быстрого поиска
-        settings_by_adv_id = {setting.adv_id: setting for setting in existing_settings}
-        for adv in advs:
-            existing_adv = settings_by_adv_id.get(adv.advertId, None)
-            if existing_adv:
-                existing_adv.active_status = adv.status_native
-                existing_adv.name = adv.name
-                existing_adv.type = adv.type
-                nmids = adv.nmids
-                existing_adv.cpm = adv.cpm
-                if nmids:
-                    existing_adv.nmids = adv.nmids
-            else:
-                stmt = select(WBCabinet)\
-                .where(WBCabinet.id ==  wb_cabinet_id)
-                wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
-                adv_in_db = my_types.AdvSetting()
-                adv_in_db.adv_id = adv.advertId
-                adv_in_db.name = adv.name
-                adv_in_db.wb_cabinet = wb_cabinet
-                session.add(wb_cabinet)
-                adv_in_db.nmids = adv.nmids
-                adv_in_db.active_status = adv.status_native
-                adv_in_db.type = adv.type
-                adv_in_db.cpm = adv.cpm
-                session.add(adv_in_db)
-            await session.commit()
-    return
+        await session.execute(stmt)
+        await session.commit()
+    pass
 
 
 
