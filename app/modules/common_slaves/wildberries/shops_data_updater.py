@@ -76,7 +76,7 @@ class ShopDataUpdater:
         nmids_collection = set()
         await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
         for adv in advs:
-            nmids = adv.nmids
+            nmids = adv.nmid
             if nmids:
                 for nmid in nmids:
                     nmids_collection.add(nmid)

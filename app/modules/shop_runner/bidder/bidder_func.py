@@ -66,7 +66,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
         return
     logger.debug(f'Получаю ставку для биддера для {shop_id} adv_id {adv_id}')
     try:
-        auto_adv= adv_setting
+        auto_adv: AdvSetting = adv_setting
         fact_cpm = await data_manager.get_cpm(auto_adv, keywords)
     except Exception as e:
         logger.error(f'Ошибка {e} при получении ставки для {shop_id} adv_id {adv_id}', exc_info=True)
