@@ -12,7 +12,6 @@ import aiogram
 from aiogram.utils import deep_linking
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.sql.functions import coalesce
-from collections import Counter
 from app.exc import CardNotFoundInDB, PositionNotFoundError, NotFoundPositionWithCMPError
 import pandas as pd
 from PIL import Image
@@ -1935,7 +1934,6 @@ async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(shop_id: str):
     async with _sm() as session:
         result = await session.execute(stmt)
         return result.scalar_one()
-
 
 
 async def get_cpm(auto_adv: AdvSetting, keywords):
