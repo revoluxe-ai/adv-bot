@@ -35,7 +35,8 @@ async def get_common_keywords_with_positions(nmid)-> Optional[list[CommonKeyword
         return common_keywords
 
 
-async def get_keyword_history_graphic(adv_original_id):
+async def get_keyword_history_graphic(adv_original_id,
+                                      keywords):
     async with sm() as session:
         stmt = select(AdvSetting.nmids)\
                 .where(AdvSetting.id == adv_original_id)
@@ -43,9 +44,17 @@ async def get_keyword_history_graphic(adv_original_id):
         nmids = result.scalar()
         nmid = nmids[0]
         common_keywords: list[CommonKeyword] = await get_common_keywords_with_positions(nmid)
+        def sort_func(kw: CommonKeyword, order_map):
+            return order_map.get(kw.text,  -float('inf'))
+
+        order_map = {kw.text: i for i, kw in enumerate(keywords)}
+        # Сортируем common_keywords по индексу из order_map
+        sorted_common_keywords = sorted(common_keywords,
+                                        key=lambda kw: sort_func(kw, order_map))
+        common_keywords = sorted_common_keywords
         if not common_keywords:
             return
-        common_keywords.sort(key=lambda x: min([pos.base_position for pos in  x.wb_item_positions]))
+        common_keywords.sort(key=lambda x: min([pos.promo_position for pos in  x.wb_item_positions]))
         common_keywords = common_keywords[:5]
         end_date = datetime.datetime.now()
         start_date = end_date - datetime.timedelta(days=7)
@@ -93,7 +102,7 @@ async def get_keyword_history_graphic(adv_original_id):
         plt.figure(figsize=(10, 6))
         title_text = "Динамика Органики за 7 дней"
         if len(common_keywords) > 5:
-            def get_graphic_and_legend(df, title_text):
+            def get_graphic_and_legend(plt, df, title_text):
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=False)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
@@ -124,7 +133,7 @@ async def get_keyword_history_graphic(adv_original_id):
                                                                      title_text)
             return image_stream, legend_stream
         else:
-            def get_graphic(df, title_text):
+            def get_graphic(plt, df, title_text):
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=True)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
@@ -140,6 +149,7 @@ async def get_keyword_history_graphic(adv_original_id):
             loop = asyncio.get_event_loop()
             image_stream = await loop.run_in_executor(None,
                                                       get_graphic,
+                                                      plt,
                                                       df,
                                                       title_text,
                                                       )
