@@ -11,6 +11,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat import KeywordStat
 from app.modules.shop_runner.wb_statistic_manager.backend import  common_stat_manager
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
@@ -458,7 +459,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._filter: bool = False
         self._on_page = 24
 
-
     async def __call__(self, state: FSMContext, sort_mode = 'by_adv'):
         self.sort_mode = sort_mode
         self._state = state
@@ -534,6 +534,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if common_stat:
              self._all_orders_for_last_3_days = common_stat.orders
              spend_for_inner_adv_for_3_days = full_adv_stat_for_last_3_days.spend
+             self._sum_spend = spend_for_inner_adv_for_3_days
              self._spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days
              now = datetime.now()
              hours_passed = now.hour + now.minute / 60 + now.second / 3600  # Количество часов, прошедших в текущих сутках
@@ -547,6 +548,31 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._spend_for_inner_adv_for_3_days = None
         pass
 
+        spend_for_keywords = await full_wb_adv_stat.get_keywords_spend([auto_adv_id],
+                                                                        start_date,
+                                                                        end_date)
+        self.spend_for_keywords = spend_for_keywords
+        self.addition_spend = full_adv_stat_for_last_3_days.spend - spend_for_keywords
+        self.total_spend = full_adv_stat_for_last_3_days.spend
+
+    # async def _get_additional_traffic_spend(self, days):
+    #     """
+    #     Вычисляет расходы на дополнительный трафик за последние дни.
+    #     Дополнительный трафик - это разница между общими расходами и расходами по ключевым словам.
+    #     """
+    #     adv: AdvSetting = self._adv_setting
+    #     adv_id = adv.adv_id
+    #     end_date = datetime.now()
+    #     start_date = end_date - timedelta(days=days)
+    #
+    #     # Получаем общие расходы
+    #     total_spend_data = await full_wb_adv_stat.get_stats_by_last_days([adv_id], start_date, end_date)
+    #     total_spend = total_spend_data.spend if total_spend_data else 0
+    #
+    #
+    #     # Вычисляем разницу (дополнительный трафик)
+    #     additional_spend = max(0, total_spend - keyword_spend)
+    #     return round(additional_spend, 2)
 
     @property
     def text(self):
@@ -582,10 +608,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             order_cost = self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_3_days if self._all_orders_for_last_3_days else self._spend_for_inner_adv_for_3_days
             
             text += (
-                f'\nСредняя статистика за 3 дня:\n'
+                f'\nВ среднем в день (срез за 3 дня):\n'
                 f'Заказов: {self._mean_orders_for_3_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
-                f'Расходы на рекламу: {self._spend_for_inner_adv_for_3_days:.2f} р.\n'
-                f'Средняя цена заказа: {round(order_cost)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
+                f': {round(order_cost)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
             )
             
         if hasattr(self, '_fact_cpm') and self._fact_cpm is not None:
@@ -600,18 +625,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     @image.setter
     def image(self, value):
         self._image = value
-
-    @property
-    def keyboard(self):
-        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
-                                                       self._adv_choice_last_page,
-                                                       self._wb_user_cabinet_original_id,
-                                                       self._page,
-                                                       self._filter,
-                                                       self._on_page,
-                                                       self.min_ctr,
-                                                       self.hide_keywords_is_not_relevant,
-                                                       sort_mode=self.sort_mode)
 
     async def _graphic_injection(self):
         bot = self.bot
@@ -628,6 +641,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             return legend
         return graphic
 
+    @property
+    def keyboard(self):
+        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
+                                                      self._adv_choice_last_page,
+                                                      self._wb_user_cabinet_original_id,
+                                                      self._page,
+                                                      self._filter,
+                                                      self._on_page,
+                                                      self.min_ctr,
+                                                      self.hide_keywords_is_not_relevant,
+                                                      sort_mode=self.sort_mode)
 
 
 class KeywordSettingMessage(TextWithKeyboard):
@@ -1932,6 +1956,19 @@ class CPMSetting(TextWithKeyboard):
                                       callback_data=callbacks.CPMSettingMenu(
                                           action="set_auto_cpm",
                                           adv_original_id=self.adv_setting.id).pack())
+
+        builder.row(bottom)
+
+        button_text = "Выключить управление ставкой для Авто" if self.adv_setting.bidder_for_auto else "Включить управление ставкой для Авто"
+        callback_action = "off_bidder_for_auto" if self.adv_setting.bidder_for_auto else "on_bidder_for_auto"
+
+        bottom = InlineKeyboardButton(
+            text=button_text,
+            callback_data=callbacks.CPMSettingMenu(
+                action=callback_action,
+                adv_original_id=self.adv_setting.id
+            ).pack()
+        )
 
         builder.row(bottom)
 
