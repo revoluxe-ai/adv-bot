@@ -134,16 +134,19 @@ async def insert(stats: Iterable[FullAdvStat]):
             logger.error('Ошибка вставки в кликхаус', exc_info=True)
 
 
-async def get_keywords_spend(adv_ids: list[int], start_date: datetime, end_date: datetime) -> float:
+async def get_keywords_spend(adv_ids: list[int],
+                             start_date: datetime,
+                             end_date: datetime,
+                             table_name: str) -> float:
     end_date_str = end_date.strftime('%Y-%m-%d')
     start_date_str = start_date.strftime('%Y-%m-%d')
 
     async with get_clickhouse_client() as client:
-        query = """
+        query = f"""
         WITH max_versions AS (
             SELECT *, 
                    ROW_NUMBER() OVER (PARTITION BY adv_id, date, text ORDER BY version DESC) AS row_num
-            FROM default_db.advkeyword
+            FROM default_db.{table_name}
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
             AND adv_id IN %(adv_ids)s
         )

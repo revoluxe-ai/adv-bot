@@ -296,7 +296,7 @@ async def update_all_data_in_db_run(tasks):
 
 
 
-async def insert_or_update_keywords(client, keyword_stats, adv_setting):
+async def insert_or_update_keywords(client, keyword_stats, adv_id, table_name: str):
         # Подготовка данных для вставки
         new_version = int(datetime.datetime.now().timestamp())
         data_to_insert = []
@@ -304,13 +304,13 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
             date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())#просто добавляем время к дате
             data_to_insert.append([kw.text,
                                    date_time,
-                                   adv_setting.adv_id,
+                                   adv_id,
                                    kw.views,
                                    kw.clicks,
                                    kw.spend,
                                    new_version])
 
-        await client.insert(table="default_db.advkeyword",
+        await client.insert(table=f"default_db.{table_name}",
                             data=data_to_insert,
                                 column_names=["text",
                                               "date",
@@ -322,8 +322,8 @@ async def insert_or_update_keywords(client, keyword_stats, adv_setting):
 
 
 async def update_keywords_stat_in_click_house(client, keyword_stats: List[KeywordStat],
-                                              adv_setting: AdvSetting):
-    await insert_or_update_keywords(client, keyword_stats, adv_setting)
+                                              adv_id: int, table_name: str):
+    await insert_or_update_keywords(client, keyword_stats, adv_id, table_name)
 
 
 async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
@@ -504,9 +504,14 @@ async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
 
 
 async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
-    adv_id = adv_setting.adv_id
+    auto_adv_id = adv_setting.adv_id
+    auction_adv_id = adv_setting.search_adv_id
     try:
-        keywords_from_auto: list[KeywordStat] = await wb_api.advert.get_keywords_stat(adv_id)
+        keywords_from_auto: list[KeywordStat] = await wb_api.advert.get_keywords_stat(auto_adv_id)
+        await update_keywords_stat_in_click_house(client, keywords_from_auto,
+                                                  auto_adv_id,
+                                                  'advkeyword_new')
+
     except ApiForbiddenError as exc:
         raise exc
     except Exception as exc:
@@ -514,10 +519,14 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
         logger.error(f'Ошибка получения статистики по ключевым словам для кампании: {adv_setting.name}, '
                      f'shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}', exc_info=True)
     try:
-        if not adv_setting.search_adv_id:
+        if not auction_adv_id:
             keywords_from_search_adv = []
         else:
-             keywords_from_search_adv = await wb_api.advert.get_keywords_stat(adv_setting.search_adv_id)
+             keywords_from_search_adv = await wb_api.advert.get_keywords_stat(auction_adv_id)
+             await update_keywords_stat_in_click_house(client,
+                                                       keywords_from_search_adv,
+                                                       auction_adv_id,
+                                                       'advkeyword_new')
     except Exception as exc:
         keywords_from_search_adv = []
         logger.error(f'Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}')
@@ -537,10 +546,10 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
             text_to_keyword_from_auto[key].spend += kw.spend
     full_stat  = list(text_to_keyword_from_auto.values())
 
-    keywords = full_stat
+    full_stat_keywords = full_stat
 
-    logger.debug(f'Получено {len(keywords)} ключевых слов для {adv_setting.name}')
-    texts_for_adv_setting = {keyword.text for keyword in keywords}
+    logger.debug(f'Получено {len(full_stat_keywords)} ключевых слов для {adv_setting.name}')
+    texts_for_adv_setting = {keyword.text for keyword in full_stat_keywords}
     clusters = set()
     for text in texts_for_adv_setting:
         try:
@@ -571,7 +580,10 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
         logger.error(f'Ошибка добавления ключевых слов в базу данных: {exc}', exc_info=True)
         raise exc
 
-    await update_keywords_stat_in_click_house(client, keywords, adv_setting)
+    await update_keywords_stat_in_click_house(client,
+                                              full_stat_keywords,
+                                              auto_adv_id,
+                                              'advkeyword')
 
     keyword_stat_update_state = KeywordStatUpdateState()
 

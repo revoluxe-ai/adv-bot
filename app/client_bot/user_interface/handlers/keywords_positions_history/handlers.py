@@ -44,7 +44,8 @@ async def keyword_position_history(callback: types.CallbackQuery,
     keywords = await data_manager.get_good_bad_phrases(adv)
 
     try:
-          graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id))
+          graphic, legend = (await utils.get_keyword_history_graphic(adv_original_id,
+                                                                     keywords))
     except Exception as e:
         logger.error(e, exc_info=True)
         await messages.NotKeywordHistoryPositions(bot, callback.message.chat.id)()
