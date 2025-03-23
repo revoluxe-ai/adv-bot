@@ -30,7 +30,6 @@ from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
 from app.utils import redis_manager
 from app.utils.pricer.pricer import Pricer
 from app.utils.suffixes import get_day_suffix
-from .get_main_text import get_main_text
 from .. import states
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
