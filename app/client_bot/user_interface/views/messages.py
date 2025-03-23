@@ -507,6 +507,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if not graphic:
             graphic = 'app/core/telegram/static_images/not_keywords_position_graphic.jpg'
         self._image = graphic
+        # self._additional_spend = await self._get_additional_traffic_spend(3)
         await super().__call__()
 
     async def _set_statistics(self):
@@ -526,8 +527,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         full_adv_stat_for_last_3_days = await full_wb_adv_stat.get_stats_by_last_days(advs,
                                                                                       start_date,
                                                                                       end_date)
+        self.full_adv_stat = full_adv_stat_for_last_3_days
         self._orders_by_adv_for_last_3_days = full_adv_stat_for_last_3_days.orders
         common_stat = await common_stat_manager.get_stats_for_last_period(adv.nmids[0], pass_days)
+        self.common_stat = common_stat
         if common_stat:
              self._all_orders_for_last_3_days = common_stat.orders
              spend_for_inner_adv_for_3_days = full_adv_stat_for_last_3_days.spend
@@ -535,9 +538,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
              now = datetime.now()
              hours_passed = now.hour + now.minute / 60 + now.second / 3600  # Количество часов, прошедших в текущих сутках
              fraction_of_day = hours_passed / 24  + pass_days # Доля суток
-             mean_price_for_order  = common_stat.orders/fraction_of_day
-             self._mean_price_for_order = mean_price_for_order
-             self._mean_spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days/fraction_of_day
+             self._fraction_of_day = fraction_of_day
+             self._mean_orders_for_3_days = self._all_orders_for_last_3_days/fraction_of_day
+             self._mean_price_for_order = spend_for_inner_adv_for_3_days/common_stat.orders if common_stat.orders else 0
+             self._mean_spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days
         else:
             self._all_orders_for_last_3_days = None
             self._spend_for_inner_adv_for_3_days = None
@@ -553,55 +557,40 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                                       f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """
                                                                       'ID кампании: ' + str(
             self._adv_setting.adv_id) + '\n'
+                                        'Общая статистика за 3 дня:\n'
                                         f'Минимальный CRT для кампании: {self.min_ctr * 100}%\n'
                                         f'Страница: {self._page}/{total_page + 1}\n'
                                         f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n'
+                                        f'Общий расход на рекламу: {self.full_adv_stat.spend:.2f}\n'
+                                        f'Расход на ключи: {(self.full_adv_stat.spend - self.additional_spend):.2f}\n'
+                                        f'Расход на доп.трафик: {self.additional_spend} р.\n'
+                                        f'Общее число заказов: {self._all_orders_for_last_3_days}\n'
+                                        f'Заказов от рекламы: {self._orders_by_adv_for_last_3_days}\n'
         )
-
-
-        if self._spend_for_inner_adv_for_3_days is not None and self._all_orders_for_last_3_days is not None:
-             order_cost = self._spend_for_inner_adv_for_3_days/self._all_orders_for_last_3_days if self._all_orders_for_last_3_days\
-                                                                           else self._spend_for_inner_adv_for_3_days
-             target_price_for_order = self._adv_setting.target_price_for_order
-             if target_price_for_order:
-                 target_price_for_order = str(round(target_price_for_order))
-             else:
-                 target_price_for_order = "Не задано"
-
-             max_price_for_order = self._adv_setting.max_price_for_order
-             if max_price_for_order:
-                 max_price_for_order = str(round(max_price_for_order))
-             else:
-                 max_price_for_order = "Не задано"
-
-             plan_for_sales_for_day  = self._adv_setting.plan_for_sales_for_day
-             if plan_for_sales_for_day:
-                 plan_for_sales_for_day = str(round(plan_for_sales_for_day))
-             else:
-                 plan_for_sales_for_day = 'Не задано'
-
-             text +=  (
-                 f'Срезы за 3 дня(сегодня, вчера, позавчера):\n'
-                 f'Общий расход на вн.рекламу: {round(self._spend_for_inner_adv_for_3_days)}\n'
-                 f'Средний расход на вн.рекламу: {round(self._mean_spend_for_inner_adv_for_3_days)}\n'
-                 f'Заказы всего: {self._all_orders_for_last_3_days}\n'
-                 
-                 f'Среднее число заказов в день: {round(self._mean_price_for_order, 1)}'
-                 f'({plan_for_sales_for_day})\n'
-                 f'Себестоимость заказа (цель) (максимум): {round(order_cost)} ({target_price_for_order})'
-                 f' ({max_price_for_order})\n'
-                 f'Текущая вычисляемая ставка: {self._fact_cpm}\n'
-                 f'Целевая позиция: {self._adv_setting.max_place}\n'
-                 f'Максимальная ставка: {self._adv_setting.max_cpm}\n'
-             )
-
-        else:
-            if self._spend_for_inner_adv_for_3_days is None:
-                text += "Нет данных по полной статистике РК\n"
-            if self._all_orders_for_last_3_days is None:
-                text += "Нет данных по полной статистике карточки\n"
-
-
+        
+        if hasattr(self, '_all_orders_for_last_3_days') and self._all_orders_for_last_3_days is not None:
+            # Получаем целевые значения из настроек
+            plan_for_sales_for_day = self._adv_setting.plan_for_sales_for_day
+            plan_for_sales_for_day_str = str(round(plan_for_sales_for_day)) if plan_for_sales_for_day else "Не задано"
+            
+            target_price_for_order = self._adv_setting.target_price_for_order
+            target_price_for_order_str = str(round(target_price_for_order)) if target_price_for_order else "Не задано"
+            
+            max_price_for_order = self._adv_setting.max_price_for_order
+            max_price_for_order_str = str(round(max_price_for_order)) if max_price_for_order else "Не задано"
+            
+            order_cost = self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_3_days if self._all_orders_for_last_3_days else self._spend_for_inner_adv_for_3_days
+            
+            text += (
+                f'\nСредняя статистика за 3 дня:\n'
+                f'Заказов: {self._mean_orders_for_3_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
+                f'Расходы на рекламу: {self._spend_for_inner_adv_for_3_days:.2f} р.\n'
+                f'Средняя цена заказа: {round(order_cost)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
+            )
+            
+        if hasattr(self, '_fact_cpm') and self._fact_cpm is not None:
+            text += f'\nФактический CPM: {self._fact_cpm} р.\n'
+            
         return text
 
     @property
@@ -2565,4 +2554,32 @@ class ShowFavoriteAdvs(TextWithKeyboard):
     def keyboard(self):
          keyboard = keyboards.get_advs_list(self.advs)
          return keyboard
+
+    async def _get_additional_traffic_spend(self, pass_days) -> float:
+        """Получает расходы на дополнительный трафик (разница между общими затратами и затратами по ключам)"""
+        from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+        from datetime import datetime, timedelta
+
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=pass_days)  # За последние 30 дней
+
+        # # Получаем общие затраты
+        # total_stats = await full_wb_adv_stat.get_stats_by_last_days(
+        #     [self._adv_setting.adv_id, self._adv_setting.search_adv_id],
+        #     start_date=start_date,
+        #     end_date=end_date
+        # ),
+        sum_spends = self._spend_for_inner_adv_for_3_days
+        total_spend = sum_spends if sum_spends else 0
+
+        # Получаем затраты по ключам
+        keywords_spend = await full_wb_adv_stat.get_keywords_spend(
+            [self._adv_setting.adv_id],
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        # Разница - это расходы на дополнительный трафик
+        additional_spend = total_spend - keywords_spend
+        return round(additional_spend, 2) if additional_spend > 0 else 0
 
