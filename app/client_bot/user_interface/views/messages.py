@@ -628,8 +628,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         bot = self.bot
         user_telegram_id = self.chat_id
         adv_original_id = self._adv_setting.id
-        result = (await utils.get_keyword_history_graphic(adv_original_id,
-                                                          self._keywords))
+        result = (await utils.get_keyword_history_graphic(adv_original_id))
         if not result:
             graphic = None
             legend = None
