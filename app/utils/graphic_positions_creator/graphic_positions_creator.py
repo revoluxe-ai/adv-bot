@@ -8,7 +8,6 @@ from sqlalchemy import select
 import pandas as pd
 import matplotlib
 from matplotlib.ticker import MaxNLocator
-import seaborn as sns
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
@@ -103,6 +102,7 @@ async def get_keyword_history_graphic(adv_original_id,
         title_text = "Динамика Органики за 7 дней"
         if len(common_keywords) > 5:
             def get_graphic_and_legend(plt, df, title_text):
+                import seaborn as sns
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=False)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
@@ -134,6 +134,7 @@ async def get_keyword_history_graphic(adv_original_id,
             return image_stream, legend_stream
         else:
             def get_graphic(plt, df, title_text):
+                import seaborn as sns
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=True)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
