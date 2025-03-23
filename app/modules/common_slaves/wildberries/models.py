@@ -275,6 +275,10 @@ class AdvSetting(BaseTable):
                                            nullable=True,
                                            default=None,)
     cpm = mapped_column(Integer, nullable=True, default=None)
+    bidder_for_auto = mapped_column(Boolean,
+                                    nullable=True,
+                                    default=True,
+                                    server_default='true')
 
     # auto_adv_target_status = mapped_column(Boolean,
     #                                        nullable=True,
@@ -302,7 +306,9 @@ class AdvSetting(BaseTable):
               'name',
               postgresql_using='gin',
               postgresql_ops={'name': 'gin_trgm_ops'}),
-        Index('ix_name__nmids__search_adv_id', 'name', 'nmids', '_search_adv_id')
+        Index('ix_name__nmids__search_adv_id', 'name', 'nmids', '_search_adv_id'),
+        Index('ix_advsetting_bot_active', 'bot_active')
+
     )
 
 

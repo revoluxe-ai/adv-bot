@@ -4,8 +4,8 @@ dotenv.load_dotenv()
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-shop_id = ''
-add_balance = 0
+shop_id = '21fcfd4f-a10e-57c5-b4c6-a1e5b077a2e8'
+add_balance = 600
 add_bonus = 0
 async def add_balance_and_bonus():
     async with sm(read_only=False) as session:

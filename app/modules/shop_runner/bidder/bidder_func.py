@@ -66,7 +66,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
         return
     logger.debug(f'Получаю ставку для биддера для {shop_id} adv_id {adv_id}')
     try:
-        auto_adv= adv_setting
+        auto_adv: AdvSetting = adv_setting
         fact_cpm = await data_manager.get_cpm(auto_adv, keywords)
     except Exception as e:
         logger.error(f'Ошибка {e} при получении ставки для {shop_id} adv_id {adv_id}', exc_info=True)
@@ -76,8 +76,12 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
         logger.debug(f'Не удалось получить ставку для биддера для кампании {adv_id} для {shop_id}')
         return
     logger.debug(f'Получаю позицию бест ключа из белого списка для {shop_id} adv_id {adv_id}')
-    wb_position = await redis_manager.get_keyword_position(text, nmid_in_adv)
-    logger.debug(f'Позиция ключа из белого списка получена для {shop_id} adv_id {adv_id}')
+    try:
+        wb_position = await redis_manager.get_keyword_position(text, nmid_in_adv)
+        logger.debug(f'Позиция ключа из белого списка получена для {shop_id} adv_id {adv_id}')
+    except Exception as e:
+        logger.error(f'Ошибка при получении позиции ключа для {shop_id} adv_id {adv_id}: {e}', exc_info=True)
+        return
     if wb_position:
         promo_position = wb_position.promo_position
         if not promo_position:
@@ -88,7 +92,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
         elif promo_position > max_position_for_adv:
             new_cpm = fact_cpm + step
         else:
-            new_cpm = fact_cpm
+            new_cpm = fact_cpm - step
         if new_cpm >= max_cpm:
             new_cpm = max_cpm
             if adv_setting.reset_place:
@@ -96,13 +100,11 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
                     adv_setting = await session.get(AdvSetting, adv_setting.id)
                     adv_setting.max_place = promo_position + 1
                     await session.commit()
-        if new_cpm == fact_cpm:
-            logger.debug(f'Новая ставка равна старой для {shop_id} adv_id {adv_id}')
-            return
         if new_cpm < 125:
             new_cpm = 125
-        await wb_api.update_cpm(adv_id, new_cpm)
-        await redis_manager.set_last_adv_bid(adv_id, new_cpm)
+        if not adv_setting.bidder_for_auto:
+            await wb_api.update_cpm(adv_id, new_cpm)
+            await redis_manager.set_last_adv_bid(adv_id, new_cpm)
         if new_cpm < 150:
             new_cpm = 150
         adv_id = adv_setting.search_adv_id

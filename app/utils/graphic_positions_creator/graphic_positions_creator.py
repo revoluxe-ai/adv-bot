@@ -117,7 +117,11 @@ async def get_keyword_history_graphic(adv_original_id):
                 plt.close()
                 return image_stream, legend_stream
             loop = asyncio.get_event_loop()
-            image_stream, legend_stream = await loop.run_in_executor(None, get_graphic_and_legend)
+            image_stream, legend_stream = await loop.run_in_executor(None,
+                                                                     get_graphic_and_legend,
+                                                                     plt,
+                                                                     df,
+                                                                     title_text)
             return image_stream, legend_stream
         else:
             def get_graphic(df, title_text):

@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-from itertools import zip_longest
 import json
 import random
 import re

@@ -118,7 +118,9 @@ class Text(Base):
         # Отправка нового сообщения без попытки редактирования существующего
         last_message = await self.bot.send_message(chat_id=self.chat_id,
                                                  text=self.text,
-                                                 parse_mode= getattr(self, 'parse_mode', None))
+                                                 parse_mode= getattr(self, 'parse_mode', None),
+                                                   disable_web_page_preview=getattr(self,
+                                                                                    'DISABLE_WEBPAGE_PREVIEW', None))
         return last_message
 
 

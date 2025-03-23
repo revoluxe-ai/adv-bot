@@ -4,7 +4,6 @@ from datetime import timedelta
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
-
 from app import utils
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
@@ -28,6 +27,7 @@ from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
                                                           KeywordSetting, WBCabinet)
 from app.utils import redis_manager
+from app.utils.pricer.pricer import Pricer
 from app.utils.suffixes import get_day_suffix
 from .get_main_text import get_main_text
 from .. import states
@@ -131,7 +131,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     async def __call__(self):
         await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
                 .join(WBCabinet.wb_user_cabinets) \
@@ -860,6 +860,7 @@ class ShopMenu(TextWithKeyboard):
        self._user_telegram_id = chat_id
        self._state = state
        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+       self._pricer = Pricer()
        super().__init__(bot, chat_id)
 
 
@@ -905,7 +906,6 @@ class ShopMenu(TextWithKeyboard):
             bonus = 0
         self._balance = balance
         self._bonus = bonus
-        total_amount_for_day = 0
         async with _sm(read_only=True) as session:
             stmt = select(func.count(AdvSetting.id))\
                 .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
@@ -913,9 +913,11 @@ class ShopMenu(TextWithKeyboard):
             result = await session.execute(stmt)
             count_active_advs = result.scalar()
             if count_active_advs:
-                total_amount_for_day += count_active_advs * const.PRICE_FOR_ADV_FOR_DAY
+                shop_id = self._wb_cabinet.shop_id
+                self.price_for_month_for_shop = await self._pricer.get_month_tariff_for_count_advs(shop_id)
+                self.total_amount_for_day = await self._pricer.get_price_for_day_for_shop(shop_id)
+
         self.count_active_advs = count_active_advs
-        self.total_amount_for_day = total_amount_for_day
         user: User = self._wb_user_cabinet.user
         stmt = select(WBToken)
         async with _sm(read_only=True) as session:
@@ -959,7 +961,9 @@ class ShopMenu(TextWithKeyboard):
             last_for_days = '∞'
         text = (
             f'📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n'
-            f'💸 <b>Расход в сутки</b>: {total_amount_for_day} рублей\n'
+            f"""Ваш тариф за РК в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else 'Нет активных РК'}"""
+            f'(больше РК -> ниже цена, тарифы -> https://telegra.ph/Tarify-03-17)\n'
+            f'💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n'
             f'⏳ <b>Срок действия токена</b>: {self.expiration_time}\n'
             f'<b>Истечет через</b> {get_day_suffix(self.last_days_for_token)}\n'
 
@@ -1046,7 +1050,7 @@ class ShopMenu(TextWithKeyboard):
                     wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
             )
 
-        builder.row(button)
+            builder.row(button)
 
         if is_active_adv:
             button = InlineKeyboardButton(
@@ -1304,30 +1308,20 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
     def keyboard(self):
         return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
 
-
-
-
 class WaitingForAmount(Text):
+
+    DISABLE_WEBPAGE_PREVIEW = True
 
     def __init__(self, bot: Bot, chat_id, master_sum: float):
         super().__init__(bot, chat_id)
         self.master_sum = master_sum
-
+        self._pricer = Pricer()
 
 
     @property
     def text(self):
-        date_to = datetime.now() + timedelta(days=1)
-        date_to = date_to.strftime('%d-%m-%Y')
-        text = f"""
-Прайс:
-- Работа одной кампании, подключенной к боту: 299р./мес.
-- Парсинг активных ключей для кампании и Биддер (управление ставками) входят в стоимость
-
-Минимальная сумма пополнения: {const.MIN_SUM} р.
-
-Укажите сумму пополнения:"""
-
+        text = self._pricer.text
+        text += "\nУкажите сумму пополнения:"
         return text
 
 
