@@ -536,11 +536,14 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                                                       [self._adv_setting.adv_id],
                                                                                       start_date,
                                                                                       end_date)
+        self.full_adv_stat_for_last_3_days_for_auto_adv = full_adv_stat_for_last_3_days_for_auto_adv
 
         full_adv_stat_for_last_3_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
             [self._adv_setting.search_adv_id],
             start_date,
             end_date)
+
+        self.full_adv_stat_for_last_3_days_for_auction = full_adv_stat_for_last_3_days_for_auction
 
         full_spend_for_all_advs: float = full_adv_stat_for_last_3_days_for_auto_adv.spend \
         + full_adv_stat_for_last_3_days_for_auction.spend
@@ -601,6 +604,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f'Общий расход на рекламу: {self.total_spend:.2f}\n'
                 f'Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n'
                 f'Общее число заказов: {self._all_orders_for_last_3_days}\n'
+                f'Заказов из Авто: {self.full_adv_stat_for_last_3_days_for_auto_adv.orders}\n'
+                f'Заказов из Аукцион: {self.full_adv_stat_for_last_3_days_for_auction.orders}\n'
+                f"""Заказов из Органики: {self._all_orders_for_last_3_days
+                    - self.full_adv_stat_for_last_3_days_for_auction.orders
+                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders}"""
         )
         
         if hasattr(self, '_all_orders_for_last_3_days') and self._all_orders_for_last_3_days is not None:
