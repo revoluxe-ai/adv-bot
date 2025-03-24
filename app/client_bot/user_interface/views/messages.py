@@ -937,6 +937,8 @@ class ShopMenu(TextWithKeyboard):
             bonus = 0
         self._balance = balance
         self._bonus = bonus
+        self.total_amount_for_day = 0
+        self.price_for_month_for_shop = 0
         async with _sm(read_only=True) as session:
             stmt = select(func.count(AdvSetting.id))\
                 .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
