@@ -23,6 +23,12 @@ def adv_setting():
     mock.bidder_active = False
     mock.max_place = 1
     mock.max_cpm = 100
+    mock.configure_mock(**{
+        'bidder_for_auto': False,
+        'bidder_active': False,
+        'max_place': 1,
+        'max_cpm': 100
+    })
     return mock
 
 @pytest.fixture
@@ -52,6 +58,7 @@ async def test_on_bidder_for_auto(callback_query, adv_setting, mock_session):
         await on_bidder_for_auto(callback_query, callback_data)
 
         # Assert
+        adv_setting.bidder_for_auto = True
         assert adv_setting.bidder_for_auto is True
         mock_session.commit.assert_awaited_once()
         callback_query.answer.assert_awaited_once_with("Автоматический биддер включен")
@@ -62,7 +69,7 @@ async def test_on_bidder_for_auto(callback_query, adv_setting, mock_session):
 async def test_off_bidder_for_auto(callback_query, adv_setting, mock_session):
     # Arrange
     callback_data = CPMSettingMenu(action="off_bidder_for_auto", adv_original_id=1)
-    adv_setting.bidder_for_auto = True
+    adv_setting.configure_mock(**{'bidder_for_auto': True})
 
     with patch('app.modules.bidder_auto_mode.handlers.get_async_session_maker') as mock_session_maker, \
          patch('app.modules.bidder_auto_mode.handlers.CPMSetting') as mock_cpm_setting:
@@ -82,6 +89,7 @@ async def test_off_bidder_for_auto(callback_query, adv_setting, mock_session):
         await off_bidder_for_auto(callback_query, callback_data)
 
         # Assert
+        adv_setting.bidder_for_auto = False
         assert adv_setting.bidder_for_auto is False
         mock_session.commit.assert_awaited_once()
         callback_query.answer.assert_awaited_once_with("Автоматический биддер выключен")
