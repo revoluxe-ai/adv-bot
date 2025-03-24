@@ -579,7 +579,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                                        'advkeyword_new')
         spend_for_keywords = spend_for_keywords_in_auto_adv + spend_for_keywords_in_auction_adv
         self.spend_for_keywords = spend_for_keywords
-        self.addition_spend_in_adv = spend_for_keywords_in_auto_adv - spend_for_keywords_in_auto_adv
+        self.addition_spend_in_adv = full_adv_stat_for_last_3_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
         self.total_spend = self._sum_spend
         pass
 
@@ -626,7 +626,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         text += f'\nСтавка из Авто: {self.auto_cpm} р. '
         text += f"""(Биддер для Авто: {' Включен' if self._adv_setting.bidder_for_auto else ' Выключен'})\n"""
-        text += f"""Ставка из Аукциона: {self.auction_cpm}"""
+        text += f"""Ставка из Аукциона: {self.auction_cpm}\n"""
+        text += f"Целевая позиция: {self._adv_setting.max_place}\n"
         text += f""""""
         return text
 
