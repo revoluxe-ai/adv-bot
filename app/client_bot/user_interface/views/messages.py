@@ -590,18 +590,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         total_page = len(self._keywords) // self._on_page
         text = (
                 'Название кампании: ' + str(self._adv_setting.name) + '\n'
-                                                                      f'Статус: {self._adv_setting.active_status}\n'
-                                                                      f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """
-                                                                      'ID кампании: ' + str(
-            self._adv_setting.adv_id) + '\n'
-                                        f'ID Аукциона: {self._adv_setting.search_adv_id}\n'                           
-                                        'Общая статистика за 3 дня:\n'
-                                        f'Минимальный CRT для кампании: {self.min_ctr * 100:.2f}%\n'
-                                        f'Страница: {self._page}/{total_page + 1}\n'
-                                        f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n'
-                                        f'Общий расход на рекламу: {self.total_spend:.2f}\n'
-                                        f'Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n'
-                                        f'Общее число заказов: {self._all_orders_for_last_3_days}\n'
+                f'Статус: {self._adv_setting.active_status}\n'
+                f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""
+                'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'
+                f'ID Аукциона: {self._adv_setting.search_adv_id}\n'
+                f'Общая статистика за 3 дня:\n'
+                f'Минимальный CRT для кампании: {self.min_ctr * 100:.2f}%\n'
+                f'Страница: {self._page}/{total_page + 1}\n'
+                f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n'
+                f'Общий расход на рекламу: {self.total_spend:.2f}\n'
+                f'Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n'
+                f'Общее число заказов: {self._all_orders_for_last_3_days}\n'
         )
         
         if hasattr(self, '_all_orders_for_last_3_days') and self._all_orders_for_last_3_days is not None:
