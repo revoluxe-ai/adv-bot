@@ -15,7 +15,7 @@ async def on_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSettingM
         # Получаем настройки рекламной кампании
         stmt = select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         result = await session.execute(stmt)
-        adv_setting = result.scalar_one()
+        adv_setting = result.scalar_one_or_none()
         
         if not adv_setting:
             await callback.answer("Рекламная кампания не найдена")
@@ -37,7 +37,7 @@ async def off_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSetting
         # Получаем настройки рекламной кампании
         stmt = select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         result = await session.execute(stmt)
-        adv_setting = result.scalar_one()
+        adv_setting = result.scalar_one_or_none()
         
         if not adv_setting:
             await callback.answer("Рекламная кампания не найдена")
