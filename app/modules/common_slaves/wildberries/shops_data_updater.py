@@ -76,15 +76,12 @@ class ShopDataUpdater:
         nmids_collection = set()
         await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
         for adv in advs:
-            nmids = adv.nmid
+            nmids = adv.nmids
             if nmids:
                 for nmid in nmids:
                     nmids_collection.add(nmid)
-        async def update_cards():
-            cards = await wb_api.content.get_all_cards()
-            await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
-        func = update_cards()
-        await _coroutine_parallel_run_queue.put(func)
+        cards = await wb_api.content.get_all_cards()
+        await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
 
 
     async def update_advs_data(self) -> list[Adv]:
