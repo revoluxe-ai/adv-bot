@@ -18,6 +18,7 @@ from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload, joinedload
+from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
 
 from app.modules.wb_update_state_manager import KeywordStatUpdateState, AdvActiveKeywordUpdateStateManager
 from app.utils.click_house.client import get_clickhouse_client
@@ -479,7 +480,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                 clear_keywords.append(keyword)
 
             self._keywords = clear_keywords
-        self.min_ctr = await data_manager.get_min_ctr(self._adv_setting)
+        
         hide_keywords_is_not_relevant = data.get('hide_keywords_is_not_relevant')
         self.hide_keywords_is_not_relevant = hide_keywords_is_not_relevant
 
@@ -499,94 +500,33 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
                      clear_keywords.append(keyword)
             self._keywords = clear_keywords
-        await self._set_statistics()
+        
+        # Получаем данные через CommonAdvsStatDataManager
+        stat_data = await CommonAdvsStatDataManager.get_data(self._adv_setting, self._keywords)
+        
+        # Устанавливаем полученные данные
+        self.min_ctr = stat_data.min_ctr
+        self.auto_cpm = stat_data.auto_cpm
+        self.auction_cpm = stat_data.auction_cpm
+        self.total_spend = stat_data.total_spend
+        self.addition_spend_in_adv = stat_data.addition_spend_in_adv
+        self._all_orders_for_last_3_days = stat_data.all_orders_for_last_3_days
+        self._mean_orders_for_3_days = stat_data.mean_orders_for_3_days
+        self._mean_price_for_order = stat_data.mean_price_for_order
+        self._spend_for_inner_adv_for_3_days = stat_data.spend_for_inner_adv_for_3_days
+        self.full_adv_stat_for_last_3_days_for_auto_adv = stat_data.full_adv_stat_for_last_3_days_for_auto_adv
+        self.full_adv_stat_for_last_3_days_for_auction = stat_data.full_adv_stat_for_last_3_days_for_auction
+        self.common_stat = stat_data.common_stat
+        
+        # Дополнительные рассчеты, если нужны
+        if self._all_orders_for_last_3_days is not None:
+            self._sum_spend = self._spend_for_inner_adv_for_3_days
+        
         graphic = await self._graphic_injection()
         if not graphic:
             graphic = 'app/core/telegram/static_images/not_keywords_position_graphic.jpg'
         self._image = graphic
-        # self._additional_spend = await self._get_additional_traffic_spend(3)
         await super().__call__()
-
-    async def _set_statistics(self):
-        adv: AdvSetting = self._adv_setting
-        advs: list[int] = []
-        auto_adv_id = adv.adv_id
-        advs.append(auto_adv_id)
-        auction_adv_id = adv.search_adv_id
-        self.auto_adv_cpm = self._adv_setting.cpm
-        if search_adv_id := self._adv_setting.search_adv_id:
-            assert isinstance(search_adv_id, int)
-            search_adv_id = typing.cast(int, search_adv_id)
-            stmt = select(AdvSetting.cpm)\
-            .where(AdvSetting.adv_id == search_adv_id)
-            async with _sm() as session:
-                result = await session.execute(stmt)
-                auction_cpm: int | None = result.scalar_one()
-            self.auction_cpm = auction_cpm
-        else:
-            self.auction_cpm = None
-        auto_cpm = self._adv_setting.cpm
-        self.auto_cpm = auto_cpm
-        if auction_adv_id:
-            advs.append(auction_adv_id)
-        pass_days = 2
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=pass_days)
-        full_adv_stat_for_last_3_days_for_auto_adv = await full_wb_adv_stat.get_stats_by_last_days(
-                                                                                      [self._adv_setting.adv_id],
-                                                                                      start_date,
-                                                                                      end_date)
-        self.full_adv_stat_for_last_3_days_for_auto_adv = full_adv_stat_for_last_3_days_for_auto_adv
-
-        full_adv_stat_for_last_3_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
-            [self._adv_setting.search_adv_id],
-            start_date,
-            end_date)
-
-        self.full_adv_stat_for_last_3_days_for_auction = full_adv_stat_for_last_3_days_for_auction
-
-        full_spend_for_all_advs: float = full_adv_stat_for_last_3_days_for_auto_adv.spend \
-        + full_adv_stat_for_last_3_days_for_auction.spend
-
-        common_stat = await common_stat_manager.get_stats_for_last_period(adv.nmids[0], pass_days)
-        self.common_stat = common_stat
-        if common_stat:
-             self._all_orders_for_last_3_days = common_stat.orders
-             spend_for_inner_adv_for_3_days = full_spend_for_all_advs
-             self._sum_spend = spend_for_inner_adv_for_3_days
-             self._spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days
-             now = datetime.now()
-             hours_passed = now.hour + now.minute / 60 + now.second / 3600  # Количество часов, прошедших в текущих сутках
-             fraction_of_day = hours_passed / 24  + pass_days # Доля суток
-             self._fraction_of_day = fraction_of_day
-             self._mean_orders_for_3_days = self._all_orders_for_last_3_days/fraction_of_day
-             self._mean_price_for_order = spend_for_inner_adv_for_3_days/common_stat.orders if common_stat.orders else 0
-             self._mean_spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days
-        else:
-            self._all_orders_for_last_3_days = None
-            self._spend_for_inner_adv_for_3_days = None
-        pass
-
-        spend_for_keywords_in_auto_adv = await full_wb_adv_stat.get_keywords_spend([
-            auto_adv_id
-        ],
-            start_date,
-            end_date,
-            'advkeyword_new')
-
-        spend_for_keywords_in_auction_adv = await full_wb_adv_stat.get_keywords_spend([
-                                                                        auction_adv_id
-        ],
-                                                                        start_date,
-                                                                        end_date,
-                                                                       'advkeyword_new')
-        spend_for_keywords = spend_for_keywords_in_auto_adv + spend_for_keywords_in_auction_adv
-        self.spend_for_keywords = spend_for_keywords
-        self.addition_spend_in_adv = full_adv_stat_for_last_3_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
-        self.total_spend = self._sum_spend
-        pass
-
-
 
     @property
     def text(self):
