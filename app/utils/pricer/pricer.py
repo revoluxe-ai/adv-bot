@@ -27,17 +27,16 @@ class Pricer:
 
     async def get_month_tariff_for_count_advs(self, shop_id: str) -> int:
         """
-            Возвращает стоимость за артикул в зависимости от количества артикулов.
-
+            Возвращает стоимость за все артикулы в зависимости от количества артикулов.
+            Цена за месяц = цена_тарифа * количество_артикулов
         """
         count = await self.get_advs_count(shop_id)
 
         for limit, price in sorted(tariffs.items()):
             if count <= limit:
-                return price
-        tariffs_for_month = tariffs[max(tariffs)]
-        tariffs_for_month *= count
-        return tariffs_for_month # Если больше всех лимитов, берем минимальную цену
+                return price * count
+        # Если больше всех лимитов, берем максимальную цену
+        return tariffs[max(tariffs)] * count
 
     @staticmethod
     def get_tariff_for_day(tariff_for_month) -> float:
