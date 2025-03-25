@@ -126,7 +126,7 @@ class MockAdvSetting(MockBase):
     target_ctr_mode = Column(Boolean, default=False)
     hide_small_query_keywords = Column(Boolean, default=False)
     target_ctr_mode_strategy = Column(String, default="forward")
-    new_auto_min_ctr_mode = Column(Boolean, default=False)
+    new_auto_min_ctr_mode = Column(Boolean, default=True)
     reset_place = Column(Boolean, default=False)
     _search_adv_id = Column(String, nullable=True)
     bidder_step = Column(Float, default=0.5)
