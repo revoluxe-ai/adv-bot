@@ -161,30 +161,18 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
         tariff_for_month = await pricer.get_price_for_day_for_shop(wb_cabinet.shop_id)
         PRICE_FOR_ADV_FOR_DAY = pricer.get_tariff_for_day(tariff_for_month)
         if wb_cabinet.expiration_time < datetime.now():
-            today = datetime.now().date()
-            payments = adv.payments
             if not (bonus := wb_cabinet.bonus):
                 bonus = 0
             if not (balance := wb_cabinet.balance):
                 balance = 0
-            if not any(payment.date == today for payment in payments):
-                if bonus > PRICE_FOR_ADV_FOR_DAY:
-                    payment = AdvPayment(date=datetime.now().date())
-                    adv.payments.append(payment)
-                    wb_cabinet.bonus -= PRICE_FOR_ADV_FOR_DAY
-                elif balance > 0:
-                    payment = AdvPayment()
-                    payment.date = datetime.now().date()
-                    session.add(payment)
-                    adv.payments.append(payment)
-                    wb_cabinet.balance -= PRICE_FOR_ADV_FOR_DAY
-                else:
-                    await bot.send_message(callback.message.chat.id, 'Недостаточно средств')
-                    await messages.ShopMenu(bot,
-                                            callback.message.chat.id,
-                                            state,
-                                            wb_user_cabinet_original_id)()
-                    return
+            sum_balance = balance + bonus
+            if not sum_balance >= PRICE_FOR_ADV_FOR_DAY:
+                await bot.send_message(callback.message.chat.id, 'Недостаточно средств')
+                await messages.ShopMenu(bot,
+                                        callback.message.chat.id,
+                                        state,
+                                        wb_user_cabinet_original_id)()
+                return
         await bot.send_message(callback.message.chat.id, 'Включаю бота')
         adv.bot_active = True
         await session.commit()
