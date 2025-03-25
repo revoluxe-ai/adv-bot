@@ -107,7 +107,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
             return
         if promo_position < max_position_for_adv or promo_position == 1:
             fact_cmp_for_with_step = min(cpms)
-            new_cpm = fact_cmp_for_with_step- step
+            new_cpm = fact_cmp_for_with_step - step
         elif promo_position > max_position_for_adv:
             fact_cmp_for_with_step = max(cpms)
             new_cpm = fact_cmp_for_with_step + step
