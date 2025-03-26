@@ -29,11 +29,16 @@ class GlobalCategorySetting(BaseTable):
 
 
 class AdvPayment(BaseTable):
+    __tablename__ = "advpayment"
     id = Column(Integer, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False)
     adv_setting_id = Column(Integer, ForeignKey('advsetting.id'), nullable=False)
     adv_setting = relationship('AdvSetting', back_populates='payments')
+    type = mapped_column(String, nullable=True)
+    # Поля из common_slaves/wildberries/models.py
+    wb_cabinet_id = Column(Integer, ForeignKey("wbcabinet.id"), nullable=True)
+    wb_cabinet = relationship("WBCabinet", back_populates="payments")
+    amount = Column(Float, nullable=True)
     __table_args__ = (
         UniqueConstraint('date', 'adv_setting_id', 'type', name='uix_date_adv_setting_id_type'),
     )
-    type = mapped_column(String, nullable=True)

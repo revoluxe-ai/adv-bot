@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 from app.utils.db.base import Base
 from app.utils.db.session_maker import get_async_session_maker
-from tests.mocks import MockBase, MockItemFeature, MockKeywordFeature, MockWBCabinet, MockUser, MockWBUserCabinet, MockWBToken, MockAdvSetting
+from tests.mocks import MockBase, MockItemFeature, MockKeywordFeature, MockWBCabinet, MockUser, MockWBUserCabinet, MockWBToken, MockAdvSetting, MockAdvPayment
 import app.modules.wb_adv_updater.models as models
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, User, WBToken, AdvSetting
 from datetime import datetime, timedelta
@@ -35,6 +35,7 @@ wb_models.WBUserCabinet = MockWBUserCabinet
 wb_models.User = MockUser
 wb_models.WBToken = MockWBToken
 wb_models.AdvSetting = MockAdvSetting
+wb_models.AdvPayment = MockAdvPayment
 
 # Заменяем модели в модуле messages
 from app.client_bot.user_interface.views import messages
@@ -43,6 +44,10 @@ messages.WBUserCabinet = MockWBUserCabinet
 messages.WBCabinet = MockWBCabinet
 messages.WBToken = MockWBToken
 messages.AdvSetting = MockAdvSetting
+
+# Заменяем модели в модуле wb_adv_updater
+from app.modules.wb_adv_updater import models as adv_models
+adv_models.AdvPayment = MockAdvPayment
 
 @pytest.fixture
 def mock_wb_cabinet():
