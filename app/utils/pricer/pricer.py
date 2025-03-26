@@ -31,12 +31,8 @@ class Pricer:
             Цена за месяц = цена_тарифа * количество_артикулов
         """
         count = await self.get_advs_count(shop_id)
+        return self.get_price_for_count_advs_in_cabinet(count)
 
-        for limit, price in sorted(tariffs.items()):
-            if count <= limit:
-                return price * count
-        # Если больше всех лимитов, берем максимальную цену
-        return tariffs[max(tariffs)] * count
 
     @staticmethod
     def get_tariff_for_day(tariff_for_month) -> float:
@@ -47,6 +43,12 @@ class Pricer:
         price_for_day = self.get_tariff_for_day(price_for_month_for_shop)
         return price_for_day
 
+    def get_price_for_count_advs_in_cabinet(self, count_advs: int):
+        for limit, price in sorted(tariffs.items()):
+            if count_advs <= limit:
+                return price * count_advs
+        # Если больше всех лимитов, берем максимальную цену
+        return tariffs[max(tariffs)] * count_advs
 
 
 
