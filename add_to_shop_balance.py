@@ -8,6 +8,7 @@ shop_id =
 add_balance =
 add_bonus =
 
+
 async def add_balance_and_bonus():
     async with sm(read_only=False) as session:
         stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id)
@@ -20,6 +21,7 @@ async def add_balance_and_bonus():
         wb_cabinet.balance = balance + add_balance
         wb_cabinet.bonus = bonus + add_bonus
         await session.commit()
+        print(f'Баланс кабинета {shop_id} увеличен на {add_balance} и {add_bonus} рублей')
 
 
 
