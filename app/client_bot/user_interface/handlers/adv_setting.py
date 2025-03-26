@@ -5,7 +5,7 @@ from typing import Union
 
 import aiogram
 from aiogram import Router, types, F, Bot
-from aiogram.filters import StateFilter
+from aiogram.filters import StateFilter, BaseFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import update
 from sqlalchemy.future import select
@@ -25,12 +25,24 @@ sm = get_async_session_maker
 
 router = Router()
 
-
-
 logger = logging.getLogger(__name__)
 
 pricer = Pricer()
 
+class AdminsFilter(BaseFilter):
+    async def __call__(self, event: Union[types.Message, types.CallbackQuery]) -> bool:
+        user_id = event.from_user.id if isinstance(event, types.Message) else event.from_user.id
+        return user_id in const.ADMINS
+
+class CallbackStartsWithFilter(BaseFilter):
+    def __init__(self, prefix: str) -> None:
+        self.prefix = prefix
+
+
+    async def __call__(self, callback_query: types.CallbackQuery) -> bool:
+        if not callback_query.data:
+            return False
+        return callback_query.data.startswith(self.prefix)
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter == True))
 async def reset_filter(callback: types.CallbackQuery, callback_data: callbacks.ChoiceAdvPaginator,
@@ -39,28 +51,52 @@ async def reset_filter(callback: types.CallbackQuery, callback_data: callbacks.C
      wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
      await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
      await state.update_data(filter_advs=[])
-     page = 1
-     await messages.AdvCompanyChoicing(bot, state, callback.message.chat.id, wb_user_cabinet_original_id, page=page)()
+     
+     # Получаем список рекламных кампаний
+     async with sm() as session:
+         stmt = select(AdvSetting)\
+             .join(AdvSetting.wb_cabinet)\
+             .join(WBCabinet.wb_user_cabinets)\
+             .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
+             .order_by(AdvSetting.name)
+         result = await session.execute(stmt)
+         adv_settings = result.scalars().all()
+     
+     message = messages.AdvCompanyChoicing(bot, callback.message.chat.id, wb_user_cabinet_original_id, adv_settings)
+     message._page = 1
+     message._state = state
+     await message()
      return
 
 
-@router.message(StateFilter(states.AdvCompanyCatalog.waiting_for_keywords_for_filter))
-async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, state: FSMContext):
-    chat_id = message.chat.id
-    text = message.text
-    filter_advs = text.splitlines()
-    filter_advs = [keyword.strip().lower() for keyword in filter_advs if keyword]
-    await state.update_data(filter_advs=filter_advs)
-    state_data = await state.get_data()
-    wb_user_cabinet_original_id = state_data['last_wb_user_cabinet_original_id']
-    page = 1
-    check_data = await state.get_data()
-    logger.debug(f'check_data: {check_data}')
-    await messages.AdvCompanyChoicing \
-        (bot, state, chat_id, wb_user_cabinet_original_id, page=page)()
-    return
+@router.callback_query(F.data.startswith("wb_user_cabinet_page:"))
+async def handle_pagination(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
+    # Разбираем callback_data
+    _, wb_user_cabinet_original_id, page, *filter_parts = callback.data.split(":")
+    wb_user_cabinet_original_id = int(wb_user_cabinet_original_id)
+    page = int(page)
+    keywords_filter = filter_parts[0].split(",") if filter_parts else None
 
+    # Получаем список рекламных кампаний
+    async with sm() as session:
+        stmt = select(AdvSetting)\
+            .join(AdvSetting.wb_cabinet)\
+            .join(WBCabinet.wb_user_cabinets)\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
+            .order_by(AdvSetting.name)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
 
+    # Создаем и отправляем сообщение с новой страницей
+    message = messages.AdvCompanyChoicing(
+        bot,
+        callback.message.chat.id,
+        wb_user_cabinet_original_id,
+        adv_settings
+    )
+    message._page = page
+    message._state = state
+    await message()
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
@@ -74,70 +110,98 @@ async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Messag
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(state=states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
     page = callback_data.page
-    check_data = await state.get_data()
-    logger.debug(f'check_data: {check_data}')
-    await messages.AdvCompanyChoicing \
-        (bot, state, chat_id, wb_user_cabinet_original_id, page=page)()
-    return
 
-
-
-
-
-@router.callback_query(callbacks.Adv.filter())
-async def adv(callback: types.CallbackQuery, callback_data: callbacks.Adv,
-              bot: aiogram.Bot, state: FSMContext):
-
-    await state.set_state(state = None)
-    await messages.LongTimeOperation(bot, callback.message.chat.id)()
-    adv_original_id = callback_data.adv_original_id
-    await state.update_data(last_adv_original_id=adv_original_id)
-    data = await state.get_data()
-    try:
-        wb_user_cabinet_original_id = data['last_wb_user_cabinet_original_id']
-    except KeyError:
-        async with sm() as session:
-            stmt = select(WBUserCabinet) \
-                .join(WBUserCabinet.user) \
-                .join(WBUserCabinet.wb_cabinet) \
-                .join(WBCabinet.adv_settings) \
-                .filter(User.user_telegram_id == callback.from_user.id,  # Фильтрация по user_telegram_id
-                        AdvSetting.id == adv_original_id)  # Фильтрация по нужному AdvSetting
-
-            result = await session.execute(stmt)
-            wb_user_cabinet = result.scalar()  # Извлекаем первую строку
-        wb_user_cabinet_original_id = wb_user_cabinet.id
+    # Получаем список рекламных кампаний
     async with sm() as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv = adv.scalar()
-    if not adv:
-        await bot.send_message(callback.message.chat.id, 'Кампания не найдена, попробуйте еще раз')
-        async with sm() as session:
-            adv_settings = await session.execute(select(AdvSetting)\
-                                                .join(AdvSetting.wb_cabinet)\
+        stmt = select(AdvSetting)\
+            .join(AdvSetting.wb_cabinet)\
             .join(WBCabinet.wb_user_cabinets)\
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id))\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
             .order_by(AdvSetting.name)
-            adv_settings = adv_settings.scalars().all()
-        await messages.AdvCompanyChoicing\
-            (bot, callback.message.chat.id, wb_user_cabinet_original_id, adv_settings)(state)
-        return
-    else:
-        async with sm() as session:
-            wb_user_cabinet = await session.execute(select(WBUserCabinet) \
-                                                    .where(WBUserCabinet.id == wb_user_cabinet_original_id))
-            wb_user_cabinet = wb_user_cabinet.scalar()
-    chat_id = callback.message.chat.id
-    try:
-        await messages.AdvSettingMenu(bot,
-                                                               chat_id,
-                                                               wb_user_cabinet,
-                                                               adv,
-                                                               )()
-    except NotItemsInAdvSetting:
-        await messages.NoMainPhotos(bot, chat_id)(adv)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
 
-    return
+    # Создаем и отправляем сообщение
+    message = messages.AdvCompanyChoicing(
+        bot,
+        chat_id,
+        wb_user_cabinet_original_id,
+        adv_settings
+    )
+    message._page = page
+    message._state = state
+    await message()
+
+
+@router.message(StateFilter(states.AdvCompanyCatalog.waiting_for_keywords_for_filter))
+async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, state: FSMContext):
+    chat_id = message.chat.id
+    text = message.text
+    filter_advs = text.splitlines()
+    filter_advs = [keyword.strip().lower() for keyword in filter_advs if keyword]
+    await state.update_data(filter_advs=filter_advs)
+    state_data = await state.get_data()
+    wb_user_cabinet_original_id = state_data['last_wb_user_cabinet_original_id']
+    page = 1
+
+    # Получаем список рекламных кампаний
+    async with sm() as session:
+        stmt = select(AdvSetting)\
+            .join(AdvSetting.wb_cabinet)\
+            .join(WBCabinet.wb_user_cabinets)\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
+            .order_by(AdvSetting.name)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+
+    # Создаем и отправляем сообщение
+    message = messages.AdvCompanyChoicing(
+        bot,
+        chat_id,
+        wb_user_cabinet_original_id,
+        adv_settings
+    )
+    message._page = page
+    message._state = state
+    await message()
+
+
+@router.callback_query(F.data.startswith("adv_setting_id:"))
+async def handle_adv_setting_selection(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
+    # Разбираем callback_data
+    _, adv_id = callback.data.split(":")
+    adv_id = int(adv_id)
+
+    await state.set_state(None)
+    await messages.LongTimeOperation(bot, callback.message.chat.id)()
+    
+    # Получаем данные о рекламной кампании
+    async with sm() as session:
+        stmt = select(AdvSetting)\
+            .where(AdvSetting.adv_id == adv_id)
+        result = await session.execute(stmt)
+        adv_setting = result.scalar()
+
+        if not adv_setting:
+            await bot.send_message(callback.message.chat.id, 'Кампания не найдена, попробуйте еще раз')
+            return
+
+        # Получаем wb_user_cabinet
+        stmt = select(WBUserCabinet)\
+            .join(WBUserCabinet.wb_cabinet)\
+            .where(WBCabinet.id == adv_setting.wb_cabinet_id)
+        result = await session.execute(stmt)
+        wb_user_cabinet = result.scalar()
+
+    try:
+        await messages.AdvSettingMenu(
+            bot,
+            callback.message.chat.id,
+            wb_user_cabinet,
+            adv_setting
+        )()
+    except NotItemsInAdvSetting:
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
 
 
 @router.callback_query(callbacks.TurnBot.filter(F.action == 'on'))
@@ -290,3 +354,47 @@ async def turn_off_auto_min_ctr(callback: types.CallbackQuery,
 #     last_message, message_type = await messages.GetMinCtr(bot, last_message,
 #                                                            callback.message.chat.id, adv)()
 #     return last_message, message_type
+
+@router.callback_query(CallbackStartsWithFilter('back_to_adv'), AdminsFilter())
+async def back_to_advs(callback_query: types.CallbackQuery, state: FSMContext, bot: Bot):
+    wb_user_cabinet_original_id = int(callback_query.data.split(':')[-1])
+    
+    # Получаем список рекламных кампаний
+    async with sm() as session:
+        stmt = select(AdvSetting)\
+            .join(AdvSetting.wb_cabinet)\
+            .join(WBCabinet.wb_user_cabinets)\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
+            .order_by(AdvSetting.name)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+    
+    await messages.AdvCompanyChoicing(
+        bot,
+        callback_query.message.chat.id,
+        wb_user_cabinet_original_id,
+        adv_settings,
+        page=1
+    )()
+
+@router.callback_query(CallbackStartsWithFilter('cancel_delete_adv'), AdminsFilter())
+async def cancel_delete(callback_query: types.CallbackQuery, state: FSMContext, bot: Bot):
+    wb_user_cabinet_original_id = int(callback_query.data.split(':')[-1])
+    
+    # Получаем список рекламных кампаний
+    async with sm() as session:
+        stmt = select(AdvSetting)\
+            .join(AdvSetting.wb_cabinet)\
+            .join(WBCabinet.wb_user_cabinets)\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
+            .order_by(AdvSetting.name)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+        
+    await messages.AdvCompanyChoicing(
+        bot,
+        callback_query.message.chat.id,
+        wb_user_cabinet_original_id,
+        adv_settings,
+        page=1
+    )()
