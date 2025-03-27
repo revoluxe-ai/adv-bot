@@ -4,9 +4,9 @@ dotenv.load_dotenv()
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-shop_id =
-add_balance =
-add_bonus =
+shop_id = ""
+add_balance = ...
+add_bonus = ...
 
 
 async def add_balance_and_bonus():

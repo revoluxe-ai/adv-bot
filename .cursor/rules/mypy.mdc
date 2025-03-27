@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- you not can change inner func logic, only typing, style, PEP8, еtc
+
