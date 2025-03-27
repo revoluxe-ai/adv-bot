@@ -109,51 +109,70 @@ class GetCardsApiError(Text):
 
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
-
-    @staticmethod
-    async def get_state_data(state: FSMContext)->(int, int):
-        data = await state.get_data()
-        last_wb_user_cabinet_original_id = data.get('last_wb_user_cabinet_original_id')
-        last_wb_user_cabinet_page = data.get('last_wb_user_cabinet_page')
-        return last_wb_user_cabinet_original_id, last_wb_user_cabinet_page
-
-
-    def __init__(self, bot: Bot,
-                  state: FSMContext,
-                  chat_id: int,
-                  wb_user_cabinet_original_id: int,
-                  page: int = 1):
+    def __init__(self, bot: Bot, chat_id: int, wb_user_cabinet_original_id: int, adv_settings: list[AdvSetting], page: int = 1):
         super().__init__(bot, chat_id)
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-        self._page = page
-        self._state = state
+        self._adv_settings = adv_settings
+        self._page = page  # Устанавливаем страницу из параметра
+        self._keywords_filter = None  # Инициализируем фильтр ключевых слов
+        self._state = None  # Инициализируем состояние
 
-
+    @staticmethod
+    async def _get_wb_cabinet(wb_cabinet_original_id):
+        async with _sm() as session:
+            stmt = select(WBCabinet)\
+            .where(WBCabinet.id == wb_cabinet_original_id)
+            result = await session.execute(stmt)
+            wb_cabinet = result.scalar()
+            return wb_cabinet
 
     async def __call__(self):
         await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
-        async with _sm(read_only=True) as session:
-            stmt = select(AdvSetting) \
-                .join(AdvSetting.wb_cabinet) \
-                .join(WBCabinet.wb_user_cabinets) \
-                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id) \
-                .order_by(AdvSetting.bot_active.desc())
-            result = await session.execute(stmt)
-            adv_settings = result.scalars().all()
-        adv_settings: list[AdvSetting] = await self._filter_advs(adv_settings)
-        self._adv_settings = adv_settings
-        stmt = select(WBCabinet.id)\
-                .where(WBCabinet.wb_user_cabinets\
-                       .any(WBUserCabinet == self._wb_user_cabinet_original_id))
+        
+        # Получаем статистику для расчета diff_to_plan
         async with _sm() as session:
-            result = await session.execute(stmt)
-            wb_cabinet_original_id = result.scalar()
+            wb_cabinet = await self._get_wb_cabinet(self._adv_settings[0].wb_cabinet_id if self._adv_settings else None)
+            if wb_cabinet:
+                # Получаем общую статистику и статистику рекламы
+                common_stat = await common_stat_manager.get_stats_for_last_period(wb_cabinet.shop_id, 3)
+                full_adv_stat = await full_wb_adv_stat.get_stats_by_last_days(
+                    [adv.adv_id for adv in self._adv_settings],
+                    datetime.now() - timedelta(days=3),
+                    datetime.now()
+                )
+                
+                # Рассчитываем diff_to_plan для всех кампаний
+                self._adv_settings = await CommonAdvsStatDataManager.calculate_diff_to_plan_for_adv_settings(
+                    self._adv_settings,
+                    common_stat,
+                    full_adv_stat
+                )
+        
+        # Сортируем кампании на активные и неактивные
+        active_advs = []
+        inactive_advs = []
+        for adv in self._adv_settings:
+            if adv.active_status and adv.bot_active:
+                active_advs.append(adv)
+            else:
+                inactive_advs.append(adv)
+        
+        # Сортируем каждую группу по diff_to_plan
+        active_advs.sort(key=lambda x: x.diff_to_plan if x.diff_to_plan is not None else float('inf'))
+        inactive_advs.sort(key=lambda x: x.diff_to_plan if x.diff_to_plan is not None else float('inf'))
+        
+        # Объединяем отсортированные списки
+        self._adv_settings = active_advs + inactive_advs
+        
         await self._state.update_data(
-            last_wb_cabinet_original_id=wb_cabinet_original_id,
+            last_wb_cabinet_original_id=wb_cabinet.id if wb_cabinet else None,
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
             last_wb_user_cabinet_page=self._page
         )
-        # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
+        
+        # Фильтруем кампании если есть фильтр
+        self._adv_settings = await self._filter_advs(self._adv_settings)
+        
         await super().__call__()
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
@@ -177,13 +196,14 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             adv_settings = clear_advs
         return adv_settings
 
-
-
     @property
     def text(self):
         return ('Выберите рекламную кампанию для настройки или проверки. \n'
                 '✅ - кампания проверялась в течение последних 24 часов\n'
-                 '❓ - кампания не проверялась в течение последних 24 часов\n')
+                '❓ - кампания не проверялась в течение последних 24 часов\n'
+                '⚡ - отклонение от плана (0-1: в норме, >1: требует внимания)\n'
+                '\n📊 Активные кампании отображаются первыми, отсортированные по отклонению от плана\n'
+                '🔄 Неактивные кампании отображаются после активных')
 
     @property
     def keyboard(self):
@@ -192,7 +212,6 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                                                           self._page,
                                                           self.on_page,
                                                           self._keywords_filter)
-
 
     @property
     def on_page(self):
@@ -518,6 +537,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self.full_adv_stat_for_last_3_days_for_auction = stat_data.full_adv_stat_for_last_3_days_for_auction
         self.common_stat = stat_data.common_stat
         
+        # Получаем векторы плана и факта
+        self.plan_vector = stat_data.plan_vector
+        self.fact_vector = stat_data.fact_vector
+        
         # Дополнительные рассчеты, если нужны
         if self._all_orders_for_last_3_days is not None:
             self._sum_spend = self._spend_for_inner_adv_for_3_days
@@ -548,7 +571,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f'Заказов из Аукцион: {self.full_adv_stat_for_last_3_days_for_auction.orders}\n'
                 f"""Заказов из Органики: {self._all_orders_for_last_3_days
                     - self.full_adv_stat_for_last_3_days_for_auction.orders
-                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders}"""
+                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders if self._all_orders_for_last_3_days else 0}"""
         )
         
         if hasattr(self, '_all_orders_for_last_3_days') and self._all_orders_for_last_3_days is not None:
@@ -569,6 +592,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f'Заказов: {self._mean_orders_for_3_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
                 f'Себестоимость: {round(order_cost, 2)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
             )
+        
             
 
         text += f'\nСтавка из Авто: {self.auto_cpm} р. '
@@ -973,7 +997,7 @@ class ShopMenu(TextWithKeyboard):
 '===================================\n'
             f'🏬 Магазин: {self._wb_user_cabinet.name}\n'
             f'🆔 Shop ID: {self._wb_cabinet.shop_id}\n'
-            f'💰 Баланс магазина: {balance} рублей\n'
+            f'💰 Баланс магазина: {balance:.2f} рублей\n'
             f'🎁 Бонусы: {self._bonus} рублей\n'
         )
 

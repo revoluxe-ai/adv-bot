@@ -47,6 +47,7 @@ class AddBalance(StatesGroup):
 
 class AdvCompanyCatalog(StatesGroup):
     waiting_for_keywords_for_filter = State()
+    waiting_for_sort_type = State()
 
 
 class AddWhitePhrases(StatesGroup):

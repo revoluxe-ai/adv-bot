@@ -35,11 +35,20 @@ class PaymentCompensator:
                     continue
                 compansation_sum = self._calculate_over_payments(over_payments)
                 for date_for_comp in self._date_range(start_date, current_date):
-                    success = await self._create_compensation_payment(cabinet_id, compansation_sum, date_for_comp)
-                    if success:
-                        await self._compensate_cabinet(cabinet_id, compansation_sum)
-                        self._compensated_cabinet_ids.add(cabinet_id)
-                        break
+                    # Используем первый платеж для получения adv_setting_id и user_id
+                    reference_payment = over_payments[0] if over_payments else None
+                    if reference_payment:
+                        success = await self._create_compensation_payment(
+                            cabinet_id, 
+                            reference_payment.adv_setting_id,
+                            date_for_comp,
+                            compansation_sum,
+                            reference_payment.user_id if hasattr(reference_payment, 'user_id') else None
+                        )
+                        if success:
+                            await self._compensate_cabinet(cabinet_id, compansation_sum)
+                            self._compensated_cabinet_ids.add(cabinet_id)
+                            break
 
     @staticmethod
     def _date_range(start_date, end_date):
@@ -72,14 +81,21 @@ class PaymentCompensator:
         cabinet = await self.session.get(WBCabinet, cabinet_id)
         cabinet.bonus += over_payments_sum
 
-    async def _create_compensation_payment(self, cabinet_id, over_payments_sum, comp_date):
+    async def _create_compensation_payment(self, cabinet_id, adv_setting_id, comp_date, over_payments_sum, user_id=None):
         """Создаёт компенсационную запись и гарантирует её добавление"""
         payment = AdvPayment(
             wb_cabinet_id=cabinet_id,
+            adv_setting_id=adv_setting_id,
             date=comp_date,
             amount=over_payments_sum,
+            type='compensation',
             comment='Компенсация излишних списаний'
         )
+        
+        # Устанавливаем user_id, если он предоставлен
+        if user_id is not None and hasattr(AdvPayment, 'user_id'):
+            payment.user_id = user_id
+            
         self.session.add(payment)
         await self.session.flush()  # Гарантия добавления в БД перед изменением бонуса
         return True

@@ -93,13 +93,6 @@ def mock_adv_setting(mock_wb_cabinet):
     )
 
 @pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-@pytest.fixture(scope="session")
 async def test_db():
     """Create a test database and tables."""
     # Создаем движок SQLite в памяти

@@ -11,6 +11,7 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 import jwt
 from sqlalchemy.dialects.postgresql import JSONB
 import datetime
+from sqlalchemy import JSON
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.utils.db.base import BaseTable
@@ -46,7 +47,7 @@ class WBCabinet(BaseTable):
                                                            back_populates="wb_cabinet",
                                                                  )
     active = Column(Boolean, default=True)
-
+    payments = relationship("AdvPayment", back_populates="wb_cabinet")
     expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
@@ -225,7 +226,7 @@ class AdvSetting(BaseTable):
                                 back_populates='adv_setting',
                                 uselist=True)
     bot_active = Column(Boolean, default=False)
-    nmids = Column(JSONB, default=[])
+    nmids = Column(JSON, default=[])
     keyword_settings: Mapped[list['KeywordSetting']] = relationship('KeywordSetting',
                                                                     cascade="all, delete-orphan",
                                                                     back_populates='adv_setting',

@@ -282,8 +282,18 @@ async def select_shop(callback_query: types.CallbackQuery,
     # await state.update_data(chat_id = chat_id)
 
 
+    # Получаем список рекламных кампаний
+    async with sm() as session:
+        stmt = select(AdvSetting)\
+            .join(AdvSetting.wb_cabinet)\
+            .join(WBCabinet.wb_user_cabinets)\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
+            .order_by(AdvSetting.name)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+
     await messages.AdvCompanyChoicing \
-        (bot, state, chat_id, wb_user_cabinet_original_id, page=1)()
+        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=1)()
     return
 
 
@@ -370,10 +380,21 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
         await bot.send_message(chat_id,
                                f'Ошибка при обновлении данных, обратитесь в поддержку {const.SUPPORT_LINK}')
 
+    # Получаем список рекламных кампаний
+    async with sm() as session:
+        stmt = select(AdvSetting)\
+            .join(AdvSetting.wb_cabinet)\
+            .join(WBCabinet.wb_user_cabinets)\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)\
+            .order_by(AdvSetting.name)
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
+            
     await messages.AdvCompanyChoicing(bot,
-                                      state,
                                       callback_query.message.chat.id,
-                                      wb_user_cabinet_original_id, page=1)()
+                                      wb_user_cabinet_original_id, 
+                                      adv_settings,
+                                      page=1)()
 
 
 
