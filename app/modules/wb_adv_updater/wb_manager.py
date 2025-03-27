@@ -157,7 +157,8 @@ async def process_payment_for_advs():
         for adv_setting in adv_settings:
             wb_cabinet: WBCabinet = adv_setting.wb_cabinet
             shop_id = wb_cabinet.shop_id
-            PRICE_FOR_ADV_FOR_DAY = await pricer.get_price_for_day_for_shop(shop_id)
+            PRICE_FOR_SHOP_FOR_DAY = await pricer.get_price_for_day_for_shop(shop_id)
+            PRICE_FOR_ADV_FOR_DAY = PRICE_FOR_SHOP_FOR_DAY / len(adv_settings)
             if not (bonus := wb_cabinet.bonus):
                 bonus = 0
             if not (balance := wb_cabinet.balance):
