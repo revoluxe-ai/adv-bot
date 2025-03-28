@@ -1,6 +1,7 @@
-from .compensator import main
+from .compensator import PaymentCompensator
 
-__all__ = ['main']
+__all__ = ['PaymentCompensator']
+
 
 
 """

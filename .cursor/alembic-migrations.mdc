@@ -1,0 +1,9 @@
+---
+description: Это правила для миграции бд постгрес
+globs: 
+alwaysApply: false
+---
+
+Строго соблюдай эти правила миграции:
+
+1. Команду генерации ревизии можно делать так cd migrations &&  python -m alembic revision --autogenerate -m "..." и по аналогии

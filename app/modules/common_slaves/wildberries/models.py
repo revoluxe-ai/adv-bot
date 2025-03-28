@@ -11,11 +11,12 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 import jwt
 from sqlalchemy.dialects.postgresql import JSONB
 import datetime
+from sqlalchemy import JSON
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.utils.db.base import BaseTable
 from . import exceptions
-from ...wb_adv_updater.models import AdvPayment
+
 
 from app.utils.db.models import User, favorite_advs_association
 
@@ -24,6 +25,24 @@ from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
 
+
+
+    
+class AdvPayment(BaseTable):
+    __tablename__ = "advpayment"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False)
+    adv_setting_id = Column(Integer, ForeignKey('advsetting.id'), nullable=False)
+    adv_setting = relationship('AdvSetting', back_populates='payments')
+    type = mapped_column(String, nullable=True)
+    amount = mapped_column(Float, nullable=True, default=None)
+    __table_args__ = (
+        UniqueConstraint('date', 'adv_setting_id', 'type', name='uix_date_adv_setting_id_type'),
+    )
+
+
+
+
 class WBUserCabinet(BaseTable):
     wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
@@ -31,7 +50,11 @@ class WBUserCabinet(BaseTable):
     user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
-    __table_args__ = (UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),)
+    __table_args__ = (
+        UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),
+        Index('idx_wb_user_cabinet_user_id', 'user_id'),
+        Index('idx_wb_user_cabinet_cabinet_id', 'wb_cabinet_id'),
+    )
 
 
 
@@ -46,7 +69,6 @@ class WBCabinet(BaseTable):
                                                            back_populates="wb_cabinet",
                                                                  )
     active = Column(Boolean, default=True)
-
     expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
@@ -57,6 +79,7 @@ class WBCabinet(BaseTable):
         Index('idx_balance_bonus', 'balance', 'bonus'),
         Index('idx_balance', 'balance'),
         Index('idx_bonus', 'bonus'),
+        Index('idx_wb_cabinet_id', 'id'),
     )
 
 
@@ -225,7 +248,7 @@ class AdvSetting(BaseTable):
                                 back_populates='adv_setting',
                                 uselist=True)
     bot_active = Column(Boolean, default=False)
-    nmids = Column(JSONB, default=[])
+    nmids = Column(JSON, default=[])
     keyword_settings: Mapped[list['KeywordSetting']] = relationship('KeywordSetting',
                                                                     cascade="all, delete-orphan",
                                                                     back_populates='adv_setting',
@@ -266,14 +289,14 @@ class AdvSetting(BaseTable):
                                                   server_default='false')
     plan_for_sales_for_day = mapped_column(Integer,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
     target_price_for_order = mapped_column(Float,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
 
     max_price_for_order = mapped_column(Float,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(Boolean,
                                     nullable=True,
@@ -288,7 +311,6 @@ class AdvSetting(BaseTable):
 
 
 
-
     __table_args__ = (
         # Составной индекс для основного запроса
         Index('ix_adv_settings_cabinet_type_update',
@@ -296,6 +318,9 @@ class AdvSetting(BaseTable):
 
         # Индекс для поиска по cabinet_id
         Index('ix_adv_settings_cabinet_id', 'wb_cabinet_id'),
+        
+        # Добавляем новый индекс для оптимизации запросов
+        Index('idx_adv_setting_cabinet_id', 'wb_cabinet_id'),
 
         # Индекс для type, если он часто используется в запросах
         Index('ix_adv_settings_type', 'type'),
@@ -308,7 +333,6 @@ class AdvSetting(BaseTable):
               postgresql_ops={'name': 'gin_trgm_ops'}),
         Index('ix_name__nmids__search_adv_id', 'name', 'nmids', '_search_adv_id'),
         Index('ix_advsetting_bot_active', 'bot_active')
-
     )
 
 
@@ -462,4 +486,5 @@ class WBItemPosition:
             position.adv_type = None
 
         return position
+    
 

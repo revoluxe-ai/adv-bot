@@ -10,8 +10,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
-from app.modules.wb_adv_updater.models import AdvPayment
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet, AdvPayment
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from .start import start_registration

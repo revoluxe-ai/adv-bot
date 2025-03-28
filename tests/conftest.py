@@ -14,6 +14,7 @@ import app.modules.wb_adv_updater.models as models
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, User, WBToken, AdvSetting
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
+from unittest.mock import MagicMock, AsyncMock
 
 # Add the project root directory to PYTHONPATH
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -95,17 +96,23 @@ def mock_adv_setting(mock_wb_cabinet):
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     yield loop
-    loop.close()
+    if not loop.is_closed():
+        loop.close()
 
-@pytest.fixture(scope="session")
-async def test_db():
+@pytest.fixture(scope="function")
+async def test_async_db():
     """Create a test database and tables."""
     # Создаем движок SQLite в памяти
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         echo=False,
+        poolclass=StaticPool
     )
 
     # Создаем все таблицы
@@ -120,28 +127,9 @@ async def test_db():
 
     async with async_session() as session:
         yield session
-
-@pytest.fixture(scope="function")
-async def test_async_db():
-    """Create a test database and tables."""
-    # Создаем движок SQLite в памяти
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        echo=False,
-    )
-
-    # Создаем все таблицы
-    async with engine.begin() as conn:
-        await conn.run_sync(MockBase.metadata.drop_all)
-        await conn.run_sync(MockBase.metadata.create_all)
-
-    # Создаем сессию
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    async with async_session() as session:
-        yield session 
+        
+    # Закрываем все соединения после завершения теста
+    await engine.dispose()
 
 @pytest.fixture(autouse=True)
 def patch_get_async_session_maker(monkeypatch, test_async_db):
@@ -151,4 +139,16 @@ def patch_get_async_session_maker(monkeypatch, test_async_db):
         yield test_async_db
     
     monkeypatch.setattr("app.utils.db.session_maker.get_async_session_maker", mock_get_async_session_maker)
-    monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker) 
+    monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker)
+
+@pytest.fixture
+def mock_session():
+    """Создает мок для сессии SQLAlchemy"""
+    session = MagicMock()
+    session.execute = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session.close = AsyncMock()
+    session.get = AsyncMock()
+    session.add = MagicMock()
+    return session 
