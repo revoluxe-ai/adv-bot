@@ -16,7 +16,7 @@ from sqlalchemy import JSON
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.utils.db.base import BaseTable
 from . import exceptions
-from ...wb_adv_updater.models import AdvPayment
+
 
 from app.utils.db.models import User, favorite_advs_association
 
@@ -24,6 +24,24 @@ from app.utils.db.session_maker import get_async_session_maker
 
 
 _sm = get_async_session_maker
+
+
+
+    
+class AdvPayment(BaseTable):
+    __tablename__ = "advpayment"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False)
+    adv_setting_id = Column(Integer, ForeignKey('advsetting.id'), nullable=False)
+    adv_setting = relationship('AdvSetting', back_populates='payments')
+    type = mapped_column(String, nullable=True)
+    amount = mapped_column(Float, nullable=True, default=None)
+    __table_args__ = (
+        UniqueConstraint('date', 'adv_setting_id', 'type', name='uix_date_adv_setting_id_type'),
+    )
+
+
+
 
 class WBUserCabinet(BaseTable):
     wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
@@ -463,4 +481,5 @@ class WBItemPosition:
             position.adv_type = None
 
         return position
+    
 

@@ -93,12 +93,25 @@ def mock_adv_setting(mock_wb_cabinet):
     )
 
 @pytest.fixture(scope="session")
-async def test_db():
+def event_loop():
+    """Create an instance of the default event loop for each test case."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    yield loop
+    if not loop.is_closed():
+        loop.close()
+
+@pytest.fixture(scope="function")
+async def test_async_db():
     """Create a test database and tables."""
     # Создаем движок SQLite в памяти
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         echo=False,
+        poolclass=StaticPool
     )
 
     # Создаем все таблицы
@@ -113,28 +126,9 @@ async def test_db():
 
     async with async_session() as session:
         yield session
-
-@pytest.fixture(scope="function")
-async def test_async_db():
-    """Create a test database and tables."""
-    # Создаем движок SQLite в памяти
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        echo=False,
-    )
-
-    # Создаем все таблицы
-    async with engine.begin() as conn:
-        await conn.run_sync(MockBase.metadata.drop_all)
-        await conn.run_sync(MockBase.metadata.create_all)
-
-    # Создаем сессию
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    async with async_session() as session:
-        yield session 
+        
+    # Закрываем все соединения после завершения теста
+    await engine.dispose()
 
 @pytest.fixture(autouse=True)
 def patch_get_async_session_maker(monkeypatch, test_async_db):

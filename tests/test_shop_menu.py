@@ -6,6 +6,8 @@ from aiogram.fsm.context import FSMContext
 from app.client_bot.user_interface.views.messages import ShopMenu
 from tests.mocks import MockUser, MockWBCabinet, MockWBUserCabinet, MockWBToken, MockAdvSetting
 import json
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, User, WBToken, AdvSetting
+from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.fixture
 def mock_bot():
@@ -31,45 +33,42 @@ def mock_wb_token():
 
 @pytest.fixture
 def mock_user():
-    user = MockUser()
+    user = MagicMock(spec=User)
     user.id = 1
     user.user_telegram_id = 123456789
     return user
 
 @pytest.fixture
 def mock_wb_cabinet():
-    cabinet = MockWBCabinet()
+    cabinet = MagicMock(spec=WBCabinet)
     cabinet.id = 1
-    cabinet.shop_id = "test_shop_id"
+    cabinet.shop_id = "test_shop"
     cabinet.balance = 1000
-    cabinet.bonus = 500
-    cabinet.expiration_time = datetime.now() + timedelta(days=30)
-    cabinet.active = True
+    cabinet.bonus = 100
     return cabinet
 
 @pytest.fixture
-def mock_wb_user_cabinet(mock_user, mock_wb_cabinet):
-    cabinet = MockWBUserCabinet()
-    cabinet.id = 1
+def mock_wb_user_cabinet(mock_wb_cabinet, mock_user):
+    cabinet = MagicMock(spec=WBUserCabinet)
+    cabinet.wb_cabinet = mock_wb_cabinet
+    cabinet.user = mock_user
     cabinet.wb_cabinet_id = mock_wb_cabinet.id
     cabinet.user_id = mock_user.id
     cabinet.name = "Test Cabinet"
-    cabinet.wb_cabinet = mock_wb_cabinet
-    cabinet.user = mock_user
     return cabinet
 
 @pytest.fixture
 def mock_adv_setting(mock_wb_cabinet):
-    adv_setting = MockAdvSetting()
-    adv_setting.id = 1
-    adv_setting.adv_id = "test_adv_id"
-    adv_setting.name = "Test Adv"
-    adv_setting.wb_cabinet_id = mock_wb_cabinet.id
-    adv_setting.active_status = True
-    adv_setting.bot_active = True
-    adv_setting.nmids = json.dumps([12345, 67890])
-    adv_setting.type = "search"
-    return adv_setting
+    return AdvSetting(
+        id=1,
+        adv_id="test_adv_id",
+        name="Test Adv",
+        wb_cabinet_id=mock_wb_cabinet.id,
+        active_status=True,
+        bot_active=True,
+        nmids=[12345, 67890],
+        type="search"
+    )
 
 @pytest.fixture
 def shop_menu(mock_bot, mock_state, mock_chat_id, mock_wb_user_cabinet):
@@ -100,22 +99,13 @@ async def test_shop_menu_call(shop_menu, mock_wb_user_cabinet, mock_user, mock_w
     test_async_db.add(mock_adv_setting)
     await test_async_db.commit()
     
-    # Пересоздаем ShopMenu с теми же параметрами,
-    # чтобы использовать новый патч для get_async_session_maker
-    updated_shop_menu = ShopMenu(
-        bot=shop_menu.bot,
-        chat_id=shop_menu.chat_id,
-        state=shop_menu._state,
-        wb_user_cabinet_original_id=mock_wb_user_cabinet.id
-    )
-    
     # Вызов метода
-    await updated_shop_menu()
+    await shop_menu()
     
     # Проверка результатов
-    assert "Магазин" in updated_shop_menu.text
-    assert mock_wb_user_cabinet.name in updated_shop_menu.text
-    assert str(mock_wb_user_cabinet.wb_cabinet.balance) in updated_shop_menu.text
+    assert "Магазин" in shop_menu.text
+    assert mock_wb_user_cabinet.name in shop_menu.text
+    assert str(mock_wb_user_cabinet.wb_cabinet.balance) in shop_menu.text
 
 @pytest.mark.asyncio
 async def test_shop_menu_with_active_advs(shop_menu, mock_wb_user_cabinet, mock_user, mock_wb_cabinet, mock_wb_token, mock_adv_setting, test_async_db):
@@ -137,19 +127,225 @@ async def test_shop_menu_with_active_advs(shop_menu, mock_wb_user_cabinet, mock_
     test_async_db.add(mock_adv_setting)
     await test_async_db.commit()
     
-    # Пересоздаем ShopMenu с теми же параметрами,
-    # чтобы использовать новый патч для get_async_session_maker
-    updated_shop_menu = ShopMenu(
-        bot=shop_menu.bot,
-        chat_id=shop_menu.chat_id,
-        state=shop_menu._state,
-        wb_user_cabinet_original_id=mock_wb_user_cabinet.id
-    )
-    
     # Вызов метода
-    await updated_shop_menu()
+    await shop_menu()
     
     # Проверка результатов
-    assert "Магазин" in updated_shop_menu.text
-    assert mock_wb_user_cabinet.name in updated_shop_menu.text
-    assert str(mock_wb_user_cabinet.wb_cabinet.balance) in updated_shop_menu.text
+    assert "Магазин" in shop_menu.text
+    assert mock_wb_user_cabinet.name in shop_menu.text
+    assert str(mock_wb_user_cabinet.wb_cabinet.balance) in shop_menu.text
+
+@pytest.mark.asyncio
+async def test_get_shop_menu(mock_wb_user_cabinet, test_async_db):
+    shop_menu = ShopMenu()
+    menu_text = await shop_menu.get_shop_menu(mock_wb_user_cabinet)
+    
+    assert "🏪 Меню магазина" in menu_text
+    assert "test_shop" in menu_text
+    assert "💰 Баланс: 1000.0" in menu_text
+    assert "🎁 Бонус: 100.0" in menu_text
+
+@pytest.mark.asyncio
+async def test_get_adv_menu(mock_wb_user_cabinet, mock_adv_setting, test_async_db):
+    shop_menu = ShopMenu()
+    menu_text = await shop_menu.get_adv_menu(mock_wb_user_cabinet)
+    
+    assert "📊 Меню рекламных кампаний" in menu_text
+    assert "Test Adv" in menu_text
+    assert "✅ Активна" in menu_text
+
+@pytest.mark.asyncio
+async def test_get_adv_menu_no_advs(mock_wb_user_cabinet, test_async_db):
+    shop_menu = ShopMenu()
+    menu_text = await shop_menu.get_adv_menu(mock_wb_user_cabinet)
+    
+    assert "📊 Меню рекламных кампаний" in menu_text
+    assert "У вас пока нет рекламных кампаний" in menu_text
+
+@pytest.mark.asyncio
+async def test_get_adv_menu_with_error(mock_wb_user_cabinet, test_async_db):
+    shop_menu = ShopMenu()
+    
+    # Симулируем ошибку при получении данных
+    with patch("app.client_bot.user_interface.views.shop_menu.get_async_session_maker") as mock_session:
+        mock_session.side_effect = Exception("Database Error")
+        
+        with pytest.raises(Exception) as exc_info:
+            await shop_menu.get_adv_menu(mock_wb_user_cabinet)
+        assert str(exc_info.value) == "Database Error"
+
+@pytest.mark.asyncio
+async def test_shop_menu_call():
+    # Mock data
+    mock_message = AsyncMock()
+    mock_state = AsyncMock()
+    
+    # Test handler
+    from app.client_bot.user_interface.handlers.shop_menu import shop_menu_call
+    await shop_menu_call(mock_message, mock_state)
+    
+    # Verify
+    mock_message.answer.assert_called_once()
+    mock_state.set_state.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_shop_menu_with_active_advs(test_async_db):
+    async with test_async_db as session:
+        # Create test data
+        wb_cabinet = WBCabinet(
+            id=1,
+            shop_id="test_shop",
+            balance=1000,
+            bonus=100,
+            expiration_time="2024-01-01",
+            active=True
+        )
+        await session.merge(wb_cabinet)
+        
+        user = User(
+            id=1,
+            user_telegram_id=123456789,
+            username="test_user"
+        )
+        session.add(user)
+        
+        wb_user_cabinet = WBUserCabinet(
+            id=1,
+            wb_cabinet_id=wb_cabinet.id,
+            user_id=user.id,
+            name="Test Cabinet"
+        )
+        session.add(wb_user_cabinet)
+        
+        adv_setting = AdvSetting(
+            adv_id=123,
+            name="Test Adv",
+            wb_cabinet_id=wb_cabinet.id,
+            active_status="active",
+            bot_active=True
+        )
+        session.add(adv_setting)
+        await session.commit()
+        
+        # Create menu instance
+        menu = ShopMenu(session)
+        
+        # Get menu text
+        menu_text = await menu.get_shop_menu(wb_user_cabinet.id)
+        
+        # Verify
+        assert "Test Cabinet" in menu_text
+        assert "1000" in menu_text
+        assert "100" in menu_text
+
+@pytest.mark.asyncio
+async def test_get_shop_menu(test_async_db):
+    async with test_async_db as session:
+        # Create test data
+        wb_cabinet = WBCabinet(
+            id=1,
+            shop_id="test_shop",
+            balance=1000,
+            bonus=100,
+            expiration_time="2024-01-01",
+            active=True
+        )
+        await session.merge(wb_cabinet)
+        
+        user = User(
+            id=1,
+            user_telegram_id=123456789,
+            username="test_user"
+        )
+        session.add(user)
+        
+        wb_user_cabinet = WBUserCabinet(
+            id=1,
+            wb_cabinet_id=wb_cabinet.id,
+            user_id=user.id,
+            name="Test Cabinet"
+        )
+        session.add(wb_user_cabinet)
+        await session.commit()
+        
+        # Create menu instance
+        menu = ShopMenu(session)
+        
+        # Get menu text
+        menu_text = await menu.get_shop_menu(wb_user_cabinet.id)
+        
+        # Verify
+        assert "Test Cabinet" in menu_text
+        assert "1000" in menu_text
+        assert "100" in menu_text
+
+@pytest.mark.asyncio
+async def test_get_adv_menu(test_async_db):
+    async with test_async_db as session:
+        # Create test data
+        wb_cabinet = WBCabinet(
+            id=1,
+            shop_id="test_shop",
+            balance=1000,
+            bonus=100,
+            expiration_time="2024-01-01",
+            active=True
+        )
+        await session.merge(wb_cabinet)
+        
+        adv_setting = AdvSetting(
+            adv_id=123,
+            name="Test Adv",
+            wb_cabinet_id=wb_cabinet.id,
+            active_status="active",
+            bot_active=True
+        )
+        session.add(adv_setting)
+        await session.commit()
+        
+        # Create menu instance
+        menu = ShopMenu(session)
+        
+        # Get menu text
+        menu_text = await menu.get_adv_menu(wb_cabinet.id)
+        
+        # Verify
+        assert "Test Adv" in menu_text
+        assert "active" in menu_text.lower()
+
+@pytest.mark.asyncio
+async def test_get_adv_menu_no_advs(test_async_db):
+    async with test_async_db as session:
+        # Create test data
+        wb_cabinet = WBCabinet(
+            id=1,
+            shop_id="test_shop",
+            balance=1000,
+            bonus=100,
+            expiration_time="2024-01-01",
+            active=True
+        )
+        await session.merge(wb_cabinet)
+        await session.commit()
+        
+        # Create menu instance
+        menu = ShopMenu(session)
+        
+        # Get menu text
+        menu_text = await menu.get_adv_menu(wb_cabinet.id)
+        
+        # Verify
+        assert "No active advertisements" in menu_text
+
+@pytest.mark.asyncio
+async def test_get_adv_menu_with_error(test_async_db):
+    async with test_async_db as session:
+        # Create menu instance with error-raising mock session
+        menu = ShopMenu(AsyncMock())
+        menu.session.execute.side_effect = Exception("Database Error")
+        
+        # Get menu text should raise exception
+        with pytest.raises(Exception) as exc_info:
+            await menu.get_adv_menu(1)
+        
+        assert str(exc_info.value) == "Database Error"
