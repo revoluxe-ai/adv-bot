@@ -50,7 +50,11 @@ class WBUserCabinet(BaseTable):
     user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
-    __table_args__ = (UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),)
+    __table_args__ = (
+        UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),
+        Index('idx_wb_user_cabinet_user_id', 'user_id'),
+        Index('idx_wb_user_cabinet_cabinet_id', 'wb_cabinet_id'),
+    )
 
 
 
@@ -75,6 +79,7 @@ class WBCabinet(BaseTable):
         Index('idx_balance_bonus', 'balance', 'bonus'),
         Index('idx_balance', 'balance'),
         Index('idx_bonus', 'bonus'),
+        Index('idx_wb_cabinet_id', 'id'),
     )
 
 
@@ -284,14 +289,14 @@ class AdvSetting(BaseTable):
                                                   server_default='false')
     plan_for_sales_for_day = mapped_column(Integer,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
     target_price_for_order = mapped_column(Float,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
 
     max_price_for_order = mapped_column(Float,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(Boolean,
                                     nullable=True,
@@ -306,7 +311,6 @@ class AdvSetting(BaseTable):
 
 
 
-
     __table_args__ = (
         # Составной индекс для основного запроса
         Index('ix_adv_settings_cabinet_type_update',
@@ -314,6 +318,9 @@ class AdvSetting(BaseTable):
 
         # Индекс для поиска по cabinet_id
         Index('ix_adv_settings_cabinet_id', 'wb_cabinet_id'),
+        
+        # Добавляем новый индекс для оптимизации запросов
+        Index('idx_adv_setting_cabinet_id', 'wb_cabinet_id'),
 
         # Индекс для type, если он часто используется в запросах
         Index('ix_adv_settings_type', 'type'),
@@ -326,7 +333,6 @@ class AdvSetting(BaseTable):
               postgresql_ops={'name': 'gin_trgm_ops'}),
         Index('ix_name__nmids__search_adv_id', 'name', 'nmids', '_search_adv_id'),
         Index('ix_advsetting_bot_active', 'bot_active')
-
     )
 
 
