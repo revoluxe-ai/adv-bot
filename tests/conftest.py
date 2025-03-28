@@ -14,6 +14,7 @@ import app.modules.wb_adv_updater.models as models
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, User, WBToken, AdvSetting
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
+from unittest.mock import MagicMock, AsyncMock
 
 # Add the project root directory to PYTHONPATH
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -138,4 +139,16 @@ def patch_get_async_session_maker(monkeypatch, test_async_db):
         yield test_async_db
     
     monkeypatch.setattr("app.utils.db.session_maker.get_async_session_maker", mock_get_async_session_maker)
-    monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker) 
+    monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker)
+
+@pytest.fixture
+def mock_session():
+    """Создает мок для сессии SQLAlchemy"""
+    session = MagicMock()
+    session.execute = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session.close = AsyncMock()
+    session.get = AsyncMock()
+    session.add = MagicMock()
+    return session 

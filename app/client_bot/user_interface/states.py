@@ -1,4 +1,5 @@
 from aiogram.filters.state import State, StatesGroup
+from aiogram.fsm.state import State, StatesGroup
 
 
 class GlobalState(StatesGroup):
@@ -71,3 +72,7 @@ class AddRelevantPhrases(StatesGroup):
 
 class ChangeCPM(StatesGroup):
     waiting_for_cpm = State()
+
+
+class ShopMenuState(StatesGroup):
+    shop_menu = State()

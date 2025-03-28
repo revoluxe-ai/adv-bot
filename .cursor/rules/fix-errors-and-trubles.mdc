@@ -4,6 +4,5 @@ globs:
 alwaysApply: true
 ---
 
-# Строго придерживайся правил исправления 
-- You can @ files here
-- You can use markdown but dont have to
+# Строго придерживайся правил исправления ошибок:
+- 
