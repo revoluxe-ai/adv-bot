@@ -256,43 +256,11 @@ async def update_vectors_in_redis():
 async def check_accesses():
     await rights_control.check_all()
 
-async def update_all_data_in_db_run(tasks):
-    wb_accesses = super_cabinet_manager.get_accesses_for_wb_cabinets()
-    logger.debug('Получен генератор к кабинетам для обновления даты')
-    async for wb_access in wb_accesses:
-        logger.debug('Получен кабинет для обновления данных')
-        if wb_access.wb_cabinet.id not in tasks:
-            try:
-                shop_data_updater = ShopDataUpdater(wb_access)
-            except ApiForbiddenError:
-                logger.debug(f'Нет нужных прав у токена')
-                await asyncio.sleep(0)
-                continue
 
-            async def task_with_delay():
-                await shop_data_updater.update_all_shop_data()
-                await asyncio.sleep(15*60)
-            task = asyncio.create_task(task_with_delay())
-            logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} создана')
-            tasks[wb_access.wb_cabinet.id] = task
-        else:
-            if tasks[wb_access.wb_cabinet.id].done():
-                logger.debug(f'Задача обновления данных для кабинета {wb_access.wb_cabinet.shop_id} завершена')
-                if tasks[wb_access.wb_cabinet.id].exception():
-                    logger.error(
-                        f'Ошибка обновления данных для Shop id {wb_access.wb_cabinet.shop_id}: {tasks[wb_access.wb_cabinet.id].exception()}, '
-                        f'{tasks[wb_access.wb_cabinet.id].exception()}')
-                else:
-                    async with sm(read_only=False) as session:
-                        wb_cabinet = wb_access.wb_cabinet
-                        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet.id)
-                        result = await session.execute(stmt)
-                        wb_cabinet = result.scalar()
-                        wb_cabinet.last_update_all_data = datetime.datetime.now()
-                        await session.commit()
-                    logger.debug('Задача обновления успешно выполнена')
-                del tasks[wb_access.wb_cabinet.id]
-        await asyncio.sleep(15*60)
+
+
+
+
 
 
 

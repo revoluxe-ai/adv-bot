@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.exceptions import ApiForbiddenError
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken, AdvSetting
 from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -293,7 +293,7 @@ async def select_shop(callback_query: types.CallbackQuery,
         adv_settings = result.scalars().all()
 
     await messages.AdvCompanyChoicing \
-        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, page=1)()
+        (bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=1)()
     return
 
 

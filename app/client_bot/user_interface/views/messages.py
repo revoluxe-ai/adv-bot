@@ -109,13 +109,20 @@ class GetCardsApiError(Text):
 
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
-    def __init__(self, bot: Bot, chat_id: int, wb_user_cabinet_original_id: int, adv_settings: list[AdvSetting], page: int = 1):
+    def __init__(self,
+                 bot: Bot,
+                 chat_id: int,
+                 wb_user_cabinet_original_id: int,
+                 adv_settings: list[AdvSetting],
+                 state,
+                 page: int = 1):
+        self._state = state
         super().__init__(bot, chat_id)
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._adv_settings = adv_settings
         self._page = page  # Устанавливаем страницу из параметра
         self._keywords_filter = None  # Инициализируем фильтр ключевых слов
-        self._state = None  # Инициализируем состояние
+
 
     @staticmethod
     async def _get_wb_cabinet(wb_cabinet_original_id):
@@ -128,26 +135,6 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     async def __call__(self):
         await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
-        
-        # Получаем статистику для расчета diff_to_plan
-        async with _sm() as session:
-            wb_cabinet = await self._get_wb_cabinet(self._adv_settings[0].wb_cabinet_id if self._adv_settings else None)
-            if wb_cabinet:
-                # Получаем общую статистику и статистику рекламы
-                common_stat = await common_stat_manager.get_stats_for_last_period(wb_cabinet.shop_id, 3)
-                full_adv_stat = await full_wb_adv_stat.get_stats_by_last_days(
-                    [adv.adv_id for adv in self._adv_settings],
-                    datetime.now() - timedelta(days=3),
-                    datetime.now()
-                )
-                
-                # Рассчитываем diff_to_plan для всех кампаний
-                self._adv_settings = await CommonAdvsStatDataManager.calculate_diff_to_plan_for_adv_settings(
-                    self._adv_settings,
-                    common_stat,
-                    full_adv_stat
-                )
-        
         # Сортируем кампании на активные и неактивные
         active_advs = []
         inactive_advs = []
@@ -156,23 +143,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                 active_advs.append(adv)
             else:
                 inactive_advs.append(adv)
-        
-        # Сортируем каждую группу по diff_to_plan
-        active_advs.sort(key=lambda x: x.diff_to_plan if x.diff_to_plan is not None else float('inf'))
-        inactive_advs.sort(key=lambda x: x.diff_to_plan if x.diff_to_plan is not None else float('inf'))
-        
-        # Объединяем отсортированные списки
-        self._adv_settings = active_advs + inactive_advs
-        
-        await self._state.update_data(
-            last_wb_cabinet_original_id=wb_cabinet.id if wb_cabinet else None,
-            last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
-            last_wb_user_cabinet_page=self._page
-        )
-        
-        # Фильтруем кампании если есть фильтр
-        self._adv_settings = await self._filter_advs(self._adv_settings)
-        
+
         await super().__call__()
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:

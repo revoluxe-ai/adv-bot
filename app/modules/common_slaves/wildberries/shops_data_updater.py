@@ -45,11 +45,6 @@ class ShopDataUpdater:
         pass
 
 
-    async def update_all_shop_data(self):
-        await asyncio.gather(self.update_advs_data(),
-                             self.update_advs_data())
-
-
     async def quick_update_all_data(self):
         await self.__quick_update_advs()
 

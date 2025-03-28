@@ -65,7 +65,6 @@ class WBCabinet(BaseTable):
                                                            back_populates="wb_cabinet",
                                                                  )
     active = Column(Boolean, default=True)
-    payments = relationship("AdvPayment", back_populates="wb_cabinet")
     expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
