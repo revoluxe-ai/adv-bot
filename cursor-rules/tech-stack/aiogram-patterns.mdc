@@ -1,0 +1,149 @@
+---
+description: Правила и шаблоны для работы с библиотекой Aiogram
+globs: ["app/client_bot/*.py", "app/admin_bot/*.py", "app/*_bot/**/*.py"]
+alwaysApply: false
+dependencies: []
+tags: ["telegram", "aiogram", "bot", "async"]
+---
+
+# Правила работы с Aiogram
+
+## Контекст применения
+Эти правила используются при разработке и модификации Telegram-ботов с использованием библиотеки Aiogram 3.x.
+
+## Основные принципы
+1. Использовать роутеры для организации обработчиков
+2. Применять фильтры для маршрутизации сообщений
+3. Использовать FSM для организации диалогов
+4. Разделять бизнес-логику и обработчики сообщений
+
+## Базовая структура бота
+
+### Инициализация бота
+```python
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+
+# Инициализация бота и диспетчера
+bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
+dp = Dispatcher()
+
+# Подключение роутеров
+dp.include_router(start_router)
+dp.include_router(profile_router)
+dp.include_router(settings_router)
+
+# Запуск бота
+async def main():
+    await dp.start_polling(bot)
+```
+
+### Создание роутера
+```python
+from aiogram import Router, F
+from aiogram.filters import Command
+from aiogram.types import Message
+
+# Создание роутера
+router = Router()
+
+# Обработчик команды
+@router.message(Command("start"))
+async def cmd_start(message: Message):
+    await message.answer("Привет! Я бот.")
+
+# Обработчик с фильтром по тексту
+@router.message(F.text == "Помощь")
+async def help_handler(message: Message):
+    await message.answer("Раздел помощи")
+```
+
+## Работа с клавиатурами
+
+### Inline-клавиатура
+```python
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+# Создание inline-клавиатуры
+keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Кнопка 1", callback_data="button1"),
+            InlineKeyboardButton(text="Кнопка 2", callback_data="button2")
+        ],
+        [InlineKeyboardButton(text="Ссылка", url="https://example.com")]
+    ]
+)
+
+# Отправка сообщения с клавиатурой
+await message.answer("Выберите действие:", reply_markup=keyboard)
+
+# Обработчик нажатия на кнопку
+@router.callback_query(F.data == "button1")
+async def process_button1(callback_query: CallbackQuery):
+    await callback_query.answer("Вы нажали кнопку 1")
+    await callback_query.message.edit_text("Текст изменен после нажатия")
+```
+
+### Reply-клавиатура
+```python
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+
+# Создание reply-клавиатуры
+keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Кнопка 1"), KeyboardButton(text="Кнопка 2")]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
+# Отправка сообщения с клавиатурой
+await message.answer("Выберите опцию:", reply_markup=keyboard)
+
+# Удаление клавиатуры
+await message.answer("Клавиатура убрана", reply_markup=ReplyKeyboardRemove())
+```
+
+## Типичные ошибки
+- Использование глобальных переменных вместо FSM
+- Отсутствие обработки исключений
+- Смешивание бизнес-логики и обработчиков сообщений
+- Дублирование кода вместо создания утилитарных функций
+
+## Пример комплексного обработчика
+```python
+from aiogram import Router, F
+from aiogram.filters import Command
+from aiogram.types import Message, CallbackQuery
+from aiogram.exceptions import TelegramBadRequest
+
+router = Router()
+
+@router.message(Command("profile"))
+async def cmd_profile(message: Message):
+    user_id = message.from_user.id
+    
+    # Разделение: получение данных через сервис
+    user_data = await user_service.get_user_profile(user_id)
+    
+    if not user_data:
+        await message.answer("Профиль не найден. Зарегистрируйтесь.")
+        return
+    
+    # Форматирование текста ответа
+    text = f"Ваш профиль:\nИмя: {user_data['name']}\nБаланс: {user_data['balance']}"
+    
+    # Создание клавиатуры
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Пополнить баланс", callback_data=f"add_balance:{user_id}")]
+        ]
+    )
+    
+    try:
+        await message.answer(text, reply_markup=keyboard)
+    except TelegramBadRequest as e:
+        logger.error(f"Ошибка при отправке сообщения: {e}")
+        await message.answer("Произошла ошибка. Попробуйте позже.")
+``` 

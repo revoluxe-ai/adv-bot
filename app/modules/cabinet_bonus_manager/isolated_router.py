@@ -11,7 +11,7 @@ from aiogram.filters.callback_data import CallbackData
 from sqlalchemy import select
 
 from app.client_bot.const import ADMINS
-from app.modules.cabinet_bonus_manager.state_manager import BonusStateManager, BonusManagerStateGroup
+from app.modules.cabinet_bonus_manager.state_manager import BonusManagerStateGroup
 from app.modules.cabinet_bonus_manager.bonus_service import (
     add_bonus, subtract_bonus, reset_bonus, get_wb_cabinet
 )
@@ -59,17 +59,11 @@ async def handle_start_command(message: types.Message, state: FSMContext):
     CommandStart() должен стоять перед любыми обработчиками с StateFilter,
     чтобы работать независимо от текущего состояния.
     """
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
-    # Проверяем, находится ли пользователь в одном из состояний модуля
+
     current_state = await state.get_state()
     
     # Очищаем все возможные состояния, связанные с модулем бонусов
     if current_state:
-        # Очищаем состояние в изолированном менеджере
-        await bonus_state.clear_state()
-        # Также очищаем обычное состояние для совместимости с handlers.py
         await state.clear()
         logger.info(f"Пользователь {message.from_user.id} вышел из модуля бонусов по команде /start")
         
@@ -87,17 +81,6 @@ async def cmd_bonus_help(message: types.Message):
     )
     await message.answer(help_text)
 
-@bonus_router.message(Command("bonus_menu"), F.from_user.id.in_(ADMINS))
-async def cmd_bonus_menu(message: types.Message, state: FSMContext):
-    """Запрашивает shop_id для работы с бонусами"""
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
-    # Очищаем предыдущие данные и устанавливаем новое состояние
-    await bonus_state.clear_state()
-    await bonus_state.set_state(BonusManagerStateGroup.waiting_for_shop_id)
-    
-    await message.answer("Введите shop_id кабинета для управления бонусами:")
 
 # Обработчик для колбека AdminBonus, который используется в админ-панели, перенесен в bonus_scene.py
 # @bonus_router.callback_query(AdminBonus.filter(F.action == "menu"), F.from_user.id.in_(ADMINS))
@@ -118,25 +101,14 @@ async def cmd_bonus_menu(message: types.Message, state: FSMContext):
 # Обработчик callback для BonusCallback с action=menu
 @bonus_router.callback_query(BonusCallback.filter(F.action == "menu"), F.from_user.id.in_(ADMINS))
 async def admin_bonus_menu_callback(callback: types.CallbackQuery, callback_data: BonusCallback, state: FSMContext):
-    """Показывает меню управления бонусами по коллбеку"""
-    # Отвечаем на callback
-    await callback.answer()
-    
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
-    # Очищаем предыдущие данные и устанавливаем новое состояние
-    await bonus_state.clear_state()
-    await bonus_state.set_state(BonusManagerStateGroup.waiting_for_shop_id)
-    
+    await state.clear()
+    await state.set_state(BonusManagerStateGroup.waiting_for_shop_id)
+
     await callback.message.edit_text("Введите shop_id кабинета для управления бонусами:")
 
 # Обработчик ввода shop_id
 @bonus_router.message(StateFilter(BonusManagerStateGroup.waiting_for_shop_id))
 async def process_shop_id(message: types.Message, state: FSMContext):
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
     shop_id = message.text.strip()
     if not shop_id:
         await message.answer("Некорректный shop_id. Введите shop_id кабинета:")
@@ -149,7 +121,7 @@ async def process_shop_id(message: types.Message, state: FSMContext):
         return
 
     # Сохраняем информацию о кабинете в изолированном хранилище
-    await bonus_state.update_data({
+    await state.update_data({
         "shop_id": shop_id, 
         "current_bonus": cabinet.calculated_bonus,
         "current_balance": cabinet.calculated_balance
@@ -167,11 +139,6 @@ async def process_shop_id(message: types.Message, state: FSMContext):
 # Обработчик колбеков операций с магазином
 @bonus_router.callback_query(F.data.startswith("shop_bonus_"), F.from_user.id.in_(ADMINS))
 async def process_shop_bonus_callback(callback: types.CallbackQuery, state: FSMContext):
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
-    # Отвечаем на callback
-    await callback.answer()
     
     # Парсим данные из callback_data
     parts = callback.data.split("_")
@@ -179,16 +146,16 @@ async def process_shop_bonus_callback(callback: types.CallbackQuery, state: FSMC
     shop_id = parts[3]    # shop_id магазина
     
     # Получаем данные из состояния
-    data = await bonus_state.get_data()
+    data = await state.get_data()
     current_bonus = data.get("current_bonus")
     current_balance = data.get("current_balance")
     
     # Обновляем информацию о текущей операции
-    await bonus_state.update_data({"operation": operation})
+    await state.update_data({"operation": operation})
     
     if operation == "reset":
         # Для обнуления сразу переходим к описанию
-        await bonus_state.set_state(BonusManagerStateGroup.waiting_for_description)
+        await state.set_state(BonusManagerStateGroup.waiting_for_description)
         await callback.message.edit_text(
             f"🏪 Магазин: {shop_id}\n"
             f"💰 Текущий баланс: {current_balance} руб.\n"
@@ -197,7 +164,7 @@ async def process_shop_bonus_callback(callback: types.CallbackQuery, state: FSMC
         )
     else:
         # Для добавления или снятия запрашиваем сумму
-        await bonus_state.set_state(BonusManagerStateGroup.waiting_for_amount)
+        await state.set_state(BonusManagerStateGroup.waiting_for_amount)
         operation_name = "пополнения" if operation == "add" else "списания"
         await callback.message.edit_text(
             f"🏪 Магазин: {shop_id}\n"
@@ -209,20 +176,13 @@ async def process_shop_bonus_callback(callback: types.CallbackQuery, state: FSMC
 # Обработчик возврата в главное меню бонусов
 @bonus_router.callback_query(F.data == "bonus_menu", F.from_user.id.in_(ADMINS))
 async def bonus_menu_callback(callback: types.CallbackQuery, state: FSMContext):
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
-    await callback.answer()
-    await bonus_state.clear_state()
-    await bonus_state.set_state(BonusManagerStateGroup.waiting_for_shop_id)
+    await state.set_state(BonusManagerStateGroup.waiting_for_shop_id)
     await callback.message.edit_text("Введите shop_id кабинета для управления бонусами:")
 
 # Обработчик ввода суммы
 @bonus_router.message(StateFilter(BonusManagerStateGroup.waiting_for_amount))
 async def process_amount(message: types.Message, state: FSMContext):
     # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
     try:
         amount = float(message.text.strip())
         if amount <= 0:
@@ -232,10 +192,10 @@ async def process_amount(message: types.Message, state: FSMContext):
         return
 
     # Сохраняем сумму в состоянии
-    await bonus_state.update_data({"amount": amount})
+    await state.update_data({"amount": amount})
     
     # Получаем данные из состояния
-    data = await bonus_state.get_data()
+    data = await state.get_data()
     operation = data.get("operation")
     current_bonus = data.get("current_bonus")
     current_balance = data.get("current_balance")
@@ -250,34 +210,34 @@ async def process_amount(message: types.Message, state: FSMContext):
         return
 
     # Переходим к вводу описания
-    await bonus_state.set_state(BonusManagerStateGroup.waiting_for_description)
+    await state.set_state(BonusManagerStateGroup.waiting_for_description)
     await message.answer(
         f"🏪 Магазин: {shop_id}\n"
         f"💰 Текущий баланс: {current_balance} руб.\n"
         f"🎁 Текущие бонусы: {current_bonus} руб.\n\n"
-        f"Введите описание операции (или отправьте '-' для пропуска):"
+        f"Введите описание операции:"
     )
 
 # Обработчик ввода описания
 @bonus_router.message(StateFilter(BonusManagerStateGroup.waiting_for_description))
 async def process_description(message: types.Message, state: FSMContext):
     # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
-    description = message.text.strip()
-    if description == "-":
-        description = None
 
+    description = message.text.strip()
+    if description is None:
+        await message.answer("Введите описание операции:")
+        return
     # Сохраняем описание в состоянии
-    await bonus_state.update_data({"description": description})
+    await state.update_data({"description": description})
     
     # Получаем данные из состояния
-    data = await bonus_state.get_data()
+    data = await state.get_data()
 
     # Формируем сообщение для подтверждения
     operation = data.get("operation")
     shop_id = data.get("shop_id")
     current_bonus = data.get("current_bonus")
+    assert current_bonus
     current_balance = data.get("current_balance")
     
     if operation == "reset":
@@ -308,15 +268,13 @@ async def process_description(message: types.Message, state: FSMContext):
         keyboard = get_confirm_keyboard(operation, shop_id, amount)
     
     # Переходим к ожиданию подтверждения
-    await bonus_state.set_state(BonusManagerStateGroup.waiting_for_confirm)
+    await state.set_state(BonusManagerStateGroup.waiting_for_confirm)
     await message.answer(confirm_message, reply_markup=keyboard)
 
 # Обработчик колбека для подтверждения/отмены операции
 @bonus_router.callback_query(F.data.startswith("bonus_confirm_"), F.from_user.id.in_(ADMINS))
 async def process_confirm_callback(callback: types.CallbackQuery, state: FSMContext, bot: Bot):
     # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
     # Отвечаем на callback
     await callback.answer()
     
@@ -325,9 +283,8 @@ async def process_confirm_callback(callback: types.CallbackQuery, state: FSMCont
     operation = parts[2]
     shop_id = parts[3]
     amount = float(parts[4]) if len(parts) > 4 else None
-    
     admin_user_id = callback.from_user.id
-    data = await bonus_state.get_data()
+    data = await state.get_data()
     description = data.get("description")
     
     try:
@@ -342,6 +299,8 @@ async def process_confirm_callback(callback: types.CallbackQuery, state: FSMCont
         elif operation == "reset":
             result = await reset_bonus(shop_id, admin_user_id, description)
             operation_text = "Бонусы успешно обнулены"
+        else:
+            raise ValueError("Некорректная операция")
         
         if result:
             # Получаем обновленную информацию о кабинете
@@ -354,19 +313,19 @@ async def process_confirm_callback(callback: types.CallbackQuery, state: FSMCont
                 reply_markup=get_shop_bonus_keyboard(shop_id)
             )
             # Обновляем данные о кабинете в состоянии
-            await bonus_state.update_data({
+            await state.update_data({
                 "current_bonus": cabinet.calculated_bonus,
                 "current_balance": cabinet.calculated_balance
             })
             # Сбрасываем состояние ожидания подтверждения
-            await bonus_state.set_state(None)
+            await state.set_state(None)
         else:
             await callback.message.edit_text(
                 f"❌ Ошибка при выполнении операции для магазина {shop_id}.\n\n"
                 f"Попробуйте еще раз:",
                 reply_markup=get_shop_bonus_keyboard(shop_id)
             )
-            await bonus_state.set_state(None)
+            await state.set_state(None)
             
     except Exception as e:
         logger.error(f"Ошибка при управлении бонусами: {e}")
@@ -375,25 +334,20 @@ async def process_confirm_callback(callback: types.CallbackQuery, state: FSMCont
             f"Вернитесь в меню управления магазином:",
             reply_markup=get_shop_bonus_keyboard(shop_id)
         )
-        await bonus_state.set_state(None)
+        await state.set_state(None)
 
 # Обработчик колбека для отмены операции
 @bonus_router.callback_query(F.data == "bonus_cancel", F.from_user.id.in_(ADMINS))
 async def process_cancel_callback(callback: types.CallbackQuery, state: FSMContext):
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
-    # Отвечаем на callback
-    await callback.answer()
-    
+
     # Получаем данные о магазине
-    data = await bonus_state.get_data()
+    data = await state.get_data()
     shop_id = data.get("shop_id")
     current_bonus = data.get("current_bonus")
     current_balance = data.get("current_balance")
     
     # Очищаем состояние ожидания подтверждения и возвращаемся к меню магазина
-    await bonus_state.set_state(None)
+    await state.set_state(None)
     
     await callback.message.edit_text(
         f"🏪 Магазин: {shop_id}\n"
@@ -406,15 +360,8 @@ async def process_cancel_callback(callback: types.CallbackQuery, state: FSMConte
 # Обработчик callback для кнопки "Назад"
 @bonus_router.callback_query(F.data == "bonus_back", F.from_user.id.in_(ADMINS))
 async def process_back_button(callback: types.CallbackQuery, state: FSMContext):
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
-    # Отвечаем на callback
-    await callback.answer()
-    
-    # Очищаем все состояния и данные
-    await bonus_state.clear_state()
-    
+
+    await state.set_state(None)
     # Отправляем пользователя назад в главное меню
     from app.client_bot.user_interface.views.keyboards import get_admin_keyboard
     
@@ -426,11 +373,9 @@ async def process_back_button(callback: types.CallbackQuery, state: FSMContext):
 # Обработчик ввода shop_id для проверки бонусов (без состояния)
 @bonus_router.message(lambda message: message.text and message.text.strip().isalnum(), F.from_user.id.in_(ADMINS))
 async def process_check_bonus_shop_id(message: types.Message, state: FSMContext):
-    # Создаем изолированный менеджер состояний
-    bonus_state = BonusStateManager(state)
-    
+
     # Получаем данные из состояния
-    data = await bonus_state.get_data()
+    data = await state.get_data()
     
     # Проверяем, что это проверка бонусов
     if data.get("action") != "check_bonus":
@@ -448,7 +393,7 @@ async def process_check_bonus_shop_id(message: types.Message, state: FSMContext)
         return
     
     # Очищаем флаг проверки бонусов
-    await bonus_state.clear_state()
+    await state.update_data({"action": None})
     
     # Отображаем информацию о бонусах и балансе кабинета
     await message.answer(

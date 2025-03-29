@@ -7,7 +7,7 @@ from aiogram import F, Router
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.scene import Scene, SceneRegistry, on
+from aiogram.fsm.scene import Scene, SceneRegistry, on, SceneWizard
 from aiogram.fsm.storage.memory import SimpleEventIsolation
 
 
@@ -18,7 +18,7 @@ from app.modules.cabinet_bonus_manager.bonus_service import (
 from app.modules.cabinet_bonus_manager.keyboards import (
     get_bonus_admin_keyboard, get_confirm_keyboard, get_shop_bonus_keyboard, get_back_to_menu_keyboard
 )
-from app.modules.cabinet_bonus_manager.state_manager import BonusStateManager
+
 from app.client_bot.user_interface.views.callbacks import AdminBonus
 
 logger = logging.getLogger(__name__)
@@ -33,14 +33,14 @@ OPERATIONS = {
 class BonusScene(Scene, state="bonus_scene"):
     """Сцена для управления бонусами кабинетов"""
     
-    def __init__(self, event_isolation: SimpleEventIsolation):
+    def __init__(self, wizard: SceneWizard):
         """
         Инициализация сцены бонусов
         
         Args:
-            event_isolation: Изоляция событий для сцены
+            wizard: Объект SceneWizard для управления сценой
         """
-        super().__init__(event_isolation)
+        super().__init__(wizard)
         self.state_context = None  # Будет установлен в enter методах
     
     @on.message.enter()

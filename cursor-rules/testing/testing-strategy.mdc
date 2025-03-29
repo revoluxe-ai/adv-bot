@@ -1,0 +1,170 @@
+---
+description: Общая стратегия тестирования проекта
+globs: ["tests/**/*.py", "**/*test*.py"]
+alwaysApply: false
+dependencies: []
+tags: ["testing", "pytest", "quality"]
+---
+
+# Общая стратегия тестирования проекта
+
+## Контекст применения
+Эти правила используются при написании и поддержке тестов для всех компонентов проекта.
+
+## Основные принципы
+1. Каждый новый функционал должен быть покрыт тестами
+2. Сначала фокусироваться на модульных тестах, затем на интеграционных
+3. Следовать подходу TDD (Test-Driven Development) при разработке новых компонентов
+4. При обнаружении ошибки сначала писать тест, воспроизводящий ее, затем исправлять
+5. Перед исправлением проблемы в коде всегда сначала анализировать тесты
+
+## Организация тестов
+
+### Структура тестов
+```
+tests/
+├── conftest.py              # Общие фикстуры и настройки
+├── pytest.ini               # Конфигурация pytest
+├── test_models.py           # Тесты моделей данных
+├── test_cabinet_bonus_manager.py
+├── test_shop_menu.py
+└── modules/                 # Тесты отдельных модулей
+    ├── test_module_1.py
+    └── test_module_2.py
+```
+
+### Конвенции именования
+- Файлы тестов: `test_*.py`
+- Функции тестов: `test_*`
+- Классы тестов: `Test*`
+- Фикстуры: имя существительное, отражающее суть создаваемого объекта
+
+## Запуск тестов
+
+### Базовые команды
+```powershell
+# Запуск всех тестов
+python -m pytest
+
+# Запуск с подробным выводом
+python -m pytest -v
+
+# Запуск конкретного теста
+python -m pytest tests/test_models.py::test_function_name
+
+# Запуск тестов по маркерам
+python -m pytest -m "slow"
+```
+
+### Параметры запуска
+```powershell
+# Запуск с выводом print-сообщений
+python -m pytest -v --capture=no
+
+# Остановка после первого падения
+python -m pytest -x
+
+# Подробный traceback
+python -m pytest --tb=native
+```
+
+## Фикстуры и моки
+
+### Создание фикстур
+```python
+import pytest
+
+@pytest.fixture
+def db_connection():
+    # Настройка перед тестами
+    conn = create_test_db_connection()
+    yield conn
+    # Очистка после тестов
+    conn.close()
+
+@pytest.fixture
+def user_data():
+    return {
+        "id": 1,
+        "name": "Test User",
+        "email": "test@example.com"
+    }
+```
+
+### Использование моков
+```python
+from unittest.mock import patch, MagicMock
+
+def test_payment_service(mocker):
+    # Создание мока для внешнего API
+    mock_api = mocker.patch("app.payment.external_api.make_payment")
+    mock_api.return_value = {"status": "success", "transaction_id": "123456"}
+    
+    # Тестирование функции с использованием мока
+    result = payment_service.process_payment(100, "user123")
+    
+    # Проверка, что мок был вызван с правильными параметрами
+    mock_api.assert_called_once_with(amount=100, user_id="user123")
+    
+    # Проверка результата
+    assert result["status"] == "success"
+    assert "transaction_id" in result
+```
+
+## Процесс отладки тестов
+
+### Когда тест падает
+1. Сфокусируйтесь на одном конкретном падающем тесте
+2. Запустите только этот тест с подробным выводом:
+   ```powershell
+   python -m pytest tests/test_file.py::test_function -v --capture=no
+   ```
+3. Анализируйте стек ошибки и логи
+4. Проверьте, изменились ли входные данные или ожидаемые результаты
+5. Сравните поведение с другими рабочими тестами
+
+### Приоритеты при отладке
+1. Сначала всеми силами старайтесь решить проблему с тестом, а не с кодом
+2. Ищите примеры других рабочих тестов для понимания правильного подхода
+3. Проверяйте, не изменились ли зависимости или внешние факторы
+
+## Типичные ошибки
+- Написание тестов только для успешных сценариев, игнорирование ошибочных
+- Создание нестабильных тестов, зависящих от внешних факторов
+- Использование реальных зависимостей вместо моков
+- Нечеткие assert-сообщения, не позволяющие понять причину ошибки
+
+## Пример хорошего теста
+```python
+import pytest
+from app.models.user import User
+from app.services.user_service import UserService
+from app.exceptions import UserNotFoundError
+
+class TestUserService:
+    def test_get_user_by_id_success(self, db_session, test_user):
+        # Arrange: подготовка данных
+        user_id = test_user.id
+        service = UserService(db_session)
+        
+        # Act: вызов тестируемой функции
+        result = service.get_user_by_id(user_id)
+        
+        # Assert: проверка результата
+        assert result is not None
+        assert result.id == user_id
+        assert result.name == test_user.name
+        assert result.email == test_user.email
+    
+    def test_get_user_by_id_not_found(self, db_session):
+        # Arrange
+        non_existent_id = 9999
+        service = UserService(db_session)
+        
+        # Act & Assert: проверка, что вызывается ожидаемое исключение
+        with pytest.raises(UserNotFoundError) as exc_info:
+            service.get_user_by_id(non_existent_id)
+        
+        # Дополнительная проверка деталей исключения
+        assert str(exc_info.value) == f"User with ID {non_existent_id} not found"
+``` 
