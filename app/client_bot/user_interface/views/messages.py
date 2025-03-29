@@ -9,7 +9,7 @@ from app import utils
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
-from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
+from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken, WBBalancePayment, WBBonusPayment, WBCabinet)
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import  common_stat_manager
@@ -2463,4 +2463,45 @@ class ShowFavoriteAdvs(TextWithKeyboard):
         # Разница - это расходы на дополнительный трафик
         additional_spend = total_spend - keywords_spend
         return round(additional_spend, 2) if additional_spend > 0 else 0
+
+async def process_cabinet_balance_topup(user_id: int, cabinet_id: int, amount: float):
+    """Обработка запроса на пополнение баланса кабинета"""
+    async with _sm() as session:
+        # Получаем пользователя для описания платежа
+        user = await session.get(User, user_id)
+        if not user:
+            raise ValueError("Пользователь не найден")
+            
+        # Создаем запись о платеже
+        payment = WBBalancePayment(
+            wb_cabinet_id=cabinet_id,
+            amount=amount,
+            description=f"Пополнение баланса пользователем {user.username or user.user_telegram_id}",
+            transaction_date_time=datetime.now()
+        )
+        session.add(payment)
+        await session.commit()
+        await session.refresh(payment)
+        return payment
+
+async def confirm_cabinet_balance_topup(payment_id: int, cabinet_id: int):
+    """Подтверждение платежа и обновление баланса кабинета"""
+    async with _sm() as session:
+        # Получаем платеж
+        payment = await session.get(WBBalancePayment, payment_id)
+        if not payment or payment.wb_cabinet_id != cabinet_id:
+            raise ValueError("Платеж не найден или не соответствует кабинету")
+        
+        # Получаем кабинет
+        cabinet = await session.get(WBCabinet, cabinet_id)
+        if not cabinet:
+            raise ValueError("Кабинет не найден")
+        
+        # Обновляем баланс кабинета
+        cabinet.balance += payment.amount
+        
+        await session.commit()
+        await session.refresh(payment)
+        await session.refresh(cabinet)
+        return payment, cabinet
 

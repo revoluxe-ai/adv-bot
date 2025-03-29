@@ -217,3 +217,10 @@ class ResetPlace(CallbackData, prefix="reset_place"):
 class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
     action: str
     wb_cabinet_original_id: int
+
+
+class AdminBonus(CallbackData, prefix="admin_bonus"):
+    """Callback для кнопок управления бонусами"""
+    action: str  # add, subtract, reset, check
+    shop_id: Optional[str] = None
+    amount: Optional[float] = None

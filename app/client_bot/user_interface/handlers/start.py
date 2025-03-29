@@ -3,7 +3,7 @@ from operator import and_
 from typing import Union
 import aiogram
 from aiogram import Router, types
-from aiogram.filters import StateFilter, CommandStart
+from aiogram.filters import StateFilter, CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -21,7 +21,7 @@ from aiogram.types import Message, CallbackQuery
 from ..views.callbacks import Action
 from ...redis_manager import RedisManager
 import logging
-from ..views import callbacks, messages
+from ..views import callbacks, messages, keyboards
 from app.utils.db.models import User
 from app.modules.common_slaves.wildberries import models as wb_models, super_cabinet_manager
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
@@ -341,7 +341,7 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
                                "Начинаю обновление РК, процесс может занять длительное время."
                                )
         try:
-            advs: list[Adv] =await asyncio.wait_for(shop_updater.update_advs_data(), timeout=10 * 60)
+            await asyncio.wait_for(shop_updater.update_advs_data(), timeout=10 * 60)
         except ApiForbiddenError:
             await bot.send_message(chat_id, f"Нет прав для доступа в РК, обновите токен, в случае проблем обратитесь в поддержку -> ")
             return
@@ -395,12 +395,6 @@ async def update_company_from_wb(callback_query: types.CallbackQuery,
                                       wb_user_cabinet_original_id, 
                                       adv_settings,
                                       page=1)()
-
-
-
-
-
-
 
 
 

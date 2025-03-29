@@ -73,7 +73,8 @@ async def _run_update_for_bot_active_advs():
 
 async def run_update_wb_data_to_redis():
     await asyncio.gather(
-        _run_update_for_bot_active_advs(),
+        _run_update_for_bot_active_advs()
+    )
 
 
 

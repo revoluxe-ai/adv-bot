@@ -1,1 +1,55 @@
- 
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Правила для работы с PowerShell
+globs: "*"
+alwaysApply: false
+---
+
+# Правила для работы с PowerShell командами
+
+## Базовые команды PowerShell и их Unix-эквиваленты
+| PowerShell команда | Unix-эквивалент | Описание |
+|-------------------|-----------------|----------|
+| `Get-ChildItem` или `dir` | `ls` | Просмотр содержимого директории |
+| `Set-Location` или `cd` | `cd` | Смена директории |
+| `Get-Content` | `cat` | Вывод содержимого файла |
+| `Add-Content` | `echo >> file` | Добавление текста в файл |
+| `Out-File` или `>` | `>` | Перенаправление вывода в файл |
+| `Select-String` | `grep` | Поиск текста в файлах |
+| `Remove-Item` | `rm` | Удаление файла или директории |
+| `Copy-Item` | `cp` | Копирование файла или директории |
+| `Move-Item` | `mv` | Перемещение файла или директории |
+| `Rename-Item` | `mv` | Переименование файла или директории |
+| `New-Item` | `touch`, `mkdir` | Создание файла или директории |
+| `Get-Process` | `ps` | Получение списка процессов |
+| `Start-Process` | `&` или `nohup` | Запуск процессов |
+| `Stop-Process` | `kill` | Остановка процессов |
+
+## Работа с Git в PowerShell
+- Используйте стандартные git команды: `git status`, `git commit`, `git push` и т.д.
+- Избегайте перенаправления в `cat`, вместо этого используйте `Out-Host -Paging`
+- Примеры:
+  ```powershell
+  # Просмотр длинного лога
+  git log --oneline | Out-Host -Paging
+  
+  # Просмотр изменений
+  git diff | Out-Host -Paging
+  ```
+
+## Работа с виртуальными окружениями Python
+- Активация окружения: `.\venv\Scripts\Activate.ps1`
+- Деактивация: `deactivate`
+- Использование pip: `pip install -r requirements.txt`
+
+## Полезные сокращения и алиасы
+```powershell
+# Добавить в профиль PowerShell
+function ll { Get-ChildItem -Force }
+function which($command) { (Get-Command $command).Path }
+function touch($file) { '' | Out-File $file -Encoding ASCII }
+``` 

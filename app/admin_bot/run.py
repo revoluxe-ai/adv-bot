@@ -8,6 +8,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
+from aiogram.fsm.storage.redis import DefaultKeyBuilder
 
 from python_modules import path_setting_funcs
 
@@ -17,7 +18,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 # Создание хранилища с Redis
-storage = RedisStorage.from_url('redis://localhost:6379/5')
+storage = RedisStorage.from_url('redis://localhost:6379/5', key_builder=DefaultKeyBuilder(with_destiny=True))
 
 
 async def run():

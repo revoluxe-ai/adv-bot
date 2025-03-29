@@ -15,7 +15,7 @@ from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers import start
 from app.client_bot.user_interface.views import callbacks, messages
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, WBBalancePayment, WBBonusPayment
 from app.payments.db.models import Payment
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
@@ -150,15 +150,28 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
             stmt = select(User).where(User.user_telegram_id == message.chat.id)
             user = await session.execute(stmt)
             user = user.scalars().first()
+            
             wb_cabinet = await session.execute(select(WBCabinet)\
                                                .filter(WBCabinet.id == wb_cabinet_original_id))
             wb_cabinet = wb_cabinet.scalars().first()
-            if wb_cabinet.balance is None:
-                wb_cabinet.balance = 0
-            if wb_cabinet.bonus is None:
-                wb_cabinet.bonus = 0
-            wb_cabinet.balance += cost
-            wb_cabinet.bonus += bonus
+            
+            # Создаем запись о пополнении баланса
+            balance_payment = WBBalancePayment(
+                wb_cabinet_id=wb_cabinet.id,
+                amount=cost,
+                description=f"Пополнение баланса пользователем {user.email or user.user_telegram_id}"
+            )
+            session.add(balance_payment)
+            
+            # Если есть бонусы, создаем запись о начислении бонусов
+            if bonus > 0:
+                bonus_payment = WBBonusPayment(
+                    wb_cabinet_id=wb_cabinet.id,
+                    amount=bonus,
+                    description=f"Бонус при пополнении баланса пользователем {user.email or user.user_telegram_id}"
+                )
+                session.add(bonus_payment)
+            
             payment = Payment(
                 user=user,
                 amount=cost,

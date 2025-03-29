@@ -1,0 +1,98 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Правила создания новых модулей
+
+## Структура модуля
+Каждый модуль должен следовать следующей структуре:
+
+```
+module_name/
+├── __init__.py         # Экспорт публичного API модуля
+├── handlers.py         # Обработчики для простых модулей
+├── backend/           # Для сложных модулей
+│   ├── __init__.py
+│   ├── main_manager.py
+│   ├── api.py
+│   └── models.py
+└── telegram/          # Для сложных модулей
+    ├── __init__.py
+    ├── handlers.py
+    └── keyboards.py
+```
+
+## Основные принципы
+1. Модули должны быть автономными и иметь четко определенную ответственность
+2. Каждый модуль должен экспортировать свой публичный API через __init__.py
+3. Использовать router для регистрации обработчиков Telegram
+4. Следовать принципу DRY и использовать общие компоненты из common_slaves
+
+## Типы модулей
+
+### Простой модуль
+- Содержит только базовые обработчики в handlers.py
+- Экспортирует router через __init__.py
+- Пример: bidder_auto_mode
+
+### Сложный модуль
+- Разделен на backend и telegram части
+- Backend содержит бизнес-логику
+- Telegram содержит обработчики и клавиатуры
+- Пример: adv_creator
+
+## Правила именования
+- Имена модулей в snake_case
+- Классы в PascalCase
+- Функции и методы в snake_case
+- Константы в UPPER_SNAKE_CASE
+
+## Интеграция с ботом
+1. Все обработчики должны использовать декораторы router
+2. Использовать типизированные callback_data
+3. Следовать структуре существующих обработчиков
+
+## Работа с базой данных
+1. Использовать async with get_async_session_maker()
+2. Применять SQLAlchemy для запросов
+3. Обрабатывать случаи отсутствия данных
+
+## Обработка ошибок
+1. Всегда проверять наличие данных перед операциями
+2. Предоставлять понятные сообщения пользователю
+3. Логировать критические ошибки
+
+## Пример базового обработчика
+```python
+@router.callback_query(SomeMenu.filter(F.action == "action_name"))
+async def handle_action(callback: CallbackQuery, callback_data: SomeMenu):
+    async with get_async_session_maker() as session:
+        # Получение данных
+        stmt = select(Model).where(Model.id == callback_data.id)
+        result = await session.execute(stmt)
+        item = result.scalar_one_or_none()
+        
+        if not item:
+            await callback.answer("Данные не найдены")
+            return
+
+        # Логика обработки
+        item.some_field = new_value
+        await session.commit()
+
+        # Обновление интерфейса
+        message = SomeView(callback.bot, callback.message.chat.id)
+        await message(callback_data.id)
+        await callback.answer("Операция выполнена")
+```
+
+## Тестирование
+1. Каждый модуль должен иметь тесты
+2. Тесты размещаются в директории tests/
+3. Использовать pytest для тестирования
+
+## Документация
+1. Каждый публичный метод должен иметь docstring
+2. Описывать параметры и возвращаемые значения
+3. Добавлять примеры использования где это необходимо 

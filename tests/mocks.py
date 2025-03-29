@@ -41,6 +41,7 @@ class MockUser(MockBase):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_telegram_id: Mapped[int] = mapped_column(BIGINT, nullable=False, unique=True)
     username: Mapped[str] = mapped_column(String, nullable=True)
+    email: Mapped[str] = mapped_column(String, nullable=True)
     adv_updater_user_chat_id: Mapped[int] = mapped_column(BIGINT, nullable=True)
     wb_user_cabinets: Mapped[list["MockWBUserCabinet"]] = relationship("MockWBUserCabinet", back_populates="user", cascade="all, delete-orphan")
     wb_tokens: Mapped[list["MockWBToken"]] = relationship("MockWBToken", back_populates="user", cascade="all, delete-orphan")
@@ -65,6 +66,8 @@ class MockWBCabinet(MockBase):
     wb_user_cabinets = relationship("MockWBUserCabinet", back_populates="wb_cabinet")
     adv_settings = relationship("MockAdvSetting", back_populates="wb_cabinet")
     payments = relationship("MockAdvPayment", back_populates="wb_cabinet")
+    balance_payments = relationship('MockWBBalancePayment', back_populates='wb_cabinet', uselist=True)
+    bonus_payments = relationship('MockWBBonusPayment', back_populates='wb_cabinet', uselist=True)
     
     __table_args__ = (
         Index('idx_balance_bonus', 'balance', 'bonus'),
@@ -74,6 +77,24 @@ class MockWBCabinet(MockBase):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        
+    @property
+    def calculated_balance(self):
+        """Вычисляет баланс на основе начального значения balance и всех платежей"""
+        if not hasattr(self, 'balance_payments') or not self.balance_payments:
+            return self.balance  # Возвращаем текущее значение, если нет платежей
+        
+        # Суммируем все платежи и начальное значение баланса
+        return self.balance + sum(payment.amount for payment in self.balance_payments)
+    
+    @property
+    def calculated_bonus(self):
+        """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
+        if not hasattr(self, 'bonus_payments') or not self.bonus_payments:
+            return self.bonus  # Возвращаем текущее значение, если нет платежей
+        
+        # Суммируем все платежи и начальное значение бонусов
+        return self.bonus + sum(payment.amount for payment in self.bonus_payments)
 
 class MockWBUserCabinet(MockBase):
     __tablename__ = 'wbusercabinet'
@@ -237,6 +258,41 @@ class MockAdvPayment(MockBase):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+class MockWBBalancePayment(MockBase):
+    __tablename__ = "wbbalancepayment"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    transaction_date_time = Column(DateTime, nullable=False, default=datetime.now)
+    wb_cabinet = relationship("MockWBCabinet", back_populates="balance_payments")
+    
+    __table_args__ = (
+        Index('idx_wb_balance_payment_cabinet_id', 'wb_cabinet_id'),
+        Index('idx_wb_balance_payment_date', 'transaction_date_time'),
+    )
+
+
+class MockWBBonusPayment(MockBase):
+    __tablename__ = "wbbonuspayment"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wb_cabinet_id = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    transaction_date_time = Column(DateTime, nullable=False, default=datetime.now)
+    operation_type = Column(String, nullable=False, default="add")  # 'add', 'subtract', 'reset'
+    admin_user_id = Column(Integer, nullable=True)  # ID администратора, выполнившего операцию
+    wb_cabinet = relationship("MockWBCabinet", back_populates="bonus_payments")
+    
+    __table_args__ = (
+        Index('idx_wb_bonus_payment_cabinet_id', 'wb_cabinet_id'),
+        Index('idx_wb_bonus_payment_date', 'transaction_date_time'),
+        Index('idx_wb_bonus_payment_admin', 'admin_user_id'),
+        Index('idx_wb_bonus_payment_operation', 'operation_type'),
+    )
 
 @pytest.fixture
 def mock_adv_setting(mock_wb_cabinet):

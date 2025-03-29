@@ -3,6 +3,7 @@ from app.modules.shop_runner.auction_boost_mode_settings import AuctionBoostMode
 from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingRouter
 from app.modules.bidder_step_setting.telegram_handler import router as bidder_step_setting_router
 from app.modules.adv_creator.telegram.handlers.main_handler import router as adv_creator_router
+from app.modules.cabinet_bonus_manager import bonus_router as cabinet_bonus_manager_router
 from python_modules import path_setting_funcs
 from .middlewars.return_to_start_from_state import ReturnToStart
 from .user_interface.handlers import (adv_setting,
@@ -57,7 +58,7 @@ common_router.include_routers(bidder_router)
 common_router.include_routers(change_cpm.router)
 common_router.include_routers(favorite_advs_for_users.router)
 common_router.include_routers(clusters.router)
-common_router.include_routers(start.router)
+# common_router.include_routers(start.router)  # Уже подключен в global_router.py
 common_router.include_routers(download_keywords.router)
 common_router.include_routers(adv_setting.router)
 # common_router.include_routers(adv_creator_router)
@@ -72,5 +73,7 @@ common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.include_routers(update_adv.router)
 common_router.include_routers(strategy_setting.router)
 common_router.include_routers(shop_settings.router)
+# Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene
+# common_router.include_routers(cabinet_bonus_manager_router)
 common_router.callback_query.middleware(middleware_for_adding_task.AddingMessageTaskMiddleWare())
 common_router.message.middleware(middleware_for_adding_task.AddingMessageTaskMiddleWare())

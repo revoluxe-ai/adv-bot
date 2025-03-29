@@ -24,14 +24,25 @@ UUID_REGEX = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA
 class AdminsGetShopFilter(BaseFilter):
     user_id: int
 
-    async def __call__(self, message: Message) -> bool:
+    async def __call__(self, message: Message, state: FSMContext) -> bool:
         text = message.text
         if not text:
             return False
+            
+        # Проверяем, находится ли пользователь в сцене bonus_scene
+        # Если да, то не обрабатываем здесь, чтобы сцена могла обработать сообщение
+        current_state = await state.get_state()
+        if current_state and "bonus_scene" in current_state:
+            logger.debug(f"Сообщение {text} не обработано фильтром AdminsGetShopFilter, т.к. пользователь в bonus_scene")
+            return False
+            
         match_uuid = re.Pattern.match(UUID_REGEX, text)
         user_id = message.from_user.id
         if match_uuid and user_id in const.ADMINS:
+            logger.debug(f"Сообщение {text} соответствует AdminsGetShopFilter")
             return True
+            
+        return False
 
 
 class AdminsGetAdvByIdFilter(BaseFilter):
@@ -42,7 +53,7 @@ class AdminsGetAdvByIdFilter(BaseFilter):
         text = message.text
         if not text:
             return False
-        if text.isdigit() and user_id in [373435337]:
+        if text.isdigit() and user_id in const.ADMINS:
             async with sm() as session:
                 stmt = select(AdvSetting)\
                 .where(AdvSetting.adv_id == int(message.text))

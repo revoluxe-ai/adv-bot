@@ -14,6 +14,7 @@ from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
+from app.modules.cabinet_bonus_manager import AdminBonus
 
 
 sm = get_async_session_maker
@@ -804,3 +805,16 @@ def get_advs_list(advs: list[AdvSetting]):
                                           adv_original_id=adv.id).pack())
         builder.row(button)
     return builder.as_markup()
+
+def get_admin_keyboard():
+    """
+    Создает клавиатуру администратора с доступными административными функциями
+    """
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="💰 Управление бонусами", callback_data=AdminBonus(action="menu").pack())
+            ]
+        ]
+    )
+    return keyboard

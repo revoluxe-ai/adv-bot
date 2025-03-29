@@ -60,6 +60,46 @@ class WBUserCabinet(BaseTable):
 
 
 
+class WBBalancePayment(BaseTable):
+    """Модель для хранения информации о пополнениях баланса"""
+    __tablename__ = 'wbbalancepayment'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
+    wb_cabinet = relationship("WBCabinet", back_populates="balance_payments")
+    
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    transaction_date_time = Column(DateTime, nullable=False, server_default=text('now()'))
+    
+    __table_args__ = (
+        Index('idx_wb_balance_payment_cabinet_id', 'wb_cabinet_id'),
+        Index('idx_wb_balance_payment_date', 'transaction_date_time'),
+    )
+
+class WBBonusPayment(BaseTable):
+    """Модель для хранения информации о бонусах"""
+    __tablename__ = 'wbbonuspayment'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
+    wb_cabinet = relationship("WBCabinet", back_populates="bonus_payments")
+    
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    transaction_date_time = Column(DateTime, nullable=False, server_default=text('now()'))
+    
+    # Новые поля для поддержки операций администраторов
+    operation_type = Column(String, nullable=False, default="add")  # 'add', 'subtract', 'reset'
+    admin_user_id = Column(Integer, nullable=True)  # ID администратора, выполнившего операцию, NULL для обычных операций
+    
+    __table_args__ = (
+        Index('idx_wb_bonus_payment_cabinet_id', 'wb_cabinet_id'),
+        Index('idx_wb_bonus_payment_date', 'transaction_date_time'),
+        Index('idx_wb_bonus_payment_admin', 'admin_user_id'),
+        Index('idx_wb_bonus_payment_operation', 'operation_type'),
+    )
+
 class WBCabinet(BaseTable):
     shop_id = Column(String, nullable=False, unique=True)
     wb_cards = relationship('WBCard', back_populates='wb_cabinet', uselist=True)
@@ -75,12 +115,47 @@ class WBCabinet(BaseTable):
     balance = Column(Float, default=0, server_default=text('0'), nullable=False)
     bonus = Column(Float, default=0, server_default=text('0'), nullable=False)
     white_list_update_active = Column(Boolean, default=False)
+    balance_payments = relationship('WBBalancePayment', back_populates='wb_cabinet', uselist=True)
+    bonus_payments = relationship('WBBonusPayment', back_populates='wb_cabinet', uselist=True)
     __table_args__ = (
         Index('idx_balance_bonus', 'balance', 'bonus'),
         Index('idx_balance', 'balance'),
         Index('idx_bonus', 'bonus'),
         Index('idx_wb_cabinet_id', 'id'),
     )
+    
+    @hybrid_property
+    def calculated_balance(self):
+        """Вычисляет баланс на основе начального значения balance и всех платежей"""
+        if not self.balance_payments:
+            return self.balance  # Если нет платежей, возвращаем текущее значение
+        
+        # Суммируем все платежи и начальное значение баланса
+        return self.balance + sum(payment.amount for payment in self.balance_payments)
+    
+    @calculated_balance.expression
+    def calculated_balance(cls):
+        """SQL выражение для вычисления баланса"""
+        from sqlalchemy import func, select
+        from sqlalchemy.orm import aliased
+        
+        balance_payment = aliased(WBBalancePayment)
+        payments_sum = select(func.coalesce(func.sum(balance_payment.amount), 0)).\
+            where(balance_payment.wb_cabinet_id == cls.id).\
+            scalar_subquery()
+        
+        # Возвращаем сумму начального значения и всех платежей
+        return cls.balance + payments_sum
+    
+    @property
+    def calculated_bonus(self):
+        """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
+        if not self.bonus_payments:
+            return self.bonus  # Если нет платежей, возвращаем текущее значение
+        
+        # Суммируем все платежи и начальное значение бонусов
+        return self.bonus + sum(payment.amount for payment in self.bonus_payments)
+
 
 
 class WBToken(BaseTable):
