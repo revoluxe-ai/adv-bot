@@ -3,7 +3,7 @@ from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
-from app.client_bot.user_interface.views import keyboards, callbacks
+from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import Action, AdminBonus
 from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.common_slaves.wildberries.models import WBUserCabinet

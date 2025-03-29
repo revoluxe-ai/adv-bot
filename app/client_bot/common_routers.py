@@ -3,7 +3,6 @@ from app.modules.shop_runner.auction_boost_mode_settings import AuctionBoostMode
 from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingRouter
 from app.modules.bidder_step_setting.telegram_handler import router as bidder_step_setting_router
 from app.modules.adv_creator.telegram.handlers.main_handler import router as adv_creator_router
-from app.modules.cabinet_bonus_manager import bonus_router as cabinet_bonus_manager_router
 from python_modules import path_setting_funcs
 from .middlewars.return_to_start_from_state import ReturnToStart
 from .user_interface.handlers import (adv_setting,

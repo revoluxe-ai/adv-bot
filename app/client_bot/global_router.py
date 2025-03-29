@@ -1,10 +1,8 @@
 from aiogram import Router
 from aiogram.utils import callback_answer
-
-from . import middlewars
 from .common_routers import common_router
-from app.modules.cabinet_bonus_manager import register_bonus_scene, bonus_router
 from .user_interface.handlers import payments, ref_program, start, add_balance
+from ..modules.cabinet_bonus_manager.bonus_scene import register_bonus_scene
 
 global_router = Router()
 global_router.callback_query.middleware(callback_answer.CallbackAnswerMiddleware(pre=True, text='Запрос в обработке'))
@@ -14,7 +12,7 @@ global_router.callback_query.middleware(callback_answer.CallbackAnswerMiddleware
 # bonus_router содержит обработчик команды /start, который очищает состояния модуля
 # Но не использует return, позволяя глобальному обработчику start.router выполниться
 global_router.include_router(start.router)
-global_router.include_router(bonus_router)
+# global_router.include_router(bonus_router)
 register_bonus_scene(global_router)
 
 # Затем регистрируем глобальные обработчики, особенно важный /start

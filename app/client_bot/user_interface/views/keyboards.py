@@ -11,10 +11,9 @@ from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks impo
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
 from app.client_bot.user_interface.views import callbacks
-from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action
+from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action, AdminBonus
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
-from app.modules.cabinet_bonus_manager import AdminBonus
 
 
 sm = get_async_session_maker

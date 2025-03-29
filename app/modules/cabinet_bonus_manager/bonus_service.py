@@ -9,7 +9,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBBonusPayment
 
 
-async def add_bonus(shop_id: str, amount: float, admin_user_id: int, description: str = None) -> bool:
+async def add_bonus(shop_id: str, amount: float, admin_user_id: int, description: str) -> bool:
     """
     Пополнить бонусы кабинета по shop_id
     

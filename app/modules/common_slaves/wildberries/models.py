@@ -124,7 +124,7 @@ class WBCabinet(BaseTable):
         Index('idx_wb_cabinet_id', 'id'),
     )
     
-    @hybrid_property
+    @property
     def calculated_balance(self):
         """Вычисляет баланс на основе начального значения balance и всех платежей"""
         if not self.balance_payments:
@@ -132,20 +132,7 @@ class WBCabinet(BaseTable):
         
         # Суммируем все платежи и начальное значение баланса
         return self.balance + sum(payment.amount for payment in self.balance_payments)
-    
-    @calculated_balance.expression
-    def calculated_balance(cls):
-        """SQL выражение для вычисления баланса"""
-        from sqlalchemy import func, select
-        from sqlalchemy.orm import aliased
-        
-        balance_payment = aliased(WBBalancePayment)
-        payments_sum = select(func.coalesce(func.sum(balance_payment.amount), 0)).\
-            where(balance_payment.wb_cabinet_id == cls.id).\
-            scalar_subquery()
-        
-        # Возвращаем сумму начального значения и всех платежей
-        return cls.balance + payments_sum
+
     
     @property
     def calculated_bonus(self):

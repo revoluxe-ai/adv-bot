@@ -878,8 +878,8 @@ class ShopMenu(TextWithKeyboard):
             balance = 0
         if not (bonus := self._wb_cabinet.bonus):
             bonus = 0
-        self._balance = balance
-        self._bonus = bonus
+        self._balance = self._wb_cabinet.calculated_balance
+        self._bonus = self._wb_cabinet.calculated_bonus
         self.total_amount_for_day = 0
         self.price_for_month_for_shop = 0
         async with _sm(read_only=True) as session:
@@ -968,8 +968,8 @@ class ShopMenu(TextWithKeyboard):
 '===================================\n'
             f'🏬 Магазин: {self._wb_user_cabinet.name}\n'
             f'🆔 Shop ID: {self._wb_cabinet.shop_id}\n'
-            f'💰 Баланс магазина: {balance:.2f} рублей\n'
-            f'🎁 Бонусы: {self._bonus} рублей\n'
+            f'💰 Баланс магазина: {balance:.0f} рублей\n'
+            f'🎁 Бонусы: {self._bonus:.0f} рублей\n'
         )
 
         text += """

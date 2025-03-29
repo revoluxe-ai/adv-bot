@@ -25,12 +25,7 @@
    - НЕ ИСПОЛЬЗОВАТЬ `return`, чтобы позволить глобальному обработчику показать список магазинов
    - НЕ ОТПРАВЛЯТЬ сообщения пользователю, это должен делать глобальный обработчик
 3. Централизованный обработчик данного модуля находится в isolated_router.py
-4. Для Scene API обработчик находится в bonus_scene.py
 """ 
 
 from app.client_bot.user_interface.views.callbacks import AdminBonus
-from app.modules.cabinet_bonus_manager.isolated_router import bonus_router
 from app.modules.cabinet_bonus_manager.state_manager import BonusManagerStateGroup
-from app.modules.cabinet_bonus_manager.bonus_scene import BonusScene, register_bonus_scene
-
-__all__ = ["AdminBonus", "bonus_router",  "BonusManagerStateGroup", "BonusScene", "register_bonus_scene"]
