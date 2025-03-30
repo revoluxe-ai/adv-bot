@@ -9,12 +9,31 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBBonusPayment
 
 
-async def add_bonus(shop_id: str, amount: float, admin_user_id: int, description: str) -> bool:
+async def get_cabinet_by_id(cabinet_id: int) -> WBCabinet:
     """
-    Пополнить бонусы кабинета по shop_id
+    Получить кабинет по ID с информацией о балансе и бонусах
+
+    Args:
+        cabinet_id: ID кабинета
+
+    Returns:
+        WBCabinet: Объект кабинета с балансом и бонусами или None, если не найден
+    """
+    async with sm() as session:
+        stmt = select(WBCabinet).where(WBCabinet.id == cabinet_id).options(
+            selectinload(WBCabinet.bonus_payments),
+            selectinload(WBCabinet.balance_payments)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+
+async def add_bonus(wb_cabinet_original_id: int, amount: float, admin_user_id: int, description: str) -> bool:
+    """
+    Пополнить бонусы кабинета по ID
     
     Args:
-        shop_id: Идентификатор магазина
+        wb_cabinet_original_id: ID кабинета
         amount: Сумма бонусов для добавления (положительное число)
         admin_user_id: ID администратора, выполняющего операцию
         description: Описание операции
@@ -27,7 +46,7 @@ async def add_bonus(shop_id: str, amount: float, admin_user_id: int, description
         
     async with sm(read_only=False) as session:
         async with session.begin():
-            cabinet = await _get_cabinet_by_shop_id(session, shop_id)
+            cabinet = await session.get(WBCabinet, wb_cabinet_original_id)
             if not cabinet:
                 return False
                 
@@ -40,18 +59,15 @@ async def add_bonus(shop_id: str, amount: float, admin_user_id: int, description
                 description=description or f"Пополнение бонусов администратором ID:{admin_user_id}"
             )
             session.add(bonus_payment)
-            
-            # Больше не нужно изменять поле bonus напрямую, так как
-            # calculated_bonus учитывает как исходное значение, так и все транзакции
-            
             return True
 
-async def subtract_bonus(shop_id: str, amount: float, admin_user_id: int, description: str = None) -> bool:
+
+async def subtract_bonus(cabinet_id: int, amount: float, admin_user_id: int, description: str | None = None) -> bool:
     """
-    Снять бонусы с кабинета по shop_id
+    Снять бонусы с кабинета по ID
     
     Args:
-        shop_id: Идентификатор магазина
+        cabinet_id: ID кабинета
         amount: Сумма бонусов для снятия (положительное число)
         admin_user_id: ID администратора, выполняющего операцию
         description: Описание операции
@@ -64,14 +80,14 @@ async def subtract_bonus(shop_id: str, amount: float, admin_user_id: int, descri
         
     async with sm(read_only=False) as session:
         async with session.begin():
-            cabinet: WBCabinet = await _get_cabinet_by_shop_id(session, shop_id)
+            cabinet = await get_cabinet_by_id(cabinet_id)
             if not cabinet:
                 return False
             
             # Проверяем расчетный баланс бонусов
             calculated_bonus = cabinet.calculated_bonus
             if calculated_bonus < amount:
-                return False
+                raise ValueError("Недостаточно бонусов")
                 
             # Создаем запись о снятии бонусов
             bonus_payment = WBBonusPayment(
@@ -82,17 +98,15 @@ async def subtract_bonus(shop_id: str, amount: float, admin_user_id: int, descri
                 description=description or f"Снятие бонусов администратором ID:{admin_user_id}"
             )
             session.add(bonus_payment)
-            
-            # Больше не нужно изменять поле bonus напрямую
-            
             return True
 
-async def reset_bonus(shop_id: str, admin_user_id: int, description: str = None) -> bool:
+
+async def reset_bonus(cabinet_id: int, admin_user_id: int, description: str) -> bool:
     """
-    Обнулить бонусы кабинета по shop_id
+    Обнулить бонусы кабинета по ID
     
     Args:
-        shop_id: Идентификатор магазина
+        cabinet_id: ID кабинета
         admin_user_id: ID администратора, выполняющего операцию
         description: Описание операции
         
@@ -101,7 +115,7 @@ async def reset_bonus(shop_id: str, admin_user_id: int, description: str = None)
     """
     async with sm(read_only=False) as session:
         async with session.begin():
-            cabinet = await _get_cabinet_by_shop_id(session, shop_id)
+            cabinet = await get_cabinet_by_id(cabinet_id)
             if not cabinet:
                 return False
                 
@@ -113,18 +127,16 @@ async def reset_bonus(shop_id: str, admin_user_id: int, description: str = None)
             # Создаем запись об обнулении бонусов с отрицательной суммой, равной текущему расчетному бонусу
             bonus_payment = WBBonusPayment(
                 wb_cabinet_id=cabinet.id,
-                amount=-calculated_bonus,  # Отрицательная сумма для обнуления
+                amount=-calculated_bonus,
                 operation_type="reset",
                 admin_user_id=admin_user_id,
                 description=description or f"Обнуление бонусов администратором ID:{admin_user_id}"
             )
             session.add(bonus_payment)
-            
-            # Больше не нужно изменять поле bonus напрямую
-            
             return True
 
-async def get_wb_cabinet(shop_id: str) -> WBCabinet:
+
+async def get_wb_cabinet_by_shop_id(shop_id: str) -> WBCabinet:
     """
     Получить кабинет по shop_id с информацией о балансе и бонусах
 
@@ -137,31 +149,10 @@ async def get_wb_cabinet(shop_id: str) -> WBCabinet:
     async with sm() as session:
         # Используем selectinload для предварительной загрузки bonus_payments,
         # чтобы избежать ошибки DetachedInstanceError
-        stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id).options(
+        stmt = select(WBCabinet)\
+            .where(WBCabinet.shop_id == shop_id).options(
             selectinload(WBCabinet.bonus_payments),
             selectinload(WBCabinet.balance_payments)
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
-
-
-
-
-async def _get_cabinet_by_shop_id(session: AsyncSession, shop_id: str) -> WBCabinet:
-    """
-    Получить кабинет по shop_id
-    
-    Args:
-        session: Сессия SQLAlchemy
-        shop_id: Идентификатор магазина
-        
-    Returns:
-        WBCabinet: Объект кабинета или None, если не найден
-    """
-    # Также используем selectinload для _get_cabinet_by_shop_id
-    stmt = select(WBCabinet).where(WBCabinet.shop_id == shop_id).options(
-        selectinload(WBCabinet.bonus_payments),
-        selectinload(WBCabinet.balance_payments)
-    )
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none() 

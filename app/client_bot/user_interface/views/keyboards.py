@@ -1,5 +1,7 @@
 import asyncio
 import datetime
+
+from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingCallback
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -11,7 +13,7 @@ from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks impo
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, AdvSetting, KeywordSetting, WBCabinet
 from app.client_bot.user_interface.views import callbacks
-from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action, AdminBonus
+from app.client_bot.user_interface.views.callbacks import BudgetForCreatingAdv, TurnBot, Action
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
 
@@ -789,7 +791,7 @@ def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]):
 
         button = InlineKeyboardButton(text="Пополнить " + wb_user_cabinet.name + f' Текущий общий баланс({total_money})',
                                       callback_data=callbacks.AddBalance(
-                                          wb_cabinet_original_id=wb_user_cabinet.wb_cabinet_id).pack())
+                                          wb_cabinet_original_id=wb_user_cabinet.id).pack())
         builder.row(button)
     return builder.as_markup()
 

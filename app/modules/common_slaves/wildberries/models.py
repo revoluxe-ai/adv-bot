@@ -3,9 +3,9 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from sqlalchemy import Index, UniqueConstraint, ARRAY
+from sqlalchemy import Index, UniqueConstraint, Date
 from sqlalchemy import (Column, Integer, String, ForeignKey,
-                        BIGINT, Boolean, Float, DateTime, text, Date)
+                        BIGINT, Boolean, Float, DateTime, text)
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 import jwt
@@ -14,20 +14,16 @@ import datetime
 from sqlalchemy import JSON
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
+from app.core.wb_api import exceptions
 from app.utils.db.base import BaseTable
-from . import exceptions
-
 
 from app.utils.db.models import User, favorite_advs_association
 
 from app.utils.db.session_maker import get_async_session_maker
 
-
 _sm = get_async_session_maker
 
 
-
-    
 class AdvPayment(BaseTable):
     __tablename__ = "advpayment"
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -41,13 +37,11 @@ class AdvPayment(BaseTable):
     )
 
 
-
-
 class WBUserCabinet(BaseTable):
     wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
     user_id: Mapped[Integer] = Column(Integer, ForeignKey('user.id'), nullable=False)
-    user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
+    user: Mapped[User] = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
     __table_args__ = (
@@ -90,7 +84,7 @@ class WBBonusPayment(BaseTable):
     transaction_date_time = Column(DateTime, nullable=False, server_default=text('now()'))
     
     # Новые поля для поддержки операций администраторов
-    operation_type = Column(String, nullable=False, default="add")  # 'add', 'subtract', 'reset'
+    operation_type = Column(String, nullable=False)  # 'add', 'subtract', 'reset'
     admin_user_id = Column(Integer, nullable=True)  # ID администратора, выполнившего операцию, NULL для обычных операций
     
     __table_args__ = (
@@ -109,7 +103,7 @@ class WBCabinet(BaseTable):
                                                            back_populates="wb_cabinet",
                                                                  )
     active = Column(Boolean, default=True)
-    expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
+    expiration_time = Column(DateTime, nullable=False, server_default=text('datetime("now", "+7 days")'))
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
     balance = Column(Float, default=0, server_default=text('0'), nullable=False)
@@ -211,7 +205,7 @@ class WBToken(BaseTable):
             8: "Рекомендации",
             30: "Токен только на чтение",
         }
-        s = self.get_payload('s', 0)
+        s = self.get_payload('s',)
         categories = set()
         for bit_position, category_name in categories_map.items():
             if s & (1 << bit_position):
@@ -287,6 +281,12 @@ class WBCard(BaseTable): # Изменено название таблицы
 
 
 class AdvSetting(BaseTable):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._search_adv_id = None
+        self._worst_promo_position = None
+
     def __repr__(self):
         return f'name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}'
     favorite_users: Mapped[list[User]] = relationship(

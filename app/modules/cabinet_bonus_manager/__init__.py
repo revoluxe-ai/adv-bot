@@ -27,5 +27,4 @@
 3. Централизованный обработчик данного модуля находится в isolated_router.py
 """ 
 
-from app.client_bot.user_interface.views.callbacks import AdminBonus
 from app.modules.cabinet_bonus_manager.state_manager import BonusManagerStateGroup

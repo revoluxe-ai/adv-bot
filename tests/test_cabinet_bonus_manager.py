@@ -1,16 +1,11 @@
 from datetime import datetime
 import dotenv
 import sys, os
-
-from app.modules.cabinet_bonus_manager import BonusCallback
-
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + "/.."))
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy import select
-from app.modules.cabinet_bonus_manager.bonus_service import add_bonus, subtract_bonus, reset_bonus, get_wb_cabinet
-from app.modules.cabinet_bonus_manager.main_handler import process_amount, process_confirm_callback, \
-    process_shop_bonus_callback, process_shop_id
+from app.modules.cabinet_bonus_manager.bonus_service import add_bonus, subtract_bonus, reset_bonus, get_wb_cabinet_by_shop_id
 from app.modules.cabinet_bonus_manager.state_manager import BonusManagerStateGroup
 from tests.mocks import MockWBBonusPayment
 from contextlib import asynccontextmanager
@@ -52,7 +47,8 @@ async def test_add_bonus(mock_test_db_session,
             mock_bonus.__get__ = MagicMock(return_value=initial_bonus + 200.0)
 
             # Вызываем функцию добавления бонусов
-            result = await add_bonus(shop_id='test_shop',
+            result = await add_bonus(
+                            wb_cabinet_original_id=mock_wb_cabinet.id,
                             amount=200.0,
                             admin_user_id=1,
                             description="Тестовое начисление бонусов")
@@ -156,7 +152,7 @@ async def test_get_cabinet_bonus(mock_test_db_session,
         mock_bonus.__get__ = MagicMock(return_value=initial_bonus)
 
         # Вызываем функцию получения бонусов
-        bonus = await get_wb_cabinet("test_shop")
+        bonus = await get_wb_cabinet_by_shop_id("test_shop")
 
         # Проверяем, что возвращается правильное значение бонуса
         assert bonus == initial_bonus
@@ -311,39 +307,32 @@ async def test_process_shop_id_invalid(mock_message, mock_state):
 
 
 @pytest.mark.asyncio
-async def test_process_shop_bonus_callback_add(mock_callback_query, mock_state):
-    """Тест обработки callback для добавления бонусов"""
-    shop_id = "test_shop"
-    current_bonus = 500.0
-
-    callback_data = MagicMock(spec=BonusCallback)
-
-    callback_data.shop_id = shop_id
-    callback_data.operation = "add"
-
-    # Настраиваем callback данные
-    mock_callback_query.data = f"shop_bonus_add_{shop_id}"
-
+async def test_process_shop_bonus_callback_add(mock_test_db_session,
+                                              mock_user, mock_wb_cabinet, mock_callback_query, mock_state):
+    # Настраиваем callback_data
+    mock_callback_query.data = "shop_bonus_add_test_shop"
+    
     # Настраиваем состояние
-    await mock_state.update_data(shop_id=shop_id, current_bonus=current_bonus)
+    await mock_state.update_data({
+        "shop_id": "test_shop",
+        "current_bonus": 100.0,
+        "current_balance": 1000.0
+    })
 
-    # Вызываем тестируемую функцию
-    await process_shop_bonus_callback(mock_callback_query, callback_data, mock_state)
+    # Вызываем функцию
+    await process_shop_bonus_callback(mock_callback_query, mock_state)
 
-    # Проверяем, что callback был обработан
-    mock_callback_query.answer.assert_called_once()
+    # Проверяем, что состояние обновлено
+    state_data = await mock_state.get_data()
+    assert state_data["operation"] == "add"
 
-    # Проверяем, что в состояние была добавлена операция
-    data = await mock_state.get_data()
-    assert data.get("operation") == "add"
+    # Проверяем, что установлено новое состояние
+    mock_state.set_state.assert_called_once_with(BonusManagerStateGroup.waiting_for_amount)
 
-    # Проверяем, что установлено состояние ожидания суммы
-    assert mock_state.current_state == BonusManagerStateGroup.waiting_for_amount
-
-    # Проверяем, что пользователю было отправлено сообщение для ввода суммы
+    # Проверяем, что сообщение обновлено
     mock_callback_query.message.edit_text.assert_called_once()
-    args, kwargs = mock_callback_query.message.edit_text.call_args
-    assert "Введите сумму для пополнения" in args[0]
+    edit_text_args = mock_callback_query.message.edit_text.call_args[0][0]
+    assert "Введите сумму для пополнения бонусов:" in edit_text_args
 
 
 @pytest.mark.asyncio

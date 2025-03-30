@@ -205,10 +205,11 @@ async def test_get_data():
         assert isinstance(result.full_adv_stat_for_last_3_days_for_auction, FullAdvStat)
         assert isinstance(result.common_stat, FullAdvStat)
 
+
 @pytest.mark.asyncio
 async def test_calculate_diff_to_plan_for_adv_settings():
     """Тест для проверки расчета отклонения от плана для списка настроек рекламы"""
-    
+
     # Создаем тестовые AdvSetting
     adv_settings = [
         AdvSetting(id=1, adv_id=1, nmids=[123]),  # Будет с идеальными показателями
@@ -230,6 +231,7 @@ async def test_calculate_diff_to_plan_for_adv_settings():
     
     # Фиктивный объект статистики
     full_adv_stat = MagicMock()
+
     
     # Создаем экземпляр менеджера
     manager = CommonAdvsStatDataManager()

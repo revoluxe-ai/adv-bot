@@ -1,4 +1,4 @@
-from typing import  Optional
+from typing import Optional
 
 from aiogram.filters.callback_data import CallbackData
 
@@ -13,7 +13,6 @@ class Action:
     new = 'new'
     select = 'select'
     buy = 'buy'
-
 
 
 class BudgetForCreatingAdv(CallbackData, prefix="budget"):
@@ -33,7 +32,6 @@ class Adv(CallbackData, prefix="adv"):
     adv_original_id: int
     action: Optional[str] = 'select'
     wb_user_cabinet_original_id: Optional[int] = None
-
 
 
 class TurnBot(CallbackData, prefix="turn_bot"):
@@ -118,9 +116,9 @@ class AddBalance(CallbackData, prefix="add_balance"):
 class KeywordPositionHistory(CallbackData, prefix="keyword_position_history"):
     adv_original_id: int
 
+
 class AddWhitePhrases(CallbackData, prefix="add_white_phrases"):
     adv_setting_id: int
-
 
 
 class TurnParsing(CallbackData, prefix="turn_parsing"):
@@ -169,8 +167,6 @@ class ResetAddedClicks(CallbackData, prefix="reset_added_clicks"):
     adv_setting_original_id: int
 
 
-
-
 class StrategySetting(CallbackData, prefix="strategy_setting"):
     action: str
     adv_setting_original_id: int
@@ -187,7 +183,6 @@ class AddRelevantPhrases(CallbackData, prefix="add_relevant_phrases"):
 class ChangeAutoMinCTR(CallbackData, prefix="change_auto_min_ctr"):
     action: str
     adv_setting_original_id: int
-
 
 
 class ShowFavorites(CallbackData, prefix="show_favorites"):
@@ -218,9 +213,3 @@ class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
     action: str
     wb_cabinet_original_id: int
 
-
-class AdminBonus(CallbackData, prefix="admin_bonus"):
-    """Callback для кнопок управления бонусами"""
-    action: str  # add, subtract, reset, check
-    shop_id: Optional[str] = None
-    amount: Optional[float] = None

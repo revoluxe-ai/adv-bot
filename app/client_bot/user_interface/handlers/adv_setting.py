@@ -32,13 +32,26 @@ pricer = Pricer()
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter == True))
 async def reset_filter(callback: types.CallbackQuery, callback_data: callbacks.ChoiceAdvPaginator,
-                          bot: aiogram.Bot, state: FSMContext):
+                          bot: aiogram.Bot, state: FSMContext) -> None:
 
      wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
      await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
      await state.update_data(filter_advs=[])
+
+     async with sm() as session:
+         stmt = select(AdvSetting).join(AdvSetting.wb_cabinet)\
+            .join(WBCabinet.wb_user_cabinets)\
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+         adv_settings = await session.execute(stmt)
+         adv_settings = adv_settings.scalars().all()
+
      page = 1
-     await messages.AdvCompanyChoicing(bot, state, callback.message.chat.id, wb_user_cabinet_original_id, page=page)()
+     await messages.AdvCompanyChoicing(bot,
+                                       state,
+                                       callback.message.chat.id,
+                                       wb_user_cabinet_original_id,
+                                       adv_settings,
+                                       page=page)()
      return
 
 
@@ -288,3 +301,24 @@ async def turn_off_auto_min_ctr(callback: types.CallbackQuery,
 #     last_message, message_type = await messages.GetMinCtr(bot, last_message,
 #                                                            callback.message.chat.id, adv)()
 #     return last_message, message_type
+
+# @router.callback_query(callbacks.BackToAdvs.filter())
+# async def back_to_advs(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
+#     """Обработчик возврата к списку рекламных кампаний"""
+#     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+#     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+#     await messages.AdvCompanyChoicing(bot, state, callback.message.chat.id, wb_user_cabinet_original_id, page=1)()
+#     return
+
+# @router.callback_query(callbacks.CancelDelete.filter())
+# async def cancel_delete(callback: types.CallbackQuery, bot: Bot, state: FSMContext):
+#     """Обработчик отмены удаления рекламной кампании"""
+#     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+#     adv_original_id = callback_data.adv_original_id
+#     async with sm() as session:
+#         wb_user_cabinet = await session.execute(select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id))
+#         wb_user_cabinet = wb_user_cabinet.scalar()
+#         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+#         adv = adv.scalar()
+#     await messages.AdvSettingMenu(bot, callback.message.chat.id, wb_user_cabinet, adv)()
+#     return
