@@ -101,9 +101,7 @@ class BonusScene(Scene, state="bonus_scene"):
         продолжить работу и показать список магазинов
         """
         # Сохраняем текущее содержимое для логирования
-        data = await state.get_data()
-        if data:
-            await state.clear()
+        await state.clear()
         # Выходим из сцены без отправки сообщения
         # Здесь правильно использовать выход из сцены, так как команда /start
         # должна вернуть пользователя к начальному экрану бота
@@ -282,8 +280,8 @@ class BonusScene(Scene, state="bonus_scene"):
             # Отображаем информацию о бонусах и балансе кабинета с кнопками управления
             await message.answer(
                 f"🏪 Магазин: {shop_id}\n"
-                f"💰 Текущий баланс: {current_balance} руб.\n"
-                f"🎁 Текущие бонусы: {current_bonus} руб.\n\n"
+                f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
+                f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
                 f"Выберите операцию:",
                 reply_markup=get_shop_bonus_keyboard(cabinet.id)  # Используем cabinet.id
             )

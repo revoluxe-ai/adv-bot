@@ -90,7 +90,8 @@ async def test_shop_menu_call(test_async_db):
             expiration_time=current_time + timedelta(days=30),
             active=True,
             shop_id="test_shop",
-            demo=True
+            demo=True,
+            white_list_update_active=False
         )
         user = User(id=1, user_telegram_id=123456789, username="test_user")
         wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
@@ -129,7 +130,8 @@ async def test_shop_menu_with_active_advs(test_async_db):
             expiration_time=current_time + timedelta(days=30),
             active=True,
             shop_id="test_shop",
-            demo=True
+            demo=True,
+            white_list_update_active=False
         )
         user = User(id=1, user_telegram_id=123456789, username="test_user")
         wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
@@ -140,7 +142,10 @@ async def test_shop_menu_with_active_advs(test_async_db):
             wb_cabinet_id=1,
             last_update=current_time,
             bot_active=True,
-            active_status="active"
+            active_status="active",
+            new_auto_min_ctr_mode=True,
+            exponent_predict_ctr=3.0,
+            auction_boost_all_phrase_mode=False
         )
         
         session.add(wb_cabinet)
@@ -177,7 +182,8 @@ async def test_get_shop_menu(mock_bot, mock_state, mock_chat_id, test_async_db):
             expiration_time=current_time + timedelta(days=30),
             active=True,
             shop_id="test_shop",
-            demo=True
+            demo=True,
+            white_list_update_active=False
         )
         user = User(id=1, user_telegram_id=123456789, username="test_user")
         wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
@@ -211,7 +217,8 @@ async def test_get_adv_menu(mock_bot, mock_state, mock_chat_id, test_async_db):
             expiration_time=current_time + timedelta(days=30),
             active=True,
             shop_id="test_shop",
-            demo=True
+            demo=True,
+            white_list_update_active=False
         )
         user = User(id=1, user_telegram_id=123456789, username="test_user")
         wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
@@ -221,7 +228,10 @@ async def test_get_adv_menu(mock_bot, mock_state, mock_chat_id, test_async_db):
             name="Test Adv",
             wb_cabinet_id=1,
             last_update=current_time,
-            bot_active=True
+            bot_active=True,
+            new_auto_min_ctr_mode=True,
+            exponent_predict_ctr=3.0,
+            auction_boost_all_phrase_mode=False
         )
         
         session.add(wb_cabinet)
@@ -239,7 +249,8 @@ async def test_get_adv_menu(mock_bot, mock_state, mock_chat_id, test_async_db):
         )
 
         result = await shop_menu()
-        assert "1" in shop_menu.text  # Проверяем количество активных кампаний
+        assert "Test Cabinet" in shop_menu.text
+        assert "1000.0" in shop_menu.text
 
 @pytest.mark.asyncio
 async def test_get_adv_menu_no_advs(mock_bot, mock_state, mock_chat_id, test_async_db):
@@ -252,7 +263,8 @@ async def test_get_adv_menu_no_advs(mock_bot, mock_state, mock_chat_id, test_asy
             expiration_time=current_time + timedelta(days=30),
             active=True,
             shop_id="test_shop",
-            demo=True
+            demo=True,
+            white_list_update_active=False
         )
         user = User(id=1, user_telegram_id=123456789, username="test_user")
         wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
@@ -272,7 +284,8 @@ async def test_get_adv_menu_no_advs(mock_bot, mock_state, mock_chat_id, test_asy
         )
 
         result = await shop_menu()
-        assert "0" in shop_menu.text  # Проверяем, что нет активных кампаний
+        assert "Test Cabinet" in shop_menu.text
+        assert "0" in shop_menu.text  # Проверяем что нет активных кампаний
 
 @pytest.mark.asyncio
 async def test_get_adv_menu_with_error(mock_bot, mock_state, mock_chat_id):

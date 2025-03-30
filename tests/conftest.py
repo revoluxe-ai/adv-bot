@@ -134,9 +134,12 @@ async def test_async_db():
 @pytest.fixture(autouse=True)
 def patch_get_async_session_maker(monkeypatch, test_async_db):
     """Патчим get_async_session_maker, чтобы он использовал тестовую БД"""
+    
     @asynccontextmanager
     async def mock_get_async_session_maker(*args, **kwargs):
-        yield test_async_db
+        # Создаем сессию из test_async_db с правильной настройкой greenlet контекста
+        async with AsyncSession(bind=test_async_db.bind, expire_on_commit=False) as session:
+            yield session
     
     monkeypatch.setattr("app.utils.db.session_maker.get_async_session_maker", mock_get_async_session_maker)
     monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker)

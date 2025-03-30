@@ -2,10 +2,11 @@ import logging
 import threading
 import asyncio
 import traceback
+from asyncio import Semaphore
 from contextlib import asynccontextmanager
 from time import time
-import ssl
-from sqlalchemy import event, select
+from typing import Any
+from sqlalchemy import Result
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -29,7 +30,7 @@ max_overflow = 100
 
 
 class AnalyticAsyncSession(AsyncSession):
-    async def execute(self, statement, *args, **kwargs):
+    async def execute(self, statement, *args, **kwargs) -> Result[Any]:
         query_start = time()
         try:
             # Определяем тип операции
@@ -40,7 +41,7 @@ class AnalyticAsyncSession(AsyncSession):
             caller = next((frame for frame in reversed(stack[:-1])
                            if 'sqlalchemy' not in frame.filename), None)
 
-            result = await super().execute(statement, *args, **kwargs)
+            result: Result[Any] = await super().execute(statement, *args, **kwargs)
             duration = time() - query_start
 
             if duration > 1.0:
@@ -77,22 +78,14 @@ global_semaphore = asyncio.Semaphore(count_sem)
 
 def get_alchemy_row(read_only):
     port = settings.postgres_port
-    file_path = path_setting_funcs.get_setting_path()
     postgres_dbname = settings.postgres_dbname
-    # postgres_host = path_setting_funcs.get_document_by_key_name(file_path, 'postgres-host')
     postgres_password = settings.postgres_password
     postgres_user = settings.postgres_user
     if not read_only:
         host = settings.postgres_master_host
     else:
         host = settings.postgres_replica_host
-
     # Для asyncpg используем ssl вместо sslmode
-
-    ssl_mode = settings.ssl_mode
-
-    target_session = 'read-write' if not read_only else 'any'
-
     row_connector = f'postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}'
     # if ssl_mode:
     #     row_connector += f'?sslmode={ssl_mode}'
@@ -107,15 +100,13 @@ def get_alchemy_row(read_only):
 
 
 
-def get_alchemy_row_for_migration(read_only):
+def get_alchemy_row_for_migration():
     port = settings.postgres_port
     postgres_dbname = settings.postgres_dbname
     postgres_password = settings.postgres_password
     postgres_user = settings.postgres_user
     host = settings.postgres_master_host
     # Для asyncpg используем ssl вместо sslmode
-
-    target_session = 'read-write' if not read_only else 'any'
     db_connector = (
         f'postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}'
     )
@@ -158,7 +149,7 @@ read_write_session_maker = sessionmaker(
 
 
 @asynccontextmanager
-async def get_async_session_maker(semaphore=None, read_only=False) -> AsyncSession:
+async def get_async_session_maker(semaphore:Semaphore | None=None, read_only=False) -> AsyncSession:
     session_start = time()
     current_task = asyncio.current_task()
 

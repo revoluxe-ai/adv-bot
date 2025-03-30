@@ -6,11 +6,11 @@ from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabine
 from datetime import datetime
 from app.client_bot.user_interface.handlers.get_shop_for_admin import AdminsGetAdvByIdFilter
 from app.client_bot import const
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from tests.mocks import MockAdvSetting
 
 @pytest.fixture
-def mock_message():
+def mock_message() -> AsyncMock:
     message = AsyncMock(spec=types.Message)
     message.from_user = MagicMock()
     message.from_user.id = 123456789
@@ -195,9 +195,10 @@ async def test_get_adv_settings_by_cabinet(test_async_db):
         )
         session.add_all([adv_setting1, adv_setting2])
         await session.commit()
+        wb_cabinet_original_id: int = wb_cabinet.id
 
         # Query
-        stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
+        stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet_original_id)
         result = await session.execute(stmt)
         settings = result.scalars().all()
 
@@ -231,8 +232,8 @@ async def test_adv_setting_relationships(test_async_db):
         session.add(adv_setting)
         await session.commit()
 
-        # Verify relationships
-        stmt = select(AdvSetting).where(AdvSetting.id == adv_setting.id)
+        adv_setting_original_id: int = adv_setting.id
+        stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
         result = await session.execute(stmt)
         loaded_setting = result.scalar_one()
         
@@ -284,7 +285,7 @@ async def test_admins_filter_with_non_admin_message(mock_message, mock_sm, monke
     """Тест фильтра AdminsGetAdvByIdFilter с сообщением от не-администратора"""
     non_admin_id = max(const.ADMINS) + 1  # Гарантированно не админский ID
     mock_message.from_user.id = non_admin_id
-    mock_message.text = "12345"  # Валидный ID рекламной кампании
+    mock_message.text = "12345"
     
     filter_instance = AdminsGetAdvByIdFilter()
     result = await filter_instance(mock_message)
