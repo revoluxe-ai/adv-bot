@@ -6,8 +6,10 @@ from typing import Optional
 import asyncio
 from sqlalchemy import select
 import pandas as pd
-
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+import matplotlib
+from matplotlib.ticker import MaxNLocator
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -32,30 +34,26 @@ async def get_common_keywords_with_positions(nmid)-> Optional[list[CommonKeyword
         return common_keywords
 
 
-async def get_keyword_history_graphic(adv_original_id, keywords):
-    import matplotlib
-    from matplotlib.ticker import MaxNLocator
-    import seaborn as sns
-    matplotlib.use('Agg')
-    from matplotlib import pyplot as plt
-
+async def get_keyword_history_graphic(adv_original_id,
+                                      keywords):
     async with sm() as session:
         stmt = select(AdvSetting.nmids)\
                 .where(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
         nmids = result.scalar()
         nmid = nmids[0]
-
-        stmt = select(AdvSetting)\
-                .where(AdvSetting.id == adv_original_id)
-        async with sm() as session:
-            result = await session.execute(stmt)
-            adv_setting = result.scalar()
-        first_keywords = keywords[:5]
-        texts = {keyword.text for keyword in first_keywords}
         common_keywords: list[CommonKeyword] = await get_common_keywords_with_positions(nmid)
-        common_keywords = [keyword for keyword in common_keywords if keyword.text in texts]
-        common_keywords.sort(key=lambda x: min([pos.base_position for pos in  x.wb_item_positions]))
+        def sort_func(kw: CommonKeyword, order_map):
+            return order_map.get(kw.text,  -float('inf'))
+
+        order_map = {kw.text: i for i, kw in enumerate(keywords)}
+        # Сортируем common_keywords по индексу из order_map
+        sorted_common_keywords = sorted(common_keywords,
+                                        key=lambda kw: sort_func(kw, order_map))
+        common_keywords = sorted_common_keywords
+        if not common_keywords:
+            return
+        common_keywords.sort(key=lambda x: min([pos.promo_position for pos in  x.wb_item_positions]))
         common_keywords = common_keywords[:5]
         end_date = datetime.datetime.now()
         start_date = end_date - datetime.timedelta(days=7)
@@ -103,7 +101,8 @@ async def get_keyword_history_graphic(adv_original_id, keywords):
         plt.figure(figsize=(10, 6))
         title_text = "Динамика Органики за 7 дней"
         if len(common_keywords) > 5:
-            def get_graphic_and_legend():
+            def get_graphic_and_legend(plt, df, title_text):
+                import seaborn as sns
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=False)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
@@ -127,10 +126,15 @@ async def get_keyword_history_graphic(adv_original_id, keywords):
                 plt.close()
                 return image_stream, legend_stream
             loop = asyncio.get_event_loop()
-            image_stream, legend_stream = await loop.run_in_executor(None, get_graphic_and_legend)
+            image_stream, legend_stream = await loop.run_in_executor(None,
+                                                                     get_graphic_and_legend,
+                                                                     plt,
+                                                                     df,
+                                                                     title_text)
             return image_stream, legend_stream
         else:
-            def get_graphic():
+            def get_graphic(plt, df, title_text):
+                import seaborn as sns
                 sns.lineplot(data=df, x="Дата", y="Базовая Позиция", hue="Ключи", marker="o", legend=True)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
@@ -144,5 +148,10 @@ async def get_keyword_history_graphic(adv_original_id, keywords):
                 plt.close()
                 return image_stream
             loop = asyncio.get_event_loop()
-            image_stream = await loop.run_in_executor(None, get_graphic)
+            image_stream = await loop.run_in_executor(None,
+                                                      get_graphic,
+                                                      plt,
+                                                      df,
+                                                      title_text,
+                                                      )
             return image_stream, None

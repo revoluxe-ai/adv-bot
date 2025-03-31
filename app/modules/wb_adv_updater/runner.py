@@ -1,9 +1,7 @@
 import datetime
 from app.utils.redis_func_cache import set_config
 from .ml_data_manager import update_model
-from ..full_stat_adv_updater import new_update_shop_loop
 from ..user_message_sender import message_for_not_pay_user_sender
-from ..wb_keywords_parser import parser
 from ..wb_keywords_parser.parser import Parser
 
 set_config()
@@ -72,15 +70,6 @@ async def run_update_all_keywords_on_wb():
 
 
 
-#
-# async def update_min_ctr_in_global_wb_category_settings():
-#     while True:
-#         try:
-#             await manager.update_min_ctr_in_global_wb_category_settings()
-#         except Exception as e:
-#             logger.error(f'Ошибка обновления минимальных цен {e}')
-#         # await asyncio.sleep(60)
-
 async def update_all_data_in_db():
     tasks = {}
     while True:
@@ -90,15 +79,6 @@ async def update_all_data_in_db():
             logger.error(f'Ошибка обновления данных в базе {exc}', exc_info=True)
         finally:
             await asyncio.sleep(15)
-
-
-async def demo_subscribe():
-    while True:
-        await wb_manager.check_accesses()
-        await asyncio.sleep(60*60)
-
-async def shop_subscribe_control():
-    await wb_manager.shop_subscribe_control()
 
 async def clear_data_for_expired_wb_cabinets():
     while True:
@@ -127,28 +107,10 @@ async def process_payment_for_advs():
             logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
         await asyncio.sleep(60*60)
 
-async def write_positions_to_db():
-    while True:
-        try:
-            await parser.add_wb_positions_from_queue_to_db()
-        except Exception as e:
-            logger.error(f'Ошибка добавления позиций в базу {e}', exc_info=True)
-        await asyncio.sleep(0)
-
 async def __keywords_parsing_process():
    parser = Parser()
    await asyncio.gather(parser.generate_parsing_tasks_dict(),
                         parser.parsing_by_dict())
-
-
-async def reset_out_positions_in_redis():
-    while True:
-        try:
-            await parser.reset_from_redis_positions_of_out_index()
-        except Exception as e:
-            logger.error(f'Ошибка сброса позиций в redis {e}', exc_info=True)
-
-        await asyncio.sleep(10)
 
 
 async def keywords_parsing_process():

@@ -32,6 +32,7 @@ from app.modules.white_list_updater import router as white_list_updater_router
 from ..settings import settings
 from app.modules.user_message_sender import middleware_for_adding_task
 from app.modules.sales_plan_settings  import SalesPlanSettingsMenuRouter
+from app.modules.bidder_auto_mode import router as BidderAutoModeRouter
 
 common_router = Router()
 
@@ -44,6 +45,7 @@ if not settings.test_mode:
     common_router.include_routers(exceptions.admin_router)
 
 common_router.message.middleware.register(ReturnToStart())
+common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)
 common_router.include_routers(ChangeExponentSettinginAdvSettingRouter)

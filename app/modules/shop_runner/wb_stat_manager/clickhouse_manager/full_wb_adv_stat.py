@@ -1,11 +1,18 @@
 import time
 from datetime import datetime, timedelta
-from typing import Iterable
+from typing import Iterable, List, Optional, TypedDict
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.utils.click_house.client import get_clickhouse_client
 import logging
 
+
+# Определим тип для статистики по ключевым словам
+class KeywordStat(TypedDict):
+    keyword: str
+    views: int
+    clicks: int
+    spend: float
 
 
 
@@ -127,16 +134,19 @@ async def insert(stats: Iterable[FullAdvStat]):
             logger.error('Ошибка вставки в кликхаус', exc_info=True)
 
 
-async def get_keywords_spend(adv_ids: list[int], start_date: datetime, end_date: datetime) -> float:
+async def get_keywords_spend(adv_ids: list[int],
+                             start_date: datetime,
+                             end_date: datetime,
+                             table_name: str) -> float:
     end_date_str = end_date.strftime('%Y-%m-%d')
     start_date_str = start_date.strftime('%Y-%m-%d')
 
     async with get_clickhouse_client() as client:
-        query = """
+        query = f"""
         WITH max_versions AS (
             SELECT *, 
                    ROW_NUMBER() OVER (PARTITION BY adv_id, date, text ORDER BY version DESC) AS row_num
-            FROM default_db.advkeyword
+            FROM default_db.{table_name}
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
             AND adv_id IN %(adv_ids)s
         )
@@ -157,3 +167,59 @@ async def get_keywords_spend(adv_ids: list[int], start_date: datetime, end_date:
         except Exception:
             logger.error('Ошибка получения суммы трат по ключам из ClickHouse', exc_info=True)
             return 0.0
+
+async def get_keyword_stats_by_last_days(adv_ids: list[int], start_date: datetime, end_date: datetime) -> List[KeywordStat]:
+    """
+    Получает статистику по ключевым словам за указанный период.
+    
+    Args:
+        adv_ids: Список ID рекламных кампаний
+        start_date: Начальная дата периода
+        end_date: Конечная дата периода
+        
+    Returns:
+        Список объектов KeywordStat с данными по каждому ключевому слову
+    """
+    end_date_str = end_date.strftime('%Y-%m-%d')
+    start_date_str = start_date.strftime('%Y-%m-%d')
+
+    async with get_clickhouse_client() as client:
+        query = """
+        WITH max_versions AS (
+            SELECT *, 
+                   ROW_NUMBER() OVER (PARTITION BY adv_id, date, text ORDER BY version DESC) AS row_num
+            FROM default_db.advkeyword
+            WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
+            AND adv_id IN %(adv_ids)s
+        )
+        SELECT 
+            text as keyword,
+            SUM(views) AS views, 
+            SUM(clicks) AS clicks, 
+            SUM(spend) AS spend
+        FROM max_versions
+        WHERE row_num = 1
+        GROUP BY keyword
+        """
+        try:
+            res = await client.query(query, parameters={
+                "start_date": start_date_str,
+                "end_date": end_date_str,
+                "adv_ids": adv_ids
+            })
+            
+            results = []
+            for row in res:
+                keyword_stat = KeywordStat(
+                    keyword=row["keyword"],
+                    views=row["views"],
+                    clicks=row["clicks"],
+                    spend=row["spend"]
+                )
+                results.append(keyword_stat)
+                
+            return results
+
+        except Exception:
+            logger.error('Ошибка получения статистики по ключевым словам из ClickHouse', exc_info=True)
+            return []

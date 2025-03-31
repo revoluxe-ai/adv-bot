@@ -10,10 +10,15 @@ class UnitedParams(BaseModel):
     nms: list[int]
     searchCPM: Optional[int] = None
 
+class Multibids(BaseModel):
+    nm: int
+    bid: int
+
 
 
 class AuctionAdv(Adv):
     unitedParams: Optional[list[UnitedParams]] = None
+    auction_multibids: list[Multibids] | None = None
 
 
     @property
@@ -26,4 +31,8 @@ class AuctionAdv(Adv):
 
     @property
     def cpm(self) -> int:
-        return self.unitedParams[0].searchCPM
+        if self.auction_multibids:
+            cpm =  self.auction_multibids[0].bid
+            return cpm
+        else:
+            return self.unitedParams[0].searchCPM

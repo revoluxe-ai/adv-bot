@@ -1,17 +1,35 @@
 from app.client_bot.const import DEFAULT_BIDDER_STEP
+from app.modules.common_slaves.wildberries import wb_db_manager
 from app.modules.common_slaves.wildberries.api import AdvertApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.wb_keywords_parser import parser
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
-
 from app.modules.shop_runner.bidder.wb_api import WBApi
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.bidder.excs import CpmNotFoundError
 from app.modules.wb_adv_updater import data_manager
 
 logger = logging.getLogger(__name__)
+
+
+async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: AdvertApi) -> set[float] | None:
+    adv_ids = []
+    if auto_adv.bidder_for_auto == True:
+        adv_ids.append(auto_adv.adv_id)
+    if search_adv_id := auto_adv.search_adv_id:
+        adv_ids.append(search_adv_id)
+    if not adv_ids:
+        return None
+    advs = await wb_api.get_advs(adv_ids)
+    wb_cabinet_original_id = wb_api.wb_cabinet.id
+    try:
+        await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id)
+    except Exception:
+        logger.error('Ошибка обновления РК в базе', exc_info=True)
+    cpms = {adv.cpm for adv in advs}
+    return cpms
 
 
 async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi, shop_id: str):
@@ -66,29 +84,36 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
         return
     logger.debug(f'Получаю ставку для биддера для {shop_id} adv_id {adv_id}')
     try:
-        auto_adv= adv_setting
-        fact_cpm = await data_manager.get_cpm(auto_adv, keywords)
+        auto_adv: AdvSetting = adv_setting
+        cpms: set[int | float] = await get_cpms_from_wb(auto_adv, wb_api)
     except Exception as e:
         logger.error(f'Ошибка {e} при получении ставки для {shop_id} adv_id {adv_id}', exc_info=True)
         return
     logger.debug(f'Ставка получена для {shop_id} adv_id {adv_id}')
-    if not fact_cpm:
+    if not cpms:
         logger.debug(f'Не удалось получить ставку для биддера для кампании {adv_id} для {shop_id}')
         return
     logger.debug(f'Получаю позицию бест ключа из белого списка для {shop_id} adv_id {adv_id}')
-    wb_position = await redis_manager.get_keyword_position(text, nmid_in_adv)
-    logger.debug(f'Позиция ключа из белого списка получена для {shop_id} adv_id {adv_id}')
+    try:
+        wb_position = await redis_manager.get_keyword_position(text, nmid_in_adv)
+        logger.debug(f'Позиция ключа из белого списка получена для {shop_id} adv_id {adv_id}')
+    except Exception as e:
+        logger.error(f'Ошибка при получении позиции ключа для {shop_id} adv_id {adv_id}: {e}', exc_info=True)
+        return
     if wb_position:
         promo_position = wb_position.promo_position
         if not promo_position:
             logger.error(f'У объекта позиции нет промопозиции shop_id {shop_id} в adv_id: {adv_id}')
             return
         if promo_position < max_position_for_adv or promo_position == 1:
-            new_cpm = fact_cpm - step
+            fact_cmp_for_with_step = min(cpms)
+            new_cpm = fact_cmp_for_with_step - step
         elif promo_position > max_position_for_adv:
-            new_cpm = fact_cpm + step
+            fact_cmp_for_with_step = max(cpms)
+            new_cpm = fact_cmp_for_with_step + step
         else:
-            new_cpm = fact_cpm
+            fact_cmp_for_with_step = min(cpms)
+            new_cpm = fact_cmp_for_with_step - step
         if new_cpm >= max_cpm:
             new_cpm = max_cpm
             if adv_setting.reset_place:
@@ -96,13 +121,11 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
                     adv_setting = await session.get(AdvSetting, adv_setting.id)
                     adv_setting.max_place = promo_position + 1
                     await session.commit()
-        if new_cpm == fact_cpm:
-            logger.debug(f'Новая ставка равна старой для {shop_id} adv_id {adv_id}')
-            return
         if new_cpm < 125:
             new_cpm = 125
-        await wb_api.update_cpm(adv_id, new_cpm)
-        await redis_manager.set_last_adv_bid(adv_id, new_cpm)
+        if adv_setting.bidder_for_auto:
+            await wb_api.update_cpm(adv_id, new_cpm)
+            await redis_manager.set_last_adv_bid(adv_id, new_cpm)
         if new_cpm < 150:
             new_cpm = 150
         adv_id = adv_setting.search_adv_id

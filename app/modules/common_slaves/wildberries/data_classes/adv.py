@@ -1,5 +1,5 @@
 import re
-
+from abc import abstractmethod
 from .adv_stat_classes import SimpleStat
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Union, Dict
@@ -54,7 +54,6 @@ class AdvType:
 
 
 class Adv:
-
     def __repr__(self):
         return f'Name: {self.name}, Advert ID: {self.advertId},  Status: {self.status_native_ru}, Type: {self.adv_type}'
     def __init__(self, data):
@@ -184,7 +183,10 @@ class Adv:
         self._type = value
 
 
-
+    @property
+    @abstractmethod
+    def cpm(self):
+        pass
 
 
 class Statistic:

@@ -1,10 +1,10 @@
+import typing
 from datetime import datetime
 import re
 from datetime import timedelta
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
-
 from app import utils
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
@@ -18,6 +18,7 @@ from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload, joinedload
+from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
 
 from app.modules.wb_update_state_manager import KeywordStatUpdateState, AdvActiveKeywordUpdateStateManager
 from app.utils.click_house.client import get_clickhouse_client
@@ -28,8 +29,8 @@ from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
                                                           KeywordSetting, WBCabinet)
 from app.utils import redis_manager
+from app.utils.pricer.pricer import Pricer
 from app.utils.suffixes import get_day_suffix
-from .get_main_text import get_main_text
 from .. import states
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
@@ -131,7 +132,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     async def __call__(self):
         await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
-        async with _sm() as session:
+        async with _sm(read_only=True) as session:
             stmt = select(AdvSetting) \
                 .join(AdvSetting.wb_cabinet) \
                 .join(WBCabinet.wb_user_cabinets) \
@@ -333,24 +334,22 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         return keyboards.get_adv_setting_keyboard(self.wb_user_cabinet,
                                                   self.adv,
                                                   self.in_favorites_user)
-
-    def _get_last_update_keyword_stat(self, adv_id) -> datetime:
+    @staticmethod
+    def _get_last_update_keyword_stat(adv_id) -> datetime:
         last_update_keyword_stat_manager = KeywordStatUpdateState()
         last_update_keyword_stat_for_complex_adv = last_update_keyword_stat_manager.get_one(adv_id)
         return last_update_keyword_stat_for_complex_adv
 
-    async def _get_last_keywords_status_update_timestamp(self, adv_id: int) -> datetime:
+    @staticmethod
+    async def _get_last_keywords_status_update_timestamp(adv_id: int) -> datetime:
         last_update_keyword_status_manager = AdvActiveKeywordUpdateStateManager()
         timestamp = await last_update_keyword_status_manager.get_one(adv_id)
         return timestamp
 
-
-    async def _get_last_full_stat_update(self, adv_id: int) -> datetime:
+    @staticmethod
+    async def _get_last_full_stat_update(adv_id: int) -> datetime:
         last_full_stat_update = await data_manager.get_last_full_stat_update(adv_id)
         return last_full_stat_update
-
-
-
 
 
 class CabinetNameExists(Text):
@@ -458,7 +457,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._filter: bool = False
         self._on_page = 24
 
-
     async def __call__(self, state: FSMContext, sort_mode = 'by_adv'):
         self.sort_mode = sort_mode
         self._state = state
@@ -482,7 +480,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                 clear_keywords.append(keyword)
 
             self._keywords = clear_keywords
-        self.min_ctr = await data_manager.get_min_ctr(self._adv_setting)
+        
         hide_keywords_is_not_relevant = data.get('hide_keywords_is_not_relevant')
         self.hide_keywords_is_not_relevant = hide_keywords_is_not_relevant
 
@@ -502,106 +500,83 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
                      clear_keywords.append(keyword)
             self._keywords = clear_keywords
-        await self._set_statistics()
+        
+        # Получаем данные через CommonAdvsStatDataManager
+        stat_data = await CommonAdvsStatDataManager.get_data(self._adv_setting, self._keywords)
+        
+        # Устанавливаем полученные данные
+        self.min_ctr = stat_data.min_ctr
+        self.auto_cpm = stat_data.auto_cpm
+        self.auction_cpm = stat_data.auction_cpm
+        self.total_spend = stat_data.total_spend
+        self.addition_spend_in_adv = stat_data.addition_spend_in_adv
+        self._all_orders_for_last_3_days = stat_data.all_orders_for_last_3_days
+        self._mean_orders_for_3_days = stat_data.mean_orders_for_3_days
+        self._mean_price_for_order = stat_data.mean_price_for_order
+        self._spend_for_inner_adv_for_3_days = stat_data.spend_for_inner_adv_for_3_days
+        self.full_adv_stat_for_last_3_days_for_auto_adv = stat_data.full_adv_stat_for_last_3_days_for_auto_adv
+        self.full_adv_stat_for_last_3_days_for_auction = stat_data.full_adv_stat_for_last_3_days_for_auction
+        self.common_stat = stat_data.common_stat
+        
+        # Дополнительные рассчеты, если нужны
+        if self._all_orders_for_last_3_days is not None:
+            self._sum_spend = self._spend_for_inner_adv_for_3_days
+        
         graphic = await self._graphic_injection()
         if not graphic:
             graphic = 'app/core/telegram/static_images/not_keywords_position_graphic.jpg'
         self._image = graphic
         await super().__call__()
 
-    async def _set_statistics(self):
-        adv: AdvSetting = self._adv_setting
-        advs: list[int] = []
-        auto_adv_id = adv.adv_id
-        advs.append(auto_adv_id)
-        auction_adv_id = adv.search_adv_id
-        keywords = self._keywords
-        fact_cpm = await data_manager.get_cpm(adv, keywords)
-        self._fact_cpm = fact_cpm
-        if auction_adv_id:
-            advs.append(auction_adv_id)
-        pass_days = 2
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=pass_days)
-        full_adv_stat_for_last_3_days = await full_wb_adv_stat.get_stats_by_last_days(advs,
-                                                                                      start_date,
-                                                                                      end_date)
-        self._orders_by_adv_for_last_3_days = full_adv_stat_for_last_3_days.orders
-        common_stat = await common_stat_manager.get_stats_for_last_period(adv.nmids[0], pass_days)
-        if common_stat:
-             self._all_orders_for_last_3_days = common_stat.orders
-             spend_for_inner_adv_for_3_days = full_adv_stat_for_last_3_days.spend
-             self._spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days
-             now = datetime.now()
-             hours_passed = now.hour + now.minute / 60 + now.second / 3600  # Количество часов, прошедших в текущих сутках
-             fraction_of_day = hours_passed / 24  + pass_days # Доля суток
-             mean_price_for_order  = common_stat.orders/fraction_of_day
-             self._mean_price_for_order = mean_price_for_order
-             self._mean_spend_for_inner_adv_for_3_days = spend_for_inner_adv_for_3_days/fraction_of_day
-        else:
-            self._all_orders_for_last_3_days = None
-            self._spend_for_inner_adv_for_3_days = None
-        pass
-
-
     @property
     def text(self):
         total_page = len(self._keywords) // self._on_page
         text = (
                 'Название кампании: ' + str(self._adv_setting.name) + '\n'
-                                                                      f'Статус: {self._adv_setting.active_status}\n'
-                                                                      f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n  """
-                                                                      'ID кампании: ' + str(
-            self._adv_setting.adv_id) + '\n'
-                                        f'Минимальный CRT для кампании: {self.min_ctr * 100}%\n'
-                                        f'Страница: {self._page}/{total_page + 1}\n'
-                                        f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n'
+                f'Статус: {self._adv_setting.active_status}\n'
+                f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""
+                'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'
+                f'ID Аукциона: {self._adv_setting.search_adv_id}\n'
+                f'Общая статистика за 3 дня:\n'
+                f'Минимальный CRT для кампании: {self.min_ctr * 100:.2f}%\n'
+                f'Страница: {self._page}/{total_page + 1}\n'
+                f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n'
+                f'Общий расход на рекламу: {self.total_spend:.2f}\n'
+                f'Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n'
+                f'Общее число заказов: {self._all_orders_for_last_3_days}\n'
+                f'Заказов из Авто: {self.full_adv_stat_for_last_3_days_for_auto_adv.orders}\n'
+                f'Заказов из Аукцион: {self.full_adv_stat_for_last_3_days_for_auction.orders}\n'
+                f"""Заказов из Органики: {self._all_orders_for_last_3_days
+                    - self.full_adv_stat_for_last_3_days_for_auction.orders
+                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders}"""
         )
+        
+        if hasattr(self, '_all_orders_for_last_3_days') and self._all_orders_for_last_3_days is not None:
+            # Получаем целевые значения из настроек
+            plan_for_sales_for_day = self._adv_setting.plan_for_sales_for_day
+            plan_for_sales_for_day_str = str(round(plan_for_sales_for_day)) if plan_for_sales_for_day else "Не задано"
+            
+            target_price_for_order = self._adv_setting.target_price_for_order
+            target_price_for_order_str = str(round(target_price_for_order)) if target_price_for_order else "Не задано"
+            
+            max_price_for_order = self._adv_setting.max_price_for_order
+            max_price_for_order_str = str(round(max_price_for_order)) if max_price_for_order else "Не задано"
+            
+            order_cost = self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_3_days if self._all_orders_for_last_3_days else self._spend_for_inner_adv_for_3_days
+            
+            text += (
+                f'\nВ среднем в день (срез за 3 дня):\n'
+                f'Заказов: {self._mean_orders_for_3_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
+                f'Себестоимость: {round(order_cost, 2)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
+            )
+            
 
-
-        if self._spend_for_inner_adv_for_3_days is not None and self._all_orders_for_last_3_days is not None:
-             order_cost = self._spend_for_inner_adv_for_3_days/self._all_orders_for_last_3_days if self._all_orders_for_last_3_days\
-                                                                           else self._spend_for_inner_adv_for_3_days
-             target_price_for_order = self._adv_setting.target_price_for_order
-             if target_price_for_order:
-                 target_price_for_order = str(round(target_price_for_order))
-             else:
-                 target_price_for_order = "Не задано"
-
-             max_price_for_order = self._adv_setting.max_price_for_order
-             if max_price_for_order:
-                 max_price_for_order = str(round(max_price_for_order))
-             else:
-                 max_price_for_order = "Не задано"
-
-             plan_for_sales_for_day  = self._adv_setting.plan_for_sales_for_day
-             if plan_for_sales_for_day:
-                 plan_for_sales_for_day = str(round(plan_for_sales_for_day))
-             else:
-                 plan_for_sales_for_day = 'Не задано'
-
-             text +=  (
-                 f'Срезы за 3 дня(сегодня, вчера, позавчера):\n'
-                 f'Общий расход на вн.рекламу: {round(self._spend_for_inner_adv_for_3_days)}\n'
-                 f'Средний расход на вн.рекламу: {round(self._mean_spend_for_inner_adv_for_3_days)}\n'
-                 f'Заказы всего: {self._all_orders_for_last_3_days}\n'
-                 
-                 f'Среднее число заказов в день: {round(self._mean_price_for_order, 1)}'
-                 f'({plan_for_sales_for_day})\n'
-                 f'Себестоимость заказа (цель) (максимум): {round(order_cost)} ({target_price_for_order})'
-                 f' ({max_price_for_order})\n'
-                 f'Текущая вычисляемая ставка: {self._fact_cpm}\n'
-                 f'Целевая позиция: {self._adv_setting.max_place}\n'
-                 f'Максимальная ставка: {self._adv_setting.max_cpm}\n'
-             )
-
-        else:
-            if self._spend_for_inner_adv_for_3_days is None:
-                text += "Нет данных по полной статистике РК\n"
-            if self._all_orders_for_last_3_days is None:
-                text += "Нет данных по полной статистике карточки\n"
-
-
+        text += f'\nСтавка из Авто: {self.auto_cpm} р. '
+        text += f"""(Биддер для Авто: {' Включен' if self._adv_setting.bidder_for_auto else ' Выключен'})\n"""
+        text += f"""Ставка из Аукциона: {self.auction_cpm}\n"""
+        text += f"Целевая позиция: {self._adv_setting.max_place}\n"
+        text += f"Максимальная ставка: {self._adv_setting.max_cpm}\n"
+        text += f""""""
         return text
 
     @property
@@ -611,18 +586,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     @image.setter
     def image(self, value):
         self._image = value
-
-    @property
-    def keyboard(self):
-        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
-                                                       self._adv_choice_last_page,
-                                                       self._wb_user_cabinet_original_id,
-                                                       self._page,
-                                                       self._filter,
-                                                       self._on_page,
-                                                       self.min_ctr,
-                                                       self.hide_keywords_is_not_relevant,
-                                                       sort_mode=self.sort_mode)
 
     async def _graphic_injection(self):
         bot = self.bot
@@ -640,6 +603,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             return legend
         return graphic
 
+    @property
+    def keyboard(self):
+        return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
+                                                      self._adv_choice_last_page,
+                                                      self._wb_user_cabinet_original_id,
+                                                      self._page,
+                                                      self._filter,
+                                                      self._on_page,
+                                                      self.min_ctr,
+                                                      self.hide_keywords_is_not_relevant,
+                                                      sort_mode=self.sort_mode)
 
 
 class KeywordSettingMessage(TextWithKeyboard):
@@ -692,7 +666,11 @@ class KeywordSettingMessage(TextWithKeyboard):
     def text(self):
         keyword_text = self._keyword_setting.text
         keyword_text  = re.sub(r'([_*[\]()~>`#+\-=|{}.!])', r'\\\1', keyword_text)
-        text = (f'🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n'
+        nmids = self._adv_setting.nmids
+        nmids = [str(nmid) for nmid in nmids]
+        nmids_str = ', '.join(nmids)
+        text = (f"""Артикул: {nmids_str}\n"""
+                f'🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n'
                 f'📈 *Показы:* {self.views}\n'
                 f'🖱 *Клики:* {self.clicks}\n'
                 f'Прогнозируемый CTR: {self.original_predict_ctr*100 if self.original_predict_ctr else "Не просчитан"}%\n'
@@ -861,6 +839,7 @@ class ShopMenu(TextWithKeyboard):
        self._user_telegram_id = chat_id
        self._state = state
        self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+       self._pricer = Pricer()
        super().__init__(bot, chat_id)
 
 
@@ -906,7 +885,8 @@ class ShopMenu(TextWithKeyboard):
             bonus = 0
         self._balance = balance
         self._bonus = bonus
-        total_amount_for_day = 0
+        self.total_amount_for_day = 0
+        self.price_for_month_for_shop = 0
         async with _sm(read_only=True) as session:
             stmt = select(func.count(AdvSetting.id))\
                 .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
@@ -914,9 +894,11 @@ class ShopMenu(TextWithKeyboard):
             result = await session.execute(stmt)
             count_active_advs = result.scalar()
             if count_active_advs:
-                total_amount_for_day += count_active_advs * const.PRICE_FOR_ADV_FOR_DAY
+                shop_id = self._wb_cabinet.shop_id
+                self.price_for_month_for_shop = await self._pricer.get_month_tariff_for_count_advs(shop_id)
+                self.total_amount_for_day = await self._pricer.get_price_for_day_for_shop(shop_id)
+
         self.count_active_advs = count_active_advs
-        self.total_amount_for_day = total_amount_for_day
         user: User = self._wb_user_cabinet.user
         stmt = select(WBToken)
         async with _sm(read_only=True) as session:
@@ -960,7 +942,9 @@ class ShopMenu(TextWithKeyboard):
             last_for_days = '∞'
         text = (
             f'📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n'
-            f'💸 <b>Расход в сутки</b>: {total_amount_for_day} рублей\n'
+            f"""Ваш тариф за РК в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else 'Нет активных РК'}"""
+            f'(больше РК -> ниже цена, тарифы -> https://telegra.ph/Tarify-03-17)\n'
+            f'💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n'
             f'⏳ <b>Срок действия токена</b>: {self.expiration_time}\n'
             f'<b>Истечет через</b> {get_day_suffix(self.last_days_for_token)}\n'
 
@@ -1047,7 +1031,7 @@ class ShopMenu(TextWithKeyboard):
                     wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
             )
 
-        builder.row(button)
+            builder.row(button)
 
         if is_active_adv:
             button = InlineKeyboardButton(
@@ -1305,30 +1289,20 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
     def keyboard(self):
         return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
 
-
-
-
 class WaitingForAmount(Text):
+
+    DISABLE_WEBPAGE_PREVIEW = True
 
     def __init__(self, bot: Bot, chat_id, master_sum: float):
         super().__init__(bot, chat_id)
         self.master_sum = master_sum
-
+        self._pricer = Pricer()
 
 
     @property
     def text(self):
-        date_to = datetime.now() + timedelta(days=1)
-        date_to = date_to.strftime('%d-%m-%Y')
-        text = f"""
-Прайс:
-- Работа одной кампании, подключенной к боту: 299р./мес.
-- Парсинг активных ключей для кампании и Биддер (управление ставками) входят в стоимость
-
-Минимальная сумма пополнения: {const.MIN_SUM} р.
-
-Укажите сумму пополнения:"""
-
+        text = self._pricer.text
+        text += "\nУкажите сумму пополнения:"
         return text
 
 
@@ -1337,6 +1311,10 @@ class BalanceUpdated(Text):
         super().__init__(bot, chat_id)
         self.__balance = added_balance
         self.__bonus = bonus
+        self._image = None
+
+
+
     @property
     def text(self):
         return f'Баланс успешно пополнен на {self.__balance} рублей + бонус {self.__bonus} рублей'
@@ -1953,6 +1931,19 @@ class CPMSetting(TextWithKeyboard):
 
         builder.row(bottom)
 
+        button_text = "Выключить управление ставкой для Авто" if self.adv_setting.bidder_for_auto else "Включить управление ставкой для Авто"
+        callback_action = "off_bidder_for_auto" if self.adv_setting.bidder_for_auto else "on_bidder_for_auto"
+
+        bottom = InlineKeyboardButton(
+            text=button_text,
+            callback_data=callbacks.CPMSettingMenu(
+                action=callback_action,
+                adv_original_id=self.adv_setting.id
+            ).pack()
+        )
+
+        builder.row(bottom)
+
         bottom = InlineKeyboardButton(text = 'Изменить ставку (Максимальную ставку)',
                                       callback_data = callbacks.CPMSettingMenu(
                                           action = 'set_manual_cpm',
@@ -2162,44 +2153,6 @@ class Single_message106(Text):
         Успейте воспользоваться предложением и опробовать все новые функции бота!"""
 
 
-class ItemIsOutOfIndex(Text):
-
-    def __init__(self,bot,
-            user_telegram_id,
-            last_position: WBItemPosition,
-            new_position: WBItemPosition):
-        self.user_telegram_id = user_telegram_id
-        self.last_position = last_position
-        self.new_position = new_position
-        super().__init__(bot, user_telegram_id)
-
-
-
-    @property
-    def text(self):
-        return f"""
-Ваш товар {self.last_position.nmid} выпал из индекса по ключевому слову {self.last_position.keyword_text}."""
-
-
-class ItemIsInIndex(Text):
-
-    def __init__(self,bot,
-            user_telegram_id,
-            last_position: WBItemPosition,
-            new_position: WBItemPosition):
-        self.user_telegram_id = user_telegram_id
-        self.last_position = last_position
-        self.new_position = new_position
-        super().__init__(bot, user_telegram_id)
-
-
-    @property
-    def text(self):
-        return f"""
-Ваш товар {self.last_position.nmid} добавлен (вернулся) в индекс по ключевому слову {self.last_position.keyword_text}."""
-
-
-
 class Single_message107(Text):
     text = f"""
     🚀 Как с помощью бота попасть в рекламные полки?
@@ -2283,63 +2236,6 @@ class Single_message110(TextWithKeyboard):
 📩 {const.SUPPORT_LINK}
     
     """
-
-
-class Single_message111(TextWithKeyboard):
-    async def  __call__(self, wb_user_cabinets: list[WBUserCabinet]):
-        self._wb_user_cabinets = wb_user_cabinets
-        await super().__call__()
-
-
-    text = """
-  ⏳ Последние сутки акции "Удвоение пополнений"!
-
-❗️Мы снизили минимальный платёж до тысячи рублей!
-
-Осталось всего 24 часа до завершения нашей акции, когда каждый ваш платёж удваивается. Это отличная возможность увеличить свой баланс, если вы планировали пополнить счёт.
-
-💡 В чём суть?
-
-🔸    На любую сумму пополнения вы получите 100% бонус.
-🔸    Акция действует только до 18:00 вторника (завтра).
-🔸    Если вы уже думали о пополнении — сейчас самое время, чтобы сделать это с дополнительной выгодой.
-
-Акция подходит к концу, но вы ещё успеваете воспользоваться ей на полную. Всё решаете вы — никаких обязательств, только возможность получить больше. """
-
-    @property
-    def keyboard(self):
-        return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
-
-
-class Single_message112(TextWithKeyboard):
-
-    async def  __call__(self, wb_user_cabinets: list[WBUserCabinet]):
-        self._wb_user_cabinets = wb_user_cabinets
-        await super().__call__()
-
-    text = """
- ⏳ До окончания акции "Удвоение пополнений" осталось всего несколько часов!
-
-❗️ Акция завершается сегодня в 18:00, и у вас ещё есть возможность удвоить свой баланс! Напоминаем, что минимальный платёж — всего 1000 рублей.
-
-💡 Что вы получаете?
-
-🔸    100% бонус на каждое пополнение на любую сумму
-🔸    Увеличенный баланс для будущих возможностей и успехов
-
-Если вы планировали пополнить счёт — сегодня последний шанс получить двойную выгоду.   
-    
-    
-    
-    """
-
-
-
-    @property
-    def keyboard(self):
-        return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
-
-
 class KeywordStatUpdated(Text):
     text = """Статистика из WB успешно загружена, подгружаю страницу"""
 
@@ -2347,34 +2243,6 @@ class KeywordStatUpdated(Text):
 class MinusKeywordsUpdated(Text):
     text = "Минус-слова успешно обновлены, подгружаю страницу"
 
-
-
-
-
-
-class Single_message113(TextWithKeyboard):
-
-    async def  __call__(self, wb_user_cabinets: list[WBUserCabinet]):
-        self._wb_user_cabinets = wb_user_cabinets
-        await super().__call__()
-
-
-
-    text = """
- ⏳ Остался всего 1 час до окончания акции "Удвоение пополнений"!
-
-Акция завершится уже в 18:00, и это ваш последний шанс удвоить сумму пополнения.
-
-🎯 Что важно помнить?
-
-🔹    100% бонус на сумму пополнения от 1000 рублей.
-🔹    Акция действует ещё 1 час — не упустите эту возможность!
-
-Если планировали пополнить счёт — сделайте это сейчас и получите двойную выгоду! Время на исходе!"""
-
-    @property
-    def keyboard(self):
-        return keyboards.get_payment_keyboard_for_shops(self._wb_user_cabinets)
 
 
 class StrategySetting(TextWithKeyboard):
@@ -2572,4 +2440,32 @@ class ShowFavoriteAdvs(TextWithKeyboard):
     def keyboard(self):
          keyboard = keyboards.get_advs_list(self.advs)
          return keyboard
+
+    async def _get_additional_traffic_spend(self, pass_days) -> float:
+        """Получает расходы на дополнительный трафик (разница между общими затратами и затратами по ключам)"""
+        from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+        from datetime import datetime, timedelta
+
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=pass_days)  # За последние 30 дней
+
+        # # Получаем общие затраты
+        # total_stats = await full_wb_adv_stat.get_stats_by_last_days(
+        #     [self._adv_setting.adv_id, self._adv_setting.search_adv_id],
+        #     start_date=start_date,
+        #     end_date=end_date
+        # ),
+        sum_spends = self._spend_for_inner_adv_for_3_days
+        total_spend = sum_spends if sum_spends else 0
+
+        # Получаем затраты по ключам
+        keywords_spend = await full_wb_adv_stat.get_keywords_spend(
+            [self._adv_setting.adv_id],
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        # Разница - это расходы на дополнительный трафик
+        additional_spend = total_spend - keywords_spend
+        return round(additional_spend, 2) if additional_spend > 0 else 0
 

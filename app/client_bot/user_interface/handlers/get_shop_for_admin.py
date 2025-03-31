@@ -42,14 +42,14 @@ class AdminsGetAdvByIdFilter(BaseFilter):
         text = message.text
         if not text:
             return False
-        if text.isdigit() and user_id in [373435337]:
+        if text.isdigit() and user_id in const.ADMINS:
             async with sm() as session:
                 stmt = select(AdvSetting)\
                 .where(AdvSetting.adv_id == int(message.text))
                 adv = await session.execute(stmt)
                 adv = adv.scalar()
-                if adv:
-                    return True
+                return bool(adv)
+        return False
 
 @router.message(AdminsGetShopFilter())
 async def getting_shop_for_admin(message: types.Message, bot: Bot, state: FSMContext):
