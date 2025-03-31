@@ -10,7 +10,7 @@ from app.utils import redis_manager
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
-from app.modules.common_slaves.wildberries.models import AdvPayment
+from app.modules.common_slaves.wildberries.models import AdvPayment, WBBalancePayment, WBBonusPayment
 from .ABC_manager import AbcManager
 from .data_setter import DataSetter
 from .graph_vector_updater import GraphUpdater
@@ -49,93 +49,6 @@ sm = get_async_session_maker
 
 keywords_hashs_in_neo = set()
 
-
-async def process_payment_for_auto_bidder():
-    current_date = datetime.datetime.now().date()
-    async with sm(read_only=False) as session:
-        stmt = select(AdvSetting).options(
-            joinedload(AdvSetting.payments),
-            selectinload(AdvSetting.wb_cabinet)
-        ).filter(
-            and_(
-                AdvSetting.bidder_active == True,
-                AdvSetting.active_status == 'started',
-                not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
-                                                  AdvPayment.type == 'auto_bidder')))
-
-            )
-        )
-
-        result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = result.unique().scalars().all()
-
-        for adv_setting in adv_settings:
-            wb_cabinet = adv_setting.wb_cabinet
-            if not (bonus := wb_cabinet.bonus):
-                bonus = 0
-            if not (balance := wb_cabinet.balance):
-                balance = 0
-            if bonus >= const.AUTO_BIDDER_PRICE:
-                payment = AdvPayment(date=current_date,
-                                     type='auto_bidder')
-                session.add(payment)
-                adv_setting.payments.append(payment)
-                wb_cabinet.bonus -= const.AUTO_BIDDER_PRICE
-            elif balance > 0:
-                payment = AdvPayment(date=current_date,
-                                     type='auto_bidder')
-                session.add(payment)
-                adv_setting.payments.append(payment)
-                wb_cabinet.balance -= const.AUTO_BIDDER_PRICE
-            else:
-                wb_cabinet.bonus = 0
-                adv_setting.bidder_active = False
-            await session.commit()
-            await asyncio.sleep(0)
-
-
-
-async def process_payment_for_parsing():
-    current_date = datetime.datetime.now().date()
-    async with sm(read_only=False) as session:
-        stmt = select(AdvSetting).options(
-            joinedload(AdvSetting.payments),
-            selectinload(AdvSetting.wb_cabinet)
-        ).filter(
-            and_(
-                AdvSetting.parsing_active == True,
-                AdvSetting.active_status == 'started',
-                not_(AdvSetting.payments.any(and_(AdvPayment.date == current_date,
-                                                  AdvPayment.type == 'parsing')))
-
-            )
-        )
-
-        result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = result.unique().scalars().all()
-
-        for adv_setting in adv_settings:
-            wb_cabinet = adv_setting.wb_cabinet
-            if not (bonus := wb_cabinet.bonus):
-                bonus = 0
-            if not (balance := wb_cabinet.balance):
-                balance = 0
-            if bonus >= const.PARSING_PRICE:
-                payment = AdvPayment(date=current_date)
-                adv_setting.payments.append(payment)
-                wb_cabinet.bonus -= const.PARSING_PRICE
-            elif balance > 0:
-                payment = AdvPayment(date=current_date,
-                                     type='parsing')
-                adv_setting.payments.append(payment)
-                wb_cabinet.balance -= const.PARSING_PRICE
-            else:
-                wb_cabinet.bonus = 0
-                adv_setting.parsing_active = False
-            await session.commit()
-            await asyncio.sleep(0)
-
-
 async def process_payment_for_advs() -> None:
     current_date = datetime.datetime.now().date()
     async with sm(read_only=False) as session:
@@ -165,18 +78,42 @@ async def process_payment_for_advs() -> None:
             shop_id = wb_cabinet.shop_id
             PRICE_FOR_SHOP_FOR_DAY = await pricer.get_price_for_day_for_shop(shop_id)
             PRICE_FOR_ADV_FOR_DAY = PRICE_FOR_SHOP_FOR_DAY / len(adv_settings)
-            balance = wb_cabinet.calculated_balance
-            bonus = wb_cabinet.bonus_payments
-            if bonus >= PRICE_FOR_ADV_FOR_DAY:
-                payment = AdvPayment(date=current_date)
-                adv_setting.payments.append(payment)
-                wb_cabinet.bonus -= PRICE_FOR_ADV_FOR_DAY
-            elif balance > 0:
-                payment = AdvPayment(date=current_date)
-                adv_setting.payments.append(payment)
-                wb_cabinet.balance -= PRICE_FOR_ADV_FOR_DAY
+            
+            # Используем гибридные свойства вместо прямого доступа к полям
+            calculated_bonus = wb_cabinet.calculated_bonus
+            calculated_balance = wb_cabinet.calculated_balance
+            
+            payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+            adv_setting.payments.append(payment)
+            
+            # Сначала используем бонусы, затем баланс
+            if calculated_bonus >= PRICE_FOR_ADV_FOR_DAY:
+                # Создаем запись списания бонусов
+                bonus_payment = WBBonusPayment(
+                    wb_cabinet_id=wb_cabinet.id,
+                    amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
+                    description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
+                    operation_type="subtract"
+                )
+                session.add(bonus_payment)
+                
+                # Расчет остатка идет с учетом платежей, не нужно вычитать из поля bonus
+            elif calculated_balance >= PRICE_FOR_ADV_FOR_DAY:
+                # Создаем запись списания с баланса
+                balance_payment = WBBalancePayment(
+                    wb_cabinet_id=wb_cabinet.id,
+                    amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
+                    description=f"Списание за рекламную кампанию {adv_setting.adv_id}"
+                )
+                session.add(balance_payment)
+                
+                # Расчет остатка идет с учетом платежей, не нужно вычитать из поля balance
             else:
+                # Если недостаточно средств, деактивируем бота
                 adv_setting.bot_active = False
+                
+                # Добавляем тип списания в платеж для отслеживания причины
+                payment.type = "deactivation_due_to_insufficient_funds"
 
             await session.commit()
 
@@ -190,7 +127,7 @@ async def graph_vector_update() -> None:
 
 
 
-async def update_vectors_update_in_graph():
+async def update_vectors_update_in_graph() -> None:
     while True:
         try:
             await graph_vector_update()
@@ -201,7 +138,7 @@ async def update_vectors_update_in_graph():
 
 
 
-async def update_vectors_in_redis():
+async def update_vectors_in_redis() -> None:
     await gds.update_vectors_in_redis()
 
 

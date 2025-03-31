@@ -85,12 +85,60 @@ bonus_payment = WBBonusPayment(
 session.add(bonus_payment)
 ```
 
+## Учет списаний за рекламные кампании
+
+Для учета списаний за рекламные кампании в системе реализован механизм двойной записи:
+
+1. Создается запись в таблице `AdvPayment` с указанием даты и суммы списания
+2. Создается соответствующая запись в таблице `WBBalancePayment` или `WBBonusPayment` (в зависимости от источника средств)
+
+```python
+# Пример учета списания за рекламную кампанию
+# 1. Создание записи о платеже за рекламу
+payment = AdvPayment(
+    date=current_date,
+    amount=price_for_adv,
+    adv_setting_id=adv_setting.id
+)
+adv_setting.payments.append(payment)
+
+# 2. Создание записи списания с баланса или бонусов
+if calculated_bonus >= price_for_adv:
+    # Списание с бонусов
+    bonus_payment = WBBonusPayment(
+        wb_cabinet_id=cabinet.id,
+        amount=-price_for_adv,
+        description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
+        operation_type="subtract"
+    )
+    session.add(bonus_payment)
+    # НЕ обновляем прямое поле bonus, используем только транзакции
+else:
+    # Списание с баланса
+    balance_payment = WBBalancePayment(
+        wb_cabinet_id=cabinet.id,
+        amount=-price_for_adv,
+        description=f"Списание за рекламную кампанию {adv_setting.adv_id}"
+    )
+    session.add(balance_payment)
+    # НЕ обновляем прямое поле balance, используем только транзакции
+```
+
+### Приоритеты списания
+
+Система использует следующие приоритеты при списании:
+1. Сначала всегда используются бонусы (`calculated_bonus`)
+2. Если бонусов недостаточно, используется основной баланс (`calculated_balance`)
+3. Если и баланса недостаточно, рекламная кампания деактивируется (устанавливается `bot_active = False`)
+
 ## Важные замечания
 
 1. **Не модифицируйте напрямую** поля `balance` и `bonus` - это может привести к несогласованности данных.
 2. Всегда проверяйте достаточность средств перед списанием: `if cabinet.calculated_balance >= amount`.
 3. Для получения истории транзакций используйте запросы к таблицам `WBBalancePayment` и `WBBonusPayment`.
 4. При работе с админ-панелью рекомендуется использовать функции из модуля `cabinet_bonus_manager`.
+5. Всегда создавайте два типа записей при списании за рекламные кампании: в `AdvPayment` и в соответствующей таблице платежей.
+6. Для расчета текущего баланса и бонусов всегда используйте гибридные свойства `calculated_balance` и `calculated_bonus`, которые учитывают все транзакции в системе.
 
 ## Использование в SQL-запросах
 

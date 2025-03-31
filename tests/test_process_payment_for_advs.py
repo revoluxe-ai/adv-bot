@@ -25,10 +25,13 @@ class MockWBCabinet:
         self.balance = balance
         self.calculated_balance = balance
         self.bonus = bonus
-        self.bonus_payments = bonus
+        self.calculated_bonus = bonus
+        self.bonus_payments = []
+        self.balance_payments = []
         self.shop_id = shop_id
         self.expiration_time = expiration_time or (datetime.now().date() - timedelta(days=1))
         self.adv_settings = []
+        self.id = 1  # Добавим ID для создания платежей
 
 class MockAdvSetting:
     def __init__(self, bot_active=True, wb_cabinet=None, adv_id=1, payments=None):
@@ -40,10 +43,11 @@ class MockAdvSetting:
             wb_cabinet.adv_settings.append(self)
 
 class MockAdvPayment:
-    def __init__(self, date=None, adv_setting_id=None, type=None):
+    def __init__(self, date=None, adv_setting_id=None, type=None, amount=None):
         self.date = date or datetime.now().date()
         self.adv_setting_id = adv_setting_id
         self.type = type
+        self.amount = amount
 
 class MockPricer:
     async def get_price_for_day_for_shop(self, shop_id):
@@ -92,8 +96,13 @@ async def test_process_payment_for_advs_with_bonus(mock_sm, mock_pricer):
     assert mock_session.execute.called
     assert mock_session.commit.called
     assert len(adv_setting.payments) == 1
-    assert cabinet.bonus == 100  # 200 - 100 (стоимость на день)
+    assert adv_setting.payments[0].amount == 100  # Сумма платежа
+    assert cabinet.bonus == 200  # Значение bonus не меняется напрямую
     assert adv_setting.bot_active is True
+    
+    # Проверяем, что была создана запись о списании бонусов
+    assert mock_session.add.called
+    assert mock_session.add.call_args[0][0].__class__.__name__ == 'WBBonusPayment'
 
 @pytest.mark.asyncio
 async def test_process_payment_for_advs_with_balance(mock_sm, mock_pricer):
@@ -114,8 +123,13 @@ async def test_process_payment_for_advs_with_balance(mock_sm, mock_pricer):
     assert mock_session.execute.called
     assert mock_session.commit.called
     assert len(adv_setting.payments) == 1
-    assert cabinet.balance == 50  # 150 - 100 (стоимость на день)
+    assert adv_setting.payments[0].amount == 100  # Сумма платежа
+    assert cabinet.balance == 150  # Значение balance не меняется напрямую
     assert adv_setting.bot_active is True
+    
+    # Проверяем, что была создана запись о списании с баланса
+    assert mock_session.add.called
+    assert mock_session.add.call_args[0][0].__class__.__name__ == 'WBBalancePayment'
 
 @pytest.mark.asyncio
 async def test_process_payment_for_advs_insufficient_funds(mock_sm, mock_pricer):
@@ -135,8 +149,13 @@ async def test_process_payment_for_advs_insufficient_funds(mock_sm, mock_pricer)
     # Проверки
     assert mock_session.execute.called
     assert mock_session.commit.called
-    assert len(adv_setting.payments) == 0  # Платеж не должен быть создан
+    assert len(adv_setting.payments) == 1  # В новой реализации платеж создается в любом случае
+    assert adv_setting.payments[0].type == "deactivation_due_to_insufficient_funds"  # Проверка типа платежа
     assert adv_setting.bot_active is False  # Бот должен быть деактивирован
+    
+    # Проверяем, что не было создания записей о списании
+    assert cabinet.balance == 0
+    assert cabinet.bonus == 0
 
 @pytest.mark.asyncio
 async def test_process_payment_for_advs_multiple_settings(mock_sm, mock_pricer):
@@ -158,10 +177,15 @@ async def test_process_payment_for_advs_multiple_settings(mock_sm, mock_pricer):
     assert mock_session.execute.called
     assert mock_session.commit.called
     assert len(adv_setting1.payments) == 1
+    assert adv_setting1.payments[0].amount == 50  # 100 / 2 settings = 50 на каждую настройку
     assert len(adv_setting2.payments) == 1
-    assert cabinet.bonus == 100  # 200 - 50 - 50 = 100
+    assert adv_setting2.payments[0].amount == 50
+    assert cabinet.bonus == 200  # Значение bonus не меняется напрямую
     assert adv_setting1.bot_active is True
     assert adv_setting2.bot_active is True
+    
+    # Проверяем, что были созданы записи о списании бонусов
+    assert mock_session.add.called
 
 @pytest.mark.asyncio
 async def test_process_payment_for_advs_non_expired(mock_sm, mock_pricer):
@@ -185,3 +209,4 @@ async def test_process_payment_for_advs_non_expired(mock_sm, mock_pricer):
     assert len(adv_setting.payments) == 0  # Платеж не должен быть создан
     assert adv_setting.bot_active is True  # Статус не меняется
     assert cabinet.balance == 200  # Баланс остается тем же
+    assert cabinet.calculated_balance == 200  # Расчетный баланс тоже не меняется
