@@ -1,4 +1,5 @@
 from aiogram.filters.state import State, StatesGroup
+from aiogram.fsm.state import State, StatesGroup
 
 
 class GlobalState(StatesGroup):
@@ -47,6 +48,7 @@ class AddBalance(StatesGroup):
 
 class AdvCompanyCatalog(StatesGroup):
     waiting_for_keywords_for_filter = State()
+    waiting_for_sort_type = State()
 
 
 class AddWhitePhrases(StatesGroup):
@@ -70,3 +72,7 @@ class AddRelevantPhrases(StatesGroup):
 
 class ChangeCPM(StatesGroup):
     waiting_for_cpm = State()
+
+
+class ShopMenuState(StatesGroup):
+    shop_menu = State()

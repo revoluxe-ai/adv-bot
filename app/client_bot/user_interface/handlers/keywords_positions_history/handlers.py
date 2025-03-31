@@ -10,9 +10,9 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBCabinet,
     WBUserCabinet,
+    AdvPayment,
 )
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.session_maker import get_async_session_maker
 from app.client_bot.user_interface.views import messages, callbacks
 import datetime

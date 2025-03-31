@@ -20,7 +20,7 @@ from app.utils.db.base import BaseTable as Base
 # access to the values within the .ini file in use.
 config = context.config
 
-row = get_alchemy_row_for_migration(read_only=False)
+row = get_alchemy_row_for_migration()
 
 config.set_main_option('sqlalchemy.url', row)
 

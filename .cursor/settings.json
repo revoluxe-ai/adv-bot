@@ -1,0 +1,54 @@
+{
+  "aiDocs": {
+    "rules": [
+      {
+        "name": "Общие правила разработки",
+        "files": [
+          "cursor-rules/general/*.mdc"
+        ]
+      },
+      {
+        "name": "Технологический стек",
+        "files": [
+          "cursor-rules/tech-stack/*.mdc"
+        ]
+      },
+      {
+        "name": "Бизнес-процессы",
+        "files": [
+          "cursor-rules/business/*.mdc"
+        ]
+      },
+      {
+        "name": "Тестирование",
+        "files": [
+          "cursor-rules/testing/*.mdc"
+        ]
+      },
+      {
+        "name": "Деплой и инфраструктура",
+        "files": [
+          "cursor-rules/deploy/*.mdc"
+        ]
+      },
+      {
+        "name": "Оптимизация",
+        "files": [
+          "cursor-rules/optimization/*.mdc"
+        ]
+      },
+      {
+        "name": "Модульные правила",
+        "files": [
+          "cursor-rules/modules/*.mdc"
+        ]
+      },
+      {
+        "name": "Задачи разработки",
+        "files": [
+          "cursor-rules/tasks/*.mdc"
+        ]
+      }
+    ]
+  }
+} 
