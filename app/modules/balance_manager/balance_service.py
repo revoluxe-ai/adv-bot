@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Tuple, Optional
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.modules.balance_manager.exceptions import (
     UserNotFoundError, 
@@ -121,20 +122,16 @@ async def add_bonus(user_id: int, cabinet_id: int, amount: float, description: O
 
 
 async def get_cabinet_balance(cabinet_id: int) -> Tuple[float, float]:
-    """
-    Получает текущий баланс и бонусы кабинета
-    
-    Args:
-        cabinet_id: ID кабинета WB
-        
-    Returns:
-        Tuple[float, float]: Кортеж (расчетный баланс, расчетные бонусы)
-        
-    Raises:
-        CabinetNotFoundError: Если кабинет не найден
-    """
+    """Получает текущий баланс и бонусы кабинета с учетом всех платежей"""
     async with sm() as session:
-        cabinet = await session.get(WBCabinet, cabinet_id)
+        cabinet = await session.get(
+            WBCabinet,
+            cabinet_id,
+            options=[
+                selectinload(WBCabinet.balance_payments),
+                selectinload(WBCabinet.bonus_payments)
+            ]
+        )
         if not cabinet:
             raise CabinetNotFoundError(f"Кабинет с ID {cabinet_id} не найден")
         

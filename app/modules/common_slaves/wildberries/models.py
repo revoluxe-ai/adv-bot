@@ -118,7 +118,7 @@ class WBCabinet(BaseTable):
         Index('idx_wb_cabinet_id', 'id'),
     )
     
-    @property
+    @hybrid_property
     def calculated_balance(self):
         """Вычисляет баланс на основе начального значения balance и всех платежей"""
         if not self.balance_payments:
@@ -127,8 +127,7 @@ class WBCabinet(BaseTable):
         # Суммируем все платежи и начальное значение баланса
         return self.balance + sum(payment.amount for payment in self.balance_payments)
 
-    
-    @property
+    @hybrid_property
     def calculated_bonus(self):
         """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
         if not self.bonus_payments:
