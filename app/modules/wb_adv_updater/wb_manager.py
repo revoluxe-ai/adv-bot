@@ -136,7 +136,7 @@ async def process_payment_for_parsing():
             await asyncio.sleep(0)
 
 
-async def process_payment_for_advs():
+async def process_payment_for_advs() -> None:
     current_date = datetime.datetime.now().date()
     async with sm(read_only=False) as session:
         stmt = select(AdvSetting)\
@@ -176,7 +176,6 @@ async def process_payment_for_advs():
                 adv_setting.payments.append(payment)
                 wb_cabinet.balance -= PRICE_FOR_ADV_FOR_DAY
             else:
-                wb_cabinet.bonus = 0
                 adv_setting.bot_active = False
 
             await session.commit()
@@ -441,28 +440,28 @@ async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
         logger.debug(f'Error getting clusters for adv {adv.id}: {e}', exc_info=True)
         return
 
-
-async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
-    try:
-        wb_api = WBApi(access)
-    except ApiForbiddenError:
-        logger.error('Доступ запрещен')
-        return
-    async with sm() as session:
-        query = select(AdvSetting).where(AdvSetting.wb_cabinet_id == access.wb_cabinet.id)
-        adv_settings = await session.execute(query)
-        adv_settings = adv_settings.scalars().all()
-    for adv in adv_settings:
-        if adv.id not in tasks:
-            task = asyncio.create_task(update_clusters_for_adv(adv, wb_api))
-            tasks[adv.id] = task
-        else:
-            if tasks[adv.id].done():
-                logger.debug(f'Задача обновления кластеров завершена для РК {adv.name}')
-                if tasks[adv.id].exception():
-                    logger.error(f'Ошибка обновления кластеров: {tasks[adv.id].exception()}')
-                del tasks[adv.id]
-        await asyncio.sleep(0)
+#
+# async def update_clusters_for_cabinet(access: WBCabinetAccess, tasks):
+#     try:
+#         wb_api = WBApi(access)
+#     except ApiForbiddenError:
+#         logger.error('Доступ запрещен')
+#         return
+#     async with sm() as session:
+#         query = select(AdvSetting).where(AdvSetting.wb_cabinet_id == access.wb_cabinet.id)
+#         adv_settings = await session.execute(query)
+#         adv_settings = adv_settings.scalars().all()
+#     for adv in adv_settings:
+#         if adv.id not in tasks:
+#             task = asyncio.create_task(update_clusters_for_adv(adv, wb_api))
+#             tasks[adv.id] = task
+#         else:
+#             if tasks[adv.id].done():
+#                 logger.debug(f'Задача обновления кластеров завершена для РК {adv.name}')
+#                 if tasks[adv.id].exception():
+#                     logger.error(f'Ошибка обновления кластеров: {tasks[adv.id].exception()}')
+#                 del tasks[adv.id]
+#         await asyncio.sleep(0)
 
 
 
@@ -524,9 +523,9 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
     logger.debug(f'Получено {len(full_stat_keywords)} ключевых слов для {adv_setting.name}')
     texts_for_adv_setting = {keyword.text for keyword in full_stat_keywords}
     clusters = set()
-    for text in texts_for_adv_setting:
+    for text_for_adv in texts_for_adv_setting:
         try:
-            cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
+            cluster_name, _ = await redis_manager.get_cluster_and_preset(text_for_adv)
         except:
             logger.error('Не удалось получить кластер')
             cluster_name = None
@@ -585,7 +584,9 @@ class MessageCounter:
 
 message_counter = MessageCounter()
 
-class Manager(AbcManager):
+
+#
+# class Manager(AbcManager):
     # async def insert_keyword_stats(self, client, keyword_stats, adv_setting):
     #     try:
     #         # Генерация новой версии на основе текущего времени
@@ -654,135 +655,135 @@ class Manager(AbcManager):
     #     # Вывод итогового DataFrame
     #     print(final_result)
 
-    @staticmethod
-    def __load_ml_model(model_path,):
-        return joblib.load(model_path)
-
-
-
-    def __save_model( model, model_path):
-        joblib.dump(model, model_path)
-
-
-    def __get_keyword_stat(self):
-        kw_df = pd.read_csv(self.keyword_stat_df_path)
-        return kw_df
-
-
-
-    async def get_nearest_surrogate_phrases(self, phrases: set[str]):
-        if self._phrase_index is None:
-            index = await asyncio.to_thread(self._get_phrase_index)
-            self._phrase_index = index
-        else:
-            index = self._phrase_index
-
-        surrogate_phrase_dict = {}
-        loop = asyncio.get_event_loop()
-        for phrase in phrases:
-            word2vec_vec = await self._word2vec.average_vector_from_sentence(phrase)
-            if word2vec_vec is None:
-                continue
-
-            prhase_node_id = int(index.get_near_object_id(word2vec_vec))
-            surrogate_keyword = await loop.run_in_executor(None,
-                                                self._gds.get_keyword_phrase_vector_by_id,
-                                                prhase_node_id)
-
-            surrogate_phrase_dict[phrase] = surrogate_keyword
-        return surrogate_phrase_dict
-
-
-
-    async def __find_most_similar(self, phrase, index):
-        vector = await self._word2vec.average_vector_from_sentence(phrase)
-        vector = np.array(vector).reshape(1, -1).astype(np.float32)
-        faiss.normalize_L2(vector)
-        distances, indices = index.search(vector, 1)  # Ищем наиболее похожий вектор
-        return indices[0, 0]
-
-    def _get_phrase_index(self):
-       index = self._faiss_manager.get_keyword_phrases_index()
-       return index
-
-
-
-
-    @staticmethod
-    async def update_min_ctr_in_global_wb_category_settings():
-        parent_categories_to_subcategories_name_list = await data_manager.get_parent_id_categories_subcategories_name_list()
-        category_name_to_parent_id = {}
-        for parent_id, subcategories in parent_categories_to_subcategories_name_list.items():
-            for subcategory in subcategories:
-                category_name_to_parent_id[subcategory] = parent_id
-        logger.debug('Родительские категории для расчета  min_ctr получены')
-        wb_category_to_keywordstat_list = await data_manager.get_wb_category_to_keywordstat_list()
-        parent_category_to_keywordstat_list = {}
-        for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
-            parentId = category_name_to_parent_id[wb_category_name]
-            if parentId not in parent_category_to_keywordstat_list:
-                parent_category_to_keywordstat_list[parentId] = []
-            parent_category_to_keywordstat_list[parentId].extend(keywordstat_list)
-        global_keywordstats_list = []
-        for keywordstat_list in parent_category_to_keywordstat_list.values():
-            global_keywordstats_list.extend(keywordstat_list)
-        global_keywordstats_list = [keywordstat for keywordstat in global_keywordstats_list if keywordstat.ctr > 0]
-        final_wb_category_name_to_min_ctr = {}
-        percentile = 5
-        for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
-            ctrs = np.array([keywordstat.ctr for keywordstat in keywordstat_list if keywordstat.ctr > 0])
-            if ctrs.size > 0:
-                min_ctr = np.percentile(ctrs, percentile)
-                final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
-            else:
-                parentId = category_name_to_parent_id[wb_category_name]
-                keywordstats = parent_category_to_keywordstat_list[parentId]
-                ctrs = np.array([keywordstat.ctr for keywordstat in keywordstats if keywordstat.ctr > 0])
-                if ctrs.size > 0:
-                    min_ctr = np.percentile(ctrs, percentile)
-                    final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
-                else:
-                    ctrs = np.array([kw.ctr for kw in global_keywordstats_list])
-                    if ctrs.size > 0:
-                        min_ctr = np.percentile(ctrs, percentile)
-                        final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
-                    else:
-                        final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
-        async with sm(read_only=False) as session:
-            for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
-                # if message_counter.check_last_time():
-                #      await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
-
-
-                stmt = select(GlobalCategorySetting) \
-                    .where(GlobalCategorySetting.category_name == wb_category_name)
-                category_setting = await session.execute(stmt)
-                category_setting = category_setting.scalar()
-                if not category_setting:
-                    category_setting = GlobalCategorySetting(category_name=wb_category_name, min_ctr=min_ctr)
-                    session.add(category_setting)
-                else:
-                    category_setting.min_ctr = min_ctr
-                await session.execute(stmt)
-            await session.commit()
-            message_counter.add_send()
-
-
-
-    async def clear_expired_data(self):
-        async with sm(read_only=False) as session:
-            expired_cabinets: list[WBCabinet] = await data_manager.get_expired_cabinets(session)
-            for wb_cabinet in expired_cabinets:
-                adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
-                for adv_setting in adv_settings:
-                    await session.delete(adv_setting)
-                    await session.commit()
-        nmids = list(set(await data_manager.get_needs_nmids()))
-        await data_manager.clear_cards_in_db(nmids=nmids)
-        await self._gds.clear_cards_in_neo4j(need_nmids=nmids)
-        keywords = list(set(await data_manager.get_all_keywords()))
-        await self._gds.clear_keywords_in_neo4j(need_keywords=keywords)
-        await self._gds.clear_dead_nodes()
-        await asyncio.sleep(60 * 60)
+    # @staticmethod
+    # def __load_ml_model(model_path,):
+    #     return joblib.load(model_path)
+    #
+    #
+    #
+    # def __save_model( model, model_path):
+    #     joblib.dump(model, model_path)
+    #
+    #
+    # def __get_keyword_stat(self):
+    #     kw_df = pd.read_csv(self.keyword_stat_df_path)
+    #     return kw_df
+    #
+    #
+    #
+    # async def get_nearest_surrogate_phrases(self, phrases: set[str]):
+    #     if self._phrase_index is None:
+    #         index = await asyncio.to_thread(self._get_phrase_index)
+    #         self._phrase_index = index
+    #     else:
+    #         index = self._phrase_index
+    #
+    #     surrogate_phrase_dict = {}
+    #     loop = asyncio.get_event_loop()
+    #     for phrase in phrases:
+    #         word2vec_vec = await self._word2vec.average_vector_from_sentence(phrase)
+    #         if word2vec_vec is None:
+    #             continue
+    #
+    #         prhase_node_id = int(index.get_near_object_id(word2vec_vec))
+    #         surrogate_keyword = await loop.run_in_executor(None,
+    #                                             self._gds.get_keyword_phrase_vector_by_id,
+    #                                             prhase_node_id)
+    #
+    #         surrogate_phrase_dict[phrase] = surrogate_keyword
+    #     return surrogate_phrase_dict
+    #
+    #
+    #
+    # async def __find_most_similar(self, phrase, index):
+    #     vector = await self._word2vec.average_vector_from_sentence(phrase)
+    #     vector = np.array(vector).reshape(1, -1).astype(np.float32)
+    #     faiss.normalize_L2(vector)
+    #     distances, indices = index.search(vector, 1)  # Ищем наиболее похожий вектор
+    #     return indices[0, 0]
+    #
+    # def _get_phrase_index(self):
+    #    index = self._faiss_manager.get_keyword_phrases_index()
+    #    return index
+    #
+    #
+    #
+    #
+    # @staticmethod
+    # async def update_min_ctr_in_global_wb_category_settings():
+    #     parent_categories_to_subcategories_name_list = await data_manager.get_parent_id_categories_subcategories_name_list()
+    #     category_name_to_parent_id = {}
+    #     for parent_id, subcategories in parent_categories_to_subcategories_name_list.items():
+    #         for subcategory in subcategories:
+    #             category_name_to_parent_id[subcategory] = parent_id
+    #     logger.debug('Родительские категории для расчета  min_ctr получены')
+    #     wb_category_to_keywordstat_list = await data_manager.get_wb_category_to_keywordstat_list()
+    #     parent_category_to_keywordstat_list = {}
+    #     for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
+    #         parentId = category_name_to_parent_id[wb_category_name]
+    #         if parentId not in parent_category_to_keywordstat_list:
+    #             parent_category_to_keywordstat_list[parentId] = []
+    #         parent_category_to_keywordstat_list[parentId].extend(keywordstat_list)
+    #     global_keywordstats_list = []
+    #     for keywordstat_list in parent_category_to_keywordstat_list.values():
+    #         global_keywordstats_list.extend(keywordstat_list)
+    #     global_keywordstats_list = [keywordstat for keywordstat in global_keywordstats_list if keywordstat.ctr > 0]
+    #     final_wb_category_name_to_min_ctr = {}
+    #     percentile = 5
+    #     for wb_category_name, keywordstat_list in wb_category_to_keywordstat_list.items():
+    #         ctrs = np.array([keywordstat.ctr for keywordstat in keywordstat_list if keywordstat.ctr > 0])
+    #         if ctrs.size > 0:
+    #             min_ctr = np.percentile(ctrs, percentile)
+    #             final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
+    #         else:
+    #             parentId = category_name_to_parent_id[wb_category_name]
+    #             keywordstats = parent_category_to_keywordstat_list[parentId]
+    #             ctrs = np.array([keywordstat.ctr for keywordstat in keywordstats if keywordstat.ctr > 0])
+    #             if ctrs.size > 0:
+    #                 min_ctr = np.percentile(ctrs, percentile)
+    #                 final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
+    #             else:
+    #                 ctrs = np.array([kw.ctr for kw in global_keywordstats_list])
+    #                 if ctrs.size > 0:
+    #                     min_ctr = np.percentile(ctrs, percentile)
+    #                     final_wb_category_name_to_min_ctr[wb_category_name] = min_ctr
+    #                 else:
+    #                     final_wb_category_name_to_min_ctr[wb_category_name] = 0  # И тут
+    #     async with sm(read_only=False) as session:
+    #         for wb_category_name, min_ctr in final_wb_category_name_to_min_ctr.items():
+    #             # if message_counter.check_last_time():
+    #             #      await admin_sender.send_message_to_admin(f'Минимальный CTR для категории {wb_category_name} установлен в {min_ctr}')
+    #
+    #
+    #             stmt = select(GlobalCategorySetting) \
+    #                 .where(GlobalCategorySetting.category_name == wb_category_name)
+    #             category_setting = await session.execute(stmt)
+    #             category_setting = category_setting.scalar()
+    #             if not category_setting:
+    #                 category_setting = GlobalCategorySetting(category_name=wb_category_name, min_ctr=min_ctr)
+    #                 session.add(category_setting)
+    #             else:
+    #                 category_setting.min_ctr = min_ctr
+    #             await session.execute(stmt)
+    #         await session.commit()
+    #         message_counter.add_send()
+    #
+    #
+    #
+    # async def clear_expired_data(self):
+    #     async with sm(read_only=False) as session:
+    #         expired_cabinets: list[WBCabinet] = await data_manager.get_expired_cabinets(session)
+    #         for wb_cabinet in expired_cabinets:
+    #             adv_settings: list[AdvSetting] = wb_cabinet.adv_settings
+    #             for adv_setting in adv_settings:
+    #                 await session.delete(adv_setting)
+    #                 await session.commit()
+    #     nmids = list(set(await data_manager.get_needs_nmids()))
+    #     await data_manager.clear_cards_in_db(nmids=nmids)
+    #     await self._gds.clear_cards_in_neo4j(need_nmids=nmids)
+    #     keywords = list(set(await data_manager.get_all_keywords()))
+    #     await self._gds.clear_keywords_in_neo4j(need_keywords=keywords)
+    #     await self._gds.clear_dead_nodes()
+    #     await asyncio.sleep(60 * 60)
 
 

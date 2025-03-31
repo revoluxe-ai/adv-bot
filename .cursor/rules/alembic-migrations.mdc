@@ -1,4 +1,9 @@
 ---
+description: Миграция alembic
+globs: 
+alwaysApply: false
+---
+---
 description: Это правила для миграции бд постгрес
 globs: 
 alwaysApply: false
