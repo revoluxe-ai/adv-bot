@@ -5,10 +5,10 @@ from aiogram import Router, types, Bot
 from aiogram.filters import BaseFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
-
 from app.client_bot import const
 from app.client_bot.user_interface.views import messages
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet, WBCabinet
+from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
@@ -77,7 +77,7 @@ async def getting_shop_for_admin(message: types.Message, bot: Bot, state: FSMCon
         wb_user_cabinet_original_id = await session.execute(stmt)
         wb_user_cabinet_original_id = wb_user_cabinet_original_id.scalar()
     await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-    await messages.ShopMenu(bot, message.chat.id, state, wb_user_cabinet_original_id,)()
+    await ShopMenu(bot, message.chat.id, state, wb_user_cabinet_original_id,)()
 
 
 @router.message(AdminsGetAdvByIdFilter())
