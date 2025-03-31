@@ -29,7 +29,7 @@ class KeyboardsGetter:
 
         builder.row(InlineKeyboardButton(text='К настройкам АРК',
                                              callback_data=ReturnToAdvCallback(
-                                                 adv_original_id=adv.id).pack()))
+                                                 adv_original_id=int(adv.id)).pack()))
 
 
 

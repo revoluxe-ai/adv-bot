@@ -1,13 +1,10 @@
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime, timedelta
 from aiogram.fsm.context import FSMContext
 from app.modules.shop_menu.message import ShopMenu
-from tests.mocks import MockUser, MockWBCabinet, MockWBUserCabinet, MockWBToken, MockAdvSetting
-import json
+from tests.mocks import MockWBToken
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, User, WBToken, AdvSetting
-from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.fixture
 def mock_bot():
@@ -463,3 +460,4 @@ async def test_get_adv_menu_no_advs(mock_bot, mock_state, mock_chat_id, test_asy
         assert "Test Cabinet" in shop_menu.text
         assert "1000 рублей" in shop_menu.text
         assert "0" in shop_menu.text  # Проверяем количество активных кампаний
+

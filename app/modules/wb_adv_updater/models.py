@@ -33,6 +33,7 @@ class AdvPayment(BaseTable):
     adv_setting = relationship('AdvSetting', back_populates='payments')
     type = mapped_column(String, nullable=True)
     amount = mapped_column(Float, nullable=True, default=None)
-    __table_args__ = (
-        UniqueConstraint('date', 'adv_setting_id', 'type', name='uix_date_adv_setting_id_type'),
-    )
+    __table_args__ = (UniqueConstraint('date',
+                                       'adv_setting_id',
+                                       'type',
+                                       name='uix_date_adv_setting_id_type'),)

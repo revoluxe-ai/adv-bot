@@ -1,21 +1,16 @@
 import pytest
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch, MagicMock
-from app.modules.common_advs_stat.data_manager import CommonAdvsStatData, CommonAdvsStatDataManager
+from app.modules.common_advs_stat.data_manager import CommonAdvsStatDataManager
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.common_slaves.wildberries.data_classes.adv import AdvType
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
-from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, DayStats, BoosterStats, SmallFullAdvStat
-import math
-import numpy as np
-from contextlib import asynccontextmanager
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
+
 
 # Расширяем класс FullAdvStat для тестов, чтобы у него было свойство spend
 class TestFullAdvStat(FullAdvStat):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._avg_position = 2.5
-
     @property
     def spend(self):
         return self.sum
@@ -27,6 +22,7 @@ class TestFullAdvStat(FullAdvStat):
     @avg_position.setter
     def avg_position(self, value):
         self._avg_position = value
+
 
 # Переопределяем AdvSetting для тестов
 class TestAdvSetting(AdvSetting):
@@ -205,6 +201,7 @@ async def test_get_data():
         assert isinstance(result.full_adv_stat_for_last_3_days_for_auction, FullAdvStat)
         assert isinstance(result.common_stat, FullAdvStat)
 
+
 @pytest.mark.asyncio
 async def test_get_data_with_small_full_adv_stat():
     # Создаем моки для всех необходимых функций
@@ -313,3 +310,4 @@ async def test_get_data_with_small_full_adv_stat():
         assert result.common_stat is None
         assert result.plan_vector is not None
         assert result.fact_vector is not None
+

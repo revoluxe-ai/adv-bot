@@ -2,7 +2,6 @@ import json
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app import my_types
 from app.core.wb_api.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB

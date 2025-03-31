@@ -1,17 +1,17 @@
 import json
 from sqlalchemy import (
-    MetaData, Column, Integer, String, TypeDecorator, 
+    MetaData, Column, Integer, String, TypeDecorator,
     Boolean, Float, DateTime, ForeignKey, BIGINT, UniqueConstraint, Date, Index, text, Table, JSON
 )
-from sqlalchemy.dialects.postgresql import JSONB
+
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from datetime import datetime, timedelta
 import pytest
 
+
 # Создаем отдельный экземпляр MetaData для моков
 mock_metadata = MetaData()
 MockBase = declarative_base(metadata=mock_metadata)
-
 
 class JSONType(TypeDecorator):
     """Тип для хранения JSON в SQLite"""
@@ -27,7 +27,6 @@ class JSONType(TypeDecorator):
         if value is not None:
             value = json.loads(value)
         return value
-
 
 class ArrayType(TypeDecorator):
     """Тип для хранения массивов в SQLite"""
@@ -76,7 +75,6 @@ class MockUser(MockBase):
         Index('user_telegram_id_index', user_telegram_id),
     )
 
-
 class MockWBCabinet(MockBase):
     __tablename__ = 'wbcabinet'
     expiration_time = Column(DateTime, nullable=False, default=datetime.now() + timedelta(days=7))
@@ -104,7 +102,7 @@ class MockWBCabinet(MockBase):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        
+
     @property
     def calculated_balance(self) -> float:
         """Вычисляет баланс на основе начального значения balance и всех платежей"""
@@ -142,7 +140,6 @@ class MockWBUserCabinet(MockBase):
     user = relationship("MockUser", back_populates="wb_user_cabinets")
     name = Column(String(255), nullable=False)
     __table_args__ = (UniqueConstraint('wb_cabinet_id', 'user_id', name='_wb_cabinet_id_user_id_uc'),)
-
 
 class MockItemFeature(MockBase):
     __tablename__ = 'itemfeature'

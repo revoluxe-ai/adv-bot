@@ -134,7 +134,6 @@ async def pre_checkout_query_handler(pre_checkout_query: types.PreCheckoutQuery,
 async def successful_payment_handler(message: types.Message, state: FSMContext, bot: aiogram.Bot):
     successful_payment = message.successful_payment
     cost = successful_payment.total_amount / 100
-    
     state_data = await state.get_data()
     wb_cabinet_original_id = state_data['wb_cabinet_original_id_for_add_balance']
     # Получаем ID пользователя из базы

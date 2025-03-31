@@ -4,20 +4,14 @@ import os
 import sys
 import pytest
 import asyncio
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import declarative_base
-from app.utils.db.base import Base
-from app.utils.db.session_maker import get_async_session_maker
 from tests.mocks import MockBase, MockItemFeature, MockKeywordFeature, MockWBCabinet, MockUser, MockWBUserCabinet, MockWBToken, MockAdvSetting, MockAdvPayment
 import app.modules.wb_adv_updater.models as models
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, User, WBToken, AdvSetting
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from unittest.mock import MagicMock, AsyncMock, patch
-
 # Add the project root directory to PYTHONPATH
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
@@ -129,14 +123,12 @@ async def test_async_db():
 
     async with async_session() as session:
         yield session
-        
     # Закрываем все соединения после завершения теста
     await engine.dispose()
 
 @pytest.fixture(autouse=True)
 def patch_get_async_session_maker(monkeypatch, test_async_db):
     """Патчим get_async_session_maker, чтобы он использовал тестовую БД"""
-    
     @asynccontextmanager
     async def mock_get_async_session_maker(*args, **kwargs):
         # Создаем сессию из test_async_db с правильной настройкой greenlet контекста
@@ -169,4 +161,4 @@ def mock_keywords_query():
     
     with patch('app.modules.keywords_query.keywords_query.queries_dict', mock_queries_dict), \
          patch('app.modules.keywords_query.keywords_query.min_query', 50):
-        yield mock_queries_dict 
+        yield mock_queries_dict

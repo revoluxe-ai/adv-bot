@@ -4,7 +4,7 @@ from sqlalchemy import exists
 from app.utils import redis_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.wb_adv_updater import data_manager
-from app.modules.common_slaves.wildberries.models import AdvPayment, WBBalancePayment, WBBonusPayment
+from app.modules.common_slaves.wildberries.models import WBBalancePayment, WBBonusPayment
 from app.modules.wb_adv_updater.models import AdvPayment
 from .data_setter import DataSetter
 from .graph_vector_updater import GraphUpdater
@@ -125,7 +125,6 @@ async def update_vectors_update_in_graph() -> None:
 async def update_vectors_in_redis() -> None:
     await gds.update_vectors_in_redis()
 
-
 async def check_accesses():
     await rights_control.check_all()
 
@@ -143,7 +142,6 @@ async def insert_or_update_keywords(client, keyword_stats, adv_id, table_name: s
                                kw.clicks,
                                kw.spend,
                                new_version])
-
     await client.insert(
         table=f"default_db.{table_name}",
         data=data_to_insert,
@@ -155,6 +153,7 @@ async def insert_or_update_keywords(client, keyword_stats, adv_id, table_name: s
             "clicks",
             "spend",
             "version"])
+
 
 
 async def update_keywords_stat_in_click_house(client, keyword_stats: List[KeywordStat],
@@ -326,7 +325,9 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
         async with sm(read_only=False) as session:
             # Обработка данных порциями
             for keyword in keyword_settings:
-                check_by_black_list_template = await data_manager.check_by_black_list_template(keyword.text, adv_setting.id)
+                check_by_black_list_template = await data_manager.check_by_black_list_template(
+                    str(keyword.text),
+                    adv_setting.id)
                 if check_by_black_list_template:
                     keyword.hard_status = 0
                 session.add(keyword)

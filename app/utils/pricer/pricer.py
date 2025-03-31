@@ -13,15 +13,15 @@ class Pricer:
     def __init__(self):
         self._tariffs = tariffs
 
-
-    async def get_advs_count(self, shop_id: str) -> int:
+    @staticmethod
+    async def get_advs_count(shop_id: str) -> int:
         async with sm(read_only=True) as session:
             stmt = select(func.count(AdvSetting.id))\
             .join(AdvSetting.wb_cabinet)\
                 .where(WBCabinet.shop_id == shop_id,
                        AdvSetting.bot_active == True)
             result = await session.execute(stmt)
-            count_active_advs = result.scalar()
+            count_active_advs: int = result.scalar()
             return count_active_advs
 
 
@@ -43,14 +43,15 @@ class Pricer:
         price_for_day = self.get_tariff_for_day(price_for_month_for_shop)
         return price_for_day
 
-    def get_price_for_count_advs_in_cabinet_for_month(self, count_advs: int):
+    @staticmethod
+    def get_price_for_count_advs_in_cabinet_for_month(count_advs: int):
         for limit, price in sorted(tariffs.items()):
             if count_advs <= limit:
                 return price * count_advs
         # Если больше всех лимитов, берем максимальную цену
         return tariffs[max(tariffs)] * count_advs
-
-    def get_payment_for_adv(self, sum_payment: int, count_advs: int):
+    @staticmethod
+    def get_payment_for_adv(sum_payment: int, count_advs: int):
         return sum_payment / count_advs
 
 

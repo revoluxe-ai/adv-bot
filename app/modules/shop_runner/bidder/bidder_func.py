@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: AdvertApi) -> set[float] | None:
     adv_ids = []
-    if auto_adv.bidder_for_auto == True:
+    if auto_adv.bidder_for_auto:
         adv_ids.append(auto_adv.adv_id)
     if search_adv_id := auto_adv.search_adv_id:
         adv_ids.append(search_adv_id)
@@ -42,7 +42,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
     except CpmNotFoundError:
         logger.error(f'Максимальная ставка не найдена для {shop_id} adv_id {adv_id}')
         return
-    except Exception as e:
+    except Exception:
         logger.error(f'Ошибка при получении максимальной ставки для {shop_id} adv_id {adv_id}', exc_info=True)
         return
 
@@ -65,7 +65,7 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
     try:
         keywords = await data_manager.get_good_bad_phrases(adv_setting)
         logger.debug(f'Ключи получены для {shop_id}, adv_id {adv_id}')
-    except Exception as e:
+    except Exception:
         logger.error(f'Ошибка при получении ключей для {shop_id} adv_id {adv_id}', exc_info=True)
         return
     white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.keyword_setting.hard_status == 2]
@@ -78,7 +78,8 @@ async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: AdvertApi,
             await parser.add_wb_positions(text, {nmid}, delay=3)
             logger.debug(f'Парсинг ключа {text} успешно завершен для {shop_id} adv_id {adv_id}')
         except Exception as e:
-            logger.error(f'Ошибка {e} парсинга ключа {text} для {shop_id} adv_id {adv_id} артикул {nmid}', exc_info=True)
+            logger.error(f'Ошибка {e} парсинга ключа {text} для {shop_id} adv_id {adv_id} артикул {nmid}',
+                         exc_info=True)
             return
     else:
         logger.error(f'Нет ключа в белом списке для {shop_id}  adv_id: {adv_id}')

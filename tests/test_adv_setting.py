@@ -301,3 +301,4 @@ async def test_admins_filter_with_invalid_message(mock_message, mock_sm, monkeyp
     filter_instance = AdminsGetAdvByIdFilter()
     result = await filter_instance(mock_message)
     assert result is False
+

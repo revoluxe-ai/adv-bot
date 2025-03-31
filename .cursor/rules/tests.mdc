@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- python -m pytest  -v - можно так тесты делать, без перехода в папку с тестами tests

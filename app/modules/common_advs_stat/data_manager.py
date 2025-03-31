@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, List, Union, Dict
+from typing import Optional, List
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
 from app.utils.db.session_maker import get_async_session_maker
@@ -13,23 +14,6 @@ import math
 
 _sm = get_async_session_maker
 
-# Добавляем свойство diff_to_plan в AdvSetting
-# Создаем приватный атрибут
-setattr(AdvSetting, '_diff_to_plan', None)
-
-# Создаем свойство и сеттер
-def get_diff_to_plan(self) -> Optional[float]:
-    """Возвращает разницу между фактическими и плановыми показателями"""
-    return self._diff_to_plan
-
-def set_diff_to_plan(self, value: float):
-    """Устанавливает разницу между фактическими и плановыми показателями"""
-    if value is not None and not isinstance(value, float):
-        raise ValueError("diff_to_plan должно быть числом с плавающей точкой или None")
-    self._diff_to_plan = value
-
-# Устанавливаем свойство diff_to_plan
-setattr(AdvSetting, 'diff_to_plan', property(get_diff_to_plan, set_diff_to_plan))
 
 @dataclass
 class CommonAdvsStatData:
@@ -45,13 +29,10 @@ class CommonAdvsStatData:
     mean_orders_for_3_days: Optional[float]
     mean_price_for_order: Optional[float]
     spend_for_inner_adv_for_3_days: Optional[float]
-    full_adv_stat_for_last_3_days_for_auto_adv: FullAdvStat
-    full_adv_stat_for_last_3_days_for_auction: FullAdvStat
+    full_adv_stat_for_last_3_days_for_auto_adv: SmallFullAdvStat
+    full_adv_stat_for_last_3_days_for_auction: SmallFullAdvStat
     common_stat: Optional[FullAdvStat]
-    # Векторы плана и факта
-    plan_vector: dict
-    fact_vector: dict
-    
+
 
 class CommonAdvsStatDataManager:
     """Менеджер для получения данных о ключевых словах рекламной кампании"""
@@ -123,39 +104,9 @@ class CommonAdvsStatDataManager:
             end_date,
             'advkeyword_new'
         )
-        
-        spend_for_keywords_in_auction_adv = await full_wb_adv_stat.get_keywords_spend(
-            [adv_setting.search_adv_id],
-            start_date,
-            end_date,
-            'advkeyword_new'
-        )
-        
-        spend_for_keywords = spend_for_keywords_in_auto_adv + spend_for_keywords_in_auction_adv
+
         addition_spend_in_adv = full_adv_stat_for_last_3_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
-        
-        # Создаем векторы плана и факта
-        # Получаем плановые значения из настроек кампании или используем дефолтные
-        # Планируемое количество заказов (из настроек или план карточки)
-        target_orders_per_day = getattr(adv_setting, 'target_orders_per_day', 10)
-        
-        # Плановая себестоимость заказа (руб.)
-        target_cpo = getattr(adv_setting, 'target_cpo', 100)
-        
-        plan_vector = {
-            "orders": target_orders_per_day,
-            "cpo": target_cpo
-        }
-        
-        # Фактические значения
-        fact_vector = {
-            "orders": mean_orders_for_3_days,
-            "cpo": mean_price_for_order
-        }
-        
-        text = f"Ключевых фраз: {len(keywords)}"
-        call = "keywords"
-        
+
         return CommonAdvsStatData(
             adv_setting=adv_setting,
             keywords=keywords,
@@ -170,69 +121,5 @@ class CommonAdvsStatDataManager:
             spend_for_inner_adv_for_3_days=spend_for_inner_adv_for_3_days,
             full_adv_stat_for_last_3_days_for_auto_adv=full_adv_stat_for_last_3_days_for_auto_adv,
             full_adv_stat_for_last_3_days_for_auction=full_adv_stat_for_last_3_days_for_auction,
-            common_stat=common_stat,
-            plan_vector=plan_vector,
-            fact_vector=fact_vector
+            common_stat=common_stat
         )
-        
-    @classmethod
-    async def calculate_diff_to_plan_for_adv_settings(
-        self,
-            adv_settings: List[AdvSetting],
-            common_stat: CommonAdvsStatData,
-            full_adv_stat_for_auto_adv: FullAdvStat
-    ) -> List[AdvSetting]:
-        """Рассчитывает отклонение от плана для списка настроек рекламы"""
-        if not common_stat:
-            for adv_setting in adv_settings:
-                # Для полностью отсутствующих данных - максимальное отклонение
-                adv_setting.diff_to_plan = 2.0
-            return adv_settings
-
-        # Получаем плановые значения
-        plan_orders = common_stat.plan_vector.get("orders", 0)
-        plan_cpo = common_stat.plan_vector.get("cpo", 0)
-
-        for adv_setting in adv_settings:
-            # Фактические значения для данной рекламной кампании
-            fact_orders = common_stat.mean_orders_for_3_days
-            fact_cpo = common_stat.mean_price_for_order
-            
-            # Если fact_orders равен None, устанавливаем расстояние 1.0 и переходим к следующей кампании
-            if fact_orders is None:
-                adv_setting.diff_to_plan = 1.0
-                continue
-                
-            # Если нет данных о заказах, максимальное отклонение
-            if plan_orders == 0:
-                adv_setting.diff_to_plan = 2.0
-                continue
-                
-            # Рассчитываем отклонение заказов
-            orders_diff = 0
-            if fact_orders < plan_orders:
-                # Если заказов меньше плана, считаем отклонение
-                orders_diff = (plan_orders - fact_orders) / plan_orders
-                
-            # Если отклонение заказов большое (больше 50%), устанавливаем высокий приоритет
-            if orders_diff > 0.5:
-                adv_setting.diff_to_plan = 1.5
-                continue
-                
-            # Если fact_cpo равен None, устанавливаем расстояние 1.0 и переходим к следующей кампании
-            if fact_cpo is None:
-                adv_setting.diff_to_plan = 1.0
-                continue
-                
-            # Если заказов достаточно (отклонение меньше 50%), проверяем себестоимость
-            if plan_cpo == 0:
-                adv_setting.diff_to_plan = 1.0
-                continue
-                
-            # Нормализуем отклонение себестоимости
-            cpo_diff = (fact_cpo - plan_cpo) / plan_cpo if fact_cpo > plan_cpo else 0
-            
-            # Устанавливаем нормализованное отклонение (0 - идеально, 1 - максимальное отклонение)
-            adv_setting.diff_to_plan = min(1.0, max(orders_diff, cpo_diff))
-
-        return adv_settings 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
-                        BIGINT, Boolean, Float, DateTime, text)
+                        BIGINT, Boolean, Float, DateTime, text, Date)
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 import jwt
@@ -535,3 +535,4 @@ class WBItemPosition:
             position.adv_type = None
 
         return position
+
