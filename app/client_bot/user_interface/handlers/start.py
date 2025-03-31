@@ -13,6 +13,7 @@ from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken,
 from sqlalchemy.future import select
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.session_maker import get_async_session_maker
 from .shop_choice_message import ShopChoice
 from .start_registration_func import start_registration
@@ -303,7 +304,7 @@ async def shop_menu_process(
     await state.update_data(last_wb_user_cabinet_original_id=callback_data.wb_user_cabinet_original_id)
     logger.debug('Текущее состояние: %s', await state.get_data())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    await messages.ShopMenu(bot,
+    await ShopMenu(bot,
                             callback.message.chat.id,
                             state,
                             wb_user_cabinet_original_id,

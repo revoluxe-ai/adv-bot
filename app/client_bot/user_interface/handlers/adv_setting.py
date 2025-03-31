@@ -12,6 +12,8 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
+from app.modules.shop_menu.message import ShopMenu
+from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.pricer.pricer import Pricer
 from .. import states
@@ -179,7 +181,7 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
             sum_balance = balance + bonus
             if not sum_balance >= PRICE_FOR_ADV_FOR_DAY:
                 await bot.send_message(callback.message.chat.id, 'Недостаточно средств')
-                await messages.ShopMenu(bot,
+                await ShopMenu(bot,
                                         callback.message.chat.id,
                                         state,
                                         wb_user_cabinet_original_id)()
@@ -215,7 +217,7 @@ async def turn_adv_off_all(callback: types.CallbackQuery, state: FSMContext,
             adv.bot_active = False
         await session.commit()
     chat_id = callback.message.chat.id
-    await messages.ShopMenu(bot,
+    await ShopMenu(bot,
                             chat_id,
                             state,
                             wb_user_cabinet_original_id)()
