@@ -2,10 +2,9 @@
 Сервис для управления бонусами кабинетов.
 Позволяет администраторам пополнять, убирать и обнулять бонусы кабинетов по shop_id.
 """
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select, Result
 from app.utils.db.session_maker import get_async_session_maker as sm
+from sqlalchemy.orm import selectinload
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBBonusPayment
 
 
@@ -24,7 +23,7 @@ async def get_cabinet_by_id(cabinet_id: int) -> WBCabinet:
             selectinload(WBCabinet.bonus_payments),
             selectinload(WBCabinet.balance_payments)
         )
-        result = await session.execute(stmt)
+        result: Result[WBCabinet] = await session.execute(stmt)
         return result.scalar_one_or_none()
 
 
@@ -43,9 +42,10 @@ async def add_bonus(wb_cabinet_original_id: int, amount: float, admin_user_id: i
     """
     if amount <= 0:
         raise ValueError("Сумма должна быть положительным числом")
-        
+
     async with sm(read_only=False) as session:
-        async with session.begin():
+        try:
+            await session.begin()
             cabinet = await session.get(WBCabinet, wb_cabinet_original_id)
             if not cabinet:
                 return False
@@ -59,46 +59,45 @@ async def add_bonus(wb_cabinet_original_id: int, amount: float, admin_user_id: i
                 description=description or f"Пополнение бонусов администратором ID:{admin_user_id}"
             )
             session.add(bonus_payment)
+            await session.commit()
             return True
+        except Exception:
+            await session.rollback()
+            raise
 
 
 async def subtract_bonus(cabinet_id: int, amount: float, admin_user_id: int, description: str | None = None) -> bool:
     """
     Снять бонусы с кабинета по ID
-    
+
     Args:
         cabinet_id: ID кабинета
         amount: Сумма бонусов для снятия (положительное число)
         admin_user_id: ID администратора, выполняющего операцию
         description: Описание операции
-        
+
     Returns:
         bool: True если операция успешна, False если кабинет не найден или недостаточно бонусов
     """
     if amount <= 0:
         raise ValueError("Сумма должна быть положительным числом")
-        
+    wb_cabinet = await get_cabinet_by_id(cabinet_id)
     async with sm(read_only=False) as session:
-        async with session.begin():
-            cabinet = await get_cabinet_by_id(cabinet_id)
-            if not cabinet:
-                return False
-            
-            # Проверяем расчетный баланс бонусов
-            calculated_bonus = cabinet.calculated_bonus
-            if calculated_bonus < amount:
-                raise ValueError("Недостаточно бонусов")
-                
-            # Создаем запись о снятии бонусов
-            bonus_payment = WBBonusPayment(
-                wb_cabinet_id=cabinet.id,
-                amount=-amount,  # Отрицательная сумма для снятия
-                operation_type="subtract",
-                admin_user_id=admin_user_id,
-                description=description or f"Снятие бонусов администратором ID:{admin_user_id}"
-            )
-            session.add(bonus_payment)
-            return True
+        await session.begin()
+        calculated_bonus = wb_cabinet.calculated_bonus
+        if calculated_bonus < amount:
+            raise ValueError("Недостаточно бонусов")
+        # Создаем запись о снятии бонусов
+        bonus_payment = WBBonusPayment(
+            wb_cabinet_id=wb_cabinet.id,
+            amount=-amount,  # Отрицательная сумма для снятия
+            operation_type="subtract",
+            admin_user_id=admin_user_id,
+            description=description or f"Снятие бонусов администратором ID:{admin_user_id}"
+        )
+        session.add(bonus_payment)
+        await session.commit()
+        return True
 
 
 async def reset_bonus(cabinet_id: int, admin_user_id: int, description: str) -> bool:
@@ -113,12 +112,12 @@ async def reset_bonus(cabinet_id: int, admin_user_id: int, description: str) -> 
     Returns:
         bool: True если операция успешна, False если кабинет не найден
     """
+    cabinet = await get_cabinet_by_id(cabinet_id)
     async with sm(read_only=False) as session:
-        async with session.begin():
-            cabinet = await get_cabinet_by_id(cabinet_id)
+        try:
+            await session.begin()
             if not cabinet:
                 return False
-                
             # Проверяем расчетный баланс бонусов
             calculated_bonus = cabinet.calculated_bonus
             if calculated_bonus <= 0:
@@ -133,7 +132,11 @@ async def reset_bonus(cabinet_id: int, admin_user_id: int, description: str) -> 
                 description=description or f"Обнуление бонусов администратором ID:{admin_user_id}"
             )
             session.add(bonus_payment)
+            await session.commit()
             return True
+        except Exception:
+            await session.rollback()
+            raise
 
 
 async def get_wb_cabinet_by_shop_id(shop_id: str) -> WBCabinet:
@@ -146,9 +149,8 @@ async def get_wb_cabinet_by_shop_id(shop_id: str) -> WBCabinet:
     Returns:
         WBCabinet: Объект кабинета с балансом и бонусами или None, если не найден
     """
+
     async with sm() as session:
-        # Используем selectinload для предварительной загрузки bonus_payments,
-        # чтобы избежать ошибки DetachedInstanceError
         stmt = select(WBCabinet)\
             .where(WBCabinet.shop_id == shop_id).options(
             selectinload(WBCabinet.bonus_payments),

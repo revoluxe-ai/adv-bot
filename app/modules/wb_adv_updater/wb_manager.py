@@ -139,9 +139,15 @@ async def process_payment_for_parsing():
 async def process_payment_for_advs():
     current_date = datetime.datetime.now().date()
     async with sm(read_only=False) as session:
-        stmt = select(AdvSetting).options(
+        stmt = select(AdvSetting)\
+            .join(AdvSetting.wb_cabinet)\
+            .outerjoin(WBCabinet.balance_payments)\
+            .outerjoin(WBCabinet.bonus_payments)\
+            .options(
             joinedload(AdvSetting.payments),
-            selectinload(AdvSetting.wb_cabinet)
+            selectinload(AdvSetting.wb_cabinet)\
+            .selectinload(WBCabinet.bonus_payments),
+            selectinload(WBCabinet.balance_payments)
         ).filter(
             and_(
                 AdvSetting.bot_active == True,
@@ -159,10 +165,8 @@ async def process_payment_for_advs():
             shop_id = wb_cabinet.shop_id
             PRICE_FOR_SHOP_FOR_DAY = await pricer.get_price_for_day_for_shop(shop_id)
             PRICE_FOR_ADV_FOR_DAY = PRICE_FOR_SHOP_FOR_DAY / len(adv_settings)
-            if not (bonus := wb_cabinet.bonus):
-                bonus = 0
-            if not (balance := wb_cabinet.balance):
-                balance = 0
+            balance = wb_cabinet.calculated_balance
+            bonus = wb_cabinet.bonus_payments
             if bonus >= PRICE_FOR_ADV_FOR_DAY:
                 payment = AdvPayment(date=current_date)
                 adv_setting.payments.append(payment)

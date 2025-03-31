@@ -239,6 +239,9 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
                                      page: int,
                                      on_page: int,
                                      keyword_filter):
+    active_part_advs = list(filter(lambda adv: adv.bot_active is True, adv_settings))
+    not_active_part_advs = list(filter(lambda adv: adv.bot_active is not True, adv_settings))
+    adv_settings = active_part_advs + not_active_part_advs
     assert page > 0
     keyboard_buttons = []
     start_index = (page - 1) * on_page
@@ -259,6 +262,7 @@ def get_advs_keyboard_with_paginator(wb_user_cabinet_original_id: int,
                                       wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack()
         keyboard_buttons.append([InlineKeyboardButton(text=button_text,
                                                       callback_data=callback_data)])
+
 
     # Добавляем кнопки навигации
     if page > 1:
@@ -369,10 +373,10 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         ctr = keyword.ctr
         if keyword.reason == 'max_position':
             message_status = "БС-" if keyword.hard_status == 2 else ""
-            message_status = message_status + 'ЦП'
+            message_status += 'ЦП'
         elif keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
             message_status = "БС-" if keyword.hard_status == 2 else ""
-            message_status = message_status + 'МП'
+            message_status += 'МП'
         elif keyword.hard_status == BLACK_LIST:
             message_status = 'НРФ'
         elif keyword.reason == 'max_cpc':
@@ -390,7 +394,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
         cluster_name = keyword.cluster_name
         text = "🌟" if keyword.best_keyword_status else ""
         text += f"""{clicks}/{views}/{round(ctr *100,2)}%"""
-        text = text + '|'
+        text += '|'
         if keyword.cpm:
             first_position = keyword.base_position
             second_position = keyword.promo_position

@@ -57,25 +57,6 @@ logger = logging.getLogger(__name__)
 
 _sm = get_async_session_maker
 
-class MainMenu(TextWithKeyboard):
-
-    def __init__(self, bot: Bot, chat_id: int, user_original_id: int):
-        super().__init__(bot, chat_id)
-        self.__user_original_id = user_original_id
-
-
-    @property
-    def text(self):
-        return texts.get_main_menu_text(self.__user_original_id)
-
-
-
-
-
-
-
-
-
 
 class ShopNameGet(Text):
     def __init__(self, bot: Bot, chat_id: int):
@@ -155,7 +136,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             for adv in adv_settings:
                 name = adv.name
                 nmids = adv.nmids
-                nmids = [str(nmid) for nmid in nmids]
+                nmids = [str(nmid) for nmid in list(nmids)]
                 nmids = ' '.join(nmids)
                 name = name + ' ' + nmids
                 name = name.lower()
@@ -173,7 +154,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                 '✅ - кампания проверялась в течение последних 24 часов\n'
                 '❓ - кампания не проверялась в течение последних 24 часов\n'
                 '⚡ - отклонение от плана (0-1: в норме, >1: требует внимания)\n'
-                '\n📊 Активные кампании отображаются первыми, отсортированные по отклонению от плана\n'
+                '\n📊 Активные кампании отображаются первыми\n'
                 '🔄 Неактивные кампании отображаются после активных')
 
     @property
@@ -851,77 +832,229 @@ class ShopMenu(TextWithKeyboard):
             return True
         else:
             return False
-
-     async def __call__(self):
-        wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
-        await self._state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+            
+     async def _load_wb_cabinet_data(self):
+        """Загрузка данных о кабинете пользователя из БД"""
+        logger.debug(f"Загрузка данных кабинета WB (ID: {self._wb_user_cabinet_original_id})")
         async with _sm(read_only=True) as session:
-            stmt = select(WBUserCabinet)\
-                .options(selectinload(WBUserCabinet.wb_cabinet),
-                         selectinload(WBUserCabinet.user)\
-                         .selectinload(User.wb_tokens)).where(
-                WBUserCabinet.id == self._wb_user_cabinet_original_id)
+            stmt = (
+                select(WBUserCabinet)
+                .join(WBUserCabinet.wb_cabinet)  # переходим от WBUserCabinet к WBCabinet
+                .outerjoin(WBCabinet.bonus_payments)  # присоединяем bonus_payments напрямую из WBCabinet
+                .outerjoin(WBCabinet.balance_payments)  # присоединяем balance_payments напрямую из WBCabinet
+                .options(
+                    selectinload(WBUserCabinet.wb_cabinet)
+                    .selectinload(WBCabinet.bonus_payments),
+                    selectinload(WBUserCabinet.wb_cabinet)
+                    .selectinload(WBCabinet.balance_payments),
+                    selectinload(WBUserCabinet.user)
+                    .selectinload(User.wb_tokens)
+                )
+                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id)
+            )
             result = await session.execute(stmt)
             self._wb_user_cabinet: WBUserCabinet = result.scalar_one()
             self._wb_cabinet: WBCabinet = self._wb_user_cabinet.wb_cabinet
+            logger.debug(f"Кабинет WB успешно загружен (shop_id: {self._wb_cabinet.shop_id})")
+            
+     async def _calculate_cabinet_metrics(self):
+        """Расчет метрик кабинета (даты, баланс и т.д.)"""
+        logger.debug("Расчет метрик кабинета")
         self._now = datetime.now()
         self._expiration_time: datetime = self._wb_cabinet.expiration_time
         self._expiration_time_str = self._expiration_time.strftime('%d-%m-%Y-%H:%M')
         self.days_left = (self._expiration_time - self._now).days + 1
         self.bonus_days = self.days_left * 2
+        
+        # Сохраняем данные в состояние
         await self._state.update_data(
             last_wb_user_cabinet_original_id=self._wb_user_cabinet.id,
             last_wb_cabinet_original_id=self._wb_cabinet.id
         )
+        
+        # Загружаем сопутствующую информацию
         self.is_active_adv = await self._is_active_adv()
-        if not (balance := self._wb_cabinet.balance):
-            balance = 0
-        if not (bonus := self._wb_cabinet.bonus):
-            bonus = 0
         self._balance = self._wb_cabinet.calculated_balance
         self._bonus = self._wb_cabinet.calculated_bonus
+        logger.debug(f"Метрики рассчитаны: баланс={self._balance}, бонус={self._bonus}")
+            
+     async def _calculate_adv_metrics(self):
+        """Расчет метрик рекламных кампаний"""
+        logger.debug("Расчет метрик рекламных кампаний")
         self.total_amount_for_day = 0
         self.price_for_month_for_shop = 0
+        
         async with _sm(read_only=True) as session:
             stmt = select(func.count(AdvSetting.id))\
                 .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
                        AdvSetting.bot_active == True)
             result = await session.execute(stmt)
             count_active_advs = result.scalar()
+            
             if count_active_advs:
                 shop_id = self._wb_cabinet.shop_id
                 self.price_for_month_for_shop = await self._pricer.get_month_tariff_for_count_advs(shop_id)
                 self.total_amount_for_day = await self._pricer.get_price_for_day_for_shop(shop_id)
+                logger.debug(f"Рассчитаны метрики для {count_active_advs} активных РК. Цена за день: {self.total_amount_for_day}")
 
         self.count_active_advs = count_active_advs
+            
+     async def _process_tokens(self):
+        """Обработка токенов для магазина"""
+        # Получаем пользователя до обработки токенов для корректной проверки админа
         user: User = self._wb_user_cabinet.user
-        stmt = select(WBToken)
-        async with _sm(read_only=True) as session:
-            result = await session.execute(stmt)
-            tokens: list[WBToken] = result.scalars().all()
-        wb_cabinet: WBCabinet = self._wb_cabinet
-        work_tokens = []
-        for token in tokens:
-            try:
-                if token.shop_id == wb_cabinet.shop_id:
-                    work_tokens.append(token)
-            except NotValidTokenError:
-                logger.debug(f'Токен {token} не валиден')
-                continue
+        shop_id = self._wb_cabinet.shop_id
+        logger.debug(f"Обработка токенов для пользователя {user.user_telegram_id}, магазин {shop_id}")
+        
+        # Оптимизированная загрузка токенов - фильтруем сразу на уровне SQL
+        try:
+            token_start_time = datetime.now()
+            async with _sm(read_only=True) as session:
+                # Сразу фильтруем токены для конкретного магазина
+                stmt = select(WBToken).where(WBToken.shop_id == shop_id)
+                result = await session.execute(stmt)
+                work_tokens: list[WBToken] = result.scalars().all()
+                logger.debug(f"Найдено токенов для магазина {shop_id}: {len(work_tokens)} (запрос выполнен за {(datetime.now() - token_start_time).total_seconds():.2f} сек)")
+        except Exception as e:
+            logger.error(f"Ошибка при загрузке токенов из БД: {e}", exc_info=True)
+            work_tokens = []
 
+        # Проверка наличия токенов
+        if not work_tokens:
+            logger.warning(f"Токены не найдены для магазина {shop_id}")
+            # Для админов делаем исключение
+            if user.user_telegram_id in const.ADMINS:
+                logger.debug(f"Админ {user.user_telegram_id} получает временный токен")
+                expiration_time = datetime.now() + timedelta(days=30)
+                self.expiration_time = expiration_time
+                self.last_days_for_token = 30
+                return True
+            else:
+                await self.bot.send_message(
+                    self.chat_id,
+                    'Не найдены токены для этого магазина. Пожалуйста, добавьте новый токен.'
+                )
+                return False
+            
+        # Сортировка токенов по сроку действия
+        sort_start_time = datetime.now()
         shops_tokens = work_tokens
-        shops_tokens.sort(key=lambda token:  token.expires, reverse=True)
+        shops_tokens.sort(key=lambda token: token.expires, reverse=True)
+        logger.debug(f"Сортировка токенов выполнена за {(datetime.now() - sort_start_time).total_seconds():.2f} сек")
+
+        # Определение срока действия
         if user.user_telegram_id in const.ADMINS:
-            expiration_time = datetime.now() +timedelta(days=30)
+            expiration_time = datetime.now() + timedelta(days=30)
+            logger.debug("Пользователь - админ, установлен временный срок действия токена")
         else:
-            expiration_time = shops_tokens[0].expires
-        if expiration_time < datetime.now() and user.user_telegram_id in const.ADMINS:
-            await self.bot.send_message(self.chat_id, 'Срок действия токена истек. Пожалуйста, обновите токен.\n'
-                                                'Для этого добавьте магазин под другим именем с новым токеном')
-            return
-        self.expiration_time = expiration_time
-        self.last_days_for_token = (expiration_time - datetime.now()).days
+            try:
+                expiration_time = shops_tokens[0].expires
+                logger.debug(f"Установлен срок действия токена: {expiration_time}")
+            except IndexError:
+                await self.bot.send_message(
+                    self.chat_id,
+                    'Не найдены действительные токены для этого магазина. Пожалуйста, добавьте новый токен.'
+                )
+                return False
+
+        # Проверка на истечение срока действия
+        if expiration_time < datetime.now() and user.user_telegram_id not in const.ADMINS:
+            await self.bot.send_message(
+                self.chat_id,
+                'Срок действия токена истек. Пожалуйста, обновите токен.\nДля этого добавьте магазин под другим именем с новым токеном'
+            )
+            return False
+
+        # Сохранение срока действия для дальнейшего использования
+        if user.user_telegram_id in const.ADMINS:
+            # Для админов устанавливаем временное значение
+            self.expiration_time = datetime.now() + timedelta(days=30)
+            self.last_days_for_token = 30
+        else:
+            self.expiration_time = expiration_time
+            self.last_days_for_token = (expiration_time - datetime.now()).days
+            
+        logger.debug(f"Обработка токенов успешно завершена, установлен срок действия {self.last_days_for_token} дней")
+        return True
+
+     async def __call__(self):
+        """Основной метод для отображения меню магазина"""
+        start_time = datetime.now()
+        logger.debug(f"Вызов ShopMenu для кабинета {self._wb_user_cabinet_original_id}")
+        
+        # Сохраняем ID выбранного кабинета в состояние
+        wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
+        await self._state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+        
+        # 1. Загрузка данных о кабинете
+        try:
+            load_start_time = datetime.now()
+            logger.debug("Начинаю загрузку данных кабинета")
+            await self._load_wb_cabinet_data()
+            logger.debug(f"Данные кабинета загружены за {(datetime.now() - load_start_time).total_seconds():.2f} сек")
+        except Exception as e:
+            logger.error(f"Ошибка при загрузке данных кабинета: {e}", exc_info=True)
+            await self.bot.send_message(
+                self.chat_id,
+                'Произошла ошибка при загрузке данных кабинета. Пожалуйста, попробуйте позже.'
+            )
+            raise  # Пробрасываем исключение дальше
+            
+        # 2. Расчет основных метрик кабинета
+        try:
+            metrics_start_time = datetime.now()
+            logger.debug("Начинаю расчет метрик кабинета")
+            await self._calculate_cabinet_metrics()
+            logger.debug(f"Метрики кабинета рассчитаны за {(datetime.now() - metrics_start_time).total_seconds():.2f} сек")
+        except Exception as e:
+            logger.error(f"Ошибка при расчете метрик кабинета: {e}", exc_info=True)
+            await self.bot.send_message(
+                self.chat_id,
+                'Произошла ошибка при расчете метрик кабинета. Пожалуйста, попробуйте позже.'
+            )
+            raise  # Пробрасываем исключение дальше
+            
+        # 3. Расчет метрик рекламных кампаний
+        try:
+            adv_metrics_start_time = datetime.now()
+            logger.debug("Начинаю расчет метрик рекламных кампаний")
+            await self._calculate_adv_metrics()
+            logger.debug(f"Метрики рекламных кампаний рассчитаны за {(datetime.now() - adv_metrics_start_time).total_seconds():.2f} сек")
+        except Exception as e:
+            logger.error(f"Ошибка при расчете метрик рекламных кампаний: {e}", exc_info=True)
+            await self.bot.send_message(
+                self.chat_id,
+                'Произошла ошибка при расчете метрик рекламных кампаний. Пожалуйста, попробуйте позже.'
+            )
+            raise  # Пробрасываем исключение дальше
+            
+        # 4. Обработка токенов и проверка их валидности
+        # try:
+        #     tokens_start_time = datetime.now()
+        #     logger.debug("Начинаю обработку токенов")
+        #     tokens_valid = await self._process_tokens()
+        #     logger.debug(f"Токены обработаны за {(datetime.now() - tokens_start_time).total_seconds():.2f} сек")
+        #     if not tokens_valid:
+        #         logger.debug("Токены невалидны, выход из метода")
+        #         return  # Если токены невалидны, выходим - сообщение уже отправлено в _process_tokens
+        # except Exception as e:
+        #     logger.error(f"Ошибка при обработке токенов: {e}", exc_info=True)
+        #     await self.bot.send_message(
+        #         self.chat_id,
+        #         'Произошла ошибка при обработке токенов. Пожалуйста, попробуйте позже.'
+        #     )
+        #     raise  # Пробрасываем исключение дальше
+            
+        # 5. Отображение меню магазина
+        display_start_time = datetime.now()
+        logger.debug("Начинаю отображение меню магазина (вызов родительского метода __call__)")
+
+        # Вызываем родительский метод __call__, который отвечает за отправку сообщения
         await super().__call__()
+
+        logger.debug(f"Меню магазина отображено за {(datetime.now() - display_start_time).total_seconds():.2f} сек")
+        total_time = (datetime.now() - start_time).total_seconds()
+        logger.debug(f"Общее время выполнения метода ShopMenu.__call__: {total_time:.2f} сек")
 
 
      @property
@@ -937,12 +1070,9 @@ class ShopMenu(TextWithKeyboard):
             last_for_days = '∞'
         text = (
             f'📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n'
-            f"""Ваш тариф за РК в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else 'Нет активных РК'}"""
+            f"""Ваш тариф в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else 'Нет активных РК'}"""
             f'(больше РК -> ниже цена, тарифы -> https://telegra.ph/Tarify-03-17)\n'
             f'💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n'
-            f'⏳ <b>Срок действия токена</b>: {self.expiration_time}\n'
-            f'<b>Истечет через</b> {get_day_suffix(self.last_days_for_token)}\n'
-
         )
 
         if isinstance(last_for_days, int):
@@ -986,9 +1116,7 @@ class ShopMenu(TextWithKeyboard):
         is_active_adv = self.is_active_adv
         wb_cabinet_original_id = wb_cabinet.id
         is_active_adv: True
-        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
         builder = InlineKeyboardBuilder()
-
         button = InlineKeyboardButton(
         text = 'Автоматические рекламные кампании',
         callback_data = callbacks.ChoiceAdvPaginator(
@@ -1266,11 +1394,6 @@ class SettingMinViewsForPredictCTR(TextWithKeyboard):
             return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
 
 
-class NotItemsInAdvSetting(TextWithKeyboard):
-    text = "Не смогли получить информацию о товарах в кампании через API. Вы можете указать артикул товара (цифровой артикул WB) в названии РК в кабинете Wildberries, либо ввести артикул прямо сейчас:"
-
-    # keyword = keyboards.get_return_to_adv_setting_keyboard()
-
 class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
 
     def __init__(self, bot: Bot, chat_id, adv: AdvSetting):
@@ -1396,53 +1519,6 @@ class NotEnoughMoneyForParsing(TextWithKeyboard):
 
 
 
-class SubscribeOnMyNewChannel(Text):
-    text = ("""
-**Привет!** Я создатель этого бота. Меня часто спрашивают: могу ли я автоматизировать те или иные вещи для Wildberries или Ozon?
-Отвечаю: _95% задач вы можете автоматизировать сами,_ используя ChatGPT, даже если вы полный ноль в программировании.
-Для этого я открыл специальный канал, на котором расскажу как создавать крутые программы,
-с помощью нейросетей за один день с самого нуля - [перейти на канал](https://t.me/selfscript)""" )
-
-    parse_mode = ParseMode.MARKDOWN
-
-
-class StatTelegramTranslation(Text):
-    text = ('Привет! На связи разработчик данного бота, и когда я помогаю пользователям его настроить, '
-            'то мне часто задают вопросы, напрямую к нему не относящиеся: как успешно продвигать товары, '
-            'какую выбрать стратегию, как минимизировать расходы, повысить прибыль и т.д. \n Я не считаю себя '
-            'супер-экспертом по маркетплейсам, но и свой бизнес запустить и раскрутить как-то смог. '
-            'Поэтому сегодня в 15:00 по Москве я проведу трансляцию на канале поддержки бота @auto_wb_master, на '
-            'которой поделюсь своим опытом и отвечу на самые частые вопросы. \n\n'
-            'Сразу скажу, что я сторонник математического подхода к бизнесу, когда мы все считаем и проверяем заранее,'
-            'а не делаем что-то наугад. Если вы разделяете такой подход, то прошу присоединиться к трансляции - @auto_wb_master_bot \n\n'
-            'Все, до встречи на трансляции и удачи в вашем бизнесе!')
-
-
-class WrongLinkMessage(Text):
-    text = ('Пардон, ошибся во второй ссылке на канал, вот правильная: @auto_wb_master')
-
-
-class TranslatinSoon(Text):
-    text = ('Напоминаю: через 15 минут начнется трансляция на канале поддержки бота @auto_wb_master. ')
-
-
-class Tranlation_15_00(Text):
-
-    text = ('Ура! Починили возможность  добавления новых кампаний в бота  - /start \n\n'
-            'Поэтому сегодня в 15:00 по Москве я проведу трансляцию на канале поддержки бота @auto_wb_master, на '
-            'которой расскажу подробнее о том, как наш бот работает и как с его помощью экономить 70-80 % '
-            'от рекламного бюджета при тех же результатах. Трансляция пройдет на канале поддержки бота @auto_wb_master\n'
-            'До встречи!')
-
-
-class Tranlation_14_45(Text):
-
-    text = ('Решил напомнить: через 15 минут в трансляции на канале @auto_wb_master я расскажу о том, '
-            'как наш бот работает и как с его помощью экономить 70-80 % от рекламного бюджета при тех же результатах.'
-            ' Трансляция пройдет на канале поддержки бота @auto_wb_master\n'
-            'Жду Вас!')
-
-
 class BotPriceMessage(Text):
     text = ("""Приветствую, на связи разработчик данного бота.\n
 Продвижение на маркетплейсах - это сложный процесс, и у каждого селлера возникают с этим проблемы в той или иной степени.
@@ -1486,31 +1562,6 @@ class CallMe2(Text):
 Когда я разрабатывал бота, то думал именно в контексте того, как бот должен влиять именно на прибыль. И то, что самый частый отзыв о боте заключается в экономии денег на рекламу и личного времени - так это так изначально и задумывалось.
 Дело в том, что я вдоволь насмотрелся на бизнесы, которые делают заоблачные обороты, но если заглянуть в их бухгалтерию, то там дырка от бублика.
     """
-
-class CallWithManager(TextWithKeyboard):
-
-
-    text = ("""Мы с программистами провели исследование и вот что выяснилось:
-
-1. Те, кто смогли подключиться к боту и самостоятельно в нем разобраться, 
-повысили эффективность своих кампаний на 70 % по сравнению с кампаниями, которые к боту не подключены.\n
-2. Тех, кого мы консультировали лично по работе с ботом, помогли в нем разобраться и объяснили на примере их товаров как использовать его максимально эффективно, увеличили эффективность
-кампаний в пересчете на продажи в среднем в 2 раза.\n
-\n
-Как разработчик данного бота скажу, что потенциал увеличения продаж с помощью бота x4 - x5,
-поэтому если у вас пока нет такого роста, значит вы все еще что-то делаете не так или не до
-конца понимаете как работает бот и как работает Wildberries с его системой продвижения в топ.
-Поэтому предлагаю следующую схему: свяжитесь со мной по кнопке ниже, 
-мы с вами созвонимся в телеграмме, и я лично помогу вам настроить правильно 
-бота и запустить эффективный процесс продвижения. \n
-Вы получите сразу эффект: экономия бюджета на рекламу в 3-5 раз 
-+ поймете как можно экономить несколько часов времени в день, которые обычно нужно тратить на настройку эффективной рекламы.\n\n
-
-Не ждите когда у Wildberries все снова поменяются, используйте эффективный инструмент, пока он работает и дает результат! \n\n
-
-
-
-""")
 
 
 class Single_message0(TextWithKeyboard):

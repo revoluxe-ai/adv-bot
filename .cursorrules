@@ -18,3 +18,7 @@ await arq_client.enqueue_job('task_name', user_id, shop_id)
 ```python
 await arq_client.enqueue_job('task_name', user_id, _defer_by=3600)
 ``` 
+
+### Навигация к списку магазинов
+- Детальное описание механизма перехода к списку магазинов находится в файле `cursor-rules/modules/shop-list-navigation.mdc`
+- Используй эту информацию при разработке новых функций или исправлении ошибок, связанных с навигацией между магазинами 

@@ -5,7 +5,7 @@ import traceback
 from asyncio import Semaphore
 from contextlib import asynccontextmanager
 from time import time
-from typing import Any
+from typing import Any, overload, AsyncGenerator
 from sqlalchemy import Result
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -149,7 +149,8 @@ read_write_session_maker = sessionmaker(
 
 
 @asynccontextmanager
-async def get_async_session_maker(semaphore:Semaphore | None=None, read_only=False) -> AsyncSession:
+async def get_async_session_maker(semaphore: Semaphore | None = None,
+                                  read_only=False) -> AsyncGenerator[AsyncSession, None]:
     session_start = time()
     current_task = asyncio.current_task()
 

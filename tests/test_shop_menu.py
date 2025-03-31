@@ -117,7 +117,7 @@ async def test_shop_menu_call(test_async_db):
         result = await shop_menu()
         assert "Магазин" in shop_menu.text
         assert "Test Cabinet" in shop_menu.text
-        assert "1000.0" in shop_menu.text
+        assert "1000 рублей" in shop_menu.text
 
 @pytest.mark.asyncio
 async def test_shop_menu_with_active_advs(test_async_db):
@@ -168,7 +168,7 @@ async def test_shop_menu_with_active_advs(test_async_db):
 
         result = await shop_menu()
         assert "Test Cabinet" in shop_menu.text
-        assert "1000.0" in shop_menu.text
+        assert "1000 рублей" in shop_menu.text
         assert "1" in shop_menu.text  # Проверяем количество активных кампаний
 
 @pytest.mark.asyncio
@@ -250,7 +250,7 @@ async def test_get_adv_menu(mock_bot, mock_state, mock_chat_id, test_async_db):
 
         result = await shop_menu()
         assert "Test Cabinet" in shop_menu.text
-        assert "1000.0" in shop_menu.text
+        assert "1000 рублей" in shop_menu.text
 
 @pytest.mark.asyncio
 async def test_get_adv_menu_no_advs(mock_bot, mock_state, mock_chat_id, test_async_db):
@@ -289,12 +289,15 @@ async def test_get_adv_menu_no_advs(mock_bot, mock_state, mock_chat_id, test_asy
 
 @pytest.mark.asyncio
 async def test_get_adv_menu_with_error(mock_bot, mock_state, mock_chat_id):
-    mock_state.get_data = AsyncMock(side_effect=Exception("Test error"))
     shop_menu = ShopMenu(
         bot=mock_bot,
         chat_id=mock_chat_id,
         state=mock_state,
         wb_user_cabinet_original_id=1
     )
+    
+    # Переопределяем метод _load_wb_cabinet_data чтобы он вызывал исключение
+    shop_menu._load_wb_cabinet_data = AsyncMock(side_effect=Exception("Test error"))
+    
     with pytest.raises(Exception):
         result = await shop_menu()

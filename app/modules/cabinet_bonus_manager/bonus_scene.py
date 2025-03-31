@@ -191,7 +191,7 @@ class BonusScene(Scene, state="bonus_scene"):
             await state.update_data(action="description")
             await message.answer(
                 f"🏪 Магазин: {shop_id}\n"
-                f"💰 Текущий баланс: {current_balance} руб.\n"
+                f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
                 f"🎁 Текущие бонусы: {current_bonus} руб.\n\n"
                 f'Указанная сумма: {amount:.0f} руб.\n'
                 f"Введите комментарий для операции:"
@@ -228,8 +228,8 @@ class BonusScene(Scene, state="bonus_scene"):
                 operation_name = OPERATIONS.get(operation, "операция")
                 confirm_message = (
                     f"🏪 Магазин: {shop_id}\n"
-                    f"💰 Текущий баланс: {current_balance} руб.\n"
-                    f"🎁 Текущие бонусы: {current_bonus} руб.\n\n"
+                    f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
+                    f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
                     f"Операция: {operation_name.upper()} бонусов\n"
                     f"Сумма: {amount} руб.\n"
                     f"Описание: {description or 'Не указано'}\n\n"
@@ -306,8 +306,8 @@ class BonusScene(Scene, state="bonus_scene"):
             await state.update_data(action="description")
             await callback.message.edit_text(
                 f"🏪 Магазин: {shop_id}\n"
-                f"💰 Текущий баланс: {current_balance} руб.\n"
-                f"🎁 Текущие бонусы: {current_bonus} руб.\n\n"
+                f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
+                f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
                 f"Введите описание операции обнуления:"
             )
         else:
@@ -379,8 +379,8 @@ class BonusScene(Scene, state="bonus_scene"):
 
                 await callback.message.edit_text(
                     f"{operation_text}\n"
-                    f"💰 Текущий баланс: {new_balance} руб.\n"
-                    f"🎁 Текущие бонусы: {new_bonus} руб.\n\n"
+                    f"💰 Текущий баланс: {new_balance:.0f} руб.\n"
+                    f"🎁 Текущие бонусы: {new_bonus:.0f} руб.\n\n"
                     f"Для продолжения работы с этим кабинетом используйте кнопки ниже:",
                     reply_markup=get_shop_bonus_keyboard(wb_cabinet_original_id)
                 )
@@ -411,8 +411,8 @@ class BonusScene(Scene, state="bonus_scene"):
 
         await callback.message.edit_text(
             f"🏪 Магазин: {shop_id}\n"
-            f"💰 Текущий баланс: {current_balance} руб.\n"
-            f"🎁 Текущие бонусы: {current_bonus} руб.\n\n"
+            f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
+            f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
             f"Операция отменена. Выберите действие:",
             reply_markup=get_shop_bonus_keyboard(wb_cabinet_original_id)
         )
