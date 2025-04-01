@@ -14,6 +14,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from sqlalchemy import select
 from app.utils.db.models import User
 import logging
+from app.core.wb_api.exceptions import ApiForbiddenError
 
 sm = get_async_session_maker
 
@@ -212,8 +213,9 @@ async def get_access_for_wb_cabinet(wb_cabinet_id_or_shop_id: typing.Union[int, 
                 continue
             if token.shop_id == shop_id:
                 catch_tokens.append(token)
-        if catch_tokens:
-            access = WBCabinetAccess(tokens = catch_tokens,
-                                     wb_user_cabinet = None,
-                                     wb_cabinet = wb_cabinet)
-            return access
+        if not catch_tokens:
+            raise ApiForbiddenError(f'Нет валидных токенов для кабинета с shop_id {shop_id}')
+        access = WBCabinetAccess(tokens = catch_tokens,
+                                wb_user_cabinet = None,
+                                wb_cabinet = wb_cabinet)
+        return access
