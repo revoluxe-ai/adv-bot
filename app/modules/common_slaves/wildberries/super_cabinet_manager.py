@@ -205,7 +205,7 @@ async def get_access_for_wb_cabinet(wb_cabinet_id_or_shop_id: typing.Union[int, 
         stmt = select(WBToken)
         result =  await session.stream(stmt)
         catch_tokens = []
-        async for token in  result.yield_per(100):
+        async for token in result.yield_per(100):
             token: WBToken = token[0]
             if not token.check_valid():
                 logger.debug(f'Не валидный токен {token.api_key}')
