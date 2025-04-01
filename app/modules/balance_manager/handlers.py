@@ -30,6 +30,7 @@ sm = get_async_session_maker
 
 router = Router()
 
+
 @router.callback_query(callbacks.AddBalance.filter())
 async def add_balance(callback: types.CallbackQuery,
                       callback_data: callbacks.AddBalance,
@@ -64,14 +65,15 @@ async def add_balance(callback: types.CallbackQuery,
         current_bonus=cabinet_bonus
     )()
 
+
 @router.message(StateFilter(states.AddBalance.awaiting_amount))
 async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot):
-    amount = message.text
+    amount: str = message.text
     min_sum = const.min_sum
     if not amount.isdigit():
         await message.answer(f"Введите сумму (число) от {min_sum} рублей")
         return
-    amount = int(amount)
+    amount: int = int(amount)
     if amount < const.MIN_SUM:
         await message.answer(f"Введите сумму (число) от {min_sum}")
         return
@@ -105,7 +107,8 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
     )
 
     user_telegram_id = message.chat.id
-    prices = [LabeledPrice(label=f'Пополнение баланса', amount=amount * 100)]
+    sum_for_adding = amount * 100
+    prices = [LabeledPrice(label=f'Пополнение баланса', amount=sum_for_adding)]
     await bot.send_invoice(
         user_telegram_id,
         title='Подписка на бота',
@@ -159,13 +162,11 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
     # Переходим к меню магазина
     async with sm() as session:
         stmt = select(WBUserCabinet.id)\
-        .join(WBUserCabinet.wb_cabinet)\
-        .where(WBCabinet.id == wb_cabinet_original_id)
+                .join(WBUserCabinet.wb_cabinet)\
+                .where(WBCabinet.id == wb_cabinet_original_id)
         wb_user_cabinet_id = await session.execute(stmt)
         wb_user_cabinet_id = wb_user_cabinet_id.scalars().first()
 
     logger.debug(f'wb_user_cabinet_id: {wb_user_cabinet_id}')
     await asyncio.sleep(1)
     await ShopMenu(bot, message.chat.id, state, wb_user_cabinet_id)()
-        
-
