@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
@@ -52,64 +52,6 @@ class CommonAdvsStatData:
     plan_vector: dict
     fact_vector: dict
     
-    def calculate_vector_distance(self) -> float:
-        """
-        Рассчитывает нормализованное расстояние между вектором плана и фактом
-        
-        Returns:
-            float: Нормализованное расстояние между векторами (чем меньше, тем лучше)
-        """
-        plan_orders = self.plan_vector.get("orders", 0)
-        fact_orders = self.fact_vector.get("orders", 0)
-        
-        # Если fact_orders равен None, сразу возвращаем расстояние 1.0
-        if fact_orders is None:
-            return 1.0
-            
-        # Если нет данных о заказах, возвращаем максимальное отклонение
-        if plan_orders == 0:
-            return 2.0
-            
-        # Рассчитываем отклонение заказов
-        orders_diff = 0
-        if fact_orders < plan_orders:
-            # Если заказов меньше плана, считаем отклонение
-            orders_diff = (plan_orders - fact_orders) / plan_orders
-            
-        # Если отклонение заказов большое (больше 50%), устанавливаем высокий приоритет
-        if orders_diff > 0.5:
-            return 1.5
-            
-        # Если заказов достаточно (отклонение меньше 50%), проверяем себестоимость
-        plan_cpo = self.plan_vector.get("cpo", 0)
-        fact_cpo = self.fact_vector.get("cpo", 0)
-        
-        # Если fact_cpo равен None, сразу возвращаем расстояние 1.0
-        if fact_cpo is None:
-            return 1.0
-            
-        if plan_cpo == 0:
-            return 1.0
-            
-        # Нормализуем отклонение себестоимости
-        cpo_diff = (fact_cpo - plan_cpo) / plan_cpo if fact_cpo > plan_cpo else 0
-        
-        # Возвращаем нормализованное отклонение (0 - идеально, 1 - максимальное отклонение)
-        return min(1.0, max(orders_diff, cpo_diff))
-    
-    def get_campaign_efficiency_score(self) -> float:
-        """
-        Возвращает оценку эффективности кампании от 0 до 100
-        чем ближе к 100, тем лучше кампания соответствует плану
-        
-        Returns:
-            float: Оценка от 0 до 100
-        """
-        distance = self.calculate_vector_distance()
-        # Преобразуем расстояние в оценку (чем меньше расстояние, тем выше оценка)
-        # Используем экспоненциальное затухание для перевода расстояния в оценку
-        score = 100 * math.exp(-2 * distance)
-        return max(0, min(100, score))  # Ограничиваем значение от 0 до 100
 
 class CommonAdvsStatDataManager:
     """Менеджер для получения данных о ключевых словах рекламной кампании"""
