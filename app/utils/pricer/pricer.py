@@ -50,6 +50,9 @@ class Pricer:
         # Если больше всех лимитов, берем максимальную цену
         return tariffs[max(tariffs)] * count_advs
 
+    def get_payment_for_adv(self, sum_payment: int, count_advs: int):
+        return sum_payment / count_advs
+
 
 
 

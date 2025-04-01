@@ -70,25 +70,6 @@ async def run_update_all_keywords_on_wb():
 
 
 
-async def update_all_data_in_db():
-    tasks = {}
-    while True:
-        try:
-            await wb_manager.update_all_data_in_db_run(tasks=tasks)
-        except Exception as exc:
-            logger.error(f'Ошибка обновления данных в базе {exc}', exc_info=True)
-        finally:
-            await asyncio.sleep(15)
-
-async def clear_data_for_expired_wb_cabinets():
-    while True:
-        try:
-            await wb_manager.clear_expired_data()
-        except Exception as e:
-            logger.error(f'Ошибка очистки данных для просроченных кабинетов {e}', exc_info=True)
-            await asyncio.sleep(0)
-
-
 async def sender_message_to_not_pay_users():
     while True:
         try:

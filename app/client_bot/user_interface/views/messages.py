@@ -9,7 +9,7 @@ from app import utils
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
-from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken)
+from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken, WBBalancePayment, WBBonusPayment, WBCabinet)
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import  common_stat_manager
@@ -57,25 +57,6 @@ logger = logging.getLogger(__name__)
 
 _sm = get_async_session_maker
 
-class MainMenu(TextWithKeyboard):
-
-    def __init__(self, bot: Bot, chat_id: int, user_original_id: int):
-        super().__init__(bot, chat_id)
-        self.__user_original_id = user_original_id
-
-
-    @property
-    def text(self):
-        return texts.get_main_menu_text(self.__user_original_id)
-
-
-
-
-
-
-
-
-
 
 class ShopNameGet(Text):
     def __init__(self, bot: Bot, chat_id: int):
@@ -109,51 +90,41 @@ class GetCardsApiError(Text):
 
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
-
-    @staticmethod
-    async def get_state_data(state: FSMContext)->(int, int):
-        data = await state.get_data()
-        last_wb_user_cabinet_original_id = data.get('last_wb_user_cabinet_original_id')
-        last_wb_user_cabinet_page = data.get('last_wb_user_cabinet_page')
-        return last_wb_user_cabinet_original_id, last_wb_user_cabinet_page
-
-
-    def __init__(self, bot: Bot,
-                  state: FSMContext,
-                  chat_id: int,
-                  wb_user_cabinet_original_id: int,
-                  page: int = 1):
+    def __init__(self,
+                 bot: Bot,
+                 chat_id: int,
+                 wb_user_cabinet_original_id: int,
+                 adv_settings: list[AdvSetting],
+                 state,
+                 page: int = 1):
+        self._state = state
         super().__init__(bot, chat_id)
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-        self._page = page
-        self._state = state
+        self._adv_settings = adv_settings
+        self._page = page  # Устанавливаем страницу из параметра
+        self._keywords_filter = None  # Инициализируем фильтр ключевых слов
 
 
+    @staticmethod
+    async def _get_wb_cabinet(wb_cabinet_original_id):
+        async with _sm() as session:
+            stmt = select(WBCabinet)\
+            .where(WBCabinet.id == wb_cabinet_original_id)
+            result = await session.execute(stmt)
+            wb_cabinet = result.scalar()
+            return wb_cabinet
 
     async def __call__(self):
         await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
-        async with _sm(read_only=True) as session:
-            stmt = select(AdvSetting) \
-                .join(AdvSetting.wb_cabinet) \
-                .join(WBCabinet.wb_user_cabinets) \
-                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id) \
-                .order_by(AdvSetting.bot_active.desc())
-            result = await session.execute(stmt)
-            adv_settings = result.scalars().all()
-        adv_settings: list[AdvSetting] = await self._filter_advs(adv_settings)
-        self._adv_settings = adv_settings
-        stmt = select(WBCabinet.id)\
-                .where(WBCabinet.wb_user_cabinets\
-                       .any(WBUserCabinet == self._wb_user_cabinet_original_id))
-        async with _sm() as session:
-            result = await session.execute(stmt)
-            wb_cabinet_original_id = result.scalar()
-        await self._state.update_data(
-            last_wb_cabinet_original_id=wb_cabinet_original_id,
-            last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
-            last_wb_user_cabinet_page=self._page
-        )
-        # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
+        # Сортируем кампании на активные и неактивные
+        active_advs = []
+        inactive_advs = []
+        for adv in self._adv_settings:
+            if adv.active_status and adv.bot_active:
+                active_advs.append(adv)
+            else:
+                inactive_advs.append(adv)
+
         await super().__call__()
 
     async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
@@ -165,7 +136,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             for adv in adv_settings:
                 name = adv.name
                 nmids = adv.nmids
-                nmids = [str(nmid) for nmid in nmids]
+                nmids = [str(nmid) for nmid in list(nmids)]
                 nmids = ' '.join(nmids)
                 name = name + ' ' + nmids
                 name = name.lower()
@@ -177,13 +148,14 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             adv_settings = clear_advs
         return adv_settings
 
-
-
     @property
     def text(self):
         return ('Выберите рекламную кампанию для настройки или проверки. \n'
                 '✅ - кампания проверялась в течение последних 24 часов\n'
-                 '❓ - кампания не проверялась в течение последних 24 часов\n')
+                '❓ - кампания не проверялась в течение последних 24 часов\n'
+                '⚡ - отклонение от плана (0-1: в норме, >1: требует внимания)\n'
+                '\n📊 Активные кампании отображаются первыми\n'
+                '🔄 Неактивные кампании отображаются после активных')
 
     @property
     def keyboard(self):
@@ -192,7 +164,6 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
                                                           self._page,
                                                           self.on_page,
                                                           self._keywords_filter)
-
 
     @property
     def on_page(self):
@@ -518,6 +489,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self.full_adv_stat_for_last_3_days_for_auction = stat_data.full_adv_stat_for_last_3_days_for_auction
         self.common_stat = stat_data.common_stat
         
+        # Получаем векторы плана и факта
+        self.plan_vector = stat_data.plan_vector
+        self.fact_vector = stat_data.fact_vector
+        
         # Дополнительные рассчеты, если нужны
         if self._all_orders_for_last_3_days is not None:
             self._sum_spend = self._spend_for_inner_adv_for_3_days
@@ -548,7 +523,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f'Заказов из Аукцион: {self.full_adv_stat_for_last_3_days_for_auction.orders}\n'
                 f"""Заказов из Органики: {self._all_orders_for_last_3_days
                     - self.full_adv_stat_for_last_3_days_for_auction.orders
-                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders}"""
+                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders if self._all_orders_for_last_3_days else 0}"""
         )
         
         if hasattr(self, '_all_orders_for_last_3_days') and self._all_orders_for_last_3_days is not None:
@@ -569,6 +544,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f'Заказов: {self._mean_orders_for_3_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
                 f'Себестоимость: {round(order_cost, 2)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
             )
+        
             
 
         text += f'\nСтавка из Авто: {self.auto_cpm} р. '
@@ -828,241 +804,6 @@ class RefProgramSelect(TextWithKeyboard):
     keyboard = keyboards.get_return_for_your_ref_links()
 
 
-class ShopMenu(TextWithKeyboard):
-     parse_mode = ParseMode.HTML
-
-     def __init__(self, bot: Bot,
-                  chat_id: int,
-                  state: FSMContext,
-                  wb_user_cabinet_original_id: int,
-                  ):
-       self._user_telegram_id = chat_id
-       self._state = state
-       self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-       self._pricer = Pricer()
-       super().__init__(bot, chat_id)
-
-
-     async def _is_active_adv(self):
-        async with _sm(read_only=True) as session:
-            stmt = select(AdvSetting)\
-                .where(
-                AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
-                AdvSetting.bot_active == True
-            )
-            result = await session.execute(stmt)
-            advs = result.scalars().all()
-        if advs:
-            return True
-        else:
-            return False
-
-     async def __call__(self):
-        wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
-        await self._state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-        async with _sm(read_only=True) as session:
-            stmt = select(WBUserCabinet)\
-                .options(selectinload(WBUserCabinet.wb_cabinet),
-                         selectinload(WBUserCabinet.user)\
-                         .selectinload(User.wb_tokens)).where(
-                WBUserCabinet.id == self._wb_user_cabinet_original_id)
-            result = await session.execute(stmt)
-            self._wb_user_cabinet: WBUserCabinet = result.scalar_one()
-            self._wb_cabinet: WBCabinet = self._wb_user_cabinet.wb_cabinet
-        self._now = datetime.now()
-        self._expiration_time: datetime = self._wb_cabinet.expiration_time
-        self._expiration_time_str = self._expiration_time.strftime('%d-%m-%Y-%H:%M')
-        self.days_left = (self._expiration_time - self._now).days + 1
-        self.bonus_days = self.days_left * 2
-        await self._state.update_data(
-            last_wb_user_cabinet_original_id=self._wb_user_cabinet.id,
-            last_wb_cabinet_original_id=self._wb_cabinet.id
-        )
-        self.is_active_adv = await self._is_active_adv()
-        if not (balance := self._wb_cabinet.balance):
-            balance = 0
-        if not (bonus := self._wb_cabinet.bonus):
-            bonus = 0
-        self._balance = balance
-        self._bonus = bonus
-        self.total_amount_for_day = 0
-        self.price_for_month_for_shop = 0
-        async with _sm(read_only=True) as session:
-            stmt = select(func.count(AdvSetting.id))\
-                .where(AdvSetting.wb_cabinet_id == self._wb_cabinet.id,
-                       AdvSetting.bot_active == True)
-            result = await session.execute(stmt)
-            count_active_advs = result.scalar()
-            if count_active_advs:
-                shop_id = self._wb_cabinet.shop_id
-                self.price_for_month_for_shop = await self._pricer.get_month_tariff_for_count_advs(shop_id)
-                self.total_amount_for_day = await self._pricer.get_price_for_day_for_shop(shop_id)
-
-        self.count_active_advs = count_active_advs
-        user: User = self._wb_user_cabinet.user
-        stmt = select(WBToken)
-        async with _sm(read_only=True) as session:
-            result = await session.execute(stmt)
-            tokens: list[WBToken] = result.scalars().all()
-        wb_cabinet: WBCabinet = self._wb_cabinet
-        work_tokens = []
-        for token in tokens:
-            try:
-                if token.shop_id == wb_cabinet.shop_id:
-                    work_tokens.append(token)
-            except NotValidTokenError:
-                logger.debug(f'Токен {token} не валиден')
-                continue
-
-        shops_tokens = work_tokens
-        shops_tokens.sort(key=lambda token:  token.expires, reverse=True)
-        if user.user_telegram_id in const.ADMINS:
-            expiration_time = datetime.now() +timedelta(days=30)
-        else:
-            expiration_time = shops_tokens[0].expires
-        if expiration_time < datetime.now() and user.user_telegram_id in const.ADMINS:
-            await self.bot.send_message(self.chat_id, 'Срок действия токена истек. Пожалуйста, обновите токен.\n'
-                                                'Для этого добавьте магазин под другим именем с новым токеном')
-            return
-        self.expiration_time = expiration_time
-        self.last_days_for_token = (expiration_time - datetime.now()).days
-        await super().__call__()
-
-
-     @property
-     def text(self):
-        balance = self._balance
-        bonus = self._bonus
-        count_active_advs = self.count_active_advs
-        total_money = balance + bonus
-        total_amount_for_day = self.total_amount_for_day
-        if self.total_amount_for_day:
-            last_for_days = int(total_money / self.total_amount_for_day)
-        else:
-            last_for_days = '∞'
-        text = (
-            f'📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n'
-            f"""Ваш тариф за РК в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else 'Нет активных РК'}"""
-            f'(больше РК -> ниже цена, тарифы -> https://telegra.ph/Tarify-03-17)\n'
-            f'💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n'
-            f'⏳ <b>Срок действия токена</b>: {self.expiration_time}\n'
-            f'<b>Истечет через</b> {get_day_suffix(self.last_days_for_token)}\n'
-
-        )
-
-        if isinstance(last_for_days, int):
-            if last_for_days > 7:
-                text += (f"""
-💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота. 💰
-            """)
-            elif last_for_days == 0:
-                text += (f"""
-⚠️ Денег на продление кампаний больше нет! ⚠️
-
-💳 Срочно пополните баланс во избежание проблем с работой кампаний!
-""")
-            else:
-                text += (f"""
-🚨 Внимание!!! 🚨
-
-💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота.
-
-🔔 Настоятельно рекомендую пополнить счет во избежание проблем с работой кампаний""")
-
-        text += (
-'===================================\n'
-            f'🏬 Магазин: {self._wb_user_cabinet.name}\n'
-            f'🆔 Shop ID: {self._wb_cabinet.shop_id}\n'
-            f'💰 Баланс магазина: {balance} рублей\n'
-            f'🎁 Бонусы: {self._bonus} рублей\n'
-        )
-
-        text += """
-<a href="https://telegra.ph/Bystryj-start-02-11">Инструкция по быстрому старту работы</a>. Подходит для базовой автоматизации.
-                """
-
-        return text
-
-     @property
-     def keyboard(self):
-        user_telegram_id = self._user_telegram_id
-        wb_user_cabinet = self._wb_user_cabinet
-        wb_cabinet  = self._wb_cabinet
-        is_active_adv = self.is_active_adv
-        wb_cabinet_original_id = wb_cabinet.id
-        is_active_adv: True
-        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-        builder = InlineKeyboardBuilder()
-
-        button = InlineKeyboardButton(
-        text = 'Автоматические рекламные кампании',
-        callback_data = callbacks.ChoiceAdvPaginator(
-            wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
-        )
-        builder.row(button)
-
-        button = InlineKeyboardButton(
-            text='Создать и настроить кампании',
-            callback_data = CreateNewAdvs(
-                wb_user_cabinet_original_id = wb_user_cabinet.id).pack()
-        )
-
-
-        builder.row(button)
-
-
-        #
-        # button_for_create_new_complex_adv = get_button_for_create_new_complex_adv(wb_user_cabinet.id)
-        # builder.row(button_for_create_new_complex_adv)
-
-        button = InlineKeyboardButton(
-        text = 'Пополнить баланс',
-        callback_data = callbacks.AddBalance(wb_cabinet_original_id=wb_cabinet_original_id).pack(),
-        )
-
-        builder.row(button)
-        #
-
-        if user_telegram_id in const.ADMINS:
-            button = InlineKeyboardButton(
-                text = 'Удалить личный кабинет магазина',
-                callback_data\
-                    = callbacks.DeleteWbUserCabinet(
-                    wb_user_cabinet_original_id = self._wb_user_cabinet.id).pack()
-            )
-
-            builder.row(button)
-
-        if is_active_adv:
-            button = InlineKeyboardButton(
-            text = 'Отключить все кампании',
-            callback_data = callbacks.TurnBot(action='off_all',
-                                              wb_user_cabinet_original_id=wb_user_cabinet.id).pack())
-            builder.row(button)
-
-        if self._wb_cabinet.white_list_update_active:
-            button = InlineKeyboardButton(
-            text = 'Выключить авто-обновление белого списка',
-            callback_data = callbacks.TurnWhiteListUpdate(
-                wb_cabinet_original_id=self._wb_cabinet.id,
-                action='off').pack()
-            )
-        else:
-            button = InlineKeyboardButton(
-            text = 'Включить авто-обновление белого списка',
-            callback_data = callbacks.TurnWhiteListUpdate(
-                wb_cabinet_original_id=self._wb_cabinet.id,
-                action='on').pack()
-            )
-
-        builder.row(button)
-
-        button = InlineKeyboardButton(text='Вернуться к списку магазинов',
-        callback_data = callbacks.Start().pack())
-        builder.row(button)
-        return builder.as_markup()
-
-
 
 
 class OrderSubscribe(Text):
@@ -1271,11 +1012,6 @@ class SettingMinViewsForPredictCTR(TextWithKeyboard):
             return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
 
 
-class NotItemsInAdvSetting(TextWithKeyboard):
-    text = "Не смогли получить информацию о товарах в кампании через API. Вы можете указать артикул товара (цифровой артикул WB) в названии РК в кабинете Wildberries, либо ввести артикул прямо сейчас:"
-
-    # keyword = keyboards.get_return_to_adv_setting_keyboard()
-
 class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
 
     def __init__(self, bot: Bot, chat_id, adv: AdvSetting):
@@ -1290,18 +1026,28 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
         return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
 
 class WaitingForAmount(Text):
-
     DISABLE_WEBPAGE_PREVIEW = True
 
-    def __init__(self, bot: Bot, chat_id, master_sum: float):
+    def __init__(self, bot: Bot, chat_id, master_sum: float, current_balance: float = None, current_bonus: float = None):
         super().__init__(bot, chat_id)
         self.master_sum = master_sum
         self._pricer = Pricer()
-
+        self.current_balance = current_balance
+        self.current_bonus = current_bonus
 
     @property
     def text(self):
         text = self._pricer.text
+        
+        # Добавляем информацию о текущем балансе, если она доступна
+        if self.current_balance is not None:
+            text = f"💰 Текущий баланс: {self.current_balance:.0f} руб.\n"
+            
+            if self.current_bonus is not None and self.current_bonus > 0:
+                text += f"🎁 Текущие бонусы: {self.current_bonus:.0f} руб.\n"
+            
+            text += "\n" + self._pricer.text
+        
         text += "\nУкажите сумму пополнения:"
         return text
 
@@ -1401,53 +1147,6 @@ class NotEnoughMoneyForParsing(TextWithKeyboard):
 
 
 
-class SubscribeOnMyNewChannel(Text):
-    text = ("""
-**Привет!** Я создатель этого бота. Меня часто спрашивают: могу ли я автоматизировать те или иные вещи для Wildberries или Ozon?
-Отвечаю: _95% задач вы можете автоматизировать сами,_ используя ChatGPT, даже если вы полный ноль в программировании.
-Для этого я открыл специальный канал, на котором расскажу как создавать крутые программы,
-с помощью нейросетей за один день с самого нуля - [перейти на канал](https://t.me/selfscript)""" )
-
-    parse_mode = ParseMode.MARKDOWN
-
-
-class StatTelegramTranslation(Text):
-    text = ('Привет! На связи разработчик данного бота, и когда я помогаю пользователям его настроить, '
-            'то мне часто задают вопросы, напрямую к нему не относящиеся: как успешно продвигать товары, '
-            'какую выбрать стратегию, как минимизировать расходы, повысить прибыль и т.д. \n Я не считаю себя '
-            'супер-экспертом по маркетплейсам, но и свой бизнес запустить и раскрутить как-то смог. '
-            'Поэтому сегодня в 15:00 по Москве я проведу трансляцию на канале поддержки бота @auto_wb_master, на '
-            'которой поделюсь своим опытом и отвечу на самые частые вопросы. \n\n'
-            'Сразу скажу, что я сторонник математического подхода к бизнесу, когда мы все считаем и проверяем заранее,'
-            'а не делаем что-то наугад. Если вы разделяете такой подход, то прошу присоединиться к трансляции - @auto_wb_master_bot \n\n'
-            'Все, до встречи на трансляции и удачи в вашем бизнесе!')
-
-
-class WrongLinkMessage(Text):
-    text = ('Пардон, ошибся во второй ссылке на канал, вот правильная: @auto_wb_master')
-
-
-class TranslatinSoon(Text):
-    text = ('Напоминаю: через 15 минут начнется трансляция на канале поддержки бота @auto_wb_master. ')
-
-
-class Tranlation_15_00(Text):
-
-    text = ('Ура! Починили возможность  добавления новых кампаний в бота  - /start \n\n'
-            'Поэтому сегодня в 15:00 по Москве я проведу трансляцию на канале поддержки бота @auto_wb_master, на '
-            'которой расскажу подробнее о том, как наш бот работает и как с его помощью экономить 70-80 % '
-            'от рекламного бюджета при тех же результатах. Трансляция пройдет на канале поддержки бота @auto_wb_master\n'
-            'До встречи!')
-
-
-class Tranlation_14_45(Text):
-
-    text = ('Решил напомнить: через 15 минут в трансляции на канале @auto_wb_master я расскажу о том, '
-            'как наш бот работает и как с его помощью экономить 70-80 % от рекламного бюджета при тех же результатах.'
-            ' Трансляция пройдет на канале поддержки бота @auto_wb_master\n'
-            'Жду Вас!')
-
-
 class BotPriceMessage(Text):
     text = ("""Приветствую, на связи разработчик данного бота.\n
 Продвижение на маркетплейсах - это сложный процесс, и у каждого селлера возникают с этим проблемы в той или иной степени.
@@ -1491,31 +1190,6 @@ class CallMe2(Text):
 Когда я разрабатывал бота, то думал именно в контексте того, как бот должен влиять именно на прибыль. И то, что самый частый отзыв о боте заключается в экономии денег на рекламу и личного времени - так это так изначально и задумывалось.
 Дело в том, что я вдоволь насмотрелся на бизнесы, которые делают заоблачные обороты, но если заглянуть в их бухгалтерию, то там дырка от бублика.
     """
-
-class CallWithManager(TextWithKeyboard):
-
-
-    text = ("""Мы с программистами провели исследование и вот что выяснилось:
-
-1. Те, кто смогли подключиться к боту и самостоятельно в нем разобраться, 
-повысили эффективность своих кампаний на 70 % по сравнению с кампаниями, которые к боту не подключены.\n
-2. Тех, кого мы консультировали лично по работе с ботом, помогли в нем разобраться и объяснили на примере их товаров как использовать его максимально эффективно, увеличили эффективность
-кампаний в пересчете на продажи в среднем в 2 раза.\n
-\n
-Как разработчик данного бота скажу, что потенциал увеличения продаж с помощью бота x4 - x5,
-поэтому если у вас пока нет такого роста, значит вы все еще что-то делаете не так или не до
-конца понимаете как работает бот и как работает Wildberries с его системой продвижения в топ.
-Поэтому предлагаю следующую схему: свяжитесь со мной по кнопке ниже, 
-мы с вами созвонимся в телеграмме, и я лично помогу вам настроить правильно 
-бота и запустить эффективный процесс продвижения. \n
-Вы получите сразу эффект: экономия бюджета на рекламу в 3-5 раз 
-+ поймете как можно экономить несколько часов времени в день, которые обычно нужно тратить на настройку эффективной рекламы.\n\n
-
-Не ждите когда у Wildberries все снова поменяются, используйте эффективный инструмент, пока он работает и дает результат! \n\n
-
-
-
-""")
 
 
 class Single_message0(TextWithKeyboard):
@@ -2468,4 +2142,45 @@ class ShowFavoriteAdvs(TextWithKeyboard):
         # Разница - это расходы на дополнительный трафик
         additional_spend = total_spend - keywords_spend
         return round(additional_spend, 2) if additional_spend > 0 else 0
+
+async def process_cabinet_balance_topup(user_id: int, cabinet_id: int, amount: float):
+    """Обработка запроса на пополнение баланса кабинета"""
+    async with _sm() as session:
+        # Получаем пользователя для описания платежа
+        user = await session.get(User, user_id)
+        if not user:
+            raise ValueError("Пользователь не найден")
+            
+        # Создаем запись о платеже
+        payment = WBBalancePayment(
+            wb_cabinet_id=cabinet_id,
+            amount=amount,
+            description=f"Пополнение баланса пользователем {user.username or user.user_telegram_id}",
+            transaction_date_time=datetime.now()
+        )
+        session.add(payment)
+        await session.commit()
+        await session.refresh(payment)
+        return payment
+
+async def confirm_cabinet_balance_topup(payment_id: int, cabinet_id: int):
+    """Подтверждение платежа и обновление баланса кабинета"""
+    async with _sm() as session:
+        # Получаем платеж
+        payment = await session.get(WBBalancePayment, payment_id)
+        if not payment or payment.wb_cabinet_id != cabinet_id:
+            raise ValueError("Платеж не найден или не соответствует кабинету")
+        
+        # Получаем кабинет
+        cabinet = await session.get(WBCabinet, cabinet_id)
+        if not cabinet:
+            raise ValueError("Кабинет не найден")
+        
+        # Обновляем баланс кабинета
+        cabinet.balance += payment.amount
+        
+        await session.commit()
+        await session.refresh(payment)
+        await session.refresh(cabinet)
+        return payment, cabinet
 

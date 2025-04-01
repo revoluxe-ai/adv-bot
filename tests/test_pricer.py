@@ -1,3 +1,5 @@
+import dotenv
+dotenv.load_dotenv()
 import pytest
 from unittest.mock import AsyncMock, patch
 from app.utils.pricer.pricer import Pricer

@@ -3,39 +3,96 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from sqlalchemy import Index, UniqueConstraint, ARRAY
+from sqlalchemy import Index, UniqueConstraint, Date
 from sqlalchemy import (Column, Integer, String, ForeignKey,
-                        BIGINT, Boolean, Float, DateTime, text, Date)
+                        BIGINT, Boolean, Float, DateTime, text)
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 import jwt
 from sqlalchemy.dialects.postgresql import JSONB
 import datetime
+from sqlalchemy import JSON
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
+from app.core.wb_api import exceptions
 from app.utils.db.base import BaseTable
-from . import exceptions
-from ...wb_adv_updater.models import AdvPayment
 
 from app.utils.db.models import User, favorite_advs_association
 
 from app.utils.db.session_maker import get_async_session_maker
 
-
 _sm = get_async_session_maker
+
+
+class AdvPayment(BaseTable):
+    __tablename__ = "advpayment"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False)
+    adv_setting_id = Column(Integer, ForeignKey('advsetting.id'), nullable=False)
+    adv_setting = relationship('AdvSetting', back_populates='payments')
+    type = mapped_column(String, nullable=True)
+    amount = mapped_column(Float, nullable=True, default=None)
+    __table_args__ = (
+        UniqueConstraint('date', 'adv_setting_id', 'type', name='uix_date_adv_setting_id_type'),
+    )
+
 
 class WBUserCabinet(BaseTable):
     wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
     user_id: Mapped[Integer] = Column(Integer, ForeignKey('user.id'), nullable=False)
-    user: Mapped[User]  = relationship("User", back_populates="wb_user_cabinets",
+    user: Mapped[User] = relationship("User", back_populates="wb_user_cabinets",
                                        )
     name = Column(String(255), nullable=False)
-    __table_args__ = (UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),)
+    __table_args__ = (
+        UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),
+        Index('idx_wb_user_cabinet_user_id', 'user_id'),
+        Index('idx_wb_user_cabinet_cabinet_id', 'wb_cabinet_id'),
+    )
 
 
 
 
+
+class WBBalancePayment(BaseTable):
+    """Модель для хранения информации о пополнениях баланса"""
+    __tablename__ = 'wbbalancepayment'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
+    wb_cabinet = relationship("WBCabinet", back_populates="balance_payments")
+    
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    transaction_date_time = Column(DateTime, nullable=False, server_default=text('now()'))
+    
+    __table_args__ = (
+        Index('idx_wb_balance_payment_cabinet_id', 'wb_cabinet_id'),
+        Index('idx_wb_balance_payment_date', 'transaction_date_time'),
+    )
+
+class WBBonusPayment(BaseTable):
+    """Модель для хранения информации о бонусах"""
+    __tablename__ = 'wbbonuspayment'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
+    wb_cabinet = relationship("WBCabinet", back_populates="bonus_payments")
+    
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    transaction_date_time = Column(DateTime, nullable=False, server_default=text('now()'))
+    
+    # Новые поля для поддержки операций администраторов
+    operation_type = Column(String, nullable=False)  # 'add', 'subtract', 'reset'
+    admin_user_id = Column(Integer, nullable=True)  # ID администратора, выполнившего операцию, NULL для обычных операций
+    
+    __table_args__ = (
+        Index('idx_wb_bonus_payment_cabinet_id', 'wb_cabinet_id'),
+        Index('idx_wb_bonus_payment_date', 'transaction_date_time'),
+        Index('idx_wb_bonus_payment_admin', 'admin_user_id'),
+        Index('idx_wb_bonus_payment_operation', 'operation_type'),
+    )
 
 class WBCabinet(BaseTable):
     shop_id = Column(String, nullable=False, unique=True)
@@ -46,18 +103,39 @@ class WBCabinet(BaseTable):
                                                            back_populates="wb_cabinet",
                                                                  )
     active = Column(Boolean, default=True)
-
-    expiration_time = Column(DateTime, nullable=False, server_default=text('now() + interval \'7 day\''))
+    expiration_time = Column(DateTime, nullable=False, server_default=text('datetime("now", "+7 days")'))
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
     balance = Column(Float, default=0, server_default=text('0'), nullable=False)
     bonus = Column(Float, default=0, server_default=text('0'), nullable=False)
     white_list_update_active = Column(Boolean, default=False)
+    balance_payments = relationship('WBBalancePayment', back_populates='wb_cabinet', uselist=True)
+    bonus_payments = relationship('WBBonusPayment', back_populates='wb_cabinet', uselist=True)
     __table_args__ = (
         Index('idx_balance_bonus', 'balance', 'bonus'),
         Index('idx_balance', 'balance'),
         Index('idx_bonus', 'bonus'),
+        Index('idx_wb_cabinet_id', 'id'),
     )
+    
+    @hybrid_property
+    def calculated_balance(self):
+        """Вычисляет баланс на основе начального значения balance и всех платежей"""
+        if not self.balance_payments:
+            return self.balance  # Если нет платежей, возвращаем текущее значение
+        
+        # Суммируем все платежи и начальное значение баланса
+        return self.balance + sum(payment.amount for payment in self.balance_payments)
+
+    @hybrid_property
+    def calculated_bonus(self):
+        """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
+        if not self.bonus_payments:
+            return self.bonus  # Если нет платежей, возвращаем текущее значение
+        
+        # Суммируем все платежи и начальное значение бонусов
+        return self.bonus + sum(payment.amount for payment in self.bonus_payments)
+
 
 
 class WBToken(BaseTable):
@@ -126,7 +204,7 @@ class WBToken(BaseTable):
             8: "Рекомендации",
             30: "Токен только на чтение",
         }
-        s = self.get_payload('s', 0)
+        s = self.get_payload('s',)
         categories = set()
         for bit_position, category_name in categories_map.items():
             if s & (1 << bit_position):
@@ -202,6 +280,12 @@ class WBCard(BaseTable): # Изменено название таблицы
 
 
 class AdvSetting(BaseTable):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._search_adv_id = None
+        self._worst_promo_position = None
+
     def __repr__(self):
         return f'name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}'
     favorite_users: Mapped[list[User]] = relationship(
@@ -225,7 +309,7 @@ class AdvSetting(BaseTable):
                                 back_populates='adv_setting',
                                 uselist=True)
     bot_active = Column(Boolean, default=False)
-    nmids = Column(JSONB, default=[])
+    nmids = Column(JSON, default=[])
     keyword_settings: Mapped[list['KeywordSetting']] = relationship('KeywordSetting',
                                                                     cascade="all, delete-orphan",
                                                                     back_populates='adv_setting',
@@ -266,14 +350,14 @@ class AdvSetting(BaseTable):
                                                   server_default='false')
     plan_for_sales_for_day = mapped_column(Integer,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
     target_price_for_order = mapped_column(Float,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
 
     max_price_for_order = mapped_column(Float,
                                            nullable=True,
-                                           default=None,)
+                                           default=None)
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(Boolean,
                                     nullable=True,
@@ -288,7 +372,6 @@ class AdvSetting(BaseTable):
 
 
 
-
     __table_args__ = (
         # Составной индекс для основного запроса
         Index('ix_adv_settings_cabinet_type_update',
@@ -296,6 +379,9 @@ class AdvSetting(BaseTable):
 
         # Индекс для поиска по cabinet_id
         Index('ix_adv_settings_cabinet_id', 'wb_cabinet_id'),
+        
+        # Добавляем новый индекс для оптимизации запросов
+        Index('idx_adv_setting_cabinet_id', 'wb_cabinet_id'),
 
         # Индекс для type, если он часто используется в запросах
         Index('ix_adv_settings_type', 'type'),
@@ -308,7 +394,6 @@ class AdvSetting(BaseTable):
               postgresql_ops={'name': 'gin_trgm_ops'}),
         Index('ix_name__nmids__search_adv_id', 'name', 'nmids', '_search_adv_id'),
         Index('ix_advsetting_bot_active', 'bot_active')
-
     )
 
 
@@ -462,4 +547,5 @@ class WBItemPosition:
             position.adv_type = None
 
         return position
+    
 

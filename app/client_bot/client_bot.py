@@ -16,6 +16,9 @@ from app import settings
 nest_asyncio.apply()
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
+from aiogram.fsm.storage.memory import SimpleEventIsolation
+from aiogram.fsm.strategy import FSMStrategy
+from aiogram.fsm.storage.redis import DefaultKeyBuilder
 
 from app.modules.common_slaves.wildberries.shops_data_updater import consumer as shop_updater
 from python_modules import path_setting_funcs
@@ -29,7 +32,7 @@ import os
 redis_host = os.environ.get("REDIS_HOST")
 
 # Создание хранилища с Redis
-storage = RedisStorage.from_url(f'redis://{redis_host}:6379/0')
+storage = RedisStorage.from_url(f'redis://{redis_host}:6379/0', key_builder=DefaultKeyBuilder(with_destiny=True))
 
 path_setting = path_setting_funcs.get_setting_path()
 
@@ -60,7 +63,11 @@ async def on_shutdown(bot: Bot) -> None:
 
 
 
-dp = Dispatcher(storage=storage)
+dp = Dispatcher(
+    storage=storage,
+    fsm_strategy=FSMStrategy.USER_IN_CHAT,
+    events_isolation=SimpleEventIsolation()
+)
 dp.include_router(global_router)
 
 try:

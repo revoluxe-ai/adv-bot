@@ -1,0 +1,180 @@
+---
+description: Правила организации структуры проекта
+globs: ["app/**/*.py", "*.py"]
+alwaysApply: false
+dependencies: []
+tags: ["architecture", "structure", "organization"]
+---
+
+# Правила организации структуры проекта
+
+## Контекст применения
+Эти правила используются для понимания организации кода проекта и правильного размещения новых компонентов.
+
+## Общая структура проекта
+
+```
+/
+├── app/                          # Основной код приложения
+│   ├── __init__.py
+│   ├── modules/                  # Функциональные модули
+│   │   ├── module_name/
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py        # Модели данных модуля
+│   │   │   ├── service.py       # Бизнес-логика
+│   │   │   ├── backend/         # Серверная часть модуля
+│   │   │   └── telegram/        # Часть модуля для Telegram-бота
+│   │   │       ├── __init__.py
+│   │   │       ├── handlers.py  # Обработчики Telegram-сообщений
+│   │   │       └── keyboards.py # Клавиатуры
+│   │   │
+│   │   ├── admin_bot/               # Бот для администраторов
+│   │   ├── client_bot/              # Бот для клиентов
+│   │   ├── core/                    # Ядро системы
+│   │   │   ├── __init__.py
+│   │   │   ├── database.py          # Настройки базы данных
+│   │   │   ├── models.py            # Базовые модели
+│   │   │   └── config.py            # Конфигурация
+│   │   │
+│   │   ├── utils/                   # Утилиты
+│   │   │   ├── __init__.py
+│   │   │   └── helpers.py           # Вспомогательные функции
+│   │   │
+│   │   └── settings/                # Настройки приложения
+│   │
+│   ├── migrations/                  # Миграции базы данных
+│   │   ├── __init__.py
+│   │   ├── env.py
+│   │   ├── script.py.mako
+│   │   └── versions/                # Версии миграций
+│   │
+│   ├── tests/                       # Тесты
+│   │   ├── __init__.py
+│   │   ├── conftest.py              # Общие фикстуры
+│   │   └── test_*.py                # Файлы тестов
+│   │
+│   ├── scripts/                     # Скрипты для выполнения задач
+│   │
+│   └── docs/                        # Документация
+│
+└── requirements.txt             # Зависимости
+```
+
+## Основные компоненты
+
+### Модули (`app/modules/`)
+Модули представляют собой функционально-законченные части приложения, которые решают определённую бизнес-задачу.
+
+Каждый модуль должен содержать:
+- Модели данных (`models.py`)
+- Бизнес-логику (`service.py`)
+- Обработчики Telegram-сообщений (`telegram/handlers.py`)
+- Определения клавиатур (`telegram/keyboards.py`)
+
+### Боты (`app/client_bot/` и `app/admin_bot/`)
+Содержат настройки и инициализацию Telegram-ботов.
+
+```python
+# app/client_bot/main.py
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+from app.core.config import settings
+
+# Инициализация бота
+bot = Bot(token=settings.CLIENT_BOT_TOKEN, parse_mode=ParseMode.HTML)
+dp = Dispatcher()
+
+# Подключение роутеров из модулей
+from app.modules.module1.telegram.handlers import router as module1_router
+from app.modules.module2.telegram.handlers import router as module2_router
+
+dp.include_router(module1_router)
+dp.include_router(module2_router)
+```
+
+### Ядро (`app/core/`)
+Содержит базовую инфраструктуру:
+- Настройка соединения с базой данных
+- Базовые модели и абстракции
+- Глобальные конфигурации
+
+### Утилиты (`app/utils/`)
+Вспомогательные функции и классы, используемые в разных частях проекта:
+- Форматирование данных
+- Работа с датами и временем
+- Логирование
+- Обработка исключений
+
+## Принципы организации кода
+
+### 1. Модульность
+- Каждый модуль решает одну конкретную задачу
+- Модули должны быть слабо связаны между собой
+- Взаимодействие между модулями через определённые интерфейсы
+
+### 2. Слоистая архитектура
+```
+Telegram Bot Layer (handlers, keyboards)
+    ↓
+Service Layer (бизнес-логика)
+    ↓
+Data Access Layer (работа с БД)
+```
+
+### 3. Инверсия зависимостей
+- Высокоуровневые модули не зависят от низкоуровневых
+- Оба типа модулей зависят от абстракций
+
+## Добавление нового функционала
+
+### 1. Определение места
+- Если это новая бизнес-функция - создать новый модуль
+- Если дополнение существующей - расширить существующий модуль
+- Если общая функциональность - добавить в utils или core
+
+### 2. Создание новых файлов
+```powershell
+# Пример создания нового модуля
+$MODULE_NAME = "new_module"
+$MODULE_PATH = "app/modules/$MODULE_NAME"
+
+New-Item -ItemType Directory -Path $MODULE_PATH
+New-Item -ItemType Directory -Path "$MODULE_PATH/telegram"
+New-Item -ItemType Directory -Path "$MODULE_PATH/backend"
+
+@(
+    "__init__.py", 
+    "models.py", 
+    "service.py", 
+    "telegram/__init__.py", 
+    "telegram/handlers.py", 
+    "telegram/keyboards.py",
+    "backend/__init__.py"
+) | ForEach-Object {
+    New-Item -ItemType File -Path "$MODULE_PATH/$_"
+}
+```
+
+## Типичные ошибки
+- Размещение бизнес-логики в обработчиках Telegram-бота
+- Создание циклических зависимостей между модулями
+- Дублирование кода в разных модулях
+- Нарушение разделения ответственности (один файл делает слишком много)
+
+## Пример правильной структуры модуля
+```
+app/modules/payments/
+├── __init__.py
+├── models.py              # Модели: Transaction, Payment, Balance
+├── service.py             # Сервис PaymentService 
+├── exceptions.py          # Специфичные исключения
+├── backend/
+│   ├── __init__.py
+│   ├── payment_api.py     # Интеграция с платежными системами
+│   └── transactions.py    # Работа с транзакциями
+└── telegram/
+    ├── __init__.py
+    ├── handlers.py        # Обработчики команд
+    ├── keyboards.py       # Клавиатуры
+    └── states.py          # FSM состояния для диалогов
+``` 

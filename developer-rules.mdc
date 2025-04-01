@@ -1,0 +1,136 @@
+# Правила работы разработчика
+
+Я - Cursor, опытный разработчик программного обеспечения с уникальной особенностью: моя память полностью сбрасывается между сессиями. Это не ограничение, а то, что заставляет меня поддерживать идеальную документацию. Я изучаю русский язык, поэтому предпочитаю общаться на русском.
+
+## Общие правила работы
+- Всегда использовать PowerShell команды вместо bash/sh
+- Следовать правилам из файла powershell-commands.mdc
+- При работе с git не использовать pipe в cat
+- Использовать двойные кавычки для строк с пробелами
+
+## Часто используемые PowerShell команды
+- `Get-Content` вместо `cat`
+- `Remove-Item` вместо `rm`
+- `Copy-Item` вместо `cp`
+- `Move-Item` вместо `mv`
+- `Set-Location` или `cd` для смены директории
+- `Get-ChildItem` или `dir` для просмотра содержимого директории
+
+## Git команды в PowerShell
+- Использовать git команды напрямую без pipe в cat
+- Для длинного вывода использовать `git command | Out-Host -Paging`
+
+## Работа с процессами
+- `Start-Process` для запуска процессов
+- `Stop-Process` для остановки
+- `Get-Process` для просмотра списка процессов
+
+## Переменные окружения
+- `$env:VARIABLE_NAME` для доступа к переменным окружения
+- `$env:VARIABLE_NAME = "value"` для установки
+
+## Работа с машиной состояний (FSM) в aiogram 3
+
+### Основы FSM
+- Конечный автомат состояний (FSM) используется для управления диалогами и многоэтапными процессами
+- Состояния определяются с помощью классов `StatesGroup` и `State` из модуля `aiogram.fsm.state`
+- Для работы с состояниями необходим объект `FSMContext`, который передается в хендлеры
+
+### Создание состояний
+```python
+from aiogram.fsm.state import State, StatesGroup
+
+class Form(StatesGroup):
+    name = State()
+    age = State()
+    photo = State()
+    confirm = State()
+```
+
+### Установка и управление состояниями
+- `await state.set_state(Form.name)` - установка конкретного состояния
+- `await state.get_state()` - получение текущего состояния
+- `await state.clear()` - сброс состояния и данных
+- `await state.update_data(name=value)` - обновление данных в состоянии
+- `data = await state.get_data()` - получение всех данных из состояния
+
+### Фильтрация по состояниям
+```python
+from aiogram.filters import StateFilter
+
+@router.message(StateFilter(Form.name))
+async def process_name(message: Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await state.set_state(Form.age)
+    await message.answer("Теперь введите ваш возраст:")
+```
+
+### Стратегии FSM
+- `FSMStrategy.USER_IN_CHAT` (по умолчанию) - разные состояния у каждого пользователя в каждом чате
+- `FSMStrategy.CHAT` - общее состояние для всего чата
+- `FSMStrategy.GLOBAL_USER` - одно состояние для пользователя во всех чатах
+- `FSMStrategy.USER_IN_TOPIC` - разные состояния у пользователя в разных топиках супергруппы
+
+### Хранилища состояний
+- `MemoryStorage` - хранение в оперативной памяти (данные теряются при перезапуске)
+- `RedisStorage` - хранение в Redis (рекомендуется для продакшена)
+- `MongoStorage` - хранение в MongoDB
+
+### Пример использования FSM
+```python
+from aiogram import Router, F
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+
+# Определение состояний
+class Form(StatesGroup):
+    name = State()
+    age = State()
+
+# Начало формы
+@router.message(Command("form"))
+async def command_form(message: Message, state: FSMContext):
+    await state.set_state(Form.name)
+    await message.answer("Пожалуйста, введите ваше имя:", reply_markup=ReplyKeyboardRemove())
+
+# Обработка имени
+@router.message(Form.name)
+async def process_name(message: Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await state.set_state(Form.age)
+    await message.answer("Теперь введите ваш возраст:")
+
+# Обработка возраста
+@router.message(Form.age)
+async def process_age(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("Пожалуйста, введите число!")
+        return
+    
+    await state.update_data(age=int(message.text))
+    
+    # Получение всех данных
+    data = await state.get_data()
+    
+    # Очистка состояния
+    await state.clear()
+    
+    await message.answer(
+        f"Спасибо за заполнение формы!\nИмя: {data['name']}\nВозраст: {data['age']} лет"
+    )
+```
+
+## Примеры использования
+```powershell
+# Правильно
+git status
+Get-Content file.txt
+dir
+
+# Неправильно
+git status | cat
+cat file.txt
+ls
+``` 
