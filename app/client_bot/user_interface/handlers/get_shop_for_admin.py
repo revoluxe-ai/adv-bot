@@ -61,7 +61,7 @@ class AdminsGetAdvByIdFilter(BaseFilter):
         if text.isdigit() and user_id in const.ADMINS:
             async with sm() as session:
                 stmt = select(AdvSetting)\
-                             .where(AdvSetting.adv_id == int(message.text))
+                             .where(AdvSetting.adv_id == int(text))
                 adv = await session.execute(stmt)
                 adv = adv.scalar()
                 return bool(adv)
