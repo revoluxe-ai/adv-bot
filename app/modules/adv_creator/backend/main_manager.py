@@ -1,17 +1,14 @@
 import asyncio
-import functools
-
 from aiogram import Bot
 from sqlalchemy import select, or_, and_
-from app.client_bot import const
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.core.wb_api.mixins.excs import NotChangeError, \
     AdvNotFoundInWBError, CardNotFoundInWB
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.core.wb_api.data_classes.adv import Balances
-from .exc import CardsNotFoundForShopError, ComplexAdvsExistsError, NotEnoughBalanceOnShopError, StartComplexAdvError
+from .exc import CardsNotFoundForShopError, NotEnoughBalanceOnShopError, StartComplexAdvError
 from .wb_api import WBApi
-from ...common_slaves.wildberries.models import WBCard, AdvSetting, WBCabinet
+from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
 from ...common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.client_bot.bot import bot
 import logging
@@ -42,7 +39,7 @@ class MainAdvManager:
         global_max_attempts = 10
         for attempt in range(global_max_attempts):
             max_attempts = 3
-            for attempt in range(max_attempts):
+            for _ in range(max_attempts):
                 try:
                     advs = (await self.wb_api.get_advs([auto_adv_id]))
                     break
@@ -141,8 +138,8 @@ class MainAdvManager:
             auto_adv_id = exist_adv.adv_id
             search_adv_id = exist_adv.search_adv_id
             await bot.send_message(user_telegram_id, f'Кампания для артикула {nmid} уже существует :'
-                                                     f' Авто: {auto_adv_id}, Аукцион {search_adv_id},'
-                                                      f'Делаю попытку правильно настроить и запустить РК')
+                                                          f' Авто: {auto_adv_id}, Аукцион {search_adv_id},'
+                                                          f'Делаю попытку правильно настроить и запустить РК')
         try:
             await self.upcast_auto_adv(nmid, auto_adv_id, user_telegram_id)
         except AdvNotFoundInWBError as exc:
@@ -210,8 +207,8 @@ class MainAdvManager:
             if adv_settings:
                 return adv_settings[0][0]
 
-
-    def _check_enough_balance(self, balances: Balances) -> bool:
+    @staticmethod
+    def _check_enough_balance(balances: Balances) -> bool:
         balance = balances.balance
         net = balances.net
         bonus = balances.bonus
