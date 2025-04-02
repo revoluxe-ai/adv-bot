@@ -4,7 +4,7 @@ import faiss
 import joblib
 import numpy as np
 from asyncpg import ProgramLimitExceededError
-from sqlalchemy import not_, text
+from sqlalchemy import not_, text, exists
 from sqlalchemy.exc import IntegrityError
 from app.utils import redis_manager
 from app.client_bot.bot import bot
@@ -49,46 +49,53 @@ sm = get_async_session_maker
 
 keywords_hashs_in_neo = set()
 
+
+def get_count_advs_for_wb_cabinet(wb_cabinet: WBCabinet, adv_settings: list[AdvSetting]) -> int:
+    advs_for_wb_cabinet = [adv_setting for adv_setting in adv_settings if adv_setting.wb_cabinet_id == wb_cabinet.id]
+    return len(advs_for_wb_cabinet)
+
+
 async def process_payment_for_advs() -> None:
     current_date = datetime.datetime.now().date()
     async with sm(read_only=False) as session:
         stmt = select(AdvSetting)\
-            .join(AdvSetting.wb_cabinet)\
-            .outerjoin(WBCabinet.balance_payments)\
-            .outerjoin(WBCabinet.bonus_payments)\
             .options(
-            joinedload(AdvSetting.payments),
-            selectinload(AdvSetting.wb_cabinet)\
-            .selectinload(WBCabinet.bonus_payments),
-            selectinload(WBCabinet.balance_payments)
-        ).filter(
-            and_(
-                AdvSetting.bot_active == True,
-                not_(AdvSetting.payments.any(AdvPayment.date == current_date)),
-                AdvSetting.wb_cabinet.has(WBCabinet.expiration_time < current_date)
-                # условие на истекший срок действия
+                joinedload(AdvSetting.payments),
+                joinedload(AdvSetting.wb_cabinet)
+                .selectinload(WBCabinet.balance_payments),
+                joinedload(AdvSetting.wb_cabinet)
+                .selectinload(WBCabinet.bonus_payments)
+            ).filter(
+                and_(
+                    AdvSetting.bot_active == True,
+                    ~exists().where(
+                        and_(
+                            AdvPayment.adv_setting_id == AdvSetting.id,
+                            AdvPayment.date == current_date
+                        )
+                    )
+                )
             )
-        )
 
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.unique().scalars().all()
         pricer = Pricer()
         for adv_setting in adv_settings:
             wb_cabinet: WBCabinet = adv_setting.wb_cabinet
-            shop_id = wb_cabinet.shop_id
+            shop_id: str = str(wb_cabinet.shop_id)
             PRICE_FOR_SHOP_FOR_DAY = await pricer.get_price_for_day_for_shop(shop_id)
-            PRICE_FOR_ADV_FOR_DAY = PRICE_FOR_SHOP_FOR_DAY / len(adv_settings)
-            
+            count_advs_for_wb_cabinet: int = get_count_advs_for_wb_cabinet(wb_cabinet, adv_settings)
+            PRICE_FOR_ADV_FOR_DAY = PRICE_FOR_SHOP_FOR_DAY / count_advs_for_wb_cabinet
             # Используем гибридные свойства вместо прямого доступа к полям
             calculated_bonus = wb_cabinet.calculated_bonus
             calculated_balance = wb_cabinet.calculated_balance
             
-            payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
-            adv_setting.payments.append(payment)
-            
-            # Сначала используем бонусы, затем баланс
+            # Сначала проверяем наличие средств
             if calculated_bonus >= PRICE_FOR_ADV_FOR_DAY:
-                # Создаем запись списания бонусов
+                # Создаем платеж и запись списания бонусов
+                payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+                adv_setting.payments.append(payment)
+                
                 bonus_payment = WBBonusPayment(
                     wb_cabinet_id=wb_cabinet.id,
                     amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
@@ -96,25 +103,20 @@ async def process_payment_for_advs() -> None:
                     operation_type="subtract"
                 )
                 session.add(bonus_payment)
-                
-                # Расчет остатка идет с учетом платежей, не нужно вычитать из поля bonus
             elif calculated_balance >= PRICE_FOR_ADV_FOR_DAY:
-                # Создаем запись списания с баланса
+                # Создаем платеж и запись списания с баланса
+                payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+                adv_setting.payments.append(payment)
+                
                 balance_payment = WBBalancePayment(
                     wb_cabinet_id=wb_cabinet.id,
                     amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
-                    description=f"Списание за рекламную кампанию {adv_setting.adv_id}"
+                    description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
                 )
                 session.add(balance_payment)
-                
-                # Расчет остатка идет с учетом платежей, не нужно вычитать из поля balance
             else:
                 # Если недостаточно средств, деактивируем бота
                 adv_setting.bot_active = False
-                
-                # Добавляем тип списания в платеж для отслеживания причины
-                payment.type = "deactivation_due_to_insufficient_funds"
-
             await session.commit()
 
 

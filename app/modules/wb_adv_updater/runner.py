@@ -8,7 +8,6 @@ set_config()
 import asyncio
 import logging
 from app.utils.db.session_maker import get_async_session_maker
-from ..common_slaves.wildberries import super_cabinet_manager as users_manager
 from . import wb_manager
 
 
@@ -21,43 +20,6 @@ logger = logging.getLogger(__name__)
 
 async def run_update_predict_ctr():
      await wb_manager.update_predict_ctr()
-
-async def   run_update_keyword_stat():
-    while True:
-        try:
-            await __run_update_keyword_stat()
-        except Exception as e:
-            logger.error(f'Ошибка обновления статистики ключей {e}', exc_info=True)
-        await asyncio.sleep(0)
-
-
-async def __run_update_keyword_stat():
-    wb_cabinet_tasks = {}
-    adv_update_tasks = {}
-    # not_first_runs = set()
-    while True:
-        accesses = users_manager.get_accesses_for_wb_cabinets()
-        async for access in accesses:
-            cabinet_id = access.wb_cabinet.id
-            if cabinet_id not in wb_cabinet_tasks:
-                task = asyncio.create_task(
-                    wb_manager.update_keyword_stat(access,
-                                                      adv_update_tasks,))
-                wb_cabinet_tasks[cabinet_id] = task
-
-            else:
-                if wb_cabinet_tasks[cabinet_id].done():
-                    logger.debug(f'Задача обновления статистики ключей завершена для кабинета {cabinet_id}')
-                    if wb_cabinet_tasks[cabinet_id].exception():
-                        logger.error(
-                            f'Ошибка обновления статистики ключей: '
-                            f'{wb_cabinet_tasks[cabinet_id].exception()},'
-                            f' для кабинета {cabinet_id}'
-                        )
-
-                    del wb_cabinet_tasks[cabinet_id]
-        await asyncio.sleep(0)
-
 
 
 async def run_update_all_keywords_on_wb():
