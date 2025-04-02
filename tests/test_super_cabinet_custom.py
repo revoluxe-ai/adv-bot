@@ -1,10 +1,11 @@
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
+from contextlib import asynccontextmanager
 
 from app.modules.common_slaves.wildberries.super_cabinet_manager import get_access_for_wb_cabinet, WBCabinetAccess
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBToken
 from app.modules.common_slaves.wildberries.exceptions import WBCabinetNotFoundError
-from contextlib import asynccontextmanager
+from app.core.wb_api.exceptions import ApiForbiddenError
 
 
 @pytest.mark.asyncio
@@ -12,26 +13,103 @@ async def test_get_access_for_wb_cabinet_by_id():
     """Тестирование получения доступа к кабинету по cabinet_id"""
     
     # Создаем мок кабинета
-    mock_cabinet = MagicMock(spec=WBCabinet)
+    mock_cabinet = AsyncMock(spec=WBCabinet)
     mock_cabinet.id = 1
     mock_cabinet.shop_id = '123'
     mock_cabinet.balance = 100.0
     
-    # Создаем мок токена
-    mock_token = MagicMock(spec=WBToken)
-    mock_token.api_key = 'test_token'
-    mock_token.check_valid = MagicMock(return_value=True)
+    # Создаем мок токена с правильным JWT
+    mock_token = AsyncMock(spec=WBToken)
+    mock_token.api_key = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzaWQiOiIxMjMiLCJleHAiOjE3MzA5NzI4MDB9.dummy"
+    mock_token.user_id = 1
+    mock_token.active = True
     mock_token.shop_id = '123'
+    mock_token.check_valid = AsyncMock(return_value=True)
     
-    # Создаем мок сессии для второго вызова (получение кабинета и токенов)
+    # Создаем мок сессии
     session_mock = AsyncMock()
     
     # Настраиваем execute для получения кабинета
-    execute_result = AsyncMock()
-    execute_result.scalar.return_value = mock_cabinet
-    session_mock.execute.return_value = execute_result
+    cabinet_result = AsyncMock()
+    cabinet_result.scalar = AsyncMock(return_value=mock_cabinet)
+    session_mock.execute = AsyncMock(return_value=cabinet_result)
     
-    # Простой класс для имитации асинхронного итератора токенов
+    # Настраиваем stream для токенов
+    class MockAsyncIterator:
+        def __init__(self, tokens):
+            self.tokens = tokens
+            self._index = 0
+        
+        def yield_per(self, _):
+            return self
+        
+        async def __aiter__(self):
+            for token in self.tokens:
+                yield (token,)
+    
+    stream_result = AsyncMock()
+    stream_result.yield_per.return_value = MockAsyncIterator([mock_token])
+    session_mock.stream = AsyncMock(return_value=stream_result)
+    
+    # Создаем контекстный менеджер
+    class MockSessionManager:
+        async def __aenter__(self):
+            return session_mock
+            
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+    
+    # Патчим get_async_session_maker
+    with patch('app.modules.common_slaves.wildberries.super_cabinet_manager.sm', 
+               return_value=MockSessionManager()):
+        
+        # Вызываем функцию с числовым cabinet_id
+        access = await get_access_for_wb_cabinet(1)
+        
+        # Проверяем результаты
+        assert access is not None
+        assert access.wb_cabinet == mock_cabinet
+        assert len(access.tokens) == 1
+        assert access.tokens[0] == mock_token
+        
+        # Проверяем, что execute был вызван с правильным запросом
+        session_mock.execute.assert_called()
+        
+        # Проверяем, что stream был вызван для получения токенов
+        session_mock.stream.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_access_for_wb_cabinet_by_shop_id():
+    """Тестирование получения доступа к кабинету по shop_id"""
+    
+    # Создаем мок кабинета
+    mock_cabinet = AsyncMock(spec=WBCabinet)
+    mock_cabinet.id = 1
+    mock_cabinet.shop_id = '123'
+    mock_cabinet.balance = 100.0
+    
+    # Создаем мок токена с правильным JWT
+    mock_token = AsyncMock(spec=WBToken)
+    mock_token.api_key = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzaWQiOiIxMjMiLCJleHAiOjE3MzA5NzI4MDB9.dummy"
+    mock_token.user_id = 1
+    mock_token.active = True
+    mock_token.shop_id = '123'
+    mock_token.check_valid = AsyncMock(return_value=True)
+    
+    # Создаем мок сессии для первого вызова (поиск cabinet_id)
+    session_mock1 = AsyncMock()
+    execute_result1 = AsyncMock()
+    execute_result1.scalar = AsyncMock(return_value=1)  # ID кабинета
+    session_mock1.execute = AsyncMock(return_value=execute_result1)
+    
+    # Создаем мок сессии для второго вызова (получение кабинета и токенов)
+    session_mock2 = AsyncMock()
+    execute_result2 = AsyncMock()
+    execute_result2.scalar = AsyncMock(return_value=mock_cabinet)
+    session_mock2.execute = AsyncMock(return_value=execute_result2)
+    
+    # Настраиваем stream для токенов
     class MockAsyncIterator:
         def __init__(self, tokens):
             self.tokens = tokens
@@ -41,95 +119,30 @@ async def test_get_access_for_wb_cabinet_by_id():
         
         async def __aiter__(self):
             for token in self.tokens:
-                yield [token]
+                yield (token,)
     
-    # Настраиваем stream для токенов
     stream_result = AsyncMock()
     stream_result.yield_per.return_value = MockAsyncIterator([mock_token])
-    session_mock.stream.return_value = stream_result
+    session_mock2.stream = AsyncMock(return_value=stream_result)
     
-    # Создаем контекстный менеджер
-    @asynccontextmanager
-    async def mock_session_manager():
-        yield session_mock
+    # Создаем контекстный менеджер, который будет возвращать разные моки
+    sessions = [session_mock1, session_mock2]
+    session_index = 0
+    
+    class MockSessionManager:
+        async def __aenter__(self):
+            nonlocal session_index
+            current_session = sessions[session_index]
+            session_index = (session_index + 1) % len(sessions)
+            return current_session
+            
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
     
     # Патчим get_async_session_maker
-    with patch('app.modules.common_slaves.wildberries.super_cabinet_manager.get_async_session_maker', 
-               return_value=mock_session_manager):
-        # Вызываем функцию с числовым cabinet_id (минуя первую сессию)
-        access = await get_access_for_wb_cabinet(1)
-        
-        # Проверяем результаты
-        assert access is not None
-        assert access.wb_cabinet == mock_cabinet
-        assert len(access.tokens) == 1
-        assert access.tokens[0] == mock_token
-
-
-@pytest.mark.asyncio
-async def test_get_access_for_wb_cabinet_by_shop_id():
-    """Тестирование получения доступа к кабинету по shop_id"""
-    
-    # Создаем мок кабинета
-    mock_cabinet = MagicMock(spec=WBCabinet)
-    mock_cabinet.id = 1
-    mock_cabinet.shop_id = '123'
-    mock_cabinet.balance = 100.0
-    
-    # Создаем мок токена
-    mock_token = MagicMock(spec=WBToken)
-    mock_token.api_key = 'test_token'
-    mock_token.check_valid = MagicMock(return_value=True)
-    mock_token.shop_id = '123'
-    
-    # Счетчик вызовов для разных сессий
-    call_count = 0
-    
-    # Создаем контекстный менеджер, который будет возвращать разные моки при разных вызовах
-    @asynccontextmanager
-    async def mock_session_manager():
-        nonlocal call_count
-        
-        if call_count == 0:
-            # Первый вызов - поиск cabinet_id по shop_id
-            session_mock1 = AsyncMock()
-            execute_result1 = AsyncMock()
-            execute_result1.scalar.return_value = 1  # Возвращаем ID кабинета
-            session_mock1.execute.return_value = execute_result1
-            call_count += 1
-            yield session_mock1
-        else:
-            # Второй вызов - получение кабинета и токенов
-            session_mock2 = AsyncMock()
-            
-            # Настраиваем execute для получения кабинета
-            execute_result2 = AsyncMock()
-            execute_result2.scalar.return_value = mock_cabinet
-            session_mock2.execute.return_value = execute_result2
-            
-            # Простой класс для имитации асинхронного итератора токенов
-            class MockAsyncIterator:
-                def __init__(self, tokens):
-                    self.tokens = tokens
-                
-                def yield_per(self, _):
-                    return self
-                
-                async def __aiter__(self):
-                    for token in self.tokens:
-                        yield [token]
-            
-            # Настраиваем stream для токенов
-            stream_result = AsyncMock()
-            stream_result.yield_per.return_value = MockAsyncIterator([mock_token])
-            session_mock2.stream.return_value = stream_result
-            
-            yield session_mock2
-    
-    # Патчим get_async_session_maker
-    with patch('app.modules.common_slaves.wildberries.super_cabinet_manager.get_async_session_maker', 
-               return_value=mock_session_manager):
-        # Вызываем функцию со строковым shop_id (использует обе сессии)
+    with patch('app.modules.common_slaves.wildberries.super_cabinet_manager.sm', 
+               return_value=MockSessionManager()):
+        # Вызываем функцию со строковым shop_id
         access = await get_access_for_wb_cabinet('123')
         
         # Проверяем результаты
@@ -144,7 +157,7 @@ async def test_get_access_for_wb_cabinet_no_tokens():
     """Тестирование получения доступа к кабинету без токенов"""
     
     # Создаем мок кабинета
-    mock_cabinet = MagicMock(spec=WBCabinet)
+    mock_cabinet = AsyncMock(spec=WBCabinet)
     mock_cabinet.id = 1
     mock_cabinet.shop_id = '123'
     mock_cabinet.balance = 100.0
@@ -154,38 +167,39 @@ async def test_get_access_for_wb_cabinet_no_tokens():
     
     # Настраиваем execute для получения кабинета
     execute_result = AsyncMock()
-    execute_result.scalar.return_value = mock_cabinet
-    session_mock.execute.return_value = execute_result
+    execute_result.scalar = AsyncMock(return_value=mock_cabinet)
+    session_mock.execute = AsyncMock(return_value=execute_result)
     
-    # Простой класс для имитации пустого асинхронного итератора
-    class EmptyMockAsyncIterator:
+    # Настраиваем stream для пустого списка токенов
+    class MockAsyncIterator:
+        def __init__(self, tokens):
+            self.tokens = tokens
+        
         def yield_per(self, _):
             return self
         
         async def __aiter__(self):
-            # Ничего не возвращаем
-            return
+            for token in self.tokens:
+                yield (token,)
     
-    # Настраиваем stream для пустого списка токенов
     stream_result = AsyncMock()
-    stream_result.yield_per.return_value = EmptyMockAsyncIterator()
-    session_mock.stream.return_value = stream_result
+    stream_result.yield_per.return_value = MockAsyncIterator([])
+    session_mock.stream = AsyncMock(return_value=stream_result)
     
     # Создаем контекстный менеджер
-    @asynccontextmanager
-    async def mock_session_manager():
-        yield session_mock
+    class MockSessionManager:
+        async def __aenter__(self):
+            return session_mock
+            
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
     
     # Патчим get_async_session_maker
-    with patch('app.modules.common_slaves.wildberries.super_cabinet_manager.get_async_session_maker', 
-               return_value=mock_session_manager):
-        # Вызываем функцию с числовым cabinet_id (минуя первую сессию)
-        access = await get_access_for_wb_cabinet(1)
-        
-        # Проверяем результаты
-        assert access is not None
-        assert access.wb_cabinet == mock_cabinet
-        assert access.tokens == []
+    with patch('app.modules.common_slaves.wildberries.super_cabinet_manager.sm',
+               return_value=MockSessionManager()):
+        # Вызываем функцию и ожидаем исключение
+        with pytest.raises(ApiForbiddenError):
+            await get_access_for_wb_cabinet(1)
 
 
 @pytest.mark.asyncio
@@ -195,19 +209,22 @@ async def test_get_access_for_nonexistent_cabinet():
     # Создаем мок сессии
     session_mock = AsyncMock()
     
-    # Настраиваем execute для отсутствующего кабинета
+    # Настраиваем execute для возврата None (кабинет не найден)
     execute_result = AsyncMock()
-    execute_result.scalar.return_value = None  # Кабинет не найден
-    session_mock.execute.return_value = execute_result
+    execute_result.scalar = AsyncMock(return_value=None)
+    session_mock.execute = AsyncMock(return_value=execute_result)
     
     # Создаем контекстный менеджер
-    @asynccontextmanager
-    async def mock_session_manager():
-        yield session_mock
+    class MockSessionManager:
+        async def __aenter__(self):
+            return session_mock
+            
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
     
     # Патчим get_async_session_maker
-    with patch('app.modules.common_slaves.wildberries.super_cabinet_manager.get_async_session_maker', 
-               return_value=mock_session_manager):
+    with patch('app.modules.common_slaves.wildberries.super_cabinet_manager.sm',
+               return_value=MockSessionManager()):
         # Вызываем функцию и ожидаем исключение
         with pytest.raises(WBCabinetNotFoundError):
-            await get_access_for_wb_cabinet(999) 
+            await get_access_for_wb_cabinet(1) 

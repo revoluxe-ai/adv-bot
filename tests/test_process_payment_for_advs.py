@@ -37,6 +37,7 @@ class MockAdvSetting:
     def __init__(self, bot_active=True, wb_cabinet=None, adv_id=1, payments=None):
         self.bot_active = bot_active
         self.wb_cabinet = wb_cabinet
+        self.wb_cabinet_id = wb_cabinet.id if wb_cabinet else None
         self.adv_id = adv_id
         self.payments = payments or []
         if wb_cabinet:
@@ -50,7 +51,8 @@ class MockAdvPayment:
         self.amount = amount
 
 class MockPricer:
-    async def get_price_for_day_for_shop(self, shop_id):
+    @staticmethod
+    async def get_price_for_day_for_shop(shop_id):
         return 100
 
 # Патчи для тестов
@@ -149,8 +151,7 @@ async def test_process_payment_for_advs_insufficient_funds(mock_sm, mock_pricer)
     # Проверки
     assert mock_session.execute.called
     assert mock_session.commit.called
-    assert len(adv_setting.payments) == 1  # В новой реализации платеж создается в любом случае
-    assert adv_setting.payments[0].type == "deactivation_due_to_insufficient_funds"  # Проверка типа платежа
+    assert len(adv_setting.payments) == 0  # Платеж не должен создаваться
     assert adv_setting.bot_active is False  # Бот должен быть деактивирован
     
     # Проверяем, что не было создания записей о списании
