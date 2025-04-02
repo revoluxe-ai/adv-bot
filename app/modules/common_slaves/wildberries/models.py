@@ -2,8 +2,7 @@ import json
 import re
 from dataclasses import dataclass
 from typing import Optional
-
-from sqlalchemy import Index, UniqueConstraint, Date
+from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
                         BIGINT, Boolean, Float, DateTime, text)
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -15,6 +14,7 @@ from sqlalchemy import JSON
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
+from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.base import BaseTable
 
 from app.utils.db.models import User, favorite_advs_association
@@ -24,25 +24,13 @@ from app.utils.db.session_maker import get_async_session_maker
 _sm = get_async_session_maker
 
 
-class AdvPayment(BaseTable):
-    __tablename__ = "advpayment"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    date = Column(Date, nullable=False)
-    adv_setting_id = Column(Integer, ForeignKey('advsetting.id'), nullable=False)
-    adv_setting = relationship('AdvSetting', back_populates='payments')
-    type = mapped_column(String, nullable=True)
-    amount = mapped_column(Float, nullable=True, default=None)
-    __table_args__ = (
-        UniqueConstraint('date', 'adv_setting_id', 'type', name='uix_date_adv_setting_id_type'),
-    )
 
 
 class WBUserCabinet(BaseTable):
     wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
     user_id: Mapped[Integer] = Column(Integer, ForeignKey('user.id'), nullable=False)
-    user: Mapped[User] = relationship("User", back_populates="wb_user_cabinets",
-                                       )
+    user: Mapped[User] = relationship("User", back_populates="wb_user_cabinets")
     name = Column(String(255), nullable=False)
     __table_args__ = (
         UniqueConstraint('wb_cabinet_id', 'user_id',  name='_wb_cabinet_id_user_id_uc'),
@@ -165,7 +153,7 @@ class WBToken(BaseTable):
             if result:
                 return True
         except Exception:
-           return False
+            return False
 
 
     def get_payload(self, key, default=0):
@@ -535,8 +523,8 @@ class WBItemPosition:
         position.adv_id = data['adv_id']
         position.nmid = data['nmid']
         try:
-           str_timestamp = data['timestamp']
-           position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
+            str_timestamp = data['timestamp']
+            position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
         except:
             position.timestamp = None
 
@@ -547,5 +535,3 @@ class WBItemPosition:
             position.adv_type = None
 
         return position
-    
-
