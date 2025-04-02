@@ -149,12 +149,12 @@ async def adv_handler(
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
 
     async with sm() as session:
-        adv_ = await session.execute(
+        adv = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
-        adv_ = adv_.scalar()
+        adv = adv.scalar()
 
-    if not adv_:
+    if not adv:
         await bot.send_message(callback.message.chat.id, "Кампания не найдена, попробуйте еще раз")
         stmt = (
             select(AdvSetting)
@@ -202,8 +202,8 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
         wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
         stmt = select(AdvSetting).options(selectinload(AdvSetting.payments))\
             .where(AdvSetting.id == adv_original_id)
-        adv_ = await session.execute(stmt)
-        adv_: AdvSetting = adv_.scalar()
+        adv = await session.execute(stmt)
+        adv: AdvSetting = adv.scalar()
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
         tariff_for_month = await pricer.get_price_for_day_for_shop(wb_cabinet.shop_id)
         price_for_adv_for_day = pricer.get_tariff_for_day(tariff_for_month)
@@ -232,7 +232,7 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
         chat_id = callback.message.chat.id
-        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_)()
+        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
 
