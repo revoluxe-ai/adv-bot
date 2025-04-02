@@ -95,9 +95,8 @@ async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Messag
         .where(WBUserCabinet.id == wb_user_cabinet_original_id)
     async with sm() as session:
         adv_settings = await session.execute(stmt)
-        adv_settings = adv_settings.scalars().all()
-
-
+        adv_settings =adv_settings.scalars().all()
+        adv_settings = list(adv_settings)
     await messages.AdvCompanyChoicing (bot,
                                        chat_id,
                                        wb_user_cabinet_original_id,
