@@ -6,12 +6,15 @@ import yaml
 
 from collections import defaultdict
 from neo4j import AsyncGraphDatabase
+from sqlalchemy import select, distinct, func
 
-from app.modules.common_advs_stat import data_manager
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.namedtuples import KeywordPhrase
-from app.modules.common_slaves.wildberries.models import WBCard, WBCategory
+from app.modules.common_slaves.wildberries.models import WBCard, WBCategory, KeywordSetting, AdvSetting
+from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager, text_cleaner
+from python_modules.path_setting_funcs import get_setting_path
+from app.utils.db.session_maker import get_async_session_maker as sm
 
 
 logger = logging.getLogger(__name__)
@@ -801,6 +804,72 @@ UNWIND phrase.words AS word
 
 
 
+
+    # def create_graph_for_keyword_phrase_knn(self, graph_name):
+    #     query = """
+    #         CALL gds.graph.project(
+    #         $graph_name,
+    #         {
+    #
+    #             KeywordPhrase: {properties: ['fastrp']}
+    #         },
+    #         {
+    #             IS: {
+    #                 type: 'IS',
+    #                 properties: {
+    #                     dist: {
+    #                         property: 'dist',
+    #                         defaultValue:1
+    #                     }
+    #                 }
+    #             },
+    #              LIKE: {
+    #                 type: 'LIKE',
+    #                 properties: {
+    #                     dist: {
+    #                         property: 'dist',
+    #                         defaultValue: 1
+    #                     }
+    #                 }
+    #             },
+    #
+    #
+    #              IN: {
+    #                 type: 'IN',
+    #                 properties: {
+    #                     dist: {
+    #                         property: 'dist',
+    #                         defaultValue: 1
+    #                     }
+    #                 }
+    #             }
+    #
+    #         }
+    #     ) YIELD graphName, nodeProjection, nodeCount, relationshipProjection, relationshipCount, projectMillis
+    #     RETURN graphName
+    #             """
+    #     with self._neo_driver.driver.session() as s:
+    #         result = s.run(query, graph_name=graph_name)
+    #         logger.debug(result)
+
+    # def set_knn_for_keyword_phrase_by_fastrp(self, graph_name, topK):
+    #     query = """
+    #           CALL gds.knn.write(
+    #                    $graph_name,
+    #                    {
+    #                       nodeLabels: ['KeywordPhrase'],
+    #                       relationshipTypes:  ['*'],
+    #                       jobId: 'knn',
+    #                       nodeProperties: {fastrp: 'EUCLIDEAN'},
+    #                       topK: $topK,
+    #                       writeRelationshipType: 'KNN',
+    #                       writeProperty: 'dist'
+    #                    }
+    #                  )    YIELD  nodesCompared RETURN nodesCompared"""
+    #     with self._neo_driver.driver.session() as s:
+    #         result = s.run(query, graph_name=graph_name,
+    #                        topK=topK).data()
+    #         logger.debug(result)
 
     async def get_nmid_vectors(self,  nmids: list[int]) -> typing.List[typing.Tuple[int, typing.List[float]]]:
         query = """
