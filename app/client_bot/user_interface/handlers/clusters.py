@@ -1,25 +1,13 @@
 import logging
-import typing
-from datetime import datetime
-from typing import Union
-
-import aiogram
 from aiogram import Router, types, F, Bot
-from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet, AdvPayment
-from app.utils.db.models import User
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker
-from .start import start_registration
-from .. import states
 from ..views import messages
 from ..views import callbacks
-from ... import const
-
 sm = get_async_session_maker
+
 
 router = Router()
 
@@ -41,7 +29,7 @@ async def turn_clusters_on(callback: types.CallbackQuery, bot: Bot,
         adv_setting: AdvSetting = adv_setting.scalar()
         adv_setting.clusters_mode = True
         await session.commit()
-    wb_user_cabinet_original_id = data['last_wb_user_cabinet_original_id']
+    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
         wb_user_cabinet = await session.execute(
             select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
@@ -64,7 +52,7 @@ async def turn_clusters_off(callback: types.CallbackQuery, bot: Bot,
         adv_setting: AdvSetting = adv_setting.scalar()
         adv_setting.clusters_mode = False
         await session.commit()
-    wb_user_cabinet_original_id = data['last_wb_user_cabinet_original_id']
+    wb_user_cabinet_original_id: int = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
         wb_user_cabinet = await session.execute(
             select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
