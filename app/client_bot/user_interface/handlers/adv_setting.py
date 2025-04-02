@@ -118,7 +118,7 @@ async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Messag
 
 
 @router.callback_query(callbacks.Adv.filter())
-async def adv(
+async def adv_handler(
         callback: types.CallbackQuery,
         callback_data: callbacks.Adv,
         bot: aiogram.Bot,
