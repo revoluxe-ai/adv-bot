@@ -297,7 +297,7 @@ class AdvSetting(BaseTable):
                                 back_populates='adv_setting',
                                 uselist=True)
     bot_active = Column(Boolean, default=False)
-    nmids = Column(JSON, default=[])
+    nmids = Column(JSONB, default=[])
     keyword_settings: Mapped[list['KeywordSetting']] = relationship('KeywordSetting',
                                                                     cascade="all, delete-orphan",
                                                                     back_populates='adv_setting',

@@ -41,6 +41,9 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> Inlin
             callback_data=AdminBonus(action="menu").pack()
         )
         keyboard_buttons.append([admin_button])
+
+    button = InlineKeyboardButton(text='Добавить магазин', callback_data=callbacks.ShopNew().pack())
+    keyboard_buttons.append([button])
     
     button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
     keyboard_buttons.append([button])
@@ -53,8 +56,6 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> Inlin
                                             wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack())
         # Добавляем кнопку в список строк кнопок
         keyboard_buttons.append([button])  # Каждая кнопка в своем списке, т.е. каждая в новой строке
-    
-    button = InlineKeyboardButton(text='Добавить магазин', callback_data=callbacks.ShopNew().pack())
-    keyboard_buttons.append([button])
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     return keyboard
