@@ -70,19 +70,23 @@ async def get_access_for_wb_cabinet(wb_cabinet_id_or_shop_id: typing.Union[int, 
             result = await session.execute(stmt)
             wb_cabinet_id = result.scalar()
             if wb_cabinet_id is None:
-                raise exceptions.WBCabinetNotFoundError(wb_cabinet_id)
+                raise exceptions.WBCabinetNotFoundError(shop_id)
     else:
         wb_cabinet_id = wb_cabinet_id_or_shop_id
+
     async with sm() as session:
         stmt_wb_cabinet_getting = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
         result_from_pg = await session.execute(stmt_wb_cabinet_getting)
         wb_cabinet: WBCabinet = result_from_pg.scalar()
+        
         if wb_cabinet is None:
             raise exceptions.WBCabinetNotFoundError(wb_cabinet_id)
+            
         shop_id = str(wb_cabinet.shop_id)
         stmt = select(WBToken)
         result = await session.stream(stmt)
         catch_tokens = []
+        
         async for token in result.yield_per(100):
             token: WBToken = token[0]
             if not token.check_valid():
@@ -90,8 +94,9 @@ async def get_access_for_wb_cabinet(wb_cabinet_id_or_shop_id: typing.Union[int, 
                 continue
             if token.shop_id == shop_id:
                 catch_tokens.append(token)
+                
         # Всегда возвращаем WBCabinetAccess, даже если список токенов пуст
         access = WBCabinetAccess(tokens=catch_tokens,
-                                 wb_user_cabinet=None,
-                                 wb_cabinet=wb_cabinet)
+                                wb_user_cabinet=None,
+                                wb_cabinet=wb_cabinet)
         return access

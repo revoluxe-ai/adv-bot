@@ -62,4 +62,10 @@ class NotItemsInAdvSetting(Exception):
 
 
 class WBCabinetNotFoundError(Exception):
-    pass
+    def __init__(self, identifier: Union[int, str]):
+        self.identifier = identifier
+        self.is_shop_id = isinstance(identifier, str)
+        
+        id_type = "shop_id" if self.is_shop_id else "cabinet_id"
+        message = f"Кабинет не найден (по {id_type}: {self.identifier})"
+        super().__init__(message)
