@@ -10,7 +10,6 @@ from .exc import CardsNotFoundForShopError, NotEnoughBalanceOnShopError, StartCo
 from .wb_api import WBApi
 from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
 from ...common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
-from app.client_bot.bot import bot
 import logging
 
 
@@ -33,7 +32,7 @@ class MainAdvManager:
         return await self.wb_api.create_auto_adv(name, SubjectID, balance_type, start_status)
 
 
-    async def upcast_auto_adv(self, nmid: int, auto_adv_id, user_telegram_id: int):
+    async def upcast_auto_adv(self, nmid: int, auto_adv_id, user_telegram_id: int, bot: Bot):
         await bot.send_message(user_telegram_id, f'Пытаюсь найти и настроить Авто-РК для артикула {nmid}')
         start_delay = 10*60
         global_max_attempts = 10
@@ -44,7 +43,8 @@ class MainAdvManager:
                     advs = (await self.wb_api.get_advs([auto_adv_id]))
                     break
                 except AdvNotFoundInWBError:
-                    logger.info(f'Кампания {auto_adv_id} не найдена после создания, следующая попытка через {start_delay} секунд')
+                    logger.info(f'Кампания {auto_adv_id} не найдена после создания,'
+                                f' следующая попытка через {start_delay} секунд')
                     await asyncio.sleep(start_delay)
                     start_delay *= 2
             else:
@@ -86,9 +86,12 @@ class MainAdvManager:
                 target_card = await self.wb_api.get_card_by_text(nmid)
             except CardNotFoundInWB:
                 raise CardsNotFoundForShopError(f'Карточка с артикулом {nmid} не найдена на Wildberries')
-
-            await wb_db_manager.update_cards_in_db([target_card], self.access.wb_cabinet)
-
+            wb_cabinet = self.access.wb_cabinet
+            assert wb_cabinet is not None
+            async with sm() as session:
+                await wb_db_manager.update_cards_in_db([target_card],
+                                                       wb_cabinet,
+                                                       session)
             name = target_card.name
             new_adv_name = str(nmid) + ' ' + name
             new_adv_name = new_adv_name[:128]
@@ -112,7 +115,9 @@ class MainAdvManager:
 
             setattr(balances, balance_property_str, getattr(balances, balance_property_str) - 1000)
             async with sm(read_only=False) as session:
-                stmt = select(WBCabinet).where(WBCabinet.id == self.access.wb_cabinet.id)
+                assert self.access.wb_cabinet is not None
+                wb_cabinet_original_id: int = self.access.wb_cabinet.id
+                stmt = select(WBCabinet).where(WBCabinet.id==wb_cabinet_original_id)
                 wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
                 new_adv = AdvSetting()
                 new_adv.adv_id = auto_adv_id
@@ -141,7 +146,7 @@ class MainAdvManager:
                                                           f' Авто: {auto_adv_id}, Аукцион {search_adv_id},'
                                                           f'Делаю попытку правильно настроить и запустить РК')
         try:
-            await self.upcast_auto_adv(nmid, auto_adv_id, user_telegram_id)
+            await self.upcast_auto_adv(nmid, auto_adv_id, user_telegram_id, bot)
         except AdvNotFoundInWBError as exc:
             exc.auto_adv_id = auto_adv_id
             exc.search_adv_id = search_adv_id
@@ -151,8 +156,9 @@ class MainAdvManager:
         try:
             await self.start_complex_advs(nmid, auto_adv_id, search_adv_id)
             await bot.send_message(user_telegram_id,
-            f'Отправлены запросы на запуск РК для артикула {nmid}, проверьте правильность запуска в кабинете WB: '
-            f'ID Авто-РК: {auto_adv_id}, ID Поисковой РК: {search_adv_id}')
+                                f'Отправлены запросы на запуск РК для артикула {nmid},'
+                                     f' проверьте правильность запуска в кабинете WB: '
+                                     f'ID Авто-РК: {auto_adv_id}, ID Поисковой РК: {search_adv_id}')
         except StartComplexAdvError as exc:
             exc.auto_adv_id = auto_adv_id
             exc.search_adv_id = search_adv_id
@@ -182,8 +188,8 @@ class MainAdvManager:
 
 
 
-
-    async def get_adv_setting_by_nmid(self, nmid: int) -> AdvSetting:
+    @staticmethod
+    async def get_adv_setting_by_nmid(nmid: int) -> AdvSetting:
         async with sm() as session:
             stmt = select(AdvSetting) \
                 .where(
@@ -196,8 +202,8 @@ class MainAdvManager:
                         ),
                         # Дополнительно можно вернуть этот блок, если нужно
                         and_(
-                            AdvSetting.nmids == [nmid],
-                            AdvSetting._search_adv_id != None
+                            AdvSetting.nmids==[nmid],
+                            AdvSetting._search_adv_id!=None
                         )
                     )))
 
@@ -237,7 +243,3 @@ class MainAdvManager:
         else:
             raise Exception('Неизвестный тип баланса')
         return balance_type, min_balance_property_name
-
-
-
-
