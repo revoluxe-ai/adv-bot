@@ -89,12 +89,13 @@ async def process_payment_for_advs() -> None:
             # Используем гибридные свойства вместо прямого доступа к полям
             calculated_bonus = wb_cabinet.calculated_bonus
             calculated_balance = wb_cabinet.calculated_balance
-            payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
-            adv_setting.payments.append(payment)
             
-            # Сначала используем бонусы, затем баланс
+            # Сначала проверяем наличие средств
             if calculated_bonus >= PRICE_FOR_ADV_FOR_DAY:
-                # Создаем запись списания бонусов
+                # Создаем платеж и запись списания бонусов
+                payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+                adv_setting.payments.append(payment)
+                
                 bonus_payment = WBBonusPayment(
                     wb_cabinet_id=wb_cabinet.id,
                     amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
@@ -102,18 +103,17 @@ async def process_payment_for_advs() -> None:
                     operation_type="subtract"
                 )
                 session.add(bonus_payment)
-                
-                # Расчет остатка идет с учетом платежей, не нужно вычитать из поля bonus
             elif calculated_balance >= PRICE_FOR_ADV_FOR_DAY:
-                # Создаем запись списания с баланса
+                # Создаем платеж и запись списания с баланса
+                payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+                adv_setting.payments.append(payment)
+                
                 balance_payment = WBBalancePayment(
                     wb_cabinet_id=wb_cabinet.id,
                     amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
-                    description=f"Списание за рекламную кампанию {adv_setting.adv_id}"
+                    description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
                 )
                 session.add(balance_payment)
-                
-                # Расчет остатка идет с учетом платежей, не нужно вычитать из поля balance
             else:
                 # Если недостаточно средств, деактивируем бота
                 adv_setting.bot_active = False
