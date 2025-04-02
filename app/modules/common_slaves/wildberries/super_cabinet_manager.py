@@ -142,5 +142,6 @@ async def get_access_for_wb_cabinet(wb_cabinet_id_or_shop_id: typing.Union[int, 
         if not catch_tokens:
             raise ApiForbiddenError(f'Нет валидных токенов для кабинета с shop_id {shop_id}')
         access = WBCabinetAccess(tokens = catch_tokens,
-                                wb_user_cabinet = None,)
+                                wb_user_cabinet = None,
+                                wb_cabinet = wb_cabinet)
         return access
