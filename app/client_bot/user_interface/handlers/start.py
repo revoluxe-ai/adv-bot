@@ -6,6 +6,7 @@ from aiogram import Router, types
 from aiogram.filters import StateFilter, CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import select
 
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.exceptions import ApiForbiddenError
@@ -126,7 +127,7 @@ async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMCont
             .join(WBCabinet.adv_settings)\
             .join(WBCabinet.wb_user_cabinets)\
             .join(WBUserCabinet.user)\
-            .options(WBCabinet.adv_settings)\
+            .options(joinedload(WBCabinet.adv_settings))\
             .where(and_(WBCabinet.shop_id == wb_token.shop_id,
                         WBUserCabinet.user_id == user.id))
         result = await session.execute(stmt)
