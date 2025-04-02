@@ -1,6 +1,6 @@
+import asyncio
 import dotenv
 dotenv.load_dotenv()
-import asyncio
 from app.modules.wb_adv_updater.runner import keywords_parsing_process
 from python_modules.logger import setup_logging
 

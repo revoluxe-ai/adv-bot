@@ -1,4 +1,3 @@
-import asyncio
 from time import sleep
 
 from app.modules.wb_adv_updater.runner import run_update_model
