@@ -59,3 +59,7 @@ class CardNotFoundInWB(Exception):
 
 class NotItemsInAdvSetting(Exception):
     pass
+
+
+class WBCabinetNotFoundError(Exception):
+    pass
