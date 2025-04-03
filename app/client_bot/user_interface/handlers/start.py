@@ -3,12 +3,9 @@ from operator import and_
 from typing import Union
 import aiogram
 from aiogram import Router, types
-from aiogram.filters import StateFilter, CommandStart, Command
+from aiogram.filters import StateFilter, CommandStart
 from aiogram.fsm.context import FSMContext
-from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy import select
-
-from app.core.wb_api.data_classes.adv import Adv
+from sqlalchemy.orm import joinedload
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken, AdvSetting
 from sqlalchemy.future import select
@@ -27,6 +24,7 @@ from ..views import callbacks, messages, keyboards
 from app.utils.db.models import User
 from app.modules.common_slaves.wildberries import models as wb_models, super_cabinet_manager
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
+from app.core.wb_api.exceptions import NotValidTokenError
 from app.client_bot import const
 
 logger = logging.getLogger(__name__)
@@ -99,10 +97,19 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 
 @router.message(StateFilter(states.CabinetRegistration.api))
 async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMContext):
-    api = message.text
-    api = api.strip()
+    text = message.text
+    if '/start' in text:
+        await start_registration(message, bot, state)
+        return
+    text = text.strip()
     user_telegram_id = message.from_user.id
-    wb_token = wb_models.WBToken(api_key=api)
+    wb_token = wb_models.WBToken(api_key=text)
+    try:
+        shop_id = wb_token.shop_id
+    except NotValidTokenError:
+        await bot.send_message(message.chat.id,
+                                 "Токен не валиден, попробуйте еще раз: ")
+        return
     access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
     chat_id = message.chat.id
     await messages.ShopUpdateInfo(bot, chat_id)()
@@ -128,7 +135,7 @@ async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMCont
             .join(WBCabinet.wb_user_cabinets)\
             .join(WBUserCabinet.user)\
             .options(joinedload(WBCabinet.adv_settings))\
-            .where(and_(WBCabinet.shop_id == wb_token.shop_id,
+            .where(and_(WBCabinet.shop_id == shop_id,
                         WBUserCabinet.user_id == user.id))
         result = await session.execute(stmt)
         wb_cabinet = result.scalar()

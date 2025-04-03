@@ -14,6 +14,7 @@ from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabine
 from ..into_callback import CreateNewAdvs as CreateNewAdvsCallbackData
 from .states import CreateCompamyStates as states
 import logging
+from app.modules.cabinet_bonus_manager.bonus_service import get_cabinet_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,12 @@ async def create_new_adv(callback: ao.CallbackQuery,
                          bot: ao.Bot,
                          state: ao.FSMContext) -> None:
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    balance, bonus = await balance_service.get_cabinet_balance(wb_user_cabinet_original_id)
+    async with (sm() as session):
+        stmt = select(WBCabinet.id)\
+            .where(WBCabinet.wb_user_cabinets.any(WBUserCabinet.id == wb_user_cabinet_original_id))
+        result = await session.execute(stmt)
+        wb_cabinet_id = result.scalar_one()
+    balance, bonus = await balance_service.get_cabinet_balance(wb_cabinet_id)
     sum_bot_balance = balance + bonus
     if sum_bot_balance <= 0:
         await messages.NotEnoughMoneyMessage(bot, callback.from_user.id)(wb_user_cabinet_original_id)
