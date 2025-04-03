@@ -333,7 +333,8 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                   on_page,
                                   min_ctr,
                                   hide_keywords_is_not_relevant,
-                                  sort_mode = 'default'):
+                                  sort_mode='default',
+                                  image_mode='graphic'):
 
 
     def sorting_keywords(keywords, sort_mode):
@@ -422,7 +423,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
                                                 ).pack())]
         bottoms.append(inline_keyboard)
 
-    if return_from_filter_bottom:
+    if return_from_filter_bottom or image_mode == 'image':
         bottom = [InlineKeyboardButton(text='Сбросить фильтр',
                                          callback_data=callbacks.SettingKeywords(
                                              adv_original_id=adv_setting.id,
