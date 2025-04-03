@@ -23,7 +23,7 @@ async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: AdvertApi) -> set[float
     if not adv_ids:
         return None
     advs = await wb_api.get_advs(adv_ids)
-    wb_cabinet_original_id = wb_api.wb_cabinet.id
+    wb_cabinet_original_id = int(wb_api.wb_cabinet.id)
     try:
         async with sm(read_only=False) as session:
             await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id, session)
