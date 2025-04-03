@@ -416,6 +416,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         adv_choice_last_page,
         image: str,
         page,
+        image_mode='graphic'
     ):
         super().__init__(bot, chat_id)
         self._keywords = keywords
@@ -426,6 +427,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._image = image
         self._filter: bool = False
         self._on_page = 24
+        self.image_mode = image_mode
 
     async def __call__(self, state: FSMContext, sort_mode = 'by_adv'):
         self.sort_mode = sort_mode
@@ -495,11 +497,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         # Дополнительные рассчеты, если нужны
         if self._all_orders_for_last_3_days is not None:
             self._sum_spend = self._spend_for_inner_adv_for_3_days
-        
-        graphic = await self._graphic_injection()
-        if not graphic:
-            graphic = 'app/core/telegram/static_images/not_keywords_position_graphic.jpg'
-        self._image = graphic
+        if self.image_mode == 'graphic':
+            graphic = await self._graphic_injection()
+            if not graphic:
+                graphic = 'app/core/telegram/static_images/not_keywords_position_graphic.jpg'
+            self._image = graphic
         await super().__call__()
 
     @property
@@ -588,7 +590,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                                                       self._on_page,
                                                       self.min_ctr,
                                                       self.hide_keywords_is_not_relevant,
-                                                      sort_mode=self.sort_mode)
+                                                      sort_mode=self.sort_mode,
+                                                      image_mode=self.image_mode)
 
 
 class KeywordSettingMessage(TextWithKeyboard):

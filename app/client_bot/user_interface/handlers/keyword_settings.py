@@ -227,6 +227,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
         adv_choice_last_page,
         main_photos[0],
         page=page,
+        image_mode='main_photo'
     )(state, 'by_adv')
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
