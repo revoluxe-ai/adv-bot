@@ -778,21 +778,23 @@ async def test_get_cabinet_by_id_found():
     type(mock_cabinet).calculated_balance = PropertyMock(return_value=500.0)
     
     # Создаем мок для сессии и результата запроса
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none = MagicMock(return_value=mock_cabinet)
-    
     mock_session = MagicMock()
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session.__aexit__ = AsyncMock()
+    
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none = MagicMock(return_value=mock_cabinet)
     mock_session.execute = AsyncMock(return_value=mock_result)
     
     # Патчим функцию sm для возврата нашего мока сессии
     with patch('app.modules.cabinet_bonus_manager.bonus_service.sm', return_value=mock_session):
-        # Вызываем тестируемую функцию и ожидаем результат
+        # Вызываем тестируемую функцию
         result = await get_cabinet_by_id(1)
         
         # Проверяем результат
-        assert result is mock_cabinet
+        assert result == mock_cabinet
+        mock_session.execute.assert_called_once()
+        mock_result.scalar_one_or_none.assert_called_once()
 
 
 @pytest.mark.asyncio

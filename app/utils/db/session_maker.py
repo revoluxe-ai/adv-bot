@@ -45,12 +45,8 @@ class AnalyticAsyncSession(AsyncSession):
             duration = time() - query_start
 
             if duration > 1.0:
-                logger.warning(
-                    f"Slow query ({duration:.2f}s)\n"
-                    f"Type: {operation_type}\n"
-                    f"Location: {caller.filename}:{caller.lineno}\n"
-                    f"Statement: {statement}"
-                )
+                logger.warning(f"Slow query ({duration:.2f}s), Type: {operation_type} "
+                               f"Location: {caller.filename}:{caller.lineno} Statement: {statement}")
             return result
         except Exception as e:
             logger.error(f"Query error: {e}")
