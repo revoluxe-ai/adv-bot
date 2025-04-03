@@ -14,6 +14,7 @@ class WhiteListUpdater:
         assert [isinstance(keyword, CalculatedKeyword) for keyword in keywords]
         keywords.sort(key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
         top_keyword: CalculatedKeyword = keywords[0]
+
         stmt = update(KeywordSetting)\
             .where(KeywordSetting.id == top_keyword.keyword_setting.id)\
         .values({
