@@ -1,5 +1,4 @@
 import logging
-import typing
 from datetime import datetime
 from typing import Union
 
@@ -19,8 +18,6 @@ from app.utils.pricer.pricer import Pricer
 from .. import states
 from ..views import messages
 from ..views import callbacks
-from ... import const
-
 sm = get_async_session_maker
 
 router = Router()
@@ -202,8 +199,8 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
         wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
         stmt = select(AdvSetting).options(selectinload(AdvSetting.payments))\
             .where(AdvSetting.id == adv_original_id)
-        adv = await session.execute(stmt)
-        adv: AdvSetting = adv.scalar()
+        result = await session.execute(stmt)
+        adv: AdvSetting = result.scalar()
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
         tariff_for_month = await pricer.get_price_for_day_for_shop(wb_cabinet.shop_id)
         price_for_adv_for_day = pricer.get_tariff_for_day(tariff_for_month)
@@ -267,8 +264,8 @@ async def turn_adv_off(call: types.CallbackQuery,
         wb_user_cabinet = wb_user_cabinet.scalar()
 
     async with sm(read_only=False) as session:
-        adv_setting = await session.execute(select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id))
-        adv_setting: AdvSetting = adv_setting.scalars().first()
+        result = await session.execute(select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id))
+        adv_setting: AdvSetting = result.scalars().first()
         adv_setting.bot_active = False
         await session.commit()
 
