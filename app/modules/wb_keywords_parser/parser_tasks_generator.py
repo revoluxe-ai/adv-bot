@@ -19,6 +19,8 @@ class ParserTasksGenerator:
         keywords = await data_manager.get_good_bad_phrases(self._adv)
         nmid = self._adv.nmids[0]
         for keyword in keywords:
+            if keyword.hard_status == 2:
+                continue
             text = keyword.text
             last_position = await redis_manager.get_keyword_position(text, nmid)
             if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(hours=1):
