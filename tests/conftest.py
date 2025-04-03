@@ -16,7 +16,7 @@ import app.modules.wb_adv_updater.models as models
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, User, WBToken, AdvSetting
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 
 # Add the project root directory to PYTHONPATH
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -157,3 +157,16 @@ def mock_session():
     session.get = AsyncMock()
     session.add = MagicMock()
     return session 
+
+@pytest.fixture(autouse=True)
+def mock_keywords_query():
+    """Мок для модуля keywords_query"""
+    mock_queries_dict = {
+        'test_keyword': 100,
+        'another_keyword': 200,
+        'last_keyword': 50
+    }
+    
+    with patch('app.modules.keywords_query.keywords_query.queries_dict', mock_queries_dict), \
+         patch('app.modules.keywords_query.keywords_query.min_query', 50):
+        yield mock_queries_dict 
