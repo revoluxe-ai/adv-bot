@@ -225,6 +225,13 @@ class Settings:
             return None
         return int(value)
 
+    @property
+    def PARSING_TIMEOUT(self):
+        value = os.getenv('PARSING_TIMEOUT')
+        if not value:
+            return 60*60*4
+        return int(value)
+
 
 
 

@@ -13,9 +13,7 @@ from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.parser_tasks_generator import ParserTasksGenerator
 from app.modules.wb_keywords_parser.parsing_task import ParsingTask
 from app.utils import redis_manager
-from sqlalchemy import select, and_, not_
-
-
+from sqlalchemy import select, and_, not_, Sequence
 
 from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting, WBCabinet
 from aiogram.client.session import aiohttp
@@ -617,12 +615,13 @@ class Parser:
                     continue
 
 
-    async def generate_parsing_tasks_dict(self):
+    async def generate_parsing_tasks_dict(self) -> None:
         async with sm() as session:
             stmt = select(AdvSetting)\
-            .where(AdvSetting.bot_active == True)
+                .where(AdvSetting.bot_active == True)
             result = await session.execute(stmt)
             advs: list[AdvSetting] = result.scalars().all()
+            advs = list(advs)
             random.shuffle(advs)
             tasks_generators = []
             for adv in advs:
