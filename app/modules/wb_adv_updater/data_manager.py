@@ -910,7 +910,9 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
-        keyword_setting = keyword_text_to_keyword_setting[text]
+        keyword_setting = keyword_text_to_keyword_setting.get(text)
+        if not keyword_setting:
+            continue
         keyword_stat.keyword_setting = keyword_setting
         keyword_stat.hard_status = keyword_setting.hard_status
         original_predict_ctr = text_to_predict_ctr.get(text, None)
