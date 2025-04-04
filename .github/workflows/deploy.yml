@@ -1,4 +1,4 @@
-name: Yandex Cloud Deploy
+name: GitHub Container Registry Deploy
 
 on:
   push:
@@ -11,35 +11,42 @@ jobs:
       matrix:
         include:
           - service: common-wb-adv-bot
-            # Здесь указываем имя репозитория внутри проекта, например "common-wb-adv-bot"
-            repo_name: common-wb-adv-bot
+            repo_name: adv-bot
             dockerfile: ./dockers/Dockerfile
     env:
-      # Имя проекта в Harbor (создай проект "wb-adv-bot" в интерфейсе Harbor)
-      HARBOR_PROJECT: wb-adv-bot
-      # Имя репозитория (обычно имя сервиса)
+      GHCR_NAMESPACE: revoluxe-ai
       CR_REPOSITORY: ${{ matrix.repo_name }}
       IMAGE_TAG: ${{ github.sha }}
-      LATEST_TAG: latest
-      HARBOR_REGISTRY: harbor.skyline360.ru  # Адрес Harbor
+      LATEST_TAG: master
+      GHCR_REGISTRY: ghcr.io
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Login to Harbor registry
+      - name: Log in to GitHub Container Registry
         run: |
-          echo "${{ secrets.HARBOR_PASSWORD }}" | docker login ${{ env.HARBOR_REGISTRY }} --username ${{ secrets.HARBOR_USERNAME }} --password-stdin
+          echo "Checking access to GHCR..."
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.GHCR_REGISTRY }} -u ${{ github.actor }} --password-stdin
+          # Попробуем выполнить pull, но не прерываем пайплайн, если репозиторий еще не существует.
+          if ! docker pull ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:latest; then
+            echo "Warning: Repository not found or access denied (Invalid token or insufficient permissions). Continuing with build process."
+          fi
+
+      - name: Check available tags in GHCR
+        run: |
+          curl -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
+          https://ghcr.io/v2/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}/tags/list
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image to GHCR
         run: |
           docker buildx build \
             --no-cache \
             --platform=linux/amd64 \
             --push \
-            -t ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
-            -t ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.CR_REPOSITORY }}:${{ env.LATEST_TAG }} \
+            -t ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
+            -t ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:${{ env.LATEST_TAG }} \
             -f ${{ matrix.dockerfile }} .
