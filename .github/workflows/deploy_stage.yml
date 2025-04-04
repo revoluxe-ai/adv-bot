@@ -33,6 +33,11 @@ jobs:
             echo "Warning: Repository not found or access denied (Invalid token or insufficient permissions). Continuing with build process."
           fi
 
+      - name: Check available tags in GHCR
+        run: |
+          curl -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
+          https://ghcr.io/v2/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}/tags/list
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
