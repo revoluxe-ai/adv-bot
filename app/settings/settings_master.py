@@ -233,7 +233,12 @@ class Settings:
         return int(value)
 
 
-
+    @property
+    def MAX_PARSING_PARALLEL_JOBS(self):
+        value = os.getenv('MAX_PARSING_PARALLEL_JOBS')
+        if not value:
+            return 10
+        return int(value)
 
 
 settings = Settings()
