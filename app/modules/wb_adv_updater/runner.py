@@ -65,29 +65,6 @@ async def keywords_parsing_process():
             logger.error('Ошибка парсинга ключей', exc_info=True)
         await asyncio.sleep(0)
 
-
-async def payment_for_parsing_keyword():
-    while True:
-        hours = datetime.datetime.now().hour
-        if 12 < hours < 21:
-            try:
-                await wb_manager.process_payment_for_parsing()
-            except Exception as e:
-                logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
-        await asyncio.sleep(60 * 60)
-
-
-async def payment_for_auto_bidder():
-    while True:
-        hours = datetime.datetime.now().hour
-        if 11 < hours < 21:
-            try:
-                await wb_manager.process_payment_for_auto_bidder()
-            except Exception as e:
-                logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
-        await asyncio.sleep(0)
-
-
 async def run_update_vectors_in_redis():
     await wb_manager.update_vectors_in_redis()
 
