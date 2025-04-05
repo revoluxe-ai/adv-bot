@@ -23,7 +23,8 @@ class ParserTasksGenerator:
                 continue
             text = keyword.text
             last_position = await redis_manager.get_keyword_position(text, nmid)
-            if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(hours=1):
+            if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(hours=1)\
+                    or not last_position:
                 task = ParsingTask(keyword.text,
                                    nmid=nmid,
                                    adv_id_order=self._adv.adv_id)

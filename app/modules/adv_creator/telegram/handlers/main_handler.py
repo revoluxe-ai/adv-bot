@@ -1,6 +1,6 @@
 from arq import create_pool
 from app.modules.balance_manager import balance_service
-from worker import arq_redis_settings
+from app.arq_workers.arq_redis_settings import arq_redis_settings
 from . import messages
 from aiogram import Bot
 from aiogram.filters import StateFilter
@@ -14,7 +14,7 @@ from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabine
 from ..into_callback import CreateNewAdvs as CreateNewAdvsCallbackData
 from .states import CreateCompamyStates as states
 import logging
-from app.modules.cabinet_bonus_manager.bonus_service import get_cabinet_by_id
+
 
 logger = logging.getLogger(__name__)
 

@@ -1,22 +1,17 @@
 import dotenv
-dotenv.load_dotenv()
-from app.settings import settings
+from app.arq_workers.arq_redis_settings import arq_redis_settings
+from app.modules.wb_keywords_parser.parser import create_arq_parsing_task, _create_arq_parsing_task
 
+dotenv.load_dotenv()
 import logging
 from python_modules.logger import setup_logging
-from arq.connections import RedisSettings
 from app.client_bot.bot import get_bot
 from app.modules.adv_creator.backend.tasks import create_complex_advs
-
 
 # Настраиваем логирование
 setup_logging()
 logger = logging.getLogger(__name__)
 
-
-arq_redis_settings = RedisSettings(
-        host=settings.REDIS_MASTER_HOST
-    )
 
 async def startup(ctx):
     """Инициализация бота при запуске воркера."""
@@ -42,3 +37,14 @@ class WorkerSettings:
     keep_jobs = 86400  # Храним задачи в Redis 24 часа
     max_tries = 10 # Максимальное число попыток
     job_timeout = 86400   #максимальное время на выполнение задачи
+
+
+class ParserWorker:
+    functions = [_create_arq_parsing_task]
+    redis_settings = arq_redis_settings
+    on_startup = startup
+    on_shutdown = shutdown
+    max_jobs = 5 # Максимальное число задач
+    keep_jobs = 60*60*4 # Храним задачи в Redis 1 час
+    max_tries = 1 # Максимальное число попыток
+    job_timeout = 120 #максимальное время на выполнение задачи

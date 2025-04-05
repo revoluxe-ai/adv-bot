@@ -8,6 +8,10 @@ import typing
 from statistics import mean
 from aiohttp import ServerDisconnectedError, ClientOSError
 from dataclasses import dataclass
+
+from arq import Retry, create_pool
+
+from app.arq_workers.arq_redis_settings import arq_redis_settings
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.parser_tasks_generator import ParserTasksGenerator
@@ -179,9 +183,9 @@ class Parser:
                 cpm=cpm,
                 adv_id=adv_id,
                 real_position=real_position,
-                keyword_text = text,
-                timestamp = datetime.datetime.now(),
-                adv_type = adv_type
+                keyword_text=text,
+                timestamp=datetime.datetime.now(),
+                adv_type=adv_type
             )
             positions.append(position)
 
@@ -247,17 +251,10 @@ class Parser:
         assert isinstance(preset, int)
         assert isinstance(cluster, str)
         assert isinstance(products, list)
-
-        logger.debug(f'Возвращаемые данные: products={products}, cluster={cluster}, preset={preset}')
         return products, cluster, preset, total_items
 
 parser = Parser()
 
-text_to_task = {}
-
-write_to_db_queue = asyncio.Queue(10000)
-
-queue_position_dict = {}
 
 parsing_queue_manager = ParsingQueueManager()
 
@@ -418,11 +415,35 @@ max_threads = settings.MAX_THREAD_PARSER
 semaphore = asyncio.Semaphore(max_threads)
 
 
+async def create_arq_parsing_task(text: str,
+                                  need_nmids: set[int],
+                                  delay: float,
+                                    max_page: int) -> None:
+    redis_task_pool = await create_pool(arq_redis_settings)
+    await redis_task_pool.enqueue_job(
+      '_create_arq_parsing_task',
+        text,
+        need_nmids,
+        delay,
+        max_page,
+    )
+
+
+
+async def _create_arq_parsing_task(ctx, text, need_nmids, delay, max_page) -> None:
+    assert ctx
+    try:
+        await add_wb_positions(text, need_nmids, delay, max_page)
+    except Retry:
+        logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
+
+
 async def add_wb_positions_from_wb_search(text:str,
                                           need_nmids: set[int],
                                           max_page: int):
     try:
-        await add_wb_positions(text, need_nmids, 1, max_page)
+        delay = 0.1
+        await create_arq_parsing_task(text, need_nmids, delay, max_page)
     except ErrorParsingPositions as e:
         logger.error(f'По запросу {text} не найдено ни одной позиции', exc_info=True)
     except Exception as e:
@@ -518,7 +539,6 @@ async def async_iter(generator):
         yield item
 
 class Parser:
-
     def __init__(self):
         self._parsing_tasks: dict[str, ComplexTask] = {}
         self._all_adv_ids = set()
@@ -564,6 +584,26 @@ class Parser:
                         complex_task = ComplexTask(text, {nmid}, {adv_id})
                         self._parsing_tasks[text] = complex_task
                     await asyncio.sleep(0)
+
+
+    async def generate_parsing_tasks(self):
+
+        async with sm() as session:
+            stmt = select(AdvSetting)\
+                .where(AdvSetting.bot_active == True)
+            result = await session.execute(stmt)
+            advs: typing.List[AdvSetting] = result.scalars().all()
+            advs = list(advs)
+            random.shuffle(advs)
+            tasks_generators = []
+            for adv in advs:
+                parser_tasks_generator = ParserTasksGenerator(adv)
+                tasks_generators.append(parser_tasks_generator.generator())
+            tasks_generators = [async_iter(generators) for generators in tasks_generators]
+            async for parser_task in self.global_parsing_tasks_generator(tasks_generators):
+                    nmid = parser_task.nmid
+                    text = parser_task.keyword
+                    await create_arq_parsing_task(text, {nmid}, 0.1, 60)
 
 
     async def parsing_by_dict(self):
