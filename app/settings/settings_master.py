@@ -1,6 +1,6 @@
-import re
-
-from python_modules.path_setting_funcs import get_document_by_key_name, get_setting_path
+import dotenv
+dotenv.load_dotenv()
+from python_modules.path_setting_funcs import  get_setting_path
 import os
 setting_path = get_setting_path()
 

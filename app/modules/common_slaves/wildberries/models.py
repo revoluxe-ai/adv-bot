@@ -489,7 +489,7 @@ class WBItemPosition:
     cpm: int = None
     adv_id: int = None
     keyword_text: str = None
-    adv_type: int = None
+    adv_type: int | None = None
 
     @property
     def type_native(self)-> str:
