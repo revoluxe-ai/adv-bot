@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.parser_tasks_generator import ParserTasksGenerator
+from app.modules.wb_keywords_parser.parsing_queue_manager import ParsingQueueManager
 from app.modules.wb_keywords_parser.parsing_task import ParsingTask
 from app.utils import redis_manager
 from sqlalchemy import select, and_, not_, Sequence
@@ -250,12 +251,6 @@ class Parser:
         logger.debug(f'Возвращаемые данные: products={products}, cluster={cluster}, preset={preset}')
         return products, cluster, preset, total_items
 
-
-
-
-
-
-
 parser = Parser()
 
 text_to_task = {}
@@ -264,6 +259,7 @@ write_to_db_queue = asyncio.Queue(10000)
 
 queue_position_dict = {}
 
+parsing_queue_manager = ParsingQueueManager()
 
 
 class ErrorParsingPositions(Exception):
@@ -325,6 +321,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
     catch_any_position.set()
     logger.debug(f'Найдено {len(positions)}')
     if positions:
+        await parsing_queue_manager.add_found_not_found_page(text, positions, need_nmids, page)
         await add_wb_positions_to_all_bases(positions, need_nmids)
         logger.debug('Записали позиции в базы')
         positions_for_catch_max_bet = [position for position in positions if position.promo_position\
@@ -351,117 +348,42 @@ async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60
     return
 
 
-async def _add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60):
+async def _add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60) -> None:
     total_pages = TotalPages()
     stop_event = asyncio.Event()
     catch_any_position = asyncio.Event()
-    tasks = []
-    last_positions = []
-    checked_pages = set()
-    # Получаем последние позиции для всех артикулов
-
-
-
-    for nmid in need_nmids:
-        last_position: WBItemPosition = await redis_manager.get_keyword_position(text, nmid)
-        if last_position:
-            last_positions.append(last_position)
-    # Если нет предыдущих позиций или все позиции на первой странице, начинаем с конца
-    if not last_positions or any([lp.real_position for lp in last_positions]) == 0:
-            for page in range(1, 61):
-                if page > total_pages.total_pages:
-                    break
-                if len(checked_pages) >= page_limit:
-                    break
-                if stop_event.is_set():
-                    break
-                task = asyncio.create_task(
-                    add_positions_from_page(stop_event,
-                                            catch_any_position,
-                                            text,
-                                            page,
-                                            need_nmids,
-                                            total_pages,
-                                            checked_pages))
-
-                tasks.append(task)
-                await asyncio.sleep(delay)
-    else:
-        for position in last_positions:
-            start_page = position.real_position // 100 + 1
-            min_page = start_page - 1
-            max_page = start_page
-
-            while need_nmids and not stop_event.is_set():
-                # Прерывание, если страница выходит за пределы
-                if min_page < 1 and max_page > 60:
-                    logger.debug('Достигнут предел страниц')
-                    break
-
-                logger.debug(f'Проверка артикула {position.nmid} запроса {text}: {min_page} {max_page}')
-
-                # Проверка max_page
-                if max_page <= 60 and max_page not in checked_pages:
-                    if max_page <= total_pages.total_pages:
-                        try:
-                            await add_positions_from_page(stop_event,
-                                                          catch_any_position,
-                                                          text, max_page,
-                                                          need_nmids,
-                                                          total_pages,
-                                                          checked_pages)
-                            logger.debug(f'Добавляем страницу {max_page} в проверенные')
-                            checked_pages.add(max_page)
-                        except Exception as e:
-                            logger.error(f'Ошибка при парсинге страницы {max_page}: {e}')
-                    max_page += 1
-                    await asyncio.sleep(delay)
-
-                if min_page >= 1 and min_page not in checked_pages:
-                    if min_page <= total_pages.total_pages:
-                        try:
-                            await add_positions_from_page(stop_event,
-                                                          catch_any_position,
-                                                          text, min_page,
-                                                          need_nmids,
-                                                          total_pages,
-                                                          checked_pages)
-                            checked_pages.add(min_page)
-                        except Exception as e:
-                            logger.error(f'Ошибка при парсинге страницы {min_page}: {e}')
-                    min_page -= 1
-                    await asyncio.sleep(delay)
-
-                # Прерывание, если обе страницы уже проверены
-                if (min_page in checked_pages or min_page < 1) and (max_page in checked_pages or max_page > 60):
-                    logger.debug('Достигнут предел страниц или все страницы проверены')
-                    break
-    logger.debug('Ожидание завершения всех задач')
-    while True:
-        logger.debug(f'Проверяем лимиты страниц {page_limit} {len(checked_pages)}')
-        if (page_limit <= len(checked_pages)
-                or total_pages.total_pages >= len(checked_pages)
-                or stop_event.is_set()):
-            logger.debug(f'Достигнут лимит страниц {page_limit}, ключ {text}, артикулы {need_nmids}')
+    checked_pages: set[int] = set()
+    parsing_pages_queue: list[int] = await parsing_queue_manager.get_parsing_queue(text, need_nmids, 60)
+    for page in parsing_pages_queue:
+        if page in checked_pages:
+            continue
+        if page > total_pages.total_pages:
             break
-        else:
-            logger.debug(f'Не достигнут лимит страниц {page_limit}')
-            await asyncio.sleep(0)
+        if len(checked_pages) >= page_limit:
+            break
+        if stop_event.is_set():
+            break
 
-    for task in tasks:
-        logger.debug(f'Проверяем задачу {task}')
-        if not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-            except Exception as e:
-                logger.error(f'Ошибка при парсинге страницы {e}')
+        try:
+            await add_positions_from_page(
+                stop_event,
+                catch_any_position,
+                text,
+                page,
+                need_nmids,
+                total_pages,
+                checked_pages
+            )
+        except Exception as e:
+            logger.error(f'Ошибка при парсинге страницы {page}: {e}')
 
-    if page_limit in [1, 60] and not catch_any_position.is_set():
+        checked_pages.add(page)
+        await asyncio.sleep(delay)
+
+    if page_limit in [1, page_limit] and not catch_any_position.is_set():
         raise ErrorParsingPositions('Не найдено ни одной позиции в выдаче')
-    if page_limit == 60 and need_nmids:
+
+    if page_limit == page_limit and need_nmids:
         not_found_positions = [
             WBItemPosition(
                 real_position=0,
@@ -475,6 +397,8 @@ async def _add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=6
             for nmid in need_nmids
         ]
         await add_wb_positions_to_redis(not_found_positions)
+    return
+
 
 
 
@@ -620,7 +544,7 @@ class Parser:
             stmt = select(AdvSetting)\
                 .where(AdvSetting.bot_active == True)
             result = await session.execute(stmt)
-            advs: list[AdvSetting] = result.scalars().all()
+            advs: typing.List[AdvSetting] = result.scalars().all()
             advs = list(advs)
             random.shuffle(advs)
             tasks_generators = []
