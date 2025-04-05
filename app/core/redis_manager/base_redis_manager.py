@@ -20,9 +20,9 @@ class BaseRedis(ABC, Generic[T]):
     #     pass
     #
 
-    @abstractmethod
-    async def set_one(self, *arg: Any, **kwarg: Any):
-        pass
+    # @abstractmethod
+    # async def set_one(self, *arg: Any, **kwarg: Any):
+    #     pass
 
     # @abstractmethod
     # async def set_many(self, objs: list[T], *arg, **kwarg):
