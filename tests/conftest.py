@@ -101,30 +101,44 @@ def event_loop():
     if not loop.is_closed():
         loop.close()
 
+# Глобальная сессия и движок для всех тестов
+_engine = None
+_async_session_maker = None
+
 @pytest.fixture(scope="function")
 async def test_async_db():
     """Create a test database and tables."""
-    # Создаем движок SQLite в памяти
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        echo=False,
-        poolclass=StaticPool
-    )
-
-    # Создаем все таблицы
-    async with engine.begin() as conn:
+    global _engine, _async_session_maker
+    
+    # Создаем движок SQLite в памяти, если его еще нет
+    if _engine is None:
+        _engine = create_async_engine(
+            "sqlite+aiosqlite:///:memory:",
+            echo=False,
+            poolclass=StaticPool
+        )
+        
+        # Создаем все таблицы
+        async with _engine.begin() as conn:
+            await conn.run_sync(MockBase.metadata.drop_all)
+            await conn.run_sync(MockBase.metadata.create_all)
+            
+        # Создаем фабрику сессий
+        _async_session_maker = sessionmaker(
+            _engine, class_=AsyncSession, expire_on_commit=False
+        )
+    
+    # Создаем сессию
+    session = _async_session_maker()
+    
+    # Очищаем базу данных перед каждым тестом
+    async with _engine.begin() as conn:
         await conn.run_sync(MockBase.metadata.drop_all)
         await conn.run_sync(MockBase.metadata.create_all)
-
-    # Создаем сессию
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    async with async_session() as session:
+    try:
         yield session
-    # Закрываем все соединения после завершения теста
-    await engine.dispose()
+    finally:
+        await session.close()
 
 @pytest.fixture(autouse=True)
 def patch_get_async_session_maker(monkeypatch, test_async_db):
