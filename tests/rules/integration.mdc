@@ -1,0 +1,139 @@
+---
+description: Правила для интеграционных тестов
+globs: "tests/**"
+alwaysApply: true
+---
+
+# Правила для интеграционных тестов
+
+## Основные требования
+- Отделять интеграционные тесты от unit-тестов
+- Использовать реальные сервисы где необходимо
+- Очищать данные после тестов
+- Проверять взаимодействие между компонентами
+- Тестировать полные сценарии использования
+
+## Маркировка интеграционных тестов
+```python
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_integration_scenario():
+    # Тест интеграционного сценария
+    pass
+```
+
+## Пример фикстуры для интеграционных тестов
+```python
+@pytest.fixture(scope="module")
+async def integration_setup():
+    # Настройка тестового окружения
+    redis = await create_test_redis()
+    db = await create_test_db()
+    
+    yield {
+        "redis": redis,
+        "db": db
+    }
+    
+    # Очистка после тестов
+    await cleanup_test_data(redis, db)
+```
+
+## Тестирование взаимодействия с БД и Redis
+```python
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_db_redis_integration(integration_setup):
+    # Подготовка данных
+    db = integration_setup["db"]
+    redis = integration_setup["redis"]
+    
+    # Запись в БД
+    async with db.begin() as session:
+        obj = TestModel(name="test")
+        session.add(obj)
+        await session.commit()
+    
+    # Кэширование в Redis
+    await redis.set(f"test:{obj.id}", obj.name)
+    
+    # Проверка согласованности
+    cached_name = await redis.get(f"test:{obj.id}")
+    assert cached_name == obj.name
+```
+
+## Тестирование полного сценария
+```python
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_full_scenario(integration_setup):
+    # Инициализация компонентов
+    bot = create_test_bot()
+    db = integration_setup["db"]
+    redis = integration_setup["redis"]
+    
+    # Выполнение сценария
+    # 1. Пользователь отправляет команду
+    await process_user_command(bot, "/start")
+    
+    # 2. Создание записи в БД
+    async with db.begin() as session:
+        user = await create_user(session)
+    
+    # 3. Кэширование данных
+    await cache_user_data(redis, user)
+    
+    # 4. Проверка результатов
+    assert await check_user_exists(db, user.id)
+    assert await check_cache_exists(redis, user.id)
+```
+
+## Тестирование обработки ошибок
+```python
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_error_handling(integration_setup):
+    # Настройка тестового окружения с ошибкой
+    db = integration_setup["db"]
+    redis = integration_setup["redis"]
+    
+    # Имитация ошибки БД
+    async with db.begin() as session:
+        await session.execute("SELECT 1/0")
+    
+    # Проверка обработки ошибки
+    assert await check_error_logged()
+    assert await check_system_state(db, redis)
+```
+
+## Тестирование производительности
+```python
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_performance(integration_setup):
+    # Настройка тестового окружения
+    db = integration_setup["db"]
+    redis = integration_setup["redis"]
+    
+    # Измерение времени выполнения
+    start_time = time.time()
+    
+    # Выполнение операций
+    await perform_operations(db, redis)
+    
+    # Проверка времени выполнения
+    execution_time = time.time() - start_time
+    assert execution_time < 1.0  # Максимальное время выполнения
+```
+
+## Очистка после тестов
+```python
+@pytest.fixture(autouse=True)
+async def cleanup(integration_setup):
+    yield
+    # Очистка данных после каждого теста
+    await cleanup_test_data(
+        integration_setup["redis"],
+        integration_setup["db"]
+    )
+``` 

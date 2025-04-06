@@ -1,3 +1,4 @@
+import random
 from collections import OrderedDict
 
 from .parsing_found_redis_manager import  ParsingFoundRedisManager as RedisManager
@@ -39,10 +40,12 @@ class ParsingQueueManager:
 
             remaining_pages_all -= set(found_pages)
             remaining_pages_all -= set(not_found_pages)
+            remaining_pages_all = list(remaining_pages_all)
+            random.shuffle(remaining_pages_all)
 
         # Собираем итоговую очередь с приоритетом: найденные -> неизвестные -> не найденные
         final_queue = list(OrderedDict.fromkeys(
-            found_pages_all + list(remaining_pages_all) + not_found_pages_all
+            found_pages_all + remaining_pages_all + not_found_pages_all
         ))
 
         assert len(final_queue) == max_pages

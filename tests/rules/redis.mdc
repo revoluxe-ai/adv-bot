@@ -1,0 +1,118 @@
+---
+description: Правила для тестирования Redis
+globs: "tests/**"
+alwaysApply: true
+---
+
+# Правила для тестирования Redis
+
+## Основные требования
+- Мокировать Redis клиент для unit-тестов
+- Использовать тестовый Redis для интеграционных тестов
+- Проверять корректность TTL для ключей
+- Тестировать атомарные операции
+- Проверять обработку ошибок подключения
+- Тестировать работу с кластером Redis
+
+## Пример фикстуры для мокирования Redis
+```python
+@pytest.fixture
+def mock_redis():
+    with patch('redis.asyncio.Redis') as mock:
+        mock.return_value = AsyncMock()
+        yield mock
+```
+
+## Пример теста с мокированным Redis
+```python
+@pytest.mark.asyncio
+async def test_redis_operation(mock_redis):
+    # Настройка мока
+    mock_redis.return_value.get.return_value = "test_value"
+    
+    # Выполнение операции
+    result = await redis_operation(mock_redis.return_value)
+    
+    # Проверка
+    assert result == "test_value"
+    mock_redis.return_value.get.assert_called_once_with("test_key")
+```
+
+## Тестирование TTL
+```python
+@pytest.mark.asyncio
+async def test_redis_ttl(mock_redis):
+    # Настройка мока
+    mock_redis.return_value.ttl.return_value = 3600
+    
+    # Выполнение операции
+    ttl = await get_key_ttl(mock_redis.return_value, "test_key")
+    
+    # Проверка
+    assert ttl == 3600
+    mock_redis.return_value.ttl.assert_called_once_with("test_key")
+```
+
+## Тестирование атомарных операций
+```python
+@pytest.mark.asyncio
+async def test_atomic_operation(mock_redis):
+    # Настройка мока для транзакции
+    mock_redis.return_value.multi.return_value = True
+    mock_redis.return_value.execute.return_value = [True]
+    
+    # Выполнение атомарной операции
+    result = await atomic_operation(mock_redis.return_value)
+    
+    # Проверка
+    assert result is True
+    mock_redis.return_value.multi.assert_called_once()
+    mock_redis.return_value.execute.assert_called_once()
+```
+
+## Тестирование обработки ошибок
+```python
+@pytest.mark.asyncio
+async def test_redis_error_handling(mock_redis):
+    # Настройка мока для генерации ошибки
+    mock_redis.return_value.get.side_effect = RedisError("Connection error")
+    
+    # Проверка обработки ошибки
+    with pytest.raises(RedisError) as exc_info:
+        await redis_operation(mock_redis.return_value)
+    
+    assert str(exc_info.value) == "Connection error"
+```
+
+## Тестирование кластера Redis
+```python
+@pytest.mark.asyncio
+async def test_redis_cluster(mock_redis_cluster):
+    # Настройка мока для кластера
+    mock_redis_cluster.return_value.get.return_value = "cluster_value"
+    
+    # Выполнение операции
+    result = await cluster_operation(mock_redis_cluster.return_value)
+    
+    # Проверка
+    assert result == "cluster_value"
+    mock_redis_cluster.return_value.get.assert_called_once_with("test_key")
+```
+
+## Интеграционные тесты с Redis
+```python
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_redis_integration(redis_client):
+    # Запись данных
+    await redis_client.set("test_key", "test_value")
+    
+    # Чтение данных
+    value = await redis_client.get("test_key")
+    
+    # Проверка
+    assert value == "test_value"
+    
+    # Очистка
+    await redis_client.delete("test_key")
+``` 

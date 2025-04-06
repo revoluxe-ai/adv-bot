@@ -1,0 +1,95 @@
+---
+description: Правила для асинхронных тестов
+globs: "tests/**"
+alwaysApply: true
+---
+
+# Правила для асинхронных тестов
+
+## Основные требования
+- Все асинхронные тесты должны использовать `@pytest.mark.asyncio`
+- Правильно обрабатывать таймауты в асинхронных тестах
+- Использовать `asyncio.wait_for` для контроля времени выполнения
+- Мокировать асинхронные зависимости через `AsyncMock`
+- Проверять порядок выполнения асинхронных операций
+
+## Пример структуры асинхронного теста
+```python
+@pytest.mark.asyncio
+async def test_async_operation():
+    # Arrange
+    mock = AsyncMock()
+    mock.return_value = "result"
+    
+    # Act
+    result = await async_function(mock)
+    
+    # Assert
+    assert result == "result"
+    mock.assert_called_once()
+```
+
+## Обработка таймаутов
+```python
+@pytest.mark.asyncio
+async def test_with_timeout():
+    try:
+        result = await asyncio.wait_for(
+            long_running_operation(),
+            timeout=1.0
+        )
+    except asyncio.TimeoutError:
+        pytest.fail("Operation timed out")
+```
+
+## Тестирование конкурентных операций
+```python
+@pytest.mark.asyncio
+async def test_concurrent_operations():
+    # Arrange
+    tasks = [
+        async_operation(i) for i in range(5)
+    ]
+    
+    # Act
+    results = await asyncio.gather(*tasks)
+    
+    # Assert
+    assert len(results) == 5
+    assert all(isinstance(r, str) for r in results)
+```
+
+## Мокирование асинхронных зависимостей
+```python
+@pytest.fixture
+def mock_async_dependency():
+    mock = AsyncMock()
+    mock.side_effect = [
+        "result1",
+        "result2",
+        Exception("Error")
+    ]
+    return mock
+```
+
+## Тестирование исключений
+```python
+@pytest.mark.asyncio
+async def test_async_exception():
+    with pytest.raises(ExpectedError) as exc_info:
+        await function_that_raises()
+    assert str(exc_info.value) == "expected message"
+```
+
+## Параметризация асинхронных тестов
+```python
+@pytest.mark.asyncio
+@pytest.mark.parametrize("input,expected", [
+    (1, "result1"),
+    (2, "result2"),
+    (3, "result3")
+])
+async def test_async_with_params(input, expected):
+    result = await async_function(input)
+    assert result == expected
+``` 

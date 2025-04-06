@@ -1,0 +1,118 @@
+---
+description: Правила для тестирования базы данных
+globs: "tests/**"
+alwaysApply: true
+---
+
+# Правила для тестирования базы данных
+
+## Основные требования
+- Использовать транзакции для каждого теста
+- Очищать данные после каждого теста
+- Создавать тестовые данные через фикстуры
+- Проверять целостность данных после операций
+- Тестировать каскадные операции
+- Проверять блокировки и конкурентный доступ
+
+## Пример фикстуры для тестовой БД
+```python
+@pytest.fixture
+async def test_db():
+    # Создание тестовой БД
+    engine = create_async_engine(TEST_DB_URL)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    # Создание сессии
+    async_session = sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    
+    yield async_session
+    
+    # Очистка после тестов
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+```
+
+## Пример теста с транзакцией
+```python
+@pytest.mark.asyncio
+async def test_db_operation(test_db):
+    async with test_db() as session:
+        # Начало транзакции
+        async with session.begin():
+            # Создание тестовых данных
+            obj = TestModel(name="test")
+            session.add(obj)
+            
+            # Выполнение операции
+            result = await some_db_operation(session)
+            
+            # Проверка результатов
+            assert result is not None
+            assert result.name == "test"
+```
+
+## Тестирование конкурентного доступа
+```python
+@pytest.mark.asyncio
+async def test_concurrent_access(test_db):
+    async with test_db() as session1, test_db() as session2:
+        # Первая сессия блокирует запись
+        async with session1.begin():
+            obj1 = await session1.get(TestModel, 1)
+            obj1.value = "changed"
+            
+            # Вторая сессия пытается изменить ту же запись
+            async with session2.begin():
+                obj2 = await session2.get(TestModel, 1)
+                assert obj2.value == "original"  # Должно быть старое значение
+```
+
+## Тестирование каскадных операций
+```python
+@pytest.mark.asyncio
+async def test_cascade_operations(test_db):
+    async with test_db() as session:
+        # Создание родительской записи с дочерними
+        parent = ParentModel(
+            name="parent",
+            children=[
+                ChildModel(name="child1"),
+                ChildModel(name="child2")
+            ]
+        )
+        session.add(parent)
+        await session.commit()
+        
+        # Проверка каскадного удаления
+        await session.delete(parent)
+        await session.commit()
+        
+        # Проверка, что дочерние записи тоже удалены
+        children = await session.execute(
+            select(ChildModel).where(ChildModel.parent_id == parent.id)
+        )
+        assert children.scalars().all() == []
+```
+
+## Тестирование миграций
+```python
+@pytest.mark.asyncio
+async def test_migrations(test_db):
+    # Применение миграций
+    await alembic.command.upgrade(alembic_cfg, "head")
+    
+    # Проверка структуры БД
+    async with test_db() as session:
+        # Проверка существования таблиц
+        tables = await session.execute(
+            text("SELECT table_name FROM information_schema.tables")
+        )
+        assert "new_table" in [t[0] for t in tables]
+        
+    # Откат миграций
+    await alembic.command.downgrade(alembic_cfg, "base")
+``` 
