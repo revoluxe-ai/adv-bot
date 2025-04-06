@@ -103,6 +103,9 @@ webhook_requests_handler = SimpleRequestHandler(
 
 app = web.Application()
 
+app.router.add_get('/healthz', health_check)
+app.router.add_get('/ready', readiness_check)
+
 
 async def start_web_server():
     webhook_requests_handler.register(app, path=WEBHOOK_PATH)
