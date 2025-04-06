@@ -27,6 +27,18 @@ from .global_router import global_router
 setup_logging()
 import os
 
+
+# Простой эндпоинт для проверки здоровья контейнера
+async def health_check(_):
+    return web.Response(text="OK", status=200)
+
+# Простой эндпоинт для проверки готовности контейнера
+async def readiness_check(_):
+    # Можно добавить логику для проверки готовности, например, соединение с базой данных
+    return web.Response(text="Ready", status=200)
+
+
+
 redis_host = os.environ.get("REDIS_HOST")
 
 # Создание хранилища с Redis
