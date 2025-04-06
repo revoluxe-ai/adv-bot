@@ -24,7 +24,7 @@ app/utils/faiss_manager/indexes/*
 *.rar
 *.csv
 *.ipynb
-
+new_venv
 # Compiled Java class files
 *.class
 venv

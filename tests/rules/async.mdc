@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: true
+---
+---
 description: Правила для асинхронных тестов
 globs: "tests/**"
 alwaysApply: true

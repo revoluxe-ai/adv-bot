@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Правила для интеграционных тестов
 globs: "tests/**"
 alwaysApply: true

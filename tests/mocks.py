@@ -7,6 +7,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from datetime import datetime, timedelta
 import pytest
+import pandas as pd
+from typing import List, Dict, Any, Optional
+from sqlalchemy.ext.declarative import declarative_base
+from unittest.mock import MagicMock
 
 
 # Создаем отдельный экземпляр MetaData для моков
@@ -373,3 +377,303 @@ class MockImage(MockBase):
     vector = Column(ArrayType)
     nouns = Column(ArrayType, nullable=True)
     old_keywords = Column(ArrayType)
+
+# Добавим мок для модуля pandas, чтобы обойти ошибку AttributeError: __version__
+if not hasattr(pd, '__version__'):
+    pd.__version__ = '1.5.3'  # Устанавливаем фиктивную версию pandas
+
+# Создадим мок для XGBoost
+class MockXGBModel:
+    def predict(self, X):
+        return [0.1] * len(X)  # Возвращаем фиктивные предсказания
+
+class MockXGBoost:
+    XGBModel = MockXGBModel
+    XGBRegressor = MockXGBModel
+
+    @staticmethod
+    def load_model(*args, **kwargs):
+        return MockXGBModel()
+
+import sys
+# Если нужно замокать целые модули, которые вызывают ошибки
+sys.modules['xgboost'] = MockXGBoost()
+
+# Базовый класс для моделей SQLAlchemy
+Base = declarative_base()
+
+# Дополнительный класс для MockBase с улучшенными моками
+class MockBase:
+    metadata = MagicMock()
+    metadata.drop_all = MagicMock()
+    metadata.create_all = MagicMock()
+    query = MagicMock()
+
+    @classmethod
+    def get_or_404(cls, id):
+        return cls(id=id)
+
+    def to_dict(self):
+        return {
+            'id': getattr(self, 'id', None),
+            'name': getattr(self, 'name', None)
+        }
+
+# Класс для моков SQLAlchemy
+class Column:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+        
+class ForeignKey:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+class relationship:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+class ArrayType:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+# Мок для WBCabinet
+class MockWBCabinet:
+    def __init__(self, id=1, shop_id="test_shop", expiration_time=None, active=True, 
+                 demo=False, balance=0.0, bonus=0.0, white_list_update_active=False):
+        self.id = id
+        self.shop_id = shop_id
+        self.expiration_time = expiration_time or (datetime.now() + timedelta(days=30))
+        self.active = active
+        self.demo = demo
+        self.balance = balance
+        self.calculated_balance = balance
+        self.bonus = bonus
+        self.calculated_bonus = bonus
+        self.white_list_update_active = white_list_update_active
+        self.adv_settings = []
+        self.bonus_payments = []
+        self.balance_payments = []
+        self.wbusercabinets = []
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'shop_id': self.shop_id,
+            'expiration_time': self.expiration_time,
+            'active': self.active,
+            'demo': self.demo,
+            'balance': self.balance,
+            'bonus': self.bonus,
+            'white_list_update_active': self.white_list_update_active
+        }
+
+# Мок для User
+class MockUser:
+    def __init__(self, id=1, user_telegram_id=123456789, username="test_user", 
+                 email=None, adv_updater_user_chat_id=None):
+        self.id = id
+        self.user_telegram_id = user_telegram_id
+        self.username = username
+        self.email = email
+        self.adv_updater_user_chat_id = adv_updater_user_chat_id
+        self.wbusercabinets = []
+        self.favorite_advs = []
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_telegram_id': self.user_telegram_id,
+            'username': self.username,
+            'email': self.email
+        }
+
+# Мок для WBUserCabinet
+class MockWBUserCabinet:
+    def __init__(self, id=1, user=None, wb_cabinet=None, active=True, name='Test Cabinet'):
+        self.id = id
+        self.user = user
+        self.user_id = user.id if user else None
+        self.wb_cabinet = wb_cabinet
+        self.wb_cabinet_id = wb_cabinet.id if wb_cabinet else None
+        self.active = active
+        self.name = name
+        
+        if user and user.wbusercabinets is not None and self not in user.wbusercabinets:
+            user.wbusercabinets.append(self)
+        if wb_cabinet and wb_cabinet.wbusercabinets is not None and self not in wb_cabinet.wbusercabinets:
+            wb_cabinet.wbusercabinets.append(self)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'wb_cabinet_id': self.wb_cabinet_id,
+            'active': self.active,
+            'name': self.name
+        }
+
+# Мок для WBToken
+class MockWBToken:
+    def __init__(self, id=1, api_key="test_api_key", user=None, active=True, shop_id="test_shop"):
+        self.id = id
+        self.api_key = api_key
+        self.user = user
+        self.user_id = user.id if user else None
+        self.active = active
+        self.shop_id = shop_id
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'api_key': self.api_key,
+            'user_id': self.user_id,
+            'active': self.active,
+            'shop_id': self.shop_id
+        }
+
+# Мок для AdvSetting
+class MockAdvSetting:
+    def __init__(self, id=1, adv_id="test_adv_id", name="Test Adv", wb_cabinet=None, wb_cabinet_id=None,
+                 active_status=True, bot_active=True, nmids=None, type="search", 
+                 keyword_settings=None, adv_keywords=None, payments=None):
+        self.id = id
+        self.adv_id = adv_id
+        self.name = name
+        self.wb_cabinet = wb_cabinet
+        self.wb_cabinet_id = wb_cabinet_id or (wb_cabinet.id if wb_cabinet else None)
+        self.active_status = active_status
+        self.bot_active = bot_active
+        self.nmids = nmids or [12345, 67890]
+        self.type = type
+        self.keyword_settings = keyword_settings or []
+        self.adv_keywords = adv_keywords or []
+        self.payments = payments or []
+        self.bid_data = {}
+        self.bidder_active = True
+        self.exponent_predict_ctr = 1.0
+        self.auction_boost_all_phrase_mode = False
+        self.new_auto_min_ctr_mode = True
+        
+        if wb_cabinet and self not in wb_cabinet.adv_settings:
+            wb_cabinet.adv_settings.append(self)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'adv_id': self.adv_id,
+            'name': self.name,
+            'wb_cabinet_id': self.wb_cabinet_id,
+            'active_status': self.active_status,
+            'bot_active': self.bot_active,
+            'nmids': self.nmids,
+            'type': self.type,
+            'bidder_active': self.bidder_active
+        }
+
+# Мок для ItemFeature
+class MockItemFeature:
+    def __init__(self, id=1, nmid=12345, vector=None):
+        self.id = id
+        self.nmid = nmid
+        self.vector = vector or "[0.1, 0.2, 0.3]"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nmid': self.nmid,
+            'vector': self.vector
+        }
+
+# Мок для KeywordFeature
+class MockKeywordFeature:
+    def __init__(self, id=1, keyword="test_keyword", vector=None):
+        self.id = id
+        self.keyword = keyword
+        self.vector = vector or "[0.1, 0.2, 0.3]"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'keyword': self.keyword,
+            'vector': self.vector
+        }
+
+# Мок для AdvPayment
+class MockAdvPayment:
+    def __init__(self, id=1, adv_setting=None, adv_setting_id=None, date=None, 
+                 amount=100.0, type="balance", wb_cabinet=None, wb_cabinet_id=None, user=None, user_id=None):
+        self.id = id
+        self.adv_setting = adv_setting
+        self.adv_setting_id = adv_setting_id or (adv_setting.id if adv_setting else None)
+        self.date = date or datetime.now().date()
+        self.amount = amount
+        self.type = type
+        self.wb_cabinet = wb_cabinet
+        self.wb_cabinet_id = wb_cabinet_id or (wb_cabinet.id if wb_cabinet else None)
+        self.user = user
+        self.user_id = user_id or (user.id if user else None)
+        
+        if adv_setting and adv_setting.payments is not None and self not in adv_setting.payments:
+            adv_setting.payments.append(self)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'adv_setting_id': self.adv_setting_id,
+            'date': self.date,
+            'amount': self.amount,
+            'type': self.type,
+            'wb_cabinet_id': self.wb_cabinet_id,
+            'user_id': self.user_id
+        }
+
+# Мок для KeywordSetting
+class MockKeywordSetting:
+    def __init__(self, id=1, adv_setting=None, adv_setting_id=None, text="test_keyword", 
+                 bid=None, search_count=100, auto_bid=True):
+        self.id = id
+        self.adv_setting = adv_setting
+        self.adv_setting_id = adv_setting_id or (adv_setting.id if adv_setting else None)
+        self.text = text
+        self.bid = bid or 100.0
+        self.search_count = search_count
+        self.auto_bid = auto_bid
+        
+        if adv_setting and adv_setting.keyword_settings is not None and self not in adv_setting.keyword_settings:
+            adv_setting.keyword_settings.append(self)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'adv_setting_id': self.adv_setting_id,
+            'text': self.text,
+            'bid': self.bid,
+            'search_count': self.search_count,
+            'auto_bid': self.auto_bid
+        }
+
+# Моки для файловых операций и другие вспомогательные классы
+class MockMessage:
+    def __init__(self, text=None, from_user=None, chat=None):
+        self.text = text
+        self.from_user = from_user or MockUser()
+        self.chat = chat or {'id': 123456789}
+
+class MockCallback:
+    def __init__(self, data=None, from_user=None, message=None):
+        self.data = data
+        self.from_user = from_user or MockUser()
+        self.message = message or MockMessage()
+
+# Мокируем все функции SQLAlchemy
+SQLAlchemyMockClasses = [
+    'and_', 'or_', 'not_', 'select', 'update', 'delete', 'join', 'outerjoin', 
+    'func', 'desc', 'asc', 'cast', 'text', 'alias', 'literal', 'distinct'
+]
+
+for cls_name in SQLAlchemyMockClasses:
+    globals()[cls_name] = MagicMock(return_value=MagicMock())

@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Правила для тестирования ботов
 globs: "tests/**"
 alwaysApply: true

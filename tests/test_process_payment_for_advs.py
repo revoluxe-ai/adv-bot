@@ -19,6 +19,11 @@ sys.modules['app.client_bot.bot'] = MockBotModule()
 # После патча импортируем тестируемую функцию
 from app.modules.wb_adv_updater.wb_manager import process_payment_for_advs
 
+# Моки для ML модулей
+class MockXGBModel:
+    def predict(self, X):
+        return [0.1] * len(X)
+
 # Создаем моки для тестирования
 class MockWBCabinet:
     def __init__(self, balance=0, bonus=0, shop_id="test_shop", expiration_time=None):

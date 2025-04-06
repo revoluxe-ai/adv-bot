@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Общие принципы тестирования
 globs: "tests/**"
 alwaysApply: true

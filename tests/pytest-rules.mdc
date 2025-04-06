@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Правила тестирования с pytest
 globs: "tests/**"
 alwaysApply: true

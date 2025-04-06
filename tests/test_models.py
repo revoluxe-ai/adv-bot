@@ -1,11 +1,22 @@
 import pytest
-from sqlalchemy import create_engine
+import os
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 from tests.mocks import mock_metadata, MockWBCabinet, MockWBBalancePayment, MockWBBonusPayment
 
-# Создаем тестовую базу данных в памяти
-engine = create_engine('sqlite:///:memory:')
+# Создаем тестовую файловую БД SQLite вместо памяти
+DB_PATH = 'test_db.sqlite'
+
+# Используем новый URL формат для SQLAlchemy 2.0
+engine = create_engine(f"sqlite:///{DB_PATH}")
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Устанавливаем поддержку внешних ключей
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 @pytest.fixture
@@ -23,6 +34,16 @@ def db_session():
     
     # Удаляем все таблицы
     mock_metadata.drop_all(engine)
+    
+    # Закрываем соединение с базой данных
+    engine.dispose()
+    
+    # Удаляем файл базы данных
+    if os.path.exists(DB_PATH):
+        try:
+            os.remove(DB_PATH)
+        except:
+            pass
 
 
 def test_wb_cabinet_calculated_balance(db_session: Session):
