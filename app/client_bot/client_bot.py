@@ -36,7 +36,7 @@ storage = RedisStorage.from_url(f'redis://{redis_host}:6379/0', key_builder=Defa
 
 path_setting = path_setting_funcs.get_setting_path()
 
-WEB_SERVER_HOST = "127.0.0.1"
+WEB_SERVER_HOST = "0.0.0.0"
 # Port for incoming request from reverse proxy. Should be any available port
 
 PORT = settings.TELEGRAM_WEB_PORT
@@ -136,7 +136,6 @@ async def run():
         # Запускаем бота с пулингом вместо вебхука
         await dp.storage.close()  # Закрываем хранилище перед запуском, чтобы избежать конфликтов
         await asyncio.gather(
-             # run_shop_updater(),
              dp.start_polling(bot, on_startup=on_startup, on_shutdown=on_shutdown)
         )
 
