@@ -1,7 +1,5 @@
 from datetime import datetime
 from typing import Tuple, Optional
-
-from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.modules.balance_manager.exceptions import (
@@ -18,7 +16,10 @@ from app.utils.db.session_maker import get_async_session_maker
 sm = get_async_session_maker
 
 
-async def add_balance(user_id: int, cabinet_id: int, amount: float, description: Optional[str] = None) -> WBBalancePayment:
+async def add_balance(user_id: int,
+                      cabinet_id: int,
+                      amount: float,
+                      description: Optional[str] = None) -> WBBalancePayment:
     """
     Создает запись о пополнении баланса
     
@@ -138,7 +139,9 @@ async def get_cabinet_balance(cabinet_id: int) -> Tuple[float, float]:
         return cabinet.calculated_balance, cabinet.calculated_bonus
 
 
-async def confirm_payment(user_id: int, payment_id: int, add_to_system_payments: bool = True) -> Tuple[WBBalancePayment, WBCabinet]:
+async def confirm_payment(user_id: int,
+                          payment_id: int,
+                          add_to_system_payments: bool = True) -> Tuple[WBBalancePayment, WBCabinet]:
     """
     Подтверждает платеж и регистрирует его в системе платежей
     

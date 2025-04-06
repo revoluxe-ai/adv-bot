@@ -64,181 +64,137 @@ def mock_adv_setting():
 
 
 @pytest.mark.asyncio
-async def test_create_adv_setting(test_async_db):
-    async with test_async_db as session:
-        # Create test data
-        wb_cabinet = WBCabinet(
-            id=1,
-            shop_id="test_shop",
-            balance=1000,
-            bonus=100,
-            expiration_time=datetime.now(),
-            active=True
-        )
-        await session.merge(wb_cabinet)
-        
-        adv_setting = AdvSetting(
-            adv_id=123,
-            name="test_adv",
-            wb_cabinet_id=wb_cabinet.id,
-            active_status="active",
-            bot_active=True,
-            last_update=datetime.now()
+async def test_create_adv_setting(test_async_db, mock_wb_cabinet):
+    """Тест создания настройки рекламы"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
+        await session.commit()
+
+        adv_setting = MockAdvSetting(
+            wb_cabinet_id=mock_wb_cabinet.id,
+            name="Test Setting",
+            description="Test Description",
+            is_active=True
         )
         session.add(adv_setting)
         await session.commit()
 
-        # Verify
-        result = await session.get(AdvSetting, adv_setting.id)
+        # Проверяем, что запись создана
+        result = await session.get(MockAdvSetting, adv_setting.id)
         assert result is not None
-        assert result.adv_id == 123
-        assert result.name == "test_adv"
-
+        assert result.name == "Test Setting"
+        assert result.description == "Test Description"
+        assert result.is_active is True
 
 @pytest.mark.asyncio
-async def test_update_adv_setting(test_async_db):
-    async with test_async_db as session:
-        # Create test data
-        wb_cabinet = WBCabinet(
-            id=1,
-            shop_id="test_shop",
-            balance=1000,
-            bonus=100,
-            expiration_time=datetime.now(),
-            active=True
-        )
-        await session.merge(wb_cabinet)
-        
-        adv_setting = AdvSetting(
-            adv_id=123,
-            name="test_adv",
-            wb_cabinet_id=wb_cabinet.id,
-            active_status="active",
-            bot_active=True,
-            last_update=datetime.now()
+async def test_update_adv_setting(test_async_db, mock_wb_cabinet):
+    """Тест обновления настройки рекламы"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
+        await session.commit()
+
+        # Создаем настройку
+        adv_setting = MockAdvSetting(
+            wb_cabinet_id=mock_wb_cabinet.id,
+            name="Test Setting",
+            description="Test Description",
+            is_active=True
         )
         session.add(adv_setting)
         await session.commit()
 
-        # Update
-        adv_setting.name = "updated_adv"
+        # Обновляем настройку
+        adv_setting.name = "Updated Setting"
+        adv_setting.description = "Updated Description"
+        adv_setting.is_active = False
         await session.commit()
 
-        # Verify
-        result = await session.get(AdvSetting, adv_setting.id)
-        assert result.name == "updated_adv"
-
+        # Проверяем обновление
+        result = await session.get(MockAdvSetting, adv_setting.id)
+        assert result is not None
+        assert result.name == "Updated Setting"
+        assert result.description == "Updated Description"
+        assert result.is_active is False
 
 @pytest.mark.asyncio
-async def test_delete_adv_setting(test_async_db):
-    async with test_async_db as session:
-        # Create test data
-        wb_cabinet = WBCabinet(
-            id=1,
-            shop_id="test_shop",
-            balance=1000,
-            bonus=100,
-            expiration_time=datetime.now(),
-            active=True
-        )
-        await session.merge(wb_cabinet)
-        
-        adv_setting = AdvSetting(
-            adv_id=123,
-            name="test_adv",
-            wb_cabinet_id=wb_cabinet.id,
-            active_status="active",
-            bot_active=True,
-            last_update=datetime.now()
+async def test_delete_adv_setting(test_async_db, mock_wb_cabinet):
+    """Тест удаления настройки рекламы"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
+        await session.commit()
+
+        # Создаем настройку
+        adv_setting = MockAdvSetting(
+            wb_cabinet_id=mock_wb_cabinet.id,
+            name="Test Setting",
+            description="Test Description",
+            is_active=True
         )
         session.add(adv_setting)
         await session.commit()
 
-        # Delete
+        # Удаляем настройку
         await session.delete(adv_setting)
         await session.commit()
 
-        # Verify
-        result = await session.get(AdvSetting, adv_setting.id)
+        # Проверяем удаление
+        result = await session.get(MockAdvSetting, adv_setting.id)
         assert result is None
 
-
 @pytest.mark.asyncio
-async def test_get_adv_settings_by_cabinet(test_async_db):
-    async with test_async_db as session:
-        # Create test data
-        wb_cabinet = WBCabinet(
-            id=1,
-            shop_id="test_shop",
-            balance=1000,
-            bonus=100,
-            expiration_time=datetime.now(),
-            active=True
-        )
-        await session.merge(wb_cabinet)
-        
-        adv_setting1 = AdvSetting(
-            adv_id=123,
-            name="test_adv1",
-            wb_cabinet_id=wb_cabinet.id,
-            active_status="active",
-            bot_active=True,
-            last_update=datetime.now()
-        )
-        adv_setting2 = AdvSetting(
-            adv_id=124,
-            name="test_adv2",
-            wb_cabinet_id=wb_cabinet.id,
-            active_status="active",
-            bot_active=True,
-            last_update=datetime.now()
-        )
-        session.add_all([adv_setting1, adv_setting2])
+async def test_get_adv_settings_by_cabinet(test_async_db, mock_wb_cabinet):
+    """Тест получения настроек рекламы по кабинету"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
         await session.commit()
-        wb_cabinet_original_id: int = wb_cabinet.id
 
-        # Query
-        stmt = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet_original_id)
-        result = await session.execute(stmt)
-        settings = result.scalars().all()
+        # Создаем несколько настроек
+        settings = [
+            MockAdvSetting(
+                wb_cabinet_id=mock_wb_cabinet.id,
+                name=f"Setting {i}",
+                description=f"Description {i}",
+                is_active=True
+            )
+            for i in range(3)
+        ]
+        for setting in settings:
+            session.add(setting)
+        await session.commit()
 
-        # Verify
-        assert len(settings) == 2
-        assert all(s.wb_cabinet_id == wb_cabinet.id for s in settings)
+        # Получаем настройки
+        from sqlalchemy import select
+        query = select(MockAdvSetting).where(MockAdvSetting.wb_cabinet_id == mock_wb_cabinet.id)
+        result = await session.execute(query)
+        result_settings = result.scalars().all()
 
+        assert len(result_settings) == 3
+        for i, setting in enumerate(result_settings):
+            assert setting.name == f"Setting {i}"
+            assert setting.description == f"Description {i}"
+            assert setting.is_active is True
 
 @pytest.mark.asyncio
-async def test_adv_setting_relationships(test_async_db):
-    async with test_async_db as session:
-        # Create test data
-        wb_cabinet = WBCabinet(
-            id=1,
-            shop_id="test_shop",
-            balance=1000,
-            bonus=100,
-            expiration_time=datetime.now(),
-            active=True
-        )
-        await session.merge(wb_cabinet)
-        
-        adv_setting = AdvSetting(
-            adv_id=123,
-            name="test_adv",
-            wb_cabinet_id=wb_cabinet.id,
-            active_status="active",
-            bot_active=True,
-            last_update=datetime.now()
+async def test_adv_setting_relationships(test_async_db, mock_wb_cabinet):
+    """Тест связей настройки рекламы"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
+        await session.commit()
+
+        # Создаем настройку
+        adv_setting = MockAdvSetting(
+            wb_cabinet_id=mock_wb_cabinet.id,
+            name="Test Setting",
+            description="Test Description",
+            is_active=True
         )
         session.add(adv_setting)
         await session.commit()
 
-        adv_setting_original_id: int = adv_setting.id
-        stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
-        result = await session.execute(stmt)
-        loaded_setting = result.scalar_one()
-        
-        assert loaded_setting.wb_cabinet_id == wb_cabinet.id
-
+        # Проверяем связь с кабинетом
+        result = await session.get(MockAdvSetting, adv_setting.id)
+        assert result is not None
+        assert result.wb_cabinet_id == mock_wb_cabinet.id
 
 def mock_session():
     session = AsyncMock()

@@ -1448,7 +1448,8 @@ class ShowFavoriteAdvs(TextWithKeyboard):
 
 async def process_cabinet_balance_topup(user_id: int, cabinet_id: int, amount: float):
     """Обработка запроса на пополнение баланса кабинета"""
-    async with _sm() as session:
+    session_maker = _sm()
+    async with session_maker() as session:
         # Получаем пользователя для описания платежа
         user = await session.get(User, user_id)
         if not user:
@@ -1468,7 +1469,8 @@ async def process_cabinet_balance_topup(user_id: int, cabinet_id: int, amount: f
 
 async def confirm_cabinet_balance_topup(payment_id: int, cabinet_id: int):
     """Подтверждение платежа и обновление баланса кабинета"""
-    async with _sm() as session:
+    session_maker = _sm()
+    async with session_maker() as session:
         # Получаем платеж
         payment = await session.get(WBBalancePayment, payment_id)
         if not payment or payment.wb_cabinet_id != cabinet_id:

@@ -8,19 +8,15 @@ import typing
 from statistics import mean
 from aiohttp import ServerDisconnectedError, ClientOSError
 from dataclasses import dataclass
-
 from arq import Retry, create_pool
-
 from app.arq_workers.arq_redis_settings import arq_redis_settings
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.parser_tasks_generator import ParserTasksGenerator
 from app.modules.wb_keywords_parser.parsing_queue_manager import ParsingQueueManager
-from app.modules.wb_keywords_parser.parsing_task import ParsingTask
 from app.utils import redis_manager
-from sqlalchemy import select, and_, not_, Sequence
-
-from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting, WBCabinet
+from sqlalchemy import select
+from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting
 from aiogram.client.session import aiohttp
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
@@ -60,11 +56,12 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
 
             method_name = func.__name__
             if method_name not in instance._api_call_state:
+                next_pause = interval_seconds / requests_per_interval
                 instance._api_call_state[method_name] = {
                     '_last_query_time': 0,
                     '_attempts': 0,
                     '_last_pauses': [0],
-                    '_next_pause': 0,
+                    '_next_pause': next_pause,
 
                 }
 
@@ -93,8 +90,8 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                     elif current_pause <= min_pause:
                         next_pause = current_pause/2
                     else:
-                       mean_pause = mean(state['_last_pauses'])
-                       next_pause = mean_pause*0.95
+                        mean_pause = mean(state['_last_pauses'])
+                        next_pause = mean_pause*0.95
                     if next_pause > max_delay:
                         next_pause = max_delay
                     state['_next_pause'] = next_pause
@@ -132,7 +129,7 @@ def get_parse_url(text: str, page: int):
     url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
     return url
 
-class Parser:
+class ParserService:
 
     async def parse_keywords_from_wb(self, text: str, page: int, total_pages: TotalPages) -> list[WBItemPosition]:
         first_place = page*100 - 99
@@ -253,7 +250,7 @@ class Parser:
         assert isinstance(products, list)
         return products, cluster, preset, total_items
 
-parser = Parser()
+parser = ParserService()
 
 
 parsing_queue_manager = ParsingQueueManager()
@@ -309,7 +306,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
         return []
     try:
          positions = await parser.parse_keywords_from_wb(text, page, total_pages)
-    except Exception as e:
+    except Exception:
         logger.error(f'Ошибка при парсинге страницы {page} ключа {text}', exc_info=True)
         logger.debug(f'{get_parse_url(text, page)}')
         return []
@@ -340,7 +337,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
 async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60):
     try:
         await _add_wb_positions(text, need_nmids, delay, page_limit)
-    except Exception as e:
+    except Exception:
         logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
     return
 
@@ -444,77 +441,12 @@ async def add_wb_positions_from_wb_search(text:str,
     try:
         delay = 0.1
         await create_arq_parsing_task(text, need_nmids, delay, max_page)
-    except ErrorParsingPositions as e:
+    except ErrorParsingPositions:
         logger.error(f'По запросу {text} не найдено ни одной позиции', exc_info=True)
-    except Exception as e:
+    except Exception:
         logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
 
 
-
-
-async def get_phrases_for_parsing(queue: asyncio.Queue, semaphore=None):
-    max_views_difference = 10
-    pass_keywords_texts = set()
-    async with sm() as session:
-        logger.debug("Открытие сессии для выполнения запросов к базе данных.")
-
-        stmt = select(AdvSetting).where(
-            AdvSetting.bot_active == True,
-        )
-        logger.debug("Формирование запроса для выбора активных рекламных кампаний.")
-
-        advs = await session.execute(stmt)
-        advs = advs.scalars().all()
-    logger.debug(f"Получено {len(advs)} активных рекламных кампаний для парсинга.")
-
-    adv_ids = [adv.adv_id for adv in advs]
-    logger.debug(f"Список ID рекламных кампаний: {adv_ids}. Перемешивание списка для случайного порядка обработки.")
-
-    random.shuffle(advs)
-    for adv in advs:
-        logger.debug(f'Обработка кампании {adv.name}')
-        need_nmids = set(adv.nmid)
-        adv_id = adv.adv_id
-        logger.debug(f"Обработка рекламной кампании ID: {adv_id}. Получение ключевых слов.")
-        try:
-             keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
-        except Exception as exc:
-            logger.error('Ошибка получения фраз для парсинга', exc_info=True)
-            continue
-        for keyword in keywords:
-            text = keyword.text
-            if text in pass_keywords_texts:
-                logger.debug(f"Ключевое слово '{text}' уже обработано. Пропуск.")
-                await asyncio.sleep(0)
-                continue
-            last_position = await redis_manager.get_keyword_position(text, adv.nmid[0])
-            if last_position and last_position.timestamp < datetime.datetime.now() - datetime.timedelta(days=1)\
-                    and keyword.hard_status != 0:
-                logger.debug(f"Последняя позиция для ключевого слова '{text}' устарела. Перезапуск парсинга.")
-                await redis_manager.set_last_views(adv_id, text, 0)
-                await queue.put((text, adv.adv_id, list(need_nmids), None, 60))
-                pass_keywords_texts.add(text)
-            total_views = keyword.views
-            logger.debug(f"Поиск кластера и пресета для ключевого слова '{text}'.")
-            cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
-            if not cluster_name:
-                logger.debug(
-                    f"Кластер не найден для ключевого слова '{text}'. Определение необходимых nmids для парсинга.")
-                max_page = 1
-                await queue.put((text, adv.adv_id, list(need_nmids), None, max_page,))
-                pass_keywords_texts.add(text)
-                continue
-
-            if keyword.status == KeywordStatus.GOOD:
-                logger.debug(f"Ключевое слово '{text}' отмечено как хорошее. Проверка изменения просмотров.")
-                last_views = await redis_manager.get_last_views(adv_id, text)
-                if not last_views or\
-                        (total_views - last_views) > max_views_difference and keyword.hard_status == 2 or\
-                        last_views == total_views and keyword.hard_status == 2\
-                        or not last_position:
-                        await queue.put((text, adv.adv_id, list(need_nmids), last_views, 60))
-                        pass_keywords_texts.add(text)
-                        logger.debug(f"Ключевое слово '{text}' добавлено в список обработанных.")
 @dataclass
 class ComplexTask:
     text: str
@@ -526,7 +458,7 @@ class TimeAdvLimit:
         self._limit = limit
         self._parsing_time = 0
 
-    def add_parsing_time(self, value: float |  int):
+    def add_parsing_time(self, value: float | int) -> None:
         self._parsing_time += value
 
     @property
@@ -539,11 +471,9 @@ async def async_iter(generator):
         yield item
 
 class Parser:
-    def __init__(self):
-        self._parsing_tasks: dict[str, ComplexTask] = {}
-        self._all_adv_ids = set()
+    def __init__(self: 'Parser'):
+        self._all_adv_ids: set[int] = set()
         self._parsing_limits: dict = {}
-
 
     @staticmethod
     async def global_parsing_tasks_generator(generators: list):
@@ -558,36 +488,7 @@ class Parser:
                 except StopAsyncIteration:
                     continue
 
-
-    async def generate_parsing_tasks_dict(self) -> None:
-        async with sm() as session:
-            stmt = select(AdvSetting)\
-                .where(AdvSetting.bot_active == True)
-            result = await session.execute(stmt)
-            advs: typing.List[AdvSetting] = result.scalars().all()
-            advs = list(advs)
-            random.shuffle(advs)
-            tasks_generators = []
-            for adv in advs:
-                parser_tasks_generator = ParserTasksGenerator(adv)
-                tasks_generators.append(parser_tasks_generator.generator())
-            tasks_generators = [async_iter(generators) for generators in tasks_generators]
-            async for parser_task in self.global_parsing_tasks_generator(tasks_generators):
-                    nmid = parser_task.nmid
-                    text = parser_task.keyword
-                    adv_id = adv.adv_id
-                    self._all_adv_ids.add(adv_id)
-                    if complex_parsing_task := self._parsing_tasks.get(text):
-                        complex_parsing_task.nmids.add(nmid)
-                        complex_parsing_task.adv_ids.add(adv_id)
-                    else:
-                        complex_task = ComplexTask(text, {nmid}, {adv_id})
-                        self._parsing_tasks[text] = complex_task
-                    await asyncio.sleep(0)
-
-
-    async def generate_parsing_tasks(self):
-
+    async def generate_parsing_tasks(self) -> None:
         async with sm() as session:
             stmt = select(AdvSetting)\
                 .where(AdvSetting.bot_active == True)
@@ -604,54 +505,3 @@ class Parser:
                     nmid = parser_task.nmid
                     text = parser_task.keyword
                     await create_arq_parsing_task(text, {nmid}, 0.1, 60)
-
-
-    async def parsing_by_dict(self):
-        limits = {}
-        while True:
-            if not self._parsing_tasks:
-                await asyncio.sleep(0)
-                continue
-            parsing_tasks: dict[str, ComplexTask] = self._parsing_tasks
-            self._parsing_tasks = {}
-            all_adv_ids = [adv_id for task in parsing_tasks.values()  for adv_id in task.adv_ids]
-            self._all_adv_ids = set()
-            limit_for_adv = 60*60/len(all_adv_ids)
-            for text in parsing_tasks:
-                complex_task = parsing_tasks[text]
-                adv_ids = complex_task.adv_ids
-                limits_for_task = []
-                for adv_id in adv_ids:
-                    if not (limit := limits.get(adv_id)):
-                        limit = TimeAdvLimit(limit_for_adv)
-                    limits_for_task.append(limit)
-                sum_limits = sum(limit.limit for limit in limits_for_task)
-                if sum_limits > 0:
-                    need_nmids = complex_task.nmids
-                    time_start = time.time()
-                    try:
-                        await asyncio.wait_for(add_wb_positions_from_wb_search(text,
-                                                              set(need_nmids),
-                                                              60),
-                                               timeout=sum_limits)
-                    except TimeoutError:
-                        logger.debug(f'Таймаут парсинга по лимитам для {need_nmids}')
-                    stop_time = time.time()
-                    delta_time_sec = stop_time - time_start
-                    ext_limit = sum_limits - delta_time_sec
-                    for limit in limits_for_task:
-                        max_limit = limit.limit
-                        max_limit_for_this_limit = min(ext_limit, max_limit)
-                        limit.add_parsing_time(max_limit_for_this_limit)
-                        ext_limit -= max_limit_for_this_limit
-                        await asyncio.sleep(0)
-                    pass
-
-
-
-
-
-
-
-
-

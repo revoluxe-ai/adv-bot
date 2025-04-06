@@ -3,10 +3,11 @@ dotenv.load_dotenv()
 import os
 import sys
 import pytest
+import pytest_asyncio
 import asyncio
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from tests.mocks import MockBase, MockItemFeature, MockKeywordFeature, MockWBCabinet, MockUser, MockWBUserCabinet, MockWBToken, MockAdvSetting, MockAdvPayment
 import app.modules.wb_adv_updater.models as models
 from datetime import datetime, timedelta
@@ -105,49 +106,37 @@ def event_loop():
 _engine = None
 _async_session_maker = None
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture
 async def test_async_db():
-    """Create a test database and tables."""
-    global _engine, _async_session_maker
-    
-    # Создаем движок SQLite в памяти, если его еще нет
-    if _engine is None:
-        _engine = create_async_engine(
-            "sqlite+aiosqlite:///:memory:",
-            echo=False,
-            poolclass=StaticPool
-        )
-        
-        # Создаем все таблицы
-        async with _engine.begin() as conn:
-            await conn.run_sync(MockBase.metadata.drop_all)
-            await conn.run_sync(MockBase.metadata.create_all)
-            
-        # Создаем фабрику сессий
-        _async_session_maker = sessionmaker(
-            _engine, class_=AsyncSession, expire_on_commit=False
-        )
-    
-    # Создаем сессию
-    session = _async_session_maker()
-    
-    # Очищаем базу данных перед каждым тестом
-    async with _engine.begin() as conn:
+    """Фикстура для создания тестовой базы данных"""
+    # Создаем движок для тестовой базы данных в памяти
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        echo=False,
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+
+    # Создаем все таблицы
+    async with engine.begin() as conn:
         await conn.run_sync(MockBase.metadata.drop_all)
         await conn.run_sync(MockBase.metadata.create_all)
-    try:
+
+    # Создаем фабрику сессий
+    async_session = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session() as session:
         yield session
-    finally:
-        await session.close()
 
 @pytest.fixture(autouse=True)
 def patch_get_async_session_maker(monkeypatch, test_async_db):
     """Патчим get_async_session_maker, чтобы он использовал тестовую БД"""
-    @asynccontextmanager
     async def mock_get_async_session_maker(*args, **kwargs):
-        # Создаем сессию из test_async_db с правильной настройкой greenlet контекста
-        async with AsyncSession(bind=test_async_db.bind, expire_on_commit=False) as session:
-            yield session
+        return test_async_db
     
     monkeypatch.setattr("app.utils.db.session_maker.get_async_session_maker", mock_get_async_session_maker)
     monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker)
@@ -176,3 +165,29 @@ def mock_keywords_query():
     with patch('app.modules.keywords_query.keywords_query.queries_dict', mock_queries_dict), \
          patch('app.modules.keywords_query.keywords_query.min_query', 50):
         yield mock_queries_dict
+
+@pytest.fixture(autouse=True)
+def mock_wb_parser():
+    """Мок для парсера WB API"""
+    mock_response = {
+        'data': {
+            'products': [
+                {
+                    'id': 12345,
+                    'log': {
+                        'advertId': 'test_adv_id',
+                        'cpm': 100,
+                        'position': 1,
+                        'promoPosition': 1,
+                        'tp': 'c'
+                    }
+                }
+            ],
+            'total': 100
+        }
+    }
+    
+    with patch('app.modules.wb_keywords_parser.parser.ParserService._ParserService__parse_keywords_from_wb', 
+              new_callable=AsyncMock, 
+              return_value=(mock_response['data']['products'], 'test_cluster', 'test_preset', mock_response['data']['total'])):
+        yield

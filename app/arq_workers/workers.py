@@ -1,6 +1,6 @@
 import dotenv
 from app.arq_workers.arq_redis_settings import arq_redis_settings
-from app.modules.wb_keywords_parser.parser import create_arq_parsing_task, _create_arq_parsing_task
+from app.modules.wb_keywords_parser.parser import _create_arq_parsing_task
 from app.settings import settings
 
 dotenv.load_dotenv()
@@ -36,7 +36,7 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     keep_jobs = 86400  # Храним задачи в Redis 24 часа
-    max_tries = 10 # Максимальное число попыток
+    max_tries = 10  # Максимальное число попыток
     job_timeout = 86400   #максимальное время на выполнение задачи
 
 
@@ -46,6 +46,6 @@ class ParserWorker:
     on_startup = startup
     on_shutdown = shutdown
     max_jobs = settings.MAX_PARSING_PARALLEL_JOBS
-    keep_jobs = 60*60*4 # Храним задачи в Redis 1 час
-    max_tries = 1 # Максимальное число попыток
-    job_timeout = 120 #максимальное время на выполнение задачи
+    keep_jobs = 60*60*4  # Храним задачи в Redis 1 час
+    max_tries = 1  # Максимальное число попыток
+    job_timeout = 120  # Максимальное время на выполнение задачи

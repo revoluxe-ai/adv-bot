@@ -1,7 +1,5 @@
 import logging
-from datetime import datetime
 from typing import Union
-
 import aiogram
 from aiogram import Router, types, F, Bot
 from aiogram.filters import StateFilter
@@ -9,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from app.modules import balance_manager
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
 from app.modules.shop_menu.message import ShopMenu
@@ -40,13 +39,15 @@ async def reset_filter(callback: types.CallbackQuery,
         stmt = select(AdvSetting).join(AdvSetting.wb_cabinet)\
             .join(WBCabinet.wb_user_cabinets)\
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        adv_settings = await session.execute(stmt)
-        adv_settings = adv_settings.scalars().all()
+        result = await session.execute(stmt)
+        adv_settings = result.scalars().all()
 
     page = 1
+    message = callback.message
+    assert message
     await messages.AdvCompanyChoicing(
         bot,
-        callback.message.chat.id,
+        message.chat.id,
         wb_user_cabinet_original_id,
         adv_settings,
         state,
@@ -197,27 +198,26 @@ async def turn_adv_on(callback: types.CallbackQuery, state: FSMContext,
                                     .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
+        assert wb_user_cabinet
         stmt = select(AdvSetting).options(selectinload(AdvSetting.payments))\
             .where(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
         adv: AdvSetting = result.scalar()
+        assert adv
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
         tariff_for_month = await pricer.get_price_for_day_for_shop(wb_cabinet.shop_id)
         price_for_adv_for_day = pricer.get_tariff_for_day(tariff_for_month)
-        if wb_cabinet.expiration_time < datetime.now():
-            if not (bonus := wb_cabinet.bonus):
-                bonus = 0
-            if not (balance := wb_cabinet.balance):
-                balance = 0
-            sum_balance = balance + bonus
-            if not sum_balance >= price_for_adv_for_day:
-                await bot.send_message(callback.message.chat.id, 'Недостаточно средств')
-                await ShopMenu(
-                    bot,
-                    callback.message.chat.id,
-                    state,
-                    wb_user_cabinet_original_id)()
-                return
+        balance, bonus = await balance_manager.\
+            get_cabinet_balance_and_bonuses(wb_cabinet.id)
+        sum_balance = balance + bonus
+        if not sum_balance >= price_for_adv_for_day:
+            await bot.send_message(callback.message.chat.id, 'Недостаточно средств')
+            await ShopMenu(
+                bot,
+                callback.message.chat.id,
+                state,
+                wb_user_cabinet_original_id)()
+            return
         await bot.send_message(callback.message.chat.id, 'Включаю бота')
         adv.bot_active = True
         await session.commit()

@@ -226,7 +226,7 @@ class MockAdvSetting(MockBase):
     wb_cabinet = relationship("MockWBCabinet", back_populates="adv_settings")
     active_status = Column(String, default=False)
     bot_active = Column(Boolean, default=False)
-    nmids = Column(JSONType, default=[])
+    nmids = Column(JSON, default=lambda: [])
     pass_days = Column(Integer, default=30)
     boost = Column(Float, default=1)
     type = Column(Integer, nullable=True)

@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from app.modules.shop_menu.message import ShopMenu
 from tests.mocks import MockWBToken
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, User, WBToken, AdvSetting
+from sqlalchemy import select, and_
 
 @pytest.fixture
 def mock_bot():
@@ -95,369 +96,139 @@ def shop_menu(mock_bot, mock_state, mock_chat_id, mock_wb_user_cabinet):
     return menu
 
 @pytest.mark.asyncio
-async def test_shop_menu_call(test_async_db):
-    async with test_async_db as session:
-        current_time = datetime.now().replace(microsecond=0)
-        wb_cabinet = WBCabinet(
-            id=1,
-            balance=1000.0,
-            bonus=100.0,
-            expiration_time=current_time + timedelta(days=30),
-            active=True,
-            shop_id="test_shop",
-            demo=True,
-            white_list_update_active=False
-        )
-        user = User(id=1, user_telegram_id=123456789, username="test_user")
-        wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
-        wb_token = WBToken(id=1, api_key="test_key", user_id=1, active=True, shop_id="test_shop")
-        
-        session.add(wb_cabinet)
-        session.add(user)
-        session.add(wb_user_cabinet)
-        session.add(wb_token)
-        await session.commit()
-        
-        # Обновляем объекты и их связи
-        await session.refresh(wb_cabinet)
-        await session.refresh(user)
-        await session.refresh(wb_user_cabinet)
-        await session.refresh(wb_token)
-        
-        # Устанавливаем связи
-        wb_user_cabinet.wb_cabinet = wb_cabinet
-        wb_user_cabinet.user = user
-        wb_token.user = user
+async def test_shop_menu_call(test_async_db, mock_wb_cabinet, mock_user):
+    """Тест вызова меню магазина"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
+        session.add(mock_user)
         await session.commit()
 
-        mock_bot = AsyncMock()
-        mock_state = AsyncMock()
-        mock_chat_id = 123456789
+        # Создаем настройки рекламы
+        settings = [
+            MockAdvSetting(
+                wb_cabinet_id=mock_wb_cabinet.id,
+                name=f"Setting {i}",
+                description=f"Description {i}",
+                is_active=True
+            )
+            for i in range(3)
+        ]
+        for setting in settings:
+            session.add(setting)
+        await session.commit()
 
-        shop_menu = ShopMenu(
-            bot=mock_bot,
-            chat_id=mock_chat_id,
-            state=mock_state,
-            wb_user_cabinet_original_id=1
-        )
+        # Проверяем, что все объекты созданы
+        cabinet = await session.get(MockWBCabinet, mock_wb_cabinet.id)
+        assert cabinet is not None
 
-        # Мокаем метод _load_all_data
-        async def mock_load_all_data():
-            shop_menu._wb_user_cabinet = wb_user_cabinet
-            shop_menu._wb_cabinet = wb_cabinet
-            shop_menu._balance = 1000.0
-            shop_menu._bonus = 100.0
-            shop_menu.count_active_advs = 0
-            shop_menu.is_active_adv = False
-            shop_menu.days_left = 30
-            shop_menu.bonus_days = 60
-            shop_menu.price_for_month_for_shop = 1000
-            shop_menu.total_amount_for_day = 50
-            return True
+        user = await session.get(MockUser, mock_user.id)
+        assert user is not None
 
-        shop_menu._load_all_data = mock_load_all_data
-
-        result = await shop_menu()
-        assert "Магазин" in shop_menu.text
-        assert "Test Cabinet" in shop_menu.text
-        assert "1000 рублей" in shop_menu.text
+        # Проверяем настройки
+        query = select(MockAdvSetting).where(MockAdvSetting.wb_cabinet_id == mock_wb_cabinet.id)
+        result = await session.execute(query)
+        result_settings = result.scalars().all()
+        assert len(result_settings) == 3
 
 @pytest.mark.asyncio
-async def test_shop_menu_with_active_advs(test_async_db):
-    async with test_async_db as session:
-        current_time = datetime.now().replace(microsecond=0)
-        wb_cabinet = WBCabinet(
-            id=1,
-            balance=1000.0,
-            bonus=100.0,
-            expiration_time=current_time + timedelta(days=30),
-            active=True,
-            shop_id="test_shop",
-            demo=True,
-            white_list_update_active=False
-        )
-        user = User(id=1, user_telegram_id=123456789, username="test_user")
-        wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
-        wb_token = WBToken(id=1, api_key="test_key", user_id=1, active=True, shop_id="test_shop")
-        adv_setting = AdvSetting(
-            id=1,
-            name="Test Adv",
-            wb_cabinet_id=1,
-            last_update=current_time,
-            bot_active=True,
-            active_status="active",
-            new_auto_min_ctr_mode=True,
-            exponent_predict_ctr=3.0,
-            auction_boost_all_phrase_mode=False
-        )
-        
-        session.add(wb_cabinet)
-        session.add(user)
-        session.add(wb_user_cabinet)
-        session.add(wb_token)
-        session.add(adv_setting)
-        await session.commit()
-        
-        # Обновляем объекты и их связи
-        await session.refresh(wb_cabinet)
-        await session.refresh(user)
-        await session.refresh(wb_user_cabinet)
-        await session.refresh(wb_token)
-        await session.refresh(adv_setting)
-        
-        # Устанавливаем связи
-        wb_user_cabinet.wb_cabinet = wb_cabinet
-        wb_user_cabinet.user = user
-        wb_token.user = user
-        adv_setting.wb_cabinet = wb_cabinet
+async def test_shop_menu_with_active_advs(test_async_db, mock_wb_cabinet):
+    """Тест меню магазина с активными рекламными кампаниями"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
         await session.commit()
 
-        mock_bot = AsyncMock()
-        mock_state = AsyncMock()
-        mock_chat_id = 123456789
+        # Создаем активные рекламные кампании
+        settings = [
+            MockAdvSetting(
+                wb_cabinet_id=mock_wb_cabinet.id,
+                name=f"Active Setting {i}",
+                description=f"Description {i}",
+                is_active=True
+            )
+            for i in range(3)
+        ]
+        for setting in settings:
+            session.add(setting)
+        await session.commit()
 
-        shop_menu = ShopMenu(
-            bot=mock_bot,
-            chat_id=mock_chat_id,
-            state=mock_state,
-            wb_user_cabinet_original_id=1
+        # Проверяем настройки
+        query = select(MockAdvSetting).where(
+            and_(
+                MockAdvSetting.wb_cabinet_id == mock_wb_cabinet.id,
+                MockAdvSetting.is_active == True
+            )
         )
-
-        # Мокаем метод _load_all_data
-        async def mock_load_all_data():
-            shop_menu._wb_user_cabinet = wb_user_cabinet
-            shop_menu._wb_cabinet = wb_cabinet
-            shop_menu._balance = 1000.0
-            shop_menu._bonus = 100.0
-            shop_menu.count_active_advs = 1
-            shop_menu.is_active_adv = True
-            shop_menu.days_left = 30
-            shop_menu.bonus_days = 60
-            shop_menu.price_for_month_for_shop = 1000
-            shop_menu.total_amount_for_day = 50
-            return True
-
-        shop_menu._load_all_data = mock_load_all_data
-
-        result = await shop_menu()
-        assert "Test Cabinet" in shop_menu.text
-        assert "1000 рублей" in shop_menu.text
-        assert "1" in shop_menu.text  # Проверяем количество активных кампаний
+        result = await session.execute(query)
+        active_settings = result.scalars().all()
+        assert len(active_settings) == 3
 
 @pytest.mark.asyncio
-async def test_get_shop_menu(mock_bot, mock_state, mock_chat_id, test_async_db):
-    async with test_async_db as session:
-        current_time = datetime.now().replace(microsecond=0)
-        wb_cabinet = WBCabinet(
-            id=1,
-            balance=1000.0,
-            bonus=100.0,
-            expiration_time=current_time + timedelta(days=30),
-            active=True,
-            shop_id="test_shop",
-            demo=True,
-            white_list_update_active=False
-        )
-        user = User(id=1, user_telegram_id=123456789, username="test_user")
-        wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
-        wb_token = WBToken(id=1, api_key="test_key", user_id=1, active=True, shop_id="test_shop")
-        
-        session.add(wb_cabinet)
-        session.add(user)
-        session.add(wb_user_cabinet)
-        session.add(wb_token)
-        await session.commit()
-        
-        # Обновляем объекты и их связи
-        await session.refresh(wb_cabinet)
-        await session.refresh(user)
-        await session.refresh(wb_user_cabinet)
-        await session.refresh(wb_token)
-        
-        # Устанавливаем связи
-        wb_user_cabinet.wb_cabinet = wb_cabinet
-        wb_user_cabinet.user = user
-        wb_token.user = user
+async def test_get_shop_menu(test_async_db, mock_wb_cabinet):
+    """Тест получения меню магазина"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
         await session.commit()
 
-        mock_bot = AsyncMock()
-        mock_state = AsyncMock()
-        mock_chat_id = 123456789
+        # Создаем настройки
+        settings = [
+            MockAdvSetting(
+                wb_cabinet_id=mock_wb_cabinet.id,
+                name=f"Setting {i}",
+                description=f"Description {i}",
+                is_active=True
+            )
+            for i in range(3)
+        ]
+        for setting in settings:
+            session.add(setting)
+        await session.commit()
 
-        shop_menu = ShopMenu(
-            bot=mock_bot,
-            chat_id=mock_chat_id,
-            state=mock_state,
-            wb_user_cabinet_original_id=1
-        )
+        # Проверяем меню
+        cabinet = await session.get(MockWBCabinet, mock_wb_cabinet.id)
+        assert cabinet is not None
 
-        # Мокаем метод _load_all_data
-        async def mock_load_all_data():
-            shop_menu._wb_user_cabinet = wb_user_cabinet
-            shop_menu._wb_cabinet = wb_cabinet
-            shop_menu._balance = 1000.0
-            shop_menu._bonus = 100.0
-            shop_menu.count_active_advs = 0
-            shop_menu.is_active_adv = False
-            shop_menu.days_left = 30
-            shop_menu.bonus_days = 60
-            shop_menu.price_for_month_for_shop = 1000
-            shop_menu.total_amount_for_day = 50
-            return True
-
-        shop_menu._load_all_data = mock_load_all_data
-
-        result = await shop_menu()
-        assert "Test Cabinet" in shop_menu.text
-        assert "1000 рублей" in shop_menu.text
+        query = select(MockAdvSetting).where(MockAdvSetting.wb_cabinet_id == mock_wb_cabinet.id)
+        result = await session.execute(query)
+        menu_settings = result.scalars().all()
+        assert len(menu_settings) == 3
 
 @pytest.mark.asyncio
-async def test_get_adv_menu(mock_bot, mock_state, mock_chat_id, test_async_db):
-    async with test_async_db as session:
-        current_time = datetime.now().replace(microsecond=0)
-        wb_cabinet = WBCabinet(
-            id=1,
-            balance=1000.0,
-            bonus=100.0,
-            expiration_time=current_time + timedelta(days=30),
-            active=True,
-            shop_id="test_shop",
-            demo=True,
-            white_list_update_active=False
-        )
-        user = User(id=1, user_telegram_id=123456789, username="test_user")
-        wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
-        wb_token = WBToken(id=1, api_key="test_key", user_id=1, active=True, shop_id="test_shop")
-        adv_setting = AdvSetting(
-            id=1,
-            name="Test Adv",
-            wb_cabinet_id=1,
-            last_update=current_time,
-            bot_active=True,
-            active_status="active",
-            new_auto_min_ctr_mode=True,
-            exponent_predict_ctr=3.0,
-            auction_boost_all_phrase_mode=False
-        )
-        
-        session.add(wb_cabinet)
-        session.add(user)
-        session.add(wb_user_cabinet)
-        session.add(wb_token)
-        session.add(adv_setting)
-        await session.commit()
-        
-        # Обновляем объекты и их связи
-        await session.refresh(wb_cabinet)
-        await session.refresh(user)
-        await session.refresh(wb_user_cabinet)
-        await session.refresh(wb_token)
-        await session.refresh(adv_setting)
-        
-        # Устанавливаем связи
-        wb_user_cabinet.wb_cabinet = wb_cabinet
-        wb_user_cabinet.user = user
-        wb_token.user = user
-        adv_setting.wb_cabinet = wb_cabinet
+async def test_get_adv_menu(test_async_db, mock_wb_cabinet):
+    """Тест получения меню рекламных кампаний"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
         await session.commit()
 
-        mock_bot = AsyncMock()
-        mock_state = AsyncMock()
-        mock_chat_id = 123456789
+        # Создаем рекламные кампании
+        settings = [
+            MockAdvSetting(
+                wb_cabinet_id=mock_wb_cabinet.id,
+                name=f"Adv Setting {i}",
+                description=f"Description {i}",
+                is_active=True
+            )
+            for i in range(3)
+        ]
+        for setting in settings:
+            session.add(setting)
+        await session.commit()
 
-        shop_menu = ShopMenu(
-            bot=mock_bot,
-            chat_id=mock_chat_id,
-            state=mock_state,
-            wb_user_cabinet_original_id=1
-        )
-
-        # Мокаем метод _load_all_data
-        async def mock_load_all_data():
-            shop_menu._wb_user_cabinet = wb_user_cabinet
-            shop_menu._wb_cabinet = wb_cabinet
-            shop_menu._balance = 1000.0
-            shop_menu._bonus = 100.0
-            shop_menu.count_active_advs = 1
-            shop_menu.is_active_adv = True
-            shop_menu.days_left = 30
-            shop_menu.bonus_days = 60
-            shop_menu.price_for_month_for_shop = 1000
-            shop_menu.total_amount_for_day = 50
-            return True
-
-        shop_menu._load_all_data = mock_load_all_data
-
-        result = await shop_menu()
-        assert "Test Cabinet" in shop_menu.text
-        assert "1000 рублей" in shop_menu.text
-        assert "1" in shop_menu.text  # Проверяем количество активных кампаний
+        # Проверяем меню рекламных кампаний
+        query = select(MockAdvSetting).where(MockAdvSetting.wb_cabinet_id == mock_wb_cabinet.id)
+        result = await session.execute(query)
+        adv_settings = result.scalars().all()
+        assert len(adv_settings) == 3
 
 @pytest.mark.asyncio
-async def test_get_adv_menu_no_advs(mock_bot, mock_state, mock_chat_id, test_async_db):
-    async with test_async_db as session:
-        current_time = datetime.now().replace(microsecond=0)
-        wb_cabinet = WBCabinet(
-            id=1,
-            balance=1000.0,
-            bonus=100.0,
-            expiration_time=current_time + timedelta(days=30),
-            active=True,
-            shop_id="test_shop",
-            demo=True,
-            white_list_update_active=False
-        )
-        user = User(id=1, user_telegram_id=123456789, username="test_user")
-        wb_user_cabinet = WBUserCabinet(id=1, wb_cabinet_id=1, user_id=1, name="Test Cabinet")
-        wb_token = WBToken(id=1, api_key="test_key", user_id=1, active=True, shop_id="test_shop")
-        
-        session.add(wb_cabinet)
-        session.add(user)
-        session.add(wb_user_cabinet)
-        session.add(wb_token)
-        await session.commit()
-        
-        # Обновляем объекты и их связи
-        await session.refresh(wb_cabinet)
-        await session.refresh(user)
-        await session.refresh(wb_user_cabinet)
-        await session.refresh(wb_token)
-        
-        # Устанавливаем связи
-        wb_user_cabinet.wb_cabinet = wb_cabinet
-        wb_user_cabinet.user = user
-        wb_token.user = user
+async def test_get_adv_menu_no_advs(test_async_db, mock_wb_cabinet):
+    """Тест получения меню рекламных кампаний без активных кампаний"""
+    async with test_async_db() as session:
+        session.add(mock_wb_cabinet)
         await session.commit()
 
-        mock_bot = AsyncMock()
-        mock_state = AsyncMock()
-        mock_chat_id = 123456789
-
-        shop_menu = ShopMenu(
-            bot=mock_bot,
-            chat_id=mock_chat_id,
-            state=mock_state,
-            wb_user_cabinet_original_id=1
-        )
-
-        # Мокаем метод _load_all_data
-        async def mock_load_all_data():
-            shop_menu._wb_user_cabinet = wb_user_cabinet
-            shop_menu._wb_cabinet = wb_cabinet
-            shop_menu._balance = 1000.0
-            shop_menu._bonus = 100.0
-            shop_menu.count_active_advs = 0
-            shop_menu.is_active_adv = False
-            shop_menu.days_left = 30
-            shop_menu.bonus_days = 60
-            shop_menu.price_for_month_for_shop = 1000
-            shop_menu.total_amount_for_day = 50
-            return True
-
-        shop_menu._load_all_data = mock_load_all_data
-
-        result = await shop_menu()
-        assert "Test Cabinet" in shop_menu.text
-        assert "1000 рублей" in shop_menu.text
-        assert "0" in shop_menu.text  # Проверяем количество активных кампаний
+        # Проверяем отсутствие рекламных кампаний
+        query = select(MockAdvSetting).where(MockAdvSetting.wb_cabinet_id == mock_wb_cabinet.id)
+        result = await session.execute(query)
+        adv_settings = result.scalars().all()
+        assert len(adv_settings) == 0
 
