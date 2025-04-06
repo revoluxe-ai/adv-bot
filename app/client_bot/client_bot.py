@@ -1,7 +1,5 @@
 import asyncio
 import secrets
-import string
-
 from aiogram.types import BotCommand
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
@@ -48,9 +46,7 @@ BASE_WEBHOOK_URL = settings.WEBHOOK_URL
 
 WEBHOOK_PATH = settings.WEBHOOK_PATH
 
-WEBHOOK_SECRET = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
-# WEBHOOK_SECRET = '89779uoiugkftyeoilyeligoyuv' #для нагрузочных тестов
-
+WEBHOOK_SECRET = secrets.token_urlsafe(32)
 
 async def on_startup(bot: Bot) -> None:
     await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
@@ -71,7 +67,7 @@ dp = Dispatcher(
 dp.include_router(global_router)
 
 try:
-    test_mode = os.environ.get('TEST_MODE')
+    test_mode: bool = bool(os.environ.get('TEST_MODE'))
 except:
     test_mode = False
 
