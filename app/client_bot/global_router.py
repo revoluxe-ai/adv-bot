@@ -6,7 +6,9 @@ from ..modules.balance_manager import add_balance_router
 from ..modules.cabinet_bonus_manager.bonus_scene import register_bonus_scene
 
 global_router = Router()
-global_router.callback_query.middleware(callback_answer.CallbackAnswerMiddleware(pre=True, text='Запрос в обработке'))
+global_router.callback_query.middleware(callback_answer.CallbackAnswerMiddleware(pre=True,
+                                                                                 text='Запрос в обработке'),
+                                        )
 
 # ВАЖНО: порядок подключения роутеров критически важен для правильной обработки команды /start
 # Сначала регистрируем bonus_router и bonus_scene
