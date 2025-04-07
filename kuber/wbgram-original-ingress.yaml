@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wbgram-original
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  tls:
+  - hosts:
+    - skyline360.ru
+    secretName: skyline360-tls
+  rules:
+  - host: skyline360.ru
+    http:
+      paths:
+      - path: /test-wgram
+        pathType: Prefix
+        backend:
+          service:
+            name: wbgram-original
+            port:
+              number: 80 
