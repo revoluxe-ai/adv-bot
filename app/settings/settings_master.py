@@ -239,5 +239,12 @@ class Settings:
             return 10
         return int(value)
 
+    @property
+    def TELEGRAM_BOT_TOKEN(self):
+        value = os.getenv('TELEGRAM_BOT_TOKEN')
+        if not value:
+            raise ValueError("TELEGRAM_BOT_TOKEN is not set")
+        return value
+
 
 settings = Settings()
