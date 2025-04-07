@@ -146,3 +146,5 @@ yarl==1.9.4
 zipp==3.18.0
 zstandard==0.23.0
 tensorflow
+fastapi==0.110.0
+uvicorn==0.27.1
