@@ -79,9 +79,11 @@ dp = Dispatcher(
 dp.include_router(global_router)
 
 try:
-    test_mode: bool = bool(os.environ.get('TEST_MODE'))
+    test_mode = os.environ.get("TEST_MODE", "").lower() in ("1", "true", "yes")
 except:
     test_mode = False
+
+
 
 
 polling_mode = settings.polling_mode
