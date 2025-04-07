@@ -163,12 +163,6 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
 
     builder.row(button)
 
-    button = InlineKeyboardButton(text = "Настройка стратегии",
-                                        callback_data=callbacks.StrategySetting(
-                                        action='main_menu',
-                                        adv_setting_original_id = adv_setting.id).pack())
-    builder.row(button)
-
     if adv_setting.reset_place:
         button = InlineKeyboardButton(text='Выключить сброс позиций',
                                       callback_data=callbacks.ResetPlace(
