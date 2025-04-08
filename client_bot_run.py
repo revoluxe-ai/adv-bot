@@ -1,24 +1,22 @@
 from app.settings import settings
 from python_modules.logger import setup_logging
 setup_logging()
-from aiogram import Bot, Dispatcher
-from aiogram.types import Update
-from fastapi import FastAPI, Request, HTTPException
+from aiogram import Dispatcher
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.client_bot.bot import get_bot
 from app.client_bot.global_router import global_router
-import secrets
-import string
-
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
+from app.settings import settings
 
 bot = get_bot()
 dp = Dispatcher()
 dp.include_router(global_router)
 
-# Генерируем секретный токен для вебхука, используя только допустимые символы
-def generate_webhook_token(length=32):
-    alphabet = string.ascii_letters + string.digits + '-_'
-    return ''.join(secrets.choice(alphabet) for _ in range(length))
+# Генерируем секретный токен для вебхука, используя фиксированный seed
+def generate_webhook_token() -> str:
+    token = settings.WEBHOOK_SECRET
+    return token
 
 WEBHOOK_SECRET_TOKEN = generate_webhook_token()
 
@@ -27,7 +25,8 @@ async def lifespan(app: FastAPI):
     full_url = settings.WEBHOOK_URL + settings.WEBHOOK_PATH
     await bot.set_webhook(url=full_url,
                           allowed_updates=dp.resolve_used_update_types(),
-                          drop_pending_updates=True)
+                          drop_pending_updates=True,
+                          secret_token=WEBHOOK_SECRET_TOKEN)
     try:
         yield
     finally:
@@ -67,11 +66,15 @@ async def webhook_info():
         "ip_address": webhook_info.ip_address
     }
 
-@app.post(settings.WEBHOOK_PATH, name="webhook")
-async def webhook(request: Request) -> None:
-    update = Update.model_validate(await request.json(), context={"bot": bot})
-    await dp.feed_update(bot, update)
+# Создаем обработчик вебхука с использованием SimpleRequestHandler
+webhook_handler = SimpleRequestHandler(
+    dispatcher=dp,
+    bot=bot,
+    secret_token=WEBHOOK_SECRET_TOKEN
+)
 
+# Регистрируем обработчик вебхука
+webhook_handler.register(app, path=settings.WEBHOOK_PATH)
 
 if __name__ == "__main__":
     import uvicorn
