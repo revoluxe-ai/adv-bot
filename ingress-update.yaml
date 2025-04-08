@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  name: ingress-service
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: skyline360.ru
+    http:
+      paths:
+      - backend:
+          service:
+            name: adv-bot-service
+            port:
+              number: 8080
+        path: /test-wgram
+        pathType: Prefix
+      - backend:
+          service:
+            name: adv-bot-service
+            port:
+              number: 8080
+        path: /wgram
+        pathType: Prefix
+  tls:
+  - hosts:
+    - skyline360.ru
+    secretName: skyline360-tls 
