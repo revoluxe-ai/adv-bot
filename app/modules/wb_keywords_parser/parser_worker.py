@@ -1,10 +1,10 @@
 import asyncio
 import logging
-
+from python_modules.logger import setup_logging
 from app.modules.wb_keywords_parser.global_parsing_queue_manager import GlobalParsingQueueManager
 from app.modules.wb_keywords_parser.wb_parser import parser
 from app.modules.wb_keywords_parser.parsing_task import ParsingTask
-
+setup_logging()
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +25,16 @@ class ParserWorker:
                 # Получаем следующую задачу из очереди
                 task: ParsingTask | None = await self.queue_manager.get_next_task()
                 if task:
+                    logger.debug(f'Processing task: {task}')
                     text = task.keyword
                     need_nmids = task.nmids
-                    await parser.add_wb_positions(text,
-                                                  need_nmids,
-                                                  0.1)
+                    try:
+                        await parser.add_wb_positions(text,
+                                                      need_nmids,
+                                                      0.1)
+                        logger.debug(f'Finished task: {task}')
+                    except Exception as e:
+                        logger.error(f"Error processing task {task}: {e}", exc_info=True)
                 else:
                     # Если задач нет, ждем немного
                     await asyncio.sleep(1)
