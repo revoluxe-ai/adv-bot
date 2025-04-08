@@ -330,7 +330,7 @@ async def _add_positions_from_page(stop_event: asyncio.Event,
 
 async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60):
     try:
-        await _add_wb_positions(text, need_nmids, delay, page_limit)
+        await _add_wb_positions(text, set(need_nmids), delay, page_limit)
     except Exception:
         logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
     return
