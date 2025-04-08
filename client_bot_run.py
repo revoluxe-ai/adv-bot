@@ -1,58 +1,54 @@
-from fastapi.openapi.models import Response
-from app.settings import settings
-from python_modules.logger import setup_logging
-
-setup_logging()
-
-from aiogram import Dispatcher, types
+from fastapi import Response
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
+from aiogram import Dispatcher, types
+from app.settings import settings
 from app.client_bot.bot import get_bot
 from app.client_bot.global_router import global_router
+from python_modules.logger import setup_logging
+import logging
+import asyncio
+
+logger = logging.getLogger(__name__)
+
+
+setup_logging()
 
 bot = get_bot()
 dp = Dispatcher()
 dp.include_router(global_router)
 
-# Генерация секретного токена
 WEBHOOK_SECRET_TOKEN = settings.WEBHOOK_SECRET
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    full_url = settings.WEBHOOK_URL + settings.WEBHOOK_PATH
-    await bot.set_webhook(
-        url=full_url,
-        allowed_updates=dp.resolve_used_update_types(),
-        drop_pending_updates=True,
-        secret_token=WEBHOOK_SECRET_TOKEN,
-    )
-    print("✅ Вебхук установлен:", full_url)
-    try:
-        yield
-    finally:
-        print("🧹 Удаление вебхука...")
-        await bot.delete_webhook()
-        await bot.session.close()
-        print("✅ Вебхук удалён и сессия закрыта.")
+POLLING_MODE = settings.polling_mode
 
+
+@asynccontextmanager
+async def lifespan(app_fast_api: FastAPI):
+    if POLLING_MODE:
+        logger.info("⚙️ POLLING_MODE=True: FastAPI только для health-check и info.")
+        yield  # FastAPI просто живёт, бот живёт отдельно
+    else:
+        full_url = settings.WEBHOOK_URL + settings.WEBHOOK_PATH
+        await bot.set_webhook(
+            url=full_url,
+            allowed_updates=dp.resolve_used_update_types(),
+            drop_pending_updates=True,
+            secret_token=WEBHOOK_SECRET_TOKEN,
+        )
+        logger.info(f"✅ Вебхук установлен: {full_url}")
+
+        try:
+            yield
+        finally:
+            logger.info("🧹 Удаление вебхука и закрытие сессии...")
+            await bot.delete_webhook()
+            await bot.session.close()
+            logger.info("✅ Завершено.")
 
 
 app = FastAPI(lifespan=lifespan)
-
-@app.on_event("startup")
-async def on_startup():
-    await bot.set_webhook(
-        url=settings.full_webhook_url,
-        secret_token=settings.WEBHOOK_SECRET,
-    )
-    logger.info("✅ Вебхук установлен: {}", settings.full_webhook_url)
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    await bot.session.close()
-    logger.info("🛑 Сессия бота закрыта")
-
 
 
 # Эндпоинты для проверок
@@ -60,13 +56,12 @@ async def on_shutdown():
 async def health_check():
     return {"status": "OK"}
 
+
 @app.get("/readiness")
+@app.get("/ready")
 async def readiness_check():
     return {"status": "Ready"}
 
-@app.get("/ready")
-async def ready_check():
-    return {"status": "Ready"}
 
 @app.get("/webhook-info")
 async def webhook_info():
@@ -81,12 +76,13 @@ async def webhook_info():
         "ip_address": info.ip_address,
     }
 
-# Основной POST-обработчик вебхука
+
+# POST-обработчик вебхука
 @app.post(settings.WEBHOOK_PATH)
 async def telegram_webhook(request: Request):
     token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
     if token != WEBHOOK_SECRET_TOKEN:
-        # можно добавить логирование, чтобы понять кто ломится
+        logger.warning(f"⛔ Неверный Secret Token: {token}")
         return Response(status_code=403, content="Forbidden")
 
     update = types.Update.model_validate(await request.json())
@@ -94,18 +90,27 @@ async def telegram_webhook(request: Request):
     return {"status": "ok"}
 
 
-@app.post(settings.WEBHOOK_PATH)
-async def telegram_webhook(request: Request):
-    token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-    if token != WEBHOOK_SECRET_TOKEN:
-        # можно добавить логирование, чтобы понять кто ломится
-        return Response(status_code=403, content="Forbidden")
-
-    update = types.Update.model_validate(await request.json())
-    await dp.feed_update(bot, update)
-    return {"status": "ok"}
-
-
+# Запуск в зависимости от режима
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+
+    if POLLING_MODE:
+        async def start_polling():
+            logger.info("🚀 Стартуем в режиме POLLING...")
+
+            # Принудительное удаление вебхука
+            logger.info("🧹 Удаляем вебхук перед стартом POLLING...")
+            await bot.delete_webhook()
+            logger.info("✅ Вебхук удалён.")
+
+            try:
+                await dp.start_polling(bot)
+            finally:
+                await bot.session.close()
+                logger.info("✅ Сессия бота завершена.")
+
+        asyncio.run(start_polling())
+    else:
+        logger.info("🌐 Стартуем FastAPI в режиме WEBHOOK...")
+        uvicorn.run(app, host="0.0.0.0", port=8080)
+
