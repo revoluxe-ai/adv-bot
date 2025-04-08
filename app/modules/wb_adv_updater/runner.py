@@ -1,10 +1,8 @@
 import asyncio
 import logging
-import datetime
 from app.utils.redis_func_cache import set_config
 from .ml_data_manager import update_model
 from ..user_message_sender import message_for_not_pay_user_sender
-from ..wb_keywords_parser.parser import Parser
 from app.utils.db.session_maker import get_async_session_maker
 from . import wb_manager
 
@@ -44,11 +42,6 @@ async def process_payment_for_advs():
         except Exception as e:
             logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
         await asyncio.sleep(60*60)
-
-
-async def __keywords_parsing_process():
-    parser = Parser()
-    await parser.generate_parsing_tasks()
 
 
 async def run_update_vectors_in_redis():

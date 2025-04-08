@@ -20,7 +20,7 @@ from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBToken
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBToken, WBItemPosition
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -116,7 +116,7 @@ class WBShop:
             raise ApiForbiddenError(f'Нет доступов для Shop ID {self.shop_id}')
 
     @single_run()
-    async def _update_advs_models(self):
+    async def _update_advs_models(self) -> None:
         shop_id = self.shop_id
         stmt = select(AdvSetting)\
         .join(AdvSetting.wb_cabinet)\
@@ -133,7 +133,7 @@ class WBShop:
         assert hasattr(self, '_adv_settings')
         adv_settings = self._adv_settings
         adv_settings = list(filter(lambda adv: adv.bot_active == True, adv_settings))
-        if self._adv_settings == []:
+        if self._adv_settings:
             logger.debug(f'Модели не обновлены для магазина {self.shop_id}')
             self.__first_bidder_update_time = datetime.now()
             return
@@ -194,7 +194,7 @@ class WBShop:
 
     @update_data()
     async def __update_common_sale_stat(self, wb_stat_manager: WBCommonStatManager):
-        all_nmids = [adv.nmids[0] for adv in self._adv_settings if adv.bot_active == True]
+        all_nmids = [int(adv.nmids[0]) for adv in self._adv_settings if adv.bot_active == True]
         await wb_stat_manager.update_common_statistic(all_nmids)
 
 
@@ -204,8 +204,8 @@ class WBShop:
         wb_stat_manager = WBCommonStatManager(access)
         while True:
             try:
-               await ping_manager.ping_analytics_rights_and_connect()
-               await self.__update_common_sale_stat(wb_stat_manager)
+                await ping_manager.ping_analytics_rights_and_connect()
+                await self.__update_common_sale_stat(wb_stat_manager)
             except ApiForbiddenError:
                 logger.error('Ошибка доступа, пауза час и  обновление доступов с повторной попыткой')
                 await asyncio.sleep(60*60)
@@ -229,7 +229,7 @@ class WBShop:
         auction_adv_ids = {adv.search_adv_id for adv in self._adv_settings if adv.search_adv_id}
         all_adv_ids = auto_adv_ids | auction_adv_ids
         full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(wb_api,
-                                                                                       all_adv_ids,
+                                                                                       list(all_adv_ids),
                                                                                        threshold_dates=30)
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
@@ -254,7 +254,6 @@ class WBShop:
             finally:
                 await asyncio.sleep(60 * 15)
 
-
     @staticmethod
     async def _update_adv_data_from_wb_to_pg(shop_data_updater: ShopDataUpdater):
         try:
@@ -275,8 +274,6 @@ class WBShop:
         except Exception as exc:
             logger.error('Ошибка обновления данных', exc_info=True)
             raise exc
-
-
 
     async def update_advs_data_from_wb_to_pg(self):
         wb_access = self.__access
@@ -316,8 +313,6 @@ class WBShop:
     async def run(self):
         await self._run()
 
-    # async def _update_full_stat_in_redis(self, full_stats: Iterable[FullAdvStat]):
-    #     await redis_manager.set_full_stat_adv(full_stats)
     async def update_cards_data_from_wb_to_pf(self):
         access = self.__access
         shop_data_updater = ShopDataUpdater(access)
@@ -343,10 +338,21 @@ class WBShop:
     async def _parsing_keywords_for_adv_generator(self, adv: AdvSetting, nmid: int) -> (str, int):
         keywords = self.__keywords_for_advs[adv.adv_id]
         nmid = adv.nmids[0]
+        keywords_with_positins: list[CalculatedKeyword] = []
+        keywords_without_positions: list[CalculatedKeyword] = []
+        last_positions: dict[str, WBItemPosition] = {}
         for keyword in keywords:
-            if keyword.hard_status == 2:
-                continue
             last_position = await redis_manager.get_keyword_position(keyword.text, nmid)
+            if last_position:
+                last_positions[keyword.text] = last_position
+                keywords_with_positins.append(keyword)
+            else:
+                keywords_without_positions.append(keyword)
+        keywords = keywords_without_positions + keywords_with_positins
+        for keyword in keywords:
+            last_position = last_positions.get(keyword.text)
+            if last_position and keyword.hard_status == 2:
+                continue
             max_hours_period_for_parsing_keywords = settings.MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS
             if not last_position or last_position.timestamp < datetime.now()\
                     - timedelta(hours=max_hours_period_for_parsing_keywords):
@@ -355,7 +361,7 @@ class WBShop:
     @update_data()
     async def parsing_keywords_run(self):
         while True:
-            active_advs = list(filter(lambda adv: adv.bot_active, self._adv_settings))
+            active_advs = list(filter(lambda adv_: adv_.bot_active, self._adv_settings))
             generators = []
             for adv in active_advs:
                 nmid = adv.nmids[0]
@@ -367,7 +373,7 @@ class WBShop:
                     if item:  # Check if not fillvalue
                         text, nmid = item
                         await parsing_queue.add_or_update_task(text, {nmid})
-                        await asyncio.sleep(60)  # Добавляем небольшую задержку между задачами
+                        await asyncio.sleep(0.1)  # Добавляем небольшую задержку между задачами
 
 
 
