@@ -1,108 +1,157 @@
-from typing import Optional, Set, Dict
+from typing import Optional, Set, List
 import json
 import hashlib
 from datetime import datetime
-from app.utils.redis_manager import RedisManager
+from app.core.redis_manager.base_redis_manager import BaseRedis
+from app.core.redis_manager.redis_client import redis_client
+from .parsing_task import ParsingTask
 
-class TaskQueueManager:
+
+class TaskQueueManager(BaseRedis):
+    """
+    Менеджер очереди задач парсинга.
+    Обеспечивает атомарные операции добавления/обновления задач и получения следующей задачи.
+    """
     def __init__(self):
-        self.redis = RedisManager()
-        self.queue_key = "parser:task:queue"  # ZSET для хранения очереди
-        self.task_data_prefix = "parser:task:data:"  # HASH для хранения данных задачи
-        self.text_index_prefix = "parser:task:index:text:"  # SET для индексации по тексту
-        
+        super().__init__()
+        self.queue_key = "parser:task:queue"
+        self.task_data_prefix = "parser:task:data:"
+        self.text_index_prefix = "parser:task:index:text:"
+
+    @property
+    def redis(self):
+        """Геттер для доступа к клиенту Redis"""
+        return self.client
+
     def _get_task_id(self, text: str) -> str:
         """Генерирует уникальный ID задачи на основе текста"""
         return hashlib.sha1(text.encode()).hexdigest()[:12]
         
-    async def add_or_update_task(self, text: str, nmids: Set[int], priority: int = 0) -> str:
+    async def add_or_update_task(self, text: str, nmids: Set[int]) -> str:
         """
         Добавляет новую задачу или обновляет существующую
         
         Args:
             text: Текст для поиска
             nmids: Множество nmids для поиска
-            priority: Приоритет задачи (чем меньше, тем выше приоритет)
             
         Returns:
             task_id: ID задачи
         """
         task_id = self._get_task_id(text)
-        task_data = {
-            "text": text,
-            "nmids": list(nmids),
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
-        }
+        timestamp = datetime.utcnow().timestamp()
         
         # Атомарная операция для добавления/обновления задачи
-        async with self.redis.pipeline() as pipe:
-            # Проверяем существование задачи
+        async with self.client.pipeline() as pipe:
             exists = await pipe.exists(f"{self.task_data_prefix}{task_id}")
             if exists:
                 # Обновляем существующую задачу
-                old_data = await self.redis.get(f"{self.task_data_prefix}{task_id}")
+                old_data = await self.client.get(f"{self.task_data_prefix}{task_id}")
                 if old_data:
                     old_task = json.loads(old_data)
                     # Объединяем nmids
                     old_nmids = set(old_task["nmids"])
                     new_nmids = old_nmids.union(nmids)
-                    task_data["nmids"] = list(new_nmids)
-                    task_data["created_at"] = old_task["created_at"]
-            
+                    task_data = {
+                        "text": text,
+                        "nmids": list(new_nmids)
+                    }
+                else:
+                    task_data = {
+                        "text": text,
+                        "nmids": list(nmids)
+                    }
+            else:
+                task_data = {
+                    "text": text,
+                    "nmids": list(nmids)
+                }
+
             # Сохраняем данные задачи
             pipe.set(f"{self.task_data_prefix}{task_id}", json.dumps(task_data))
-            # Добавляем в очередь с приоритетом
-            pipe.zadd(self.queue_key, {task_id: priority})
+            # Добавляем в очередь с приоритетом по времени добавления
+            pipe.zadd(self.queue_key, {task_id: timestamp})
             # Индексируем по тексту
             pipe.sadd(f"{self.text_index_prefix}{text}", task_id)
             await pipe.execute()
             
         return task_id
         
-    async def get_next_task(self) -> Optional[Dict]:
+    async def get_next_task(self) -> Optional[ParsingTask]:
         """
-        Получает следующую задачу из очереди
+        Получает следующую задачу из очереди по приоритету
         
         Returns:
-            task_data: Данные задачи или None, если очередь пуста
+            task: Объект ParsingTask или None, если очередь пуста
         """
-        # Получаем ID задачи с наивысшим приоритетом
-        task_id = await self.redis.zrange(self.queue_key, 0, 0)
+        # Получаем ID задачи с наивысшим приоритетом (самая ранняя задача)
+        task_id = await self.client.zrange(self.queue_key, 0, 0)
         if not task_id:
             return None
             
         task_id = task_id[0].decode()
         # Получаем данные задачи
-        task_data = await self.redis.get(f"{self.task_data_prefix}{task_id}")
+        task_data = await self.client.get(f"{self.task_data_prefix}{task_id}")
         if not task_data:
             return None
             
-        return json.loads(task_data)
+        data = json.loads(task_data)
+        # Создаем объект ParsingTask
+        return ParsingTask(
+            keyword=data["text"],
+            nmids=set(data["nmids"]),  # Преобразуем список в множество
+        )
         
-    async def remove_task(self, task_id: str) -> None:
+    async def remove_task(self, task_id: str) -> bool:
         """
         Удаляет задачу из очереди
         
         Args:
             task_id: ID задачи для удаления
+            
+        Returns:
+            bool: True если задача была удалена, иначе False
         """
         # Получаем данные задачи для удаления индексов
-        task_data = await self.redis.get(f"{self.task_data_prefix}{task_id}")
-        if task_data:
-            task = json.loads(task_data)
-            text = task["text"]
+        task_data = await self.client.get(f"{self.task_data_prefix}{task_id}")
+        if not task_data:
+            return False
             
-            async with self.redis.pipeline() as pipe:
-                # Удаляем из очереди
-                pipe.zrem(self.queue_key, task_id)
-                # Удаляем данные задачи
-                pipe.delete(f"{self.task_data_prefix}{task_id}")
-                # Удаляем индекс по тексту
-                pipe.srem(f"{self.text_index_prefix}{text}", task_id)
-                await pipe.execute()
-                
-    async def get_task_by_text(self, text: str) -> Optional[Dict]:
+        task = json.loads(task_data)
+        text = task["text"]
+        
+        async with self.client.pipeline() as pipe:
+            pipe.zrem(self.queue_key, task_id)
+            pipe.delete(f"{self.task_data_prefix}{task_id}")
+            pipe.srem(f"{self.text_index_prefix}{text}", task_id)
+            await pipe.execute()
+            
+        return True
+        
+    async def get_queue_size(self) -> int:
+        """
+        Возвращает количество задач в очереди
+        """
+        return await self.client.zcard(self.queue_key)
+        
+    async def get_all_tasks(self) -> List[ParsingTask]:
+        """
+        Возвращает все задачи из очереди
+        """
+        task_ids = await self.client.zrange(self.queue_key, 0, -1)
+        tasks = []
+        for task_id in task_ids:
+            task_id = task_id.decode()
+            task_data = await self.client.get(f"{self.task_data_prefix}{task_id}")
+            if task_data:
+                data = json.loads(task_data)
+                tasks.append(ParsingTask(
+                    keyword=data["text"],
+                    nmids=set(data["nmids"]),  # Преобразуем список в множество
+                ))
+        return tasks
+        
+    async def get_task_by_text(self, text: str) -> Optional[ParsingTask]:
         """
         Ищет задачу по тексту
         
@@ -110,10 +159,14 @@ class TaskQueueManager:
             text: Текст для поиска
             
         Returns:
-            task_data: Данные задачи или None, если не найдена
+            task: Объект ParsingTask или None, если не найдена
         """
         task_id = self._get_task_id(text)
-        task_data = await self.redis.get(f"{self.task_data_prefix}{task_id}")
+        task_data = await self.client.get(f"{self.task_data_prefix}{task_id}")
         if task_data:
-            return json.loads(task_data)
-        return None 
+            data = json.loads(task_data)
+            return ParsingTask(
+                keyword=data["text"],
+                nmids=set(data["nmids"]),  # Преобразуем список в множество
+            )
+        return None

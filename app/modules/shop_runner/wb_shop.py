@@ -1,22 +1,21 @@
 import asyncio
 import logging
-import typing
 from collections import defaultdict
 from functools import wraps
-from typing import Optional, Iterable, List
-from datetime import datetime
+from typing import Optional, Iterable
+from datetime import datetime, timedelta
 from app.core.wb_api import exceptions
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.api import AdvertApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater.types import FullAdvStat
-from app.modules.shop_runner.modules.keywords_parser.keywords_parser import KeywordsParser
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
 from app.modules.wb_adv_updater import data_manager
-from app.settings import settings
+from app.modules.wb_keywords_parser.global_parsing_queue_manager import GlobalParsingQueueManager
+from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.api import WBApi as CommonWBApi
@@ -30,7 +29,6 @@ from app.modules.common_slaves.wildberries import super_cabinet_manager
 logger = logging.getLogger(__name__)
 
 
-
 def update_data():
     def decorator(func):
         @wraps(func)
@@ -41,7 +39,6 @@ def update_data():
             return result
         return wrapper
     return decorator
-
 
 
 def single_run():
@@ -129,6 +126,32 @@ class WBShop:
             advs: list[AdvSetting] = result.scalars().all()
         self._adv_settings = advs
         assert hasattr(self, '_adv_settings')
+
+
+    @update_data()
+    async def _parsing_keywords(self, adv: AdvSetting):
+        """
+        Парсит позиции по ключевым словам для конкретной кампании
+        """
+        try:
+            keywords = self.__keywords_for_advs[adv.adv_id]
+            nmid = adv.nmids[0]  # Берем первый товар из кампании
+            for keyword in keywords:
+                if keyword.hard_status == 2:  # Пропускаем заблокированные слова
+                    continue
+                    
+                # Проверяем, нужно ли обновлять позицию
+                last_position = await redis_manager.get_keyword_position(keyword.text, nmid)
+                if not last_position or last_position.timestamp < datetime.now() - timedelta(hours=1):
+                    # Добавляем задачу в очередь через TaskQueueManager
+                    await self._task_queue_manager.add_or_update_task(
+                        text=keyword.text,
+                        nmids={nmid}  # Передаем как множество, как требует метод
+                    )
+                    
+        except Exception as e:
+            logger.error(f'Ошибка при парсинге ключевых слов для кампании {adv.adv_id}: {e}', exc_info=True)
+            raise
 
     @update_data()
     async def __update_cpm_bid(self,  wb_api: AdvertApi):
@@ -296,15 +319,24 @@ class WBShop:
                 await asyncio.sleep(60*3)
 
 
-    async def _run(self):
-        await self._update_access()
-        await asyncio.gather(
-            self.update_advs_data_from_wb_to_pg(),
-            self.update_cards_data_from_wb_to_pf(),
-            self.update_cpm_run(),
-            self.update_common_sale_stat(),
-            self.update_full_adv_stat(),
-        )
+    @staticmethod
+    async def async_zip_longest(*async_gens, fillvalue=None):
+        iterators = [gen.__aiter__() for gen in async_gens]
+        finished = [False] * len(iterators)
+
+        while not all(finished):
+            row = []
+            for i, it in enumerate(iterators):
+                if finished[i]:
+                    row.append(fillvalue)
+                    continue
+                try:
+                    item = await it.__anext__()
+                    row.append(item)
+                except StopAsyncIteration:
+                    finished[i] = True
+                    row.append(fillvalue)
+            yield tuple(row)
 
     async def run(self):
         await self._run()
@@ -327,49 +359,48 @@ class WBShop:
             finally:
                 await asyncio.sleep(60 * 15)
 
-    async def _parsing_keywords_update(self, adv: AdvSetting):
-        try:
-            await self._parsing_keywords(adv)
-        except Exception as exc:
-            logger.error('Ошибка парсинга фраз', exc_info=True)
-            await asyncio.sleep(60)
+    @staticmethod
+    async def async_iterate(iterable: Iterable) -> Iterable:
+        for item in iterable:
+            yield item
 
+
+    async def _parsing_keywords_for_adv_generator(self, adv: AdvSetting, nmid: int) -> (str, int):
+        keywords = self.__keywords_for_advs[adv.adv_id]
+        nmid = adv.nmids[0]
+        for keyword in keywords:
+            if keyword.hard_status == 2:
+                continue
+            yield keyword.text, nmid
+
+    @update_data()
     async def parsing_keywords_run(self):
-        adv_parsing_update_tasks = {}
         while True:
-            await self._update_advs_models()
-            advs = self._adv_settings
-            for adv in advs:
-                adv_original_id = adv.id
+            active_advs = list(filter(lambda adv: adv.bot_active, self._adv_settings))
+            generators = []
+            for adv in active_advs:
+                nmid = adv.nmids[0]
+                generators.append(self._parsing_keywords_for_adv_generator(adv, nmid))
 
-                async def implement_pause(func: typing.Awaitable):
-                    time_out = settings.TIME_OUT_FOR_PARSER
-                    if not time_out:
-                        time_out = 60 * 10
-                    pause_after = settings.PAUSE_AFTER_PARSING
-                    if not pause_after:
-                        pause_after = 60*60
-                    try:
-                        await asyncio.wait_for(func, timeout=time_out)
-                    except TimeoutError:
-                        logger.debug(f'Истек срок проверки парсинга магазина {self.shop_id}')
+            zipped_generators = self.async_zip_longest(*generators)
+            parsing_queue = GlobalParsingQueueManager()
 
-                    await asyncio.sleep(pause_after)
-                if not adv_original_id in adv_parsing_update_tasks:
-                    new_adv_parsing_task = asyncio.create_task(implement_pause(self._parsing_keywords_update(adv)))
-                    adv_parsing_update_tasks[adv_original_id] = new_adv_parsing_task
-                else:
-                    old_task = adv_parsing_update_tasks[adv_original_id]
-                    if old_task.done():
-                        if old_task.exception():
-                            logger.error(f'Ошибка парсинга ключей', exc_info=True)
-                    del adv_parsing_update_tasks[adv_original_id]
-                await asyncio.sleep(1)
-
-            await asyncio.sleep(60)
+            async for row in zipped_generators:
+                for item in row:
+                    if item:  # Check if not fillvalue
+                        text, nmid = item
+                        await parsing_queue.add_or_update_task(text, {nmid})
+                        await asyncio.sleep(60)  # Добавляем небольшую задержку между задачами
 
 
 
-
-
-
+    async def _run(self):
+        await self._update_access()
+        await asyncio.gather(
+            self.parsing_keywords_run(),
+            self.update_advs_data_from_wb_to_pg(),
+            self.update_cards_data_from_wb_to_pf(),
+            self.update_cpm_run(),
+            self.update_common_sale_stat(),
+            self.update_full_adv_stat(),
+        )

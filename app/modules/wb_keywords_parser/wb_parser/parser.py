@@ -1,26 +1,17 @@
 import asyncio
 import datetime
 import json
-import random
 import re
 import time
 import typing
 from statistics import mean
 from aiohttp import ServerDisconnectedError, ClientOSError
-from dataclasses import dataclass
-from arq import Retry, create_pool
-from app.arq_workers.arq_redis_settings import arq_redis_settings
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser.parser_tasks_generator import ParserTasksGenerator
-from app.modules.wb_keywords_parser.parsing_queue_manager import ParsingQueueManager
 from app.utils import redis_manager
-from sqlalchemy import select
-from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting
+from app.modules.common_slaves.wildberries.models import WBItemPosition
 from aiogram.client.session import aiohttp
-from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
-from app import settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +69,7 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                 await asyncio.sleep(time_to_wait)
                 state['_last_pauses'].append(time_to_wait)
                 state['_last_pauses'] = state['_last_pauses'][-1000:]
-                state['_last_query_time'] = time.time()
+                state['_last_query_time'] = int(time.time())
                 try:
                     result = await func(instance, *args, **kwargs)
                     logger.debug(f'Запрос через {method_name} выполнен успешно')
@@ -136,7 +127,7 @@ class ParserService:
         try:
             data = await self.__parse_keywords_from_wb(text, page)
             if data:
-                 products, cluster, preset, total_items = data
+                products, cluster, preset, total_items = data
             else:
                 return []
             if total_items:
@@ -203,10 +194,13 @@ class ParserService:
         return positions
 
     @try_except(1, 1)
-    async def __parse_keywords_from_wb(self, text: str, page: int) -> tuple[typing.Optional[list[WBItemPosition]],
-    typing.Optional[str],
-    typing.Optional[int],
-    typing.Optional[int]]:
+    async def __parse_keywords_from_wb(self, text: str, page: int)\
+        -> tuple[
+            typing.Optional[list[dict]],
+            typing.Optional[str],
+            typing.Optional[int],
+            typing.Optional[int]
+        ]:
         url = get_parse_url(text, page)
         logger.debug(f'Запрос к URL: {url}')
         async with aiohttp.ClientSession() as http_session:
@@ -252,7 +246,7 @@ class ParserService:
 
 parser = ParserService()
 
-
+from .parsing_page_queue_manager import ParsingQueueManager
 parsing_queue_manager = ParsingQueueManager()
 
 
@@ -405,103 +399,3 @@ async def add_wb_positions_to_redis(positions: list[WBItemPosition]):
     await redis_manager.add_positions_to_redis(positions)
 
 
-
-
-max_threads = settings.MAX_THREAD_PARSER
-
-semaphore = asyncio.Semaphore(max_threads)
-
-
-async def create_arq_parsing_task(text: str,
-                                  need_nmids: set[int],
-                                  delay: float,
-                                    max_page: int) -> None:
-    redis_task_pool = await create_pool(arq_redis_settings)
-    await redis_task_pool.enqueue_job(
-      '_create_arq_parsing_task',
-        text,
-        need_nmids,
-        delay,
-        max_page,
-    )
-
-
-
-async def _create_arq_parsing_task(ctx, text, need_nmids, delay, max_page) -> None:
-    assert ctx
-    try:
-        await add_wb_positions(text, need_nmids, delay, max_page)
-    except Retry:
-        logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
-
-
-async def add_wb_positions_from_wb_search(text:str,
-                                          need_nmids: set[int],
-                                          max_page: int):
-    try:
-        delay = 0.1
-        await create_arq_parsing_task(text, need_nmids, delay, max_page)
-    except ErrorParsingPositions:
-        logger.error(f'По запросу {text} не найдено ни одной позиции', exc_info=True)
-    except Exception:
-        logger.error(f'Ошибка при парсинге позиций {text}', exc_info=True)
-
-
-@dataclass
-class ComplexTask:
-    text: str
-    nmids: set
-    adv_ids: set
-
-class TimeAdvLimit:
-    def __init__(self, limit: float | int):
-        self._limit = limit
-        self._parsing_time = 0
-
-    def add_parsing_time(self, value: float | int) -> None:
-        self._parsing_time += value
-
-    @property
-    def limit(self):
-        return self._limit - self._parsing_time
-
-async def async_iter(generator):
-    # Оборачиваем асинхронный генератор в асинхронный итератор
-    async for item in generator:
-        yield item
-
-class Parser:
-    def __init__(self: 'Parser'):
-        self._all_adv_ids: set[int] = set()
-        self._parsing_limits: dict = {}
-
-    @staticmethod
-    async def global_parsing_tasks_generator(generators: list):
-        ALIVE_GENERATOR_FLAG = True
-        while ALIVE_GENERATOR_FLAG:
-            ALIVE_GENERATOR_FLAG = False
-            for generator in generators:
-                try:
-                    next_task = await generator.__anext__()
-                    yield next_task
-                    ALIVE_GENERATOR_FLAG = True
-                except StopAsyncIteration:
-                    continue
-
-    async def generate_parsing_tasks(self) -> None:
-        async with sm() as session:
-            stmt = select(AdvSetting)\
-                .where(AdvSetting.bot_active == True)
-            result = await session.execute(stmt)
-            advs: typing.List[AdvSetting] = result.scalars().all()
-            advs = list(advs)
-            random.shuffle(advs)
-            tasks_generators = []
-            for adv in advs:
-                parser_tasks_generator = ParserTasksGenerator(adv)
-                tasks_generators.append(parser_tasks_generator.generator())
-            tasks_generators = [async_iter(generators) for generators in tasks_generators]
-            async for parser_task in self.global_parsing_tasks_generator(tasks_generators):
-                    nmid = parser_task.nmid
-                    text = parser_task.keyword
-                    await create_arq_parsing_task(text, {nmid}, 0.1, 60)

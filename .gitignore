@@ -1,6 +1,8 @@
 !wb/keyword_async_ml_updater/bot/images/*
 !wb/keyword_async_ml_updater/bot/images
 setting.yaml
+*.yaml
+
 # Node artifact files
 node_modules/
 dist/

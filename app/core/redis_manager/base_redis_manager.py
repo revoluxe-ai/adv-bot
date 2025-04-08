@@ -1,11 +1,17 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from .redis_client import redis_client
-from typing import TypeVar, Generic, Any
+from typing import TypeVar, Generic
 
 T = TypeVar('T', )
 
 class BaseRedis(ABC, Generic[T]):
     _client = redis_client
+
+
+    @property
+    def client(self):
+        """Геттер для доступа к клиенту Redis"""
+        return self._client
 
     # @abstractmethod
     # def _get_key(self, *args, **kwargs) -> str:

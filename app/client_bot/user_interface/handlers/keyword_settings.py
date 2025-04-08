@@ -17,7 +17,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser import parser
+from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
@@ -44,7 +44,6 @@ async def setting_keywords_filter_by_query(callback: types.CallbackQuery,
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.AdvSetting.waiting_for_filter_by_query)
     await messages.FilterByQuery(bot, callback.message.chat.id)()
-
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == 'active_keywords'))
@@ -228,7 +227,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
         main_photos[0],
         page=page,
         image_mode='main_photo'
-    )(state, 'by_adv')
+    )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
     return
@@ -299,7 +298,7 @@ async def setting_keywords_by_adv(message: types.Message,
     await message.answer("Пожалуйста подождите, эта операция займет немного времени")
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
     state_data = await state.get_data()
-    adv_original_id = state_data.get('last_adv_original_id')
+    adv_original_id: int = int(state_data.get('last_adv_original_id'))
 
     async with _sm() as session:
         stmt = select(AdvSetting) \
@@ -441,7 +440,7 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
                                   callback_data: callbacks.SettingKeywords,
                                   bot: aiogram.Bot,
                                   state: FSMContext):
-    if callback_data.reset_filter == True:
+    if callback_data.reset_filter:
         await state.update_data(keywords_filter=None)
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
     adv_original_id: int = callback_data.adv_original_id
@@ -470,8 +469,9 @@ async def setting_keywords_by_adv(callback: callbacks.SettingKeywords,
                         WBCabinet.id == adv_setting.wb_cabinet_id))
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
-    if wb_user_cabinet is None and callback.from_user.id in const.ADMINS:
-        stmt = select(User).where(User.user_telegram_id == callback.from_user.id)
+    user_id: int = callback.from_user.id
+    if wb_user_cabinet is None and user_id in const.ADMINS:
+        stmt = select(User).where(User.user_telegram_id == user_id)
         admin_user = await session.execute(stmt)
         admin_user = admin_user.scalar()
         wb_user_cabinet = WBUserCabinet()
@@ -668,7 +668,7 @@ async def setting_keywords_filter_by_query(message: types.Message,
     chat_id = message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
     logger.debug('Обработка собщения')
-    await state.set_state(None)
+    await state.set_state()
     await messages.AdvKeywordsSetting(
         bot,
         chat_id,

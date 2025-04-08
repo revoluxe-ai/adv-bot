@@ -1,8 +1,6 @@
 import dotenv
 dotenv.load_dotenv()
-from python_modules.path_setting_funcs import  get_setting_path
 import os
-setting_path = get_setting_path()
 
 
 class Settings:
@@ -17,16 +15,15 @@ class Settings:
         value = os.environ.get('POSTGRES_MASTER_HOST')
         return value
 
-
     @property
     def postgres_user(self) -> str:
         value = os.environ.get('POSTGRES_USER')
         return value
+
     @property
     def postgres_password(self) -> str:
         value = os.environ.get('POSTGRES_PASSWORD')
         return value
-
 
     @property
     def postgres_dbname(self) -> str:
@@ -34,7 +31,7 @@ class Settings:
         return value
 
     @property
-    def cv(self)->bool:
+    def cv(self) ->bool:
         value = os.environ.get('CV')
         if value is None:
             return False
@@ -46,7 +43,7 @@ class Settings:
         raise Exception('Не верное значение в CV')
 
     @property
-    def test_mode(self)-> bool:
+    def test_mode(self) -> bool:
         value = os.environ.get('TEST_MODE')
         value = value.lower()
         if value == 'false':
@@ -55,7 +52,7 @@ class Settings:
             return True
 
     @property
-    def polling_mode(self)-> bool:
+    def polling_mode(self) -> bool:
         value = os.environ.get('POLLING_MODE')
         if value is None:
             return False
@@ -66,31 +63,25 @@ class Settings:
             return True
         raise Exception('Не верное значение в POLLING_MODE')
 
-
     @property
     def version(self) -> str:
         value = os.environ.get('VERSION')
         return value
-
-
 
     @property
     def WEBHOOK_URL(self):
         value = os.environ.get('WEBHOOK_URL')
         return value
 
-
     @property
     def COUNT_SEMAPHORE_TO_POSTGRES(self):
         value = os.environ.get('COUNT_SEMAPHORE_TO_POSTGRES')
         return int(value)
 
-
     @property
     def MAX_THREAD_FOR_PROXY(self):
         value = os.environ.get('MAX_THREAD_FOR_PROXY')
         return int(value)
-
 
     @property
     def COUNT_THREAD_SQL_KW_STAT_LOAD(self):
@@ -99,12 +90,10 @@ class Settings:
             return 30
         return int(value)
 
-
     @property
     def MAX_THREAD_PARSER(self):
         value = os.environ.get('MAX_THREAD_PARSER')
         return int(value)
-
 
     @property
     def MAX_MINUS_KW_THREAD(self):
@@ -115,7 +104,6 @@ class Settings:
     def clickhouse_host(self):
         value = os.environ.get('CLICK_HOUSE_HOST')
         return value
-
 
     @property
     def clickhouse_user(self):
@@ -134,7 +122,6 @@ class Settings:
         value = os.environ.get('WEBHOOK_PATH')
         return value
 
-
     @property
     def TELEGRAM_WEB_PORT(self):
         value = os.environ.get('TELEGRAM_WEB_PORT')
@@ -150,16 +137,15 @@ class Settings:
         value = os.environ.get('BIDDER_STEP_RUB')
         return int(value)
 
-
     @property
     def CLICKHOUSE_PORT(self):
-        value  = os.environ.get('CLICKHOUSE_PORT')
+        value = os.environ.get('CLICKHOUSE_PORT')
         return int(value)
 
 
     @property
     def postgres_port(self):
-        value  = os.environ.get('POSTGRES_PORT')
+        value = os.environ.get('POSTGRES_PORT')
         return int(value)
 
 
@@ -251,5 +237,11 @@ class Settings:
             raise ValueError("WEBHOOK_SECRET environment variable is not set")
         return value
 
+    @property
+    def PARALLER_PARSE_TASKS(self):
+        value = os.environ.get('PARALLER_PARSE_TASKS')
+        if not value:
+            return 50
+        return int(value)
 
 settings = Settings()

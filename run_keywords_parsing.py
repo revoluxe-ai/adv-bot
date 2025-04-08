@@ -1,13 +1,27 @@
 import asyncio
-import dotenv
-dotenv.load_dotenv()
-from app.modules.wb_adv_updater.runner import keywords_parsing_process
-from python_modules.logger import setup_logging
+import logging
+from dotenv import load_dotenv
+from app.modules.wb_keywords_parser.parser_worker import ParserWorker
+from app.settings import settings
+load_dotenv()
+# Настройка логирования
+logger = logging.getLogger(__name__)
 
-setup_logging()
+max_parallel_parsing_tasks = settings.PARALLER_PARSE_TASKS
 
 
+async def main():
+    """Основная функция запуска парсера"""
+    try:
+        # Загружаем переменные окружения
 
+        # Создаем и запускаем воркер
+        worker = ParserWorker(max_parallel_tasks=max_parallel_parsing_tasks)
+        await worker.run()
+        
+    except Exception as e:
+        logger.error(f"Error in main: {e}")
+        raise
 
-if __name__ == '__main__':
-    asyncio.run(keywords_parsing_process())
+if __name__ == "__main__":
+    asyncio.run(main())

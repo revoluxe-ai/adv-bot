@@ -1,12 +1,13 @@
 import random
 from collections import OrderedDict
-
-from .parsing_found_redis_manager import  ParsingFoundRedisManager as RedisManager
-from ..common_slaves.wildberries.models import WBItemPosition
+from app.modules.common_slaves.wildberries.models import WBItemPosition
+from app.modules.wb_keywords_parser.parsing_found_redis_manager import ParsingFoundRedisManager
 
 
 class ParsingQueueManager:
-    redis_manager = RedisManager()
+    def __init__(self):
+        self.redis_manager = ParsingFoundRedisManager()
+
 
     async def add_found_not_found_page(self,
                                        text: str,

@@ -2,11 +2,10 @@ from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.modules.common_slaves.wildberries.api import AdvertApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
-from app.modules.wb_keywords_parser import parser
+from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 import logging
-from app.modules.shop_runner.bidder.wb_api import WBApi
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.bidder.excs import CpmNotFoundError
 from app.modules.wb_adv_updater import data_manager

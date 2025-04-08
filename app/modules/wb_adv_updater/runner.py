@@ -51,14 +51,6 @@ async def __keywords_parsing_process():
     await parser.generate_parsing_tasks()
 
 
-async def keywords_parsing_process():
-    while True:
-        try:
-            await __keywords_parsing_process()
-        except:
-            logger.error('Ошибка парсинга ключей', exc_info=True)
-        await asyncio.sleep(0)
-
 async def run_update_vectors_in_redis():
     await wb_manager.update_vectors_in_redis()
 
