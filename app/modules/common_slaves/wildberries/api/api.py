@@ -200,7 +200,10 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_id)-> list[KeywordStat]:
         keywords = []
-        date_to = datetime.datetime.now().date()
+        # Используем дату по московскому времени (UTC+3)
+        moscow_tz = datetime.timezone(datetime.timedelta(hours=3))
+        date_now_msk = datetime.datetime.now(moscow_tz)
+        date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
         url = f'https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}'
         async with aiohttp.ClientSession() as session:
@@ -362,10 +365,6 @@ class AdvertApi(ABC_WB_API):
                 return {}
 
 
-
-
-
-
 class ContentApi(ABC_WB_API, ContentMixin):
     _only_read = api_rights.OnlyRead.FALSE
     _rights: set = {api_rights.Rights.CONTENT}
@@ -382,8 +381,6 @@ class ContentApi(ABC_WB_API, ContentMixin):
                 subcategory = Subcategory(**data)
                 all_categories.append(subcategory)
             return all_categories
-
-
 
         offset = 0
         limit = 1000

@@ -1,5 +1,4 @@
-from abc import ABC
-
+from app.core.wb_api.http_request import try_except_decorator, requests
 from .data_classes.card_from_wb import CardFromWB
 import asyncio
 import datetime
@@ -12,7 +11,6 @@ import json
 from .data_classes.keywordstat import KeywordStat
 from .data_classes.subcategories import Subcategory
 from .exceptions import CardNotFoundInWB
-from .http_request import requests, try_except_decorator
 from .models import AdvSetting
 from . import api_rights
 from .super_cabinet_manager import WBCabinetAccess
@@ -231,7 +229,10 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_id)-> list[KeywordStat]:
         keywords = []
-        date_to = datetime.datetime.now().date()
+        # Используем дату по московскому времени (UTC+3)
+        moscow_tz = datetime.timezone(datetime.timedelta(hours=3))
+        date_now_msk = datetime.datetime.now(moscow_tz)
+        date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
         url = f'https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}'
         async with aiohttp.ClientSession() as session:
