@@ -2,6 +2,9 @@ import random
 from collections import OrderedDict
 from app.modules.common_slaves.wildberries.models import WBItemPosition
 from app.modules.wb_keywords_parser.parsing_found_redis_manager import ParsingFoundRedisManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ParsingQueueManager:
@@ -41,15 +44,24 @@ class ParsingQueueManager:
 
             remaining_pages_all -= set(found_pages)
             remaining_pages_all -= set(not_found_pages)
-            remaining_pages_all = list(remaining_pages_all)
-            random.shuffle(remaining_pages_all)
+
+        # Преобразуем множество в список только после завершения цикла
+        remaining_pages_all = list(remaining_pages_all)
+        random.shuffle(remaining_pages_all)
 
         # Собираем итоговую очередь с приоритетом: найденные -> неизвестные -> не найденные
         final_queue = list(OrderedDict.fromkeys(
             found_pages_all + remaining_pages_all + not_found_pages_all
         ))
 
-        assert len(final_queue) == max_pages
+        # Проверяем, что все страницы присутствуют
+        if len(final_queue) != max_pages:
+            logger.warning(f"Количество страниц в очереди ({len(final_queue)}) не соответствует ожидаемому ({max_pages})")
+            # Добавляем недостающие страницы
+            all_pages = set(range(1, max_pages + 1))
+            missing_pages = list(all_pages - set(final_queue))
+            final_queue.extend(missing_pages)
+
         return final_queue
 
 
