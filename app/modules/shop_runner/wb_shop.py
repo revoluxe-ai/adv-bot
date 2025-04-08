@@ -15,6 +15,7 @@ from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.global_parsing_queue_manager import GlobalParsingQueueManager
+from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from sqlalchemy import select
@@ -126,32 +127,6 @@ class WBShop:
             advs: list[AdvSetting] = result.scalars().all()
         self._adv_settings = advs
         assert hasattr(self, '_adv_settings')
-
-
-    @update_data()
-    async def _parsing_keywords(self, adv: AdvSetting):
-        """
-        Парсит позиции по ключевым словам для конкретной кампании
-        """
-        try:
-            keywords = self.__keywords_for_advs[adv.adv_id]
-            nmid = adv.nmids[0]  # Берем первый товар из кампании
-            for keyword in keywords:
-                if keyword.hard_status == 2:  # Пропускаем заблокированные слова
-                    continue
-                    
-                # Проверяем, нужно ли обновлять позицию
-                last_position = await redis_manager.get_keyword_position(keyword.text, nmid)
-                if not last_position or last_position.timestamp < datetime.now() - timedelta(hours=1):
-                    # Добавляем задачу в очередь через TaskQueueManager
-                    await self._task_queue_manager.add_or_update_task(
-                        text=keyword.text,
-                        nmids={nmid}  # Передаем как множество, как требует метод
-                    )
-                    
-        except Exception as e:
-            logger.error(f'Ошибка при парсинге ключевых слов для кампании {adv.adv_id}: {e}', exc_info=True)
-            raise
 
     @update_data()
     async def __update_cpm_bid(self,  wb_api: AdvertApi):
@@ -371,7 +346,11 @@ class WBShop:
         for keyword in keywords:
             if keyword.hard_status == 2:
                 continue
-            yield keyword.text, nmid
+            last_position = await redis_manager.get_keyword_position(keyword.text, nmid)
+            max_hours_period_for_parsing_keywords = settings.MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS
+            if not last_position or last_position.timestamp < datetime.now()\
+                    - timedelta(hours=max_hours_period_for_parsing_keywords):
+                 yield keyword.text, nmid
 
     @update_data()
     async def parsing_keywords_run(self):
@@ -381,10 +360,8 @@ class WBShop:
             for adv in active_advs:
                 nmid = adv.nmids[0]
                 generators.append(self._parsing_keywords_for_adv_generator(adv, nmid))
-
             zipped_generators = self.async_zip_longest(*generators)
             parsing_queue = GlobalParsingQueueManager()
-
             async for row in zipped_generators:
                 for item in row:
                     if item:  # Check if not fillvalue

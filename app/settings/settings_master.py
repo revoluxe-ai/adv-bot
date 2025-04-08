@@ -244,4 +244,11 @@ class Settings:
             return 50
         return int(value)
 
+    @property
+    def MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS(self):
+        value = os.getenv('MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS')
+        if not value:
+            return 1
+        return int(value)
+
 settings = Settings()
