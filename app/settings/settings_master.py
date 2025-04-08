@@ -241,9 +241,14 @@ class Settings:
 
     @property
     def TELEGRAM_BOT_TOKEN(self):
-        value = os.getenv('TELEGRAM_BOT_TOKEN')
+        value = os.environ.get('TELEGRAM_BOT_TOKEN')
+        return value
+
+    @property
+    def WEBHOOK_SECRET(self):
+        value = os.environ.get('WEBHOOK_SECRET')
         if not value:
-            raise ValueError("TELEGRAM_BOT_TOKEN is not set")
+            raise ValueError("WEBHOOK_SECRET environment variable is not set")
         return value
 
 

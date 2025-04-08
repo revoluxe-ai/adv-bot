@@ -70,3 +70,4 @@ app/keword_async_ml_updater/model/*
 git ls-tree
 app/utils/text_master/w2v_cc_300d_ru
 logs
+.env
