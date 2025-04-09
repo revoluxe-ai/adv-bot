@@ -390,9 +390,9 @@ class WBShop:
         await self._update_access()
         await asyncio.gather(
             self.parsing_keywords_run(),
-            # self.update_advs_data_from_wb_to_pg(),
-            # self.update_cards_data_from_wb_to_pf(),
-            # self.update_cpm_run(),
-            # self.update_common_sale_stat(),
-            # self.update_full_adv_stat(),
+            self.update_advs_data_from_wb_to_pg(),
+            self.update_cards_data_from_wb_to_pf(),
+            self.update_cpm_run(),
+            self.update_common_sale_stat(),
+            self.update_full_adv_stat(),
         )
