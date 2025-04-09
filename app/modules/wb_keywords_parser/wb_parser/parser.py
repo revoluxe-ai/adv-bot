@@ -88,10 +88,6 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                     state['_next_pause'] = next_pause
                     state['_attempts'] = 0  # Сброс попыток после успешного выполнения
                     return result
-                # except DataError:
-                #     pause = 0.5
-                #     state['_next_pause'] = pause
-                #     state['_attempts'] += 1
                 except (DataError,
                         ServerDisconnectedError,
                         ClientOSError) as e:
@@ -99,6 +95,8 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
                                  f'Пауза перед следующим запросом: {state["_next_pause"]} секунд')
                     state['_attempts'] += 1
                     if state['_attempts'] >= max_attempts:
+                        logger.error(f'Превышено максимальное количество попыток {max_attempts} '
+                                        f'для метода {method_name}, аргументы: {args}, {kwargs}')
                         raise e
                     last_pause = state['_last_pauses'][-1]
                     previous_pause = state['_last_pauses'][-2]
