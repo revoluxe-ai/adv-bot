@@ -357,7 +357,9 @@ class WBShop:
             adv_id: int = int(adv.adv_id)
             last_views = await redis_manager.get_last_views(adv_id, text)
             views_now = keyword.views
-            if last_position and last_position.base_position == 0 and views_now == last_views:
+            if last_position and last_position.base_position == 0 and views_now <= last_views:
+                if views_now != last_views:
+                    await redis_manager.set_last_views(adv_id, text, views_now)
                 continue
             max_hours_period_for_parsing_keywords = settings.MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS
             if not last_position or last_position.timestamp < datetime.now()\
