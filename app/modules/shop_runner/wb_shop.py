@@ -350,13 +350,20 @@ class WBShop:
                 keywords_without_positions.append(keyword)
         keywords = keywords_without_positions + keywords_with_positins
         for keyword in keywords:
-            last_position = last_positions.get(keyword.text)
-            if last_position and keyword.hard_status == 2:
+            text = keyword.text
+            last_position = last_positions.get(text)
+            if last_position and keyword.hard_status == 2 and last_position.base_position != 0:
+                continue
+            adv_id: int = int(adv.adv_id)
+            last_views = await redis_manager.get_last_views(adv_id, text)
+            views_now = keyword.views
+            if last_position and last_position.base_position == 0 and views_now == last_views:
                 continue
             max_hours_period_for_parsing_keywords = settings.MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS
             if not last_position or last_position.timestamp < datetime.now()\
                     - timedelta(hours=max_hours_period_for_parsing_keywords):
-                 yield keyword.text, nmid
+                await redis_manager.set_last_views(adv_id, text, views_now)
+                yield text, nmid
 
     @update_data()
     async def parsing_keywords_run(self):
@@ -381,9 +388,9 @@ class WBShop:
         await self._update_access()
         await asyncio.gather(
             self.parsing_keywords_run(),
-            self.update_advs_data_from_wb_to_pg(),
-            self.update_cards_data_from_wb_to_pf(),
-            self.update_cpm_run(),
-            self.update_common_sale_stat(),
-            self.update_full_adv_stat(),
+            # self.update_advs_data_from_wb_to_pg(),
+            # self.update_cards_data_from_wb_to_pf(),
+            # self.update_cpm_run(),
+            # self.update_common_sale_stat(),
+            # self.update_full_adv_stat(),
         )
