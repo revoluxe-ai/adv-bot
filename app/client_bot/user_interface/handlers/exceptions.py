@@ -73,7 +73,7 @@ async def error_parsing_positions_handler(error_event: ErrorEvent, state: FSMCon
         chat_id = message.chat.id
     await bot.send_message(chat_id=chat_id,
                            text='Ошибка парсинга позиций. Попробуйте через время еще раз. '
-                            'Если ошибка будет повторяться, то обратитесь в поддержку -> ')
+                                'Если ошибка будет повторяться, то обратитесь в поддержку -> ')
     await bot.send_message(admin_telegram_id, str(exception))
 
     async with sm() as session:
@@ -124,7 +124,7 @@ async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMCon
 
 @admin_router.errors(ExceptionTypeFilter(Exception))
 async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-    await state.set_state(state=None)
+    await state.set_state()
     message = error_event.update.message
     exception = error_event.exception
     if isinstance(exception, KeyboardInterrupt):
