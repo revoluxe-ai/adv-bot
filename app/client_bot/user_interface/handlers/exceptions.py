@@ -8,9 +8,7 @@ from aiogram import Router
 from aiogram.exceptions import TelegramForbiddenError
 from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.types.error_event import ErrorEvent
-import app
 import aiogram
-
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 import traceback
@@ -18,7 +16,7 @@ from aiogram.fsm.context import FSMContext
 import logging
 from app import client_bot as tb
 from app.client_bot import const
-from app.modules.wb_keywords_parser.parser import ErrorParsingPositions
+from app.modules.wb_keywords_parser.wb_parser.parser import ErrorParsingPositions
 
 logger = logging.getLogger(__name__)
 
