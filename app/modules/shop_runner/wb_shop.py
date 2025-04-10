@@ -119,9 +119,9 @@ class WBShop:
     async def _update_advs_models(self) -> None:
         shop_id = self.shop_id
         stmt = select(AdvSetting)\
-        .join(AdvSetting.wb_cabinet)\
-        .filter(WBCabinet.shop_id == shop_id,
-                AdvSetting.bot_active == True)
+            .join(AdvSetting.wb_cabinet)\
+            .filter(WBCabinet.shop_id == shop_id,
+            AdvSetting.bot_active == True)
         async with sm() as session:
             result = await session.execute(stmt)
             advs: list[AdvSetting] = result.scalars().all()
@@ -225,12 +225,12 @@ class WBShop:
 
     @update_data()
     async def _update_full_adv_stat(self, wb_api: CommonWBApi):
-        auto_adv_ids = {adv.adv_id for adv in self._adv_settings}
-        auction_adv_ids = {adv.search_adv_id for adv in self._adv_settings if adv.search_adv_id}
+        auto_adv_ids: set = {adv.adv_id for adv in self._adv_settings}
+        auction_adv_ids: set = {adv.search_adv_id for adv in self._adv_settings if adv.search_adv_id}
         all_adv_ids = auto_adv_ids | auction_adv_ids
         full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(wb_api,
-                                                                                       list(all_adv_ids),
-                                                                                       threshold_dates=30)
+                                                                                         all_adv_ids,
+                                                                                         threshold_dates=30)
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
             date_time = datetime.now()
@@ -352,8 +352,6 @@ class WBShop:
         for keyword in keywords:
             text = keyword.text
             last_position = last_positions.get(text)
-            if last_position and keyword.hard_status == 2 and last_position.base_position != 0:
-                continue
             adv_id: int = int(adv.adv_id)
             last_views = await redis_manager.get_last_views(adv_id, text)
             views_now = keyword.views
