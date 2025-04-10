@@ -1,0 +1,11 @@
+[33m6d006084[m[33m ([m[1;36mHEAD -> [m[1;32mimplement-day-stat[m[33m)[m Return Create Adv Worker (app/arq_workers/workers.py) and delete olf parser ark module from workers.py
+[33m8c9fbb97[m Add logger error info in app/modules/wb_keywords_parser/wb_parser/parser.py in try_except decorator
+[33m6815cdc5[m Change condition for last_views in send keywords for parsing
+[33m7aab96c7[m Implement last views to parsing
+[33ma510e1b3[m Fix error with time zone for getting keywordstats
+[33m088bcde7[m[33m ([m[1;32mmaster[m[33m)[m Refactoring parsing task generator for keywords without positions is First
+[33m17df100b[m Impelemt conditionds with settings for parsing
+[33mf238bd62[m Fix error in inner parser module app/modules/wb_keywords_parser/wb_parser/parsing_page_queue_manager.py
+[33m29bb4bfb[m Add loggers to app/modules/wb_keywords_parser/parser_worker.py
+[33m41e128c3[m Fix potential and real errors with needs nmids arguments
+[33m146c13cc[m[33m ([m[1;32mimplement-asq-task-to-parser[m[33m)[m New Parsing With Custom Queue Impelent

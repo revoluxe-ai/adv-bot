@@ -1,9 +1,6 @@
 import dotenv
-from app.arq_workers.arq_redis_settings import arq_redis_settings
-from app.modules.wb_keywords_parser.parser import _create_arq_parsing_task
-from app.settings import settings
-
 dotenv.load_dotenv()
+from app.arq_workers.arq_redis_settings import arq_redis_settings
 import logging
 from python_modules.logger import setup_logging
 from app.client_bot.bot import get_bot
