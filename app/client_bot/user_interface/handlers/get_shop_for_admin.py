@@ -26,12 +26,11 @@ class AdminsGetShopFilter(BaseFilter):
         text = message.text
         if not text:
             return False
+            
         # Проверяем, находится ли пользователь в сцене bonus_scene
-        # Если да, то не обрабатываем здесь, чтобы сцена могла обработать сообщение
         current_state = await state.get_state()
         if current_state and "bonus_scene" in current_state:
-            logger.debug(f"Сообщение {text} не обработано фильтром AdminsGetShopFilter,"
-                         f" т.к. пользователь в bonus_scene")
+            logger.debug(f"Сообщение {text} не обработано фильтром AdminsGetShopFilter, т.к. пользователь в bonus_scene")
             return False
             
         match_uuid = re.Pattern.match(UUID_REGEX, text)
