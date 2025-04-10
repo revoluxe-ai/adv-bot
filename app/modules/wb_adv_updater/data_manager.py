@@ -788,6 +788,7 @@ def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
                       min_ctr,
                       adv_setting:AdvSetting)->list[CalculatedKeyword]:
     for keyword_stat in keyword_stats:
+        assert keyword_stat.keyword_setting
         keyword_stat.predict_ctr_exponent = adv_setting.exponent_predict_ctr
         original_predict_ctr = keyword_stat.original_predict_ctr
         keyword_setting = keyword_stat.keyword_setting
@@ -804,6 +805,8 @@ def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
         if clicks == 0:
              clicks += 1
              views += enough_views
+        if views == 0:
+            views = 1
         original_baes_ctr = clicks / views
         keyword_stat.baes_ctr = original_baes_ctr
         added_clicks = keyword_setting.added_clicks
