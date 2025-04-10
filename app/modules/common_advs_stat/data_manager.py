@@ -50,7 +50,7 @@ class CommonAdvsStatDataManager:
             stmt = select(AdvSetting.cpm).where(AdvSetting.adv_id == search_adv_id)
             async with _sm() as session:
                 result = await session.execute(stmt)
-                auction_cpm = result.scalar_one()
+                auction_cpm = result.scalar_one_or_none()
         
         # Получаем статистику за последние 3 дня
         pass_days = 2
