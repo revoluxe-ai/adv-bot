@@ -133,7 +133,7 @@ class WBShop:
         assert hasattr(self, '_adv_settings')
         adv_settings = self._adv_settings
         adv_settings = list(filter(lambda adv: adv.bot_active == True, adv_settings))
-        if self._adv_settings:
+        if not self._adv_settings:
             logger.debug(f'Модели не обновлены для магазина {self.shop_id}')
             self.__first_bidder_update_time = datetime.now()
             return
@@ -389,10 +389,10 @@ class WBShop:
     async def _run(self):
         await self._update_access()
         await asyncio.gather(
-            self.parsing_keywords_run(),
-            self.update_advs_data_from_wb_to_pg(),
-            self.update_cards_data_from_wb_to_pf(),
+            # self.parsing_keywords_run(),
+            # self.update_advs_data_from_wb_to_pg(),
+            # self.update_cards_data_from_wb_to_pf(),
             self.update_cpm_run(),
-            self.update_common_sale_stat(),
-            self.update_full_adv_stat(),
+            # self.update_common_sale_stat(),
+            # self.update_full_adv_stat(),
         )
