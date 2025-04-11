@@ -123,20 +123,6 @@ def get_adv_setting_keyboard(wb_user_cabinet: WBUserCabinet,
                                         adv_original_id=adv_setting.id).pack())
     builder.row(button)
 
-
-    if adv_setting.parsing_active:
-        button = InlineKeyboardButton(text='Отключить сбор позиций',
-                                        callback_data=callbacks.TurnParsing(action='off',
-                                                                            adv_original_id=adv_setting.id,
-                                                                            wb_user_cabinet_original_id = wb_user_cabinet.id).pack())
-    else:
-        button = InlineKeyboardButton(text='Включить сбор позиций',
-                                        callback_data=callbacks.TurnParsing(action='on',
-                                                                            adv_original_id=adv_setting.id,
-                                                                            wb_user_cabinet_original_id=wb_user_cabinet.id
-                                                                            ).pack())
-    builder.row(button)
-
     if adv_setting.hard_min_ctr:
          builder.row(InlineKeyboardButton(text='Изменить минимальный CTR',
                                          callback_data=callbacks.ChangeMinCTR(
