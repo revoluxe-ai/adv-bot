@@ -2,7 +2,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from functools import wraps
-from typing import Optional, Iterable
+from typing import Optional, Iterable, TypeVar, AsyncGenerator
 from datetime import datetime, timedelta
 from app.core.wb_api import exceptions
 from app.core.wb_api.ping_manager import PingManager
@@ -29,6 +29,7 @@ from app.modules.common_slaves.wildberries import super_cabinet_manager
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar('T')
 
 def update_data():
     def decorator(func):
@@ -121,7 +122,7 @@ class WBShop:
         stmt = select(AdvSetting)\
             .join(AdvSetting.wb_cabinet)\
             .filter(WBCabinet.shop_id == shop_id,
-            AdvSetting.bot_active == True)
+                AdvSetting.bot_active == True)
         async with sm() as session:
             result = await session.execute(stmt)
             advs: list[AdvSetting] = result.scalars().all()
@@ -288,7 +289,7 @@ class WBShop:
             except Exception:
                 logger.error('Ошибка обновления данных', exc_info=True)
             finally:
-                await asyncio.sleep(60*3)
+                await asyncio.sleep(60*7 + 30)
 
 
     @staticmethod
@@ -327,10 +328,10 @@ class WBShop:
             except Exception:
                 logger.error('Ошибка обновления полной статистики обновления', exc_info=True)
             finally:
-                await asyncio.sleep(60 * 15)
+                await asyncio.sleep(60 * 60 * 12)
 
     @staticmethod
-    async def async_iterate(iterable: Iterable) -> Iterable:
+    async def async_iterate(iterable: Iterable[T]) -> AsyncGenerator[T]:
         for item in iterable:
             yield item
 
@@ -380,7 +381,7 @@ class WBShop:
                     if item:  # Check if not fillvalue
                         text, nmid = item
                         await parsing_queue.add_or_update_task(text, {nmid})
-                        await asyncio.sleep(0.1)  # Добавляем небольшую задержку между задачами
+                        await asyncio.sleep(60)  # Добавляем небольшую задержку между задачами
 
 
 
