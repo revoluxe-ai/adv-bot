@@ -2,7 +2,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from functools import wraps
-from typing import Optional, Iterable, TypeVar, AsyncGenerator
+from typing import Optional, Iterable, AsyncGenerator, TypeVar
 from datetime import datetime, timedelta
 from app.core.wb_api import exceptions
 from app.core.wb_api.ping_manager import PingManager
@@ -73,7 +73,7 @@ def single_run():
     return decorator
 
 
-
+T = TypeVar('T')
 
 class WBShop:
 
@@ -331,7 +331,7 @@ class WBShop:
                 await asyncio.sleep(60 * 60 * 12)
 
     @staticmethod
-    async def async_iterate(iterable: Iterable[T]) -> AsyncGenerator[T]:
+    async def async_iterate(iterable: Iterable[T]) -> AsyncGenerator[T, None]:
         for item in iterable:
             yield item
 

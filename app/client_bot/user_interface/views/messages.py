@@ -288,7 +288,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
             days_stat = sorted(days_stat, key=lambda x: x.date)
 
-            stat_text = 'Себестоимость заказа за последние дни (заказы) (затраты):\n'
+            stat_text = 'Статистика по дням:\n'
+            stat_text += 'Дата | Заказы | Себестоимость заказа\n'
+            stat_text += '--------------------------------\n'
 
             def reverse_date(date_str):
                 parts = date_str.split('-')
@@ -307,7 +309,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                     cost_per_order = spend / orders
                 else:
                     cost_per_order = 0
-                stat_text += f'{date}: {round(cost_per_order, 0)} ({orders}) ({spend}) р.\n'
+                stat_text += f'{date} | {orders} | {round(cost_per_order, 0)} р.\n'
 
             text += stat_text
         text += f'{max_cpc_text}'
@@ -1416,35 +1418,6 @@ class ShowFavoriteAdvs(TextWithKeyboard):
     def keyboard(self):
          keyboard = keyboards.get_advs_list(self.advs)
          return keyboard
-
-    async def _get_additional_traffic_spend(self, pass_days) -> float:
-        """Получает расходы на дополнительный трафик (разница между общими затратами и затратами по ключам)"""
-        from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-        from datetime import datetime, timedelta
-
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=pass_days)  # За последние 30 дней
-
-        # # Получаем общие затраты
-        # total_stats = await full_wb_adv_stat.get_stats_by_last_days(
-        #     [self._adv_setting.adv_id, self._adv_setting.search_adv_id],
-        #     start_date=start_date,
-        #     end_date=end_date
-        # ),
-        sum_spends = self._spend_for_inner_adv_for_3_days
-        total_spend = sum_spends if sum_spends else 0
-
-        # Получаем затраты по ключам
-        keywords_spend = await full_wb_adv_stat.get_keywords_spend(
-            [self._adv_setting.adv_id],
-            start_date=start_date,
-            end_date=end_date
-        )
-
-        # Разница - это расходы на дополнительный трафик
-        additional_spend = total_spend - keywords_spend
-        return round(additional_spend, 2) if additional_spend > 0 else 0
-
 
 async def process_cabinet_balance_topup(user_id: int, cabinet_id: int, amount: float):
     """Обработка запроса на пополнение баланса кабинета"""

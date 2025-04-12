@@ -1,0 +1,4 @@
+.cursor/rules/base-rules.mdc
+app/client_bot/user_interface/views/keyboards.py
+app/modules/common_advs_stat/data_manager.py
+docs/statistics_module.md

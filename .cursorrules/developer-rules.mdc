@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Правила работы разработчика
 globs: "*"
 alwaysApply: true

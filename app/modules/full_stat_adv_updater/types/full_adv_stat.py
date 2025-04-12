@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from datetime import date
+
 
 class NmStats(BaseModel):
     views: int = Field(..., description="Количество просмотров")
@@ -49,6 +51,21 @@ class BoosterStats(BaseModel):
     date: str = Field(..., description="Дата, за которую предоставлены данные")
     nm: int = Field(..., description="Артикул WB")
     avg_position: int = Field(..., description="Средняя позиция товара на страницах поисковой выдачи и каталога")
+
+@dataclass
+class SmallFullAdvStatPerDay(BaseModel):
+    date: date
+    views: int
+    clicks: int
+    spend: float
+    added_to_cart: int
+    orders: int
+    sum_price: float
+
+
+
+
+
 
 @dataclass
 class SmallFullAdvStat:

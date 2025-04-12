@@ -21,15 +21,15 @@ from ...settings import settings
 
 logger = logging.getLogger(__name__)
 
-
-
-async def run_bidder_process():
-    while True:
-        try:
-            await _run_bidder_process()
-        except Exception as e:
-            logger.error(f'Ошибка процесса управления ставками {e}', exc_info=True)
-        await asyncio.sleep(0)
+#
+#
+# async def run_bidder_process():
+#     while True:
+#         try:
+#             await _run_bidder_process()
+#         except Exception as e:
+#             logger.error(f'Ошибка процесса управления ставками {e}', exc_info=True)
+#         await asyncio.sleep(0)
 
 
 
