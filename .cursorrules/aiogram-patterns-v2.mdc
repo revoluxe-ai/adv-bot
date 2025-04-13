@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Правила и шаблоны для работы с библиотекой Aiogram
 globs: ["app/client_bot/*.py", "app/admin_bot/*.py", "app/*_bot/**/*.py"]
 alwaysApply: false

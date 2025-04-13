@@ -311,8 +311,6 @@ class WBShop:
                     row.append(fillvalue)
             yield tuple(row)
 
-    async def run(self):
-        await self._run()
 
     async def update_cards_data_from_wb_to_pf(self):
         access = self.__access
@@ -395,3 +393,7 @@ class WBShop:
             self.update_common_sale_stat(),
             self.update_full_adv_stat(),
         )
+
+
+    async def run(self):
+        await self._run()

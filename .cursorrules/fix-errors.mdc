@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Правила исправления проблем и ошибок в коде
 globs: 
 alwaysApply: true

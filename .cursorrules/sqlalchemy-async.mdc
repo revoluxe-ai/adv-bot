@@ -1,0 +1,65 @@
+---
+description: Правила работы с асинхронным SQLAlchemy
+globs: "*.py"
+alwaysApply: true
+---
+
+# Правила работы с асинхронным SQLAlchemy
+
+## Основные принципы
+1. Используем асинхронную сессию через контекстный менеджер
+2. Все запросы выполняются через `await`
+3. При загрузке связанных данных используем `selectinload()` или `joinedload()`
+4. Для больших наборов данных используем `yield_per()`
+
+## Работа с гибридными свойствами
+1. Гибридные свойства (`calculated_balance`, `calculated_bonus`) нельзя использовать напрямую в SQL запросах
+2. Для фильтрации по гибридным свойствам нужно:
+   - Загрузить все необходимые связанные данные через `selectinload()`
+   - Выполнить фильтрацию после получения данных из БД
+   - Использовать Python-side фильтрацию
+
+## Примеры правильного кода
+
+```python
+# Правильно - загрузка связанных данных
+async with sm() as session:
+    query = select(WBCabinet).options(
+        selectinload(WBCabinet.balance_payments),
+        selectinload(WBCabinet.bonus_payments)
+    )
+    result = await session.execute(query)
+    cabinets = result.scalars().all()
+    # Фильтрация по гибридным свойствам после загрузки
+    filtered_cabinets = [cab for cab in cabinets 
+                        if cab.calculated_balance > 0 
+                        or cab.calculated_bonus > 0]
+
+# Правильно - обработка больших наборов данных
+async with sm() as session:
+    query = select(WBToken)
+    result = await session.stream(query)
+    async for token in result.yield_per(100):
+        # Обработка токена
+        pass
+
+# Неправильно - использование гибридных свойств в where
+query = select(WBCabinet).where(WBCabinet.calculated_balance > 0)  # Не будет работать!
+```
+
+## Обработка ошибок
+1. Всегда используем `try/except` для обработки ошибок БД
+2. При ошибках транзакций делаем `rollback`
+3. Логируем ошибки через `logger`
+
+```python
+async with sm() as session:
+    try:
+        await session.begin()
+        # ... операции с БД ...
+        await session.commit()
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Ошибка БД: {e}")
+        raise
+``` 
