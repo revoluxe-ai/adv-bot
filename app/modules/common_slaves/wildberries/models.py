@@ -170,10 +170,6 @@ class WBToken(BaseTable):
         return self.__expires
 
 
-    @hybrid_property
-    def shop_id(self):
-        return self.get_payload('sid')
-
     @property
     def read_only(self) -> bool:
         # Проверяем, содержится ли категория "Токен только на чтение" в категориях
