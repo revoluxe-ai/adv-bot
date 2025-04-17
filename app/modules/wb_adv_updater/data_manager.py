@@ -60,8 +60,6 @@ async def measure_time(function):
         return result
     return wrapper
 
-
-
 async def get_keyword_statistic_clickhouse(client,
                                            text: str,
                                            adv_id: int,
@@ -325,8 +323,6 @@ async def get_category_name_min_ctr_final_data() -> dict[int, float]:
         get_category_name_min_ctr[category_name] = min_ctr
     return get_category_name_min_ctr
 
-
-
 def __sort_by_update_keyword(keyword: WBItemPosition):
     if not (update := keyword.timestamp):
         update = datetime.now() - timedelta(days=1000)
@@ -336,7 +332,7 @@ async def set_positions(keyword_stats: list[CalculatedKeyword],
                         adv_setting: AdvSetting) -> list[CalculatedKeyword]:
     texts = [keyword.text for keyword in keyword_stats]
     try:
-       positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+        positions = await redis_manager.get_keywords_positions(adv_setting, texts)
     except:
         logger.warning(f'Ошибка получения позиций из Redis для арк {adv_setting.adv_id}')
         return keyword_stats
@@ -540,7 +536,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
             keyword_stat.keyword_setting = keyword_setting
 
     texts_in_keyword_stat = {kw.text for kw in keyword_stats}
-    text_to_keyword_setting = {kw.text: kw for kw in keyword_settings}
+    text_to_keyword_setting: dict[str, KeywordSetting] = {str(kw.text): kw for kw in keyword_settings}
 
     for keyword_setting in keyword_settings:
         text = keyword_setting.text
@@ -602,7 +598,7 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
         keyword_stat.predict_ctr = calculate_ctr
         if max_position:
             try:
-                 position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
+                position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
             except Exception as e:
                 position = None
                 logger.warning(f'Ошибка получения позиции {e} для {keyword_setting.text} adv_id: {adv_setting.adv_id}' )
@@ -659,7 +655,6 @@ async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
         assert keyword_stat.predict_ctr
         await asyncio.sleep(0)
     keyword_stats = sorted(keyword_stats, key=lambda x: x.predict_ctr, reverse=True)
-
 
     for keyword_stat in keyword_stats:
         if keyword_stat.status:
@@ -803,8 +798,8 @@ def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
         views = keyword_stat.views
         clicks = keyword_stat.clicks
         if clicks == 0:
-             clicks += 1
-             views += enough_views
+            clicks += 1
+            views += enough_views
         if views == 0:
             views = 1
         original_baes_ctr = clicks / views
@@ -870,10 +865,8 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 await session.commit()
             keyword_stat.keyword_setting = keyword_setting
 
-
     texts_in_keyword_stat = {kw.text for kw in keyword_stats}
     text_to_keyword_setting = {kw.text: kw for kw in keyword_settings}
-
 
     for keyword_setting in keyword_settings:
         text = keyword_setting.text
@@ -909,7 +902,6 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         logger.error(f'Ошибка при получении cpm {e}', exc_info=True)
         cpm_now = None
     new_statuses = []
-
 
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
@@ -1063,11 +1055,11 @@ class DataGetter(AbcManager):
 
 async def get_wb_category(adv_setting: AdvSetting)-> Union[WBCategory, None]:
     try:
-         nmid = adv_setting.nmids[0]
+        nmid = adv_setting.nmids[0]
     except:
         raise NotItemsInAdvSetting('У кампании в базе нет товаров')
     async with _sm() as session:
-        smtp = select(WBCard).where(WBCard.nmid == nmid).options(selectinload(WBCard.wb_category))
+        smtp = select(WBCard).where(WBCard.nmid==int(nmid)).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
     wb_card: WBCategory = wb_card.unique().scalar()
     if wb_card:
@@ -1248,7 +1240,7 @@ async def get_ref_names_and_links(user_telegram_id: int, bot:aiogram.Bot):
         stmt = select(User.id).where(User.user_telegram_id == user_telegram_id)
         result = await session.execute(stmt)
         user_id = result.scalar()
-        stmt = select(RefLink.name, RefLink.id).where(RefLink.referrer_id == user_id)
+        stmt = select(RefLink.name, RefLink.id).where(RefLink.referrer_id == int(user_id))
         result = await session.execute(stmt)
         refs = result.fetchall()
 
@@ -1390,8 +1382,6 @@ async def _get_min_ctr(adv: AdvSetting):
             logger.error(f'Ошибка получения статистики из ch', exc_info=True)
             raise
 
-
-
         text_to_real_ctr = {row[0]: row[1] for row in rows}
         real_ctrs  = []
         predict_ctrs = []
@@ -1414,7 +1404,7 @@ async def _get_min_ctr(adv: AdvSetting):
         stmt = select(GlobalCategorySetting.min_ctr).where(GlobalCategorySetting.category_name == category_name)
         result = await session.execute(stmt)
         try:
-             min_ctr = result.scalar_one()
+            min_ctr = result.scalar_one()
         except NoResultFound:
             return 0.03
     return float(min_ctr)
@@ -1477,9 +1467,9 @@ async def clear_cards_in_db(nmids: list[int]):
         result = await session.execute(stmt)
         wb_cards: list[WBCard] = result.unique().scalars().all()
         for card in wb_cards:
-             await session.delete(card)
-             await session.commit()
-             await asyncio.sleep(0)
+            await session.delete(card)
+            await session.commit()
+            await asyncio.sleep(0)
 
 
 async def get_keywords_from_clickhouse(adv_id: int)-> list[str]:
