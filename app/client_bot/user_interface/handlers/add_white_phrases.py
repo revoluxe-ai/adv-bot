@@ -4,7 +4,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from sqlalchemy import select
 from app.client_bot.user_interface import states
-from app.client_bot.user_interface.handlers.start import start_registration
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import KeywordSetting
@@ -39,15 +38,14 @@ async def waiting_for_white_phrases(message, bot: Bot, state: FSMContext):
 
 @router.callback_query(callbacks.AddRelevantPhrases.filter())
 async def add_relevant_phrases(callback: CallbackQuery,
-                                 bot: Bot,
-                                 callback_data: callbacks.AddRelevantPhrases,
-                                 state: FSMContext):
-     await callback.answer('Добавление фраз в релевантный список')
-     adv_setting_id = callback_data.adv_setting_id
-     await state.update_data(last_adv_setting_id=adv_setting_id)
-     await state.set_state(states.AddRelevantPhrases.waiting_for_relevant_phrases)
-     await messages.WaitingForRelevantPhrases(bot, callback.from_user.id)()
-
+                               bot: Bot,
+                               callback_data: callbacks.AddRelevantPhrases,
+                               state: FSMContext):
+    await callback.answer('Добавление фраз в релевантный список')
+    adv_setting_id = callback_data.adv_setting_id
+    await state.update_data(last_adv_setting_id=adv_setting_id)
+    await state.set_state(states.AddRelevantPhrases.waiting_for_relevant_phrases)
+    await messages.WaitingForRelevantPhrases(bot, callback.from_user.id)()
 
 
 @router.message(StateFilter(states.AddRelevantPhrases.waiting_for_relevant_phrases))
@@ -60,7 +58,6 @@ async def waiting_for_relevant_phrases(message, bot: Bot, state: FSMContext):
     await messages.LongTimeOperation(bot, message.from_user.id)()
     await data_manager.add_relevant_phrases(keywords, adv_setting_id)
     await messages.RelevantPhrasesAdded(bot, message.from_user.id, adv_setting_id)()
-
 
 
 @router.callback_query(callbacks.ResetWhiteList.filter())
@@ -76,19 +73,20 @@ async def reset_white_list(callback: CallbackQuery,
                    KeywordSetting.hard_status == 2)
         keyword_settings = (await session.execute(stmt)).scalars().all()
         for keyword_setting in keyword_settings:
-            keyword_setting.hard_status = 1
+            keyword_setting.hard_status = 1  # type: ignore
         await session.commit()
     async with sm() as session:
         stmt = select(AdvSetting)\
             .where(AdvSetting.id == adv_setting_id)
         adv = (await session.execute(stmt)).scalar()
+    assert adv
     data = await state.get_data()
     wb_user_cabinet_id: int = data['last_wb_user_cabinet_original_id']
     async with sm() as session:
         stmt = select(WBUserCabinet)\
             .where(WBUserCabinet.id == wb_user_cabinet_id)
         wb_user_cabinet = (await session.execute(stmt)).scalar()
-
+    assert wb_user_cabinet
     await bot.send_message(callback.from_user.id, 'Белый список сброшен, возвращаю меню кампании...')
     await messages.AdvSettingMenu(bot,
                                   callback.from_user.id,
