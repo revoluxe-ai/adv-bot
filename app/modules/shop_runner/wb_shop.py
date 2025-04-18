@@ -2,7 +2,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from functools import wraps
-from typing import Optional, Iterable, AsyncGenerator, TypeVar
+from typing import Optional, Iterable, AsyncGenerator, TypeVar, Tuple, Sequence
 from datetime import datetime, timedelta
 from app.core.wb_api import exceptions
 from app.core.wb_api.ping_manager import PingManager
@@ -30,6 +30,7 @@ from app.modules.common_slaves.wildberries import super_cabinet_manager
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
+
 
 def update_data():
     def decorator(func):
@@ -106,7 +107,6 @@ class WBShop:
             self.__keywords_for_advs[adv.adv_id] = keywords
             await asyncio.sleep(0)
 
-
     @single_run()
     async def _update_access(self):
         access = await super_cabinet_manager.get_access_for_wb_cabinet(self.shop_id)
@@ -140,7 +140,8 @@ class WBShop:
             return
         try:
             logger.debug(f'Обновляю ставки для магазина {self.shop_id}')
-            await asyncio.gather(*[self.__run_bidder_process_for_adv(adv, wb_api, self.shop_id) for adv in adv_settings])
+            await asyncio.gather(*[self.__run_bidder_process_for_adv(adv, wb_api, self.shop_id)
+                                   for adv in adv_settings])
             logger.debug(f'Все ставки обновлены для магазина {self.shop_id}')
         except ApiForbiddenError:
             raise ApiForbiddenError('Нет доступов для выполнения задачи')
@@ -183,8 +184,6 @@ class WBShop:
                 logger.error(f'Ошибка {e} обновления ставки для {self.shop_id}', exc_info=True)
                 await asyncio.sleep(60)
 
-
-
     async def update_cpm_run(self):
         while True:
             try:
@@ -192,12 +191,10 @@ class WBShop:
             except Exception as exc:
                 logger.error(f'Ошибка {exc} обновления ставок в магазине', exc_info=True)
 
-
     @update_data()
     async def __update_common_sale_stat(self, wb_stat_manager: WBCommonStatManager):
         all_nmids = [int(adv.nmids[0]) for adv in self._adv_settings if adv.bot_active == True]
         await wb_stat_manager.update_common_statistic(all_nmids)
-
 
     async def update_common_sale_stat(self):
         access = self.__access
@@ -218,11 +215,9 @@ class WBShop:
             finally:
                 await asyncio.sleep(60*15)
 
-
     @staticmethod
     async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]):
         await full_wb_adv_stat.insert(stats)
-
 
     @update_data()
     async def _update_full_adv_stat(self, wb_api: CommonWBApi):
@@ -334,9 +329,9 @@ class WBShop:
             yield item
 
 
-    async def _parsing_keywords_for_adv_generator(self, adv: AdvSetting, nmid: int) -> (str, int):
+    async def _parsing_keywords_for_adv_generator(self, adv: AdvSetting, nmid: int)->Tuple[str, int]:
         keywords = self.__keywords_for_advs[adv.adv_id]
-        nmid = adv.nmids[0]
+        nmid = int(adv.nmids[0])
         keywords_with_positins: list[CalculatedKeyword] = []
         keywords_without_positions: list[CalculatedKeyword] = []
         last_positions: dict[str, WBItemPosition] = {}
@@ -370,7 +365,7 @@ class WBShop:
             active_advs = list(filter(lambda adv_: adv_.bot_active, self._adv_settings))
             generators = []
             for adv in active_advs:
-                nmid = adv.nmids[0]
+                nmid = int(adv.nmids[0])
                 generators.append(self._parsing_keywords_for_adv_generator(adv, nmid))
             zipped_generators = self.async_zip_longest(*generators)
             parsing_queue = GlobalParsingQueueManager()
