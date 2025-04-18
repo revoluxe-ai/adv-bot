@@ -128,6 +128,153 @@ def test_payment_service(mocker):
 2. Ищите примеры других рабочих тестов для понимания правильного подхода
 3. Проверяйте, не изменились ли зависимости или внешние факторы
 
+## Тестирование асинхронных функций и циклических зависимостей
+
+### Решение циклических импортов
+1. При возникновении циклических зависимостей между модулями используйте строковые аннотации типов:
+```python
+# Вместо прямого импорта
+from app.utils.db.models import User
+
+# Используйте строковые аннотации
+user: Mapped['User'] = relationship("User", back_populates="wb_user_cabinets")
+```
+
+2. Для отношений с secondary-таблицами также используйте строковые имена:
+```python
+# Вместо импорта объекта таблицы 
+from app.utils.db.assoc_tables import favorite_advs_association
+
+# Используйте строковое имя таблицы
+favorites_advs: Mapped[list['AdvSetting']] = relationship(
+    'AdvSetting', 
+    secondary='favorite_advs_association'
+)
+```
+
+### Создание фикстур для тестирования асинхронных функций
+1. При создании фикстур для асинхронных функций используйте синхронные фикстуры, которые возвращают асинхронные объекты:
+
+```python
+@pytest.fixture
+def cabinet_bonus_session_mocker(mock_wb_cabinet):
+    mock_session = AsyncMock()
+    
+    # Настраиваем асинхронные методы
+    mock_session.begin = AsyncMock(return_value=None)
+    mock_session.commit = AsyncMock(return_value=None)
+    
+    # Создаем асинхронный контекстный менеджер
+    class AsyncSessionContextManager:
+        async def __aenter__(self):
+            return mock_session
+            
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+    
+    # Создаем фабрику сессий
+    def session_factory(*args, **kwargs):
+        return AsyncSessionContextManager()
+    
+    # Патчим функцию
+    patch('app.modules.function.sm', session_factory).start()
+    return mock_session
+```
+
+2. При создании моков для гибридных свойств используйте PropertyMock:
+
+```python
+mock_wb_cabinet = MagicMock()
+type(mock_wb_cabinet).calculated_bonus = PropertyMock(return_value=100.0)
+```
+
+### Тестирование асинхронных функций
+1. Используйте `@pytest.mark.asyncio` для асинхронных тестов:
+
+```python
+@pytest.mark.asyncio
+async def test_get_min_ctr():
+    # Тестовый код
+```
+
+2. При патчинге функций в асинхронных тестах используйте `side_effect` для асинхронных возвращаемых значений:
+
+```python
+mock_get_min_ctr = AsyncMock()
+mock_get_min_ctr.return_value = 0.5
+
+with patch('app.modules.path.function', side_effect=mock_get_min_ctr):
+    result = await tested_function()
+```
+
+3. Для имитации класса, не существующего в тестовой среде, создавайте локальные реализации:
+
+```python
+# Создаем имитацию класса
+class CommonAdvsStatData:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+# Патчим импорт класса
+with patch('app.module.path.CommonAdvsStatData', CommonAdvsStatData):
+    # Тестовый код
+```
+
+### Патчинг методов класса
+1. При патчинге методов класса используйте полный путь к методу:
+
+```python
+with patch('app.module.path.ClassName.method_name', 
+          side_effect=mock_method):
+    result = await class_instance.method()
+```
+
+2. Для классовых методов (classmethod) убедитесь, что патчите полный путь:
+
+```python
+with patch('app.module.path.ClassName.class_method', 
+          side_effect=mock_class_method):
+    result = await ClassName.class_method()
+```
+
+### Тестирование SQLAlchemy моделей с гибридными свойствами
+1. Не пытайтесь использовать гибридные свойства в SQL запросах в тестах
+2. Для тестирования гибридных свойств создавайте моки с PropertyMock
+3. Если нужно тестировать запросы с фильтрацией по гибридным свойствам, имитируйте результат запроса и проводите фильтрацию в Python-коде
+
+### Основные шаблоны для асинхронных тестов
+1. Патчинг асинхронного метода:
+```python
+mock_method = AsyncMock(return_value=expected_result)
+with patch('app.module.path.function', mock_method):
+    result = await tested_function()
+    assert result == expected_result
+```
+
+2. Патчинг SQLAlchemy сессии:
+```python
+mock_session = AsyncMock()
+mock_result = MagicMock()
+mock_result.scalar_one_or_none = MagicMock(return_value=expected_result)
+mock_session.execute = AsyncMock(return_value=mock_result)
+
+with patch('app.module.path.sm', return_value=mock_session):
+    result = await tested_function()
+```
+
+3. Создание имитации асинхронного контекстного менеджера:
+```python
+class AsyncContextManager:
+    async def __aenter__(self):
+        return mock_object
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+mock_context = AsyncContextManager()
+```
+
 ## Типичные ошибки
 - Написание тестов только для успешных сценариев, игнорирование ошибочных
 - Создание нестабильных тестов, зависящих от внешних факторов
