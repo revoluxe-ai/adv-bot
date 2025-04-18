@@ -1,0 +1,285 @@
+# Общая стратегия тестирования проекта
+
+## Контекст применения
+Эти правила используются при написании и поддержке тестов для всех компонентов проекта.
+
+## Основные принципы
+1. Каждый новый функционал должен быть покрыт тестами
+2. Сначала фокусироваться на модульных тестах, затем на интеграционных
+3. Следовать подходу TDD (Test-Driven Development) при разработке новых компонентов
+4. При обнаружении ошибки сначала писать тест, воспроизводящий ее, затем исправлять
+5. Перед исправлением проблемы в коде всегда сначала анализировать тесты
+
+## Организация тестов
+
+### Структура тестов
+```
+tests/
+├── conftest.py              # Общие фикстуры и настройки
+├── pytest.ini               # Конфигурация pytest
+├── test_models.py           # Тесты моделей данных
+├── test_parser_isolated.py  # Изолированные тесты парсера
+├── test_parser_integration.py # Интеграционные тесты парсера
+├── test_parsing_queue_manager.py # Тесты менеджера очередей парсера
+└── modules/                 # Тесты отдельных модулей
+    ├── test_module_1.py
+    └── test_module_2.py
+```
+
+### Конвенции именования
+- Файлы тестов: `test_*.py`
+- Функции тестов: `test_*`
+- Классы тестов: `Test*`
+- Фикстуры: имя существительное, отражающее суть создаваемого объекта
+
+## Запуск тестов
+
+### Базовые команды
+```powershell
+# Запуск всех тестов
+python -m pytest
+
+# Запуск с подробным выводом
+python -m pytest -v
+
+# Запуск конкретного теста
+python -m pytest tests/test_models.py::test_function_name
+
+# Запуск нескольких конкретных файлов тестов
+python -m pytest tests/test_parser_isolated.py tests/test_parser_integration.py -v
+
+# Запуск тестов по маркерам
+python -m pytest -m "slow"
+```
+
+### Параметры запуска
+```powershell
+# Запуск с выводом print-сообщений
+python -m pytest -v --capture=no
+
+# Остановка после первого падения
+python -m pytest -x
+
+# Подробный traceback
+python -m pytest --tb=native
+```
+
+## Фикстуры и моки
+
+### Создание фикстур
+```python
+import pytest
+
+@pytest.fixture
+def db_connection():
+    # Настройка перед тестами
+    conn = create_test_db_connection()
+    yield conn
+    # Очистка после тестов
+    conn.close()
+
+@pytest.fixture
+def user_data():
+    return {
+        "id": 1,
+        "name": "Test User",
+        "email": "test@example.com"
+    }
+```
+
+### Использование моков
+```python
+from unittest.mock import patch, MagicMock, AsyncMock
+
+def test_payment_service(mocker):
+    # Создание мока для внешнего API
+    mock_api = mocker.patch("app.payment.external_api.make_payment")
+    mock_api.return_value = {"status": "success", "transaction_id": "123456"}
+    
+    # Тестирование функции с использованием мока
+    result = payment_service.process_payment(100, "user123")
+    
+    # Проверка, что мок был вызван с правильными параметрами
+    mock_api.assert_called_once_with(amount=100, user_id="user123")
+    
+    # Проверка результата
+    assert result["status"] == "success"
+    assert "transaction_id" in result
+```
+
+### Мокирование классов и модулей
+```python
+# Мокирование модуля для избежания нежелательных зависимостей
+sys.modules['app.utils.redis_manager'] = MagicMock(
+    set_cluster_and_preset=AsyncMock()
+)
+
+# Правильное мокирование функций в conftest.py
+@pytest.fixture(autouse=True)
+def patch_get_async_session_maker(monkeypatch, test_async_db):
+    engine, async_session = test_async_db
+    async def mock_get_async_session_maker(*args, **kwargs):
+        return async_sessionmaker(class_=async_session)
+    
+    # Указывайте полный путь к атрибуту при использовании monkeypatch
+    monkeypatch.setattr("app.utils.db.session_maker.get_async_session_maker", mock_get_async_session_maker)
+    # При необходимости, устанавливайте мок для всех мест, где используется функция
+    monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker)
+```
+
+## Особенности асинхронного тестирования
+
+### Настройка асинхронных тестов
+```python
+import pytest
+import asyncio
+
+# Создание фикстуры event_loop с правильной областью видимости
+@pytest.fixture(scope="function")
+def event_loop():
+    """Create an instance of the default event loop for each test case."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    yield loop
+    if not loop.is_closed():
+        loop.close()
+
+# Асинхронный тест
+@pytest.mark.asyncio
+async def test_async_function():
+    result = await my_async_function()
+    assert result == expected_value
+```
+
+### Правильная настройка настроек pytest-asyncio
+```python
+# В pytest.ini или conftest.py
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"  # Рекомендуется явно указывать область видимости
+```
+
+## Процесс отладки тестов
+
+### Когда тест падает
+1. Сфокусируйтесь на одном конкретном падающем тесте
+2. Запустите только этот тест с подробным выводом:
+   ```powershell
+   python -m pytest tests/test_file.py::test_function -v --capture=no
+   ```
+3. Анализируйте стек ошибки и логи
+4. Проверьте, изменились ли входные данные или ожидаемые результаты
+5. Сравните поведение с другими рабочими тестами
+
+### Приоритеты при отладке
+1. Сначала всеми силами старайтесь решить проблему с тестом, а не с кодом
+2. Ищите примеры других рабочих тестов для понимания правильного подхода
+3. Проверяйте, не изменились ли зависимости или внешние факторы
+
+### Распространенные проблемы и их решения
+1. **Проблемы с импортами:**
+   - Проверьте пути импорта в тестируемых файлах
+   - Проверьте, не изменилась ли структура проекта
+   - Создайте файлы-заглушки для обратной совместимости
+
+2. **Проблемы с сессиями SQLAlchemy:**
+   - Всегда используйте полные пути при мокировании функций создания сессий
+   - Убедитесь, что все места использования сессий правильно замокированы
+   - Проверьте, что фикстуры сессий создаются до использования
+
+3. **AttributeError и ImportError:**
+   - Проверьте, что все мокируемые модули и классы существуют в проекте
+   - Используйте правильные пути к модулям при мокировании
+   - Создавайте для тестов обертки-заглушки при рефакторинге и переносе кода
+
+## Типичные ошибки
+- Написание тестов только для успешных сценариев, игнорирование ошибочных
+- Создание нестабильных тестов, зависящих от внешних факторов
+- Использование реальных зависимостей вместо моков
+- Нечеткие assert-сообщения, не позволяющие понять причину ошибки
+- Неправильные пути в monkeypatch при мокировании функций
+- Отсутствие обработки изменений структуры проекта (перемещение модулей, изменение путей)
+
+## Поддержка обратной совместимости
+
+### При рефакторинге или переносе кода
+1. Создавайте файлы-заглушки для обратной совместимости:
+   ```python
+   """
+   Этот файл обеспечивает обратную совместимость со старыми импортами.
+   Перенаправляет на правильную реализацию в wb_parser/parsing_page_queue_manager.py
+   """
+   
+   from .wb_parser.parsing_page_queue_manager import ParsingQueueManager
+   
+   # Для обратной совместимости
+   __all__ = ['ParsingQueueManager']
+   ```
+
+2. Экспортируйте классы и функции через `__init__.py`:
+   ```python
+   """
+   Модуль для парсинга ключевых слов на Wildberries
+   """
+   
+   # Экспортируем основные классы для облегчения импорта
+   from .parsing_queue_manager import ParsingQueueManager
+   from .parsing_found_redis_manager import ParsingFoundRedisManager
+   from .parsing_task import ParsingTask
+   from .wb_parser.parser import parser
+   
+   __all__ = [
+       'ParsingQueueManager',
+       'ParsingFoundRedisManager',
+       'ParsingTask',
+       'parser'
+   ]
+   ```
+
+## Пример хорошего теста
+```python
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+from app.modules.wb_keywords_parser.wb_parser.parsing_page_queue_manager import ParsingQueueManager
+from app.modules.common_slaves.wildberries.models import WBItemPosition
+
+@pytest.mark.asyncio
+async def test_parsing_queue_manager_add_found_not_found_page():
+    """
+    Тест проверяет функциональность метода add_found_not_found_page класса ParsingQueueManager
+    """
+    # Arrange: создаем и настраиваем моки
+    manager = ParsingQueueManager()
+    manager.redis_manager = AsyncMock()
+    
+    text = "тестовый запрос"
+    nmid1 = 12345678
+    nmid2 = 87654321
+    need_nmids = {nmid1, nmid2}
+    page = 3
+    
+    # Создаем тестовые данные: позиция только для первого nmid
+    positions = [
+        WBItemPosition(
+            nmid=nmid1,
+            real_position=100, 
+            base_position=100,
+            promo_position=2,
+            keyword_text=text,
+            cpm=120
+        )
+    ]
+    
+    # Act: вызываем тестируемый метод
+    await manager.add_found_not_found_page(text, positions, need_nmids, page)
+    
+    # Assert: проверяем, что нужные методы были вызваны с правильными аргументами
+    manager.redis_manager.add_last_found_page_for_text_nmid.assert_called_once_with(
+        text, nmid1, page
+    )
+    manager.redis_manager.add_last_not_found_page_for_text_nmid.assert_called_once_with(
+        text, nmid2, page
+    )
+``` 
