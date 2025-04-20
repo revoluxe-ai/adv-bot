@@ -95,11 +95,6 @@ class GraphUpdater:
             await session.commit()
         logger.debug('Вектора для nmids обновлены')
 
-    async def get_nmids_and_keyword_featers_for_ml(self):
-        await asyncio.gather(self._update_nmids_vectors(),
-                       self._update_keywords_vectors()
-                             )
-
 
     async def _update_keywords_vectors(self) -> None:
         keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors()
