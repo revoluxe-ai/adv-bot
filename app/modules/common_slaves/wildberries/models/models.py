@@ -1,6 +1,7 @@
 import json
 import re
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
@@ -258,6 +259,9 @@ class WBCard(BaseTable): # Изменено название таблицы
 
 
 class AdvSetting(BaseTable):
+
+    class ActiveStatuses(Enum):
+        DONE = 'done'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
