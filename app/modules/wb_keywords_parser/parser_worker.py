@@ -62,6 +62,7 @@ class ParserWorker:
             await parser.add_wb_positions(
                 text=task.keyword,
                 need_nmids=task.nmids,
-                delay=0.1)
+                delay=0.1,
+                page_limit=1)
         except Exception as e:
             logger.error(f"Error processing task {task}: {e}", exc_info=True)
