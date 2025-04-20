@@ -4,13 +4,12 @@ from dataclasses import dataclass
 from typing import Optional
 from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy import (Column, Integer, String, ForeignKey,
-                        BIGINT, Boolean, Float, DateTime, text, Date)
+                        BIGINT, Boolean, Float, DateTime, text)
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 import jwt
 from sqlalchemy.dialects.postgresql import JSONB
 import datetime
-from sqlalchemy import JSON
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
@@ -24,8 +23,6 @@ from app.utils.db.session_maker import get_async_session_maker
 _sm = get_async_session_maker
 
 
-
-
 class WBUserCabinet(BaseTable):
     wb_cabinet_id: Mapped[Integer] = Column(Integer, ForeignKey('wbcabinet.id'), nullable=False)
     wb_cabinet = relationship("WBCabinet", back_populates="wb_user_cabinets")
@@ -37,9 +34,6 @@ class WBUserCabinet(BaseTable):
         Index('idx_wb_user_cabinet_user_id', 'user_id'),
         Index('idx_wb_user_cabinet_cabinet_id', 'wb_cabinet_id'),
     )
-
-
-
 
 
 class WBBalancePayment(BaseTable):
