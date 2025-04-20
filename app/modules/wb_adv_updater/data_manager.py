@@ -1039,8 +1039,8 @@ async def get_wb_category(adv_setting: AdvSetting) -> Union[WBCategory, None]:
         raise NotItemsInAdvSetting('У кампании в базе нет товаров')
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid==int(nmid)).options(selectinload(WBCard.wb_category))
-        wb_card = await session.execute(smtp)
-    wb_card: WBCard = wb_card.unique().scalar()
+        result = await session.execute(smtp)
+    wb_card: WBCard = result.unique.scalar_one()
     if wb_card:
         wb_category = wb_card.wb_category
     else:
@@ -1371,6 +1371,8 @@ async def _get_min_ctr(adv: AdvSetting):
             return float(min(real_ctrs))
 
     category = await get_wb_category(adv)
+    if not category:
+        return 0.1
     category_name = category.wb_category_name
     async with _sm() as session:
         stmt = select(GlobalCategorySetting.min_ctr).where(str(GlobalCategorySetting.category_name) == category_name)
