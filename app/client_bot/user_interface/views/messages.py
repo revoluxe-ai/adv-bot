@@ -6,31 +6,25 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
 from app import utils
-from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
-from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
-from app.modules.common_slaves.wildberries.models import (WBItemPosition, WBToken, WBBalancePayment, WBBonusPayment, WBCabinet)
+from app.modules.common_slaves.wildberries.models import WBItemPosition, WBBalancePayment
 from app.modules.full_stat_adv_updater.types import FullAdvStat
-from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.modules.shop_runner.wb_statistic_manager.backend import  common_stat_manager
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload, joinedload
-from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
-
+from app.modules.common_advs_stat import CommonAdvsStatDataManager
 from app.modules.wb_update_state_manager import KeywordStatUpdateState, AdvActiveKeywordUpdateStateManager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
-from app.utils.db.session_maker import get_async_session_maker
+from app.utils.db.session_maker import get_async_session_maker as sm
 from aiogram.fsm.context import FSMContext
 from app.modules.common_slaves.wildberries.models import (WBUserCabinet,
                                                           AdvSetting,
                                                           KeywordSetting, WBCabinet)
 from app.utils import redis_manager
 from app.utils.pricer.pricer import Pricer
-from app.utils.suffixes import get_day_suffix
 from .. import states
 from ..message_templates.templates import (TextWithKeyboard,
                                            Text,
@@ -56,9 +50,6 @@ logger = logging.getLogger(__name__)
 
 
 
-_sm = get_async_session_maker
-
-
 class ShopNameGet(Text):
     def __init__(self, bot: Bot, chat_id: int):
         super().__init__(bot,  chat_id)
@@ -66,7 +57,6 @@ class ShopNameGet(Text):
     @property
     def text(self):
         return 'Введите название магазина (кабинета):'
-
 
 
 class ShopAddedSuccess(Text):
@@ -86,8 +76,8 @@ class GetApiForrbidenError(Text):
 
 
 class GetCardsApiError(Text):
-    text = ('Ошибка настройки прав: нет доступа в контенту. Пожалуйста, создайте новый API-ключ с требуемыми правами и попробуйте снова.')
-
+    text = ('Ошибка настройки прав: нет доступа в контенту.'
+            ' Пожалуйста, создайте новый API-ключ с требуемыми правами и попробуйте снова.')
 
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
@@ -105,17 +95,16 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         self._page = page  # Устанавливаем страницу из параметра
         self._keywords_filter = None  # Инициализируем фильтр ключевых слов
 
-
     @staticmethod
-    async def _get_wb_cabinet(wb_cabinet_original_id):
-        async with _sm() as session:
+    async def _get_wb_cabinet(wb_cabinet_original_id: int):
+        async with sm() as session:
             stmt = select(WBCabinet)\
-            .where(WBCabinet.id == wb_cabinet_original_id)
+                .where(WBCabinet.id == wb_cabinet_original_id)
             result = await session.execute(stmt)
             wb_cabinet = result.scalar()
             return wb_cabinet
 
-    async def __call__(self):
+    async def __call__(self) -> (LastMessage, str):
         await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
         # Сортируем кампании на активные и неактивные
         active_advs = []
@@ -128,10 +117,10 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         adv_settings = active_advs + inactive_advs
         adv_settings: list[AdvSetting] = await self._filter_advs(adv_settings)
         self._adv_settings = adv_settings
-        stmt = select(WBCabinet.id)\
-                .where(WBCabinet.wb_user_cabinets\
-                       .any(WBUserCabinet == self._wb_user_cabinet_original_id))
-        async with _sm() as session:
+        stmt = (select(WBCabinet.id)
+                .where(WBCabinet.wb_user_cabinets
+                    .any(WBUserCabinet.id==int(self._wb_user_cabinet_original_id))))
+        async with sm() as session:
             result = await session.execute(stmt)
             wb_cabinet_original_id = result.scalar()
         await self._state.update_data(
@@ -140,20 +129,22 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_page=self._page
         )
         # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
-        await super().__call__()
+        return await super().__call__()
 
-    async def _filter_advs(self, adv_settings: list[AdvSetting])->list[AdvSetting]:
+    async def _filter_advs(self, adv_settings: list[AdvSetting]) -> list[AdvSetting]:
         state_data = await self._state.get_data()
-        keywords_filter: list[list[str]] = state_data.get('filter_advs')
+        keywords_filter: list[str] | None = state_data.get('filter_advs')
         self._keywords_filter = keywords_filter
         if keywords_filter:
             clear_advs = []
             for adv in adv_settings:
+                if not adv.bot_active and adv.active_status == adv.ActiveStatuses.DONE:
+                    continue
                 name = adv.name
-                nmids = adv.nmids
-                nmids = [str(nmid) for nmid in list(nmids)]
-                nmids = ' '.join(nmids)
-                name = name + ' ' + nmids
+                nmids = list(adv.nmids)
+                nmids = [str(nmid) for nmid in nmids]
+                nmids_str = ' '.join(nmids)
+                name = name + ' ' + nmids_str
                 name = name.lower()
                 name += str(adv.adv_id)
                 for keyword_filter in keywords_filter:
@@ -186,11 +177,9 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
 class ShopUpdateInfo(Text):
 
-
     @property
     def text(self):
         return f'Обновление данных для магазина, немного подождите...'
-
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
@@ -215,8 +204,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             self._min_ctr = 'Минимальный CTR не определен'
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(self.adv.id,
-                                                                        self.wb_user_cabinet.user_id)
-
+                                                                              self.wb_user_cabinet.user_id)
 
         full_stat_update_time = await self._get_last_full_stat_update(self.adv.adv_id)
         self.full_stat_update_time = full_stat_update_time if full_stat_update_time else 'Нет данных'
@@ -232,23 +220,23 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         last_update_keyword_stat: datetime = await self._get_last_update_keyword_stat(self.adv.adv_id)
         if last_update_keyword_stat:
-           self.last_update_keyword_stat_str = last_update_keyword_stat.strftime("%Y-%m-%d %H:%M:%S")
+            self.last_update_keyword_stat_str = last_update_keyword_stat.strftime("%Y-%m-%d %H:%M:%S")
         else:
             self.last_update_keyword_stat_str = 'Нет данных'
 
-        self.keywords_status_last_update_auto_adv =  await self._get_last_keywords_status_update_timestamp(self.adv.adv_id)
+        self.keywords_status_last_update_auto_adv = await self._get_last_keywords_status_update_timestamp(
+            self.adv.adv_id)
 
         if not self.keywords_status_last_update_auto_adv:
             self.keywords_status_last_update_auto_adv = 'Нет данных'
 
-
         if (search_adv_id := self.adv.search_adv_id):
-            self.keywords_status_last_update_search_adv = await self._get_last_keywords_status_update_timestamp(search_adv_id)
+            self.keywords_status_last_update_search_adv = await self._get_last_keywords_status_update_timestamp(
+                search_adv_id)
             if self.keywords_status_last_update_search_adv is None:
                 self.keywords_status_last_update_search_adv = 'Нет данных'
         else:
             self.keywords_status_last_update_search_adv = 'Аукцион не подключен к РК'
-
 
         adv_stat: FullAdvStat \
             = await data_manager.get_full_adv_stat_for_adv_id_from_redis(adv_id=self.adv.adv_id)
@@ -321,6 +309,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         return keyboards.get_adv_setting_keyboard(self.wb_user_cabinet,
                                                   self.adv,
                                                   self.in_favorites_user)
+
     @staticmethod
     def _get_last_update_keyword_stat(adv_id) -> datetime:
         last_update_keyword_stat_manager = KeywordStatUpdateState()
@@ -347,9 +336,6 @@ class CabinetExistsForUser(Text):
     text = "Этот кабинет уже был добавлен вам ранее. Сейчас я предоставлю вам его..."
 
 
-
-
-
 class NotValideToken(Text):
     text = 'Вы ввели что-то не то. Попробуйте снова:'
 
@@ -359,37 +345,32 @@ class ApiForrbidenError(Text):
         super().__init__(bot, chat_id)
         self.__wb_user_cabinet = wb_user_cabinet
 
-
     text = ('Ошибка настройки прав: нет доступа в рекламе. Пожалуйста, '
             'создайте новый API-ключ с требуемыми правами и добавьте кабинет снова. '
             'Все ваши настройки будут сохранены')
-
 
 
 class AddNewTokenGet(TextWithImage):
     def __init__(self, bot: Bot, chat_id,
                  cabinet_name: str):
 
-        self.__cabinet_name  = cabinet_name
+        self.__cabinet_name = cabinet_name
         super().__init__(bot, chat_id)
 
         self._image = 'app/client_bot/images/static/api_setting.png'
 
     @property
     def text(self):
-        return  (f'Пришлите новый Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n'
+        return (f'Пришлите новый Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n'
                  'Для работы бота нужны права Контент,  Продвижение и Аналитика')
-
 
     @property
     def image(self):
         return self._image
 
-
     @image.setter
     def image(self, value):
         self._image = value
-
 
 
 class GetMinCtr(Text):
@@ -445,7 +426,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
         self.image_mode = image_mode
 
-    async def __call__(self, state: FSMContext, sort_mode = 'by_adv') -> (LastMessage, str):
+    async def __call__(self, state: FSMContext, sort_mode='by_adv') -> (LastMessage, str):
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
@@ -486,7 +467,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             clear_keywords = []
             for keyword in self._keywords:
                 if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
-                     clear_keywords.append(keyword)
+                    clear_keywords.append(keyword)
             self._keywords = clear_keywords
         
         # Получаем данные через CommonAdvsStatDataManager
@@ -535,7 +516,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f'Заказов из Аукцион: {self.full_adv_stat_for_last_3_days_for_auction.orders}\n'
                 f"""Заказов из Органики: {self._all_orders_for_last_3_days
                     - self.full_adv_stat_for_last_3_days_for_auction.orders
-                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders if self._all_orders_for_last_3_days else 0}"""
+                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders
+                if self._all_orders_for_last_3_days else 0}"""
         )
 
         # Получаем целевые значения из настроек
@@ -548,12 +530,14 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         max_price_for_order = self._adv_setting.max_price_for_order
         max_price_for_order_str = str(round(max_price_for_order)) if max_price_for_order else "Не задано"
 
-        order_cost = self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_3_days if self._all_orders_for_last_3_days else self._spend_for_inner_adv_for_3_days
+        order_cost = self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_3_days\
+            if self._all_orders_for_last_3_days else self._spend_for_inner_adv_for_3_days
 
         text += (
             f'\nВ среднем в день (срез за 3 дня):\n'
             f'Заказов: {self._mean_orders_for_3_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
-            f'Себестоимость: {round(order_cost, 2)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
+            f'Себестоимость: {round(order_cost, 2)} р.'
+            f' (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
         )
 
         text += f'\nСтавка из Авто: {self.auto_cpm} р. '
@@ -562,7 +546,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
         text += f"Максимальная ставка: {self._adv_setting.max_cpm}\n"
         return text
-
 
     @property
     def image(self) -> str:
@@ -591,15 +574,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     @property
     def keyboard(self):
         return keyboards.get_keywords_setting_keyboard(self._keywords, self._adv_setting,
-                                                      self._adv_choice_last_page,
-                                                      self._wb_user_cabinet_original_id,
-                                                      self._page,
-                                                      self._filter,
-                                                      self._on_page,
-                                                      self.min_ctr,
-                                                      self.hide_keywords_is_not_relevant,
-                                                      sort_mode=self.sort_mode,
-                                                      image_mode=self.image_mode)
+                                                       self._adv_choice_last_page,
+                                                       self._wb_user_cabinet_original_id,
+                                                       self._page,
+                                                       self._filter,
+                                                       self._on_page,
+                                                       self.min_ctr,
+                                                       self.hide_keywords_is_not_relevant,
+                                                       sort_mode=self.sort_mode,
+                                                       image_mode=self.image_mode)
 
 class KeywordSettingMessage(TextWithKeyboard):
     parse_mode = ParseMode.MARKDOWN
@@ -614,7 +597,7 @@ class KeywordSettingMessage(TextWithKeyboard):
     async def __call__(self) -> (LastMessage, str):
         auto_block_status = await redis_manager.get_auto_block_status(self._keyword_original_id)
         self._auto_block_status = auto_block_status
-        async with _sm(read_only=True) as session:
+        async with sm(read_only=True) as session:
             stmt = select(KeywordSetting)\
                           .options(selectinload(KeywordSetting.adv_setting))\
                           .where(KeywordSetting.id == self._keyword_original_id)
@@ -623,8 +606,11 @@ class KeywordSettingMessage(TextWithKeyboard):
         adv_setting: AdvSetting = keyword_setting.adv_setting
         self._keyword_setting = keyword_setting
         self._adv_setting = adv_setting
-        nmid = adv_setting.nmids[0]
-        position: WBItemPosition = await redis_manager.get_keyword_position(keyword_setting.text, nmid)
+        nmid = int(adv_setting.nmids[0])
+        adv_id = int(self._adv_setting.adv_id)
+        text = str(self._keyword_setting.text)
+        position: WBItemPosition = await redis_manager.get_keyword_position(str(keyword_setting.text),
+                                                                            nmid)
         self.position = position
         if position:
             self.last_full_update = position.timestamp.strftime('%d-%m-%Y %H:%M')
@@ -633,15 +619,12 @@ class KeywordSettingMessage(TextWithKeyboard):
 
         async with get_clickhouse_client() as client:
             total_clicks, total_views, total_spend\
-                = await data_manager.get_keyword_statistic_clickhouse(client,
-                                                                      self._keyword_setting.text,
-                                                                      self._adv_setting.adv_id)
+                = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_id)
         self.clicks = total_clicks
         self.views = total_views
         self.fact_ctr = total_clicks / total_views if total_views else 0
 
-        self.original_predict_ctr =  await redis_manager.get_predict_ctr(self._adv_setting.adv_id,
-                                                                         self._keyword_setting.text)
+        self.original_predict_ctr =  await redis_manager.get_predict_ctr(adv_id, text)
 
         self.spend = total_spend
 
@@ -651,7 +634,7 @@ class KeywordSettingMessage(TextWithKeyboard):
     def text(self) -> str:
         keyword_text = self._keyword_setting.text
         keyword_text  = re.sub(r'([_*[\]()~>`#+\-=|{}.!])', r'\\\1', keyword_text)
-        nmids = self._adv_setting.nmids
+        nmids = list(self._adv_setting.nmids)
         nmids = [str(nmid) for nmid in nmids]
         nmids_str = ', '.join(nmids)
         text = (f"""Артикул: {nmids_str}\n"""
@@ -712,7 +695,7 @@ class LongTimeOperation(Text):
 
 
 class NeedSubscribe(TextWithKeyboard):
-    text = ('Для использования функций вы должны быть подписаны на канал службы поддержки')
+    text = 'Для использования функций вы должны быть подписаны на канал службы поддержки'
 
 
     @property
@@ -860,7 +843,7 @@ class ExpiredSubscription(TextWithKeyboard):
             super().__init__(bot, chat_id)
 
     async def __call__(self):
-            async with _sm() as session:
+            async with sm() as session:
                 stmt = select(WBCabinet).where(WBCabinet.id == self._wb_cabinet_original_id)
                 result = await session.execute(stmt)
                 self._wb_cabinet = result.scalar()
@@ -890,7 +873,7 @@ class SettingMinCTR(TextWithKeyboard):
 
 
     async def __call__(self,  adv_original_id):
-        async with _sm() as session:
+        async with sm() as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv: AdvSetting = adv.scalar()
         self._adv: AdvSetting = adv
@@ -957,7 +940,7 @@ class SettingMinCTR(TextWithKeyboard):
 class MaxCPCSetting(TextWithKeyboard):
 
     async def __call__(self, adv_original_id):
-        async with _sm() as session:
+        async with sm() as session:
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
         self._adv = adv
@@ -1002,7 +985,7 @@ class MaxCPCSetting(TextWithKeyboard):
 
 class SettingMinViewsForPredictCTR(TextWithKeyboard):
         async def __call__(self, adv_original_id):
-            async with _sm() as session:
+            async with sm() as session:
                 adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
                 adv = adv.scalar()
             self._adv = adv
@@ -1072,6 +1055,12 @@ class BalanceUpdated(Text):
 
 
 class Top10ByViewsKeywordsGraphic(TextWithKeyboardAndImage):
+
+    def __init__(self, bot, chat_id):
+        self._image = None
+        super().__init__(bot, chat_id)
+
+
     async def __call__(self, adv_original_id: int):
 
             await super().__call__()
@@ -1208,7 +1197,7 @@ class WhitePhrasesAdded(TextWithKeyboard):
 
 class CPMSetting(TextWithKeyboard):
     async def __call__(self, adv_setting_id):
-        async with _sm() as session:
+        async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
             result = await session.execute(stmt)
             adv_setting = result.scalars().first()
@@ -1291,7 +1280,7 @@ class CPMSetting(TextWithKeyboard):
 class AutoCPMSettingGetMinPosition(Text):
 
     async def __call__(self, adv_setting_id: int):
-        async with _sm() as session:
+        async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
             result = await session.execute(stmt)
             adv_setting = result.scalars().first()
@@ -1395,7 +1384,7 @@ class ShowFavoriteAdvs(TextWithKeyboard):
         super().__init__(bot, user_telegram_id)
 
     async def __call__(self):
-        async with _sm() as session:
+        async with sm() as session:
             stmt = select(User)\
             .options(joinedload(User.favorites_advs))\
             .join(User.favorites_advs)\
@@ -1410,9 +1399,7 @@ class ShowFavoriteAdvs(TextWithKeyboard):
                                                                         " добавить кампании в избранное вы сможете отдельно в каждом магазине"
                                                                         ". После этого сможете управлять всеми кампаниями ваших магазинов в одном месте.")
                 return
-        self.advs = await data_manager.set_worst_promo_position(advs)
         await super().__call__()
-
 
     @property
     def keyboard(self):
@@ -1421,8 +1408,7 @@ class ShowFavoriteAdvs(TextWithKeyboard):
 
 async def process_cabinet_balance_topup(user_id: int, cabinet_id: int, amount: float):
     """Обработка запроса на пополнение баланса кабинета"""
-    session_maker = _sm()
-    async with session_maker() as session:
+    async with sm() as session:
         # Получаем пользователя для описания платежа
         user = await session.get(User, user_id)
         if not user:
@@ -1442,8 +1428,7 @@ async def process_cabinet_balance_topup(user_id: int, cabinet_id: int, amount: f
 
 async def confirm_cabinet_balance_topup(payment_id: int, cabinet_id: int):
     """Подтверждение платежа и обновление баланса кабинета"""
-    session_maker = _sm()
-    async with session_maker() as session:
+    async with sm() as session:
         # Получаем платеж
         payment = await session.get(WBBalancePayment, payment_id)
         if not payment or payment.wb_cabinet_id != cabinet_id:
