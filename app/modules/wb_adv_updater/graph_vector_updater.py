@@ -30,8 +30,8 @@ class GraphUpdater:
         self._word2vec = None
 
 
-
-    def __calculate_file_hash(self, filepath):
+    @staticmethod
+    def __calculate_file_hash(filepath):
         """Вычисляет SHA256 хеш файла."""
         sha256_hash = hashlib.sha256()
         with open(filepath, "rb") as f:  # Читаем файл в бинарном режиме
