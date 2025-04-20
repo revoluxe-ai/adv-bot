@@ -356,7 +356,7 @@ async def set_positions(keyword_stats: list[CalculatedKeyword],
 
 
 async def set_position(keyword_stat: CalculatedKeyword,
-                        adv_setting: AdvSetting) -> CalculatedKeyword:
+                       adv_setting: AdvSetting) -> CalculatedKeyword:
     text = keyword_stat.text
     main_nmid = int(adv_setting.nmids[0])
     position = await redis_manager.get_keyword_position(text,
@@ -945,11 +945,11 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             await asyncio.sleep(0)
             continue
         if hard_status == 2:
-           keyword_stat.status = KeywordStatus.GOOD
-           keyword_setting.auto_block = False
-           await redis_manager.set_auto_block_status(keyword_setting.id, False)
-           await asyncio.sleep(0)
-           continue
+            keyword_stat.status = KeywordStatus.GOOD
+            keyword_setting.auto_block = False
+            await redis_manager.set_auto_block_status(keyword_setting.id, False)
+            await asyncio.sleep(0)
+            continue
         elif hard_status == 0:
             keyword_stat.status = KeywordStatus.BAD
             keyword_stat.reason = 'black_list'
