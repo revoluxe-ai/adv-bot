@@ -1009,7 +1009,7 @@ class DataGetter(AbcManager):
         nmid_offer_id_df = pd.DataFrame(dict_)
         return nmid_offer_id_df
 
-    async def listProgress(self, jobid):
+    async def get_list_progress(self, jobid):
         result = await self._gds.get_status_job(jobid)
         return result
 

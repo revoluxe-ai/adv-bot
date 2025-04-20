@@ -64,7 +64,7 @@ class GraphUpdater:
                if "a job running with jobId 'fastrp'" in e.message:
                     while True:
                         try:
-                            fastrp_status = await self._data_getter.listProgress('fastrp')
+                            fastrp_status = await self._data_getter.get_list_progress('fastrp')
                             logger.info(f'Выполнено на {fastrp_status[0]}')
                             await asyncio.sleep(60)  # Подождите немного перед повторной попыткой
                         except:
