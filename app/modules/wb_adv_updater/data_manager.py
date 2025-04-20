@@ -838,7 +838,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 keyword_setting.text = cluster_name
                 keyword_setting.adv_setting = adv_setting
                 keyword_setting.hard_status = result_hard_status
-                session.merge(adv_setting)
+                await session.flush(adv_setting)
                 session.add(keyword_setting)
                 await session.commit()
             keyword_stat.keyword_setting = keyword_setting
