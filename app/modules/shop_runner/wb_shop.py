@@ -74,8 +74,6 @@ def single_run():
     return decorator
 
 
-T = TypeVar('T')
-
 class WBShop:
 
     def __init__(self, shop_id: str,
@@ -122,10 +120,10 @@ class WBShop:
         stmt = select(AdvSetting)\
             .join(AdvSetting.wb_cabinet)\
             .filter(WBCabinet.shop_id == shop_id,
-                AdvSetting.bot_active == True)
+                    AdvSetting.bot_active)
         async with sm() as session:
             result = await session.execute(stmt)
-            advs: list[AdvSetting] = result.scalars().all()
+            advs: Sequence[AdvSetting] = result.scalars().all()
         self._adv_settings = advs
         assert hasattr(self, '_adv_settings')
 
@@ -133,7 +131,7 @@ class WBShop:
     async def __update_cpm_bid(self,  wb_api: AdvertApi):
         assert hasattr(self, '_adv_settings')
         adv_settings = self._adv_settings
-        adv_settings = list(filter(lambda adv: adv.bot_active == True, adv_settings))
+        adv_settings = list(filter(lambda adv: adv.bot_active, adv_settings))
         if not self._adv_settings:
             logger.debug(f'Модели не обновлены для магазина {self.shop_id}')
             self.__first_bidder_update_time = datetime.now()
@@ -193,7 +191,7 @@ class WBShop:
 
     @update_data()
     async def __update_common_sale_stat(self, wb_stat_manager: WBCommonStatManager):
-        all_nmids = [int(adv.nmids[0]) for adv in self._adv_settings if adv.bot_active == True]
+        all_nmids = [int(adv.nmids[0]) for adv in self._adv_settings if adv.bot_active]
         await wb_stat_manager.update_common_statistic(all_nmids)
 
     async def update_common_sale_stat(self):
@@ -225,8 +223,8 @@ class WBShop:
         auction_adv_ids: set = {adv.search_adv_id for adv in self._adv_settings if adv.search_adv_id}
         all_adv_ids = auto_adv_ids | auction_adv_ids
         full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(wb_api,
-                                                                                         all_adv_ids,
-                                                                                         threshold_dates=30)
+                                                                                           all_adv_ids,
+                                                                                           threshold_dates=30)
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
             date_time = datetime.now()
@@ -286,7 +284,6 @@ class WBShop:
             finally:
                 await asyncio.sleep(60*7 + 30)
 
-
     @staticmethod
     async def async_zip_longest(*async_gens, fillvalue=None):
         iterators = [gen.__aiter__() for gen in async_gens]
@@ -305,7 +302,6 @@ class WBShop:
                     finished[i] = True
                     row.append(fillvalue)
             yield tuple(row)
-
 
     async def update_cards_data_from_wb_to_pf(self):
         access = self.__access
@@ -328,8 +324,7 @@ class WBShop:
         for item in iterable:
             yield item
 
-
-    async def _parsing_keywords_for_adv_generator(self, adv: AdvSetting, nmid: int)->Tuple[str, int]:
+    async def _parsing_keywords_for_adv_generator(self, adv: AdvSetting, nmid: int) -> Tuple[str, int]:
         keywords = self.__keywords_for_advs[adv.adv_id]
         nmid = int(adv.nmids[0])
         keywords_with_positins: list[CalculatedKeyword] = []
@@ -376,8 +371,6 @@ class WBShop:
                         await parsing_queue.add_or_update_task(text, {nmid})
                         await asyncio.sleep(60)  # Добавляем небольшую задержку между задачами
 
-
-
     async def _run(self):
         await self._update_access()
         await asyncio.gather(
@@ -388,7 +381,6 @@ class WBShop:
             self.update_common_sale_stat(),
             self.update_full_adv_stat(),
         )
-
 
     async def run(self):
         await self._run()
