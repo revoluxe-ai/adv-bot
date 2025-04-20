@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import hashlib
 import logging
 import os
@@ -61,7 +60,8 @@ class GraphUpdater:
                 await self._gds.update_fastrp(leingth)
                 break
             except Neo4jError as e:
-               if "a job running with jobId 'fastrp'" in e.message:
+                message = e.message
+                if message and "a job running with jobId 'fastrp'" in message:
                     while True:
                         try:
                             fastrp_status = await self._data_getter.get_list_progress('fastrp')
@@ -70,15 +70,15 @@ class GraphUpdater:
                         except:
                             break
                     break
+                else:
+                    raise e  # Перебросить исключение, если ошибка не связана с выполняющимся заданием
 
-               else:
-                    raise  e # Перебросить исключение, если ошибка не связана с выполняющимся заданием
-
-    async def _update_nmids_vectors(self):
+    async def _update_nmids_vectors(self) -> None:
         async with sm() as session:
             stmt = select(ItemFeature.nmid)
             result = await session.execute(stmt)
             nmids = result.scalars().all()
+        nmids = list(nmids)
         nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors(nmids)
 
         async with sm(read_only=False) as session:
@@ -101,7 +101,7 @@ class GraphUpdater:
                              )
 
 
-    async def _update_keywords_vectors(self):
+    async def _update_keywords_vectors(self) -> None:
         keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors()
         async with sm(read_only=False) as session:
             count = 0  # Счетчик для отслеживания количества обработанных записей
