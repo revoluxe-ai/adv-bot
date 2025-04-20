@@ -901,8 +901,10 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         clicks = keyword_stat.calculated_clicks
         views = keyword_stat.calculated_views
         enough_views = keyword_stat.enough_views
+        assert enough_views
         original_predict_ctr = keyword_stat.original_predict_ctr
-        hard_status = keyword_stat.hard_status
+        hard_status = int(keyword_stat.hard_status)
+        keyword_setting = text_to_keyword_setting.get(keyword_stat.text)
         if max_position:
             try:
                 position = keyword_stat.position
@@ -930,8 +932,8 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
                 await asyncio.sleep(0)
                 continue
-
-        if not original_predict_ctr and enough_views/2 > keyword_stat.views and not adv_setting.min_views_for_ml_predict and  keyword_setting.hard_status in [1, 2]:
+        if not original_predict_ctr and enough_views/2 > keyword_stat.views\
+                and not adv_setting.min_views_for_ml_predict and  keyword_setting.hard_status in [1, 2]:
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
             await redis_manager.set_auto_block_status(keyword_setting.id, True)
@@ -1038,7 +1040,7 @@ async def get_wb_category(adv_setting: AdvSetting) -> Union[WBCategory, None]:
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid==int(nmid)).options(selectinload(WBCard.wb_category))
         wb_card = await session.execute(smtp)
-    wb_card: WBCategory = wb_card.unique().scalar()
+    wb_card: WBCard = wb_card.unique().scalar()
     if wb_card:
         wb_category = wb_card.wb_category
     else:
@@ -1075,10 +1077,10 @@ async def __download_and_resize_image(url, session, max_size=1280):
 
 
 async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
-    async with _sm() as session:
+    async with (_sm() as session):
         stmt = select(KeywordSetting)\
-            .options(selectinload(KeywordSetting.adv_setting))\
-                .where(KeywordSetting.hard_status == 0)
+            .options(selectinload(KeywordSetting.adv_setting)
+                     ).where(KeywordSetting.hard_status == 0)
         result = await session.execute(stmt)
         keyword_settings: list[KeywordSetting] = result.unique().scalars().all()
     adv_keyword_text_in_black_list = []
@@ -1184,11 +1186,11 @@ async def get_ref_statistic(user_telegram_id: int) -> Optional[list[ReferralStat
             func.count(user_reflink_association.c.user_id).label("referrals_count"),
             func.coalesce(func.sum(Payment.amount), 0).label("total_payments")
         ).select_from(RefLink) \
-         .outerjoin(user_reflink_association, RefLink.id == user_reflink_association.c.reflink_id) \
-         .outerjoin(User, user_reflink_association.c.user_id == User.id) \
+         .outerjoin(user_reflink_association, RefLink.id == int(user_reflink_association.c.reflink_id)) \
+         .outerjoin(User, user_reflink_association.c.user_id==int(User.id)) \
          .outerjoin(WBUserCabinet, WBUserCabinet.user_id == User.id) \
-         .outerjoin(WBCabinet, WBCabinet.id == WBUserCabinet.wbcabinet_id) \
-         .outerjoin(Payment, Payment  == WBCabinet.id) \
+         .outerjoin(WBCabinet, WBCabinet.id == int(WBUserCabinet.wbcabinet_id)) \
+         .outerjoin(Payment, Payment==WBCabinet.id) \
          .where(RefLink.referrer_id == user_id) \
          .group_by(RefLink.name)
 
@@ -1196,8 +1198,8 @@ async def get_ref_statistic(user_telegram_id: int) -> Optional[list[ReferralStat
         stats = result.fetchall()
 
         # Возвращаем результаты в удобном для использования виде
-        return [ReferralStatistic(name=row[0], referrals_count=row[1], total_payments=min(row[2], 500)) for row in stats]
-
+        return [ReferralStatistic(name=row[0], referrals_count=row[1],
+                                  total_payments=min(row[2], 500)) for row in stats]
 
 
 @dataclass
