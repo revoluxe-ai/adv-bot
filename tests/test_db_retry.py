@@ -212,22 +212,24 @@ async def test_get_user_with_retry():
     # Создаем отдельную функцию для тестирования, которая имитирует временные ошибки
     @with_db_retry(max_retries=3, retry_delay=0.1)
     async def test_get_user_func(telegram_id: int):
-        nonlocal mock_session, mock_result
+        nonlocal mock_session, mock_result, test_get_user_func
         # Ошибка соединения на первой попытке
         if test_get_user_func.call_count == 0:
             test_get_user_func.call_count += 1
             raise ConnectionError("Test connection error")
+            
         test_get_user_func.call_count += 1
-        # Для второй попытки возвращаем пользователя
-        async with get_async_session_maker() as session:
-            stmt = select(User).where(User.user_telegram_id == telegram_id)
-            result = await session.execute(stmt)
-            return result.scalar_one_or_none()
+        
+        # Важное изменение: не используем реальную сессию из get_async_session_maker
+        # Вместо этого просто имитируем работу запроса с моком
+        stmt = select(User).where(User.user_telegram_id == telegram_id)
+        result = await mock_session.execute(stmt)
+        return result.scalar_one_or_none()
     
     # Инициализируем счетчик вызовов
     test_get_user_func.call_count = 0
     
-    # Патчим функцию get_async_session_maker
+    # Патчим функцию get_async_session_maker (даже если мы её не используем напрямую в тесте)
     with patch('app.utils.db.session_maker.get_async_session_maker', return_value=mock_context_manager):
         # Вызываем тестируемую функцию
         user = await test_get_user_func(123456789)
@@ -235,6 +237,12 @@ async def test_get_user_with_retry():
         # Проверяем результат
         assert user == mock_user
         assert test_get_user_func.call_count == 2  # Функция должна быть вызвана дважды
+        # Проверяем, что execute был вызван
+        assert mock_session.execute.called
+        # Проверяем, что в аргументах вызова execute передан select-запрос
+        assert isinstance(mock_session.execute.call_args[0][0], type(select(User)))
+        # Проверяем количество вызовов execute
+        assert mock_session.execute.call_count >= 1
 
 @pytest.mark.asyncio
 async def test_exponential_backoff():

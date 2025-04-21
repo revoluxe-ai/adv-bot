@@ -51,7 +51,7 @@ def mock_wb_cabinet():
     return mock
 
 @pytest.fixture
-async def cabinet_bonus_session_mocker(mock_wb_cabinet):
+def cabinet_bonus_session_mocker(mock_wb_cabinet):
     """Мок для сессии и функций работы с бонусами"""
     from unittest.mock import AsyncMock, MagicMock, patch
     
@@ -74,7 +74,7 @@ async def cabinet_bonus_session_mocker(mock_wb_cabinet):
     async def fake_scalar_one_or_none():
         return mock_wb_cabinet
     mock_result.scalar_one_or_none = AsyncMock(side_effect=fake_scalar_one_or_none)
-    mock_session.execute.return_value = mock_result
+    mock_session.execute = AsyncMock(return_value=mock_result)
     
     # Создаем контекстный менеджер для асинхронной сессии
     class AsyncSessionContextManager:
@@ -89,8 +89,8 @@ async def cabinet_bonus_session_mocker(mock_wb_cabinet):
         return AsyncSessionContextManager()
     
     # Патчим функцию sm
-    with patch('app.modules.cabinet_bonus_manager.bonus_service.sm', session_factory):
-        yield mock_session
+    patch('app.modules.cabinet_bonus_manager.bonus_service.sm', session_factory).start()
+    return mock_session  # Возвращаем непосредственно mock_session
 
 
 @pytest.mark.asyncio

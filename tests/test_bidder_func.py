@@ -140,6 +140,16 @@ async def test_no_white_keywords(mock_adv_setting, mock_wb_api, mock_calculated_
     mock_data_manager = MagicMock()
     mock_data_manager.get_max_adv_bid = AsyncMock(return_value=1000)
     mock_data_manager.get_good_bad_phrases = AsyncMock(return_value=[])
+    mock_data_manager.get_best_keyword = MagicMock(return_value=None)
+
+    # Mock parser
+    mock_parser = MagicMock()
+    mock_parser.add_wb_positions = AsyncMock()
+
+    # Mock redis_manager
+    mock_redis = MagicMock()
+    mock_redis.get_keyword_position = AsyncMock()
+    mock_redis.set_last_adv_bid = AsyncMock()
 
     # Mock wb_db_manager
     mock_wb_db_manager = MagicMock()
@@ -147,12 +157,15 @@ async def test_no_white_keywords(mock_adv_setting, mock_wb_api, mock_calculated_
 
     with patch.multiple('app.modules.shop_runner.bidder.bidder_func',
                        data_manager=mock_data_manager,
+                       parser=mock_parser,
+                       redis_manager=mock_redis,
                        wb_db_manager=mock_wb_db_manager):
         # Execute
         await run_bidder_process_for_adv(mock_adv_setting, mock_wb_api, shop_id)
 
         # Verify
         mock_wb_api.update_cpm.assert_not_called()
+        mock_parser.add_wb_positions.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_position_above_max(mock_adv_setting, mock_wb_api, mock_calculated_keyword, mock_clickhouse, mock_redis_clients, mock_db_session):

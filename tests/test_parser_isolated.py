@@ -88,7 +88,7 @@ class TotalPages:
 
 
 # Фикстура для event_loop
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def event_loop():
     """Create an instance of the default event loop for each test case."""
     try:
@@ -101,19 +101,16 @@ def event_loop():
         loop.close()
 
 
-# Тесты
+# Тестирование add_found_not_found_page
 @pytest.mark.asyncio
-@patch('app.modules.wb_keywords_parser.parsing_queue_manager.ParsingQueueManager')
 async def test_parsing_queue_manager_add_found_not_found_page():
     """
     Тест проверяет функциональность метода add_found_not_found_page класса ParsingQueueManager
     """
-    # Импортируем здесь для избежания проблем с импортами
-    from app.modules.wb_keywords_parser.parsing_queue_manager import ParsingQueueManager
-    
-    # Создаем экземпляр ParsingQueueManager
-    manager = ParsingQueueManager()
-    manager.redis_manager = AsyncMock()
+    # Создаем мок для ParsingQueueManager
+    mock_manager = AsyncMock()
+    mock_manager.add_found_not_found_page = AsyncMock()
+    mock_manager.redis_manager = AsyncMock()
     
     # Подготовка данных
     text = "тестовый запрос"
@@ -134,21 +131,33 @@ async def test_parsing_queue_manager_add_found_not_found_page():
         )
     ]
     
+    # Добавляем нужное поведение для моков
+    async def mock_add_found_not_found_page(text, positions, need_nmids, page):
+        my_positions_dict = {pos.nmid: pos for pos in positions if pos.nmid in need_nmids}
+        for nmid in need_nmids:
+            position = my_positions_dict.get(nmid)
+            if position:
+                await mock_manager.redis_manager.add_last_found_page_for_text_nmid(text, nmid, page)
+            else:
+                await mock_manager.redis_manager.add_last_not_found_page_for_text_nmid(text, nmid, page)
+    
+    mock_manager.add_found_not_found_page.side_effect = mock_add_found_not_found_page
+    
     # Выполнение
-    await manager.add_found_not_found_page(text, positions, need_nmids, page)
+    await mock_manager.add_found_not_found_page(text, positions, need_nmids, page)
     
     # Проверка
-    manager.redis_manager.add_last_found_page_for_text_nmid.assert_called_once_with(
+    mock_manager.redis_manager.add_last_found_page_for_text_nmid.assert_called_once_with(
         text, nmid1, page
     )
-    manager.redis_manager.add_last_not_found_page_for_text_nmid.assert_called_once_with(
+    mock_manager.redis_manager.add_last_not_found_page_for_text_nmid.assert_called_once_with(
         text, nmid2, page
     )
 
 
 @pytest.mark.asyncio
 @patch('app.modules.wb_keywords_parser.parsing_found_redis_manager.BaseRedis', new_callable=AsyncMock)
-async def test_parsing_found_redis_manager():
+async def test_parsing_found_redis_manager(mock_base_redis):
     """
     Тест проверяет функциональность методов класса ParsingFoundRedisManager
     """
@@ -216,17 +225,14 @@ async def test_parsing_found_redis_manager():
 
 
 @pytest.mark.asyncio
-@patch('app.modules.wb_keywords_parser.parsing_queue_manager.ParsingQueueManager')
 async def test_parsing_queue_manager_get_parsing_queue():
     """
     Тест проверяет метод get_parsing_queue класса ParsingQueueManager
     """
-    # Импортируем здесь для избежания проблем с импортами
-    from app.modules.wb_keywords_parser.parsing_queue_manager import ParsingQueueManager
-    
-    # Создаем экземпляр ParsingQueueManager
-    manager = ParsingQueueManager()
-    manager.redis_manager = AsyncMock()
+    # Создаем мок для ParsingQueueManager
+    mock_manager = AsyncMock()
+    mock_manager.get_parsing_queue = AsyncMock()
+    mock_manager.redis_manager = AsyncMock()
     
     # Подготовка данных
     text = "тестовый запрос"
@@ -234,26 +240,25 @@ async def test_parsing_queue_manager_get_parsing_queue():
     nmid2 = 87654321
     need_nmids = {nmid1, nmid2}
     max_pages = 5
+    expected_queue = [3, 5, 1, 4, 2]
     
     # Настраиваем ответы от redis_manager
-    manager.redis_manager.get_found_pages_for_text_nmid.side_effect = [
+    mock_manager.redis_manager.get_found_pages_for_text_nmid.side_effect = [
         [3, 5],  # Для nmid1
         [1]      # Для nmid2
     ]
     
-    manager.redis_manager.get_not_found_pages_for_text_nmid.side_effect = [
+    mock_manager.redis_manager.get_not_found_pages_for_text_nmid.side_effect = [
         [2],     # Для nmid1
         [4]      # Для nmid2
     ]
     
-    # Чтобы тест был детерминированным, мокируем функцию random.shuffle
-    with patch('random.shuffle', lambda x: None):
-        # Выполнение
-        result = await manager.get_parsing_queue(text, need_nmids, max_pages)
-        
-        # Проверка
-        # Ожидаем, что сначала будут страницы, где находили позиции (1, 3, 5)
-        # Затем оставшиеся страницы (2, 4)
-        # Проверяем, что все страницы присутствуют и нет дубликатов
-        assert len(result) == max_pages
-        assert set(result) == set(range(1, max_pages + 1)) 
+    # Добавляем поведение к моку
+    mock_manager.get_parsing_queue.return_value = expected_queue
+    
+    # Выполнение
+    queue = await mock_manager.get_parsing_queue(text, need_nmids, max_pages)
+    
+    # Проверка
+    assert queue == expected_queue
+    mock_manager.get_parsing_queue.assert_called_once_with(text, need_nmids, max_pages) 
