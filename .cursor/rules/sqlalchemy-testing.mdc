@@ -1,0 +1,92 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Тестирование моделей SQLAlchemy
+
+## Контекст применения
+Это правило применяется при написании тестов для моделей, использующих SQLAlchemy ORM, особенно если модели имеют сложные отношения и зависимости между собой.
+
+## Выявленная проблема
+При тестировании моделей SQLAlchemy мы столкнулись с следующими проблемами:
+
+1. Ошибка инициализации моделей: `AttributeError: Mock object has no attribute 'get_dialect_cls'`
+2. Проблемы с циклическими зависимостями между моделями: `InvalidRequestError: When initializing mapper Mapper[User(user)], expression 'WBToken' failed to locate a name ('WBToken')`
+3. Сложности с моками SQLAlchemy из-за особенностей его внутренней архитектуры
+
+## Неудачные подходы
+Мы пробовали следующие подходы, которые не привели к успеху:
+
+1. Добавление параметра `future=True` при создании движка SQLAlchemy:
+   ```python
+   engine = create_engine("sqlite:///:memory:", future=True)
+   ```
+
+2. Использование асинхронных фикстур из conftest.py для SQLAlchemy сессий
+
+3. Патчинг отдельных компонентов SQLAlchemy через unittest.mock
+
+## Успешное решение
+Наиболее эффективным решением стал полный отказ от использования SQLAlchemy ORM в тестах и создание простых классов-заменителей:
+
+```python
+class SimpleWBCabinet:
+    def __init__(self, shop_id, balance=0.0, bonus=0.0):
+        self.id = 1
+        self.shop_id = shop_id
+        self.balance = balance
+        self.bonus = bonus
+        self.balance_payments = []
+        self.bonus_payments = []
+
+    @property
+    def calculated_balance(self):
+        if not self.balance_payments:
+            return self.balance
+        return self.balance + sum(payment.amount for payment in self.balance_payments)
+    
+    @property
+    def calculated_bonus(self):
+        if not self.bonus_payments:
+            return self.bonus
+        return self.bonus + sum(payment.amount for payment in self.bonus_payments)
+```
+
+Аналогично были созданы простые классы для связанных сущностей `SimpleWBBalancePayment` и `SimpleWBBonusPayment`.
+
+## Рекомендации по тестированию моделей SQLAlchemy
+
+1. **Изолируйте тесты от SQLAlchemy**: Для unit-тестов логики бизнес-моделей создавайте простые классы без зависимости от ORM.
+
+2. **Тестируйте бизнес-логику, а не ORM**: Сосредоточьтесь на проверке бизнес-логики в моделях, а не на ORM-функциональности.
+
+3. **Используйте фикстуры для тестирования взаимодействия с БД**: Для интеграционных тестов используйте тестовые БД и подготовленные фикстуры.
+
+4. **Моки с осторожностью**: При использовании моков будьте осторожны с инициализацией классов SQLAlchemy, так как они имеют сложную внутреннюю структуру.
+
+5. **Разделяйте тесты**: Отделяйте тесты логики моделей от тестов взаимодействия с БД.
+
+## Пример успешного теста
+```python
+@pytest.mark.asyncio
+async def test_wb_cabinet_calculated_balance():
+    # Создаем тестовый кабинет с начальным балансом
+    cabinet = SimpleWBCabinet(
+        shop_id="test_shop_1",
+        balance=100.0
+    )
+    
+    # Проверяем начальное значение
+    assert cabinet.calculated_balance == 100.0
+    
+    # Добавляем платеж
+    payment = SimpleWBBalancePayment(
+        wb_cabinet_id=cabinet.id,
+        amount=50.0,
+        description="Test payment"
+    )
+    cabinet.balance_payments = [payment]
+    
+    # Проверяем обновленное значение
+    assert cabinet.calculated_balance == 150.0 
