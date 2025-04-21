@@ -26,20 +26,23 @@ class CommonAdvsStatData:
     auction_cpm: Optional[int]
     total_spend: float
     addition_spend_in_adv: float
-    all_orders_for_last_3_days: Optional[int]
+    all_orders: Optional[int]
     mean_orders_for_3_days: Optional[float]
     mean_price_for_order: Optional[float]
     spend_for_inner_adv_for_3_days: Optional[float]
-    full_adv_stat_for_last_3_days_for_auto_adv: SmallFullAdvStat
-    full_adv_stat_for_last_3_days_for_auction: SmallFullAdvStat
-    common_stat: Optional[CommonCardStat]
+    full_adv_stat_for_auto_adv: SmallFullAdvStat
+    full_adv_stat_for_auction: SmallFullAdvStat
+    common_stat: Optional[FullAdvStat]
 
 
 class CommonAdvsStatDataManager:
     """Менеджер для получения данных о ключевых словах рекламной кампании"""
 
     @classmethod
-    async def get_data(cls, adv_setting: AdvSetting, keywords: List[CalculatedKeyword]) -> CommonAdvsStatData:
+    async def get_data(cls,
+                       adv_setting: AdvSetting,
+                       keywords: List[CalculatedKeyword],
+                       last_days_period: int) -> CommonAdvsStatData:
         """Получает все необходимые данные для отображения информации о ключевых словах"""
 
         # Получаем min_ctr
@@ -51,22 +54,21 @@ class CommonAdvsStatDataManager:
             stmt = select(AdvSetting.cpm).where(AdvSetting.adv_id == search_adv_id)
             async with _sm() as session:
                 result = await session.execute(stmt)
-                auction_cpm = result.scalar_one_or_none()
+                auction_cpm = result.scalar_one()
 
-        # Получаем статистику за последние 3 дня
-        pass_days = 2
+        pass_days = last_days_period - 1
         end_date = datetime.now()
         start_date = end_date - timedelta(days=pass_days)
 
         # Статистика для авто-рекламы
-        full_adv_stat_for_last_3_days_for_auto_adv = await full_wb_adv_stat.get_stats_by_last_days(
+        full_adv_stat_for_auto_adv = await full_wb_adv_stat.get_stats_by_last_days(
             [adv_setting.adv_id],
             start_date,
             end_date
         )
 
         # Статистика для аукциона
-        full_adv_stat_for_last_3_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
+        full_adv_stat_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
             [adv_setting.search_adv_id],
             start_date,
             end_date
@@ -74,8 +76,8 @@ class CommonAdvsStatDataManager:
 
         # Общий расход
         full_spend_for_all_advs = (
-                full_adv_stat_for_last_3_days_for_auto_adv.spend +
-                full_adv_stat_for_last_3_days_for_auction.spend
+            full_adv_stat_for_auto_adv.spend +
+            full_adv_stat_for_auction.spend
         )
 
         # Общая статистика
@@ -107,7 +109,7 @@ class CommonAdvsStatDataManager:
             'advkeyword_new'
         )
 
-        addition_spend_in_adv = full_adv_stat_for_last_3_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
+        addition_spend_in_adv = full_adv_stat_for_auto_adv.spend - spend_for_keywords_in_auto_adv
 
         return CommonAdvsStatData(
             adv_setting=adv_setting,
@@ -117,11 +119,11 @@ class CommonAdvsStatDataManager:
             auction_cpm=auction_cpm,
             total_spend=full_spend_for_all_advs,
             addition_spend_in_adv=addition_spend_in_adv,
-            all_orders_for_last_3_days=all_orders_for_last_3_days,
+            all_orders=all_orders_for_last_3_days,
             mean_orders_for_3_days=mean_orders_for_3_days,
             mean_price_for_order=mean_price_for_order,
             spend_for_inner_adv_for_3_days=spend_for_inner_adv_for_3_days,
-            full_adv_stat_for_last_3_days_for_auto_adv=full_adv_stat_for_last_3_days_for_auto_adv,
-            full_adv_stat_for_last_3_days_for_auction=full_adv_stat_for_last_3_days_for_auction,
+            full_adv_stat_for_auto_adv=full_adv_stat_for_auto_adv,
+            full_adv_stat_for_auction=full_adv_stat_for_auction,
             common_stat=common_stat
         )

@@ -15,7 +15,7 @@ from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
-from app.modules.common_advs_stat import CommonAdvsStatDataManager
+from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
 from app.modules.wb_update_state_manager import KeywordStatUpdateState, AdvActiveKeywordUpdateStateManager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
@@ -472,23 +472,26 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._keywords = clear_keywords
         
         # Получаем данные через CommonAdvsStatDataManager
-        stat_data = await CommonAdvsStatDataManager.get_data(self._adv_setting, self._keywords)
-        
-        # Устанавливаем полученные данные
-        self.min_ctr = stat_data.min_ctr
-        self.auto_cpm = stat_data.auto_cpm
-        self.auction_cpm = stat_data.auction_cpm
-        self.total_spend = stat_data.total_spend
-        self.addition_spend_in_adv = stat_data.addition_spend_in_adv
-        self._all_orders_for_last_3_days = stat_data.all_orders_for_last_3_days
-        self._mean_orders_for_3_days = stat_data.mean_orders_for_3_days
-        self._mean_price_for_order = stat_data.mean_price_for_order
-        self._spend_for_inner_adv_for_3_days = stat_data.spend_for_inner_adv_for_3_days
-        self.full_adv_stat_for_last_3_days_for_auto_adv = stat_data.full_adv_stat_for_last_3_days_for_auto_adv
-        self.full_adv_stat_for_last_3_days_for_auction = stat_data.full_adv_stat_for_last_3_days_for_auction
-        self.common_stat = stat_data.common_stat
-        if self._all_orders_for_last_3_days is not None:
-            self._sum_spend = self._spend_for_inner_adv_for_3_days
+        stat_data_for_3_days: CommonAdvsStatData = await CommonAdvsStatDataManager.get_data(self._adv_setting,
+                                                                                            self._keywords,
+                                                                                            3)
+        self.stat_data_for_3_days = stat_data_for_3_days
+
+        # # Устанавливаем полученные данные
+        # self.min_ctr = stat_data.min_ctr
+        # self.auto_cpm = stat_data.auto_cpm
+        # self.auction_cpm = stat_data.auction_cpm
+        # self.total_spend = stat_data.total_spend
+        # self.addition_spend_in_adv = stat_data.addition_spend_in_adv
+        # self._all_orders_for_last_3_days = stat_data.all_orders_for_last_3_days
+        # self._mean_orders_for_3_days = stat_data.mean_orders_for_3_days
+        # self._mean_price_for_order = stat_data.mean_price_for_order
+        # self._spend_for_inner_adv_for_3_days = stat_data.spend_for_inner_adv_for_3_days
+        # self.full_adv_stat_for_last_3_days_for_auto_adv = stat_data.full_adv_stat_for_last_3_days_for_auto_adv
+        # self.full_adv_stat_for_last_3_days_for_auction = stat_data.full_adv_stat_for_last_3_days_for_auction
+        # self.common_stat = stat_data.common_stat
+        if self.stat_data_for_3_days.all_orders is not None:
+            self._sum_spend = self.stat_data_for_3_days.spend_for_inner_adv_for_3_days
         if self.image_mode == 'graphic':
             graphic = await self._graphic_injection()
             if not graphic:
@@ -535,10 +538,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             if self._all_orders_for_last_3_days else self._spend_for_inner_adv_for_3_days
 
         text += (
-            f'\nВ среднем в день (срез за 3 дня):\n'
-            f'Заказов: {self._mean_orders_for_3_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
-            f'Себестоимость: {round(order_cost, 2)} р.'
-            f' (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
+            f'\nВ среднем в день: сегодня (среднее за 3 дня):\n'
+            f'Заказов: {self._mean_orders_for_1_days} ({self._mean_orders_for_3_days:.2f}) (цель: {plan_for_sales_for_day_str})\n'
+            f'Себестоимость: {round(order_cost, 2)} р. (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
         )
 
         text += f'\nСтавка из Авто: {self.auto_cpm} р. '

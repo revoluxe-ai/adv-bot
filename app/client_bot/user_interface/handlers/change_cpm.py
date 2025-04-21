@@ -48,6 +48,8 @@ async def change_cpm(message: aiogram.types.Message,
             return
 
         await state.set_state(None)
+        
+        # Получаем данные из БД
         async with sm() as session:
             stmt = select(AdvSetting)\
                 .join(AdvSetting.wb_cabinet)\
@@ -56,14 +58,16 @@ async def change_cpm(message: aiogram.types.Message,
             adv_setting: AdvSetting = (await session.execute(stmt)).scalar()
             shop_id = adv_setting.wb_cabinet.shop_id
             access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
-            wb_api = WBApi(access)
-            try:
-                await wb_api.advert.update_cpm(adv_setting.adv_id, cpm)
-            except Exception as e:
-                await message.answer(f'Ошибка при обновлении ставки на стороне WB (error: {e})')
-                return
-
+            
+        # Работа с API вне контекста сессии
+        wb_api = WBApi(access)
+        try:
+            await wb_api.advert.update_cpm(adv_setting.adv_id, cpm)
             await message.answer('CPM Авто на {}'.format(cpm))
+            
             if adv_id := adv_setting.search_adv_id:
                 await wb_api.advert.update_cpm(adv_id, cpm)
                 await message.answer('CPM Поиск на {}'.format(cpm))
+        except Exception as e:
+            await message.answer(f'Ошибка при обновлении ставки на стороне WB (error: {e})')
+            return

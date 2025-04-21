@@ -218,10 +218,23 @@ async def test_get_data(create_test_full_adv_stat, create_test_adv_setting):
         
         # Вызываем тестируемый метод
         result = await CommonAdvsStatDataManager.get_data(adv_setting, keywords)
+        # Проверяем, что все моки были вызваны
+        mock_get_min_ctr.assert_called_once()
+        mock_get_keywords_spend.assert_called()
+        mock_get_stats_by_last_days.assert_called()
+        mock_get_stats_for_last_period.assert_called_once()
+        mock_session.execute.assert_called_once()
         
-        # Проверка результата
-        assert result is not None
-        # Поскольку мы используем моки, то у нас должны быть только базовые проверки
-        assert isinstance(result, CommonAdvsStatData)
-        # Остальные проверки могут меняться в зависимости от логики метода, так что делаем только базовые проверки
+        # Проверяем результаты
+        assert result.min_ctr == 0.5
+        assert result.auction_cpm == 200.0
+        assert result.total_spend == 200.0  # 100.0 (auto) + 100.0 (auction)
+        assert result.addition_spend_in_adv == 0.0  # 100.0 - 100.0
+        assert result.all_orders == 20
+        assert result.mean_orders_for_3_days is not None
+        assert result.mean_price_for_order is not None
+        assert result.spend_for_inner_adv_for_3_days == 200.0
+        assert isinstance(result.full_adv_stat_for_auto_adv, FullAdvStat)
+        assert isinstance(result.full_adv_stat_for_auction, FullAdvStat)
+        assert isinstance(result.common_stat, FullAdvStat)
 
