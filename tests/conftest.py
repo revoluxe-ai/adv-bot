@@ -29,10 +29,6 @@ sys.modules['sqlalchemy.dialects.sqlite.json'] = MagicMock(
     _FormatTypeMixin=MockJSONMixin
 )
 
-# Создаем мок для sqlite диалекта, но не полностью заменяем модуль
-sys.modules['sqlalchemy.dialects.sqlite.base'] = MagicMock()
-sys.modules['sqlalchemy.dialects.sqlite.aiosqlite'] = MagicMock()
-
 # Создадим мок для sklearn и зависимых модулей
 class MockModules:
     pass
@@ -114,7 +110,7 @@ sys.modules['app.modules.wb_adv_updater.ML'] = type('MockML', (), {
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from tests.mocks import MockBase, MockItemFeature, MockKeywordFeature, MockWBCabinet, MockUser, MockWBUserCabinet, MockWBToken, MockAdvSetting, MockAdvPayment, MockWBBalancePayment, MockWBBonusPayment
+from tests.mocks import MockBase, MockItemFeature, MockKeywordFeature, MockWBCabinet, MockUser, MockWBUserCabinet, MockWBToken, MockAdvSetting, MockAdvPayment
 import app.modules.wb_adv_updater.models as models
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
@@ -166,6 +162,11 @@ messages.AdvSetting = MockAdvSetting
 # Заменяем модели в модуле wb_adv_updater
 from app.modules.wb_adv_updater import models as adv_models
 adv_models.AdvPayment = MockAdvPayment
+
+# Мокируем зависимости для SQLite
+sys.modules['sqlalchemy.dialects.sqlite'] = MagicMock()
+sys.modules['sqlalchemy.dialects.sqlite.base'] = MagicMock()
+sys.modules['sqlalchemy.dialects.sqlite.aiosqlite'] = MagicMock()
 
 @pytest.fixture
 def mock_wb_cabinet():
@@ -238,7 +239,6 @@ class MockAsyncSession:
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
         self.close = AsyncMock()
-        self.added_objects = []
         
     async def __aenter__(self):
         return self
@@ -247,117 +247,73 @@ class MockAsyncSession:
         pass
         
     def add(self, obj):
-        self.added_objects.append(obj)
-
-    async def commit(self):
-        # При коммите устанавливаем id для всех добавленных объектов
-        for obj in self.added_objects:
-            if hasattr(obj, 'id') and obj.id is None:
-                obj.id = 1
-
-    async def delete(self, obj):
-        if not hasattr(self, '_deleted_ids'):
-            self._deleted_ids = set()
-        self._deleted_ids.add(obj.id)
+        pass
         
     async def get(self, model, id):
-        # Для тестов "delete" возвращаем None, чтобы имитировать удаление
-        if getattr(self, '_deleted_ids', None) and id in self._deleted_ids:
-            return None
-            
-        # Для обычных случаев создаем мок объект
-        if model == MockAdvSetting:
-            mock_obj = MagicMock()
-            mock_obj.id = id
-            mock_obj.name = f"Mock AdvSetting {id}"
-            mock_obj.description = f"Mock Description {id}"
-            mock_obj.is_active = True
-            mock_obj.wb_cabinet_id = 1
-            return mock_obj
-        elif model == MockWBBalancePayment:
-            # Для тестирования MockWBBalancePayment
-            mock_obj = MagicMock()
-            mock_obj.id = id
-            mock_obj.amount = 1000.0  # Фиксированное значение для тестов
-            mock_obj.description = "Test payment"
-            return mock_obj
-        elif model == MockWBBonusPayment:
-            # Для тестирования MockWBBonusPayment
-            mock_obj = MagicMock()
-            mock_obj.id = id
-            mock_obj.amount = 1000.0  # Фиксированное значение для тестов
-            mock_obj.description = "Test bonus payment"
-            return mock_obj
-        elif model == MockWBCabinet:
-            # Для тестирования WBCabinet
-            mock_obj = MagicMock()
-            mock_obj.id = id
-            mock_obj.balance = 1000.0
-            mock_obj.bonus = 1000.0
-            return mock_obj
-        else:
-            # Для других моделей
-            mock_obj = MagicMock()
-            mock_obj.id = id
-            return mock_obj
+        return None
 
 @pytest_asyncio.fixture
 async def test_async_db():
-    engine = MockAsyncEngine()
-    
-    @asynccontextmanager
-    async def mock_db_session():
-        session = MockAsyncSession()
-        try:
-            yield session
-        finally:
-            await session.close()
-    
-    # Возвращаем фабрику сессий, которая может быть вызвана с async with
-    return mock_db_session
+    """Фикстура для создания тестовой базы данных"""
+    # Создаем мок для базы данных вместо реальной
+    session = MockAsyncSession()
+    yield session
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def event_loop():
-    # Создаем новый event loop для каждого теста
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    """Create an instance of the default event loop for each test case."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     yield loop
-    # Закрываем цикл только если он не закрыт
     if not loop.is_closed():
-        # Завершаем все отложенные колбэки
-        pending = asyncio.all_tasks(loop)
-        if pending:
-            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
         loop.close()
 
 @pytest.fixture(autouse=True)
-def patch_get_async_session_maker(monkeypatch):
+def patch_get_async_session_maker(monkeypatch, test_async_db):
+    """Патчим get_async_session_maker, чтобы он использовал тестовую БД"""
     async def mock_get_async_session_maker(*args, **kwargs):
-        return async_sessionmaker(class_=MockAsyncSession)
+        return test_async_db
     
     monkeypatch.setattr("app.utils.db.session_maker.get_async_session_maker", mock_get_async_session_maker)
-    monkeypatch.setattr("app.client_bot.user_interface.views.messages.sm", mock_get_async_session_maker)
+    monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker)
 
 @pytest.fixture
 def mock_session():
-    session = AsyncMock()
-    session.execute = AsyncMock(return_value=MagicMock(
-        scalars=MagicMock(return_value=MagicMock(
-            all=MagicMock(return_value=[]),
-            first=MagicMock(return_value=None)
-        )),
-        fetchall=MagicMock(return_value=[]),
-        fetchone=MagicMock(return_value=None)
-    ))
+    """Создает мок для сессии SQLAlchemy"""
+    session = MagicMock()
+    session.execute = AsyncMock()
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
     session.close = AsyncMock()
-    session.__aenter__ = AsyncMock(return_value=session)
-    session.__aexit__ = AsyncMock()
-    return session
+    session.get = AsyncMock()
+    session.add = MagicMock()
+    return session 
 
 @pytest.fixture(autouse=True)
 def mock_wb_parser():
-    # Фиктивная фикстура, нам не нужно фактически ничего мокировать
-    # Так как мы модифицировали тесты для работы без моков
-    yield
+    """Мок для парсера WB API"""
+    mock_response = {
+        'data': {
+            'products': [
+                {
+                    'id': 12345,
+                    'log': {
+                        'advertId': 'test_adv_id',
+                        'cpm': 100,
+                        'position': 1,
+                        'promoPosition': 1,
+                        'tp': 'c'
+                    }
+                }
+            ],
+            'total': 100
+        }
+    }
+    
+    with patch('app.modules.wb_keywords_parser.parser.ParserService._ParserService__parse_keywords_from_wb', 
+              new_callable=AsyncMock, 
+              return_value=(mock_response['data']['products'], 'test_cluster', 'test_preset', mock_response['data']['total'])):
+        yield

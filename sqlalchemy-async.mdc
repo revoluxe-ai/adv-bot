@@ -1,0 +1,126 @@
+---
+description: Правила и лучшие практики работы с асинхронным SQLAlchemy в проекте
+globs: ["**/models/*.py", "**/repositories/*.py", "**/services/*.py"]
+alwaysApply: false
+tags: ["sqlalchemy", "async", "database", "orm"]
+---
+
+# Правила работы с асинхронным SQLAlchemy
+
+## Контекст применения
+Данное правило применяется при работе с базой данных через SQLAlchemy в асинхронном режиме. Оно обеспечивает правильное использование ORM и предотвращает типичные ошибки при работе с асинхронными запросами.
+
+## Основные принципы
+1. Используем асинхронную сессию через контекстный менеджер
+2. Все запросы выполняются через `await`
+3. При загрузке связанных данных используем `selectinload()` или `joinedload()`
+4. Для больших наборов данных используем `yield_per()`
+
+## Работа с сессиями
+
+### Правильное использование сессий
+```python
+# Правильно - использование контекстного менеджера
+async with sm() as session:
+    query = select(User).where(User.id == user_id)
+    result = await session.execute(query)
+    user = result.scalar_one_or_none()
+
+# Неправильно - сессия не закрывается автоматически
+session = sm()
+query = select(User)
+result = await session.execute(query)
+```
+
+## Работа с гибридными свойствами
+
+### Особенности и ограничения
+1. Гибридные свойства (`calculated_balance`, `calculated_bonus`) нельзя использовать напрямую в SQL запросах
+2. Для фильтрации по гибридным свойствам нужно:
+   - Загрузить все необходимые связанные данные через `selectinload()`
+   - Выполнить фильтрацию после получения данных из БД
+   - Использовать Python-side фильтрацию
+
+### Примеры правильного использования
+```python
+# Правильно - загрузка связанных данных
+async with sm() as session:
+    query = select(WBCabinet).options(
+        selectinload(WBCabinet.balance_payments),
+        selectinload(WBCabinet.bonus_payments)
+    )
+    result = await session.execute(query)
+    cabinets = result.scalars().all()
+    # Фильтрация по гибридным свойствам после загрузки
+    filtered_cabinets = [cab for cab in cabinets 
+                        if cab.calculated_balance > 0 
+                        or cab.calculated_bonus > 0]
+
+# Правильно - обработка больших наборов данных
+async with sm() as session:
+    query = select(WBToken)
+    result = await session.stream(query)
+    async for token in result.yield_per(100):
+        # Обработка токена
+        pass
+```
+
+### Антипаттерны
+```python
+# Неправильно - использование гибридных свойств в where
+query = select(WBCabinet).where(WBCabinet.calculated_balance > 0)  # Не будет работать!
+
+# Неправильно - загрузка всех связанных данных без фильтрации
+query = select(WBCabinet).options(selectinload("*"))  # Избыточная загрузка
+```
+
+## Обработка ошибок
+
+### Основные принципы
+1. Всегда используем `try/except` для обработки ошибок БД
+2. При ошибках транзакций делаем `rollback`
+3. Логируем ошибки через `logger`
+
+### Пример правильной обработки ошибок
+```python
+async with sm() as session:
+    try:
+        await session.begin()
+        # ... операции с БД ...
+        await session.commit()
+    except SQLAlchemyError as e:
+        await session.rollback()
+        logger.error(f"Ошибка БД: {e}")
+        raise DatabaseError(f"Ошибка при работе с БД: {str(e)}")
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Неожиданная ошибка: {e}")
+        raise
+```
+
+## Оптимизация производительности
+
+### Рекомендации
+1. Используйте `yield_per()` для больших наборов данных
+2. Применяйте `selectinload()` вместо `joinedload()` для больших связанных коллекций
+3. Избегайте N+1 запросов через правильную загрузку связанных данных
+4. Используйте `scalar()` вместо `first()` когда ожидается один результат
+
+### Пример оптимизации
+```python
+# Правильно - оптимизированная загрузка
+async with sm() as session:
+    query = (
+        select(User)
+        .options(selectinload(User.posts))
+        .options(selectinload(User.comments))
+        .where(User.is_active == True)
+    )
+    users = await session.scalars(query)
+
+# Неправильно - N+1 запросы
+async with sm() as session:
+    users = await session.scalars(select(User))
+    for user in users:
+        posts = await session.scalars(select(Post).where(Post.user_id == user.id))
+``` 

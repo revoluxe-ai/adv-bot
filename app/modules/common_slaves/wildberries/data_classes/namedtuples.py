@@ -1,4 +1,4 @@
-from typing import NamedTuple, Union
+from typing import NamedTuple
 
 
 class KeywordStatForNeo(NamedTuple):

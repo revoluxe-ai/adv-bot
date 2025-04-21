@@ -312,12 +312,12 @@ async def set_predict_ctrs(adv_id, keywords: list[CalculatedKeyword]) -> list[Ca
 
 async def set_block_position_status(keywordsetting_original_id: int,
                                     block_position_status: str,
-                                    new_time: datetime) -> None:
+                                    new_time: datetime.datetime) -> None:
     key = 'block_position_status:' + str(keywordsetting_original_id)
     value = block_position_status + ':' + str(new_time.timestamp())
     await redis_master_client.set(key, value)
 
-async def get_block_position_status(keywordsetting_original_id: int) -> tuple[str, datetime] | None:
+async def get_block_position_status(keywordsetting_original_id: int) -> tuple[str, datetime.datetime] | None:
     key = 'block_position_status:' + str(keywordsetting_original_id)
     value = await redis_replica_client.get(key)
     if value is None:

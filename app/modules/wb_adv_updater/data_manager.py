@@ -18,7 +18,8 @@ from app.exc import CardNotFoundInDB, PositionNotFoundError, NotFoundPositionWit
 import pandas as pd
 from PIL import Image
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
-from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only, Session
+from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import RedisCalculatedKeywordsCacheManager
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
@@ -476,225 +477,6 @@ async def __get_cpm_from_positions(nmid: int, texts) -> Optional[int]:
     cpm = last_position.cpm
     return cpm
 
-#
-# async def get_good_bad_phrases_for_target_ctr(adv_setting: AdvSetting,
-#                                               max_cpc: Optional[float] = None,
-#                                               pass_time=timedelta(days=7)) -> list[CalculatedKeyword]:
-#     min_ctr = await get_min_ctr(adv_setting)
-#     max_position = adv_setting.max_place
-#     logger.debug('Минимальный ctr получен')
-#     keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time)
-#     async with _sm() as session:
-#         logger.debug('Начинаю получать фразы')
-#         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
-#         result = await session.execute(stmt)
-#         keyword_settings: Sequence[KeywordSetting] = result.unique().scalars().all()
-#     texts_to_keyword_setting = {kws.text: kws for kws in keyword_settings}
-#     if adv_setting.clusters_mode:
-#         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
-#     keyword_stats = await set_positions(keyword_stats, adv_setting)
-#     async with _sm(read_only=False) as session:
-#         for keyword_stat in keyword_stats:
-#             cluster_name = keyword_stat.text
-#             if not (keyword_setting := texts_to_keyword_setting.get(cluster_name)):
-#                 clusters = keyword_stat.childs_keywords
-#                 stat_hard_statuses = defaultdict(int)
-#                 for kw in clusters:
-#                     original_text = kw.text
-#                     if not (keyword_setting := texts_to_keyword_setting.get(original_text)):
-#                         continue
-#                     hard_status = keyword_setting.hard_status
-#                     stat_hard_statuses[hard_status] += 1
-#                 result_hard_status = max(stat_hard_statuses.items(), key=lambda x: x[1])[0]
-#                 keyword_setting = KeywordSetting()
-#                 keyword_setting.text = cluster_name
-#                 keyword_setting.adv_setting = adv_setting
-#                 keyword_setting.hard_status = result_hard_status
-#                 session.add(adv_setting)
-#                 session.add(keyword_setting)
-#                 await session.commit()
-#             keyword_stat.keyword_setting = keyword_setting
-#
-#     texts_in_keyword_stat = {kw.text for kw in keyword_stats}
-#     text_to_keyword_setting: dict[str, KeywordSetting] = {str(kw.text): kw for kw in keyword_settings}
-#
-#     for keyword_setting in keyword_settings:
-#         text = keyword_setting.text
-#         if text not in texts_in_keyword_stat and keyword_setting.hard_status == 2:
-#             keyword_setting = text_to_keyword_setting[text]
-#
-#             keyword = CalculatedKeyword(text=text,
-#                                         clicks=0,
-#                                         views=0,
-#                                         spend=0,
-#                                         keyword_setting=keyword_setting)
-#             position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
-#             if position:
-#                 keyword.real_position = position.real_position
-#                 keyword.base_position = position.base_position
-#                 keyword.promo_position = position.promo_position
-#                 keyword.position_update = position.timestamp
-#                 keyword.cpm = position.cpm
-#             keyword.query = keywords_query.get_queries_of_keyword(text)
-#             keyword_stats.append(keyword)
-#
-#     keyword_text_to_keyword_setting = {keyword_setting.text: keyword_setting for keyword_setting in keyword_settings}
-#     sum_views = 0
-#     sum_clicks = 0
-#     try:
-#         cpm_now = await get_cpm(adv_setting, keyword_stats)
-#     except Exception as e:
-#         logger.error(f'Ошибка при получении cpm {e}')
-#         cpm_now = None
-#     for keyword_stat in keyword_stats:
-#         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
-#         keyword_setting = keyword_text_to_keyword_setting[keyword_stat.text]
-#         keyword_stat.keyword_setting = keyword_setting
-#         predict_ctr = await redis_manager.get_predict_ctr(adv_setting.adv_id, keyword_stat.text)
-#         if not predict_ctr:
-#             predict_ctr = keyword_setting.predict_ctr
-#         keyword_stat.predict_ctr = predict_ctr
-#         original_predict_ctr = keyword_stat.predict_ctr
-#         predict_ctr = original_predict_ctr
-#         keyword_stat.hard_status = keyword_setting.hard_status
-#         if min_ctr == 0:
-#             enough_views = 100
-#         else:
-#             enough_views = int(1 / min_ctr)
-#         views = keyword_stat.views
-#         clicks = keyword_stat.clicks
-#         if clicks == 0:
-#             clicks += 1
-#             views += enough_views
-#         added_clicks = keyword_setting.added_clicks
-#         if added_clicks:
-#             clicks += added_clicks
-#         real_baes_ctr = clicks / views
-#         keyword_stat.baes_ctr = real_baes_ctr
-#         if not original_predict_ctr:
-#             predict_ctr = real_baes_ctr
-#             keyword_stat.predict_ctr = predict_ctr
-#         calculate_ctr = (real_baes_ctr + predict_ctr) / 2
-#         keyword_stat.predict_ctr = calculate_ctr
-#         if max_position:
-#             try:
-#                 position = await redis_manager.get_keyword_position(keyword_setting.text, adv_setting.nmids[0])
-#             except Exception as e:
-#                 position = None
-#                 logger.warning(f'Ошибка получения позиции {e} для {keyword_setting.text} adv_id: {adv_setting.adv_id}')
-#             if position:
-#                 organic_position = position.base_position
-#                 if 0 < organic_position <= max_position:
-#                     keyword_stat.status = KeywordStatus.BAD
-#                     keyword_stat.reason = 'max_position'
-#                     await redis_manager.set_auto_block_status(keyword_setting.id, False)
-#                     await asyncio.sleep(0)
-#                     continue
-#
-#         if max_cpc:
-#             if cpm_now:
-#                 cpc = (cpm_now / 1000) / keyword_stat.predict_ctr
-#             elif clicks > 0:
-#                 cpc = views/clicks
-#             else:
-#                 cpc = None
-#             if cpc and cpc > max_cpc:
-#                 keyword_stat.status = KeywordStatus.BAD
-#                 keyword_stat.reason = 'max_cpc'
-#                 await redis_manager.set_auto_block_status(keyword_setting.id, False)
-#                 await asyncio.sleep(0)
-#                 continue
-#
-#         if keyword_setting.hard_status == 3:
-#             keyword_stat.status = KeywordStatus.BAD
-#             keyword_stat.reason = 'turn_off'
-#             await redis_manager.set_auto_block_status(keyword_setting.id, False)
-#             await asyncio.sleep(0)
-#             continue
-#         if keyword_setting.hard_status == 2:
-#             keyword_stat.status = KeywordStatus.GOOD
-#             keyword_setting.auto_block = False
-#             await redis_manager.set_auto_block_status(keyword_setting.id, False)
-#             sum_views += keyword_stat.views
-#             sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
-#             await asyncio.sleep(0)
-#             continue
-#         elif keyword_setting.hard_status == 0:
-#             keyword_stat.status = KeywordStatus.BAD
-#             keyword_stat.reason = 'black_list'
-#             await redis_manager.set_auto_block_status(keyword_setting.id, False)
-#             await asyncio.sleep(0)
-#             continue
-#         if min_ctr == 0:
-#             keyword_stat.status = KeywordStatus.GOOD
-#             await redis_manager.set_auto_block_status(keyword_setting.id, False)
-#             sum_views += keyword_stat.views
-#             sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
-#             await asyncio.sleep(0)
-#             continue
-#         assert keyword_stat.predict_ctr
-#         await asyncio.sleep(0)
-#     keyword_stats = sorted(keyword_stats, key=lambda x: x.predict_ctr, reverse=True)
-#
-#     for keyword_stat in keyword_stats:
-#         if keyword_stat.status:
-#             continue
-#         if keyword_stat.predict_ctr >= min_ctr:
-#             keyword_stat.status = KeywordStatus.GOOD
-#             await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
-#             if keyword_stat.base_position != 0:
-#                 sum_views += keyword_stat.views
-#                 sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
-#         else:
-#             if adv_setting.target_ctr_mode_strategy == 'forward':
-#                 if sum_views != 0:
-#                     total_ctr = sum_clicks / sum_views
-#                 else:
-#                     total_ctr = None
-#                 if not total_ctr or total_ctr >= min_ctr:
-#                     keyword_stat.status = KeywordStatus.GOOD
-#                     await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
-#                     if keyword_stat.base_position != 0:
-#                         sum_views += keyword_stat.views
-#                         calculate_clicks = keyword_stat.views * keyword_stat.predict_ctr
-#                         calculate_clicks -= 1
-#                         if calculate_clicks < 0:
-#                             calculate_clicks = 0
-#                         sum_clicks += calculate_clicks
-#                 else:
-#                     keyword_stat.status = KeywordStatus.BAD
-#                     keyword_stat.reason = 'min_ctr'
-#                     await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, True)
-#             elif adv_setting.target_ctr_mode_strategy == 'keep':
-#                 if keyword_stat.base_position:
-#                     sum_views += keyword_stat.views
-#                     sum_clicks += keyword_stat.views * keyword_stat.predict_ctr
-#                 if sum_views != 0:
-#                     total_ctr = sum_clicks / sum_views
-#                 else:
-#                     total_ctr = None
-#                 if not total_ctr or total_ctr >= min_ctr:
-#                     keyword_stat.status = KeywordStatus.GOOD
-#                     await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, False)
-#                 else:
-#                     keyword_stat.status = KeywordStatus.BAD
-#                     keyword_stat.reason = 'min_ctr'
-#                     await redis_manager.set_auto_block_status(keyword_stat.keyword_setting.id, True)
-
-
-    # logger.debug('Проверяю статусы ключевых слов с assert')
-    #
-    # for keyword_stat in keyword_stats:
-    #     try:
-    #         assert keyword_stat.status
-    #         assert keyword_stat.status in ['good', 'bad']
-    #     except AssertionError:
-    #         raise AssertionError(f'Статус не установлен для ключевого слова {keyword_stat.text}')
-    #
-    # logger.debug('Слова по assert проверены')
-    # logger.debug('Возвращаю итоговую статистику')
-    # return keyword_stats
-
 
 async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullAdvStat]:
     """Получение Полной статистики из Redis по adv_id"""
@@ -736,19 +518,20 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullA
 
 
 async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
-    # max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
     max_cpc = None
     if not max_cpc:
         max_cpc = adv.max_cpc
     else:
         if max_cpc > adv.max_cpc:
             max_cpc = adv.max_cpc
-    # if adv.target_ctr_mode:
-    #     keywords =  await get_good_bad_phrases_for_target_ctr(adv,  max_cpc )
-    # else:
     keywords = await get_good_bad_phrases_for_min_ctr(adv,  max_cpc)
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
+    # Получаем ключевые слова
+    keywords = await get_good_bad_phrases_for_min_ctr(adv, max_cpc)
+    keywords_redis_cache_manager = RedisCalculatedKeywordsCacheManager()
+    await keywords_redis_cache_manager.set_calculated_keywords(keywords, adv.adv_id)
+    # Сортировка и возврат результатов
     keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
     keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
     keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
@@ -756,17 +539,24 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords = keywords_with_rating + keywords_without_rating
     return keywords
 
+async def get_cached_keyword(adv: AdvSetting, text: str) -> Optional[CalculatedKeyword]:
+    """Получить закешированное ключевое слово"""
+    cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}"
+    cached_data = await redis_manager.get(cache_key)
+    
+    if cached_data:
+        return CalculatedKeyword.model_validate_json(cached_data)
+    return None
+
 
 def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
                       min_ctr,
                       adv_setting: AdvSetting) -> list[CalculatedKeyword]:
     for keyword_stat in keyword_stats:
-        assert keyword_stat.keyword_setting
         keyword_stat.predict_ctr_exponent = adv_setting.exponent_predict_ctr
         original_predict_ctr = keyword_stat.original_predict_ctr
-        keyword_setting = keyword_stat.keyword_setting
         if not original_predict_ctr:
-            original_predict_ctr = keyword_setting.predict_ctr
+            original_predict_ctr = keyword_stat.predict_ctr
         logger.debug(f'Обрабатываю ключевое слово {keyword_stat.text}')
         if min_ctr == 0:
             enough_views = 100
@@ -782,7 +572,7 @@ def __set_predict_ctr(keyword_stats: list[CalculatedKeyword],
             views = 1
         original_baes_ctr = clicks / views
         keyword_stat.baes_ctr = original_baes_ctr
-        added_clicks = keyword_setting.added_clicks
+        added_clicks = keyword_stat.added_clicks
         if added_clicks:
             clicks += added_clicks
         if original_predict_ctr:
@@ -812,6 +602,9 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         keyword_settings: Sequence[KeywordSetting] = result.unique().scalars().all()
         logger.debug('Получил ключи')
     texts_to_keyword_setting = {kws.text: kws for kws in keyword_settings}
+    texts_in_keyword_stat = {kw.text for kw in keyword_stats}
+    text_to_keyword_setting = {kw.text: kw for kw in keyword_settings}
+
     if adv_setting.clusters_mode:
         logger.debug('Начинаю конвертацию в кластеры')
         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
@@ -841,11 +634,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 await session.flush(adv_setting)
                 session.add(keyword_setting)
                 await session.commit()
-            keyword_stat.keyword_setting = keyword_setting
-
-    texts_in_keyword_stat = {kw.text for kw in keyword_stats}
-    text_to_keyword_setting = {kw.text: kw for kw in keyword_settings}
-
+                text_to_keyword_setting[cluster_name] = keyword_setting
     for keyword_setting in keyword_settings:
         text = keyword_setting.text
         if text not in texts_in_keyword_stat:
@@ -884,9 +673,10 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
         keyword_setting = keyword_text_to_keyword_setting.get(text)
+        keyword_stat.added_clicks = keyword_setting.added_clicks
+        keyword_stat.keyword_setting_original_id = keyword_stat.added_clicks
         if not keyword_setting:
             continue
-        keyword_stat.keyword_setting = keyword_setting
         keyword_stat.hard_status = keyword_setting.hard_status
         original_predict_ctr = text_to_predict_ctr.get(text, None)
         keyword_stat.original_predict_ctr = original_predict_ctr
@@ -916,7 +706,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 if 0 < organic_position <= max_position:
                     keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = 'max_position'
-                    new_statuses.append((keyword_setting.id, False, ))
+                    new_statuses.append((keyword_setting.id, True, ))
                     await asyncio.sleep(0)
                     continue
         if max_cpc:
@@ -929,7 +719,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             if cpc and cpc > max_cpc:
                 keyword_stat.status = KeywordStatus.BAD
                 keyword_stat.reason = 'max_cpc'
-                await redis_manager.set_auto_block_status(keyword_setting.id, False)
+                await redis_manager.set_auto_block_status(keyword_setting.id, True)
                 await asyncio.sleep(0)
                 continue
         if not original_predict_ctr and enough_views/2 > keyword_stat.views\
@@ -1257,7 +1047,7 @@ async def get_min_ctr(adv: AdvSetting):
     return min_ctr
 
 
-def get_best_keyword(keywords: list[CalculatedKeyword])-> Optional[CalculatedKeyword]:
+def get_best_keyword(keywords: list[CalculatedKeyword]) -> Optional[CalculatedKeyword]:
     if not keywords:
         return None
     best_keyword = sorted(keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True)[0]

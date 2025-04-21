@@ -6,13 +6,14 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
 from app import utils
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import RedisCalculatedKeywordsCacheManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import WBItemPosition, WBBalancePayment
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.wb_adv_updater import data_manager
 from aiogram.enums import ParseMode
 from aiogram.utils import deep_linking
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from app.modules.common_advs_stat import CommonAdvsStatDataManager
 from app.modules.wb_update_state_manager import KeywordStatUpdateState, AdvActiveKeywordUpdateStateManager
@@ -594,6 +595,13 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._keyword_original_id = keyword_setting_id
         self._page = last_page
 
+    async def _get_calculated_keyword(self):
+        redis_manager = RedisCalculatedKeywordsCacheManager()
+        keyword = await redis_manager.get_calculated_keyword(self._adv_setting.adv_id,
+                                                             self._keyword_setting.text)
+        return keyword
+
+
     async def __call__(self) -> (LastMessage, str):
         auto_block_status = await redis_manager.get_auto_block_status(self._keyword_original_id)
         self._auto_block_status = auto_block_status
@@ -627,7 +635,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         self.original_predict_ctr =  await redis_manager.get_predict_ctr(adv_id, text)
 
         self.spend = total_spend
-
+        self.calculated_keyword = await self._get_calculated_keyword()
         return await super().__call__()
 
     @property
@@ -659,6 +667,7 @@ class KeywordSettingMessage(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_keyword_setting_keyboard(self._keyword_setting,
+                                                      self.calculated_keyword,
                                                       self._adv_setting,
                                                       self._auto_block_status,
                                                       self._page)

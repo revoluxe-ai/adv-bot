@@ -1,9 +1,4 @@
 ---
-description: 
-globs: 
-alwaysApply: false
----
----
 description: Правила работы с Git в проекте
 globs: ["*.py", "*.md"]
 alwaysApply: false

@@ -150,7 +150,6 @@ class WBToken(BaseTable):
         except Exception:
             return False
 
-
     def get_payload(self, key, default=0):
         payload = self.__payload
         return payload.get(key)
@@ -164,6 +163,8 @@ class WBToken(BaseTable):
     def expires(self):
         return self.__expires
 
+    def get_shop_id_from_token(self) -> str:
+        return self.get_payload('sid')
 
     @property
     def read_only(self) -> bool:
@@ -468,6 +469,35 @@ class KeywordSetting(BaseTable):
                     Index('ix_keywordsetting_adv_setting_id', 'adv_setting_id'),
                     Index('ix_keywordsetting_text', 'text'),
                       )
+                      
+    def to_json(self):
+        return {
+            'id': self.id,
+            'text': self.text,
+            'adv_setting_id': self.adv_setting_id,
+            'predict_ctr': self.predict_ctr,
+            'hard_status': self.hard_status,
+            'added_clicks': self.added_clicks,
+            'added_views': self.added_views,
+            'auto_block': self.auto_block
+        }
+        
+    @classmethod
+    def from_json(cls, data: dict):
+        """Создает объект KeywordSetting из JSON данных"""
+        if isinstance(data, str):
+            data = json.loads(data)
+            
+        return cls(
+            id=data.get('id'),
+            text=data.get('text'),
+            adv_setting_id=data.get('adv_setting_id'),
+            predict_ctr=data.get('predict_ctr'),
+            hard_status=data.get('hard_status'),
+            added_clicks=data.get('added_clicks'),
+            added_views=data.get('added_views'),
+            auto_block=data.get('auto_block')
+        )
 
 
 
@@ -478,7 +508,7 @@ class WBItemPosition:
     nmid: int = None
     base_position: int = None
     real_position: int = None
-    timestamp:  datetime = None
+    timestamp: datetime.datetime = None
     promo_position: int = None
     cpm: int = None
     adv_id: int = None
@@ -493,7 +523,7 @@ class WBItemPosition:
             return 'auto'
 
     def to_dict(self):
-        timestamp: datetime = self.timestamp
+        timestamp: datetime.datetime = self.timestamp
         str_timestamp = timestamp.isoformat()
         return {
             'real_position': self.real_position,

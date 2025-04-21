@@ -395,11 +395,11 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
         text += f'({round(keyword.predict_ctr*100, 2)}%)'
 
-        text += f"""{"(" + str(keyword.keyword_setting.added_clicks) + ")" if keyword.keyword_setting.added_clicks  else ''}"""
+        text += f"""{"(" + str(keyword.keyword_setting.added_clicks) + ")" if keyword.added_clicks  else ''}"""
         text += f"""{'❗' if not cluster_name else  ''}"""
         inline_keyboard = [InlineKeyboardButton(text= text,
                                                 callback_data=callbacks.SettingKeyword(
-                                                keyword_setting_original_id = keyword.keyword_setting.id,
+                                                keyword_setting_original_id = keyword.keyword_setting_original_id,
                                                 ).pack())]
         bottoms.append(inline_keyboard)
 
@@ -525,23 +525,31 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
 def get_keyword_setting_keyboard(
     keyword: KeywordSetting,
+    calculated_keyword: CalculatedKeyword,
     adv_setting: AdvSetting,
     auto_block_status,
     page,
     return_to: str = 'by_adv',
 ):
     buttons = []
-    if keyword.hard_status in [BLACK_LIST, AUTO_MODE, TURN_OFF]:
-        button = [InlineKeyboardButton(text='В продвижение (белый список)',
-                                       callback_data=callbacks.ChangeKeywordHardStatus(
-                                           new_hard_status=WHITE_LIST,
-                                           keyword_setting_original_id=keyword.id).pack())]
-        buttons.append(button)
     if hasattr(keyword, 'reason'):
         reason = keyword.reason
     else:
         reason = None
-    if auto_block_status and keyword.hard_status == AUTO_MODE:
+        
+    # Если calculated_keyword не установлен, создаем базовый объект с минимальными данными
+    if calculated_keyword is None:
+        calculated_keyword = CalculatedKeyword(
+            text=keyword.text,
+            clicks=0,
+            views=0,
+            spend=0.0,
+            hard_status=keyword.hard_status,
+            status=KeywordStatus.BAD,
+            keyword_setting=keyword
+        )
+        
+    if calculated_keyword.hard_status == 1 and calculated_keyword.status == KeywordStatus.BAD:
         button = [InlineKeyboardButton(text='Тестировать дальше',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=-1,

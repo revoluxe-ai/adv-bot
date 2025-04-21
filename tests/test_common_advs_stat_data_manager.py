@@ -164,8 +164,8 @@ async def test_get_data(create_test_full_adv_stat, create_test_adv_setting):
     # Создаем мок для сессии
     mock_session = AsyncMock()
     mock_result = MagicMock()
-    mock_result.scalar_one.return_value = 200.0
-    mock_session.execute.return_value = mock_result
+    mock_result.scalar_one_or_none = MagicMock(return_value=200.0)
+    mock_session.execute = AsyncMock(return_value=mock_result)
     
     # Создаем асинхронный контекстный менеджер
     class AsyncContextManager:
