@@ -1,11 +1,3 @@
----
-description: Общая стратегия тестирования проекта
-globs: ["tests/**/*.py", "**/*test*.py"]
-alwaysApply: false
-dependencies: []
-tags: ["testing", "pytest", "quality"]
----
-
 # Общая стратегия тестирования проекта
 
 ## Контекст применения
@@ -26,8 +18,9 @@ tests/
 ├── conftest.py              # Общие фикстуры и настройки
 ├── pytest.ini               # Конфигурация pytest
 ├── test_models.py           # Тесты моделей данных
-├── test_cabinet_bonus_manager.py
-├── test_shop_menu.py
+├── test_parser_isolated.py  # Изолированные тесты парсера
+├── test_parser_integration.py # Интеграционные тесты парсера
+├── test_parsing_queue_manager.py # Тесты менеджера очередей парсера
 └── modules/                 # Тесты отдельных модулей
     ├── test_module_1.py
     └── test_module_2.py
@@ -51,6 +44,9 @@ python -m pytest -v
 
 # Запуск конкретного теста
 python -m pytest tests/test_models.py::test_function_name
+
+# Запуск нескольких конкретных файлов тестов
+python -m pytest tests/test_parser_isolated.py tests/test_parser_integration.py -v
 
 # Запуск тестов по маркерам
 python -m pytest -m "slow"
@@ -93,7 +89,7 @@ def user_data():
 
 ### Использование моков
 ```python
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 def test_payment_service(mocker):
     # Создание мока для внешнего API
@@ -109,6 +105,60 @@ def test_payment_service(mocker):
     # Проверка результата
     assert result["status"] == "success"
     assert "transaction_id" in result
+```
+
+### Мокирование классов и модулей
+```python
+# Мокирование модуля для избежания нежелательных зависимостей
+sys.modules['app.utils.redis_manager'] = MagicMock(
+    set_cluster_and_preset=AsyncMock()
+)
+
+# Правильное мокирование функций в conftest.py
+@pytest.fixture(autouse=True)
+def patch_get_async_session_maker(monkeypatch, test_async_db):
+    engine, async_session = test_async_db
+    async def mock_get_async_session_maker(*args, **kwargs):
+        return async_sessionmaker(class_=async_session)
+    
+    # Указывайте полный путь к атрибуту при использовании monkeypatch
+    monkeypatch.setattr("app.utils.db.session_maker.get_async_session_maker", mock_get_async_session_maker)
+    # При необходимости, устанавливайте мок для всех мест, где используется функция
+    monkeypatch.setattr("app.client_bot.user_interface.views.messages._sm", mock_get_async_session_maker)
+```
+
+## Особенности асинхронного тестирования
+
+### Настройка асинхронных тестов
+```python
+import pytest
+import asyncio
+
+# Создание фикстуры event_loop с правильной областью видимости
+@pytest.fixture(scope="function")
+def event_loop():
+    """Create an instance of the default event loop for each test case."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    yield loop
+    if not loop.is_closed():
+        loop.close()
+
+# Асинхронный тест
+@pytest.mark.asyncio
+async def test_async_function():
+    result = await my_async_function()
+    assert result == expected_value
+```
+
+### Правильная настройка настроек pytest-asyncio
+```python
+# В pytest.ini или conftest.py
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"  # Рекомендуется явно указывать область видимости
 ```
 
 ## Процесс отладки тестов
@@ -128,190 +178,155 @@ def test_payment_service(mocker):
 2. Ищите примеры других рабочих тестов для понимания правильного подхода
 3. Проверяйте, не изменились ли зависимости или внешние факторы
 
-## Тестирование асинхронных функций и циклических зависимостей
+### Распространенные проблемы и их решения
+1. **Проблемы с импортами:**
+   - Проверьте пути импорта в тестируемых файлах
+   - Проверьте, не изменилась ли структура проекта
+   - Создайте файлы-заглушки для обратной совместимости
 
-### Решение циклических импортов
-1. При возникновении циклических зависимостей между модулями используйте строковые аннотации типов:
-```python
-# Вместо прямого импорта
-from app.utils.db.models import User
+2. **Проблемы с сессиями SQLAlchemy:**
+   - Всегда используйте полные пути при мокировании функций создания сессий
+   - Убедитесь, что все места использования сессий правильно замокированы
+   - Проверьте, что фикстуры сессий создаются до использования
 
-# Используйте строковые аннотации
-user: Mapped['User'] = relationship("User", back_populates="wb_user_cabinets")
-```
-
-2. Для отношений с secondary-таблицами также используйте строковые имена:
-```python
-# Вместо импорта объекта таблицы 
-from app.utils.db.assoc_tables import favorite_advs_association
-
-# Используйте строковое имя таблицы
-favorites_advs: Mapped[list['AdvSetting']] = relationship(
-    'AdvSetting', 
-    secondary='favorite_advs_association'
-)
-```
-
-### Создание фикстур для тестирования асинхронных функций
-1. При создании фикстур для асинхронных функций используйте синхронные фикстуры, которые возвращают асинхронные объекты:
-
-```python
-@pytest.fixture
-def cabinet_bonus_session_mocker(mock_wb_cabinet):
-    mock_session = AsyncMock()
-    
-    # Настраиваем асинхронные методы
-    mock_session.begin = AsyncMock(return_value=None)
-    mock_session.commit = AsyncMock(return_value=None)
-    
-    # Создаем асинхронный контекстный менеджер
-    class AsyncSessionContextManager:
-        async def __aenter__(self):
-            return mock_session
-            
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
-    
-    # Создаем фабрику сессий
-    def session_factory(*args, **kwargs):
-        return AsyncSessionContextManager()
-    
-    # Патчим функцию
-    patch('app.modules.function.sm', session_factory).start()
-    return mock_session
-```
-
-2. При создании моков для гибридных свойств используйте PropertyMock:
-
-```python
-mock_wb_cabinet = MagicMock()
-type(mock_wb_cabinet).calculated_bonus = PropertyMock(return_value=100.0)
-```
-
-### Тестирование асинхронных функций
-1. Используйте `@pytest.mark.asyncio` для асинхронных тестов:
-
-```python
-@pytest.mark.asyncio
-async def test_get_min_ctr():
-    # Тестовый код
-```
-
-2. При патчинге функций в асинхронных тестах используйте `side_effect` для асинхронных возвращаемых значений:
-
-```python
-mock_get_min_ctr = AsyncMock()
-mock_get_min_ctr.return_value = 0.5
-
-with patch('app.modules.path.function', side_effect=mock_get_min_ctr):
-    result = await tested_function()
-```
-
-3. Для имитации класса, не существующего в тестовой среде, создавайте локальные реализации:
-
-```python
-# Создаем имитацию класса
-class CommonAdvsStatData:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-# Патчим импорт класса
-with patch('app.module.path.CommonAdvsStatData', CommonAdvsStatData):
-    # Тестовый код
-```
-
-### Патчинг методов класса
-1. При патчинге методов класса используйте полный путь к методу:
-
-```python
-with patch('app.module.path.ClassName.method_name', 
-          side_effect=mock_method):
-    result = await class_instance.method()
-```
-
-2. Для классовых методов (classmethod) убедитесь, что патчите полный путь:
-
-```python
-with patch('app.module.path.ClassName.class_method', 
-          side_effect=mock_class_method):
-    result = await ClassName.class_method()
-```
-
-### Тестирование SQLAlchemy моделей с гибридными свойствами
-1. Не пытайтесь использовать гибридные свойства в SQL запросах в тестах
-2. Для тестирования гибридных свойств создавайте моки с PropertyMock
-3. Если нужно тестировать запросы с фильтрацией по гибридным свойствам, имитируйте результат запроса и проводите фильтрацию в Python-коде
-
-### Основные шаблоны для асинхронных тестов
-1. Патчинг асинхронного метода:
-```python
-mock_method = AsyncMock(return_value=expected_result)
-with patch('app.module.path.function', mock_method):
-    result = await tested_function()
-    assert result == expected_result
-```
-
-2. Патчинг SQLAlchemy сессии:
-```python
-mock_session = AsyncMock()
-mock_result = MagicMock()
-mock_result.scalar_one_or_none = MagicMock(return_value=expected_result)
-mock_session.execute = AsyncMock(return_value=mock_result)
-
-with patch('app.module.path.sm', return_value=mock_session):
-    result = await tested_function()
-```
-
-3. Создание имитации асинхронного контекстного менеджера:
-```python
-class AsyncContextManager:
-    async def __aenter__(self):
-        return mock_object
-        
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-mock_context = AsyncContextManager()
-```
+3. **AttributeError и ImportError:**
+   - Проверьте, что все мокируемые модули и классы существуют в проекте
+   - Используйте правильные пути к модулям при мокировании
+   - Создавайте для тестов обертки-заглушки при рефакторинге и переносе кода
 
 ## Типичные ошибки
 - Написание тестов только для успешных сценариев, игнорирование ошибочных
 - Создание нестабильных тестов, зависящих от внешних факторов
 - Использование реальных зависимостей вместо моков
 - Нечеткие assert-сообщения, не позволяющие понять причину ошибки
+- Неправильные пути в monkeypatch при мокировании функций
+- Отсутствие обработки изменений структуры проекта (перемещение модулей, изменение путей)
+
+## Поддержка обратной совместимости
+
+### При рефакторинге или переносе кода
+1. Создавайте файлы-заглушки для обратной совместимости:
+   ```python
+   """
+   Этот файл обеспечивает обратную совместимость со старыми импортами.
+   Перенаправляет на правильную реализацию в wb_parser/parsing_page_queue_manager.py
+   """
+   
+   from .wb_parser.parsing_page_queue_manager import ParsingQueueManager
+   
+   # Для обратной совместимости
+   __all__ = ['ParsingQueueManager']
+   ```
+
+2. Экспортируйте классы и функции через `__init__.py`:
+   ```python
+   """
+   Модуль для парсинга ключевых слов на Wildberries
+   """
+   
+   # Экспортируем основные классы для облегчения импорта
+   from .parsing_queue_manager import ParsingQueueManager
+   from .parsing_found_redis_manager import ParsingFoundRedisManager
+   from .parsing_task import ParsingTask
+   from .wb_parser.parser import parser
+   
+   __all__ = [
+       'ParsingQueueManager',
+       'ParsingFoundRedisManager',
+       'ParsingTask',
+       'parser'
+   ]
+   ```
 
 ## Пример хорошего теста
 ```python
 import pytest
-from app.models.user import User
-from app.services.user_service import UserService
-from app.exceptions import UserNotFoundError
+from unittest.mock import AsyncMock, MagicMock
+from app.modules.wb_keywords_parser.wb_parser.parsing_page_queue_manager import ParsingQueueManager
+from app.modules.common_slaves.wildberries.models import WBItemPosition
 
-class TestUserService:
-    def test_get_user_by_id_success(self, db_session, test_user):
-        # Arrange: подготовка данных
-        user_id = test_user.id
-        service = UserService(db_session)
-        
-        # Act: вызов тестируемой функции
-        result = service.get_user_by_id(user_id)
-        
-        # Assert: проверка результата
-        assert result is not None
-        assert result.id == user_id
-        assert result.name == test_user.name
-        assert result.email == test_user.email
+@pytest.mark.asyncio
+async def test_parsing_queue_manager_add_found_not_found_page():
+    """
+    Тест проверяет функциональность метода add_found_not_found_page класса ParsingQueueManager
+    """
+    # Arrange: создаем и настраиваем моки
+    manager = ParsingQueueManager()
+    manager.redis_manager = AsyncMock()
     
-    def test_get_user_by_id_not_found(self, db_session):
-        # Arrange
-        non_existent_id = 9999
-        service = UserService(db_session)
-        
-        # Act & Assert: проверка, что вызывается ожидаемое исключение
-        with pytest.raises(UserNotFoundError) as exc_info:
-            service.get_user_by_id(non_existent_id)
-        
-        # Дополнительная проверка деталей исключения
-        assert str(exc_info.value) == f"User with ID {non_existent_id} not found"
-``` 
+    text = "тестовый запрос"
+    nmid1 = 12345678
+    nmid2 = 87654321
+    need_nmids = {nmid1, nmid2}
+    page = 3
+    
+    # Создаем тестовые данные: позиция только для первого nmid
+    positions = [
+        WBItemPosition(
+            nmid=nmid1,
+            real_position=100, 
+            base_position=100,
+            promo_position=2,
+            keyword_text=text,
+            cpm=120
+        )
+    ]
+    
+    # Act: вызываем тестируемый метод
+    await manager.add_found_not_found_page(text, positions, need_nmids, page)
+    
+    # Assert: проверяем, что нужные методы были вызваны с правильными аргументами
+    manager.redis_manager.add_last_found_page_for_text_nmid.assert_called_once_with(
+        text, nmid1, page
+    )
+    manager.redis_manager.add_last_not_found_page_for_text_nmid.assert_called_once_with(
+        text, nmid2, page
+    )
+```
+
+## Решение типичных проблем с тестами
+
+### Проблемы с pytest и SQLAlchemy
+
+1. **Ошибка `AttributeError: Mock object has no attribute 'get_dialect_cls'`**:
+   - Проблема: Возникает при неправильном мокировании функции `create_engine` из SQLAlchemy
+   - Решение: Избегайте мокирования `create_engine`, вместо этого используйте SQLite в памяти для тестов
+   ```python
+   engine = create_engine('sqlite:///:memory:')
+   ```
+
+2. **Ошибка `PytestCollectionWarning: cannot collect test class 'TestClass' because it has a __init__ constructor`**:
+   - Проблема: Pytest не может собрать тестовые классы с собственным методом `__init__`
+   - Решение: Используйте фабричные функции и фикстуры вместо наследования классов
+   ```python
+   @pytest.fixture
+   def create_test_object():
+       def _create(**kwargs):
+           obj = OriginalClass(**kwargs)
+           # Модификации объекта
+           return obj
+       return _create
+   ```
+
+3. **Проблема индентации в коде, влияющая на тесты**:
+   - Проблема: Неверная индентация в исходном коде препятствует запуску тестов
+   - Решение: Проверьте и исправьте отступы в блоках `if-else`, `try-except` до запуска тестов
+
+4. **Циклические зависимости моделей SQLAlchemy**:
+   - Проблема: `InvalidRequestError: When initializing mapper... failed to locate a name`
+   - Решение: Используйте строковые имена для отношений между моделями
+   ```python
+   # Вместо:
+   relationship(OtherModel, back_populates="this_model")
+   # Используйте:
+   relationship("OtherModel", back_populates="this_model")
+   ```
+
+5. **Проблемы с Pydantic моделями в тестах**:
+   - Проблема: Невозможность добавить новые поля в существующие модели Pydantic
+   - Решение: Добавляйте свойства через динамическое определение property:
+   ```python
+   FullAdvStat.spend = property(lambda self: self.sum)
+   ```
+
+Более подробные рекомендации по работе с SQLAlchemy в тестах описаны в отдельном документе [sqlalchemy-tests.mdc](cursor-rules/testing/sqlalchemy-tests.mdc). 
