@@ -32,13 +32,13 @@ def get_budget_type_keyboard(balances):
 
     return keyboard
 
-def get_adv_list_keyboard(advs: list[Adv]):
-    buttons = []
-    for adv in advs:
-        button = InlineKeyboardButton(text=adv.name, callback_data=\
-            callbacks.Adv(action='select', adv_original_id=adv.id).pack())
-        buttons.append([button])
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+# def get_adv_list_keyboard(advs: list[Adv]):
+#     buttons = []
+#     for adv in advs:
+#         button = InlineKeyboardButton(text=adv.name, callback_data=\
+#             callbacks.Adv(action='select', adv_original_id=adv.id).pack())
+#         buttons.append([button])
+#     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard
 
 
@@ -491,7 +491,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
     bottoms.append(bottom)
 
     adv_id = adv_setting.adv_id
-
+    assert adv_id
     button = [InlineKeyboardButton(
         text='Изменить экспоненту прог. ctr',
         callback_data=ChangeExponentSettinginAdvSettingCallback(adv_id=adv_id).pack()
@@ -528,8 +528,12 @@ def get_keyword_setting_keyboard(
     calculated_keyword: CalculatedKeyword,
     adv_setting: AdvSetting,
     page,
-    return_to: str = 'by_adv',
-):
+    return_to: str = 'by_adv') -> InlineKeyboardMarkup:
+
+    adv_setting_original_id = adv_setting.id
+    keyword_setting_original_id = keyword.id
+    assert keyword_setting_original_id
+    assert adv_setting_original_id
     buttons = []
     if hasattr(keyword, 'reason'):
         reason = keyword.reason
@@ -540,7 +544,7 @@ def get_keyword_setting_keyboard(
         button = [InlineKeyboardButton(text='Тестировать дальше',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=-1,
-                                           keyword_setting_original_id=keyword.id).pack())]
+                                           keyword_setting_original_id=keyword_setting_original_id).pack())]
 
         buttons.append(button)
 
@@ -548,47 +552,45 @@ def get_keyword_setting_keyboard(
         button = [InlineKeyboardButton(text='В авто',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=AUTO_MODE,
-                                           keyword_setting_original_id=keyword.id).pack())]
+                                           keyword_setting_original_id=keyword_setting_original_id).pack())]
         buttons.append(button)
     if keyword.hard_status in [AUTO_MODE, WHITE_LIST]  or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
 
         bottom = [InlineKeyboardButton(text='Отключить (релевантная фраза)',
                                         callback_data=callbacks.ChangeKeywordHardStatus(
                                             new_hard_status=TURN_OFF,
-                                            keyword_setting_original_id=keyword.id).pack())]
+                                            keyword_setting_original_id=keyword_setting_original_id).pack())]
         buttons.append(bottom)
 
 
         button = [InlineKeyboardButton(text='В список не релевантных фраз',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=BLACK_LIST,
-                                           keyword_setting_original_id=keyword.id).pack())]
+                                           keyword_setting_original_id=keyword_setting_original_id).pack())]
         buttons.append(button)
 
     if keyword.hard_status == TURN_OFF:
         button = [InlineKeyboardButton(text='В список не релевантных фраз',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=BLACK_LIST,
-                                           keyword_setting_original_id=keyword.id).pack())]
+                                           keyword_setting_original_id=keyword_setting_original_id).pack())]
         buttons.append(button)
 
     button = [InlineKeyboardButton(text='Проверить позицию',
                                    callback_data=callbacks.CheckPosition(
-                                       keyword_setting_original_id=keyword.id,
-                                       adv_original_id=adv_setting.id).pack())]
+                                       keyword_setting_original_id=keyword_setting_original_id,
+                                       adv_original_id=adv_setting_original_id).pack())]
 
     buttons.append(button)
 
     button = [InlineKeyboardButton(text='Изменить ставку',
                                    callback_data=callbacks.ChangeCPM(
-                                       adv_setting_original_id=adv_setting.id).pack())]
+                                       adv_setting_original_id=adv_setting_original_id).pack())]
 
     buttons.append(button)
-
     buttons.append([InlineKeyboardButton(text='Вернуться к списку ключевых слов',
                                              callback_data=callbacks.SettingKeywords(
-                                             adv_original_id=adv_setting.id,
-                                             type=return_to,
+                                             adv_original_id=adv_setting_original_id,
                                              page=page,
                                              ).pack())])
 
@@ -758,6 +760,16 @@ def get_call_me_keyboard1():
     button = InlineKeyboardButton(text='Заказать демо-доступ к боту',
                                   url=const.SUPPORT_LINK)
     builder.row(button)
+    return builder.as_markup()
+
+
+def get_ozon_keyword_setting_keyboard(keyword_setting_id: int,
+                                      page: int = 1):
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text='Назад к списку ключевых слов',
+                                     callback_data=callbacks.SettingKeywords(
+                                         adv_original_id=keyword_setting_id,
+                                         page=page).pack()))
     return builder.as_markup()
 
 
