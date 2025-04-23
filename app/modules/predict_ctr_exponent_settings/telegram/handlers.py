@@ -8,18 +8,18 @@ from app.client_bot import utils
 from app.client_bot.user_interface.handlers.start_registration_func import start_registration
 from app.client_bot.user_interface.views import messages
 from app.utils.db.session_maker import get_async_session_maker as sm
+from .callbacks import ChangeExponentSettinginAdvSettingCallback
 
-from . import callbacks
 from ...common_slaves.wildberries.models import AdvSetting
 from ...wb_adv_updater import data_manager
 
 router = Router()
 
 
-@router.callback_query(callbacks.ChangeExponentSettinginAdvSetting.filter())
+@router.callback_query(ChangeExponentSettinginAdvSettingCallback.filter())
 async def change_exponent_setting(
                             callback: CallbackQuery,
-                            callback_data: callbacks.ChangeExponentSettinginAdvSetting,
+                            callback_data: ChangeExponentSettinginAdvSettingCallback,
                             state: FSMContext):
 
     adv_id = callback_data.adv_id
