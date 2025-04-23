@@ -39,7 +39,7 @@ class CalculatedKeyword(BaseModel):
     baes_ctr: Optional[float] = None
     predict_ctr: Optional[float] = None
     status: Union[str, None] = None
-    hard_status: Union[str, None] = None
+    hard_status: Union[int, None] = None
     reason: Optional[str] = None
     cpm: Optional[int] = None
     real_position: Optional[int] = None
