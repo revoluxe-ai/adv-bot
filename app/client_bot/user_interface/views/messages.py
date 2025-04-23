@@ -603,8 +603,6 @@ class KeywordSettingMessage(TextWithKeyboard):
 
 
     async def __call__(self) -> (LastMessage, str):
-        auto_block_status = await redis_manager.get_auto_block_status(self._keyword_original_id)
-        self._auto_block_status = auto_block_status
         async with sm(read_only=True) as session:
             stmt = select(KeywordSetting)\
                           .options(selectinload(KeywordSetting.adv_setting))\
@@ -669,7 +667,6 @@ class KeywordSettingMessage(TextWithKeyboard):
         return keyboards.get_keyword_setting_keyboard(self._keyword_setting,
                                                       self.calculated_keyword,
                                                       self._adv_setting,
-                                                      self._auto_block_status,
                                                       self._page)
 
 

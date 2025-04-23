@@ -527,7 +527,6 @@ def get_keyword_setting_keyboard(
     keyword: KeywordSetting,
     calculated_keyword: CalculatedKeyword,
     adv_setting: AdvSetting,
-    auto_block_status,
     page,
     return_to: str = 'by_adv',
 ):
@@ -536,18 +535,6 @@ def get_keyword_setting_keyboard(
         reason = keyword.reason
     else:
         reason = None
-        
-    # Если calculated_keyword не установлен, создаем базовый объект с минимальными данными
-    if calculated_keyword is None:
-        calculated_keyword = CalculatedKeyword(
-            text=keyword.text,
-            clicks=0,
-            views=0,
-            spend=0.0,
-            hard_status=keyword.hard_status,
-            status=KeywordStatus.BAD,
-            keyword_setting=keyword
-        )
         
     if calculated_keyword.hard_status == 1 and calculated_keyword.status == KeywordStatus.BAD:
         button = [InlineKeyboardButton(text='Тестировать дальше',

@@ -61,6 +61,7 @@ class CalculatedKeyword(BaseModel):
     enough_views: Optional[int] = None
     added_clicks: Optional[int] = None
     keyword_setting_original_id: int | None = None
+    adv_id: int | None = None
 
     @property
     def mean_ctr(self):
@@ -127,7 +128,6 @@ class CalculatedKeyword(BaseModel):
             'base_position': self.base_position,
             'promo_position': self.promo_position,
             'position_update': self.position_update.isoformat() if self.position_update else None,
-            'childs_keywords': [k.to_json() for k in self.childs_keywords] if self.childs_keywords else None,
             'query_static': self._query_static,
             'cluster_name': self.cluster_name,
             'preset': self.preset,
@@ -147,7 +147,5 @@ class CalculatedKeyword(BaseModel):
     def from_json(cls, json_str: str) -> 'CalculatedKeyword':
         data = json.loads(json_str)
         data['position_update'] = validate_datetime(data['position_update']) if data['position_update'] else None
-        data['childs_keywords'] = [CalculatedKeyword.from_json(k) for k in data['childs_keywords']]\
-            if data['childs_keywords'] else None
         data['position'] = WBItemPosition.from_dict(data['position']) if data['position'] else None
         return cls(**data)

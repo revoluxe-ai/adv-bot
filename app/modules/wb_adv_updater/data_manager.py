@@ -4,7 +4,6 @@ import logging
 import time
 import cProfile
 import pstats
-import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
@@ -527,10 +526,8 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords = await get_good_bad_phrases_for_min_ctr(adv,  max_cpc)
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
-    # Получаем ключевые слова
-    keywords = await get_good_bad_phrases_for_min_ctr(adv, max_cpc)
     keywords_redis_cache_manager = RedisCalculatedKeywordsCacheManager()
-    await keywords_redis_cache_manager.set_calculated_keywords(keywords, adv.adv_id)
+    await keywords_redis_cache_manager.set_calculated_keywords(keywords, int(adv.adv_id))
     # Сортировка и возврат результатов
     keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
     keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
@@ -538,6 +535,9 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
     keywords = keywords_with_rating + keywords_without_rating
     return keywords
+
+
+
 
 async def get_cached_keyword(adv: AdvSetting, text: str) -> Optional[CalculatedKeyword]:
     """Получить закешированное ключевое слово"""
@@ -610,7 +610,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
         logger.debug('В кластеры сконвертировали')
     logger.debug('Начинаю установку позиций')
-    keyword_stats = await set_positions(keyword_stats, adv_setting)
+    keyword_stats: list[CalculatedKeyword] = await set_positions(keyword_stats, adv_setting)
     async with _sm(read_only=False) as session: # type: AsyncSession
         for keyword_stat in keyword_stats:
             cluster_name = keyword_stat.text
@@ -634,9 +634,10 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 await session.flush(adv_setting)
                 session.add(keyword_setting)
                 await session.commit()
+                await session.refresh(keyword_setting)
                 text_to_keyword_setting[cluster_name] = keyword_setting
     for keyword_setting in keyword_settings:
-        text = keyword_setting.text
+        text = str(keyword_setting.text)
         if text not in texts_in_keyword_stat:
             keyword_setting = text_to_keyword_setting[text]
 
@@ -644,7 +645,7 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                                         clicks=0,
                                         views=0,
                                         spend=0,
-                                        keyword_setting=keyword_setting)
+                                        keyword_setting_original_id=keyword_setting.id)
             position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
             if position:
                 keyword.real_position = position.real_position
@@ -672,12 +673,14 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
-        keyword_setting = keyword_text_to_keyword_setting.get(text)
+        keyword_setting = keyword_text_to_keyword_setting[text]
         keyword_stat.added_clicks = keyword_setting.added_clicks
-        keyword_stat.keyword_setting_original_id = keyword_stat.added_clicks
+        keyword_stat.keyword_setting_original_id = keyword_setting.id
+        keyword_stat.adv_id = adv_setting.adv_id
         if not keyword_setting:
             continue
-        keyword_stat.hard_status = keyword_setting.hard_status
+        original_hard_status: int = int(keyword_setting.hard_status)
+        keyword_stat.hard_status = original_hard_status
         original_predict_ctr = text_to_predict_ctr.get(text, None)
         keyword_stat.original_predict_ctr = original_predict_ctr
 
@@ -830,7 +833,7 @@ async def get_wb_category(adv_setting: AdvSetting) -> Union[WBCategory, None]:
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid==int(nmid)).options(selectinload(WBCard.wb_category))
         result = await session.execute(smtp)
-    wb_card: WBCard = result.unique.scalar_one()
+    wb_card: WBCard = result.scalar_one_or_none()
     if wb_card:
         wb_category = wb_card.wb_category
     else:
