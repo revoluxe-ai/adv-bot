@@ -1,7 +1,5 @@
-import typing
 from datetime import datetime
 import re
-from datetime import timedelta
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.exc import NoResultFound
