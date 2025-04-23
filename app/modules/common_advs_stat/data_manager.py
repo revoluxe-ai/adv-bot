@@ -38,8 +38,10 @@ class CommonAdvsStatData:
 class CommonAdvsStatDataManager:
     """Менеджер для получения данных о ключевых словах рекламной кампании"""
 
-    @classmethod
-    async def get_data(cls, adv_setting: AdvSetting, keywords: List[CalculatedKeyword], last_days: int) -> CommonAdvsStatData:
+    @staticmethod
+    async def get_data(adv_setting: AdvSetting,
+                       keywords: List[CalculatedKeyword],
+                       last_days: int) -> CommonAdvsStatData:
         """Получает все необходимые данные для отображения информации о ключевых словах"""
 
         # Получаем min_ctr
@@ -53,7 +55,6 @@ class CommonAdvsStatDataManager:
                 result = await session.execute(stmt)
                 auction_cpm = result.scalar_one_or_none()
 
-        # Получаем статистику за последние 3 дня
         pass_days = last_days - 1
         end_date = datetime.now()
         start_date = end_date - timedelta(days=pass_days)
