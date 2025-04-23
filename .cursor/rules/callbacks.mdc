@@ -1,9 +1,0 @@
-# Обработка коллбеков Telegram
-
-1. Все коллбеки определены в `app/client_bot/user_interface/views/callbacks.py` как классы CallbackData
-2. Обработчики коллбеков регистрируются через декораторы `@router.callback_query(Callback.filter())`
-3. Клавиатуры создаются в `app/client_bot/user_interface/views/keyboards.py`
-4. Middleware для автоматического ответа на коллбеки настроен в `global_router.py`
-5. При создании новых коллбеков используйте уникальный префикс и типизированные параметры
-6. Максимальный размер данных коллбека - 64 байта
-7. Для новых модулей в `app/modules/` создавайте коллбеки в файле `telegram/callbacks.py` внутри модуля 
