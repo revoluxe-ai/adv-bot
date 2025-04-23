@@ -2,7 +2,7 @@
 !wb/keyword_async_ml_updater/bot/images
 setting.yaml
 *.yaml
-
+redis-data/
 # Node artifact files
 node_modules/
 dist/
