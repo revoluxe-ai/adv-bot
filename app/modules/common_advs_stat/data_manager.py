@@ -11,7 +11,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_man
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import CommonCardStat
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.wb_adv_updater import data_manager
-import math
+
 
 _sm = get_async_session_maker
 
@@ -26,12 +26,12 @@ class CommonAdvsStatData:
     auction_cpm: Optional[int]
     total_spend: float
     addition_spend_in_adv: float
-    all_orders_for_last_3_days: Optional[int]
-    mean_orders_for_3_days: Optional[float]
+    all_orders_for_last_days: Optional[int]
+    mean_orders_for_last_days: Optional[float]
     mean_price_for_order: Optional[float]
-    spend_for_inner_adv_for_3_days: Optional[float]
-    full_adv_stat_for_last_3_days_for_auto_adv: SmallFullAdvStat
-    full_adv_stat_for_last_3_days_for_auction: SmallFullAdvStat
+    spend_for_inner_advs: Optional[float]
+    full_adv_stat_for_last_days_for_auto_adv: SmallFullAdvStat
+    full_adv_stat_for_last_days_for_auction: SmallFullAdvStat
     common_stat: Optional[CommonCardStat]
 
 
@@ -59,14 +59,14 @@ class CommonAdvsStatDataManager:
         start_date = end_date - timedelta(days=pass_days)
 
         # Статистика для авто-рекламы
-        full_adv_stat_for_last_3_days_for_auto_adv = await full_wb_adv_stat.get_stats_by_last_days(
+        full_adv_stat_for_last_days_for_auto_adv = await full_wb_adv_stat.get_stats_by_last_days(
             [adv_setting.adv_id],
             start_date,
             end_date
         )
 
         # Статистика для аукциона
-        full_adv_stat_for_last_3_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
+        full_adv_stat_for_last_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
             [adv_setting.search_adv_id],
             start_date,
             end_date
@@ -74,8 +74,8 @@ class CommonAdvsStatDataManager:
 
         # Общий расход
         full_spend_for_all_advs = (
-                full_adv_stat_for_last_3_days_for_auto_adv.spend +
-                full_adv_stat_for_last_3_days_for_auction.spend
+                full_adv_stat_for_last_days_for_auto_adv.spend +
+                full_adv_stat_for_last_days_for_auction.spend
         )
 
         # Общая статистика
@@ -83,21 +83,21 @@ class CommonAdvsStatDataManager:
                                                                                           pass_days)
 
         # Рассчитываем дополнительные метрики
-        all_orders_for_last_3_days = None
-        mean_orders_for_3_days = None
+        all_orders_for_last_days = None
+        mean_orders_for_days = None
         mean_price_for_order = None
-        spend_for_inner_adv_for_3_days = None
+        spend_for_inner_advs_for_days = None
 
         if common_stat:
-            all_orders_for_last_3_days = common_stat.orders
-            spend_for_inner_adv_for_3_days = full_spend_for_all_advs
+            all_orders_for_last_days = common_stat.orders
+            spend_for_inner_advs_for_days = full_spend_for_all_advs
 
             now = datetime.now()
             hours_passed = now.hour + now.minute / 60 + now.second / 3600
             fraction_of_day = hours_passed / 24 + pass_days
 
-            mean_orders_for_3_days = all_orders_for_last_3_days / fraction_of_day
-            mean_price_for_order = spend_for_inner_adv_for_3_days / common_stat.orders if common_stat.orders else 0
+            mean_orders_for_days = all_orders_for_last_days / fraction_of_day
+            mean_price_for_order = spend_for_inner_advs_for_days / common_stat.orders if common_stat.orders else 0
 
         # Получаем расходы на ключевые слова
         spend_for_keywords_in_auto_adv = await full_wb_adv_stat.get_keywords_spend(
@@ -107,7 +107,7 @@ class CommonAdvsStatDataManager:
             'advkeyword_new'
         )
 
-        addition_spend_in_adv = full_adv_stat_for_last_3_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
+        addition_spend_in_adv = full_adv_stat_for_last_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
 
         return CommonAdvsStatData(
             adv_setting=adv_setting,
@@ -117,11 +117,11 @@ class CommonAdvsStatDataManager:
             auction_cpm=auction_cpm,
             total_spend=full_spend_for_all_advs,
             addition_spend_in_adv=addition_spend_in_adv,
-            all_orders_for_last_3_days=all_orders_for_last_3_days,
-            mean_orders_for_3_days=mean_orders_for_3_days,
+            all_orders_for_last_days=all_orders_for_last_days,
+            mean_orders_for_last_days=mean_orders_for_days,
             mean_price_for_order=mean_price_for_order,
-            spend_for_inner_adv_for_3_days=spend_for_inner_adv_for_3_days,
-            full_adv_stat_for_last_3_days_for_auto_adv=full_adv_stat_for_last_3_days_for_auto_adv,
-            full_adv_stat_for_last_3_days_for_auction=full_adv_stat_for_last_3_days_for_auction,
+            spend_for_inner_advs=spend_for_inner_advs_for_days,
+            full_adv_stat_for_last_days_for_auto_adv=full_adv_stat_for_last_days_for_auto_adv,
+            full_adv_stat_for_last_days_for_auction=full_adv_stat_for_last_days_for_auction,
             common_stat=common_stat
         )

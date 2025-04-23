@@ -480,15 +480,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self.auction_cpm = stat_data.auction_cpm
         self.total_spend = stat_data.total_spend
         self.addition_spend_in_adv = stat_data.addition_spend_in_adv
-        self._all_orders_for_last_3_days = stat_data.all_orders_for_last_3_days
-        self._mean_orders_for_3_days = stat_data.mean_orders_for_3_days
+        self._all_orders_for_last_2_days = stat_data.all_orders_for_last_days
+        self._mean_orders_for_2_days = stat_data.mean_orders_for_last_days
         self._mean_price_for_order = stat_data.mean_price_for_order
-        self._spend_for_inner_adv_for_3_days = stat_data.spend_for_inner_adv_for_3_days
-        self.full_adv_stat_for_last_3_days_for_auto_adv = stat_data.full_adv_stat_for_last_3_days_for_auto_adv
-        self.full_adv_stat_for_last_3_days_for_auction = stat_data.full_adv_stat_for_last_3_days_for_auction
+        self._spend_for_inner_adv_for_2_days = stat_data.spend_for_inner_advs
+        self.full_adv_stat_for_last_2_days_for_auto_adv = stat_data.full_adv_stat_for_last_days_for_auto_adv
+        self.full_adv_stat_for_last_2_days_for_auction = stat_data.full_adv_stat_for_last_days_for_auction
         self.common_stat = stat_data.common_stat
-        if self._all_orders_for_last_3_days is not None:
-            self._sum_spend = self._spend_for_inner_adv_for_3_days
+        if self._all_orders_for_last_2_days is not None:
+            self._sum_spend = self._spend_for_inner_adv_for_2_days
         if self.image_mode == 'graphic':
             graphic = await self._graphic_injection()
             if not graphic:
@@ -506,19 +506,19 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""
                 'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'
                 f'ID Аукциона: {self._adv_setting.search_adv_id}\n'
-                f'Общая статистика за 3 дня:\n'
+                f'Общая статистика за 2 дня:\n'
                 f'Минимальный CRT для кампании: {self.min_ctr * 100:.2f}%\n'
                 f'Страница: {self._page}/{total_page + 1}\n'
                 f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n'
                 f'Общий расход на рекламу: {self.total_spend:.2f}\n'
                 f'Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n'
-                f'Общее число заказов: {self._all_orders_for_last_3_days}\n'
-                f'Заказов из Авто: {self.full_adv_stat_for_last_3_days_for_auto_adv.orders}\n'
-                f'Заказов из Аукцион: {self.full_adv_stat_for_last_3_days_for_auction.orders}\n'
-                f"""Заказов из Органики: {self._all_orders_for_last_3_days
-                    - self.full_adv_stat_for_last_3_days_for_auction.orders
-                    - self.full_adv_stat_for_last_3_days_for_auto_adv.orders
-                if self._all_orders_for_last_3_days else 0}"""
+                f'Общее число заказов: {self._all_orders_for_last_2_days}\n'
+                f'Заказов из Авто: {self.full_adv_stat_for_last_2_days_for_auto_adv.orders}\n'
+                f'Заказов из Аукцион: {self.full_adv_stat_for_last_2_days_for_auction.orders}\n'
+                f"""Заказов из Органики: {self._all_orders_for_last_2_days
+                    - self.full_adv_stat_for_last_2_days_for_auction.orders
+                    - self.full_adv_stat_for_last_2_days_for_auto_adv.orders
+                if self._all_orders_for_last_2_days else 0}"""
         )
 
         # Получаем целевые значения из настроек
@@ -531,12 +531,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         max_price_for_order = self._adv_setting.max_price_for_order
         max_price_for_order_str = str(round(max_price_for_order)) if max_price_for_order else "Не задано"
 
-        order_cost = self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_3_days\
-            if self._all_orders_for_last_3_days else self._spend_for_inner_adv_for_3_days
+        order_cost = self._spend_for_inner_adv_for_2_days / self._all_orders_for_last_2_days\
+            if self._all_orders_for_last_2_days else self._spend_for_inner_adv_for_2_days
 
         text += (
             f'\nВ среднем в день (срез за 3 дня):\n'
-            f'Заказов: {self._mean_orders_for_3_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
+            f'Заказов: {self._mean_orders_for_2_days:.2f} (цель: {plan_for_sales_for_day_str})\n'
             f'Себестоимость: {round(order_cost, 2)} р.'
             f' (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n'
         )
@@ -595,7 +595,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._keyword_original_id = keyword_setting_id
         self._page = last_page
 
-    async def _get_calculated_keyword(self):
+    async def _get_calculated_keyword(self) -> CalculatedKeyword:
         redis_manager = RedisCalculatedKeywordsCacheManager()
         keyword = await redis_manager.get_calculated_keyword(self._adv_setting.adv_id,
                                                              self._keyword_setting.text)
