@@ -1,10 +1,9 @@
-from app import settings
-from .tariffs import tariffs
+﻿from app import settings
 
 is_first = True
 
 # Функция для склонения слова "артикул"
-def declension(number):
+def declension(number: int) -> str:
     if 10 <= number % 100 <= 20:  # Для чисел от 10 до 20 используем форму "артикулов"
         return "артикулов"
     elif number % 10 == 1:  # Для числа 1
