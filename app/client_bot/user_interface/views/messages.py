@@ -472,7 +472,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._keywords = clear_keywords
         
         # Получаем данные через CommonAdvsStatDataManager
-        stat_data = await CommonAdvsStatDataManager.get_data(self._adv_setting, self._keywords)
+        stat_data = await CommonAdvsStatDataManager.get_data(self._adv_setting,
+                                                             self._keywords,
+                                                             2)
         
         # Устанавливаем полученные данные
         self.min_ctr = stat_data.min_ctr
