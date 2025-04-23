@@ -504,7 +504,7 @@ async def get_all_cluster_names() -> set[str]:
     return cluster_names
 
 
-async def get(key):
+async def get(key) -> typing.Optional[Union[str, int]]:
     value = await redis_replica_client.get(key)
     return value
 
