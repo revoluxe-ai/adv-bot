@@ -608,7 +608,7 @@ class KeywordSettingMessage(TextWithKeyboard):
                           .options(selectinload(KeywordSetting.adv_setting))\
                           .where(KeywordSetting.id == self._keyword_original_id)
             result = await session.execute(stmt)
-            keyword_setting: KeywordSetting = result.scalars().one()
+            keyword_setting: KeywordSetting = result.scalar_one()
         adv_setting: AdvSetting = keyword_setting.adv_setting
         self._keyword_setting = keyword_setting
         self._adv_setting = adv_setting
