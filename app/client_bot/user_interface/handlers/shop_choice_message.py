@@ -44,9 +44,9 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> Inlin
 
     button = InlineKeyboardButton(text='Добавить магазин', callback_data=callbacks.ShopNew().pack())
     keyboard_buttons.append([button])
-    
-    button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
-    keyboard_buttons.append([button])
+
+    # button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())
+    # keyboard_buttons.append([button])
 
     for wb_user_cabinet in all_shops:
         shop_name = wb_user_cabinet.name
