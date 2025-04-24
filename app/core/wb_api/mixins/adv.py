@@ -20,7 +20,7 @@ class AdvMixin(InterfaceWBAPI):
     @try_except_decorator(1, 2)
     async def get_advs(self, adv_ids: list[int]) -> list[Adv]:
         advs = []
-        url = f'https://advert-api.wb.ru/adv/v1/promotion/adverts'
+        url = f'https://advert-api.wildberries.ru/adv/v1/promotion/adverts'
         async with aiohttp.ClientSession() as session:
             response_text = await requests(session, 'POST', url, json_data=adv_ids,
                                            headers=self.headers.standart)
@@ -203,7 +203,7 @@ class AdvMixin(InterfaceWBAPI):
     @try_except_decorator(1, 3)
     async def get_all_adv_ids(self) -> list[int]:
         advertIds = []
-        url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
+        url = 'https://advert-api.wildberries.ru/adv/v1/promotion/count'
         async with aiohttp.ClientSession() as session:
             response_text = await requests(session, 'GET', url,
                                            headers=self.headers.standart)

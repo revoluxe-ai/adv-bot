@@ -315,13 +315,13 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 3)
     async def get_advertIds(self) -> list[int]:
         advertIds = []
-        url = 'https://advert-api.wb.ru/adv/v1/promotion/count'
+        url = 'https://advert-api.wildberries.ru/adv/v1/promotion/count'
         async with aiohttp.ClientSession() as session:
             response_text = await requests(session, 'GET', url,
                                                 headers=self.headers.standart)
             answer = json.loads(response_text)
             # Используем json.loads для преобразования текста ответа в JSON
-            adverts:list = answer['adverts']
+            adverts: list = answer['adverts']
             if not adverts:
                 return []
             for advert in adverts:
@@ -334,7 +334,7 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list)->list[Adv]:
         advs = []
-        url = f'https://advert-api.wb.ru/adv/v1/promotion/adverts'
+        url = f'https://advert-api.wildberries.ru/adv/v1/promotion/adverts'
         async with aiohttp.ClientSession() as session:
             response_text = await requests(session, 'POST', url, json_data=adv_ids,
                                                 headers=self.headers.standart)

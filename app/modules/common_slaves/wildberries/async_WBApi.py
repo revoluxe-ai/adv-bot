@@ -107,7 +107,7 @@ class async_WBApi(ABC_WB_API):
 
 
     async def get_adv_companies(self, adv_ids: list[int]):
-        url = 'https://advert-api.wb.ru/adv/v1/promotion/adverts'
+        url = 'https://advert-api.wildberries.ru/adv/v1/promotion/adverts'
         advs = []
         async with aiohttp.ClientSession() as session:
             # Предполагаем, что у вас есть способ сериализации adv_ids в формат, подходящий для вашего запроса # Пример сериализации, уточните в соответствии с API
@@ -163,7 +163,7 @@ class async_WBApi(ABC_WB_API):
                                     success_even: Union[asyncio.Event, None] = None,
                                     error_event: Union[asyncio.Event, None] = None)-> list[Adv]:
         MAX_ITER_PER_MINUTE = 300
-        url = 'https://advert-api.wb.ru/adv/v1/promotion/adverts'
+        url = 'https://advert-api.wildberries.ru/adv/v1/promotion/adverts'
         adversIds = await self._get_all_advertIds(success_even, error_event)
         advs = []
         pause = get_pause(MAX_ITER_PER_MINUTE)
