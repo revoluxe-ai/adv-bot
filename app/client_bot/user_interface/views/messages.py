@@ -888,7 +888,7 @@ class SettingMinCTR(TextWithKeyboard):
             adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv: AdvSetting = adv.scalar()
         self._adv: AdvSetting = adv
-        self._min_ctr = await data_manager.get_min_ctr(adv)
+        self._min_ctr: float = await data_manager.get_min_ctr(adv)
         if  adv.new_auto_min_ctr_mode:
             self._min_ctr_type = "auto"
         else:
@@ -904,9 +904,12 @@ class SettingMinCTR(TextWithKeyboard):
 
         goods = []
         bads = []
+        min_ctr = self._min_ctr
+        assert min_ctr
         for kw in keywords:
-            kw.real_ctr = kw.predict_ctr if kw.predict_ctr > kw.baes_ctr else kw.baes_ctr
-            if kw.predict_ctr >= self._min_ctr or kw.baes_ctr >= self._min_ctr:
+            predict_ctr = kw.predict_ctr
+            assert predict_ctr is not None
+            if predict_ctr >= min_ctr:
                 goods.append(kw)
             else:
                 bads.append(kw)
@@ -928,15 +931,20 @@ class SettingMinCTR(TextWithKeyboard):
         # keywords = self._goods + self._bads
         goods = self._goods
         bads = self._bads
-        goods.sort(key=lambda x: x.real_ctr, reverse=True)
-        bads.sort(key=lambda x: x.real_ctr, reverse=True)
+        goods.sort(key=lambda x: x.predict_ctr, reverse=True)
+        bads.sort(key=lambda x: x.predict_ctr, reverse=True)
         for good in goods:
-            text += f'{good.text} - {round(good.real_ctr * 100, 1)}  % ✅\n'
+            predict_ctr = good.predict_ctr
+            baes_ctr = good.baes_ctr
+            assert baes_ctr is not None
+            assert predict_ctr is not None
+            ctr = max(predict_ctr, baes_ctr)
+            text += f'{good.text} - {round(ctr * 100, 1)}  % ✅\n'
         text += f'================== {round(self._min_ctr*100, 1)}\n'
         for bad in self._bads:
             predict_ctr = bad.predict_ctr
             baes_ctr = bad.baes_ctr
-            ctr = predict_ctr if predict_ctr > baes_ctr else baes_ctr
+            ctr = max(predict_ctr, baes_ctr)
             text += f'{bad.text} - {round(ctr*100, 1)}  % ❌\n'
 
         text += '\n\n'
