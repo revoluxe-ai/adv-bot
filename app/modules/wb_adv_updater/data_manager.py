@@ -613,9 +613,13 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     keyword_stats: list[CalculatedKeyword] = await set_positions(keyword_stats, adv_setting)
     async with _sm(read_only=False) as session: # type: AsyncSession
         for keyword_stat in keyword_stats:
-            cluster_name = keyword_stat.text
-            if not (keyword_setting := texts_to_keyword_setting.get(cluster_name)):
+            keyword_text = keyword_stat.text
+            keyword_setting = texts_to_keyword_setting.get(keyword_text)
+            if not keyword_setting:
                 clusters = keyword_stat.childs_keywords
+                if not clusters:
+                    clusters = []
+                clusters.append(keyword_stat)
                 stat_hard_statuses = defaultdict(int)
                 for kw in clusters:
                     original_text = kw.text
@@ -628,14 +632,13 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 except:
                     result_hard_status = 1
                 keyword_setting = KeywordSetting()
-                keyword_setting.text = cluster_name
+                keyword_setting.text = keyword_text
                 keyword_setting.adv_setting = adv_setting
                 keyword_setting.hard_status = result_hard_status
-                await session.flush(adv_setting)
                 session.add(keyword_setting)
                 await session.commit()
                 await session.refresh(keyword_setting)
-                text_to_keyword_setting[cluster_name] = keyword_setting
+                text_to_keyword_setting[keyword_text] = keyword_setting
     for keyword_setting in keyword_settings:
         text = str(keyword_setting.text)
         if text not in texts_in_keyword_stat:
@@ -674,7 +677,10 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
         keyword_setting = keyword_text_to_keyword_setting[text]
-        keyword_stat.added_clicks = keyword_setting.added_clicks
+        added_clicks = keyword_setting.added_clicks
+        if not added_clicks:
+           added_clicks = 0
+        keyword_stat.added_clicks = added_clicks
         keyword_stat.keyword_setting_original_id = keyword_setting.id
         keyword_stat.adv_id = adv_setting.adv_id
         if not keyword_setting:
@@ -692,7 +698,9 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
 
     for keyword_stat in keyword_stats:
         clicks = keyword_stat.calculated_clicks
+        assert clicks
         views = keyword_stat.calculated_views
+        assert views
         enough_views = keyword_stat.enough_views
         assert enough_views
         original_predict_ctr = keyword_stat.original_predict_ctr
@@ -741,25 +749,24 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
             continue
         if hard_status == 2:
             keyword_stat.status = KeywordStatus.GOOD
+            keyword_stat.reason = 'white_list'
             keyword_setting.auto_block = False
-            await redis_manager.set_auto_block_status(keyword_setting.id, False)
             await asyncio.sleep(0)
             continue
         elif hard_status == 0:
             keyword_stat.status = KeywordStatus.BAD
             keyword_stat.reason = 'black_list'
-            await redis_manager.set_auto_block_status(keyword_setting.id, False)
             await asyncio.sleep(0)
             continue
         if min_ctr == 0:
             keyword_stat.status = KeywordStatus.GOOD
-            await redis_manager.set_auto_block_status(keyword_setting.id, False)
+            keyword_stat.reason = 'min_ctr_is_zero'
             await asyncio.sleep(0)
             continue
         baes_predict_ctr = keyword_stat.baes_predict_ctr
         if baes_predict_ctr >= min_ctr:
             keyword_stat.status = KeywordStatus.GOOD
-            await redis_manager.set_auto_block_status(keyword_setting.id, False)
+            keyword_stat.reason = 'baes_ctr_more_than_min_ctr'
         else:
             if keyword_stat.views < adv_setting.min_views_for_ml_predict:
                 keyword_stat.status = KeywordStatus.GOOD
@@ -771,12 +778,35 @@ async def get_good_bad_phrases_for_min_ctr(adv_setting: AdvSetting,
                 await redis_manager.set_auto_block_status(keyword_setting.id, True)
         assert keyword_stat.predict_ctr
         await asyncio.sleep(0)
-    await redis_manager.set_auto_block_statuses(new_statuses)
     logger.debug('Проверяю статусы ключевых слов с assert')
 
     for keyword_stat in keyword_stats:
         assert keyword_stat.status
-        assert keyword_stat.status in ['good', 'bad']
+        assert keyword_stat.status in ['good', 'bad', 'views_is_not_enough', 'max_cpm']
+
+    for keyword_stat in keyword_stats:
+        for property in keyword_stat.__dict__:
+            if property in ['position_update',
+                            'k',
+                            'k',
+                            'best_keyword_status',
+                            'childs_keywords',
+                            'cpm',
+                            'promo_position',
+                            'original_predict_ctr',
+                            'real_position',
+                            'base_position',
+                            'cluster_name',
+                            'preset',
+                            'position'
+                            ]:
+                continue
+            value = getattr(keyword_stat, property)
+            try:
+                assert value is not None
+            except AssertionError as e:
+                logger.error(f'Ошибка в значении {property} для {keyword_stat.text}: {value}')
+
     logger.debug('Слова по assert проверены')
     logger.debug('Возвращаю итоговую статистику')
     return keyword_stats
@@ -1037,7 +1067,7 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 
-async def get_min_ctr(adv: AdvSetting):
+async def get_min_ctr(adv: AdvSetting) -> float:
     if not adv.new_auto_min_ctr_mode:
         hard_min_ctr = adv.hard_min_ctr
         if not hard_min_ctr:
