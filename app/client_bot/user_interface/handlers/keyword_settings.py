@@ -251,7 +251,7 @@ async def setting_keywords_white_list(callback: CallbackQuery,
         result = await session.execute(stmt)
         adv_setting: AdvSetting = result.scalar()
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
-    keywords = [keyword for keyword in keywords if keyword.keyword_setting.hard_status == 2]
+    keywords = [keyword for keyword in keywords if keyword.hard_status == 2]
     keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
