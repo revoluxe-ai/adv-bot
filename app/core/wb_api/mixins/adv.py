@@ -107,7 +107,7 @@ class AdvMixin(InterfaceWBAPI):
 
     @try_except_decorator(1, 10)
     async def get_adv_balances(self):
-        url = 'https://advert-api.wb.ru/adv/v1/balance'
+        url = 'https://advert-api.wildberries.ru/adv/v1/balance'
         async with aiohttp.ClientSession() as session:
             response = await requests(session, 'GET', url=url, headers=self.headers.standart)
             response = json.loads(response)
@@ -132,7 +132,7 @@ class AdvMixin(InterfaceWBAPI):
 
 
     async def update_nmids_in_adv(self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]):
-        url = f'https://advert-api.wb.ru/adv/v1/auto/updatenm?id={adv_id}'
+        url = f'https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}'
         data = {
             'add': nmids_for_add,
             'delete': nmids_for_del

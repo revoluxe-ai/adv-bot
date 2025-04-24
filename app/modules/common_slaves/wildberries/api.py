@@ -264,7 +264,7 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(2, 1)
     async def get_keywords_stat_depr(self, adv_setting: AdvSetting)-> list[KeywordStat]:
         keywords = []
-        url = f'https://advert-api.wb.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}'
+        url = f'https://advert-api.wildberries.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}'
         async with aiohttp.ClientSession() as session:
             response_text = await requests(session, 'GET', url,
                                                 headers=self.headers.standart)
@@ -363,7 +363,7 @@ class AdvertApi(ABC_WB_API):
             phrases.sort(key=lambda x: len(x), reverse=True)
             phrases = phrases[:1000]
             logger.debug('Больше 1000 минус-фраз, обрезаем до 1000')
-        url = f'https://advert-api.wb.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}'
+        url = f'https://advert-api.wildberries.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}'
         data = {
             "excluded": phrases
         }
@@ -394,7 +394,7 @@ class AdvertApi(ABC_WB_API):
                 break
         subjectID = catch_card.subjectID
 
-        url = 'https://advert-api.wb.ru/adv/v1/save-ad'
+        url = 'https://advert-api.wildberries.ru/adv/v1/save-ad'
         data_json = {
             "type": 8,
             "name": ', '.join([str(nmid) for nmid in nmids]),
@@ -418,7 +418,7 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 1)
     async def pause_company(self, adv_id: int):
-        url = f'https://advert-api.wb.ru/adv/v0/pause?id={adv_id}'
+        url = f'https://advert-api.wildberries.ru/adv/v0/pause?id={adv_id}'
         async with aiohttp.ClientSession() as session:
             try:
                 await requests(session, 'GET',

@@ -83,7 +83,7 @@ async def get_access_for_wb_cabinet(wb_cabinet_id_or_shop_id: typing.Union[int, 
             raise exceptions.WBCabinetNotFoundError(wb_cabinet_id)
             
         shop_id = str(wb_cabinet.shop_id)
-        stmt = select(WBToken)
+        stmt = select(WBToken).where(WBToken.shop_id==shop_id)
         result = await session.stream(stmt)
         catch_tokens = []
         

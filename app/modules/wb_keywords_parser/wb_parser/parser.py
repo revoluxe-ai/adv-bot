@@ -115,7 +115,7 @@ def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_del
 
 def get_parse_url(text: str, page: int):
     assert  60 >=  page > 0
-    url = f'https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
+    url = f'https://search.wildberries.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false'
     return url
 
 class ParserService:

@@ -46,7 +46,7 @@ class async_WBApi(ABC_WB_API):
         self._wb_stat_backup_file = 'wb_stat_backup_file'
 
     async def turn_on_only_booster(self, adv):
-        url = f'https://advert-api.wb.ru/adv/v1/auto/active?id={adv.advertId}'
+        url = f'https://advert-api.wildberries.ru/adv/v1/auto/active?id={adv.advertId}'
         data = {
             "recom": False,
             "booster": True,
@@ -82,7 +82,7 @@ class async_WBApi(ABC_WB_API):
                 break
         subjectID = catch_card.subjectID
 
-        url = 'https://advert-api.wb.ru/adv/v1/save-ad'
+        url = 'https://advert-api.wildberries.ru/adv/v1/save-ad'
         data_json = {
             "type": 8,
             "name": ', '.join([str(nmid) for nmid in nmids]),
@@ -137,7 +137,7 @@ class async_WBApi(ABC_WB_API):
         await self.update_nmids_in_adv(adv, nmids_for_add, nmids_for_del)
 
     async def update_nmids_in_adv(self, adv: Adv, nmids_for_add: list[int], nmids_for_del: list[int]):
-        url = f'https://advert-api.wb.ru/adv/v1/auto/updatenm?id={adv.advertId}'
+        url = f'https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv.advertId}'
         data = {
             'add': nmids_for_add,
             'delete': nmids_for_del
@@ -211,7 +211,7 @@ class async_WBApi(ABC_WB_API):
 
     async def get_keywords_stat(self, company):
         timer = 5
-        url = f'https://advert-api.wb.ru/adv/v2/auto/daily-words?id={company.advertId}'
+        url = f'https://advert-api.wildberries.ru/adv/v2/auto/daily-words?id={company.advertId}'
         while True:
             try:
                 async with aiohttp.ClientSession() as session:
