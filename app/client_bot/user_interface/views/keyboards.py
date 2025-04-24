@@ -527,8 +527,7 @@ def get_keyword_setting_keyboard(
     keyword: KeywordSetting,
     calculated_keyword: CalculatedKeyword,
     adv_setting: AdvSetting,
-    page,
-    return_to: str = 'by_adv') -> InlineKeyboardMarkup:
+    page) -> InlineKeyboardMarkup:
 
     adv_setting_original_id = adv_setting.id
     keyword_setting_original_id = keyword.id
