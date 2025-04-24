@@ -5,7 +5,7 @@ from sqlalchemy import select
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.exc import CardNotFoundInDB
 from aiogram import Router
-from aiogram.exceptions import TelegramForbiddenError
+from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.types.error_event import ErrorEvent
 import aiogram
@@ -40,6 +40,16 @@ user_router = Router()
 #
 
 admin_router = Router()
+
+
+@admin_router.errors(ExceptionTypeFilter(TelegramBadRequest))
+async def error_handler_for_user(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+    await state.set_state()
+    message = error_event.update.message
+    chat_id = message.chat.id
+    await bot.send_message(chat_id=chat_id,
+                           text='Кнопка устарела, нажмите на нее или другую еще раз. В случае регулярного повторения '
+                                f'проблемы обратитесь в поддержку -> {const.SUPPORT_LINK}')
 
 
 
@@ -169,11 +179,5 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
         await bot.send_message(admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены.")
 
     await bot.send_message(admin_telegram_id, 'Ник пользователя: %s' % user_name )
-
-
-
-
-
-
 
 
