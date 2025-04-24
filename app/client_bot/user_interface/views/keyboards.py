@@ -539,7 +539,9 @@ def get_keyword_setting_keyboard(
     else:
         reason = None
         
-    if calculated_keyword.hard_status == 1 and calculated_keyword.status == KeywordStatus.BAD:
+    if (calculated_keyword.hard_status == 1
+            and calculated_keyword.status == KeywordStatus.BAD
+            and calculated_keyword.reason != 'max_position'):
         button = [InlineKeyboardButton(text='Тестировать дальше',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=-1,
