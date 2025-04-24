@@ -553,6 +553,16 @@ def get_keyword_setting_keyboard(
                                            new_hard_status=AUTO_MODE,
                                            keyword_setting_original_id=keyword_setting_original_id).pack())]
         buttons.append(button)
+
+    if keyword.hard_status in [BLACK_LIST,  TURN_OFF, AUTO_MODE]:
+
+
+        button = [InlineKeyboardButton(text='В белый список',
+                                       callback_data=callbacks.ChangeKeywordHardStatus(
+                                             new_hard_status=WHITE_LIST,
+                                             keyword_setting_original_id=keyword_setting_original_id).pack())]
+        buttons.append(button)
+
     if keyword.hard_status in [AUTO_MODE, WHITE_LIST]  or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
 
         bottom = [InlineKeyboardButton(text='Отключить (релевантная фраза)',
@@ -561,14 +571,7 @@ def get_keyword_setting_keyboard(
                                             keyword_setting_original_id=keyword_setting_original_id).pack())]
         buttons.append(bottom)
 
-
-        button = [InlineKeyboardButton(text='В список не релевантных фраз',
-                                       callback_data=callbacks.ChangeKeywordHardStatus(
-                                           new_hard_status=BLACK_LIST,
-                                           keyword_setting_original_id=keyword_setting_original_id).pack())]
-        buttons.append(button)
-
-    if keyword.hard_status == TURN_OFF:
+    if keyword.hard_status in [AUTO_MODE, WHITE_LIST, TURN_OFF]:
         button = [InlineKeyboardButton(text='В список не релевантных фраз',
                                        callback_data=callbacks.ChangeKeywordHardStatus(
                                            new_hard_status=BLACK_LIST,
