@@ -395,7 +395,7 @@ def get_keywords_setting_keyboard(keywords: list[CalculatedKeyword],
 
         text += f'({round(keyword.predict_ctr*100, 2)}%)'
 
-        text += f"""{"(" + str(keyword.keyword_setting.added_clicks) + ")" if keyword.added_clicks  else ''}"""
+        text += f"""{"(" + str(keyword.added_clicks) + ")" if keyword.added_clicks  else ''}"""
         text += f"""{'❗' if not cluster_name else  ''}"""
         inline_keyboard = [InlineKeyboardButton(text= text,
                                                 callback_data=callbacks.SettingKeyword(
