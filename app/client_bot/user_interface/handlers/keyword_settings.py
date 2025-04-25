@@ -147,7 +147,7 @@ async def setting_keywords_show_keywords_is_hard(callback: CallbackQuery,
             result = await session.execute(stmt)
             adv_setting: AdvSetting = result.scalar()
         keywords = await utils.get_keywords_for_keyboard(adv_setting)
-        keywords = [keyword for keyword in keywords if keyword.keyword_setting.hard_status == 3]
+        keywords = [keyword for keyword in keywords if keyword.hard_status == 3]
         keyword_texts = [keyword.text for keyword in keywords]
         await state.update_data(keywords_filter=keyword_texts)
         await state.update_data(adv_choice_last_page=1)
