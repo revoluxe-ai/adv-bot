@@ -16,7 +16,7 @@ class WhiteListUpdater:
         top_keyword: CalculatedKeyword = keywords[0]
 
         stmt = update(KeywordSetting)\
-            .where(KeywordSetting.id == top_keyword.keyword_setting.id)\
+            .where(KeywordSetting.id == int(top_keyword.keyword_setting_original_id))\
         .values({
             KeywordSetting.hard_status: 2
 
