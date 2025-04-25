@@ -175,7 +175,7 @@ class WBToken(BaseTable):
         except:
             raise exceptions.NotValidTokenError
 
-    def check_valid(self):
+    def check_valid(self) -> None:
         try:
             result = jwt.decode(self.api_key, options={"verify_signature": False})
             if result:
