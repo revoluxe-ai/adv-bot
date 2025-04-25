@@ -509,7 +509,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""
                 'ID кампании: ' + str(self._adv_setting.adv_id) + '\n'
                 f'ID Аукциона: {self._adv_setting.search_adv_id}\n'
-                f'Общая статистика за 3 дня:\n'
+                f'Общая статистика за 2 дня:\n'
                 f'Минимальный CRT для кампании: {self.min_ctr * 100:.2f}%\n'
                 f'Страница: {self._page}/{total_page + 1}\n'
                 f'Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n'
