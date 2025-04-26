@@ -23,7 +23,10 @@ T = TypeVar("T")
 
 
 def try_except_decorator(
-    requests_per_interval: int, interval_seconds: int | float, max_attempts=50, max_delay=120
+    requests_per_interval: int,
+    interval_seconds: int | float,
+    max_attempts=50,
+    max_delay=120,
 ) -> Callable:
     def decorator(func):
         async def wrapper(instance, *args, **kwargs) -> T:
