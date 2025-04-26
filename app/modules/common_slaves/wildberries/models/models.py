@@ -109,7 +109,9 @@ class WBBonusPayment(BaseTable):
 
 class WBCabinet(BaseTable):
     shop_id: Mapped[str] = Column(String, nullable=False, unique=True)
-    wb_cards = relationship("WBCard", back_populates="wb_cabinet", uselist=True)
+    wb_cards: Mapped[list["WBCard"]] = relationship(
+        "WBCard", back_populates="wb_cabinet", uselist=True
+    )
     wb_categories = relationship("WBCategory", uselist=True)
     adv_settings = relationship("AdvSetting", back_populates="wb_cabinet", uselist=True)
     wb_user_cabinets: Mapped[list[WBUserCabinet]] = relationship(
@@ -262,7 +264,7 @@ class WBCategory(BaseTable):
     cabinet_id = Column(
         Integer, ForeignKey("wbcabinet.id"), nullable=False
     )  # Добавляем внешний ключ, ссылающийся на кабинет
-    wb_cabinet = relationship(
+    wb_cabinet: Mapped[WBCabinet] = relationship(
         "WBCabinet", back_populates="wb_categories"
     )  # Добавляем связь обратно к WbCabinet
     wb_category_name: Mapped[str] = mapped_column(String, nullable=False)
