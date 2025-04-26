@@ -1,7 +1,7 @@
 from aiogram import Router, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
@@ -28,15 +28,21 @@ async def add_white_phrases(
 
 
 @router.message(StateFilter(states.AddBlackPhrasesTemplates.waiting_for_black_phrases))
-async def waiting_for_black_phrases(message, bot: Bot, state: FSMContext) -> None:
+async def waiting_for_black_phrases(
+    message: Message, bot: Bot, state: FSMContext
+) -> None:
     text = message.text
+    if not text:
+        return None
     keywords = text.split("\n")
     keywords = [keyword.strip().lower() for keyword in keywords]
     data = await state.get_data()
     adv_setting_id = data["last_adv_setting_id"]
     await data_manager.update_black_phrases(adv_setting_id, keywords)
+    assert message.from_user
     user_id = message.from_user.id
     await messages.WaitingForBlackPhrases(bot, user_id)(adv_setting_id)
+    return None
 
 
 @router.callback_query(callbacks.ResetBlackPhrases.filter())
