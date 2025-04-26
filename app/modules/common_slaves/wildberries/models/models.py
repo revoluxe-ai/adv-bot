@@ -265,8 +265,10 @@ class WBCategory(BaseTable):
     wb_cabinet = relationship(
         "WBCabinet", back_populates="wb_categories"
     )  # Добавляем связь обратно к WbCabinet
-    wb_category_name = Column(String, nullable=False)
-    wb_cards = relationship("WBCard", back_populates="wb_category", uselist=True)
+    wb_category_name: Mapped[str] = mapped_column(String, nullable=False)
+    wb_cards: Mapped[list["WBCard"]] = relationship(
+        "WBCard", back_populates="wb_category", uselist=True
+    )
 
 
 class WBCard(BaseTable):  # Изменено название таблицы
@@ -274,16 +276,20 @@ class WBCard(BaseTable):  # Изменено название таблицы
     offer_id = Column(String)
     name = Column(String)
     wb_category_id = Column(Integer, ForeignKey("wbcategory.id"))
-    wb_category = relationship("WBCategory", back_populates="wb_cards", lazy="joined")
+    wb_category: Mapped[WBCategory] = relationship(
+        "WBCategory", back_populates="wb_cards", lazy="joined"
+    )
     json: Mapped[str] = Column(JSONB)
     wb_cabinet_id = Column(
         Integer, ForeignKey("wbcabinet.id")
     )  # Добавляем внешний ключ к WbCabinet
-    wb_cabinet = relationship("WBCabinet", back_populates="wb_cards")
+    wb_cabinet: Mapped[WBCabinet] = relationship("WBCabinet", back_populates="wb_cards")
     adv_setting_id = Column(
         Integer, ForeignKey("advsetting.id")
     )  # Добавлен внешний ключ
-    adv_setting = relationship("AdvSetting", back_populates="wb_cards")
+    adv_setting: Mapped["AdvSetting"] = relationship(
+        "AdvSetting", back_populates="wb_cards"
+    )
     updated = Column(Boolean, default=False)
     add_to_db = Column(Boolean, default=False)
 
