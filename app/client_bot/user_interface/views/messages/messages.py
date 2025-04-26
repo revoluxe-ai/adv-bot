@@ -64,18 +64,18 @@ class ShopNameGet(Text):
         super().__init__(bot, chat_id)
 
     @property
-    def text(self):
+    def text(self) -> str:
         return "Введите название магазина (кабинета):"
 
 
 class ShopAddedSuccess(Text):
 
-    def __init__(self, bot: Bot, chat_id, cabinet_name: str):
+    def __init__(self, bot: Bot, chat_id, cabinet_name: str) -> None:
         super().__init__(bot, chat_id)
         self.__cabinet_name = cabinet_name
 
     @property
-    def text(self):
+    def text(self) -> str:
         return (
             f"Магазин {self.__cabinet_name} успешно добавлен, идет обновление данных..."
         )
@@ -104,23 +104,23 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         adv_settings: list[AdvSetting],
         state,
         page: int = 1,
-    ):
+    ) -> None:
         self._state = state
         super().__init__(bot, chat_id)
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
         self._adv_settings = adv_settings
         self._page = page  # Устанавливаем страницу из параметра
-        self._keywords_filter = None  # Инициализируем фильтр ключевых слов
+        self._keywords_filter: list[str] = []  # Инициализируем фильтр ключевых слов
 
     @staticmethod
-    async def _get_wb_cabinet(wb_cabinet_original_id: int):
+    async def _get_wb_cabinet(wb_cabinet_original_id: int) -> WBCabinet:
         async with sm() as session:
             stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
             result = await session.execute(stmt)
             wb_cabinet = result.scalar()
             return wb_cabinet
 
-    async def __call__(self) -> (LastMessage, str):
+    async def __call__(self) -> tuple[LastMessage, str]:
         await self._state.set_state(
             states.AdvCompanyCatalog.waiting_for_keywords_for_filter
         )
@@ -133,8 +133,8 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             else:
                 inactive_advs.append(adv)
         adv_settings = active_advs + inactive_advs
-        adv_settings: list[AdvSetting] = await self._filter_advs(adv_settings)
-        self._adv_settings = adv_settings
+        adv_settings_filtred: list[AdvSetting] = await self._filter_advs(adv_settings)
+        self._adv_settings = adv_settings_filtred
         stmt = select(WBCabinet.id).where(
             WBCabinet.wb_user_cabinets.any(
                 WBUserCabinet.id == int(self._wb_user_cabinet_original_id)
@@ -153,7 +153,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
     async def _filter_advs(self, adv_settings: list[AdvSetting]) -> list[AdvSetting]:
         state_data = await self._state.get_data()
-        keywords_filter: list[str] | None = state_data.get("filter_advs")
+        keywords_filter: list[str] = state_data.get("filter_advs", [])
         self._keywords_filter = keywords_filter
         if keywords_filter:
             clear_advs = []
@@ -460,11 +460,10 @@ class KeywordSettingMessage(TextWithKeyboard):
         )
         return keyword
 
-    async def __call__(self) -> (LastMessage, str):
-        auto_block_status = await redis_manager.get_auto_block_status(
-            self._keyword_original_id
-        )
-        self._auto_block_status = auto_block_status
+    async def __call__(self) -> tuple[LastMessage, str]:
+
+        calculated_keyword: CalculatedKeyword = await red
+
         async with sm(read_only=True) as session:
             stmt = (
                 select(KeywordSetting)
