@@ -24,22 +24,22 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
-from app.modules.wb_adv_updater.models import AdvPayment
+from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
-from app.utils.db.models import User, favorite_advs_association
+from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
 
 
 class WBUserCabinet(BaseTable):
-    wb_cabinet_id: Mapped[Integer] = Column(
+    wb_cabinet_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("wbcabinet.id"), nullable=False
     )
     wb_cabinet: Mapped["WBCabinet"] = relationship(
         "WBCabinet", back_populates="wb_user_cabinets"
     )
-    user_id: Mapped[Integer] = Column(Integer, ForeignKey("user.id"), nullable=False)
+    user_id: Mapped[int] = Column(Integer, ForeignKey("user.id"), nullable=False)
     user: Mapped[User] = relationship("User", back_populates="wb_user_cabinets")
     name = Column(String(255), nullable=False)
     __table_args__ = (
@@ -55,10 +55,12 @@ class WBBalancePayment(BaseTable):
     __tablename__ = "wbbalancepayment"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    wb_cabinet_id: Mapped[Integer] = Column(
+    wb_cabinet_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("wbcabinet.id"), nullable=False
     )
-    wb_cabinet = relationship("WBCabinet", back_populates="balance_payments")
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="balance_payments"
+    )
 
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=True)
@@ -78,10 +80,12 @@ class WBBonusPayment(BaseTable):
     __tablename__ = "wbbonuspayment"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    wb_cabinet_id: Mapped[Integer] = Column(
+    wb_cabinet_id: Mapped[int] = Column(
         Integer, ForeignKey("wbcabinet.id"), nullable=False
     )
-    wb_cabinet = relationship("WBCabinet", back_populates="bonus_payments")
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="bonus_payments"
+    )
 
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=True)
@@ -118,8 +122,12 @@ class WBCabinet(BaseTable):
     )
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
-    balance = Column(Float, default=0, server_default=text("0"), nullable=False)
-    bonus = Column(Float, default=0, server_default=text("0"), nullable=False)
+    balance: Mapped[float] = mapped_column(
+        Float, default=0, server_default=text("0"), nullable=False
+    )
+    bonus: Mapped[float] = mapped_column(
+        Float, default=0, server_default=text("0"), nullable=False
+    )
     white_list_update_active = Column(Boolean, default=False)
     balance_payments = relationship(
         "WBBalancePayment", back_populates="wb_cabinet", uselist=True
@@ -135,7 +143,7 @@ class WBCabinet(BaseTable):
     )
 
     @hybrid_property
-    def calculated_balance(self):
+    def calculated_balance(self) -> float:
         """Вычисляет баланс на основе начального значения balance и всех платежей"""
         if not self.balance_payments:
             return self.balance  # Если нет платежей, возвращаем текущее значение
@@ -144,7 +152,7 @@ class WBCabinet(BaseTable):
         return self.balance + sum(payment.amount for payment in self.balance_payments)
 
     @hybrid_property
-    def calculated_bonus(self):
+    def calculated_bonus(self) -> float:
         """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
         if not self.bonus_payments:
             return self.bonus  # Если нет платежей, возвращаем текущее значение
@@ -157,8 +165,8 @@ class WBToken(BaseTable):
     def __repr__(self):
         return f"user_id: {self.user_id}"
 
-    api_key = Column(String, nullable=False)
-    user_id = Column(Integer, ForeignKey("user.id"))
+    api_key: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
     user = relationship("User", back_populates="wb_tokens", lazy="joined")
     active = Column(Boolean, default=True)
     shop_id: Mapped[str] = mapped_column(String, nullable=True)
@@ -175,12 +183,15 @@ class WBToken(BaseTable):
         except:
             raise exceptions.NotValidTokenError
 
-    def check_valid(self) -> None:
+    def check_valid(self) -> bool:
         try:
+            assert self.api_key
             result = jwt.decode(self.api_key, options={"verify_signature": False})
             if result:
                 return True
-        except Exception:
+            else:
+                return False
+        except ValueError:
             return False
 
     def get_payload(self, key, default=0):
@@ -259,12 +270,12 @@ class WBCategory(BaseTable):
 
 
 class WBCard(BaseTable):  # Изменено название таблицы
-    nmid = Column(Integer, unique=True, nullable=False)
+    nmid: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     offer_id = Column(String)
     name = Column(String)
     wb_category_id = Column(Integer, ForeignKey("wbcategory.id"))
     wb_category = relationship("WBCategory", back_populates="wb_cards", lazy="joined")
-    json = Column(JSONB)
+    json: Mapped[str] = Column(JSONB)
     wb_cabinet_id = Column(
         Integer, ForeignKey("wbcabinet.id")
     )  # Добавляем внешний ключ к WbCabinet
@@ -314,27 +325,31 @@ class AdvSetting(BaseTable):
     favorite_users: Mapped[list[User]] = relationship(
         "User", secondary=favorite_advs_association, back_populates="favorites_advs"
     )
-    adv_id = Column(BIGINT(), unique=True)  # Автоматическая рекламная кампания
+    adv_id: Mapped[int] = mapped_column(
+        BIGINT(), unique=True
+    )  # Автоматическая рекламная кампания
     name = mapped_column(String, nullable=False)
-    wb_cabinet_id = Column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
+    wb_cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
     wb_cabinet: Mapped[WBCabinet] = relationship(
         "WBCabinet", back_populates="adv_settings", lazy="joined"
     )
-    wb_cards = relationship(
+    wb_cards: Mapped[list[WBCard]] = relationship(
         "WBCard",
         back_populates="adv_setting",
         cascade="all," "delete-orphan",
         uselist=True,
     )  # Изменено на множественное число
-    active_status = Column(String, default=False)
-    adv_keywords = relationship(
+    active_status: Mapped[str] = mapped_column(String, default=False)
+    adv_keywords: Mapped[list[AdvKeyword]] = relationship(
         "AdvKeyword",
         cascade="all, delete-orphan",
         back_populates="adv_setting",
         uselist=True,
     )
-    bot_active = Column(Boolean, default=False)
-    nmids = Column(JSONB, default=[])
+    bot_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    nmids: Mapped[list[int] | None] = Column(JSONB, default=[])
     keyword_settings: Mapped[list["KeywordSetting"]] = relationship(
         "KeywordSetting",
         cascade="all, delete-orphan",
@@ -347,10 +362,10 @@ class AdvSetting(BaseTable):
     hard_min_ctr = Column(Float, nullable=True)
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
-    payments = relationship(AdvPayment, back_populates="adv_setting", uselist=True)
+    payments = relationship("AdvPayment", back_populates="adv_setting", uselist=True)
     parsing_active = mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
-    bidder_active = mapped_column(Boolean, default=False)
+    bidder_active: Mapped[bool] = mapped_column(Boolean, default=False)
     max_cpm = mapped_column(Integer, nullable=True)
     max_place = mapped_column(Integer, nullable=True)
     min_block_position = mapped_column(Integer, nullable=True, default=0)
@@ -453,7 +468,7 @@ class AdvSetting(BaseTable):
     def auto_max_bid(self) -> bool:
         pattern = re.compile(
             r"<MAX_PAY>(\d+)!?</MAX_PAY>"
-        )  # Используем тот же паттерн, чтобы найти !
+        )  # Используем тот же паттерн, чтобы найти!
         match = re.search(pattern, self.name)
         if match and "!" in match.group(0):  # Проверяем, есть ли "!" в найденной строке
             return True
@@ -492,7 +507,7 @@ class KeywordSetting(BaseTable):
         cascade="all, delete-orphan",
         uselist=True,
     )
-    hard_status = Column(Integer, default=1)
+    hard_status: Mapped[int] = mapped_column(Integer, default=1)
     added_clicks = Column(Integer, default=0)
     added_views = Column(Integer, default=0)
     auto_block = Column(Boolean)
@@ -542,7 +557,7 @@ class WBItemPosition:
     real_position: int = None
     timestamp: datetime.datetime = None
     promo_position: int = None
-    cpm: int = None
+    cpm: int | None = None
     adv_id: int = None
     keyword_text: str = None
     adv_type: int | None = None
@@ -587,7 +602,7 @@ class WBItemPosition:
         position.keyword_text = data["keyword_text"]
         try:
             position.adv_type = data["adv_type"]
-        except:
+        except KeyError:
             position.adv_type = None
 
         return position
