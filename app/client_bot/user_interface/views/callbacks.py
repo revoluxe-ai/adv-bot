@@ -10,9 +10,9 @@ class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
 
 
 class Action:
-    new = 'new'
-    select = 'select'
-    buy = 'buy'
+    new = "new"
+    select = "select"
+    buy = "buy"
 
 
 class BudgetForCreatingAdv(CallbackData, prefix="budget"):
@@ -30,7 +30,7 @@ class ShopNew(CallbackData, prefix="shop_new"):
 
 class Adv(CallbackData, prefix="adv"):
     adv_original_id: int
-    action: Optional[str] = 'select'
+    action: Optional[str] = "select"
     wb_user_cabinet_original_id: Optional[int] = None
 
 
@@ -60,7 +60,7 @@ class DeleteWbUserCabinet(CallbackData, prefix="delete_wb_user_cabinet"):
 
 class SettingKeywords(CallbackData, prefix="setting_keywords"):
     adv_original_id: int
-    type: str = 'by_adv'
+    type: str = "by_adv"
     page: int = 1
     reset_filter: bool = False
 
@@ -79,7 +79,6 @@ class CheckSubscribe(CallbackData, prefix="check_subscribe"):
 
 
 class RefProgram(CallbackData, prefix="ref_program"):
-
     """select or new"""
 
     action: str
@@ -105,8 +104,10 @@ class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     adv_original_id: int
 
 
-class ChangeMinViewsForPredictCTR(CallbackData, prefix="change_min_views_for_predict_ctr"):
-    pass
+class ChangeMinViewsForPredictCTR(
+    CallbackData, prefix="change_min_views_for_predict_ctr"
+):
+    adv_setting_original_id: int
 
 
 class AddBalance(CallbackData, prefix="add_balance"):
@@ -212,4 +213,3 @@ class ResetPlace(CallbackData, prefix="reset_place"):
 class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
     action: str
     wb_cabinet_original_id: int
-
