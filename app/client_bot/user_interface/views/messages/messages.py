@@ -453,17 +453,13 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._keyword_original_id = keyword_setting_id
         self._page = last_page
 
-    async def _get_calculated_keyword(self):
+    @staticmethod
+    async def _get_calculated_keyword(adv_id: int, text: str):
         redis_manager = RedisCalculatedKeywordsCacheManager()
-        keyword = await redis_manager.get_calculated_keyword(
-            self._adv_setting.adv_id, self._keyword_setting.text
-        )
+        keyword = await redis_manager.get_calculated_keyword(adv_id, text)
         return keyword
 
     async def __call__(self) -> tuple[LastMessage, str]:
-
-        calculated_keyword: CalculatedKeyword = await red
-
         async with sm(read_only=True) as session:
             stmt = (
                 select(KeywordSetting)
@@ -474,6 +470,10 @@ class KeywordSettingMessage(TextWithKeyboard):
             keyword_setting: KeywordSetting = result.scalars().one()
         adv_setting: AdvSetting = keyword_setting.adv_setting
         self._keyword_setting = keyword_setting
+        adv_id = adv_setting.adv_id
+        text = str(keyword_setting.text)
+        calculated_keyword = await self._get_calculated_keyword(adv_id, text)
+        self.calculated_keyword = calculated_keyword
         self._adv_setting = adv_setting
         nmid = int(adv_setting.nmids[0])
         adv_id = int(self._adv_setting.adv_id)
@@ -500,11 +500,22 @@ class KeywordSettingMessage(TextWithKeyboard):
         self.original_predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
 
         self.spend = total_spend
-        self.calculated_keyword = await self._get_calculated_keyword()
         return await super().__call__()
+
+    @staticmethod
+    def get_str_rus_hard_status(int_hard_status: int) -> str:
+        if int_hard_status == 0:
+            return "Список не релевантных фраз"
+        elif int_hard_status == 1:
+            return "Авто"
+        elif int_hard_status == 2:
+            return "Белый список"
+        else:
+            raise ValueError("Неизвестный хард-статус ключа")
 
     @property
     def text(self) -> str:
+        calculated_keyword = self.calculated_keyword
         keyword_text = self._keyword_setting.text
         keyword_text = re.sub(r"([_*[\]()~>`#+\-=|{}.!])", r"\\\1", keyword_text)
         nmids = list(self._adv_setting.nmids)
@@ -512,6 +523,8 @@ class KeywordSettingMessage(TextWithKeyboard):
         nmids_str = ", ".join(nmids)
         text = (
             f"""Артикул: {nmids_str}\n"""
+            f"""Хард-статус: {self.get_str_rus_hard_status(calculated_keyword.hard_status)}\n"""
+            f"""Текущий статус ключа: {calculated_keyword.status}\n"""
             f"🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n"
             f"📈 *Показы:* {self.views}\n"
             f"🖱 *Клики:* {self.clicks}\n"
