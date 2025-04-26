@@ -11,9 +11,8 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
     KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import KeywordSetting
+from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting
 from app.modules.wb_adv_updater import data_manager
-from app.my_types import AdvSetting
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -41,7 +40,7 @@ async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedK
     return all_phrases
 
 
-async def get_csv_file(adv_setting: AdvSetting):
+async def get_csv_file(adv_setting: AdvSetting) -> str:
     keywords: list[CalculatedKeyword] = await get_keywords_for_keyboard(adv_setting)
     csv_output = StringIO()
     csv_writer = csv.writer(
@@ -72,7 +71,16 @@ async def get_csv_file(adv_setting: AdvSetting):
 
     for keyword in keywords:
         clicks = keyword.clicks
+        assert clicks is not None
         views = keyword.views
+        assert views is not None
+        predict_ctr = keyword.predict_ctr
+        assert predict_ctr is not None
+        added_clicks = keyword.added_clicks
+        assert added_clicks is not None
+        added_clicks = keyword.added_clicks
+        if not added_clicks:
+            added_clicks = 0
         ctr = round(keyword.ctr * 100, 2)
         if keyword.reason == "max_position":
             hard_status = "ЦП"
@@ -94,10 +102,12 @@ async def get_csv_file(adv_setting: AdvSetting):
         turn_on = "✅Включен" if keyword.status == KeywordStatus.GOOD else "❌Выключен"
 
         # Определение позиций
-        first_position = ""
-        second_position = ""
+        first_position: Union[str, int] = ""
+        second_position: Union[str, int] = ""
         if adv_setting.parsing_active:
             if keyword.cpm:
+                assert keyword.base_position is not None
+                assert keyword.promo_position is not None
                 first_position = keyword.base_position
                 second_position = keyword.promo_position
             elif keyword.real_position:
@@ -111,16 +121,16 @@ async def get_csv_file(adv_setting: AdvSetting):
             [
                 keyword.text,
                 '"' + keyword.text + '"',
-                clicks,
-                views,
-                keyword.query,
+                str(clicks),
+                str(views),
+                str(keyword.query),
                 str(ctr).replace(".", ","),
-                str(round(keyword.predict_ctr * 100, 2)).replace(".", ","),
+                str(round(predict_ctr * 100, 2)).replace(".", ","),
                 turn_on,
                 hard_status,
-                first_position,
-                second_position,
-                keyword.added_clicks or 0,
+                str(first_position),
+                str(second_position),
+                str(added_clicks),
                 str(round(keyword.rating_by_predict_ctr * 100, 4)).replace(".", ","),
             ]
         )
@@ -136,17 +146,19 @@ async def get_csv_file(adv_setting: AdvSetting):
     return csv_string
 
 
-async def create_ref_link(ref_link_name, user_telegram_id):
+async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink | None:
     stmt = select(RefLink).where(
         and_(RefLink.name == ref_link_name, RefLink.referrer_id == user_telegram_id)
     )
     async with _sm(read_only=False) as session:
-        result = await session.execute(stmt)
-        ref_link = result.scalar_one_or_none()
+        result_ref_link = await session.execute(stmt)
+        ref_link = result_ref_link.scalar_one_or_none()
         if ref_link:
-            return False
-        stmt = select(User.id).where(User.user_telegram_id == user_telegram_id)
-        result = await session.execute(stmt)
+            return None
+        stmt_for_user_id = select(User.id).where(
+            User.user_telegram_id == user_telegram_id
+        )
+        result = await session.execute(stmt_for_user_id)
         user_id: int = result.scalar_one()
         ref_link = RefLink(name=ref_link_name, referrer_id=user_id)
         session.add(ref_link)
