@@ -1,7 +1,8 @@
 import asyncio
 import json
+import logging
 import time
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, Callable
 
 import aiohttp
 from aiohttp import ClientOSError, ServerDisconnectedError, ClientResponseError
@@ -14,7 +15,6 @@ from .exceptions import (
     NotValidDataError,
     ApiErrorWithCode,
 )
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +23,8 @@ T = TypeVar("T")
 
 
 def try_except_decorator(
-    requests_per_interval, interval_seconds, max_attempts=50, max_delay=120
-):
+    requests_per_interval: int, interval_seconds: int | float, max_attempts=50, max_delay=120
+) -> Callable:
     def decorator(func):
         async def wrapper(instance, *args, **kwargs) -> T:
             if not hasattr(instance, "_api_call_state"):
