@@ -4,6 +4,8 @@ __all__ = [
     "WBCabinet",
     "WBUserCabinet",
     "WBItemPosition",
+    "WBCard",
+    "WBCategory",
 ]
 
 from .models import *
