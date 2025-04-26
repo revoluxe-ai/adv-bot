@@ -1,6 +1,6 @@
 import logging
 from abc import ABC
-from typing import Generator
+from typing import Generator, TypeVar
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exceptions import ApiForbiddenError
@@ -9,6 +9,9 @@ from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
 from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 logger = logging.getLogger(__name__)
+
+
+T = TypeVar("T")
 
 
 class BaseAPI(ABC):
@@ -28,7 +31,7 @@ class BaseAPI(ABC):
         self.shop_id = current_token.shop_id
 
     @staticmethod
-    def chunks(lst, n) -> Generator [list, None]:
+    def chunks(lst: list[T], n: int) -> Generator[list[T], None]:
         for i in range(0, len(lst), n):
             yield lst[i : i + n]
 
