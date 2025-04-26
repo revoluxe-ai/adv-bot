@@ -1,39 +1,38 @@
 import datetime
-from enum import Enum
-from typing import Optional, Union, List, Any, Callable
-import math
 import json
+import math
+from typing import Optional, Union, List, Any
+
+from pydantic import BaseModel, PlainValidator
 from typing_extensions import Annotated
-from pydantic import BaseModel, Field, field_validator, PlainValidator
-from app.modules.common_slaves.wildberries.models import KeywordSetting, WBItemPosition
+
+from app.modules.common_slaves.wildberries.models.models import WBItemPosition
 from app.modules.keywords_query import keywords_query
 
 
-def validate_datetime(v: Any) -> datetime.datetime:
+def validate_datetime(v: Any) -> datetime.datetime | None:
     if isinstance(v, datetime.datetime):
         return v
     if isinstance(v, str):
         return datetime.datetime.fromisoformat(v)
     if v is None:
         return None
-    raise ValueError(f'Invalid datetime: {v}')
+    raise ValueError(f"Invalid datetime: {v}")
 
 
 DatetimeType = Annotated[datetime.datetime, PlainValidator(validate_datetime)]
 
 
 class KeywordStatus:
-    GOOD = 'good'
-    BAD = 'bad'
-    VIEWS_IS_NOT_ENOUGH = 'views_is_not_enough'
-    MAX_CPM = 'max_cpm'
+    GOOD = "good"
+    BAD = "bad"
+    VIEWS_IS_NOT_ENOUGH = "views_is_not_enough"
+    MAX_CPM = "max_cpm"
 
 
 class CalculatedKeyword(BaseModel):
-    model_config = {
-        "arbitrary_types_allowed": True
-    }
-    
+    model_config = {"arbitrary_types_allowed": True}
+
     text: str
     clicks: int
     views: int
@@ -48,7 +47,7 @@ class CalculatedKeyword(BaseModel):
     base_position: Optional[int] = None
     promo_position: Optional[int] = None
     position_update: Optional[DatetimeType] = None
-    childs_keywords: Optional[List['CalculatedKeyword']] = None
+    childs_keywords: Optional[List["CalculatedKeyword"]] = None
     _query_static: Optional[int] = None
     cluster_name: Optional[str] = None
     preset: Optional[int] = None
@@ -67,6 +66,8 @@ class CalculatedKeyword(BaseModel):
 
     @property
     def mean_ctr(self):
+        assert self.predict_ctr is not None
+        assert self.baes_ctr is not None
         return (self.predict_ctr + self.baes_ctr) / 2
 
     @property
@@ -77,7 +78,11 @@ class CalculatedKeyword(BaseModel):
             return 0
         if self.predict_ctr is None:
             return 0
-        rating = self.predict_ctr ** predict_ctr_exponent * self.views / (k * math.log(1 + self.base_position))
+        rating = (
+            self.predict_ctr**predict_ctr_exponent
+            * self.views
+            / (k * math.log(1 + self.base_position))
+        )
         return rating
 
     @property
@@ -92,15 +97,17 @@ class CalculatedKeyword(BaseModel):
         self._query_static = value
 
     def __repr__(self) -> str:
-        text = (f'text: {self.text}'
-                f' clicks: {self.clicks}'
-                f' views: {self.views}'
-                f' spend: {self.spend}'
-                f' status: {self.status}'
-                f' keyword_setting: {self.keyword_setting}'
-                f' cpc: {self.cpc}'
-                f' ctr: {self.ctr}'
-                f' hard_status: {self.hard_status}')
+        text = (
+            f"text: {self.text}"
+            f" clicks: {self.clicks}"
+            f" views: {self.views}"
+            f" spend: {self.spend}"
+            f" status: {self.status}"
+            f" keyword_setting: {self.keyword_setting}"
+            f" cpc: {self.cpc}"
+            f" ctr: {self.ctr}"
+            f" hard_status: {self.hard_status}"
+        )
         return text
 
     @property
@@ -116,38 +123,46 @@ class CalculatedKeyword(BaseModel):
 
     def to_json(self) -> str:
         data = {
-            'text': self.text,
-            'clicks': self.clicks,
-            'views': self.views,
-            'spend': self.spend,
-            'base_ctr': self.baes_ctr,
-            'predict_ctr': self.predict_ctr,
-            'status': self.status,
-            'hard_status': self.hard_status,
-            'reason': self.reason,
-            'cpm': self.cpm,
-            'real_position': self.real_position,
-            'base_position': self.base_position,
-            'promo_position': self.promo_position,
-            'position_update': self.position_update.isoformat() if self.position_update else None,
-            'query_static': self._query_static,
-            'cluster_name': self.cluster_name,
-            'preset': self.preset,
-            'position': self.position.to_dict() if self.position else None,
-            'original_predict_ctr': self.original_predict_ctr,
-            'predict_ctr_exponent': self.predict_ctr_exponent,
-            'k': self.k,
-            'best_keyword_status': self.best_keyword_status,
-            'baes_predict_ctr': self.baes_predict_ctr,
-            'calculated_clicks': self.calculated_clicks,
-            'calculated_views': self.calculated_views,
-            'enough_views': self.enough_views,
+            "text": self.text,
+            "clicks": self.clicks,
+            "views": self.views,
+            "spend": self.spend,
+            "base_ctr": self.baes_ctr,
+            "predict_ctr": self.predict_ctr,
+            "status": self.status,
+            "hard_status": self.hard_status,
+            "reason": self.reason,
+            "cpm": self.cpm,
+            "real_position": self.real_position,
+            "base_position": self.base_position,
+            "promo_position": self.promo_position,
+            "position_update": (
+                self.position_update.isoformat() if self.position_update else None
+            ),
+            "query_static": self._query_static,
+            "cluster_name": self.cluster_name,
+            "preset": self.preset,
+            "position": self.position.to_dict() if self.position else None,
+            "original_predict_ctr": self.original_predict_ctr,
+            "predict_ctr_exponent": self.predict_ctr_exponent,
+            "k": self.k,
+            "best_keyword_status": self.best_keyword_status,
+            "baes_predict_ctr": self.baes_predict_ctr,
+            "calculated_clicks": self.calculated_clicks,
+            "calculated_views": self.calculated_views,
+            "enough_views": self.enough_views,
         }
         return json.dumps(data, ensure_ascii=False)
 
     @classmethod
-    def from_json(cls, json_str: str) -> 'CalculatedKeyword':
+    def from_json(cls, json_str: str) -> "CalculatedKeyword":
         data = json.loads(json_str)
-        data['position_update'] = validate_datetime(data['position_update']) if data['position_update'] else None
-        data['position'] = WBItemPosition.from_dict(data['position']) if data['position'] else None
+        data["position_update"] = (
+            validate_datetime(data["position_update"])
+            if data["position_update"]
+            else None
+        )
+        data["position"] = (
+            WBItemPosition.from_dict(data["position"]) if data["position"] else None
+        )
         return cls(**data)
