@@ -1,10 +1,14 @@
 from typing import Union
-
+import os
 import pandas as pd
+
+# Определяем абсолютный путь к файлу requests.csv
+current_dir = os.path.dirname(os.path.abspath(__file__))
+csv_path = os.path.join(current_dir, 'requests.csv')
 
 # Загружаем данные из CSV в DataFrame
 df = pd.read_csv(
-    'app/modules/keywords_query/requests.csv',
+    csv_path,
     header=None,
     names=['keyword', 'query']
 )
