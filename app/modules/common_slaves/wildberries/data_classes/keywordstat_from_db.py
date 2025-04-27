@@ -28,6 +28,7 @@ class KeywordStatus:
     BAD = "bad"
     VIEWS_IS_NOT_ENOUGH = "views_is_not_enough"
     MAX_CPM = "max_cpm"
+    MAX_CPC = "max_cpc"
 
 
 class CalculatedKeyword(BaseModel):
