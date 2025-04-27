@@ -1597,7 +1597,7 @@ async def get_active_search_advs() -> list[AdvSetting]:
     return adv_settings
 
 
-async def get_all_active_shop_ids_with_active_advs() -> list[int]:
+async def get_all_active_shop_ids_with_active_advs() -> list[str]:
     stmt = (
         select(WBCabinet.shop_id)
         .join(WBCabinet.adv_settings)
