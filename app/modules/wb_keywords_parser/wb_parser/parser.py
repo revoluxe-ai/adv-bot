@@ -31,6 +31,11 @@ class TotalPages:
             value = 60
         self._total_pages = value
 
+    @property
+    def all_pages_list(self):
+        all_pages = set(range(1, self.total_pages + 1))
+        return all_pages
+
 
 class EmptyDataDictFromSearchWB(Exception):
     pass
@@ -377,15 +382,16 @@ async def _add_wb_positions(
         text, need_nmids, 60
     )
     for page in parsing_pages_queue:
+        if page not in total_pages.all_pages_list:
+            continue
         if page in checked_pages:
             continue
-        if len(checked_pages) >= total_pages.total_pages:
+        if len(set(total_pages.all_pages_list) - checked_pages) == 0:
             break
         if len(checked_pages) >= page_limit:
             break
         if len(need_nmids) == 0:
             break
-
         try:
             await add_positions_from_page(
                 stop_event,
@@ -398,7 +404,6 @@ async def _add_wb_positions(
             )
         except Exception as e:
             logger.error(f"Ошибка при парсинге страницы {page}: {e}")
-
         checked_pages.add(page)
         await asyncio.sleep(delay)
 
