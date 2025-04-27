@@ -402,9 +402,6 @@ async def _add_wb_positions(
         checked_pages.add(page)
         await asyncio.sleep(delay)
 
-    if page_limit in [1, page_limit] and not catch_any_position.is_set():
-        raise ErrorParsingPositions('Не найдено ни одной позиции в выдаче')
-
     if page_limit == page_limit and need_nmids:
         not_found_positions = [
             WBItemPosition(
