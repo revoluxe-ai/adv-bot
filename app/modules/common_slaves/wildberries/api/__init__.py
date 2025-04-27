@@ -1,1 +1,3 @@
-from .api import *
+__all__ = ["WBApi"]
+
+from .api import WBApi
