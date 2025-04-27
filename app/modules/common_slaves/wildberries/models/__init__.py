@@ -6,6 +6,7 @@ __all__ = [
     "WBItemPosition",
     "WBCard",
     "WBCategory",
+    "WBToken",
 ]
 
 from .models import *
