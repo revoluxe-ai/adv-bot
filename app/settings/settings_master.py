@@ -258,5 +258,12 @@ class Settings:
             return 1
         return int(value)
 
+    @property
+    def MAX_PAGE_LIMIT_PARSER_WORKER(self) -> int:
+        value = os.getenv("MAX_PAGE_LIMIT_PARSER_WORKER")
+        if not value:
+            return 60
+        return int(value)
+
 
 settings = Settings()
