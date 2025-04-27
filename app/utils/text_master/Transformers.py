@@ -3,13 +3,13 @@ import logging
 import os
 import re
 from functools import partial
+from typing import Union
 
+import numpy as np
 from gensim.models.keyedvectors import KeyedVectors
 from huggingface_hub import hf_hub_download
 
-
 logger = logging.getLogger(__name__)
-
 
 
 class Word2Vec:
@@ -17,23 +17,31 @@ class Word2Vec:
     model_path = "ruwiki_20180420_100d.txt"  # Имя файла модели на диске
     _load_model_lock = asyncio.Lock()
 
-    async def _load_model(self):
+    async def _load_model(self) -> None:
         try:
             if os.path.exists(self.model_path):
-                func = partial(KeyedVectors.load_word2vec_format, self.model_path, binary=False)
+                func = partial(
+                    KeyedVectors.load_word2vec_format, self.model_path, binary=False
+                )
                 self._model = await asyncio.to_thread(func)
             else:
                 model_url = hf_hub_download(
                     repo_id="Word2vec/wikipedia2vec_ruwiki_20180420_100d",
-                    filename="ruwiki_20180420_100d.txt"
+                    filename="ruwiki_20180420_100d.txt",
                 )
-                func = partial(KeyedVectors.load_word2vec_format, model_url, binary=False)
+                func = partial(
+                    KeyedVectors.load_word2vec_format, model_url, binary=False
+                )
                 self._model = await asyncio.to_thread(func)
                 # Сохранение модели на диск
-                func = partial(self._model.save_word2vec_format, self.model_path, binary=False)
+                func = partial(
+                    self._model.save_word2vec_format, self.model_path, binary=False
+                )
                 await asyncio.to_thread(func)
         except EOFError as e:
-            logger.debug(f"Ошибка загрузки модели: {e}. Попытка перезагрузить модель...")
+            logger.debug(
+                f"Ошибка загрузки модели: {e}. Попытка перезагрузить модель..."
+            )
             # Удаление поврежденного файла модели, если он существует
             if os.path.exists(self.model_path):
                 os.remove(self.model_path)
@@ -46,12 +54,13 @@ class Word2Vec:
     def _most_similar(self, word):
         return self._model.most_similar(word)
 
-
-    async def average_vector_from_sentence(self, phrase):
+    async def average_vector_from_sentence(
+        self, phrase
+    ) -> Union[float, np.ndarray] | None:
         async with self._load_model_lock:
             if self._model is None:
                 await self._load_model()
-        phrase = re.sub('[-,.]', ' ', phrase)
+        phrase = re.sub("[-,.]", " ", phrase)
         words = phrase.split()
         vectors = []
         null_vectors = 0
@@ -76,4 +85,3 @@ class Word2Vec:
                 return 1 - (value - 0.5) / 0.5
         else:
             raise ValueError("Значение должно быть в диапазоне от 0 до 1")
-
