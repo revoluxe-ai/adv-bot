@@ -1,15 +1,15 @@
 from abc import ABC
+
+import redis
+
 from .redis_client import redis_client
-from typing import TypeVar, Generic
 
-T = TypeVar('T', )
 
-class BaseRedis(ABC, Generic[T]):
+class BaseRedis(ABC):
     _client = redis_client
 
-
     @property
-    def client(self):
+    def client(self) -> redis.asyncio.Redis:
         """Геттер для доступа к клиенту Redis"""
         return self._client
 
