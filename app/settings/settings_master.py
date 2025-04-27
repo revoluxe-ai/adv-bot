@@ -7,6 +7,13 @@ import os
 class Settings:
 
     @property
+    def PARSING_KEYWORDS_DELAY_BETWEEN_TASKS(self) -> int:
+        value = os.environ.get("PARSING_KEYWORDS_DELAY_BETWEEN_TASKS")
+        if value is None:
+            return 1
+        return int(value)
+
+    @property
     def postgres_replica_host(self) -> str | None:
         value = os.environ.get("POSTGRES_REPLICA_HOST")
         return value

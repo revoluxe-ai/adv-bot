@@ -427,7 +427,7 @@ class WBShop:
                         text, nmid = item
                         await parsing_queue.add_or_update_task(text, {nmid})
                         await asyncio.sleep(
-                            60
+                            settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
                         )  # Добавляем небольшую задержку между задачами
 
     async def _run(self) -> None:
