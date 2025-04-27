@@ -1,6 +1,5 @@
 import logging
 from typing import Any
-from typing import Optional
 
 from pydantic import ValidationError
 
@@ -11,7 +10,7 @@ from .base_adv import Adv
 logger = logging.getLogger(__name__)
 
 
-def get_adv_data_class(data_from_wb: dict[str, Any]) -> Optional[Adv]:
+def get_adv_data_class(data_from_wb: dict[str, Any]) -> Adv | None:
     data = data_from_wb
     _type = data["type"]
     if _type == 8:
