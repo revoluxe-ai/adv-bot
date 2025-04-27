@@ -1,45 +1,49 @@
 import asyncio
-import datetime
 import logging
 from typing import Iterable
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import KeywordStatus, CalculatedKeyword
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
+    KeywordStatus,
+    CalculatedKeyword,
+)
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 
 logger = logging.getLogger(__name__)
 
 
-async def __update_search_adv_keywords_statistics(adv_setting):
-    wb_cabinet_id = adv_setting.wb_cabinet_id
-    access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
-    api = WBApi(access)
-    try:
-        search_adv_id = adv_setting.search_adv_id
-        keyword_stats = await api.advert.get_search_keywords_stat(search_adv_id)
-        await data_manager.update_search_adv_keywords_stat(adv_setting, keyword_stats)
+# async def __update_search_adv_keywords_statistics(adv_setting):
+#     wb_cabinet_id = adv_setting.wb_cabinet_id
+#     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
+#     api = WBApi(access)
+#     try:
+#         search_adv_id = adv_setting.search_adv_id
+#         keyword_stats = await api.advert.get_search_keywords_stat(search_adv_id)
+#         await data_manager.update_search_adv_keywords_stat(adv_setting, keyword_stats)
+#
+#     except Exception as e:
+#         logger.error(
+#             f"Ошибка получения статистики по ключам для {adv_setting.name}: {e}",
+#             exc_info=True,
+#         )
+#         return
 
-    except Exception as e:
-        logger.error(f'Ошибка получения статистики по ключам для {adv_setting.name}: {e}', exc_info=True)
-        return
 
-
-
-
-async def _update_search_advs_keywords_statistics(adv_settinds):
-    tasks = []
-    for adv_setting in adv_settinds:
-        task = asyncio.create_task(__update_search_adv_keywords_statistics(adv_setting))
-        tasks.append(task)
-    for task in tasks:
-        try:
-            await task
-        except:
-            logger.error('Ошибка обновления статистики по ключам для поисковых РК', exc_info=True)
-
+# async def _update_search_advs_keywords_statistics(adv_settinds):
+#     tasks = []
+#     for adv_setting in adv_settinds:
+#         task = asyncio.create_task(__update_search_adv_keywords_statistics(adv_setting))
+#         tasks.append(task)
+#     for task in tasks:
+#         try:
+#             await task
+#         except:
+#             logger.error(
+#                 "Ошибка обновления статистики по ключам для поисковых РК", exc_info=True
+#             )
 
 
 async def set_fix_keywords_phrases_for_search_adv(adv_setting, keywords):
@@ -51,15 +55,19 @@ async def set_fix_keywords_phrases_for_search_adv(adv_setting, keywords):
     if not keywords:
         return
     keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
-    texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.GOOD][:100]
+    texts = [
+        keyword.text for keyword in keywords if keyword.status == KeywordStatus.GOOD
+    ][:100]
 
-    texts = [text.replace('"', '') for text in texts]
+    texts = [text.replace('"', "") for text in texts]
     try:
         await api.advert.set_pluse_status_in_search_adv(search_adv_id, True)
         await api.advert.set_search_keywords(search_adv_id, texts)
         await adv_update_state_manager.set_one(search_adv_id)
     except Exception as e:
-        logger.error(f'Ошибка установки фраз для {adv_setting.name}: {e}', exc_info=True)
+        logger.error(
+            f"Ошибка установки фраз для {adv_setting.name}: {e}", exc_info=True
+        )
         return
 
 
@@ -72,23 +80,29 @@ async def set_minus_keywords_for_search_adv(adv_setting, keywords):
     if not keywords:
         return
     keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=False)
-    texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.BAD]
+    texts = [
+        keyword.text for keyword in keywords if keyword.status == KeywordStatus.BAD
+    ]
     texts = texts[:1000]
     if texts:
-        texts = [text.replace('"', '') for text in texts]
+        texts = [text.replace('"', "") for text in texts]
         texts = set(texts)
         try:
             await api.advert.set_pluse_status_in_search_adv(search_adv_id, False)
             await api.advert.set_minus_phrase_for_search_adv(search_adv_id, texts)
             await adv_update_state_manager.set_one(search_adv_id)
         except Exception as e:
-            logger.error(f'Ошибка установки минус-фраз для аукциона'
-                         f' {adv_setting.adv_id}: {e}', exc_info=True)
+            logger.error(
+                f"Ошибка установки минус-фраз для аукциона"
+                f" {adv_setting.adv_id}: {e}",
+                exc_info=True,
+            )
             return
 
 
-async def update_keyword_phrases_for_search_adv(adv_setting: AdvSetting,
-                                                keywords: Iterable[CalculatedKeyword]):
+async def update_keyword_phrases_for_search_adv(
+    adv_setting: AdvSetting, keywords: Iterable[CalculatedKeyword]
+):
     search_adv_id = adv_setting.search_adv_id
     if not search_adv_id:
         return None
@@ -98,16 +112,20 @@ async def update_keyword_phrases_for_search_adv(adv_setting: AdvSetting,
         await set_minus_keywords_for_search_adv(adv_setting, keywords)
 
 
-async def _set_keyword_phrases_for_search_advs(adv_settinds):
+async def _set_keyword_phrases_for_search_advs(adv_settinds) -> None:
     tasks = []
     for adv_setting in adv_settinds:
-        task = asyncio.create_task(update_keyword_phrases_for_search_adv(adv_setting))
+        keywords = await data_manager.get_good_bad_phrases(adv_setting)
+        task = asyncio.create_task(
+            update_keyword_phrases_for_search_adv(adv_setting, keywords)
+        )
         tasks.append(task)
     for task in tasks:
         try:
             await task
         except:
-            logger.error('Ошибка установки фраз для поисковых РК', exc_info=True)
+            logger.error("Ошибка установки фраз для поисковых РК", exc_info=True)
+
 
 #
 # async def _update_cpm_in_search_advs(adv_settinds: list[AdvSetting]):
@@ -132,7 +150,6 @@ async def _set_keyword_phrases_for_search_advs(adv_settinds):
 #              return
 
 
-
 async def update_search_advs_module_run():
     while True:
         try:
@@ -141,6 +158,8 @@ async def update_search_advs_module_run():
                 _set_keyword_phrases_for_search_advs(adv_settinds),
             )
         except:
-            logger.error('Ошибка обновления статистики по ключам для поисковых РК', exc_info=True)
+            logger.error(
+                "Ошибка обновления статистики по ключам для поисковых РК", exc_info=True
+            )
         finally:
             await asyncio.sleep(0)
