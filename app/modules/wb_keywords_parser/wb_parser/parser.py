@@ -407,19 +407,19 @@ async def _add_wb_positions(
         checked_pages.add(page)
         await asyncio.sleep(delay)
 
-    if page_limit == page_limit and need_nmids:
-        not_found_positions = [
-            WBItemPosition(
-                real_position=0,
-                base_position=0,
-                promo_position=0,
-                keyword_text=text,
-                timestamp=datetime.datetime.now(),
-                nmid=nmid,
-                cpm=0,
-            )
-            for nmid in need_nmids
-        ]
+    not_found_positions = [
+        WBItemPosition(
+            real_position=0,
+            base_position=0,
+            promo_position=0,
+            keyword_text=text,
+            timestamp=datetime.datetime.now(),
+            nmid=nmid,
+            cpm=0,
+        )
+        for nmid in need_nmids
+    ]
+    if not_found_positions:
         await add_wb_positions_to_redis(not_found_positions)
     return
 
