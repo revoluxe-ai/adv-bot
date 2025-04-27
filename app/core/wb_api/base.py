@@ -31,7 +31,7 @@ class BaseAPI(ABC):
         self.shop_id = current_token.shop_id
 
     @staticmethod
-    def chunks(lst: list[T], n: int) -> Generator[list[T], None]:
+    def chunks(lst: list[T], n: int) -> Generator[list[T], None, None]:
         for i in range(0, len(lst), n):
             yield lst[i : i + n]
 
@@ -53,5 +53,5 @@ class BaseAPI(ABC):
                 )
                 raise e
             raise ApiForbiddenError(
-                "Нет свободных токенов", wb_user_cabinet=self.access.wb_cabinet
+                "Нет свободных токенов", wb_user_cabinet=self.access.wb_user_cabinet
             )
