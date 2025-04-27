@@ -1,8 +1,9 @@
-import time
-from typing import Optional, Set
 import hashlib
 import json
 import logging
+import time
+from typing import Optional, Set
+
 from .parsing_task import ParsingTask
 from ...core.redis_manager.base_redis_manager import BaseRedis
 
@@ -11,7 +12,7 @@ logger.setLevel(logging.DEBUG)
 
 
 class GlobalParsingQueueManager(BaseRedis):
-    def __init__(self):
+    def __init__(self) -> None:
         self.queue_key = "parser:task:queue"
         self.task_data_prefix = "parser:task:data:"
         self.text_index_prefix = "parser:task:index:text:"
@@ -24,11 +25,11 @@ class GlobalParsingQueueManager(BaseRedis):
     async def add_or_update_task(self, text: str, nmids: Set[int]) -> str:
         """
         Добавляет новую задачу или обновляет существующую
-        
+
         Args:
             text: Текст для поиска
             nmids: Множество nmids для поиска
-            
+
         Returns:
             task_id: ID задачи
         """
@@ -47,7 +48,9 @@ class GlobalParsingQueueManager(BaseRedis):
                 old_task = json.loads(old_data)
                 old_nmids = set(old_task.get("nmids", []))
                 nmids = old_nmids.union(nmids)
-                logger.debug(f"Updating existing task. Old nmids: {old_nmids}, New nmids: {nmids}")
+                logger.debug(
+                    f"Updating existing task. Old nmids: {old_nmids}, New nmids: {nmids}"
+                )
 
         # Формируем task_data после возможного объединения
         task_data = {
@@ -83,7 +86,7 @@ class GlobalParsingQueueManager(BaseRedis):
     async def get_next_task(self) -> Optional[ParsingTask]:
         """
         Получает следующую задачу из очереди по приоритету
-        
+
         Returns:
             task: Объект ParsingTask или None, если очередь пуста
         """
@@ -96,12 +99,12 @@ class GlobalParsingQueueManager(BaseRedis):
         if not task_ids:
             logger.debug("Queue is empty.")
             return None
-            
+
         task_id = task_ids[0].decode()
         task_key = f"{self.task_data_prefix}{task_id}"
-        
+
         logger.debug(f"Fetching task with task_id: {task_id}")
-        
+
         # Получаем данные задачи
         task_data = await self.client.get(task_key)
         if not task_data:
@@ -109,18 +112,17 @@ class GlobalParsingQueueManager(BaseRedis):
             # Удаляем несуществующую задачу из очереди
             await self.client.zrem(self.queue_key, task_id)
             return None
-            
+
         # Удаляем задачу из очереди и её данные
         async with self.client.pipeline() as pipe:
             pipe.zrem(self.queue_key, task_id)
             pipe.delete(task_key)
             await pipe.execute()
-            
+
         data = json.loads(task_data)
         logger.debug(f"Task data: {data}")
-        
+
         return ParsingTask(
             keyword=data["text"],
             nmids=set(data["nmids"]),
         )
-
