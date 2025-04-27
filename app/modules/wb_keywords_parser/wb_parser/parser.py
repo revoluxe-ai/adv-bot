@@ -273,7 +273,7 @@ async def add_positions_from_page(
     page: int,
     need_nmids: set[int],
     total_pages: TotalPages,
-    checked_pages: set,
+    checked_pages: set[int],
 ) -> (
     list[WBItemPosition],
     int,
@@ -379,11 +379,11 @@ async def _add_wb_positions(
     for page in parsing_pages_queue:
         if page in checked_pages:
             continue
-        if page > total_pages.total_pages:
+        if len(checked_pages) >= total_pages.total_pages:
             break
         if len(checked_pages) >= page_limit:
             break
-        if stop_event.is_set():
+        if len(need_nmids) == 0:
             break
 
         try:
