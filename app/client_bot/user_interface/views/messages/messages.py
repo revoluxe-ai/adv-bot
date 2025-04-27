@@ -852,7 +852,8 @@ class MaxCPCSetting(TextWithKeyboard):
         keywords = [
             kw
             for kw in keywords
-            if kw.status == KeywordStatus.GOOD or kw.reason == KeywordStatus.MAX_CPC
+            if str(kw.status) == KeywordStatus.GOOD
+            or kw.reason == KeywordStatus.MAX_CPC
         ]
         keywords.sort(key=lambda x: x.cpc, reverse=True)
         if not self._adv.max_cpc:
