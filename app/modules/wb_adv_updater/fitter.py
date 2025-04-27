@@ -20,7 +20,7 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.utils.db.session_maker import get_async_session_maker
 from . import data_manager
-from .data_manager import DataGetter
+from .data_getter import DataGetter
 from .ml_common_funcs import save_model
 from ..common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,

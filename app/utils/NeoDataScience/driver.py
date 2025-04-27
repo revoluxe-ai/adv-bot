@@ -58,7 +58,7 @@ class AsyncMeta(type):
 
 
 class DataScience(metaclass=AsyncMeta):
-    def __init__(self):
+    def __init__(self) -> None:
         import os
 
         self.MAIN_GRAPH_NAME = "main"
@@ -1130,7 +1130,7 @@ UNWIND phrase.words AS word
     async def __update_keywords_vectors(self):
         while True:
             try:
-                await self.__update_keywords_vectors_process()
+                await self.update_keywords_vectors_process()
             except Exception as exc:
                 logger.error(
                     f"Ошибка при обновлении векторов ключевых фраз в Redis: {exc}",
@@ -1138,7 +1138,18 @@ UNWIND phrase.words AS word
                 )
             await asyncio.sleep(0)
 
-    async def __update_keywords_vectors_process(self):
+    async def update_keywords_vectors_process(self) -> None:
+        while True:
+            try:
+                await self._update_keywords_vectors_process()
+            except Exception as exc:
+                logger.error(
+                    f"Ошибка при обновлении векторов ключевых фраз в Redis: {exc}",
+                    exc_info=True,
+                )
+            await asyncio.sleep(5)
+
+    async def _update_keywords_vectors_process(self) -> None:
         texts: set[str] = await data_manager.get_all_keywords_from_ch(last_days=7)
         clear_texts = [text_cleaner.clear(text) for text in texts]
         await self._update_keywords_vectors_in_redis(clear_texts)

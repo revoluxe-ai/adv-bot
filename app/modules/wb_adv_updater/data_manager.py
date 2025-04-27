@@ -10,7 +10,6 @@ from datetime import timedelta
 from typing import Union, Optional, List, Callable, Sequence
 
 import aiogram
-import pandas as pd
 from PIL import Image
 from aiogram.utils import deep_linking
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
@@ -27,7 +26,6 @@ from app.exc import (
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
     RedisCalculatedKeywordsCacheManager,
 )
-from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
     KeywordStatus,
@@ -45,10 +43,8 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.keywords_query import keywords_query
-from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.utils import redis_manager
-from app.utils.NeoDataScience.driver import DataScience
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.models import User, RefLink, user_reflink_association, Payment
@@ -875,51 +871,6 @@ async def get_good_bad_phrases_for_min_ctr(
     logger.debug("Слова по assert проверены")
     logger.debug("Возвращаю итоговую статистику")
     return keyword_stats
-
-
-class DataGetter(AbcManager):
-    def __init__(self):
-        self._gds = DataScience()
-
-    @staticmethod
-    def normalize_df_data(df: pd.DataFrame, param_for_norm: str) -> pd.DataFrame:
-        max_ = df[param_for_norm].max()
-        min_ = df[param_for_norm].min()
-        return (df[param_for_norm] - min_) / (max_ - min_)
-
-    @staticmethod
-    def get_nmid_offer_id_df(cards: list[CardFromWB]) -> pd.DataFrame:
-        dict_ = defaultdict(list)
-        for card in cards:
-            dict_["nmid"].append(card.nmid)
-            dict_["offer_id"].append(card.offer_id)
-            dict_["shop_name"].append(card.shop_name)
-        nmid_offer_id_df = pd.DataFrame(dict_)
-        return nmid_offer_id_df
-
-    async def get_list_progress(self, jobid):
-        result = await self._gds.get_status_job(jobid)
-        return result
-
-    async def get_item_features_from_neo(self, nmids_batch):
-        result = await self._gds.get_nmid_vectors(nmids_batch)
-        return result
-
-    @staticmethod
-    async def get_item_features_from_redis(nmids_batch):
-        result = await redis_manager.get_nmid_vectors(nmids_batch)
-        return result
-
-    async def get_keyword_features_from_neo(self, keywords):
-        result = await self._gds.get_keywords_vectors_by_keywords(keywords)
-        return result
-
-    @staticmethod
-    async def get_keyword_features_from_redis(
-        keywords,
-    ) -> list[tuple[str, list[float]]]:
-        result = await redis_manager.get_keywords_vectors(keywords)
-        return result
 
 
 async def get_wb_category(adv_setting: AdvSetting) -> Union[WBCategory, None]:
