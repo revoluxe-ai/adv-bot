@@ -693,13 +693,13 @@ async def check_position(
                 KeywordSetting.id == keyword_setting_original_id
             )
         )
-        text: KeywordSetting = result.scalar()
+        text: str = result.scalar()
         adv_setting_original_id = callback_data.adv_original_id
         stmt = select(AdvSetting.nmids).where(AdvSetting.id == adv_setting_original_id)
         result = await session.execute(stmt)
         nmids: AdvSetting = result.scalar()
         nmid = nmids[0]
-    await parser.add_wb_positions(text, {nmid}, delay=3)
+    await parser.add_wb_positions(text, {nmid}, delay=1)
     await messages.KeywordSettingMessage(
         bot, callback.message.chat.id, keyword_setting_original_id, 1
     )()
