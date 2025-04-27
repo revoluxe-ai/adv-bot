@@ -1583,7 +1583,7 @@ async def add_relevant_phrases(keywords, adv_setting_id):
         await session.commit()
 
 
-async def get_active_search_advs():
+async def get_active_search_advs() -> list[AdvSetting]:
     pattern = r"<!-\[(\d+)\]-!>"
     stmt = select(AdvSetting).where(
         # Проверяем, что name содержит паттерн <!-[цифры]-!>
