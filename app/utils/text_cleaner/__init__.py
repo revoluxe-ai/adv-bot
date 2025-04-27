@@ -1,10 +1,7 @@
-
-
-
-def clear(text):
-    text = text.replace('_', '')
-    text = text.replace('"', '')
-    text = text.replace("""'""", '')
-    text = text.replace(',', '')
-    text = text.replace('.', '')
+def clear(text) -> str:
+    text = text.replace("_", "")
+    text = text.replace('"', "")
+    text = text.replace("""'""", "")
+    text = text.replace(",", "")
+    text = text.replace(".", "")
     return text
