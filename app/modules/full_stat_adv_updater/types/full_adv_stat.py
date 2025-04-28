@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+from datetime import date
 from datetime import datetime
 from typing import List, Optional
+
 from pydantic import BaseModel, Field
-from datetime import date
 
 
 class NmStats(BaseModel):
@@ -19,6 +20,7 @@ class NmStats(BaseModel):
     name: str = Field(..., description="Название товара")
     nmId: int = Field(..., description="ID товара")
 
+
 class AppStats(BaseModel):
     views: int = Field(..., description="Количество просмотров")
     clicks: int = Field(..., description="Количество кликов")
@@ -33,6 +35,7 @@ class AppStats(BaseModel):
     appType: int = Field(..., description="Тип приложения")
     nm: List[NmStats] = Field(..., description="Информация о товаре")
 
+
 class DayStats(BaseModel):
     date: datetime = Field(..., description="Дата, за которую представлены данные")
     views: int = Field(..., description="Количество просмотров")
@@ -45,12 +48,17 @@ class DayStats(BaseModel):
     cr: float = Field(..., description="Конверсия (CR), %")
     shks: int = Field(..., description="Количество заказанных товаров, шт.")
     sum_price: float = Field(..., description="Сумма заказов, ₽")
-    apps: List[AppStats] = Field(..., description="Информация о платформе")
+    # apps: List[AppStats] = Field(..., description="Информация о платформе")
+
 
 class BoosterStats(BaseModel):
     date: str = Field(..., description="Дата, за которую предоставлены данные")
     nm: int = Field(..., description="Артикул WB")
-    avg_position: int = Field(..., description="Средняя позиция товара на страницах поисковой выдачи и каталога")
+    avg_position: int = Field(
+        ...,
+        description="Средняя позиция товара на страницах поисковой выдачи и каталога",
+    )
+
 
 @dataclass
 class SmallFullAdvStatPerDay(BaseModel):
@@ -63,10 +71,6 @@ class SmallFullAdvStatPerDay(BaseModel):
     sum_price: float
 
 
-
-
-
-
 @dataclass
 class SmallFullAdvStat:
     views: int
@@ -77,19 +81,24 @@ class SmallFullAdvStat:
     sum_price: float
 
 
-
 class FullAdvStat(BaseModel):
-    dates: List[str] = Field(..., description="Даты, за которые необходимо выдать информацию")
+    dates: List[str] = Field(
+        ..., description="Даты, за которые необходимо выдать информацию"
+    )
     views: int = Field(..., description="Количество просмотров за все дни")
     clicks: int = Field(..., description="Количество кликов за все дни")
     ctr: float = Field(..., description="Показатель кликабельности, % за все дни")
     cpc: float = Field(..., description="Средняя стоимость клика, ₽ за все дни")
     sum: float = Field(..., description="Затраты, ₽ за все дни")
-    atbs: int = Field(..., description="Количество добавлений товаров в корзину за все дни")
+    atbs: int = Field(
+        ..., description="Количество добавлений товаров в корзину за все дни"
+    )
     orders: int = Field(..., description="Количество заказов за все дни")
     cr: float = Field(..., description="Конверсия (CR), % за все дни")
     shks: int = Field(..., description="Количество заказанных товаров, шт. за все дни")
     sum_price: float = Field(..., description="Сумма заказов, ₽ за все дни")
     days: List[DayStats] = Field(..., description="Статистика по дням")
-    boosterStats: Optional[List[BoosterStats]] = Field(None, description="Информация о позициях товаров")
+    boosterStats: Optional[List[BoosterStats]] = Field(
+        None, description="Информация о позициях товаров"
+    )
     advertId: int = Field(..., description="ID рекламного объявления")
