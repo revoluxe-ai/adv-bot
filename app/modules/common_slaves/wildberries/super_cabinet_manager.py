@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WBCabinetAccess:
     tokens: list[WBToken]
-    wb_user_cabinet: typing.Union[WBUserCabinet]
-    wb_cabinet: typing.Union[WBCabinet]
+    wb_user_cabinet: WBUserCabinet | None
+    wb_cabinet: WBCabinet
 
 
 async def get_access_for_wb_cabinet(
