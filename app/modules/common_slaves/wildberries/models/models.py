@@ -24,6 +24,9 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
+
+# Добавляем правильный импорт AdvPayment
+from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
 from app.utils.db.models import User
@@ -370,7 +373,9 @@ class AdvSetting(BaseTable):
     hard_min_ctr = Column(Float, nullable=True)
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
-    payments = relationship("AdvPayment", back_populates="adv_setting", uselist=True)
+    payments: Mapped[list[AdvPayment]] = relationship(
+        "AdvPayment", back_populates="adv_setting", uselist=True
+    )
     parsing_active = mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
     bidder_active: Mapped[bool] = mapped_column(Boolean, default=False)
