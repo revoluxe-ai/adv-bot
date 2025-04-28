@@ -68,7 +68,7 @@ class TextWithKeyboard(Base):
     def keyboard(self):
         pass
 
-    async def __call__(self) -> (LastMessage, str):
+    async def __call__(self) -> tuple[LastMessage, str]:
         await super().__call__()
         text = self.text
         parse_mode = getattr(self, "parse_mode", None)
