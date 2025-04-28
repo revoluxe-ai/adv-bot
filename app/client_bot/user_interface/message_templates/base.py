@@ -9,6 +9,7 @@ class Base(ABC):
     def __init__(self, bot: aiogram.Bot, chat_id: int):
         self._bot = bot
         self._chat_id = chat_id
+        self.parse_mode = None
 
     @property
     def bot(self) -> Bot:
