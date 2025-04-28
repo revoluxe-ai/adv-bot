@@ -510,8 +510,10 @@ class KeywordSettingMessage(TextWithKeyboard):
             return "Авто"
         elif int_hard_status == 2:
             return "Белый список"
+        elif int_hard_status == 3:
+            return "Отключен"
         else:
-            raise ValueError("Неизвестный хард-статус ключа")
+            raise ValueError(f"Неизвестный хард-статус ключа: {int_hard_status}")
 
     @property
     def text(self) -> str:
