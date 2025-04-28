@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import (
     Column,
     Float,
@@ -11,8 +13,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, mapped_column, Mapped
 
-from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.base import BaseTable
+
+if TYPE_CHECKING:
+    from app.modules.common_slaves.wildberries.models import AdvSetting
+
 
 Base = declarative_base()
 
