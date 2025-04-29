@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -13,6 +15,7 @@ from typing import (
     Awaitable,
     Any,
     Callable,
+    Dict,
 )
 
 from sqlalchemy import select
@@ -51,51 +54,56 @@ from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 logger = logging.getLogger(__name__)
 
 
+logger.setLevel(logging.DEBUG)
+
+
 T = TypeVar("T")
 
 
-def update_data() -> (
-    Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]
-):
-    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
-        @wraps(func)
-        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            await self._update_access()
-            await self._update_advs_models()
-            await self._update_advs_keywords()
-            return await func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
+def make_key(func_name: str, args: Any, kwargs: Any) -> str:
+    key_data = {"func_name": func_name, "args": args, "kwargs": kwargs}
+    key_json = json.dumps(key_data, sort_keys=True, default=str)
+    return hashlib.md5(key_json.encode()).hexdigest()
 
 
 def single_run() -> (
     Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]
 ):
-    def decorator(func):
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         @wraps(func)
-        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> None:
-            event_name = func.__name__ + "_event"
-            if not hasattr(self, event_name):
+        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            if not hasattr(self, "_single_run_events"):
+                self._single_run_events = {}
+            if not hasattr(self, "_single_run_results"):
+                self._single_run_results = {}
+
+            events: Dict[str, asyncio.Event] = self._single_run_events
+
+            # Генерируем уникальный ключ для набора параметров
+            key = make_key(func.__name__, args, kwargs)
+
+            event = events.get(key)
+            if event is None:
                 event = asyncio.Event()
                 event.set()
-                setattr(self, event_name, event)
-
-            event = getattr(self, event_name)
+                events[key] = event
 
             if not event.is_set():
                 await event.wait()
-                return
+                result = self._single_run_results[key]
+                return result
+
             event.clear()
             try:
-                await func(self, *args, **kwargs)
+                result = await func(self, *args, **kwargs)
+                if not hasattr(self, "_single_run_results"):
+                    self._single_run_results = {}
+                self._single_run_results[key] = result
+                return result
             except Exception as e:
-                logger.error(f"Ошибка в {func.__name__}: {e}", exc_info=True)
+                # Здесь можно вставить свой логгер
+                print(f"Ошибка в {func.__name__}: {e}", flush=True)
                 raise
-            finally:
-                event.set()
-            return
 
         return wrapper
 
@@ -112,6 +120,14 @@ class WBShop:
         self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
             list[CalculatedKeyword]
         )
+
+    @single_run()
+    async def get_calculated_keywords(self, adv_id: int) -> list[CalculatedKeyword]:
+        adv: AdvSetting = next(
+            filter(lambda adv_: adv_.adv_id == adv_id, self._adv_settings),
+        )
+        keywords = await data_manager.get_good_bad_phrases(adv)
+        return keywords
 
     @single_run()
     async def _update_advs_keywords(self):
@@ -144,9 +160,11 @@ class WBShop:
         self._adv_settings = advs
         assert hasattr(self, "_adv_settings")
 
-    @update_data()
-    async def __update_cpm_bid(self):
-        assert hasattr(self, "_adv_settings")
+    async def __update_cpm_bid(self) -> None:
+        await self._update_access()
+        assert self.__access is not None
+        access: WBCabinetAccess = self.__access
+        await self._update_advs_models()
         adv_settings = self._adv_settings
         adv_settings = list(filter(lambda adv: adv.bot_active, adv_settings))
         if not self._adv_settings:
@@ -155,8 +173,6 @@ class WBShop:
             return
         try:
             logger.debug(f"Обновляю ставки для магазина {self.shop_id}")
-            access = self.__access
-            assert access
             wb_api = BidderAPI(access)
             await asyncio.gather(
                 *[
@@ -171,7 +187,7 @@ class WBShop:
     async def __run_bidder_process_for_adv(
         self, adv_setting: AdvSetting, wb_api: BidderAPI
     ) -> None:
-        keywords = self.__keywords_for_advs[adv_setting.adv_id]
+        keywords = await self.get_calculated_keywords(adv_setting.adv_id)
         try:
 
             await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
@@ -218,20 +234,28 @@ class WBShop:
                     f"Ошибка {exc} обновления ставок в магазине", exc_info=True
                 )
 
-    @update_data()
     async def __update_common_sale_stat(
         self, wb_stat_manager: WBCommonStatManager
     ) -> None:
-        all_nmids = [int(adv.nmids[0]) for adv in self._adv_settings if adv.bot_active]
+        all_nmids = []
+        for adv in self._adv_settings:
+            assert adv.nmids, "Нет артикулов для обновления"
+            nmid = adv.nmids[0]
+            all_nmids.append(nmid)
+
         await wb_stat_manager.update_common_statistic(all_nmids)
 
     async def update_common_sale_stat(self) -> None:
-        access: WBCabinetAccess | None = self.__access
+        await self._update_access()
+
+        assert self.__access is not None
+        access: WBCabinetAccess = self.__access
         assert access is not None
         ping_manager = PingManager(access)
         wb_stat_manager = WBCommonStatManager(access)
         while True:
             try:
+                await self._update_advs_models()
                 await ping_manager.ping_analytics_rights_and_connect()
                 await self.__update_common_sale_stat(wb_stat_manager)
             except ApiForbiddenError:
@@ -249,13 +273,13 @@ class WBShop:
                 await asyncio.sleep(60 * 15)
 
     @staticmethod
-    async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]):
+    async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]) -> None:
         await full_wb_adv_stat.insert(stats)
 
-    @update_data()
-    async def _update_full_adv_stat(self, wb_api: CommonWBApi):
-        auto_adv_ids: set = {adv.adv_id for adv in self._adv_settings}
-        auction_adv_ids: set = {
+    async def _update_full_adv_stat(self, wb_api: CommonWBApi) -> None:
+        await self._update_advs_models()
+        auto_adv_ids: set[int] = {adv.adv_id for adv in self._adv_settings}
+        auction_adv_ids: set[int] = {
             adv.search_adv_id for adv in self._adv_settings if adv.search_adv_id
         }
         all_adv_ids = auto_adv_ids | auction_adv_ids
@@ -270,18 +294,19 @@ class WBShop:
             for stat in full_stats:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
 
-    @update_data()
     async def update_full_adv_stat(self) -> None:
+        await self._update_access()
         access = self.__access
-        wb_api = CommonWBApi(access)
+        assert access is not None
         while True:
             try:
+                wb_api = CommonWBApi(access)
                 await self._update_full_adv_stat(wb_api)
             except ApiForbiddenError:
                 logger.debug("Нет доступов для обновления общей статистики")
                 await self._update_access()
                 access = self.__access
-                wb_api = CommonWBApi(access)
+                assert access is not None
             except Exception:
                 logger.error(
                     "Ошибка обновления полной статистики обновления", exc_info=True
@@ -290,19 +315,22 @@ class WBShop:
                 await asyncio.sleep(60 * 15)
 
     @staticmethod
-    async def _update_adv_data_from_wb_to_pg(shop_data_updater: ShopDataUpdater):
+    async def _update_adv_data_from_wb_to_pg(
+        shop_data_updater: ShopDataUpdater,
+    ) -> None:
         try:
             await shop_data_updater.update_advs_data()
+            logger.debug("Обновление данных завершено")
         except ApiForbiddenError as exc:
             raise exc
         except Exception as exc:
             logger.error("Ошибка обновления данных", exc_info=True)
             raise exc
 
-    @update_data()
+    @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-        self, shop_data_updater: ShopDataUpdater
-    ):
+        shop_data_updater: ShopDataUpdater,
+    ) -> None:
         try:
             await shop_data_updater.update_cards_data()
         except ApiForbiddenError as exc:
@@ -312,8 +340,14 @@ class WBShop:
             raise exc
 
     async def update_advs_data_from_wb_to_pg(self) -> None:
+        await self._update_access()
+        assert self.__access is not None
         wb_access = self.__access
-        shop_data_updater = ShopDataUpdater(wb_access)
+        try:
+            shop_data_updater = ShopDataUpdater(wb_access)
+        except Exception as e:
+            raise e
+
         while True:
             try:
                 await self._update_adv_data_from_wb_to_pg(shop_data_updater)
@@ -348,11 +382,18 @@ class WBShop:
             yield tuple(row)
 
     async def update_cards_data_from_wb_to_pf(self) -> None:
+        logger.debug("Начинаю обновлять доступы")
+        await self._update_access()
+        assert self.__access is not None
         access = self.__access
-        shop_data_updater = ShopDataUpdater(access)
+        try:
+            shop_data_updater = ShopDataUpdater(access)
+        except Exception as e:
+            raise e
         while True:
             try:
                 await self._update_cards_data_from_wb_to_pg(shop_data_updater)
+                logger.debug("Обновление карточек завершено")
             except ApiForbiddenError:
                 logger.debug("Нет доступов для обновления общей статистики")
                 await self._update_access()
@@ -365,60 +406,73 @@ class WBShop:
             finally:
                 await asyncio.sleep(60 * 60 * 12)
 
-    @staticmethod
-    async def async_iterate(iterable: Iterable[T]) -> AsyncGenerator[T, None]:
-        for item in iterable:
-            yield item
-
     async def _parsing_keywords_for_adv_generator(
-        self, adv: AdvSetting
+        self,
+        adv: AdvSetting,
     ) -> AsyncGenerator[Tuple[str, int], None]:
-        keywords = self.__keywords_for_advs[adv.adv_id]
+        keywords = await self.get_calculated_keywords(adv.adv_id)
+        assert keywords, "Нет рассчитанных ключей"
+
         nmid = int(adv.nmids[0])
-        keywords_with_positins: list[CalculatedKeyword] = []
-        keywords_without_positions: list[CalculatedKeyword] = []
+        adv_id = int(adv.adv_id)
+
+        # Разделим на ключи с позициями и без
         last_positions: dict[str, WBItemPosition] = {}
+        keywords_with_positions: list[CalculatedKeyword] = []
+        keywords_without_positions: list[CalculatedKeyword] = []
+
         for keyword in keywords:
             last_position = await redis_manager.get_keyword_position(keyword.text, nmid)
             if last_position:
                 last_positions[keyword.text] = last_position
-                keywords_with_positins.append(keyword)
+                keywords_with_positions.append(keyword)
             else:
                 keywords_without_positions.append(keyword)
-        keywords = keywords_without_positions + keywords_with_positins
-        for keyword in keywords:
+
+        # Сначала те без позиции, потом с позицией
+        sorted_keywords = keywords_without_positions + keywords_with_positions
+
+        max_hours_period = settings.MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS
+        now = datetime.now()
+
+        for keyword in sorted_keywords:
             text = keyword.text
-            last_position = last_positions.get(text)
-            adv_id: int = int(adv.adv_id)
-            last_views = await redis_manager.get_last_views(adv_id, text)
             views_now = keyword.views
-            if (
-                last_position
-                and last_position.base_position == 0
-                and views_now <= last_views
-            ):
-                if views_now != last_views:
-                    await redis_manager.set_last_views(adv_id, text, views_now)
-                continue
-            max_hours_period_for_parsing_keywords = (
-                settings.MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS
-            )
-            if (
-                not last_position
-                or last_position.timestamp
-                < datetime.now()
-                - timedelta(hours=max_hours_period_for_parsing_keywords)
-            ):
+
+            last_position = last_positions.get(text)
+            last_views = await redis_manager.get_last_views(adv_id, text)
+
+            should_parse = False
+
+            if last_views is None:
+                last_views = views_now
+
+            if not last_position:
+                await redis_manager.set_last_views(adv_id, text, views_now)
+                should_parse = True
+            elif views_now - last_views > 100:
+                should_parse = True
+
+            elif last_position.base_position == 0 and (views_now != last_views):
+                should_parse = True
+
+            elif last_position.timestamp < now - timedelta(hours=max_hours_period):
+                should_parse = True
+
+            if should_parse:
                 await redis_manager.set_last_views(adv_id, text, views_now)
                 yield text, nmid
 
-    @update_data()
-    async def parsing_keywords_run(self):
+    async def parsing_keywords_run(self) -> None:
         while True:
-            active_advs = list(filter(lambda adv_: adv_.bot_active, self._adv_settings))
+            await self._update_advs_models()
+            active_advs = self._adv_settings
             generators = []
             for adv in active_advs:
-                generators.append(self._parsing_keywords_for_adv_generator(adv))
+                generator: AsyncGenerator[Tuple[str, int], None] = (
+                    self._parsing_keywords_for_adv_generator(adv)
+                )
+                generators.append(generator)
             zipped_generators = self.async_zip_longest(*generators)
             parsing_queue = GlobalParsingQueueManager()
             async for row in zipped_generators:
@@ -429,9 +483,11 @@ class WBShop:
                         await asyncio.sleep(
                             settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
                         )  # Добавляем небольшую задержку между задачами
+                        logger.info(
+                            f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
+                        )
 
     async def _run(self) -> None:
-        await self._update_access()
         await asyncio.gather(
             self.parsing_keywords_run(),
             self.update_advs_data_from_wb_to_pg(),
@@ -442,4 +498,5 @@ class WBShop:
         )
 
     async def run(self) -> None:
+        logger.debug(f"Запускаю асинхронный процесс для магазина {self.shop_id}")
         await self._run()
