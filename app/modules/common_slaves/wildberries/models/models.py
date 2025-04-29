@@ -360,7 +360,7 @@ class AdvSetting(BaseTable):
         uselist=True,
     )
     bot_active: Mapped[bool] = mapped_column(Boolean, default=False)
-    nmids: Mapped[list[int] | None] = Column(JSONB, default=[])
+    nmids: Mapped[list[int]] = Column(JSONB, default=[])
     keyword_settings: Mapped[list["KeywordSetting"]] = relationship(
         "KeywordSetting",
         cascade="all, delete-orphan",
