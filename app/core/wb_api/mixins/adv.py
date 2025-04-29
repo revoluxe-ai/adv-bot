@@ -1,26 +1,28 @@
 import json
 import logging
 from typing import Any
+from typing import TypeVar
 
 import aiohttp
 
+from app.core.wb_api.protocols import WBAPIProtocol
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv, Balances
 from .excs import (
     StartAdvError,
     ItemCategoryNotInStockError,
 )
-from .typing import WBApiMixin
 from ..data_classes.advs import adv_fabric
 from ..http_request import try_except_decorator, requests
-from ..interface import InterfaceWBAPI
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("WBAPIProtocol", bound=WBAPIProtocol)
 
-class AdvMixin(InterfaceWBAPI,  WBApiMixin):
+
+class AdvMixin:
 
     @try_except_decorator(1, 3)
-    async def get_advertIds(self) -> list[int]:
+    async def get_advertIds(self: T) -> list[int]:
         advertIds: list[int] = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/count"
 

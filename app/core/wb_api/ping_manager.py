@@ -1,7 +1,6 @@
-from .mixins.ping import WBAdvPingMixin
 from .base import BaseAPI
+from .mixins.ping import WBAdvPingMixin
 
 
-
-class PingManager(WBAdvPingMixin, BaseAPI):
+class PingManager(BaseAPI, WBAdvPingMixin):
     pass
