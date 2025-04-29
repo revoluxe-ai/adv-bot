@@ -147,6 +147,6 @@ async def run_bidder_process_for_adv(
         await update_cpm(auto_adv_id, max(new_cpm, 150), wb_api)
 
     if adv_setting.search_adv_id:
-        await update_search_cpm(adv_setting.search_adv_id, max(new_cpm, 150), wb_api)
+        await update_cpm(adv_setting.search_adv_id, max(new_cpm, 150), wb_api)
 
     logger.debug(f"[{shop_id}] [{adv_id}] Ставки обновлены")
