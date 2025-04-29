@@ -8,7 +8,17 @@ import asyncio
 import json
 import logging
 import time
-from typing import Callable, Awaitable, Optional, Union, ParamSpec, Any, TypeVar, Dict
+from typing import (
+    Callable,
+    Awaitable,
+    Optional,
+    Union,
+    Any,
+    TypeVar,
+    Dict,
+    TypedDict,
+    cast,
+)
 
 import aiohttp
 from aiohttp import ClientOSError, ServerDisconnectedError, ClientResponseError
@@ -28,10 +38,15 @@ logger = logging.getLogger(__name__)
 
 # Тип возвращаемого значения
 TypeWBApiMixin = TypeVar("TypeWBApiMixin", bound=WBApiMixin)
-# Параметры функции
-P = ParamSpec("P")
 # Тип результата функции
-T = TypeVar("T")
+R = TypeVar("R")
+F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
+
+
+class APICallState(TypedDict):
+    _last_query_time: Optional[float]
+    _current_pause: float
+    _attempts: int
 
 
 def try_except_decorator(
@@ -39,22 +54,17 @@ def try_except_decorator(
     interval_seconds: Union[int, float],
     max_attempts: int = 50,
     max_delay: int = 120,
-) -> Callable[
-    [Callable[[TypeWBApiMixin, Any], Awaitable[T]]],
-    Callable[[TypeWBApiMixin, Any], Awaitable[T]],
-]:
+) -> Callable[[F], F]:
     """
     Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
     """
 
-    def decorator(
-        func: Callable[[TypeWBApiMixin, Any], Awaitable[T]],
-    ) -> Callable[[TypeWBApiMixin, Any], Awaitable[T]]:
+    def decorator(func: F) -> F:
         """
         Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
         """
 
-        async def wrapper(instance: TypeWBApiMixin, *args: Any, **kwargs: Any) -> T:
+        async def wrapper(instance: TypeWBApiMixin, *args: Any, **kwargs: Any) -> Any:
             """Обертка для декоратора, которая добавляет обработку ошибок и адаптивное ожидание."""
             if not hasattr(instance, "api_call_state"):
                 instance.api_call_state = {}
@@ -118,7 +128,7 @@ def try_except_decorator(
                 f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
             )
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
 

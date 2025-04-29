@@ -5,19 +5,18 @@ from typing import Union
 
 import aiohttp
 
-from app.core.wb_api.base import BaseAPI
 from app.core.wb_api.data_classes.card_from_wb import CardFromWB
 from app.core.wb_api.http_request import try_except_decorator, requests
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
-
+from app.core.wb_api.mixins.typing import WBApiMixin
 
 logger = logging
 
-class ContentMixin(BaseAPI):
+class ContentMixin(WBApiMixin):
 
     HOST = 'https://content-api.wildberries.ru'
 
-    async def get_cards_by_text(self, texts):
+    async def get_cards_by_text(self, texts) -> list[CardFromWB]:
         cards = []
         for text in texts:
             try:
