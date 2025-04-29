@@ -8,9 +8,7 @@ import asyncio
 import json
 import logging
 import time
-from functools import wraps
-from typing import Callable, Awaitable, Optional, Union, ParamSpec, Concatenate
-from typing import TypeVar
+from typing import Callable, Awaitable, Optional, Union, ParamSpec, Any, TypeVar, Dict
 
 import aiohttp
 from aiohttp import ClientOSError, ServerDisconnectedError, ClientResponseError
@@ -32,7 +30,8 @@ logger = logging.getLogger(__name__)
 TypeWBApiMixin = TypeVar("TypeWBApiMixin", bound=WBApiMixin)
 # Параметры функции
 P = ParamSpec("P")
-R = TypeVar("R")
+# Тип результата функции
+T = TypeVar("T")
 
 
 def try_except_decorator(
@@ -41,28 +40,21 @@ def try_except_decorator(
     max_attempts: int = 50,
     max_delay: int = 120,
 ) -> Callable[
-    [
-        Callable[Concatenate[TypeWBApiMixin, P], Awaitable[R]]
-    ],  # Тип декорируемой функции (метод класса)
-    Callable[Concatenate[TypeWBApiMixin, P], Awaitable[R]],  # Тип возвращаемой обертки
+    [Callable[[TypeWBApiMixin, Any], Awaitable[T]]],
+    Callable[[TypeWBApiMixin, Any], Awaitable[T]],
 ]:
     """
     Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
     """
 
     def decorator(
-        func: Callable[
-            Concatenate[TypeWBApiMixin, P], Awaitable[R]
-        ],  # Декорируемая функция (метод класса)
-    ) -> Callable[Concatenate[TypeWBApiMixin, P], Awaitable[R]]:  # Возвращаемая обертка
+        func: Callable[[TypeWBApiMixin, Any], Awaitable[T]],
+    ) -> Callable[[TypeWBApiMixin, Any], Awaitable[T]]:
         """
         Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
         """
 
-        @wraps(func)
-        async def wrapper(
-            instance: TypeWBApiMixin, *args: P.args, **kwargs: P.kwargs
-        ) -> R:
+        async def wrapper(instance: TypeWBApiMixin, *args: Any, **kwargs: Any) -> T:
             """Обертка для декоратора, которая добавляет обработку ошибок и адаптивное ожидание."""
             if not hasattr(instance, "api_call_state"):
                 instance.api_call_state = {}
@@ -89,7 +81,7 @@ def try_except_decorator(
 
                 try:
                     state["_last_query_time"] = time.time()
-                    result: R = await func(instance, *args, **kwargs)
+                    result = await func(instance, *args, **kwargs)
                     logger.debug(f"Запрос {method_name} выполнен успешно для {shop_id}")
                     next_pause = (
                         interval_seconds / requests_per_interval
@@ -132,20 +124,22 @@ def try_except_decorator(
 
 
 async def requests(
-    session, method, url, data=None, json_data=None, headers=None
-) -> str | None:
+    session: aiohttp.ClientSession,
+    method: str,
+    url: str,
+    data: Optional[Any] = None,
+    json_data: Optional[Any] = None,
+    headers: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
     """Обертка для выполнения HTTP-запросов с обработкой ошибок и логированием."""
     async with session.request(
         method, url, data=data, headers=headers, json=json_data
     ) as response:
         try:
             logger.debug(f"Запрос к {url} выполнен. Статус: {response.status}")
-            text = await response.text()
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
-                text = json.loads(text)
-                logger.error(f"{text['title']}: {text['detail']}")
                 raise ApiForbiddenError("Неверный API ключ") from e
             if e.status == 429:
                 logger.debug(f"Превышен лимит запросов к API: {url}")
