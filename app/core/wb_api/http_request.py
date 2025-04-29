@@ -1,3 +1,10 @@
+"""
+Обертки для работы с API Wildberries.
+
+
+"""
+
+
 import asyncio
 import json
 import logging
@@ -17,14 +24,16 @@ from .exceptions import (
     NotValidDataError,
     ApiErrorWithCode,
 )
+from .mixins.typing import WBApiMixin
 
 logger = logging.getLogger(__name__)
 
 
 # Тип возвращаемого значения
-T = TypeVar("T")
+T = TypeVar("T", bound=WBApiMixin)
 # Параметры функции
 P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def try_except_decorator(
@@ -32,18 +41,26 @@ def try_except_decorator(
     interval_seconds: Union[int, float],
     max_attempts: int = 50,
     max_delay: int = 120,
-) -> Callable[
+) -> Callable[  # type: ignore
     [Callable[[Any, P.args], Awaitable[T]]], Callable[[Any, P.args], Awaitable[T]]
 ]:
     """
     Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
     """
 
-    def decorator(  # type: ignore
-        func: Callable[[Any, P.args], Awaitable[T]],
+    def decorator(
+
+
+
+        func: Callable[[T, P.args], Awaitable[T]],
     ) -> Callable[[Any, P.args], Awaitable[T]]:
+        """
+        Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
+
+        """
         @wraps(func)
-        async def wrapper(instance: Any, *args: P.args, **kwargs: P.kwargs) -> T:
+        async def wrapper(instance: T, *args: P.args, **kwargs: P.kwargs) -> R:
+            """Обертка для декоратора, которая добавляет обработку ошибок и адаптивное ожидание."""
             if not hasattr(instance, "api_call_state"):
                 instance.api_call_state = {}
 
@@ -69,7 +86,7 @@ def try_except_decorator(
 
                 try:
                     state["_last_query_time"] = time.time()
-                    result: T = await func(instance, *args, **kwargs)
+                    result: R = await func(instance, *args, **kwargs)
                     logger.debug(f"Запрос {method_name} выполнен успешно для {shop_id}")
                     next_pause = (
                         interval_seconds / requests_per_interval
@@ -114,6 +131,7 @@ def try_except_decorator(
 async def requests(
     session, method, url, data=None, json_data=None, headers=None
 ) -> str | None:
+    """Обертка для выполнения HTTP-запросов с обработкой ошибок и логированием."""
     async with session.request(
         method, url, data=data, headers=headers, json=json_data
     ) as response:
