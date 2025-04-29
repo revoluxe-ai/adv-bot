@@ -4,7 +4,6 @@
 
 """
 
-
 import asyncio
 import json
 import logging
@@ -49,15 +48,13 @@ def try_except_decorator(
     """
 
     def decorator(
-
-
-
         func: Callable[[T, P.args], Awaitable[T]],
     ) -> Callable[[Any, P.args], Awaitable[T]]:
         """
         Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
 
         """
+
         @wraps(func)
         async def wrapper(instance: T, *args: P.args, **kwargs: P.kwargs) -> R:
             """Обертка для декоратора, которая добавляет обработку ошибок и адаптивное ожидание."""
