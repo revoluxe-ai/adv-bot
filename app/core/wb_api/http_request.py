@@ -31,13 +31,13 @@ from .exceptions import (
     NotValidDataError,
     ApiErrorWithCode,
 )
-from .mixins.typing import WBApiMixin
+from .protocols import WBAPIProtocol
 
 logger = logging.getLogger(__name__)
 
 
 # Тип возвращаемого значения
-TypeWBApiMixin = TypeVar("TypeWBApiMixin", bound=WBApiMixin)
+TypeWBAPIProtocol = TypeVar("TypeWBAPIProtocol", bound=WBAPIProtocol)
 # Тип результата функции
 R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
@@ -64,7 +64,9 @@ def try_except_decorator(
         Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
         """
 
-        async def wrapper(instance: TypeWBApiMixin, *args: Any, **kwargs: Any) -> Any:
+        async def wrapper(
+            instance: TypeWBAPIProtocol, *args: Any, **kwargs: Any
+        ) -> Any:
             """Обертка для декоратора, которая добавляет обработку ошибок и адаптивное ожидание."""
             if not hasattr(instance, "api_call_state"):
                 instance.api_call_state = {}
