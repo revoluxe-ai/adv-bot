@@ -6,6 +6,7 @@ from typing import Union, Optional, Iterable
 
 import aiohttp
 
+from app.core.wb_api.base import BaseAPI
 from app.core.wb_api.data_classes.advs import adv_fabric
 from app.core.wb_api.http_request import requests, try_except_decorator
 from app.core.wb_api.mixins.content import ContentMixin
@@ -83,26 +84,24 @@ def escape_special_characters(text):
 
 class AdvertApi(ABC_WB_API):
 
-    _rights: set = {api_rights.Rights.PROMOTION}
+    _rights: set[str] = {api_rights.Rights.PROMOTION}
     _only_read = api_rights.OnlyRead.FALSE
     live_company_status = [4, 9, 11]
     auto_adv_types = [8, 9]
 
-    @try_except_decorator(1, 1)
-    async def get_search_keywords_stat(self, adv_id):
-        url = f"https://advert-api.wildberries.ru/adv/v1/stat/words?id={adv_id}"
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "GET", url, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            keywords = []
-            update_timestamp = datetime.datetime.now()
-            ...  # нет правильной обработки ответа
-            return keywords
+    # @try_except_decorator(1, 1)
+    # async def get_search_keywords_stat(self, adv_id):
+    #     url = f"https://advert-api.wildberries.ru/adv/v1/stat/words?id={adv_id}"
+    #     async with aiohttp.ClientSession() as session:
+    #         response_text = await requests(
+    #             session, "GET", url, headers=self.headers.standart
+    #         )
+    #         answer = json.loads(response_text)
+    #         keywords = []
+    #         return keywords
 
     @try_except_decorator(1, 1)
-    async def set_search_cpm(self, search_adv_id: int, cpm: int):
+    async def set_search_cpm(self, search_adv_id: int, cpm: int) -> None:
         url = "https://advert-api.wildberries.ru/adv/v0/cpm"
         data = {"advertId": search_adv_id, "type": 9, "cpm": cpm}
         async with aiohttp.ClientSession() as session:
@@ -356,7 +355,7 @@ class AdvertApi(ABC_WB_API):
                 return {}
 
 
-class ContentApi(ABC_WB_API, ContentMixin):
+class ContentApi(BaseAPI, ContentMixin):
     _only_read = api_rights.OnlyRead.FALSE
     _rights: set = {api_rights.Rights.CONTENT}
     HOST = "https://content-api.wildberries.ru"
