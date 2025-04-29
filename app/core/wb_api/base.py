@@ -15,9 +15,9 @@ T = TypeVar("T")
 
 class BaseAPI:
 
-    def __init__(self, wb_access: WBCabinetAccess):
+    def __init__(self, wb_access: WBCabinetAccess) -> None:
         tokens: list[WBToken] = wb_access.tokens
-        self.access = wb_access
+        self.access: WBCabinetAccess = wb_access
         if not tokens:
             raise ApiForbiddenError(
                 "Нет токенов для доступа к API",
