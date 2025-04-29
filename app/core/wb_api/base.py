@@ -1,5 +1,4 @@
 import logging
-from abc import ABC
 from typing import Generator, TypeVar
 
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class BaseAPI(ABC):
+class BaseAPI:
 
     def __init__(self, wb_access: WBCabinetAccess):
         tokens: list[WBToken] = wb_access.tokens
