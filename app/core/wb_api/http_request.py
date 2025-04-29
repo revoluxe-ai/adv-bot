@@ -9,7 +9,7 @@ import json
 import logging
 import time
 from functools import wraps
-from typing import Callable, Awaitable, Any, Optional, Union, ParamSpec
+from typing import Callable, Awaitable, Optional, Union, ParamSpec, Concatenate
 from typing import TypeVar
 
 import aiohttp
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 # Тип возвращаемого значения
-T = TypeVar("T", bound=WBApiMixin)
+TypeWBApiMixin = TypeVar("TypeWBApiMixin", bound=WBApiMixin)
 # Параметры функции
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -40,23 +40,29 @@ def try_except_decorator(
     interval_seconds: Union[int, float],
     max_attempts: int = 50,
     max_delay: int = 120,
-) -> Callable[  # type: ignore
-    [Callable[[Any, P.args], Awaitable[T]]], Callable[[Any, P.args], Awaitable[T]]
+) -> Callable[
+    [
+        Callable[Concatenate[TypeWBApiMixin, P], Awaitable[R]]
+    ],  # Тип декорируемой функции (метод класса)
+    Callable[Concatenate[TypeWBApiMixin, P], Awaitable[R]],  # Тип возвращаемой обертки
 ]:
     """
     Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
     """
 
     def decorator(
-        func: Callable[[T, P.args], Awaitable[T]],
-    ) -> Callable[[Any, P.args], Awaitable[T]]:
+        func: Callable[
+            Concatenate[TypeWBApiMixin, P], Awaitable[R]
+        ],  # Декорируемая функция (метод класса)
+    ) -> Callable[Concatenate[TypeWBApiMixin, P], Awaitable[R]]:  # Возвращаемая обертка
         """
         Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
-
         """
 
         @wraps(func)
-        async def wrapper(instance: T, *args: P.args, **kwargs: P.kwargs) -> R:
+        async def wrapper(
+            instance: TypeWBApiMixin, *args: P.args, **kwargs: P.kwargs
+        ) -> R:
             """Обертка для декоратора, которая добавляет обработку ошибок и адаптивное ожидание."""
             if not hasattr(instance, "api_call_state"):
                 instance.api_call_state = {}
