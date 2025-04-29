@@ -9,6 +9,7 @@ from .excs import (
     StartAdvError,
     ItemCategoryNotInStockError,
 )
+from .typing import WBApiMixin
 from ..data_classes.advs import adv_fabric
 from ..http_request import try_except_decorator, requests
 from ..interface import InterfaceWBAPI
@@ -16,7 +17,7 @@ from ..interface import InterfaceWBAPI
 logger = logging.getLogger(__name__)
 
 
-class AdvMixin(InterfaceWBAPI):
+class AdvMixin(InterfaceWBAPI,  WBApiMixin):
 
     @try_except_decorator(1, 3)
     async def get_advertIds(self) -> list[int]:
@@ -240,22 +241,16 @@ class AdvMixin(InterfaceWBAPI):
 
         return advertIds
 
-    @try_except_decorator(1, 1)
-    async def update_cpm(self, adv_id: int, new_cpm: int) -> None:
-        url = "https://advert-api.wildberries.ru/adv/v0/cpm"
+    @try_except_decorator(5, 60)
+    async def update_cpm(self, adv_id: int, nmid: int, new_bid: int) -> None:
+        url = "https://advert-api.wildberries.ru/adv/v0/bids"
         data = {
-            "advertId": adv_id,
-            "type": 8,
-            "cpm": int(new_cpm),
-            # "param": None
+            "bids": [{"advert_id": adv_id, "nm_bids": [{"nm": nmid, "bid": new_bid}]}]
         }
         async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "POST", url, json_data=data, headers=self.headers.standart
+            await requests(
+                session, "PATCH", url, json_data=data, headers=self.headers.standart
             )
-
-            assert response_text == ""
-            pass
 
     @try_except_decorator(1, 1)
     async def set_search_cpm(self, search_adv_id: int, cpm: int) -> None:
