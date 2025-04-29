@@ -26,5 +26,5 @@ def get_adv_data_class(data_from_wb: dict[str, Any]) -> Adv | None:
             logger.error(f"{exc}", exc_info=True)
             raise
     else:
-        logger.info(f"Неизвестный типа кампании: тип {_type}")
+        logger.debug(f"Неизвестный типа кампании: тип {_type}")
         return None
