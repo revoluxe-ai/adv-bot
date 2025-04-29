@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__all__ = ("User", "RefLink")
+__all__ = ("User", "RefLink", "user_reflink_association", "Payment")
 
 import typing
 
