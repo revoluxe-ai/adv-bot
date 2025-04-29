@@ -2,7 +2,9 @@ import asyncio
 import json
 import logging
 import time
-from typing import Optional, TypeVar, Callable
+from functools import wraps
+from typing import Callable, Awaitable, Any, Optional, Union, ParamSpec
+from typing import TypeVar
 
 import aiohttp
 from aiohttp import ClientOSError, ServerDisconnectedError, ClientResponseError
@@ -19,29 +21,41 @@ from .exceptions import (
 logger = logging.getLogger(__name__)
 
 
+# Тип возвращаемого значения
 T = TypeVar("T")
+# Параметры функции
+P = ParamSpec("P")
 
 
 def try_except_decorator(
     requests_per_interval: int,
-    interval_seconds: int | float,
-    max_attempts=50,
-    max_delay=120,
-) -> Callable:
-    def decorator(func):
-        async def wrapper(instance, *args, **kwargs) -> T:
-            if not hasattr(instance, "_api_call_state"):
-                instance._api_call_state = {}
+    interval_seconds: Union[int, float],
+    max_attempts: int = 50,
+    max_delay: int = 120,
+) -> Callable[
+    [Callable[[Any, P.args], Awaitable[T]]], Callable[[Any, P.args], Awaitable[T]]
+]:
+    """
+    Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
+    """
+
+    def decorator(  # type: ignore
+        func: Callable[[Any, P.args], Awaitable[T]],
+    ) -> Callable[[Any, P.args], Awaitable[T]]:
+        @wraps(func)
+        async def wrapper(instance: Any, *args: P.args, **kwargs: P.kwargs) -> T:
+            if not hasattr(instance, "api_call_state"):
+                instance.api_call_state = {}
 
             method_name = func.__name__
-            if method_name not in instance._api_call_state:
-                instance._api_call_state[method_name] = {
+            if method_name not in instance.api_call_state:
+                instance.api_call_state[method_name] = {
                     "_last_query_time": None,
                     "_current_pause": interval_seconds / requests_per_interval,
                     "_attempts": 0,
                 }
 
-            state = instance._api_call_state[method_name]
+            state = instance.api_call_state[method_name]
             shop_id = instance.shop_id
             while state["_attempts"] < max_attempts:
                 last_query_time: Optional[float] = state["_last_query_time"]
@@ -62,7 +76,7 @@ def try_except_decorator(
                         + state["_current_pause"]
                     ) / 2
                     state["_current_pause"] = next_pause
-                    state["_attempts"] = 0  # Сброс попыток после успешного выполнения
+                    state["_attempts"] = 0
                     return result
                 except ApiForbiddenError:
                     await instance.set_next_token()
@@ -79,13 +93,18 @@ def try_except_decorator(
                     if state["_attempts"] >= max_attempts:
                         raise e
                     state["_attempts"] += 1
-                    new_next_pause = min(max(state["_current_pause"], 1) * 2, max_delay)
-                    state["_current_pause"] = new_next_pause
+                    state["_current_pause"] = min(
+                        max(state["_current_pause"], 1) * 2, max_delay
+                    )
                     logger.debug(
                         f'Следующая пауза между запросами: {state["_current_pause"]} секунд для shop_id: {shop_id}'
                     )
                 except Exception as e:
                     raise e
+
+            raise RuntimeError(
+                f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
+            )
 
         return wrapper
 
@@ -94,7 +113,7 @@ def try_except_decorator(
 
 async def requests(
     session, method, url, data=None, json_data=None, headers=None
-) -> str:
+) -> str | None:
     async with session.request(
         method, url, data=data, headers=headers, json=json_data
     ) as response:
@@ -120,12 +139,12 @@ async def requests(
             raise UnknownApiRequestError(e) from e
 
         # Если код не в блоке except, значит ответ был успешным (статус 200-299)
-        text = await response.text()
-        if text:
-            json_answer = json.loads(text)
+        response_text: str = await response.text()
+        if response_text:
+            json_answer = json.loads(response_text)
             if isinstance(json_answer, dict):
                 if code := json_answer.get("code"):
-                    raise ApiErrorWithCode(
-                        code, json_answer.get("message"), json_answer.get("rejection")
-                    )
-        return text
+                    message = json_answer.get("message", "")
+                    rejection = json_answer.get("rejection", "")
+                    raise ApiErrorWithCode(code, message, rejection)
+        return response_text
