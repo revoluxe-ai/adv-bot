@@ -90,4 +90,10 @@ async def shop_update_run() -> None:
 
 
 def run() -> None:
-    asyncio.run(shop_update_run())
+    try:
+        asyncio.run(shop_update_run())
+    except KeyboardInterrupt:
+        logger.info("Остановка процесса обновления магазина")
+    except Exception as e:
+        logger.error(f"Необработанная ошибка: {e}", exc_info=True)
+        raise e
