@@ -3,6 +3,7 @@ import logging
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
+from app.modules.shop_runner.exceptions import ShopRunnerError
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -21,24 +22,14 @@ async def run_shop(shop_id: str, wb_cabinet_original_id: int) -> None:
 
 
 async def _run_shop_async(shop_id: str, wb_cabinet_original_id: int) -> None:
-    while True:
-        try:
-            wb_shop = WBShop(shop_id, wb_cabinet_original_id)
-            await wb_shop.run()
-        except Exception:
-            logger.error(
-                f"Ошибка в процессе обновления магазина {shop_id}", exc_info=True
-            )
-        await asyncio.sleep(1)
+    wb_shop = WBShop(shop_id, wb_cabinet_original_id)
+    await wb_shop.run()
 
 
 async def run_shop_task(shop_id: str, wb_cabinet_original_id: int) -> None:
-    try:
-        logger.debug(f"Запуск обновления магазина {shop_id}")
-        await run_shop(shop_id, wb_cabinet_original_id)
-        logger.debug(f"Обновление магазина {shop_id} завершено")
-    except Exception as e:
-        logger.error(f"Ошибка обновления магазина {shop_id}: {e}")
+    logger.debug(f"Запуск обновления магазина {shop_id}")
+    await run_shop(shop_id, wb_cabinet_original_id)
+    logger.debug(f"Обновление магазина {shop_id} завершено")
 
 
 async def __shop_update() -> None:
@@ -92,11 +83,11 @@ async def shop_update_run() -> None:
     while True:
         try:
             await __shop_update()
-        except:
-            logger.error("Ошибка обновления магазина", exc_info=True)
-        finally:
-            await asyncio.sleep(60)
+        except ShopRunnerError:
+            logger.error("Ошибка в процессе обновления магазина", exc_info=True)
+        except Exception as e:
+            logger.error(f"Необработанная ошибка: {e}", exc_info=True)
 
 
-def run():
+def run() -> None:
     asyncio.run(shop_update_run())
