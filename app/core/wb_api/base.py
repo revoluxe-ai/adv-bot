@@ -26,8 +26,20 @@ class BaseAPI:
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
         self._free_tokens = tokens
         current_token = self._free_tokens.pop()
-        self.headers = Headers(current_token)
-        self.shop_id = current_token.shop_id
+        self._headers = Headers(current_token)
+        self._shop_id = current_token.shop_id
+
+    @property
+    def headers(self) -> Headers:
+        return self._headers
+
+    @headers.setter
+    def headers(self, value: Headers) -> None:
+        self._headers = value
+
+    @property
+    def shop_id(self) -> str:
+        return self.access.shop_id
 
     @staticmethod
     def chunks(lst: list[T], n: int) -> Generator[list[T], None, None]:
