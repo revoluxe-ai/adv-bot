@@ -21,6 +21,12 @@ class WBCabinetAccess:
     wb_user_cabinet: WBUserCabinet | None
     wb_cabinet: WBCabinet
 
+    @property
+    def shop_id(self) -> str:
+        if self.wb_cabinet:
+            return str(self.wb_cabinet.shop_id)
+        raise exceptions.WBCabinetNotFoundError("Нет кабинета для доступа к API")
+
 
 async def get_access_for_wb_cabinet(
     wb_cabinet_id_or_shop_id: typing.Union[int, str],
