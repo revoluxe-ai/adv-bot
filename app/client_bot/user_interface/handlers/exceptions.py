@@ -42,6 +42,25 @@ user_router = Router()
 admin_router = Router()
 
 
+@admin_router.errors(ExceptionTypeFilter(aiogram.exceptions.TelegramNetworkError))
+async def network_error_handler(
+    error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
+) -> None:
+    await state.set_state()
+    message = error_event.update.message
+    if message is None:
+        assert error_event.update.callback_query
+        assert error_event.update.callback_query.message
+        assert error_event.update.callback_query.message.chat
+        chat_id = int(error_event.update.callback_query.message.chat.id)
+    else:
+        chat_id = message.chat.id
+    await bot.send_message(
+        chat_id=chat_id,
+        text="Ошибка сети Телеграм. Попробуйте еще раз через несколько минут.",
+    )
+
+
 @admin_router.errors(ExceptionTypeFilter(TelegramBadRequest))
 async def error_handler_for_telegram_bad_request_exception(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
