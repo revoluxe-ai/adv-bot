@@ -21,7 +21,12 @@ from typing import (
 )
 
 import aiohttp
-from aiohttp import ClientOSError, ServerDisconnectedError, ClientResponseError
+from aiohttp import (
+    ClientOSError,
+    ServerDisconnectedError,
+    ClientResponseError,
+    ClientConnectionError,
+)
 
 from .exceptions import (
     ApiForbiddenError,
@@ -113,6 +118,7 @@ def try_except_decorator(
                     ClientOSError,
                     ServerDisconnectedError,
                     ClientResponseError,
+                    ClientConnectionError,
                 ) as e:
                     if state["_attempts"] >= max_attempts:
                         raise e
@@ -148,7 +154,10 @@ async def requests(
         method, url, data=data, headers=headers, json=json_data
     ) as response:
         try:
-            logger.debug(f"Запрос к {url} выполнен. Статус: {response.status}")
+            text = await response.text()
+            logger.debug(
+                f"Запрос к {url} выполнен. Статус: {response.status}, ответ: {text:300}"
+            )
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
@@ -156,6 +165,9 @@ async def requests(
             if e.status == 429:
                 logger.debug(f"Превышен лимит запросов к API: {url}")
                 raise TooManyRequests(e) from e
+            if e.status == 400:
+                logger.error(f"Ошибка запроса: {text}")
+                raise BadRequestError(e) from e
             else:
                 resp = await response.text()
                 logger.error(f"Ошибка запроса: {resp}")
