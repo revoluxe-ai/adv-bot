@@ -458,12 +458,12 @@ class WBShop:
             if not last_position:
                 await redis_manager.set_last_views(adv_id, text, views_now)
                 should_parse = True
+            elif views_now == 0:
+                continue
             elif views_now - last_views > 100:
                 should_parse = True
-
             elif last_position.base_position == 0 and (views_now != last_views):
                 should_parse = True
-
             elif last_position.timestamp < now - timedelta(hours=max_hours_period):
                 should_parse = True
 
