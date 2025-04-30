@@ -433,7 +433,17 @@ class WBShop:
         max_hours_period = settings.MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS
         now = datetime.now()
 
-        for keyword in sorted_keywords:
+        def get_parsing_limit() -> int:
+            positions_in_index = []
+            for ps in keywords_with_positions:
+                base = ps.base_position
+                assert base is not None
+                positions_in_index.append(base)
+            limit = max([len(positions_in_index), 1])
+            return limit
+
+        parsing_limit: int = get_parsing_limit()
+        for keyword in sorted_keywords[:parsing_limit]:
             text = keyword.text
             views_now = keyword.views
 
