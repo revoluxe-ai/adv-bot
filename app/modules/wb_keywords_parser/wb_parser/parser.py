@@ -3,12 +3,9 @@ import datetime
 import json
 import logging
 import re
-import time
 import typing
-from statistics import mean
 
 from aiogram.client.session import aiohttp
-from aiohttp import ServerDisconnectedError, ClientOSError
 
 from app.modules.common_slaves.wildberries.models import WBItemPosition
 from app.modules.wb_adv_updater import data_manager
@@ -45,86 +42,10 @@ class DataError(Exception):
     pass
 
 
-def try_except(requests_per_interval, interval_seconds, max_attempts=50, max_delay=1.5):
-    def decorator(func):
-        async def wrapper(instance, *args, **kwargs):
-            if not hasattr(instance, "_api_call_state"):
-                instance._api_call_state = {}
-
-            method_name = func.__name__
-            if method_name not in instance._api_call_state:
-                next_pause = interval_seconds / requests_per_interval
-                instance._api_call_state[method_name] = {
-                    "_last_query_time": 0,
-                    "_attempts": 0,
-                    "_last_pauses": [0],
-                    "_next_pause": next_pause,
-                }
-
-            state = instance._api_call_state[method_name]
-            while state["_attempts"] < max_attempts:
-                current_time = time.time()
-                next_pause = state["_next_pause"]
-                last_query_time = state["_last_query_time"]
-                time_since_last_query = current_time - last_query_time
-                time_to_wait = next_pause - time_since_last_query
-                if time_to_wait < 0:
-                    time_to_wait = 0
-                logger.debug(f"Пауза между запросами: {time_to_wait} секунд")
-                await asyncio.sleep(time_to_wait)
-                state["_last_pauses"].append(time_to_wait)
-                state["_last_pauses"] = state["_last_pauses"][-1000:]
-                state["_last_query_time"] = int(time.time())
-                try:
-                    result = await func(instance, *args, **kwargs)
-                    logger.debug(f"Запрос через {method_name} выполнен успешно")
-                    max_pause = max(state["_last_pauses"])
-                    min_pause = min(state["_last_pauses"])
-                    current_pause = time_to_wait
-                    if current_pause >= max_pause:
-                        next_pause = current_pause * 2
-                    elif current_pause <= min_pause:
-                        next_pause = current_pause / 2
-                    else:
-                        mean_pause = mean(state["_last_pauses"])
-                        next_pause = mean_pause * 0.95
-                    if next_pause > max_delay:
-                        next_pause = max_delay
-                    state["_next_pause"] = next_pause
-                    state["_attempts"] = 0  # Сброс попыток после успешного выполнения
-                    return result
-                except (DataError, ServerDisconnectedError, ClientOSError) as e:
-                    logger.debug(
-                        f"Ошибка при выполнении запроса через {method_name}: {e}, "
-                        f'Пауза перед следующим запросом: {state["_next_pause"]} секунд'
-                    )
-                    state["_attempts"] += 1
-                    if state["_attempts"] >= max_attempts:
-                        logger.error(
-                            f"Превышено максимальное количество попыток {max_attempts} "
-                            f"для метода {method_name}, аргументы: {args}, {kwargs}"
-                        )
-                        raise e
-                    last_pause = state["_last_pauses"][-1]
-                    previous_pause = state["_last_pauses"][-2]
-                    if last_pause >= previous_pause:
-                        state["_next_pause"] = last_pause * 2
-                    else:
-                        state["_next_pause"] = mean([last_pause, previous_pause])
-                    if state["_next_pause"] == 0:
-                        state["_next_pause"] = 1
-                    if state["_next_pause"] > max_delay:
-                        state["_next_pause"] = max_delay
-                    state["_attempts"] += 1
-
-        return wrapper
-
-    return decorator
-
-
-def get_parse_url(text: str, page: int):
+def get_parse_url(text: str, page: int) -> str:
     assert 60 >= page > 0
-    url = f"https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false"
+    url = (f"https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&"
+           f"page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false")
     return url
 
 
@@ -154,30 +75,37 @@ class ParserService:
         positions = []
         for place_on_page, product in enumerate(products):
             adv_type = None
-            nmid = product["id"]
-            real_position = first_place + place_on_page
-            if "log" in product:
-                log = product["log"]
-                adv_id = log["advertId"]
-                cpm = log["cpm"]
-                base_position = log["position"]
-                promo_position = log["promoPosition"]
-                real_position = promo_position
-                adv_type_original = log["tp"]
-                if adv_type_original == "c":
-                    adv_type = 9
-                elif adv_type_original == "b":
-                    adv_type = 8
-                else:
-                    raise DataError(
-                        f"Неизвестный тип рекламы {adv_type_original}", text
-                    )
-            else:
-                adv_id = None
-                cpm = None
-                promo_position = None
-                base_position = real_position
+            try:
+                nmid = product["id"]
+                real_position = first_place + place_on_page
+                if "log" in product:
+                    log = product["log"]
+                    adv_id = log["advertId"]
+                    cpm = log["cpm"]
+                    base_position = log["position"]
+                    promo_position = log["promoPosition"]
+                    real_position = promo_position
+                    try:
+                        adv_type_original = log["tp"]
+                    except KeyError:
+                        adv_type_original = None
 
+                    if adv_type_original == "c":
+                        adv_type = 9
+                    elif adv_type_original == "b":
+                        adv_type = 8
+                    elif isinstance(adv_type_original, int):
+                        raise DataError(
+                            f"Неизвестный тип рекламы {adv_type_original}", text
+                        )
+                else:
+                    adv_id = None
+                    cpm = None
+                    promo_position = None
+                    base_position = real_position
+            except KeyError:
+                logger.error("Ошибка парсинга данных о позициях с WB")
+                continue
             position = WBItemPosition(
                 nmid=nmid,
                 base_position=base_position,
@@ -191,7 +119,7 @@ class ParserService:
             )
             positions.append(position)
 
-            if cluster != text:
+            if cluster and cluster != text:
                 position = WBItemPosition(
                     nmid=nmid,
                     base_position=base_position,
@@ -207,8 +135,8 @@ class ParserService:
 
         return positions
 
-    @try_except(1, 1)
-    async def __parse_keywords_from_wb(self, text: str, page: int) -> tuple[
+    @staticmethod
+    async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
         typing.Optional[list[dict]],
         typing.Optional[str],
         typing.Optional[int],
@@ -279,10 +207,7 @@ async def add_positions_from_page(
     need_nmids: set[int],
     total_pages: TotalPages,
     checked_pages: set[int],
-) -> (
-    list[WBItemPosition],
-    int,
-):
+) -> None:
     try:
         await _add_positions_from_page(
             stop_event,
@@ -303,7 +228,7 @@ async def add_positions_from_page(
         logger.debug(f"{get_parse_url(text, page)}")
 
 
-async def add_wb_positions_to_clickhouse(positions):
+async def add_wb_positions_to_clickhouse(positions) -> None:
     await data_manager.add_positions_to_clickhouse(positions)
 
 
@@ -363,12 +288,10 @@ async def _add_positions_from_page(
     return positions
 
 
-async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60):
-    try:
-        await _add_wb_positions(text, set(need_nmids), delay, page_limit)
-    except Exception:
-        logger.error(f"Ошибка при парсинге позиций {text}", exc_info=True)
-    return
+async def add_wb_positions(
+    text: str, need_nmids: set[int], delay, page_limit=60
+) -> None:
+    await _add_wb_positions(text, set(need_nmids), delay, page_limit)
 
 
 async def _add_wb_positions(
