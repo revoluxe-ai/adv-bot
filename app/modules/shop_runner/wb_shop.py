@@ -93,12 +93,11 @@ def single_run() -> (
                 result = self._single_run_results[key]
                 return result
 
-            event.clear()
             try:
+                event.clear()
                 result = await func(self, *args, **kwargs)
-                if not hasattr(self, "_single_run_results"):
-                    self._single_run_results = {}
                 self._single_run_results[key] = result
+                event.set()
                 return result
             except Exception as e:
                 # Здесь можно вставить свой логгер
