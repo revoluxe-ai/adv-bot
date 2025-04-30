@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 import time
-from typing import Optional, Set
+from typing import Optional, Set, Awaitable
 
 from redis.asyncio.client import Pipeline
 
@@ -92,38 +92,39 @@ class GlobalParsingQueueManager(BaseRedis):
         Returns:
             task: Объект ParsingTask или None, если очередь пуста
         """
-        # Проверяем размер очереди
-        queue_size = await self.client.zcard(self.queue_key)
-        logger.debug(f"Current queue size: {queue_size}")
+        GET_NEXT_TASK_LUA = """
+        local task_id = redis.call('zrange', KEYS[1], 0, 0)[1]
+        if not task_id then
+            return nil
+        end
 
-        # Сначала получаем ID задачи
-        task_ids = await self.client.zrange(self.queue_key, 0, 0)
-        if not task_ids:
-            logger.debug("Queue is empty.")
+        local task_key = ARGV[1] .. task_id
+        local task_data = redis.call('get', task_key)
+
+        if not task_data then
+            redis.call('zrem', KEYS[1], task_id)
+            return nil
+        end
+
+        redis.call('zrem', KEYS[1], task_id)
+        redis.call('del', task_key)
+
+        return task_data
+        """
+
+        result = self.client.eval(
+            GET_NEXT_TASK_LUA,
+            1,  # количество ключей
+            self.queue_key,
+            self.task_data_prefix,
+        )
+        if isinstance(result, Awaitable):
+            result = await result
+
+        if not result:
             return None
 
-        task_id = task_ids[0].decode()
-        task_key = f"{self.task_data_prefix}{task_id}"
-
-        logger.debug(f"Fetching task with task_id: {task_id}")
-
-        # Получаем данные задачи
-        task_data = await self.client.get(task_key)
-        if not task_data:
-            logger.warning(f"No task data found for task_id: {task_id}")
-            # Удаляем несуществующую задачу из очереди
-            await self.client.zrem(self.queue_key, task_id)
-            return None
-
-        # Удаляем задачу из очереди и её данные
-        async with self.client.pipeline() as pipe:
-            pipe.zrem(self.queue_key, task_id)
-            pipe.delete(task_key)
-            await pipe.execute()
-
-        data = json.loads(task_data)
-        logger.debug(f"Task data: {data}")
-
+        data = json.loads(result)
         return ParsingTask(
             keyword=data["text"],
             nmids=set(data["nmids"]),
