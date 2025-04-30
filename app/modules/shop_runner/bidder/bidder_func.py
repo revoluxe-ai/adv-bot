@@ -129,24 +129,20 @@ async def run_bidder_process_for_adv(
             adv_setting_for_update.max_place = promo_position + 1
             await session.commit()
 
-    async def update_cpm(
-        target_adv_id: int, cpm: int, wb_api_updater: BidderAPI
-    ) -> None:
-        await wb_api_updater.update_cpm(target_adv_id, cpm)
-        await redis_manager.set_last_adv_bid(target_adv_id, cpm)
-
-    async def update_search_cpm(
-        target_adv_id: int, cpm: int, wb_api_updater: BidderAPI
-    ) -> None:
-        await wb_api_updater.set_search_cpm(target_adv_id, cpm)
-        await redis_manager.set_last_adv_bid(target_adv_id, cpm)
-
     if adv_setting.bidder_for_auto:
         auto_adv_id = adv_setting.adv_id
         assert auto_adv_id is not None
-        await update_cpm(auto_adv_id, max(new_cpm, 150), wb_api)
+        await wb_api.update_cpm(
+            auto_adv_id,
+            nmid,
+            max(new_cpm, 125),
+        )
 
     if adv_setting.search_adv_id:
-        await update_cpm(adv_setting.search_adv_id, max(new_cpm, 150), wb_api)
+        await wb_api.update_cpm(
+            adv_setting.search_adv_id,
+            nmid,
+            max(new_cpm, 150),
+        )
 
     logger.debug(f"[{shop_id}] [{adv_id}] Ставки обновлены")
