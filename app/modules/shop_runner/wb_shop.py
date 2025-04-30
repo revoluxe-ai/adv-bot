@@ -95,7 +95,11 @@ def single_run() -> (
 
             try:
                 event.clear()
-                result = await func(self, *args, **kwargs)
+                try:
+                    result = await func(self, *args, **kwargs)
+                except Exception as exc:
+                    logger.error("Ошибка обернутой функции", func.__name__)
+                    raise exc
                 self._single_run_results[key] = result
                 event.set()
                 return result
