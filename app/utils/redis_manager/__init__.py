@@ -593,7 +593,7 @@ async def set_last_views(adv_id: int, text: str, total_views: int):
     return None
 
 
-async def get_last_views(adv_id, text):
+async def get_last_views(adv_id, text) -> int | None:
     key = "last_views:" + str(adv_id) + ":" + text
     total_views = await redis_replica_client.get(key)
     if total_views is None:
