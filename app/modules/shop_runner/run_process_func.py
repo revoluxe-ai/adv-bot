@@ -87,6 +87,7 @@ async def shop_update_run() -> None:
             logger.error("Ошибка в процессе обновления магазина", exc_info=True)
         except Exception as e:
             logger.error(f"Необработанная ошибка: {e}", exc_info=True)
+            raise e
 
 
 def run() -> None:
