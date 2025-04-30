@@ -44,8 +44,10 @@ class DataError(Exception):
 
 def get_parse_url(text: str, page: int) -> str:
     assert 60 >= page > 0
-    url = (f"https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&"
-           f"page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false")
+    url = (
+        f"https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&"
+        f"page={page}&query={text}&resultset=catalog&sort=popular&suppressSpellcheck=false"
+    )
     return url
 
 
