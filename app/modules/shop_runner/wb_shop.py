@@ -267,8 +267,6 @@ class WBShop:
                 access = self.__access
                 assert access is not None
                 wb_stat_manager = WBCommonStatManager(access)
-            except Exception:
-                logger.error("Ошибка обновления общей статистики", exc_info=True)
             finally:
                 await asyncio.sleep(60 * 15)
 
@@ -307,10 +305,6 @@ class WBShop:
                 await self._update_access()
                 access = self.__access
                 assert access is not None
-            except Exception:
-                logger.error(
-                    "Ошибка обновления полной статистики обновления", exc_info=True
-                )
             finally:
                 await asyncio.sleep(60 * 15)
 
@@ -355,8 +349,6 @@ class WBShop:
                 await self._update_access()
                 wb_access = self.__access
                 shop_data_updater = ShopDataUpdater(wb_access)
-            except Exception:
-                logger.error("Ошибка обновления данных", exc_info=True)
             finally:
                 await asyncio.sleep(60 * 7 + 30)
 
@@ -399,10 +391,11 @@ class WBShop:
                 await self._update_access()
                 access = self.__access
                 shop_data_updater = ShopDataUpdater(access)
-            except Exception:
+            except Exception as e:
                 logger.error(
                     "Ошибка обновления полной статистики обновления", exc_info=True
                 )
+                raise e
             finally:
                 await asyncio.sleep(60 * 60 * 12)
 
