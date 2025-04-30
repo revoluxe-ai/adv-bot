@@ -449,7 +449,7 @@ async def convert_keyword_stats_in_clusters(
     preset_to_cluster_name = {}
     texts = [keyword.text for keyword in keyword_stats]
     try:
-        text_to_custer_and_present: dict[str, tuple] = (
+        text_to_custer_and_present: dict[str, [tuple[str, int]]] = (
             await redis_manager.get_clusters_and_presets(texts)
         )
     except:
@@ -491,9 +491,9 @@ async def __get_cpm_from_positions(nmid: int, texts) -> Optional[int]:
             f"Позиции не найдены с cpm для nmid в редис {nmid}"
         )
 
-    def __get_last_update(position: WBItemPosition):
+    def __get_last_update(position: WBItemPosition) -> datetime:
         # Выводим значение timestamp для отладки
-        print(f"Timestamp: {position.timestamp}")
+        logger.debug(f"Timestamp: {position.timestamp}")
         return position.timestamp
 
     last_position = sorted(positions, key=__get_last_update, reverse=True)[0]
