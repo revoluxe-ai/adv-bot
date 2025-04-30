@@ -1,13 +1,16 @@
-from fastapi import Response
-from fastapi import FastAPI, Request
+import asyncio
+import logging
 from contextlib import asynccontextmanager
+
 from aiogram import Dispatcher, types
-from app.settings import settings
+from aiogram.exceptions import TelegramAPIError
+from fastapi import FastAPI, Request
+from fastapi import Response
+
 from app.client_bot.bot import get_bot
 from app.client_bot.global_router import global_router
+from app.settings import settings
 from python_modules.logger import setup_logging
-import logging
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -95,13 +98,34 @@ if __name__ == "__main__":
     import uvicorn
 
     if POLLING_MODE:
+
         async def start_polling():
             logger.info("🚀 Стартуем в режиме POLLING...")
 
             # Принудительное удаление вебхука
             logger.info("🧹 Удаляем вебхук перед стартом POLLING...")
-            await bot.delete_webhook()
-            logger.info("✅ Вебхук удалён.")
+            try:
+                # Проверяем текущий статус вебхука
+                webhook_info = await bot.get_webhook_info()
+                if webhook_info.url:
+                    # Если вебхук установлен, удаляем его с таймаутом
+                    try:
+                        # Устанавливаем таймаут в 10 секунд для операции удаления вебхука
+                        delete_task = asyncio.create_task(bot.delete_webhook())
+                        await asyncio.wait_for(delete_task, timeout=5)
+                        logger.info("✅ Вебхук удалён.")
+                    except asyncio.TimeoutError:
+                        logger.warning(
+                            "⚠️ Таймаут при удалении вебхука. Продолжаем работу."
+                        )
+                else:
+                    logger.info("ℹ️ Вебхук не был установлен, пропускаем удаление.")
+            except TelegramAPIError as e:
+                logger.error(f"❌ Ошибка при работе с API Telegram: {e}")
+                logger.info("⚠️ Продолжаем запуск несмотря на ошибку.")
+            except Exception as e:
+                logger.error(f"❌ Непредвиденная ошибка при удалении вебхука: {e}")
+                logger.info("⚠️ Продолжаем запуск несмотря на ошибку.")
 
             try:
                 await dp.start_polling(bot)
@@ -113,4 +137,3 @@ if __name__ == "__main__":
     else:
         logger.info("🌐 Стартуем FastAPI в режиме WEBHOOK...")
         uvicorn.run(app, host="0.0.0.0", port=8080)
-
