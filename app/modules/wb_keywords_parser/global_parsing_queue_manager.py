@@ -4,6 +4,8 @@ import logging
 import time
 from typing import Optional, Set
 
+from redis.asyncio.client import Pipeline
+
 from .parsing_task import ParsingTask
 from ...core.redis_manager.base_redis_manager import BaseRedis
 
@@ -65,7 +67,7 @@ class GlobalParsingQueueManager(BaseRedis):
         # Проверяем, есть ли задача в очереди
         in_queue = await self.client.zscore(self.queue_key, task_id)
         logger.debug(f"Task in queue: {in_queue is not None}")
-
+        pipe: Pipeline
         # Записываем данные и индексируем атомарно
         async with self.client.pipeline() as pipe:
             pipe.set(task_key, json.dumps(task_data))
