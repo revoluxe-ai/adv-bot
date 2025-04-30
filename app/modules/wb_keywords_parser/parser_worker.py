@@ -15,12 +15,15 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
+lock = asyncio.Lock()
+
+
 class ParserWorker:
     def __init__(self, max_parallel_tasks: int = 3):
         self.queue_manager = GlobalParsingQueueManager()
         self._max_parallel_tasks = max_parallel_tasks
         self._stop_event = asyncio.Event()
-        self._tasks: set[Task] = set()
+        self._tasks: set[Task[None]] = set()
 
     async def run(self):
         try:
@@ -41,8 +44,8 @@ class ParserWorker:
         logger.info("Starting parser worker")
         while not self._stop_event.is_set():
             try:
-                # Получаем следующую задачу из очереди
-                task: ParsingTask | None = await self.queue_manager.get_next_task()
+                async with lock:
+                    task: ParsingTask | None = await self.queue_manager.get_next_task()
                 if task:
                     logger.debug(f"Processing task: {task}")
                     try:
@@ -52,6 +55,7 @@ class ParserWorker:
                         logger.error(
                             f"Error processing task {task}: {e}", exc_info=True
                         )
+
                 else:
                     # Если задач нет, ждем немного
                     await asyncio.sleep(1)
@@ -61,7 +65,7 @@ class ParserWorker:
                 await asyncio.sleep(30)  # Ждем перед повторной попыткой
 
     @staticmethod
-    async def _process_task(task: ParsingTask):
+    async def _process_task(task: ParsingTask) -> None:
         """Обработка отдельной задачи"""
         try:
             # Выполняем парсинг через новый метод
