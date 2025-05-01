@@ -16,6 +16,7 @@ T = TypeVar("T")
 class BaseAPI:
 
     HOST = "wildberries.ru"
+    api_call_state: dict[str, dict[str, str]] = {}
 
     def __init__(self, wb_access: WBCabinetAccess) -> None:
         tokens: list[WBToken] = wb_access.tokens
@@ -30,8 +31,6 @@ class BaseAPI:
         current_token = self._free_tokens.pop()
         self._headers = Headers(current_token)
         self._shop_id = current_token.shop_id
-
-        self.api_call_state: dict[str, dict[str, str]] = {}
 
     @property
     def headers(self) -> Headers:
