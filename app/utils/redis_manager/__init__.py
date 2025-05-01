@@ -7,6 +7,7 @@ import typing
 from types import NoneType
 from typing import Union
 
+from app.core.wb_api.mixins.adv import MinCPMData
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.utils import text_cleaner
 from app.utils.redis_manager.exc import DataNotFoundError
@@ -786,3 +787,21 @@ async def get_last_parsing_position_time(text: str, nmid: int) -> int | None:
         return None
     time_now = float(value.decode("utf-8"))  # Получаем time_now как float
     return int(time_now)  # Возвращаем время и текст
+
+
+async def set_min_cpm_data(min_cpm_data: MinCPMData) -> None:
+    mapping = min_cpm_data.get_min_cpm_data_for_cagegory_name_match()
+
+    result = redis_master_client.hset("min_cpm_data", mapping=mapping)
+    if isinstance(result, typing.Awaitable):
+        await result
+
+
+async def get_min_cpm_by_category_name(category_name: str) -> int | None:
+    result = redis_replica_client.hget("min_cpm_data", category_name)
+    if isinstance(result, typing.Awaitable):
+        result = await result
+    min_cpm_data = result
+    if min_cpm_data is None:
+        return 125
+    return int(min_cpm_data)
