@@ -1,10 +1,11 @@
 import asyncio
 import logging
+
+from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
+from . import wb_manager
 from .ml_data_manager import update_model
 from ..user_message_sender import message_for_not_pay_user_sender
-from app.utils.db.session_maker import get_async_session_maker
-from . import wb_manager
 
 set_config()
 
@@ -22,7 +23,7 @@ async def run_update_all_keywords_on_wb():
         try:
             await wb_manager.update_all_keywords_on_wb()
         except Exception:
-            logger.error('Ошибка обновления фраз', exc_info=True)
+            logger.error("Ошибка обновления фраз", exc_info=True)
         await asyncio.sleep(5)
 
 
@@ -31,24 +32,24 @@ async def sender_message_to_not_pay_users():
         try:
             await message_for_not_pay_user_sender.send_messages_to_users()
         except Exception as e:
-            logger.error(f'Ошибка отправки сообщений {e}', exc_info=True)
-        await asyncio.sleep(60*5)
+            logger.error(f"Ошибка отправки сообщений {e}", exc_info=True)
+        await asyncio.sleep(60 * 5)
 
 
-async def process_payment_for_advs():
+async def process_payment_for_advs() -> None:
     while True:
         try:
             await wb_manager.process_payment_for_advs()
         except Exception as e:
-            logger.error(f'Ошибка обработки платежей {e}', exc_info=True)
-        await asyncio.sleep(60*60)
+            logger.error(f"Ошибка обработки платежей {e}", exc_info=True)
+        await asyncio.sleep(60 * 60)
 
 
-async def run_update_vectors_in_redis():
+async def run_update_vectors_in_redis() -> None:
     await wb_manager.update_vectors_in_redis()
 
 
-async def run_vector_update_in_neo4j():
+async def run_vector_update_in_neo4j() -> None:
     await wb_manager.update_vectors_update_in_graph()
 
 
@@ -57,15 +58,20 @@ async def run_update_model():
         try:
             await update_model()
         except Exception as e:
-            logger.error(f'Ошибка обновления модели {e}', exc_info=True)
+            logger.error(f"Ошибка обновления модели {e}", exc_info=True)
         await asyncio.sleep(0)
+
+
+async def update_wb_config_data() -> None:
+    await wb_manager.update_wb_config_data_run()
 
 
 async def main_loop():
     await asyncio.gather(
         process_payment_for_advs(),
         run_update_vectors_in_redis(),
-        run_vector_update_in_neo4j()
+        run_vector_update_in_neo4j(),
+        update_wb_config_data(),
     )
 
 
@@ -74,5 +80,5 @@ async def run_main_coroutines():
         try:
             await main_loop()
         except Exception as e:
-            logger.error(f'Ошибка в главном цикле {e}', exc_info=True)
+            logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
             await asyncio.sleep(0)
