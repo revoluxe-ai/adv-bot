@@ -5,7 +5,7 @@
 
 from typing import Protocol, runtime_checkable, Any
 
-from app.modules.common_slaves.wildberries.ABC_WB_API import Headers
+from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
 
 @runtime_checkable
