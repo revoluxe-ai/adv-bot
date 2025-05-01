@@ -14,7 +14,7 @@ except ImportError:
     class_based = False
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_shop_updater_initialization():
     """
     Тест проверяет, что класс или функция ShopUpdater инициализируется корректно
@@ -69,7 +69,7 @@ async def test_shop_updater_initialization():
                 mock_setup_logging.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_shop_updater_run_calls_required_functions():
     """
     Тест проверяет, что метод run вызывает необходимые функции
@@ -128,7 +128,7 @@ async def test_shop_updater_run_calls_required_functions():
             mock_cleanup.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_shop_updater_processes_shops_in_parallel():
     """
     Тест проверяет, что обработка магазинов происходит параллельно

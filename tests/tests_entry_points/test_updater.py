@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -7,7 +7,7 @@ import pytest
 from updater import Updater
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_updater_run_calls_all_coroutines():
     """
     Тест проверяет, что метод run класса Updater вызывает все необходимые корутины
@@ -41,10 +41,10 @@ async def test_updater_run_calls_all_coroutines():
         updater.update_method4.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_updater_run_gathers_correct_number_of_coroutines():
     """
-    Тест проверяет, что метод run класса Updater передает правильное количество 
+    Тест проверяет, что метод run класса Updater передает правильное количество
     корутин в asyncio.gather
     """
     # Создаем экземпляр Updater
@@ -84,7 +84,7 @@ async def test_updater_run_gathers_correct_number_of_coroutines():
         updater.update_method4.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_updater_run_coroutines_without_errors_for_one_minute():
     """
     Тест проверяет, что все корутины из метода run класса Updater
@@ -92,7 +92,7 @@ async def test_updater_run_coroutines_without_errors_for_one_minute():
     """
     # Создаем экземпляр Updater
     updater = Updater()
-    
+
     # Имитация корутины, которая будет работать бесконечно
     async def mock_infinite_run(*args, **kwargs):
         try:
@@ -102,23 +102,23 @@ async def test_updater_run_coroutines_without_errors_for_one_minute():
         except Exception as e:
             # Если возникает исключение, перехватываем его и выводим
             pytest.fail(f"Корутина вызвала исключение: {e}")
-    
+
     # Мокируем все методы, которые должны вызываться из run
     updater.update_method1 = AsyncMock(side_effect=mock_infinite_run)
     updater.update_method2 = AsyncMock(side_effect=mock_infinite_run)
     updater.update_method3 = AsyncMock(side_effect=mock_infinite_run)
     updater.update_method4 = AsyncMock(side_effect=mock_infinite_run)
-    
+
     # Запускаем run и ждем минуту
     task = asyncio.create_task(updater.run())
-    
+
     # Подождем 60 секунд (минуту)
     try:
         await asyncio.wait_for(task, timeout=60.0)
     except asyncio.TimeoutError:
         # Тайм-аут ожидаем, так как корутины должны работать бесконечно
         pass
-    
+
     # Проверяем, что задача не завершилась с исключением
     if task.done() and not task.cancelled():
         # Если задача завершилась и не была отменена, проверяем наличие исключения
@@ -126,13 +126,13 @@ async def test_updater_run_coroutines_without_errors_for_one_minute():
             task.result()
         except Exception as e:
             pytest.fail(f"Корутина завершилась с исключением: {e}")
-    
+
     # Отменяем задачу, так как она бесконечна
     task.cancel()
-    
+
     # Подождем отмену задачи
     try:
         await asyncio.wait_for(task, timeout=1.0)
     except (asyncio.TimeoutError, asyncio.CancelledError):
         # Мы ожидаем, что задача будет отменена
-        pass 
+        pass

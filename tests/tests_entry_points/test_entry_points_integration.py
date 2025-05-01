@@ -1,11 +1,10 @@
-import asyncio
 import subprocess
 from unittest.mock import patch, AsyncMock
 
 import pytest
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_entry_points_import_without_errors():
     """
     Тест проверяет, что все точки входа можно импортировать без ошибок
@@ -22,9 +21,9 @@ async def test_entry_points_import_without_errors():
         "run_update_keyword_vectors_in_redis",
         "keyword_sending_to_neo4j",
         "trunc_system_log_in_clickhouse",
-        "client_bot_run"
+        "client_bot_run",
     ]
-    
+
     for module in entry_points:
         try:
             # Пытаемся импортировать модуль
@@ -49,9 +48,9 @@ def test_entry_points_command_line_args():
         ["python", "run_update_keyword_vectors_in_redis.py", "--help"],
         ["python", "keyword_sending_to_neo4j.py", "--help"],
         ["python", "trunc_system_log_in_clickhouse.py", "--help"],
-        ["python", "client_bot_run.py", "--help"]
+        ["python", "client_bot_run.py", "--help"],
     ]
-    
+
     for cmd in entry_points_commands:
         try:
             # Запускаем команду с таймаутом в 5 секунд
@@ -71,30 +70,33 @@ def test_entry_points_command_line_args():
             pytest.fail(f"Ошибка при запуске команды {' '.join(cmd)}: {e}")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_all_entry_points_can_start():
     """
     Тест проверяет, что все точки входа могут запуститься без ошибок
     (использует мокирование для предотвращения реального выполнения)
     """
-    
+
     # Мокируем основные функции asyncio для предотвращения реального запуска
-    with patch("asyncio.run"), patch("asyncio.gather"), \
-         patch("asyncio.create_task"), patch("sys.exit"):
-        
+    with patch("asyncio.run"), patch("asyncio.gather"), patch(
+        "asyncio.create_task"
+    ), patch("sys.exit"):
+
         # Проверяем ARQ Worker
         try:
             with patch("app.arq_workers.workers.WorkerSettings.run") as mock_run:
                 from app.arq_workers.workers import main as arq_main
+
                 arq_main()
                 mock_run.assert_called_once()
         except ImportError:
             pass  # Пропускаем, если не удалось импортировать
-        
+
         # Проверяем Updater
         try:
             with patch("updater.Updater.run", new_callable=AsyncMock) as mock_run:
                 from updater import main as updater_main
+
                 await updater_main()
                 mock_run.assert_called_once()
         except ImportError:
@@ -102,47 +104,53 @@ async def test_all_entry_points_can_start():
 
         # Проверяем Keywords Parsing
         try:
-            with patch("run_keywords_parsing.main", new_callable=AsyncMock) as mock_main:
+            with patch(
+                "run_keywords_parsing.main", new_callable=AsyncMock
+            ) as mock_main:
                 from run_keywords_parsing import cli as keywords_cli
+
                 keywords_cli()
                 mock_main.assert_called_once()
         except ImportError:
             pass
-        
+
         # Проверяем Model Updater
         try:
             with patch("run_update_model.main", new_callable=AsyncMock) as mock_main:
                 from run_update_model import cli as model_cli
+
                 model_cli()
                 mock_main.assert_called_once()
         except ImportError:
             pass
-        
+
         # Оставшиеся модули можно проверить аналогично
         # ...
 
     # Тест считается успешным, если ни один из импортов и вызовов не вызвал исключение
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_entry_points_configuration_loading():
     """
     Тест проверяет, что все точки входа корректно загружают конфигурацию
     """
     # Мокируем функции для загрузки конфигурации
-    with patch("os.environ.get") as mock_env, \
-         patch("dotenv.load_dotenv") as mock_dotenv:
-         
+    with patch("os.environ.get") as mock_env, patch(
+        "dotenv.load_dotenv"
+    ) as mock_dotenv:
+
         # Устанавливаем тестовые значения переменных окружения
         mock_env.return_value = "test_value"
-        
+
         # Пытаемся импортировать и запустить каждую точку входа
         # Здесь приведен пример для одной точки входа
         try:
             # Импортируем модуль с предварительным мокированием запуска
             with patch("asyncio.run"):
                 import updater
+
                 # Проверяем, что конфигурация была загружена
                 mock_dotenv.assert_called()
         except ImportError:
-            pass  # Пропускаем, если не удалось импортировать 
+            pass  # Пропускаем, если не удалось импортировать

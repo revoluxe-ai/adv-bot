@@ -6,7 +6,7 @@ import pytest
 from app.modules.shop_runner.wb_shop import WBShop
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_wb_shop_run_calls_all_coroutines():
     """
     Тест проверяет, что метод _run класса WBShop запускает необходимые корутины
@@ -47,7 +47,7 @@ async def test_wb_shop_run_calls_all_coroutines():
         wb_shop.update_full_adv_stat.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_wb_shop_run_gathers_correct_number_of_coroutines():
     """
     Тест проверяет, что метод _run класса WBShop передает правильное количество
