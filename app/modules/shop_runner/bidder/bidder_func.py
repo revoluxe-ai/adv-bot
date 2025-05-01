@@ -1,6 +1,7 @@
 import logging
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
+from app.core.wb_api.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.bidder.excs import CpmNotFoundError
@@ -25,7 +26,7 @@ async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: BidderAPI) -> set[int] 
     if not adv_ids:
         return None
 
-    advs = await wb_api.get_advs(adv_ids)
+    advs: list[Adv] = await wb_api.get_advs(adv_ids)
     try:
         wb_cabinet_original_id: int = wb_api.access.wb_cabinet.id
         async with sm(read_only=False) as session:
@@ -135,14 +136,14 @@ async def run_bidder_process_for_adv(
         await wb_api.update_cpm(
             auto_adv_id,
             nmid,
-            max(new_cpm, 125),
+            new_cpm,
         )
 
     if adv_setting.search_adv_id:
         await wb_api.update_cpm(
             adv_setting.search_adv_id,
             nmid,
-            max(new_cpm, 150),
+            new_cpm,
         )
 
     logger.debug(f"[{shop_id}] [{adv_id}] Ставки обновлены")
