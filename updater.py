@@ -49,36 +49,6 @@ def process_controller(process_pids: list[int], process_names: list[str]):
             except psutil.NoSuchProcess:
                 logger.error(f"Процесс с PID {pid} (имя: {name}) не существует.")
                 continue
-        #     logger.debug(f'Создан объект процесса: {name}')
-        #     memory_usage = proc.memory_info().rss / (1024 * 1024)
-        #     logger.debug('Получили использование памяти')
-        #     process_info = {
-        #         'PID': pid,
-        #         'Name': name,
-        #         'Memory Usage (MB)': memory_usage,
-        #         'Status': proc.status(),
-        #         'Threads': proc.num_threads(),
-        #         'Create Time': time.ctime(proc.create_time()),
-        #         'CPU User Time (s)': cpu_times.user,
-        #         'CPU System Time (s)': cpu_times.system,
-        #         'Open Files': len(proc.open_files())
-        #     }
-        #
-        #     process_logger.info(f"  PID: {process_info['PID']}")
-        #     process_logger.info(f"  Name: {process_info['Name']}")
-        #     process_logger.info(f"  Memory Usage (MB): {process_info['Memory Usage (MB)']:.2f}")
-        #     process_logger.info(f"  Status: {process_info['Status']}")
-        #     process_logger.info(f"  Threads: {process_info['Threads']}")
-        #     process_logger.info(f"  Create Time: {process_info['Create Time']}")
-        #     process_logger.info(f"  Open Files: {process_info['Open Files']}")
-        #     process_logger.info('-----------------------------------------------')
-        #     process_logger.info('-----------------------------------------------')
-        #     if not proc.is_running() or proc.status() == psutil.STATUS_ZOMBIE:
-        #         logger.error(f'Процесс мертв, перезапуск процесса: {name}')
-        # process_logger.info('+++++++++++++++++++++++++++++++++++++++++++++++')
-        # process_logger.info('================================================')
-        # process_logger.info('+++++++++++++++++++++++++++++++++++++++++++++++')
-
         time.sleep(60)
 
 
@@ -100,14 +70,8 @@ def main() -> None:
         process_pids.append(process.pid)
         process_names.append(run_own_process.__name__)
 
-    # Запуск process_controller в отдельном процессе
-    # controller_process = Process(target=process_controller, args=(process_pids, process_names), name='ProcessController')
-    # controller_process.start()
-    # logger.info(f'Запущен процесс-контроллер с PID {controller_process.pid}')
-
     for process in processes:
         process.join()
-    # controller_process.join()
     return None
 
 
