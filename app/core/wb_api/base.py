@@ -53,7 +53,12 @@ class BaseAPI:
         if self._free_tokens:
             self.headers = Headers(self._free_tokens.pop())
         else:
-            wb_cabinet: WBCabinet = self.access.wb_cabinet
+            wb_cabinet: WBCabinet | None = self.access.wb_cabinet
+            if wb_cabinet is None:
+                raise ApiForbiddenError(
+                    "Нет WBCabinet для деактивации, метод set_next_token не может быть использован"
+                )
+
             try:
                 async with sm(read_only=False) as session:
                     fresh_cabinet = await session.get(WBCabinet, wb_cabinet.id)
