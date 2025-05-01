@@ -3,13 +3,15 @@
 
 """
 
-from typing import Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable, Any
 
 from app.modules.common_slaves.wildberries.ABC_WB_API import Headers
 
 
 @runtime_checkable
 class WBAPIProtocol(Protocol):
+
+    headers: Headers
     """
     Протокол для работы с WB API.
     """
@@ -21,13 +23,6 @@ class WBAPIProtocol(Protocol):
         pass
 
     @property
-    def headers(self) -> Headers:
-        """
-        Возвращает заголовки для доступа к API.
-        """
-        pass
-
-    @property
     def shop_id(self) -> str:
         """
         Возвращает идентификатор магазина.
@@ -35,14 +30,14 @@ class WBAPIProtocol(Protocol):
         pass
 
     @property
-    def api_call_state(self) -> dict[str, dict]:
+    def api_call_state(self) -> dict[str, dict[str, Any]]:
         """
         Возвращает состояние вызова API.
         """
         pass
 
     @api_call_state.setter
-    def api_call_state(self, value: dict[str, dict]) -> None:
+    def api_call_state(self, value: dict[str, dict[str, Any]]) -> None:
         """
         Устанавливает состояние вызова API.
         """
