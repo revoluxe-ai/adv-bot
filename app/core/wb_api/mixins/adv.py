@@ -20,7 +20,38 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=WBAPIProtocol)
 
 
+class MinCPMData:
+    def __init__(self, api_answer: dict[str, Any]):
+        category_id_to_min_cpm: dict[int, int] = {}
+        category_name_to_min_cpm: dict[str, int] = {}
+
+        for data in api_answer["categories"]:
+            category_id = data["id"]
+            category_name = data["name"]
+            min_cpm = data["cpm_min"]
+            category_id_to_min_cpm[category_id] = min_cpm
+            category_name_to_min_cpm[category_name] = min_cpm
+
+        self.category_id_to_min_cpm = category_id_to_min_cpm
+        self.category_name_to_min_cpm = category_name_to_min_cpm
+
+    def get_min_cpm_data_for_cagegory_name_match(self) -> dict[str, int]:
+        return self.category_name_to_min_cpm
+
+
 class AdvMixin(WBAPIProtocol):
+
+    PREFIX = "https://advert-api"
+
+    @try_except_decorator(1, 60)
+    async def get_min_cpm_adv_data(self) -> MinCPMData:
+        url = f"{self.PREFIX}.{self.HOST}/adv/v0/config"
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(
+                session, "GET", url, headers=self.headers.standart
+            )
+            answer = json.loads(response_text)
+            return MinCPMData(answer)
 
     @try_except_decorator(1, 3)
     async def get_advertIds(self: T) -> list[int]:
