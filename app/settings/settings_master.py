@@ -87,11 +87,15 @@ class Settings:
     @property
     def COUNT_SEMAPHORE_TO_POSTGRES(self) -> int:
         value = os.environ.get("COUNT_SEMAPHORE_TO_POSTGRES")
+        if value is None:
+            return 10
         return int(value)
 
     @property
     def MAX_THREAD_FOR_PROXY(self) -> int:
         value = os.environ.get("MAX_THREAD_FOR_PROXY")
+        if value is None:
+            return 10
         return int(value)
 
     @property
@@ -104,11 +108,15 @@ class Settings:
     @property
     def MAX_THREAD_PARSER(self) -> int:
         value = os.environ.get("MAX_THREAD_PARSER")
+        if value is None:
+            return 30
         return int(value)
 
     @property
     def MAX_MINUS_KW_THREAD(self) -> int:
         value = os.environ.get("MAX_MINUS_KW_THREAD")
+        if value is None:
+            return 30
         return int(value)
 
     @property
@@ -263,6 +271,13 @@ class Settings:
         value = os.getenv("MAX_PAGE_LIMIT_PARSER_WORKER")
         if not value:
             return 60
+        return int(value)
+
+    @property
+    def MIN_DIFF_VIEWS_FOR_PARSING_KEYWORDS(self) -> int:
+        value = os.getenv("MIN_DIFF_VIEWS_FOR_PARSING_KEYWORDS")
+        if not value:
+            return 10
         return int(value)
 
 

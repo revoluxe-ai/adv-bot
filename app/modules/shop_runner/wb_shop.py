@@ -454,13 +454,12 @@ class WBShop:
 
             if last_views is None:
                 last_views = views_now
-
             if not last_position:
                 await redis_manager.set_last_views(adv_id, text, views_now)
                 should_parse = True
             elif views_now == 0:
                 continue
-            elif views_now - last_views > 100:
+            elif views_now - last_views > settings.MIN_DIFF_VIEWS_FOR_PARSING_KEYWORDS:
                 should_parse = True
             elif last_position.base_position == 0 and (views_now != last_views):
                 should_parse = True
