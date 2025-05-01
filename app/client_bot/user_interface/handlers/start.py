@@ -228,7 +228,8 @@ async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMCont
         await session.refresh(wb_user_cabinet)
 
     await messages.ShopAddedSuccess(bot, chat_id, cabinet_name)()
-
+    access.wb_cabinet = wb_cabinet
+    access.wb_user_cabinet = wb_user_cabinet
     # Обновляем данные
     shop_updater = ShopDataUpdater(access)
     await shop_updater.update_advs_data()
