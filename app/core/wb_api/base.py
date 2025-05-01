@@ -15,6 +15,8 @@ T = TypeVar("T")
 
 class BaseAPI:
 
+    HOST = "wildberries.ru"
+
     def __init__(self, wb_access: WBCabinetAccess) -> None:
         tokens: list[WBToken] = wb_access.tokens
         self.access: WBCabinetAccess = wb_access
