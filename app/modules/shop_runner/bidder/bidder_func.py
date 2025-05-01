@@ -10,6 +10,9 @@ from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from ..bidder.wb_api import WBApi as BidderAPI
+from ..modules.adv_common_parameters_manager.adv_parameter_manager import (
+    AdvParameterManager,
+)
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -115,8 +118,9 @@ async def run_bidder_process_for_adv(
         new_cpm: int = min(cpms) - step
     else:
         new_cpm = max(cpms) + step
-
-    new_cpm = max(min(new_cpm, max_cpm), 125)
+    adv_param_manager = AdvParameterManager()
+    min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
+    new_cpm = max(min(new_cpm, max_cpm), min_cpm)
 
     if new_cpm >= max_cpm and adv_setting.reset_place:
         async with sm(read_only=False) as session:
