@@ -5,8 +5,9 @@ from typing import TypeVar
 
 import aiohttp
 
+from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
-from app.modules.common_slaves.wildberries.data_classes.adv import Adv, Balances
+from app.modules.common_slaves.wildberries.data_classes.adv import Balances
 from .excs import (
     StartAdvError,
     ItemCategoryNotInStockError,
@@ -16,10 +17,10 @@ from ..http_request import try_except_decorator, requests
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("WBAPIProtocol", bound=WBAPIProtocol)
+T = TypeVar("T", bound=WBAPIProtocol)
 
 
-class AdvMixin:
+class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 3)
     async def get_advertIds(self: T) -> list[int]:
