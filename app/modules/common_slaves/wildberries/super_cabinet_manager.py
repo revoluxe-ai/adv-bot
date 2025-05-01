@@ -15,17 +15,21 @@ sm = get_async_session_maker
 logger = logging.getLogger(__name__)
 
 
+token_check_righter = CheckRighter()
+
+
 @dataclass
 class WBCabinetAccess:
     tokens: list[WBToken]
     wb_user_cabinet: WBUserCabinet | None
-    wb_cabinet: WBCabinet
+    wb_cabinet: WBCabinet | None
 
     @property
     def shop_id(self) -> str:
         if self.wb_cabinet:
             return str(self.wb_cabinet.shop_id)
-        raise exceptions.WBCabinetNotFoundError("Нет кабинета для доступа к API")
+        else:
+            return "Не определен"
 
 
 async def get_access_for_wb_cabinet(
