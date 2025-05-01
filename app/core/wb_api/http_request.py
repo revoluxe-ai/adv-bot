@@ -148,7 +148,7 @@ async def requests(
     data: Optional[Any] = None,
     json_data: Optional[Any] = None,
     headers: Optional[Dict[str, str]] = None,
-) -> Optional[str]:
+) -> str:
     """Обертка для выполнения HTTP-запросов с обработкой ошибок и логированием."""
     async with session.request(
         method, url, data=data, headers=headers, json=json_data
