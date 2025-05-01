@@ -1,4 +1,4 @@
-from app.core.wb_api.mixins.check_righter_base import CheckRighter
+from app.core.wb_api.check_righter import CheckRighter
 
 
 class AdvRightsChecker(CheckRighter):
