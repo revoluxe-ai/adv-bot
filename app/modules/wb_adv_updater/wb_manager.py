@@ -25,10 +25,12 @@ from app.utils.db.session_maker import get_async_session_maker
 from .ML import Predictor
 from .data_setter import DataSetter
 from .graph_vector_updater import GraphUpdater
+from .wb_adv_api import WBAdvAPI
 from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..wb_update_state_manager import KeywordStatUpdateState
 from ...core.wb_api.exceptions import ApiForbiddenError
+from ...core.wb_api.mixins.adv import MinCPMData
 from ...utils.pricer.pricer import Pricer
 
 logger = logging.getLogger(__name__)
@@ -400,3 +402,21 @@ class MessageCounter:
 
 
 message_counter = MessageCounter()
+
+
+async def update_wb_config_data() -> None:
+    access = await super_cabinet_manager.get_common_access()
+    wb_api = WBAdvAPI(access)
+    min_cpm_data: MinCPMData = await wb_api.get_min_cpm_adv_data()
+    await redis_manager.set_min_cpm_data(min_cpm_data)
+
+
+async def update_wb_config_data_run() -> None:
+    while True:
+        try:
+            await update_wb_config_data()
+        except Exception as exc:
+            logger.error(f"Ошибка обновления данных {exc}", exc_info=True)
+            raise exc
+        finally:
+            await asyncio.sleep(60 * 60)
