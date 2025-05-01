@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+__all__ = ["Headers"]
+
+
 class WbRequestApiMixin(ABC):
     pass
 
@@ -75,7 +78,7 @@ class ABC_WB_API(WbRequestApiMixin):
         if self._free_tokens:
             self.headers = Headers(self._free_tokens.pop())
         else:
-            wb_cabinet: WBCabinet = self.access.wb_cabinet
+            wb_cabinet: WBCabinet | None = self.access.wb_cabinet
             try:
                 async with sm(read_only=False) as session:
                     fresh_cabinet = await session.get(WBCabinet, wb_cabinet.id)
