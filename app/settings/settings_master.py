@@ -280,5 +280,12 @@ class Settings:
             return 10
         return int(value)
 
+    @property
+    def FULL_STAT_THRESHOLD_DATES(self) -> int:
+        value = os.getenv("FULL_STAT_THRESHOLD_DATES")
+        if not value:
+            return 30
+        return int(value)
+
 
 settings = Settings()
