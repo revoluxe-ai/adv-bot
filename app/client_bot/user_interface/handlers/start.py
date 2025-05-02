@@ -188,10 +188,10 @@ async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMCont
             WBCabinet.shop_id == wb_token.shop_id
         )
         result = await session.execute(stmt_for_cabinet)
-        wb_cabinet = result.scalar()
+        wb_cabinet: WBCabinet | None = result.scalar()
 
         if wb_cabinet:
-            # Проверяем, привязан ли уже этот кабинет к пользователю
+            await messages.CabinetExistsForUser(bot, chat_id)()
             stmt_for_select_user_id = select(WBUserCabinet).where(
                 and_(
                     WBUserCabinet.wb_cabinet_id == wb_cabinet.id,
@@ -199,52 +199,61 @@ async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMCont
                 )
             )
             result = await session.execute(stmt_for_select_user_id)
-            wb_user_cabinet = result.scalar()
-
-            await messages.CabinetExistsForUser(bot, chat_id)()
-
+            wb_user_cabinet: WBUserCabinet | None = result.scalar_one_or_none()
             stmt_for_adv_setting = select(AdvSetting).where(
                 AdvSetting.wb_cabinet_id == wb_cabinet.id
             )
             result = await session.execute(stmt_for_adv_setting)
             adv_settings = result.scalars().all()
-
+            if not wb_user_cabinet:
+                wb_user_cabinet = WBUserCabinet(
+                    name=cabinet_name, user_id=user_id, wb_cabinet=wb_cabinet
+                )
+                session.add(wb_user_cabinet)
+                await session.flush()
+                await session.commit()
+            wb_user_cabinet_original_id = wb_user_cabinet.id
+            adv_settings = list(adv_settings)
             await messages.AdvCompanyChoicing(
-                bot, chat_id, wb_user_cabinet.id, adv_settings, state
+                bot, chat_id, wb_user_cabinet_original_id, adv_settings, state
             )()
             return
+        else:
+            # Если нет вб - кабинета, то Создаем новый кабинет и привязку к пользователю
+            wb_cabinet: WBCabinet = WBCabinet()
+            wb_cabinet.shop_id = shop_id
+            wb_cabinet.balance = 0
+            wb_cabinet.bonus = 0
+            session.add(wb_cabinet)
+            await session.flush()  # получаем wb_cabinet.id
+            wb_user_cabinet = WBUserCabinet()
+            wb_user_cabinet.name = cabinet_name
+            wb_user_cabinet.wb_cabinet_id = wb_cabinet.id
+            wb_user_cabinet.user_id = user_id
+            session.add(wb_user_cabinet)
+            await session.flush()
+            wb_token.user_id = user_id
+            await session.commit()
+            await session.refresh(wb_user_cabinet)
 
-        # Если нет вб - кабинета, то Создаем новый кабинет и привязку к пользователю
-        wb_cabinet = WBCabinet(shop_id=shop_id, bonus=0, balance=0)
-        session.add(wb_cabinet)
-        await session.flush()  # получаем wb_cabinet.id
-        wb_user_cabinet = WBUserCabinet(
-            name=cabinet_name, user_id=user_id, wb_cabinet=wb_cabinet
-        )
-        session.add(wb_user_cabinet)
-        await session.flush()
-        wb_token.user_id = user_id
-        await session.commit()
-        await session.refresh(wb_user_cabinet)
+        await messages.ShopAddedSuccess(bot, chat_id, cabinet_name)()
+        access.wb_cabinet = wb_cabinet
+        access.wb_user_cabinet = wb_user_cabinet
+        # Обновляем данные
+        shop_updater = ShopDataUpdater(access)
+        await shop_updater.update_advs_data()
 
-    await messages.ShopAddedSuccess(bot, chat_id, cabinet_name)()
-    access.wb_cabinet = wb_cabinet
-    access.wb_user_cabinet = wb_user_cabinet
-    # Обновляем данные
-    shop_updater = ShopDataUpdater(access)
-    await shop_updater.update_advs_data()
+        # Показываем список кабинетов пользователя
+        async with sm() as session:
+            stmt_for_wb_user_cabinet = (
+                select(WBUserCabinet)
+                .join(WBUserCabinet.user)
+                .where(User.user_telegram_id == user_telegram_id)
+            )
+            result = await session.execute(stmt_for_wb_user_cabinet)
+            wb_user_cabinets: list[WBUserCabinet] = result.scalars().all()
 
-    # Показываем список кабинетов пользователя
-    async with sm() as session:
-        stmt_for_wb_user_cabinet = (
-            select(WBUserCabinet)
-            .join(WBUserCabinet.user)
-            .where(User.user_telegram_id == user_telegram_id)
-        )
-        result = await session.execute(stmt_for_wb_user_cabinet)
-        wb_user_cabinets = result.scalars().all()
-
-    await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await ShopChoice(bot, chat_id, wb_user_cabinets)()
 
 
 #
