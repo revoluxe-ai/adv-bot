@@ -127,9 +127,7 @@ class WBCabinet(BaseTable):
     )
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
-    balance: Mapped[float] = mapped_column(
-        Float, default=0, server_default=text("0"), nullable=False
-    )
+    balance = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
     bonus: Mapped[float] = mapped_column(
         Float, default=0, server_default=text("0"), nullable=False
     )
