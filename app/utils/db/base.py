@@ -1,13 +1,13 @@
-from sqlalchemy import Column, Integer
+from sqlalchemy import Integer
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import declared_attr, Mapped
+from sqlalchemy.orm import declared_attr, mapped_column
 
 Base = declarative_base()
 
 
 class BaseTable(Base):
     __abstract__ = True
-    id: Mapped[int] = Column(Integer, primary_key=True, autoincrement=True)
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     @declared_attr
     def __tablename__(self):
