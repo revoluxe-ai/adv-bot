@@ -85,6 +85,13 @@ async def add_shop(
 async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMContext):
     catch_cab: Union[WBUserCabinet, None] = None
     cabinet_name = message.text
+    if cabinet_name is None or not cabinet_name.strip():
+        await bot.send_message(
+            message.chat.id,
+            "Имя магазина (кабинета) не может быть пустым, отправьте название еще раз:",
+        )
+        return
+    assert cabinet_name is not None
     chat_id = message.chat.id
     if len(cabinet_name) > 50:
         await messages.CabinetNameTooLong(bot, chat_id)()
