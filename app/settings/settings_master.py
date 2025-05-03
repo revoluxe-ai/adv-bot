@@ -287,5 +287,12 @@ class Settings:
             return 30
         return int(value)
 
+    @property
+    def LOG_LEVEL(self) -> str:
+        value = os.getenv("LOG_LEVEL")
+        if not value:
+            return "ERROR"
+        return value
+
 
 settings = Settings()

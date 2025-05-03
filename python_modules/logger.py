@@ -1,11 +1,13 @@
 import logging
 
+from app import settings
+
 
 class SimpleStringFormatter(logging.Formatter):
     def format(self, record) -> str:
-        # Включаем текущее время в формат
         log_time = self.formatTime(record, "%Y-%m-%d %H:%M:%S")
-        result = f"{log_time} - {record.levelname} - {record.name} - {record.getMessage()} ({record.pathname}:{record.lineno})"
+        # Формат: ВРЕМЯ - УРОВЕНЬ - ИМЯ ЛОГГЕРА: НОМЕР СТРОКИ
+        result = f"{log_time} - {record.levelname} - {record.name}:{record.lineno} - {record.getMessage()}"
         if record.exc_info:
             result += f"\n{self.formatException(record.exc_info)}"
         return result
@@ -15,7 +17,8 @@ def setup_logging() -> None:
     """Настройка логирования"""
     try:
         logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)
+        logger_level = settings.LOG_LEVEL
+        logger.setLevel(logger_level)
 
         # Удаляем все существующие обработчики
         logger.handlers.clear()
