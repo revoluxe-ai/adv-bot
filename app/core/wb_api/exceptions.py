@@ -4,11 +4,11 @@ if TYPE_CHECKING:
     import new
 
 
-class UnknownApiRequestError(BaseException):
+class UnknownApiRequestError(Exception):
     pass
 
 
-class ApiErrorWithCode(BaseException):
+class ApiErrorWithCode(Exception):
     def __init__(self, code: str | int, message: str, rejection: str) -> None:
         self.code = code
         self.message = message
@@ -19,7 +19,7 @@ class ApiErrorWithCode(BaseException):
         )
 
 
-class NotValidTokenError(BaseException):
+class NotValidTokenError(Exception):
     pass
 
 
@@ -51,7 +51,7 @@ class TooManyRequests(Exception):
 
 
 class BadRequestError(Exception):
-    pass
+    error_message: str
 
 
 class NotValidDataError(Exception):
