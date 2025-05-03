@@ -1,4 +1,5 @@
 import logging
+from time import sleep
 
 from sqlalchemy import select
 
@@ -87,7 +88,8 @@ async def shop_update_run() -> None:
             logger.error("Ошибка в процессе обновления магазина", exc_info=True)
         except Exception as e:
             logger.error(f"Необработанная ошибка: {e}", exc_info=True)
-            raise e
+        finally:
+            await asyncio.sleep(15)
 
 
 def run() -> None:
@@ -97,4 +99,4 @@ def run() -> None:
         logger.info("Остановка процесса обновления магазина")
     except Exception as e:
         logger.error(f"Необработанная ошибка: {e}", exc_info=True)
-        raise e
+        sleep(15)
