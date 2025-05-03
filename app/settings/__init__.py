@@ -1,4 +1,4 @@
-__all__ = ['cv', 'settings']
+__all__ = ["cv", "settings"]
 
 from .settings_master import settings
 
@@ -30,3 +30,6 @@ REDIS_REPLICA_HOST = settings.REDIS_REPLICA_HOST
 
 
 MIN_SUM = settings.MIN_SUM
+
+
+LOG_LEVEL = settings.LOG_LEVEL

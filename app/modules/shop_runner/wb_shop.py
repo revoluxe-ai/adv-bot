@@ -277,7 +277,7 @@ class WBShop:
     async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]) -> None:
         await full_wb_adv_stat.insert(stats)
 
-    async def _update_full_adv_stat(self, wb_api: CommonWBApi) -> None:
+    async def __update_full_adv_stat(self, wb_api: CommonWBApi) -> None:
         await self._update_advs_models()
         auto_adv_ids: set[int] = {adv.adv_id for adv in self._adv_settings}
         auction_adv_ids: set[int] = {
@@ -295,21 +295,34 @@ class WBShop:
             for stat in full_stats:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
 
-    async def update_full_adv_stat(self) -> None:
+    async def update_full_stat_run(self) -> None:
+        while True:
+            try:
+                await self._update_full_adv_stat()
+            except ApiForbiddenError:
+                await asyncio.sleep(60 * 60)
+            except Exception as exc:
+                logger.error(
+                    f"Ошибка обновления полной статистики {exc}", exc_info=True
+                )
+                await asyncio.sleep(60)
+
+    async def _update_full_adv_stat(self) -> None:
         await self._update_access()
         access = self.__access
         assert access is not None
+        wb_api = CommonWBApi(access)
         while True:
             try:
-                wb_api = CommonWBApi(access)
-                await self._update_full_adv_stat(wb_api)
-            except ApiForbiddenError:
-                logger.debug("Нет доступов для обновления общей статистики")
-                await self._update_access()
-                access = self.__access
-                assert access is not None
-            finally:
-                await asyncio.sleep(60 * 15)
+                await self.__update_full_adv_stat(wb_api)
+            except ApiForbiddenError as e:
+                raise e
+            except Exception as exc:
+                logger.error(
+                    f"Ошибка {exc} обновления полной статистики для магазина {self.shop_id}",
+                    exc_info=True,
+                )
+                await asyncio.sleep(60)
 
     @staticmethod
     async def _update_adv_data_from_wb_to_pg(
@@ -502,9 +515,15 @@ class WBShop:
             self.update_cards_data_from_wb_to_pf(),
             self.update_cpm_run(),
             self.update_common_sale_stat(),
-            self.update_full_adv_stat(),
+            self.update_full_stat_run(),
         )
 
     async def run(self) -> None:
-        logger.debug(f"Запускаю асинхронный процесс для магазина {self.shop_id}")
-        await self._run()
+        while True:
+            try:
+                await self._run()
+            except Exception as e:
+                logger.error(
+                    f"Ошибка в процессе обновления магазина: {e}", exc_info=True
+                )
+            await asyncio.sleep(15)
