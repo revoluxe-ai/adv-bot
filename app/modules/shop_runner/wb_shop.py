@@ -422,8 +422,7 @@ class WBShop:
         keywords = await self.get_calculated_keywords(adv.adv_id)
         if not keywords:
             logger.error(f"Нет ключевых для кампании {adv.adv_id}")
-            raise StopAsyncIteration
-
+            return
         nmid = int(adv.nmids[0])
         adv_id = int(adv.adv_id)
 
@@ -482,7 +481,7 @@ class WBShop:
             if should_parse:
                 await redis_manager.set_last_views(adv_id, text, views_now)
                 yield text, nmid
-        raise StopAsyncIteration
+        return
 
     async def parsing_keywords_run(self) -> None:
         while True:
