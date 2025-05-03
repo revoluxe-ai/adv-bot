@@ -7,7 +7,7 @@ from app.modules.shop_runner.wb_shop import WBShop
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_wb_shop_run_calls_all_coroutines():
+async def test_wb_shop_run_calls_all_coroutines() -> None:
     """
     Тест проверяет, что метод _run класса WBShop запускает необходимые корутины
     """
@@ -22,7 +22,7 @@ async def test_wb_shop_run_calls_all_coroutines():
     wb_shop.update_cards_data_from_wb_to_pf = AsyncMock()
     wb_shop.update_cpm_run = AsyncMock()
     wb_shop.update_common_sale_stat = AsyncMock()
-    wb_shop.update_full_adv_stat = AsyncMock()
+    wb_shop.update_full_stat_run = AsyncMock()
 
     # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
     original_gather = asyncio.gather
@@ -44,7 +44,7 @@ async def test_wb_shop_run_calls_all_coroutines():
         wb_shop.update_cards_data_from_wb_to_pf.assert_called_once()
         wb_shop.update_cpm_run.assert_called_once()
         wb_shop.update_common_sale_stat.assert_called_once()
-        wb_shop.update_full_adv_stat.assert_called_once()
+        wb_shop.update_full_stat_run.assert_called_once()
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -64,7 +64,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
     wb_shop.update_cards_data_from_wb_to_pf = AsyncMock()
     wb_shop.update_cpm_run = AsyncMock()
     wb_shop.update_common_sale_stat = AsyncMock()
-    wb_shop.update_full_adv_stat = AsyncMock()
+    wb_shop.update_full_stat_run = AsyncMock()
 
     # Мокируем asyncio.gather для проверки количества аргументов
     with patch("asyncio.gather") as mock_gather:
@@ -93,4 +93,4 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
         wb_shop.update_cards_data_from_wb_to_pf.assert_called_once()
         wb_shop.update_cpm_run.assert_called_once()
         wb_shop.update_common_sale_stat.assert_called_once()
-        wb_shop.update_full_adv_stat.assert_called_once()
+        wb_shop.update_full_stat_run.assert_called_once()
