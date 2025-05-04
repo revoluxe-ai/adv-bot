@@ -64,3 +64,11 @@ class CardNotFoundInWB(Exception):
 
 class NotItemsInAdvSetting(Exception):
     pass
+
+
+class NotMatchWBApiError(Exception):
+    pass
+
+
+class MinAdvBidWBApiError(Exception):
+    new_min_bid: int

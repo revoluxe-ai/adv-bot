@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import Any
@@ -13,6 +14,7 @@ from .excs import (
     ItemCategoryNotInStockError,
 )
 from ..data_classes.advs import adv_fabric
+from ..exceptions import MinAdvBidWBApiError, BadRequestError
 from ..http_request import try_except_decorator, requests
 
 logger = logging.getLogger(__name__)
@@ -275,16 +277,43 @@ class AdvMixin(WBAPIProtocol):
 
         return advertIds
 
-    @try_except_decorator(5, 60)
-    async def update_cpm(self, adv_id: int, nmid: int, new_bid: int) -> None:
-        url = "https://advert-api.wildberries.ru/adv/v0/bids"
+    def __get_update_cpm_data(
+        self, adv_id: int, nmid: int, new_bid: int
+    ) -> dict[str, Any]:
         data = {
             "bids": [{"advert_id": adv_id, "nm_bids": [{"nm": nmid, "bid": new_bid}]}]
         }
+        return data
+
+    @try_except_decorator(5, 60)
+    async def update_cpm(self, adv_id: int, nmid: int, new_bid: int) -> None:
+        url = "https://advert-api.wildberries.ru/adv/v0/bids"
+        max_attempts = 2
         async with aiohttp.ClientSession() as session:
-            await requests(
-                session, "PATCH", url, json_data=data, headers=self.headers.standart
-            )
+            attempts = 0
+            while True:
+                data = self.__get_update_cpm_data(adv_id, nmid, new_bid)
+                try:
+                    attempts += 1
+                    await requests(
+                        session,
+                        "PATCH",
+                        url,
+                        json_data=data,
+                        headers=self.headers.standart,
+                    )
+                    break
+                except MinAdvBidWBApiError as exc:
+                    if attempts >= max_attempts:
+                        logger.error(
+                            "Не удалось обновить ставку для {adv_id}, {nmid}, {new_bid}"
+                        )
+                        raise BadRequestError from exc
+                    new_bid = exc.new_min_bid
+                    await asyncio.sleep(1)
+                    continue
+                except Exception as exc:
+                    raise exc
 
     @try_except_decorator(1, 1)
     async def set_search_cpm(self, search_adv_id: int, cpm: int) -> None:

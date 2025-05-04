@@ -7,6 +7,7 @@
 import asyncio
 import json
 import logging
+import re
 import time
 from typing import (
     Callable,
@@ -34,6 +35,8 @@ from .exceptions import (
     BadRequestError,
     NotValidDataError,
     ApiErrorWithCode,
+    NotMatchWBApiError,
+    MinAdvBidWBApiError,
 )
 from .protocols import WBAPIProtocol
 
@@ -147,9 +150,9 @@ async def requests(
         method, url, data=data, headers=headers, json=json_data
     ) as response:
         try:
-            text = await response.text()
+            response_text = await response.text()
             logger.debug(
-                f"Запрос к {url} выполнен. Статус: {response.status}, ответ: {text:300}"
+                f"Запрос к {url} выполнен. Статус: {response.status}, ответ: {response_text[:500]}"
             )
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
@@ -159,24 +162,56 @@ async def requests(
                 logger.debug(f"Превышен лимит запросов к API: {url}")
                 raise TooManyRequests(e) from e
             if e.status == 400:
-                logger.error(f"Ошибка запроса: {text}")
-                raise BadRequestError(e) from e
+                exc = get_error_from_response(response_text)
+                raise exc
             else:
-                resp = await response.text()
-                logger.error(f"Ошибка запроса: {resp}")
-                raise BadRequestError(e) from e
+                exc = get_error_from_response(response_text)
+                raise exc
+
         except NotValidDataError as e:
             raise NotValidDataError(e) from e
         except Exception as e:
             raise UnknownApiRequestError(e) from e
 
         # Если код не в блоке except, значит ответ был успешным (статус 200-299)
-        response_text: str = await response.text()
+
         if response_text:
-            json_answer = json.loads(response_text)
-            if isinstance(json_answer, dict):
-                if code := json_answer.get("code"):
-                    message = json_answer.get("message", "")
-                    rejection = json_answer.get("rejection", "")
+            if isinstance(response_text, dict):
+                if code := response_text.get("code"):
+                    message = response_text.get("message", "")
+                    rejection = response_text.get("rejection", "")
                     raise ApiErrorWithCode(code, message, rejection)
         return response_text
+
+
+def get_error_from_response(response_text: str) -> Exception:
+    """
+    Извлекает ошибку из ответа API Wildberries.
+    """
+    response_json = json.loads(response_text)
+
+    match response_json:
+        case {
+            "errors": [{"detail": detail, "field": field}],
+            "status": status,
+            "title": title,
+        }:
+            if "wrong bid value" in detail:
+                pattern = re.compile(r"min: (?P<min>\d+)")
+                match_result = re.search(pattern, detail)
+                if match_result is not None:
+                    match_min_cpm_group: str = match_result.group("min")
+                    if match_min_cpm_group is not None:
+                        assert match_min_cpm_group
+                        new_min_ctr = int(match_min_cpm_group)
+                        exc = MinAdvBidWBApiError()
+                        exc.new_min_bid = new_min_ctr
+                        return exc
+                return ApiErrorWithCode(
+                    status, title, f"Поле: {field}, Ошибка: {detail}"
+                )
+            else:
+                return ApiErrorWithCode(
+                    status, title, f"Поле: {field}, Ошибка: {detail}"
+                )
+    return NotMatchWBApiError("Неизвестная ошибка", response_text)
