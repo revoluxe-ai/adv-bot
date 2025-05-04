@@ -16,7 +16,6 @@ from typing import (
     Any,
     TypeVar,
     Dict,
-    TypedDict,
     cast,
 )
 
@@ -46,12 +45,6 @@ TypeWBAPIProtocol = TypeVar("TypeWBAPIProtocol", bound=WBAPIProtocol)
 # Тип результата функции
 R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
-
-
-class APICallState(TypedDict):
-    _last_query_time: Optional[float]
-    _current_pause: float
-    _attempts: int
 
 
 def try_except_decorator(
