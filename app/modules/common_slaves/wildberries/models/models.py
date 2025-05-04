@@ -24,7 +24,6 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
-
 # Добавляем правильный импорт AdvPayment
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.assoc_tables import favorite_advs_association
@@ -197,7 +196,7 @@ class WBToken(BaseTable):
         except ValueError:
             return False
 
-    def get_payload(self, key, default=0):
+    def get_payload(self, key) -> str | int | None:
         payload = self.__payload
         return payload.get(key)
 
@@ -217,7 +216,7 @@ class WBToken(BaseTable):
         # Проверяем, содержится ли категория "Токен только на чтение" в категориях
         return "Токен только на чтение" in self.categories
 
-    @hybrid_property
+    @property
     def categories(self) -> set[str]:
         categories_map = {
             1: "Контент",
