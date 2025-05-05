@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from arq import Retry
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 async def create_complex_advs(
-    ctx, nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
+    ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
     try:
         await _create_complex_advs(ctx, nmid, shop_id, hard_mode, user_telegram_id)
@@ -39,7 +40,7 @@ async def create_complex_advs(
 
 
 async def _create_complex_advs(
-    ctx, nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
+    ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
     bot = ctx["bot"]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
