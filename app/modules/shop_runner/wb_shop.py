@@ -322,7 +322,7 @@ class WBShop:
                     f"Ошибка {exc} обновления полной статистики для магазина {self.shop_id}",
                     exc_info=True,
                 )
-                await asyncio.sleep(60)
+                await asyncio.sleep(60 * 60)
 
     @staticmethod
     async def _update_adv_data_from_wb_to_pg(
