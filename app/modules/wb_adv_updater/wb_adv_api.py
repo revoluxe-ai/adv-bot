@@ -2,5 +2,5 @@
 from app.core.wb_api.mixins.adv import AdvMixin
 
 
-class WBAdvAPI(AdvMixin, BaseAPI):
+class WBAdvAPI(BaseAPI, AdvMixin):
     pass
