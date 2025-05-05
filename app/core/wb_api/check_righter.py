@@ -1,10 +1,12 @@
 import asyncio
 import json
 import logging
+import typing
 
 import aiohttp
 
-from app.core.wb_api.base import Headers
+if typing.TYPE_CHECKING:
+    from app.core.wb_api.base import Headers
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.http_request import requests
 from app.modules.common_slaves.wildberries.models import WBToken
@@ -13,7 +15,7 @@ __all__ = ["CheckRighter"]
 
 
 class CheckRighter:
-    headers: Headers
+    headers: "Headers"
 
     check_entry_points = [
         ["https://content-api.wildberries.ru/ping", "Контент"],
