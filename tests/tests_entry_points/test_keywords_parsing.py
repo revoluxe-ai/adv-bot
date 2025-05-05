@@ -15,7 +15,7 @@ except ImportError:
     class_based = False
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_keywords_parsing_run_calls_all_functions():
     """
     Тест проверяет, что парсер ключевых слов вызывает все необходимые функции
@@ -61,7 +61,7 @@ async def test_keywords_parsing_run_calls_all_functions():
             mock_store.assert_called_once()
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_keywords_parsing_handles_exceptions():
     """
     Тест проверяет, что парсер ключевых слов корректно обрабатывает исключения
@@ -117,7 +117,7 @@ async def test_keywords_parsing_handles_exceptions():
                 pass
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_keywords_parsing_performance():
     """
     Тест проверяет, что парсер ключевых слов выполняется за разумное время

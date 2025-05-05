@@ -1,22 +1,34 @@
-﻿import pytest
-from sqlalchemy import select
+﻿from unittest.mock import MagicMock, patch, AsyncMock
+
+import pytest
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.modules.adv_common_parameters_manager.adv_parameter_manager import (
     AdvParameterManager,
 )
-from app.utils.db.session_maker import get_async_session_maker as sm
 
 adv_param_manager = AdvParameterManager()
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_get_min_cpm_from_redis():
-    stmt = select(AdvSetting).where(AdvSetting.adv_id == 25040169)
-    async with sm() as session:
-        result = await session.execute(stmt)
-        adv_setting = result.scalar_one()
 
-    cpm = await adv_param_manager.get_min_cpm(adv_setting)
+    result_mock = MagicMock()
+    result_mock.scalar_one.return_value = "Юбки"
+    session_mock = MagicMock()
+    session_mock.execute = AsyncMock(return_value=result_mock)
+    session_maker_mock = MagicMock()
+    session_maker_mock.__aenter__ = AsyncMock(return_value=session_mock)
+
+    get_session_maker_mock = MagicMock(return_value=session_maker_mock)
+
+    adv_setting_mock = MagicMock(spec=AdvSetting)
+    adv_setting_mock.adv_id = 25040169
+    adv_setting_mock.nmids = [222811118]
+    with patch(
+        "app.modules.shop_runner.modules.adv_common_parameters_manager.adv_parameter_manager.sm",
+        new=get_session_maker_mock,
+    ):
+        cpm = await adv_param_manager.get_min_cpm(adv_setting_mock)
     print(cpm)
     assert isinstance(cpm, int)

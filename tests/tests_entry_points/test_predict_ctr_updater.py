@@ -15,7 +15,7 @@ except ImportError:
     class_based = False
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_ctr_predictor_loads_model():
     """
     Тест проверяет, что предсказатель CTR корректно загружает модель
@@ -64,7 +64,7 @@ async def test_ctr_predictor_loads_model():
             mock_load_model.assert_called_once()
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_ctr_predictor_predicts_ctr():
     """
     Тест проверяет, что предсказатель CTR корректно выполняет предсказания
@@ -124,7 +124,7 @@ async def test_ctr_predictor_predicts_ctr():
             mock_save.assert_called_once_with(test_data["ids"], test_predictions)
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_ctr_predictor_saves_predictions():
     """
     Тест проверяет, что предсказатель CTR корректно сохраняет предсказания
@@ -175,7 +175,7 @@ async def test_ctr_predictor_saves_predictions():
             mock_save.assert_called_once_with(test_ids, test_predictions)
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_ctr_predictor_handles_empty_data():
     """
     Тест проверяет, что предсказатель CTR корректно обрабатывает пустые данные

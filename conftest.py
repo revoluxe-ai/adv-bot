@@ -19,7 +19,11 @@ def pytest_configure(config) -> None:
     config.addinivalue_line("markers", "integration: маркирует интеграционные тесты")
 
 
-# @pytest.fixture(scope="session")
-# def event_loop():
-#     loop = asyncio.new_event_loop()
-#     yield loop
+# @pytest_asyncio.fixture(scope="function", name="postgres_sqlalchemy_session")
+# async def postgres_sqlalchemy_session() -> AsyncGenerator[AsyncSession, None]:
+#     """
+#     Фикстура для создания сессии SQLAlchemy с использованием PostgreSQL
+#     """
+#     async with sm() as session:
+#         yield session
+#         await session.close()

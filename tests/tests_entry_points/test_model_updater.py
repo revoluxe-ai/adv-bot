@@ -15,7 +15,7 @@ except ImportError:
     class_based = False
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_model_updater_loads_data():
     """
     Тест проверяет, что обновление модели корректно загружает данные
@@ -73,7 +73,7 @@ async def test_model_updater_loads_data():
             mock_preprocess.assert_called_once_with(test_data)
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_model_updater_trains_model():
     """
     Тест проверяет, что обновление модели корректно обучает модель
@@ -158,7 +158,7 @@ async def test_model_updater_trains_model():
             mock_save.assert_called_once_with(test_model)
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_model_updater_saves_model():
     """
     Тест проверяет, что обновление модели корректно сохраняет модель

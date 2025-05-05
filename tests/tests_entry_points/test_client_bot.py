@@ -8,7 +8,7 @@ from aiogram import Bot, Dispatcher
 from client_bot_run import setup_bot
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_client_bot_setup_registers_all_handlers():
     """
     Тест проверяет, что функция setup_bot регистрирует все необходимые обработчики
@@ -35,7 +35,7 @@ async def test_client_bot_setup_registers_all_handlers():
     ), "Недостаточно обработчиков callback-запросов зарегистрировано"
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_client_bot_middleware_setup():
     """
     Тест проверяет, что все middleware правильно настроены для бота
@@ -60,7 +60,7 @@ async def test_client_bot_middleware_setup():
     ), "Недостаточно middleware зарегистрировано для message"
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_client_bot_startup_handlers():
     """
     Тест проверяет, что обработчики запуска бота корректно настроены

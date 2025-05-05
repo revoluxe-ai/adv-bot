@@ -14,7 +14,7 @@ except ImportError:
     class_based = False
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_message_sender_initialization():
     """
     Тест проверяет, что класс или функция MessageSender инициализируется корректно
@@ -80,7 +80,7 @@ async def test_message_sender_initialization():
                 mock_init_db.assert_called_once()
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_message_sender_run_processes_messages():
     """
     Тест проверяет, что метод run обрабатывает сообщения корректно
@@ -154,7 +154,7 @@ async def test_message_sender_run_processes_messages():
             ), "Функция mark_message_as_sent должна вызываться для каждого сообщения"
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_message_sender_handles_errors():
     """
     Тест проверяет, что MessageSender корректно обрабатывает ошибки при отправке сообщений

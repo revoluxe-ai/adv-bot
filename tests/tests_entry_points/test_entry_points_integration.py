@@ -4,7 +4,7 @@ from unittest.mock import patch, AsyncMock
 import pytest
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_entry_points_import_without_errors():
     """
     Тест проверяет, что все точки входа можно импортировать без ошибок
@@ -70,7 +70,7 @@ def test_entry_points_command_line_args():
             pytest.fail(f"Ошибка при запуске команды {' '.join(cmd)}: {e}")
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_all_entry_points_can_start():
     """
     Тест проверяет, что все точки входа могут запуститься без ошибок
@@ -130,7 +130,7 @@ async def test_all_entry_points_can_start():
     # Тест считается успешным, если ни один из импортов и вызовов не вызвал исключение
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_entry_points_configuration_loading():
     """
     Тест проверяет, что все точки входа корректно загружают конфигурацию

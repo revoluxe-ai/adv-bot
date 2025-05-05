@@ -15,7 +15,7 @@ except ImportError:
     class_based = False
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_vector_updater_initialization():
     """
     Тест проверяет, что класс или функция VectorUpdater инициализируется корректно
@@ -92,7 +92,7 @@ async def test_vector_updater_initialization():
                 mock_init_neo4j.assert_called_once()
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_vector_updater_fetches_keywords_from_neo4j():
     """
     Тест проверяет, что метод run получает ключевые слова из Neo4j
@@ -148,7 +148,7 @@ async def test_vector_updater_fetches_keywords_from_neo4j():
             mock_update.assert_called_once_with(test_keywords)
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_vector_updater_updates_redis():
     """
     Тест проверяет, что метод update_vectors_in_redis корректно обновляет векторы в Redis
@@ -203,7 +203,7 @@ async def test_vector_updater_updates_redis():
             ), "Метод set Redis должен быть вызван для каждого ключевого слова"
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_vector_updater_handles_empty_keywords():
     """
     Тест проверяет, что VectorUpdater корректно обрабатывает случай отсутствия ключевых слов

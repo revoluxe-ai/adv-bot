@@ -7,7 +7,7 @@ import pytest
 from updater import Updater
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_updater_run_calls_all_coroutines():
     """
     Тест проверяет, что метод run класса Updater вызывает все необходимые корутины
@@ -41,7 +41,7 @@ async def test_updater_run_calls_all_coroutines():
         updater.update_method4.assert_called_once()
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_updater_run_gathers_correct_number_of_coroutines():
     """
     Тест проверяет, что метод run класса Updater передает правильное количество
@@ -84,7 +84,7 @@ async def test_updater_run_gathers_correct_number_of_coroutines():
         updater.update_method4.assert_called_once()
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_updater_run_coroutines_without_errors_for_one_minute():
     """
     Тест проверяет, что все корутины из метода run класса Updater

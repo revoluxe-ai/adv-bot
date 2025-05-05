@@ -14,7 +14,7 @@ except ImportError:
     class_based = False
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_keyword_sender_initialization():
     """
     Тест проверяет, что класс или функция KeywordSender инициализируется корректно
@@ -89,7 +89,7 @@ async def test_keyword_sender_initialization():
                 mock_init_db.assert_called_once()
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_keyword_sender_fetches_keywords():
     """
     Тест проверяет, что метод run получает ключевые слова из базы данных
@@ -143,7 +143,7 @@ async def test_keyword_sender_fetches_keywords():
             mock_send.assert_called_once_with(test_keywords)
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_keyword_sender_sends_to_neo4j():
     """
     Тест проверяет, что метод send_keywords_to_neo4j корректно отправляет ключевые слова в Neo4j
@@ -200,7 +200,7 @@ async def test_keyword_sender_sends_to_neo4j():
             ), "Метод run_query Neo4j должен быть вызван для каждого ключевого слова"
 
 
-@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.asyncio
 async def test_keyword_sender_handles_empty_keywords():
     """
     Тест проверяет, что KeywordSender корректно обрабатывает случай отсутствия ключевых слов
