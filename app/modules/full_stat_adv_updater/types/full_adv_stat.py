@@ -61,7 +61,7 @@ class BoosterStats(BaseModel):
 
 
 @dataclass
-class SmallFullAdvStatPerDay(BaseModel):
+class SmallFullAdvStatPerDay:
     date: date
     views: int
     clicks: int
