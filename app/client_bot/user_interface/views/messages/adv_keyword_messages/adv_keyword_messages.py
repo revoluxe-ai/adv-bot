@@ -9,6 +9,9 @@ from app.client_bot.user_interface.message_templates import (
 )
 from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages import KeywordGraphicPart_1
+from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
+    CommonStatDataManager,
+)
 from app.modules.common_advs_stat import CommonAdvsStatDataManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
@@ -126,6 +129,13 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                     "app/core/telegram/static_images/not_keywords_position_graphic.jpg"
                 )
             self._image = graphic
+
+        common_days_stat_manager = CommonStatDataManager()
+
+        self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(
+            self._adv_setting, 2
+        )
+
         await super().__call__()
         return
 
@@ -185,6 +195,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Себестоимость: {round(order_cost, 2)} р."
             f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n"
         )
+
+        text += self._common_stat_by_days
 
         text += f"\nСтавка из Авто: {self.auto_cpm} р. "
         text += f"""(Биддер для Авто: {' Включен' if self._adv_setting.bidder_for_auto else ' Выключен'})\n"""
