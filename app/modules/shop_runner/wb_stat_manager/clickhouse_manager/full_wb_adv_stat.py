@@ -69,9 +69,6 @@ def concatenate_stats(
     return concatenate_stats
 
 
-
-
-
 async def get_daily_stats_by_last_days(
     adv_ids: list[int], start_date: datetime, end_date: datetime
 ) -> list[SmallFullAdvStatPerDay]:
@@ -218,7 +215,7 @@ def _get_insert_query() -> str:
     return query
 
 
-async def insert(stats: Iterable[FullAdvStat]):
+async def insert(stats: Iterable[FullAdvStat]) -> None:
     if not stats:
         return
 
