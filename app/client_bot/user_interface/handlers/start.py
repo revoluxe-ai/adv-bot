@@ -221,6 +221,9 @@ async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMCont
                 await session.commit()
             wb_user_cabinet_original_id = wb_user_cabinet.id
             adv_settings = list(adv_settings)
+            wb_token.user_id = user_id
+            session.add(wb_token)
+            await session.commit()
             await messages.AdvCompanyChoicing(
                 bot, chat_id, wb_user_cabinet_original_id, adv_settings, state
             )()
@@ -263,34 +266,6 @@ async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMCont
         await ShopChoice(bot, chat_id, wb_user_cabinets)()
 
 
-#
-#
-# @router.callback_query(callbacks.DeleteWbUserCabinet.filter())
-# async def delete_shop(callback_query: types.CallbackQuery,
-#                       callback_data : callbacks.DeleteWbUserCabinet,
-#                       bot: aiogram.Bot,
-#                       state: FSMContext):
-#     await bot.send_message(callback_query.message.chat.id, 'Удаление магазина (кабинета)')
-#     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
-#     async with sm() as session:
-#         stmt = select(WBUserCabinet).options(
-#             joinedload(WBUserCabinet.user),
-#
-#         ).where(WBUserCabinet.wb_cabinet_id == wb_cabinet_original_id)
-#         result = await session.execute(stmt)
-#         wb_user_cabinet = result.scalars().first()
-#         session.delete(wb_user_cabinet)
-#         await session.commit()
-#         user = wb_user_cabinet.user
-#         await session.refresh(user)
-#     all_shops = user.wb_user_cabinets
-#     chat_id = callback_query.message.chat.id
-#     await messages. \
-#         ShopChoice(bot, chat_id, all_shops)()
-#     return
-#
-
-
 @router.callback_query(callbacks.AddNewToken.filter())
 async def add_app_token(
     callback_query: types.CallbackQuery,
@@ -311,35 +286,6 @@ async def add_app_token(
     chat_id = callback_query.message.chat.id
     cabinet_name = wb_user_cabinet.name
     await messages.AddNewTokenGet(bot, chat_id, cabinet_name)()
-
-
-#
-# @router.message(StateFilter(states.AddNewToken.token))
-# async def process_app_token(message: Message, bot: aiogram.Bot, state: FSMContext):
-#     wb_user_cabinet_original_id: int = (await state.get_data())['wb_user_cabinet_original_id']
-#     message: Message = message
-#     if not message:
-#         return
-#     if '/start' in message.text:
-#         await start_registration(message, bot, state)
-#         return
-#
-#     api = message.text
-#     api = api.strip()
-#     wb_token = wb_models.WBToken(api_key=api)
-#     user.wb_tokens.append(wb_token)
-#     chat_id = message.chat.id
-#     async with sm(read_only=False) as session:
-#         user.wb_tokens.append(wb_token)
-#         session.add(user)
-#         await session.commit()
-#         await session.refresh(user)
-#     await messages. \
-#         ShopAddedSuccess(bot, chat_id, wb_user_cabinet.name)()
-#     all_shops = wb_user_cabinet.user.wb_user_cabinets
-#     await ShopChoice(bot, chat_id, all_shops)()
-#     await state.set_state()
-#     return
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
