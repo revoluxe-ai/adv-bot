@@ -12,6 +12,7 @@ from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 class WBAPIProtocol(Protocol):
     """Протокол для работы с WB API для миксинов"""
 
+    PREFIX: str
     headers: Headers
     HOST: str
     api_call_state: dict[str, dict[str, Any]]
