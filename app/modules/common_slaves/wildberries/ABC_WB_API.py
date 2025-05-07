@@ -8,14 +8,14 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from . import models
 from .models import WBToken, WBCabinet
 
+__all__ = ["Headers"]
+
+
 if TYPE_CHECKING:
     from .super_cabinet_manager import WBCabinetAccess
 
 
 logger = logging.getLogger(__name__)
-
-
-__all__ = ["Headers"]
 
 
 class WbRequestApiMixin(ABC):
