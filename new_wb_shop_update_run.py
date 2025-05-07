@@ -1,3 +1,8 @@
+"""
+Новая точка входа для обработки магазинов
+
+"""
+
 from time import sleep
 
 import dotenv
