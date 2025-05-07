@@ -12,27 +12,16 @@ from app.core.wb_api.protocols import WBAPIProtocol
 logger = logging
 
 
-class ContentMixin:
+PREFIX = "https://content-api"
 
-    HOST = "https://content-api.wildberries.ru"
 
-    # async def get_cards_by_text(self, texts) -> list[CardFromWB]:
-    #     cards = []
-    #     for text in texts:
-    #         try:
-    #             cards.append(await self.get_card_by_text(text))
-    #         except CardNotFoundInWB:
-    #             logger.debug('Карточка с текстом %s не найдена на Wildberries, возможно, карточка не существует',
-    #                          text)
-    #             continue
-    #         await asyncio.sleep(0)
-    #     return cards
+class ContentMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 2)
     async def get_card_by_text(
         self: WBAPIProtocol, text: Union[str, int]
     ) -> CardFromWB:
-        url = f"{self.HOST}/content/v2/get/cards/list"
+        url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
         text = str(text)
         data_for_req = {
             "settings": {
@@ -66,7 +55,7 @@ class ContentMixin:
 
     @try_except_decorator(1, 2)
     async def get_all_cards(self: WBAPIProtocol) -> list[CardFromWB]:
-        url = f"{self.HOST}/content/v2/get/cards/list"
+        url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
 
         # Начальные параметры для запроса
         data_for_req = {
