@@ -24,6 +24,7 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
+
 # Добавляем правильный импорт AdvPayment
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.assoc_tables import favorite_advs_association
@@ -438,6 +439,10 @@ class AdvSetting(BaseTable):
         Index("ix_name__nmids__search_adv_id", "name", "nmids", "_search_adv_id"),
         Index("ix_advsetting_bot_active", "bot_active"),
     )
+
+    @property
+    def auction_adv_id(self):
+        return self.search_adv_id
 
     @property
     def search_adv_id(self):  # Аукцион
