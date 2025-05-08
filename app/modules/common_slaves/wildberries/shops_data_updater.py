@@ -90,7 +90,9 @@ class ShopDataUpdater:
         logger.debug(f"Обновление данных для кабинета {self.wb_cabinet.shop_id}")
         wb_api: WBApi = self.wb_api
         advert_api = wb_api.advert
-        adv_ids = await advert_api.get_advertIds()
+        adv_ids: list[int] = await advert_api.get_advertIds()
+        if not adv_ids:
+            return []
         logger.debug(f"Получены adv_ids: {len(adv_ids)} штук")
         advs: list[Adv] = await advert_api.get_advs()
         async with sm() as session:
