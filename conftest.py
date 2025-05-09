@@ -1,6 +1,12 @@
 import os
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from app.modules.common_slaves.wildberries.models import WBToken, AdvSetting
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = Path(__file__).parent.absolute()
@@ -19,11 +25,23 @@ def pytest_configure(config) -> None:
     config.addinivalue_line("markers", "integration: маркирует интеграционные тесты")
 
 
-# @pytest_asyncio.fixture(scope="function", name="postgres_sqlalchemy_session")
-# async def postgres_sqlalchemy_session() -> AsyncGenerator[AsyncSession, None]:
-#     """
-#     Фикстура для создания сессии SQLAlchemy с использованием PostgreSQL
-#     """
-#     async with sm() as session:
-#         yield session
-#         await session.close()
+@pytest.fixture
+def tokens_mock() -> list[MagicMock]:
+    token_mock = MagicMock(spec=WBToken)
+    return [token_mock]
+
+
+@pytest.fixture
+def access_mock(tokens_mock):
+    access_mock = MagicMock(spec=WBCabinetAccess)
+    access_mock.tokens = tokens_mock
+    return access_mock
+
+
+@pytest.fixture
+def adv_setting_mock():
+    adv_setting_mock = MagicMock(spec=AdvSetting)
+    adv_setting_mock.max_pay_for_order = 300
+    adv_setting_mock.adv_id = 25040169
+    adv_setting_mock.nmids = [222811118]
+    return adv_setting_mock
