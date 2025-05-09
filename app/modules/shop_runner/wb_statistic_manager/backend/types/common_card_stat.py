@@ -9,3 +9,13 @@ class CommonCardStat:
         self.orders = orders
         self.orders_sum = orders_sum
         self.buy_outs = buy_outs
+        self._date = None
+
+    @property
+    def date(self) -> datetime.datetime:
+        return self._date
+
+    @date.setter
+    def date(self, value: datetime.date) -> None:
+        assert isinstance(value, datetime.date)
+        self._date = value

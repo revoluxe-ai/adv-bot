@@ -193,10 +193,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"\nВ среднем в день (срез за 2 дня):\n"
             f"Заказов: {self._mean_orders_for_days:.2f} (цель: {plan_for_sales_for_day_str})\n"
             f"Себестоимость: {round(order_cost, 2)} р."
-            f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n"
+            f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})"
         )
 
         text += self._common_stat_by_days
+
+        text += "\n"
 
         text += f"\nСтавка из Авто: {self.auto_cpm} р. "
         text += f"""(Биддер для Авто: {' Включен' if self._adv_setting.bidder_for_auto else ' Выключен'})\n"""

@@ -1,15 +1,17 @@
-import time
 import logging
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+import time
+from datetime import datetime, timedelta
+from typing import List, Optional
+
+from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.utils.click_house.client import get_clickhouse_client
 from .types.common_card_stat import CommonCardStat
 from .wb_api import WBApi
-from datetime import datetime, timedelta
-from typing import List, Optional
-from app.core.wb_api.exceptions import ApiForbiddenError
 
 logger = logging.getLogger(__name__)
+
 
 async def get_stats_for_last_period(nmid: int, days: int) -> Optional[CommonCardStat]:
     """
@@ -39,9 +41,9 @@ async def get_stats_for_last_period(nmid: int, days: int) -> Optional[CommonCard
 
     # Параметры для запроса
     params = {
-        'nmid': nmid,
-        'start_date': start_date.strftime('%Y-%m-%d'),
-        'end_date': end_date.strftime('%Y-%m-%d')
+        "nmid": nmid,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d"),
     }
 
     async with get_clickhouse_client() as client:
@@ -63,6 +65,66 @@ async def get_stats_for_last_period(nmid: int, days: int) -> Optional[CommonCard
     )
 
 
+async def get_stats_by_days(nmid: int, last_days: int) -> list[CommonCardStat]:
+    """
+    Возвращает статистику по дням за последние last_days.
+
+    Args:
+        nmid: артикул товара
+        last_days: за какое количество дней нужна стата
+
+    Returns:
+        list[CommonCardStat]: статистика по дням
+    """
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=last_days)
+
+    query = """
+    SELECT
+        toDate(date) AS stat_date,
+        SUM(open_card) AS open_card,
+        SUM(add_to_cart) AS add_to_cart,
+        SUM(orders) AS orders,
+        SUM(orders_sum) AS orders_sum,
+        SUM(buy_outs) AS buy_outs
+    FROM wb_common_stat
+    WHERE nmid = %(nmid)s
+      AND date BETWEEN %(start_date)s AND %(end_date)s
+      AND version = (
+        SELECT MAX(version)
+        FROM wb_common_stat AS inner_stat
+        WHERE inner_stat.nmid = %(nmid)s
+          AND inner_stat.date = wb_common_stat.date
+      )
+    GROUP BY stat_date
+    ORDER BY stat_date DESC
+    """
+
+    params = {
+        "nmid": nmid,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d"),
+    }
+
+    async with get_clickhouse_client() as client:
+        result = await client.query(query, parameters=params)
+
+    stats: list[CommonCardStat] = []
+    for row in result.result_rows:
+        stat = CommonCardStat(
+            nmid=nmid,
+            open_card=row[1],
+            add_to_cart=row[2],
+            orders=row[3],
+            orders_sum=row[4],
+            buy_outs=row[5],
+        )
+        stat.date = row[0]
+        stats.append(stat)
+
+    return stats
+
+
 class WBCommonStatManager:
 
     def __init__(self, wb_access: WBCabinetAccess):
@@ -71,12 +133,14 @@ class WBCommonStatManager:
 
     async def update_common_statistic(self, nmids: List[int]):
         try:
-          statistics: List[CommonStat] = await self.wb_api.get_cards_stats_by_days(nmids, 6)
+            statistics: List[CommonStat] = await self.wb_api.get_cards_stats_by_days(
+                nmids, 6
+            )
         except ApiForbiddenError as exc:
-            logger.error('Нет доступов к статистике')
+            logger.error("Нет доступов к статистике")
             raise exc
         except Exception as e:
-            logger.error('Ошибка получения общей статистики', exc_info=True)
+            logger.error("Ошибка получения общей статистики", exc_info=True)
             raise e
         # Добавляем статистику в ClickHouse
         await self._add_common_statistic_to_clickhouse(statistics)
@@ -91,7 +155,7 @@ class WBCommonStatManager:
                 stat.add_to_cart,
                 stat.orders,
                 stat.orders_sum,
-                stat.buy_outs
+                stat.buy_outs,
             )
             for stat in statistics
         ]
@@ -106,11 +170,9 @@ class WBCommonStatManager:
         """
 
         # Добавляем значения для вставки
-        query += ",".join([f"({', '.join(map(str, value))}, {version})" for value in values])
+        query += ",".join(
+            [f"({', '.join(map(str, value))}, {version})" for value in values]
+        )
 
         async with get_clickhouse_client() as client:
             await client.query(query)
-
-
-
-
