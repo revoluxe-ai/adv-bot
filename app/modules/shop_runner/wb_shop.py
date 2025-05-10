@@ -49,12 +49,10 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .bidder.wb_api import WBApi as BidderAPI
+from .modules.auto_white_list_updater.exceptions import AutoUpdateWhiteListFatalError
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 logger = logging.getLogger(__name__)
-
-
-logger.setLevel(logging.DEBUG)
 
 
 T = TypeVar("T")
@@ -315,6 +313,7 @@ class WBShop:
         while True:
             try:
                 await self.__update_full_adv_stat(wb_api)
+                await asyncio.sleep(60 * 15)
             except ApiForbiddenError as e:
                 raise e
             except Exception as exc:
@@ -515,6 +514,7 @@ class WBShop:
             self.update_cpm_run(),
             self.update_common_sale_stat(),
             self.update_full_stat_run(),
+            self.delete_phrase_from_white_list_run(),
         )
 
     async def run(self) -> None:
@@ -526,3 +526,35 @@ class WBShop:
                     f"Ошибка в процессе обновления магазина: {e}", exc_info=True
                 )
             await asyncio.sleep(15)
+
+    async def _delete_phrase_from_white_list_run(self) -> None:
+        """
+        Проверяет себестоимость заказа и убирает ключи из белого списка, если себес превышен
+        Returns:
+            None
+        """
+        await self._update_advs_models()
+        advs = self._adv_settings
+
+        from .modules.auto_white_list_updater import WhiteListDeleteManager
+
+        update_manager = WhiteListDeleteManager()
+
+        tasks = []
+        for adv in advs:
+            keywords = await self.get_calculated_keywords(adv.adv_id)
+            task = asyncio.create_task(
+                update_manager.auto_delete_phrase_from_white_list(adv, keywords)
+            )
+            tasks.append(task)
+
+        await asyncio.gather(*tasks)
+
+    async def delete_phrase_from_white_list_run(self) -> None:
+        while True:
+            try:
+                await self._delete_phrase_from_white_list_run()
+            except AutoUpdateWhiteListFatalError as exc:
+                logger.error(f"Ошибка обновления белого списка: {exc}", exc_info=True)
+                await asyncio.sleep(60 * 15)
+            await asyncio.sleep(60)
