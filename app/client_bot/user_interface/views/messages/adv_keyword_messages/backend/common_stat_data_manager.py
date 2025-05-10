@@ -79,7 +79,7 @@ class CommonStatDataManager:
             date_str = date.strftime("%d.%m.%Y")
             common_stat: CommonCardStat | None = date_to_common_stat.get(date)
             if not common_stat:
-                raise Exception("Нет общей статистики для вывода данных за день")
+                continue
             orders = common_stat.orders
 
             mean_pay_for_order = stat.spend / orders if orders else 1
