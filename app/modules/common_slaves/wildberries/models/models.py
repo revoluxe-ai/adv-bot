@@ -408,6 +408,10 @@ class AdvSetting(BaseTable):
         Boolean, nullable=True, default=True, server_default="true"
     )
 
+    auto_update_white_list: Mapped[int] = mapped_column(
+        Boolean, nullable=True, default=False, server_default="false"
+    )
+
     # auto_adv_target_status = mapped_column(Boolean,
     #                                        nullable=True,
     #                                        default=None)
@@ -526,6 +530,9 @@ class KeywordSetting(BaseTable):
     added_clicks = Column(Integer, default=0)
     added_views = Column(Integer, default=0)
     auto_block = Column(Boolean)
+    relevant: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=False, server_default="false"
+    )
     __table_args__ = (
         UniqueConstraint("text", "adv_setting_id"),
         Index("ix_text_adv_setting_id", "text", "adv_setting_id"),

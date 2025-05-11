@@ -698,9 +698,6 @@ async def get_good_bad_phrases_for_min_ctr(
             keyword.query = keywords_query.get_queries_of_keyword(text)
             keyword_stats.append(keyword)
 
-    keyword_text_to_keyword_setting = {
-        keyword_setting.text: keyword_setting for keyword_setting in keyword_settings
-    }
     adv_id = adv_setting.adv_id
     texts = [kw.text for kw in keyword_stats]
     text_to_predict_ctr: dict[str, float] = (
@@ -718,8 +715,9 @@ async def get_good_bad_phrases_for_min_ctr(
 
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
-        keyword_setting = keyword_text_to_keyword_setting[text]
+        keyword_setting = text_to_keyword_setting[text]
         added_clicks = keyword_setting.added_clicks
+        keyword_stat.relevant = keyword_setting.relevant
         if not added_clicks:
             added_clicks = 0
         keyword_stat.added_clicks = added_clicks
@@ -1502,7 +1500,7 @@ async def get_users_from_nmid(nmid: int):
         return []
 
 
-async def add_relevant_phrases(keywords, adv_setting_id):
+async def add_relevant_phrases(keywords, adv_setting_id) -> None:
     async with _sm(read_only=False) as session:
         for text in keywords:
             stmt = (
@@ -1526,6 +1524,7 @@ async def add_relevant_phrases(keywords, adv_setting_id):
                     text=text,
                     adv_setting_id=adv_setting_id,
                 )
+                keyword_setting.relevant = True
                 keyword_setting.adv_keywords.append(adv_keyword)
                 session.add(keyword_setting)
             if keyword_setting.hard_status == 0:

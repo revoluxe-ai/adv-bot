@@ -64,6 +64,7 @@ class CalculatedKeyword(BaseModel):
     added_clicks: Optional[int] = None
     keyword_setting_original_id: int | None = None
     adv_id: int | None = None
+    relevant: bool | None = None
 
     @property
     def mean_ctr(self):

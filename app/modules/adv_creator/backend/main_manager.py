@@ -112,7 +112,7 @@ class MainAdvManager:
 
     async def create_complex_advs(
         self, bot: Bot, user_telegram_id, nmid: int, hard_mode
-    ) -> (int, int):
+    ) -> tuple[int, int]:
         exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
         if (
             not exist_adv

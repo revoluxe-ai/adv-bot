@@ -1,17 +1,21 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, List
+
 from sqlalchemy import select
+
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
+    CalculatedKeyword,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
-from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
-from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import CommonCardStat
-from app.utils.db.session_maker import get_async_session_maker
+from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
+    CommonCardStat,
+)
 from app.modules.wb_adv_updater import data_manager
-
+from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
 
@@ -19,6 +23,7 @@ _sm = get_async_session_maker
 @dataclass
 class CommonAdvsStatData:
     """Класс для хранения данных о ключевых словах рекламной кампании"""
+
     adv_setting: AdvSetting
     keywords: List[CalculatedKeyword]
     min_ctr: float
@@ -39,9 +44,9 @@ class CommonAdvsStatDataManager:
     """Менеджер для получения данных о ключевых словах рекламной кампании"""
 
     @staticmethod
-    async def get_data(adv_setting: AdvSetting,
-                       keywords: List[CalculatedKeyword],
-                       last_days: int) -> CommonAdvsStatData:
+    async def get_data(
+        adv_setting: AdvSetting, keywords: List[CalculatedKeyword], last_days: int
+    ) -> CommonAdvsStatData:
         """Получает все необходимые данные для отображения информации о ключевых словах"""
 
         # Получаем min_ctr
@@ -60,28 +65,31 @@ class CommonAdvsStatDataManager:
         start_date = end_date - timedelta(days=pass_days)
 
         # Статистика для авто-рекламы
-        full_adv_stat_for_last_days_for_auto_adv = await full_wb_adv_stat.get_stats_by_last_days(
-            [adv_setting.adv_id],
-            start_date,
-            end_date
+        full_adv_stat_for_last_days_for_auto_adv = (
+            await full_wb_adv_stat.get_stats_by_last_days(
+                [adv_setting.adv_id], start_date, end_date
+            )
         )
 
         # Статистика для аукциона
-        full_adv_stat_for_last_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
-            [adv_setting.search_adv_id],
-            start_date,
-            end_date
+        full_adv_stat_for_last_days_for_auction = (
+            await full_wb_adv_stat.get_stats_by_last_days(
+                [adv_setting.search_adv_id], start_date, end_date
+            )
         )
 
         # Общий расход
         full_spend_for_all_advs = (
-                full_adv_stat_for_last_days_for_auto_adv.spend +
-                full_adv_stat_for_last_days_for_auction.spend
+            full_adv_stat_for_last_days_for_auto_adv.spend
+            + full_adv_stat_for_last_days_for_auction.spend
         )
 
         # Общая статистика
-        common_stat: CommonCardStat = await common_stat_manager.get_stats_for_last_period(int(adv_setting.nmids[0]),
-                                                                                          pass_days)
+        common_stat: CommonCardStat = (
+            await common_stat_manager.get_stats_for_last_period(
+                int(adv_setting.nmids[0]), pass_days
+            )
+        )
 
         # Рассчитываем дополнительные метрики
         all_orders_for_last_days = None
@@ -91,6 +99,8 @@ class CommonAdvsStatDataManager:
 
         if common_stat:
             all_orders_for_last_days = common_stat.orders
+            if all_orders_for_last_days == 0:
+                all_orders_for_last_days = 1
             spend_for_inner_advs_for_days = full_spend_for_all_advs
 
             now = datetime.now()
@@ -98,17 +108,19 @@ class CommonAdvsStatDataManager:
             fraction_of_day = hours_passed / 24 + pass_days
 
             mean_orders_for_days = all_orders_for_last_days / fraction_of_day
-            mean_price_for_order = spend_for_inner_advs_for_days / common_stat.orders if common_stat.orders else 0
+            mean_price_for_order = (
+                spend_for_inner_advs_for_days / all_orders_for_last_days
+            )
 
         # Получаем расходы на ключевые слова
         spend_for_keywords_in_auto_adv = await full_wb_adv_stat.get_keywords_spend(
-            [adv_setting.adv_id],
-            start_date,
-            end_date,
-            'advkeyword_new'
+            [adv_setting.adv_id], start_date, end_date, "advkeyword_new"
         )
 
-        addition_spend_in_adv = full_adv_stat_for_last_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
+        addition_spend_in_adv = (
+            full_adv_stat_for_last_days_for_auto_adv.spend
+            - spend_for_keywords_in_auto_adv
+        )
 
         return CommonAdvsStatData(
             adv_setting=adv_setting,
@@ -124,5 +136,5 @@ class CommonAdvsStatDataManager:
             spend_for_inner_advs=spend_for_inner_advs_for_days,
             full_adv_stat_for_last_days_for_auto_adv=full_adv_stat_for_last_days_for_auto_adv,
             full_adv_stat_for_last_days_for_auction=full_adv_stat_for_last_days_for_auction,
-            common_stat=common_stat
+            common_stat=common_stat,
         )

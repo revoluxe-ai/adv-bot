@@ -29,6 +29,10 @@ from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
 from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import (
     SettingAuctionBoostMode,
 )
+from app.modules.shop_runner.modules.auto_white_list_updater.telegram.callbacks import (
+    RelevantKeywordStatusSetting,
+    AutoUpdateWhiteListSetting,
+)
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -72,7 +76,7 @@ sm = get_async_session_maker
 
 
 def get_adv_setting_keyboard(
-    wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
+    chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
 ):
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -83,6 +87,20 @@ def get_adv_setting_keyboard(
             ).pack(),
         )
     )
+
+    if chat_id in const.ADMINS:
+        if adv_setting.auto_update_white_list:
+            text = "Выключить автообновление белого списка"
+            new_status = False
+        else:
+            text = "Включить автообновление белого списка"
+            new_status = True
+
+        callback = AutoUpdateWhiteListSetting(
+            new_status=new_status, adv_setting_original_id=adv_setting.id
+        ).pack()
+        button = InlineKeyboardButton(text=text, callback_data=callback)
+        builder.row(button)
 
     button = InlineKeyboardButton(
         text="План продаж",
@@ -522,6 +540,8 @@ def get_keywords_setting_keyboard(
         turn_on = "✅" if keyword.status == KeywordStatus.GOOD else "❌"
         cluster_name = keyword.cluster_name
         text = "🌟" if keyword.best_keyword_status else ""
+        if keyword.relevant:
+            text += "🟢"
         text += f"""{clicks}/{views}/{round(ctr *100,2)}%"""
         text += "|"
         if keyword.cpm:
@@ -733,6 +753,7 @@ def get_keywords_setting_keyboard(
 
 
 def get_keyword_setting_keyboard(
+    chat_id: int,
     keyword: KeywordSetting,
     calculated_keyword: CalculatedKeyword,
     adv_setting: AdvSetting,
@@ -790,6 +811,27 @@ def get_keyword_setting_keyboard(
             )
         ]
         buttons.append(button)
+
+    if chat_id in const.ADMINS:
+        if keyword.relevant:
+            text = "Удалить из релевантных фраз"
+            new_relevant_status = False
+        else:
+            text = "Добавить в релевантные фразы"
+            new_relevant_status = True
+
+        callback = RelevantKeywordStatusSetting(
+            new_relevant_status=new_relevant_status,
+            keyword_setting_original_id=keyword_setting_original_id,
+        )
+
+        buttons_row = [
+            InlineKeyboardButton(
+                text=text,
+                callback_data=callback.pack(),
+            )
+        ]
+        buttons.append(buttons_row)
 
     if (
         keyword.hard_status in [AUTO_MODE, WHITE_LIST]

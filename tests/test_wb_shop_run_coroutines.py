@@ -65,6 +65,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
     wb_shop.update_cpm_run = AsyncMock()
     wb_shop.update_common_sale_stat = AsyncMock()
     wb_shop.update_full_stat_run = AsyncMock()
+    wb_shop.update_phrases_in_white_list_run = AsyncMock()
 
     # Мокируем asyncio.gather для проверки количества аргументов
     with patch("asyncio.gather") as mock_gather:
@@ -84,8 +85,8 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
 
         # Проверяем, что gather был вызван с 6 аргументами (по количеству методов)
         assert (
-            len(call_args) == 6
-        ), f"asyncio.gather должен быть вызван с 6 аргументами, получено {len(call_args)}"
+            len(call_args) == 7
+        ), f"asyncio.gather должен быть вызван с 7 аргументами, получено {len(call_args)}"
 
         # Проверяем, что все методы были вызваны по одному разу
         wb_shop.parsing_keywords_run.assert_called_once()
@@ -94,3 +95,4 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
         wb_shop.update_cpm_run.assert_called_once()
         wb_shop.update_common_sale_stat.assert_called_once()
         wb_shop.update_full_stat_run.assert_called_once()
+        wb_shop.update_phrases_in_white_list_run.assert_called_once()

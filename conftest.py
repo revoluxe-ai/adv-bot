@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 
@@ -45,3 +45,16 @@ def adv_setting_mock():
     adv_setting_mock.adv_id = 25040169
     adv_setting_mock.nmids = [222811118]
     return adv_setting_mock
+
+
+@pytest.fixture
+def get_async_session_mock():
+    result_mock = MagicMock()
+    result_mock.scalar_one.return_value = "Юбки"
+    session_mock = MagicMock()
+    session_mock.execute = AsyncMock(return_value=result_mock)
+    session_maker_mock = MagicMock()
+    session_maker_mock.__aenter__ = AsyncMock(return_value=session_mock)
+
+    get_session_maker_mock = MagicMock(return_value=session_maker_mock)
+    return get_session_maker_mock

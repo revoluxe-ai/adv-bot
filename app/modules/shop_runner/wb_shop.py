@@ -506,28 +506,7 @@ class WBShop:
                             f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
                         )
 
-    async def _run(self) -> None:
-        await asyncio.gather(
-            self.parsing_keywords_run(),
-            self.update_advs_data_from_wb_to_pg(),
-            self.update_cards_data_from_wb_to_pf(),
-            self.update_cpm_run(),
-            self.update_common_sale_stat(),
-            self.update_full_stat_run(),
-            self.delete_phrase_from_white_list_run(),
-        )
-
-    async def run(self) -> None:
-        while True:
-            try:
-                await self._run()
-            except Exception as e:
-                logger.error(
-                    f"Ошибка в процессе обновления магазина: {e}", exc_info=True
-                )
-            await asyncio.sleep(15)
-
-    async def _delete_phrase_from_white_list_run(self) -> None:
+    async def _update_phrases_in_white_list_run(self) -> None:
         """
         Проверяет себестоимость заказа и убирает ключи из белого списка, если себес превышен
         Returns:
@@ -542,19 +521,41 @@ class WBShop:
 
         tasks = []
         for adv in advs:
-            keywords = await self.get_calculated_keywords(adv.adv_id)
-            task = asyncio.create_task(
-                update_manager.auto_delete_phrase_from_white_list(adv, keywords)
-            )
-            tasks.append(task)
+            if adv.auto_update_white_list:
+                keywords = await self.get_calculated_keywords(adv.adv_id)
+                task = asyncio.create_task(
+                    update_manager.auto_update_phrases_in_white_list(adv, keywords)
+                )
+                tasks.append(task)
+        if tasks:
+            await asyncio.gather(*tasks)
 
-        await asyncio.gather(*tasks)
-
-    async def delete_phrase_from_white_list_run(self) -> None:
+    async def update_phrases_in_white_list_run(self) -> None:
         while True:
             try:
-                await self._delete_phrase_from_white_list_run()
+                await self._update_phrases_in_white_list_run()
             except AutoUpdateWhiteListFatalError as exc:
                 logger.error(f"Ошибка обновления белого списка: {exc}", exc_info=True)
                 await asyncio.sleep(60 * 15)
             await asyncio.sleep(60)
+
+    async def run(self) -> None:
+        while True:
+            try:
+                await self._run()
+            except Exception as e:
+                logger.error(
+                    f"Ошибка в процессе обновления магазина: {e}", exc_info=True
+                )
+            await asyncio.sleep(15)
+
+    async def _run(self) -> None:
+        await asyncio.gather(
+            self.parsing_keywords_run(),
+            self.update_advs_data_from_wb_to_pg(),
+            self.update_cards_data_from_wb_to_pf(),
+            self.update_cpm_run(),
+            self.update_common_sale_stat(),
+            self.update_full_stat_run(),
+            self.update_phrases_in_white_list_run(),
+        )

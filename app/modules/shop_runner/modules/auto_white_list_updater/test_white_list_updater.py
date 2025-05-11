@@ -120,7 +120,7 @@ async def test_update_white_list_threshold_triggered(
         ),
     ):
         manager = WhiteListDeleteManager()
-        await manager.auto_delete_phrase_from_white_list(
+        await manager.auto_update_phrases_in_white_list(
             adv_setting_mock, keywords_mocks
         )
 
@@ -149,5 +149,5 @@ async def test_WBShop_delete_phrase_from_white_list_run(
     wb_shop = WBShop("тест shop_id", 123456)
     wb_shop._update_advs_models = AsyncMock()
     wb_shop._adv_settings = [adv_setting_mock]
-    wb_shop._delete_phrase_from_white_list_run()
+    wb_shop._update_phrases_in_white_list_run()
     wb_shop.get_calculated_keywords = AsyncMock(return_value=keywords_mocks)

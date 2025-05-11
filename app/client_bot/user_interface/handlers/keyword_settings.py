@@ -631,10 +631,13 @@ async def change_keyword_hard_status(
                 .options(selectinload(KeywordSetting.adv_setting))
                 .where(KeywordSetting.id == keyword_setting_original_id)
             )
-            keyword_setting: KeywordSetting = keyword_setting.scalar()
+            keyword_setting: KeywordSetting | None = keyword_setting.scalar()
+            assert keyword_setting
             adv_setting = keyword_setting.adv_setting
             if new_hard_status >= 0:
                 keyword_setting.hard_status = new_hard_status
+                if new_hard_status == 2:
+                    keyword_setting.relevant = True
 
             elif new_hard_status == -1:
                 min_ctr = await data_manager.get_min_ctr(adv_setting)

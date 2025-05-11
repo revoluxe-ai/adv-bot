@@ -344,7 +344,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def keyboard(self):
         return keyboards.get_adv_setting_keyboard(
-            self.wb_user_cabinet, self.adv, self.in_favorites_user
+            self._chat_id, self.wb_user_cabinet, self.adv, self.in_favorites_user
         )
 
     @staticmethod
@@ -452,6 +452,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         super().__init__(bot, chat_id)
         self._keyword_original_id = keyword_setting_id
         self._page = last_page
+        self._chat_id = chat_id
 
     @staticmethod
     async def _get_calculated_keyword(adv_id: int, text: str):
@@ -551,6 +552,7 @@ class KeywordSettingMessage(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_keyword_setting_keyboard(
+            self._chat_id,
             self._keyword_setting,
             self.calculated_keyword,
             self._adv_setting,
