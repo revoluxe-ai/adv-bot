@@ -167,7 +167,7 @@ class WBShop:
         access: WBCabinetAccess = self.__access
         await self._update_advs_models()
         adv_settings = self._adv_settings
-        adv_settings = list(filter(lambda adv: adv.bot_active, adv_settings))
+        adv_settings = list(filter(lambda adv: adv.bidder_active, adv_settings))
         if not self._adv_settings:
             logger.debug(f"Модели не обновлены для магазина {self.shop_id}")
             self.__first_bidder_update_time = datetime.now()
