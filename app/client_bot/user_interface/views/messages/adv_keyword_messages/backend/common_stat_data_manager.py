@@ -82,7 +82,7 @@ class CommonStatDataManager:
                 continue
             orders = common_stat.orders
 
-            mean_pay_for_order = stat.spend / orders if orders else 1
+            mean_pay_for_order = stat.spend / (orders if orders else 1)
 
             if date == today_date:
                 now = datetime.datetime.now()
