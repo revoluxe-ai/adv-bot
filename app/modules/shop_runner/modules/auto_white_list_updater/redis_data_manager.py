@@ -9,7 +9,7 @@ __all__ = ["MainRedisManager"]
 class LastSpendSumForDeletingWhiteListRedisManager(BaseRedis):
 
     @staticmethod
-    def _get_key(auto_adv_id) -> str:
+    def _get_key(auto_adv_id: int) -> str:
         return f"last_spend:{auto_adv_id}"
 
     async def get_last_spend_sum(self, auto_adv_id: int) -> float | None:
@@ -17,9 +17,32 @@ class LastSpendSumForDeletingWhiteListRedisManager(BaseRedis):
         value = await self.client.get(key)
         return float(value.decode()) if value else None
 
-    async def set_last_spend_sum(self, auto_adv_id: int, sum_spend_now: float):
+    async def set_last_spend_sum(self, auto_adv_id: int, sum_spend_now: float) -> None:
         key = self._get_key(auto_adv_id)
         await self.client.set(key, sum_spend_now)
+
+
+class LastDateTimeDeleteWhiteListRedisManager(BaseRedis):
+
+    @staticmethod
+    def _get_key(auto_adv_id: int) -> str:
+        return f"last_delete_phrase_from_white_list:{auto_adv_id}"
+
+    async def get_last_delete_datetime(
+        self, adv: AdvSetting
+    ) -> datetime.datetime | None:
+        key = self._get_key(adv.adv_id)
+        value = await self.client.get(key)
+        if value:
+            # Assuming the datetime is stored in ISO format
+            return datetime.datetime.fromisoformat(value.decode())
+        return None
+
+    async def set_last_delete_datetime(self, adv: AdvSetting) -> None:
+        now = datetime.datetime.now()
+        key = self._get_key(adv.adv_id)
+        # Store datetime in ISO format
+        await self.client.set(key, now.isoformat())
 
 
 class LastAddingToWhiteListRedisData(BaseRedis):
@@ -53,4 +76,5 @@ class LastAddingToWhiteListRedisData(BaseRedis):
 
 class MainRedisManager:
     delete_key_data = LastSpendSumForDeletingWhiteListRedisManager()
+    delete_last_datetime = LastDateTimeDeleteWhiteListRedisManager()
     adding_key_data = LastAddingToWhiteListRedisData()
