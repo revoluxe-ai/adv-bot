@@ -50,6 +50,7 @@ from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .bidder.wb_api import WBApi as BidderAPI
 from .modules.auto_white_list_updater.exceptions import AutoUpdateWhiteListFatalError
+from ..common_advs_stat import CommonAdvsStatDataManager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 logger = logging.getLogger(__name__)
@@ -515,9 +516,9 @@ class WBShop:
         await self._update_advs_models()
         advs = self._adv_settings
 
-        from .modules.auto_white_list_updater import WhiteListDeleteManager
+        from .modules.auto_white_list_updater import WhiteListUpdateManager
 
-        update_manager = WhiteListDeleteManager()
+        update_manager = WhiteListUpdateManager()
 
         tasks = []
         for adv in advs:
@@ -537,7 +538,44 @@ class WBShop:
             except AutoUpdateWhiteListFatalError as exc:
                 logger.error(f"Ошибка обновления белого списка: {exc}", exc_info=True)
                 await asyncio.sleep(60 * 15)
-            await asyncio.sleep(60)
+
+            await asyncio.sleep(60 * 15)
+
+    async def update_target_place(self) -> None:
+        """
+        Обновляет целевую позицию
+        Returns:
+            None
+        """
+        await self._update_advs_models()
+        advs = self._adv_settings
+
+        from .modules.auto_updater_target_place.auto_updater_target_place import (
+            AutoUpdaterTargetPlace,
+        )
+
+        update_manager = AutoUpdaterTargetPlace()
+
+        tasks = []
+        common_stat_data_manager = CommonAdvsStatDataManager()
+        for adv in advs:
+            if adv.auto_update_target_place:
+                keywords = await self.get_calculated_keywords(adv.adv_id)
+                stat_data = await common_stat_data_manager.get_data(adv, keywords, 2)
+                mean_price_for_order_for_two_days = stat_data.mean_price_for_order
+                mean_orders_for_last_two_days = stat_data.mean_orders_for_last_days
+                if mean_price_for_order_for_two_days and mean_orders_for_last_two_days:
+                    task = asyncio.create_task(
+                        update_manager.update_target_place(
+                            adv,
+                            mean_price_for_order_for_two_days,
+                            mean_orders_for_last_two_days,
+                            keywords,
+                        )
+                    )
+                    tasks.append(task)
+        if tasks:
+            await asyncio.gather(*tasks)
 
     async def run(self) -> None:
         while True:
@@ -558,4 +596,5 @@ class WBShop:
             self.update_common_sale_stat(),
             self.update_full_stat_run(),
             self.update_phrases_in_white_list_run(),
+            self.update_target_place(),
         )
