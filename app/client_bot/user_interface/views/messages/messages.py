@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
-from aiogram.types import InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, Message
 from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
@@ -42,6 +42,9 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.shop_runner.modules.auto_updater_target_place import (
+    LastTargetPlaceUpdateRedisManager,
+)
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import (
     KeywordStatUpdateState,
@@ -51,7 +54,6 @@ from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker as sm
-from app.utils.pricer.pricer import Pricer
 
 if TYPE_CHECKING:
     pass
@@ -218,7 +220,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
 
-    async def __call__(self):
+    async def __call__(self) -> Message:
+        self._min_ctr: float | str
         try:
             self._min_ctr = await data_manager.get_min_ctr(self.adv)
             if not self._min_ctr:
@@ -244,8 +247,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             await NoMainPhotos(self._bot, self._chat_id)(self.adv)
             return
 
-        last_update_keyword_stat: datetime = await self._get_last_update_keyword_stat(
-            self.adv.adv_id
+        last_update_keyword_stat: datetime | None = (
+            await self._get_last_update_keyword_stat(self.adv.adv_id)
         )
         if last_update_keyword_stat:
             self.last_update_keyword_stat_str = last_update_keyword_stat.strftime(
@@ -280,7 +283,58 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         # self.bid_update_time: datetime  = await redis_manager.get_last_bid_update(self.adv.adv_id)
         # self.bid_update_time = self.bid_update_time.timestamp()
-        await super().__call__()
+
+        from app.modules.shop_runner.modules.auto_white_list_updater.redis_data_manager import (
+            MainRedisManager as WhiteListUpdateRedisManager,
+        )
+
+        white_list_update_redis_manager = WhiteListUpdateRedisManager()
+        result: tuple[datetime, int] | None = (
+            await white_list_update_redis_manager.adding_key_data.get_last_adding_to_white_list(
+                self.adv
+            )
+        )
+
+        if result:
+            last_adding_keyword_to_white_list, _ = result
+            last_adding_keyword_to_white_list_str = (
+                last_adding_keyword_to_white_list.strftime("%d.%m.%Y %H:%M:%S")
+            )
+        else:
+            last_adding_keyword_to_white_list_str = "Нет данных"
+
+        self.last_adding_keyword_to_white_list = last_adding_keyword_to_white_list_str
+
+        last_delete_phrase_from_white_list: datetime | None = (
+            await white_list_update_redis_manager.delete_last_datetime.get_last_delete_datetime(
+                self.adv
+            )
+        )
+
+        if last_delete_phrase_from_white_list:
+            self.last_delete_phrase_from_white_list = (
+                last_delete_phrase_from_white_list.strftime("%d.%m.%Y %H:%M:%S")
+            )
+        else:
+            self.last_delete_phrase_from_white_list = "Нет данных"
+
+        last_target_place_update_manager = LastTargetPlaceUpdateRedisManager()
+
+        last_target_place_update_result: tuple[datetime, float] | None = (
+            await last_target_place_update_manager.get_last_target_place_update(
+                self.adv
+            )
+        )
+        if not last_target_place_update_result:
+            last_target_place_update_str: str = "Нет данных"
+        else:
+            last_target_place_update, _ = last_target_place_update_result
+            last_target_place_update_str = last_target_place_update.strftime(
+                "%d.%m.%Y %H:%M:%S"
+            )
+        self.last_target_place_update_str = last_target_place_update_str
+
+        return await super().__call__()
 
     @property
     def text(self):
@@ -300,6 +354,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n"
             f"Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n"
             f"Последнее обновление полной статистики: {self.full_stat_update_time}\n"
+            f"Последнее автоматическое добавление ключа в белый список: {self.last_adding_keyword_to_white_list}\n"
+            f"Последнее автоматическое удаление ключа из белого списка: {self.last_delete_phrase_from_white_list}\n"
+            f"Последнее автоматическое обновление целевой позиции: {self.last_target_place_update_str}\n"
             # f'Последнее обновление ставки: {self.bid_update_time}'
         )
 
@@ -348,10 +405,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         )
 
     @staticmethod
-    def _get_last_update_keyword_stat(adv_id) -> datetime:
+    async def _get_last_update_keyword_stat(adv_id: int) -> datetime | None:
         last_update_keyword_stat_manager = KeywordStatUpdateState()
         last_update_keyword_stat_for_complex_adv = (
-            last_update_keyword_stat_manager.get_one(adv_id)
+            await last_update_keyword_stat_manager.get_one(adv_id)
         )
         return last_update_keyword_stat_for_complex_adv
 
@@ -927,51 +984,6 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
     @property
     def keyboard(self):
         return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
-
-
-class WaitingForAmount(Text):
-    DISABLE_WEBPAGE_PREVIEW = True
-
-    def __init__(
-        self,
-        bot: Bot,
-        chat_id,
-        master_sum: float,
-        current_balance: float = None,
-        current_bonus: float = None,
-    ):
-        super().__init__(bot, chat_id)
-        self.master_sum = master_sum
-        self._pricer = Pricer()
-        self.current_balance = current_balance
-        self.current_bonus = current_bonus
-
-    @property
-    def text(self):
-        text = self._pricer.text
-        # Добавляем информацию о текущем балансе, если она доступна
-        if self.current_balance is not None:
-            text = f"💰 Текущий баланс: {self.current_balance:.0f} руб.\n"
-
-            if self.current_bonus is not None and self.current_bonus > 0:
-                text += f"🎁 Текущие бонусы: {self.current_bonus:.0f} руб.\n"
-
-            text += "\n" + self._pricer.text
-
-        text += "\nУкажите сумму пополнения:"
-        return text
-
-
-class BalanceUpdated(Text):
-    def __init__(self, bot: Bot, chat_id, added_balance: float, bonus: float):
-        super().__init__(bot, chat_id)
-        self.__balance = added_balance
-        self.__bonus = bonus
-        self._image = None
-
-    @property
-    def text(self):
-        return f"Баланс успешно пополнен на {self.__balance} рублей + бонус {self.__bonus} рублей"
 
 
 class Top10ByViewsKeywordsGraphic(TextWithKeyboardAndImage):

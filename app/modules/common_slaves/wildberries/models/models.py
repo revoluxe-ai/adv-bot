@@ -408,7 +408,11 @@ class AdvSetting(BaseTable):
         Boolean, nullable=True, default=True, server_default="true"
     )
 
-    auto_update_white_list: Mapped[int] = mapped_column(
+    auto_update_white_list: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=False, server_default="false"
+    )
+
+    auto_update_target_place: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
 

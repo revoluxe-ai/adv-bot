@@ -29,6 +29,9 @@ from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
 from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import (
     SettingAuctionBoostMode,
 )
+from app.modules.shop_runner.modules.auto_updater_target_place import (
+    AutoUpdateTargetPlaceSettingCallBack,
+)
 from app.modules.shop_runner.modules.auto_white_list_updater.telegram.callbacks import (
     RelevantKeywordStatusSetting,
     AutoUpdateWhiteListSetting,
@@ -97,6 +100,19 @@ def get_adv_setting_keyboard(
             new_status = True
 
         callback = AutoUpdateWhiteListSetting(
+            new_status=new_status, adv_setting_original_id=adv_setting.id
+        ).pack()
+        button = InlineKeyboardButton(text=text, callback_data=callback)
+        builder.row(button)
+
+        if adv_setting.auto_update_target_place:
+            text = "Выключить автоуправление целевой позицией"
+            new_status = False
+        else:
+            text = "Включить автоуправление целевой позицией"
+            new_status = True
+
+        callback = AutoUpdateTargetPlaceSettingCallBack(
             new_status=new_status, adv_setting_original_id=adv_setting.id
         ).pack()
         button = InlineKeyboardButton(text=text, callback_data=callback)

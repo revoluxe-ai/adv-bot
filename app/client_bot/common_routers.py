@@ -14,13 +14,15 @@ from app.modules.sales_plan_settings import SalesPlanSettingsMenuRouter
 from app.modules.shop_runner.auction_boost_mode_settings import (
     AuctionBoostModeSettingsRouter,
 )
+from app.modules.shop_runner.modules.auto_updater_target_place import (
+    auto_updater_target_place_setting_router,
+)
 from app.modules.shop_runner.modules.auto_white_list_updater import (
     AutoWhiteListUpdaterRouter,
 )
 from app.modules.user_message_sender import middleware_for_adding_task
 from app.modules.wb_adv_updater.modules.bidder import tg_router as bidder_router
 from app.modules.white_list_updater import router as white_list_updater_router
-from python_modules import path_setting_funcs
 from .middlewars.return_to_start_from_state import ReturnToStart
 from .user_interface.handlers import (
     adv_setting,
@@ -48,7 +50,6 @@ from ..settings import settings
 
 common_router = Router()
 
-setting_path = path_setting_funcs.get_setting_path()
 
 # admin_bot_api = path_setting_funcs.get_document_by_key_name(setting_path, 'admin_telegram_bot_api')
 common_router.include_routers(keywords_positions_history.handlers.router)
@@ -59,6 +60,7 @@ if not settings.test_mode:
 
 common_router.message.middleware.register(ReturnToStart())
 
+common_router.include_router(auto_updater_target_place_setting_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(BidderAutoModeRouter)

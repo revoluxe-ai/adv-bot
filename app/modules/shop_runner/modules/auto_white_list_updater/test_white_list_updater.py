@@ -2,40 +2,12 @@
 
 import pytest
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
-from .auto_while_list_updater import WhiteListDeleteManager
+from .auto_white_list_updater import WhiteListUpdateManager
 from ...wb_shop import WBShop
 
 auto_adv_id = 25031215
-
-
-@pytest.fixture
-def keywords_mocks():
-    keyword_1 = MagicMock(spec=CalculatedKeyword)
-    keyword_1.best_keyword_status = True
-    keyword_1.baes_ctr = 0.5
-    keyword_1.hard_status = 2
-
-    keyword_2 = MagicMock(spec=CalculatedKeyword)
-    keyword_2.best_keyword_status = False
-    keyword_2.baes_ctr = 0.2
-    keyword_2.hard_status = 2
-
-    keyword_3 = MagicMock(spec=CalculatedKeyword)
-    keyword_3.best_keyword_status = False
-    keyword_3.baes_ctr = 0.1
-    keyword_3.hard_status = 2
-
-    keyword_4 = MagicMock(spec=CalculatedKeyword)
-    keyword_4.best_keyword_status = False
-    keyword_4.baes_ctr = 0.4
-    keyword_4.hard_status = 1
-
-    return [keyword_1, keyword_2, keyword_3, keyword_4]
 
 
 @pytest.fixture
@@ -101,25 +73,25 @@ async def test_update_white_list_threshold_triggered(
 
     with (
         patch(
-            "app.modules.shop_runner.modules.auto_white_list_updater.auto_while_list_updater.sm",
+            "app.modules.shop_runner.modules.auto_white_list_updater.auto_white_list_updater.sm",
             new=get_session_maker_mock,
         ),
         patch(
             "app.modules.shop_runner.modules.auto_white_list_updater."
-            "auto_while_list_updater.WhiteListDeleteManager.redis_manager",
+            "auto_white_list_updater.WhiteListDeleteManager.redis_manager",
             new=redis_manager_mock,
         ),
         patch(
-            "app.modules.shop_runner.modules.auto_white_list_updater.auto_while_list_updater.click_house_manager",
+            "app.modules.shop_runner.modules.auto_white_list_updater.auto_white_list_updater.click_house_manager",
             new=click_house_manager_mock,
         ),
         patch(
             "app.modules.shop_runner.modules."
-            "auto_white_list_updater.auto_while_list_updater.get_daily_stats_by_last_days",
+            "auto_white_list_updater.auto_white_list_updater.get_daily_stats_by_last_days",
             new=get_daily_stats_by_last_days_mock,
         ),
     ):
-        manager = WhiteListDeleteManager()
+        manager = WhiteListUpdateManager()
         await manager.auto_update_phrases_in_white_list(
             adv_setting_mock, keywords_mocks
         )

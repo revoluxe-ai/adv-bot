@@ -8,7 +8,7 @@ from typing import Union, Optional
 
 import aiogram
 from aiogram import types
-from aiogram.types import BufferedInputFile
+from aiogram.types import BufferedInputFile, Message
 
 from app import file_handler
 from .base import Base
@@ -175,7 +175,7 @@ class TextWithKeyboardAndImage(Base):
         self._image = value
 
     @manage_file_id
-    async def __call__(self):
+    async def __call__(self) -> Message:
         logger.debug("Вызов метода send_photo")
         last_message = await self.bot.send_photo(
             chat_id=self.chat_id,
