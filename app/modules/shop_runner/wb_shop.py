@@ -49,6 +49,7 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .bidder.wb_api import WBApi as BidderAPI
+from .exceptions import AutoUpdateTargetPlaceError
 from .modules.auto_white_list_updater.exceptions import AutoUpdateWhiteListFatalError
 from ..common_advs_stat import CommonAdvsStatDataManager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -553,12 +554,26 @@ class WBShop:
             await asyncio.sleep(60 * 15)
 
     async def update_target_place(self) -> None:
+
+        while True:
+            try:
+                await self._update_target_place()
+                await asyncio.sleep(60 * 60)
+            except AutoUpdateTargetPlaceError:
+                logger.error("Ошибка автообновления целевой позиции", exc_info=True)
+                await asyncio.sleep(60)
+
+    async def _update_target_place(self) -> None:
         """
         Обновляет целевую позицию
         Returns:
             None
         """
-        await self._update_advs_models()
+        try:
+            await self._update_advs_models()
+        except Exception as exc:
+            raise AutoUpdateTargetPlaceError from exc
+
         advs = self._adv_settings
 
         from .modules.auto_updater_target_place.auto_updater_target_place import (
@@ -571,8 +586,18 @@ class WBShop:
         common_stat_data_manager = CommonAdvsStatDataManager()
         for adv in advs:
             if adv.auto_update_target_place:
-                keywords = await self.get_calculated_keywords(adv.adv_id)
-                stat_data = await common_stat_data_manager.get_data(adv, keywords, 2)
+                try:
+                    keywords = await self.get_calculated_keywords(adv.adv_id)
+                except Exception as exc:
+                    raise AutoUpdateTargetPlaceError from exc
+
+                try:
+                    stat_data = await common_stat_data_manager.get_data(
+                        adv, keywords, 2
+                    )
+                except Exception as exc:
+                    raise AutoUpdateTargetPlaceError from exc
+
                 mean_price_for_order_for_two_days = stat_data.mean_price_for_order
                 mean_orders_for_last_two_days = stat_data.mean_orders_for_last_days
                 if mean_price_for_order_for_two_days and mean_orders_for_last_two_days:
@@ -586,7 +611,10 @@ class WBShop:
                     )
                     tasks.append(task)
         if tasks:
-            await asyncio.gather(*tasks)
+            try:
+                await asyncio.gather(*tasks)
+            except Exception as exc:
+                raise AutoUpdateTargetPlaceError from exc
 
     async def run(self) -> None:
         while True:

@@ -8,3 +8,7 @@ class FullAdvStatUpdateCriticalError(Exception):
     """Exception raised when full adv stat update fails."""
 
     pass
+
+
+class AutoUpdateTargetPlaceError(Exception):
+    pass
