@@ -512,7 +512,11 @@ class WBShop:
         Returns:
             None
         """
-        await self._update_advs_models()
+        try:
+            await self._update_advs_models()
+        except Exception as exc:
+            raise AutoUpdateWhiteListFatalError from exc
+
         advs = self._adv_settings
 
         from .modules.auto_white_list_updater import WhiteListDeleteManager
@@ -522,13 +526,20 @@ class WBShop:
         tasks = []
         for adv in advs:
             if adv.auto_update_white_list:
-                keywords = await self.get_calculated_keywords(adv.adv_id)
+                try:
+                    keywords = await self.get_calculated_keywords(adv.adv_id)
+                except Exception as exc:
+                    raise AutoUpdateWhiteListFatalError from exc
+
                 task = asyncio.create_task(
                     update_manager.auto_update_phrases_in_white_list(adv, keywords)
                 )
                 tasks.append(task)
         if tasks:
-            await asyncio.gather(*tasks)
+            try:
+                await asyncio.gather(*tasks)
+            except Exception as exc:
+                raise AutoUpdateWhiteListFatalError from exc
 
     async def update_phrases_in_white_list_run(self) -> None:
         while True:
