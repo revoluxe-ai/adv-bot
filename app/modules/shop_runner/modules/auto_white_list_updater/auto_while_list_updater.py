@@ -89,7 +89,7 @@ class WhiteListDeleteManager:
             common_stat_data_manager = CommonAdvsStatDataManager()
             stat_data = await common_stat_data_manager.get_data(adv, keywords, 2)
             mean_price_for_order_for_two_days = stat_data.mean_price_for_order
-            mean_orders_for_last_two_days = stat_data.all_orders_for_last_days
+            mean_orders_for_last_two_days = stat_data.mean_orders_for_last_days
             if (
                 mean_orders_for_last_two_days < adv.plan_for_sales_for_day
                 and mean_price_for_order_for_two_days < adv.max_price_for_order
