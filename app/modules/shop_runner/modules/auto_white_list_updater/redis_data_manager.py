@@ -26,7 +26,7 @@ class LastAddingToWhiteListRedisData(BaseRedis):
 
     @staticmethod
     def _get_key(adv: AdvSetting) -> str:
-        return f"white_list:add:{adv.id}"
+        return f"white_list:add:{adv.adv_id}"
 
     async def get_last_adding_to_white_list(
         self, adv: AdvSetting
