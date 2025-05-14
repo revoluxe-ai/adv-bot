@@ -37,6 +37,14 @@ class WhiteListUpdateManager:
     async def auto_update_phrases_in_white_list(
         self, adv: AdvSetting, keywords: list[CalculatedKeyword]
     ) -> None:
+        try:
+            return await self._auto_update_phrases_in_white_list(adv, keywords)
+        except Exception as exc:
+            raise AutoUpdateWhiteListFatalError from exc
+
+    async def _auto_update_phrases_in_white_list(
+        self, adv: AdvSetting, keywords: list[CalculatedKeyword]
+    ) -> None:
         """Основная функция"""
 
         if not keywords:
