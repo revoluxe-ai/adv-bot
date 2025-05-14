@@ -10,7 +10,6 @@ from .parsing_task import ParsingTask
 from ...core.redis_manager.base_redis_manager import BaseRedis
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 class GlobalParsingQueueManager(BaseRedis):
