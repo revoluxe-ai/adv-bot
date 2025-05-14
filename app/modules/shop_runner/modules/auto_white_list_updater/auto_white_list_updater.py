@@ -90,7 +90,6 @@ class WhiteListUpdateManager:
 
         if not max_pay_for_order:
             return None
-
         if fact_mean_pay_for_order < max_pay_for_order:
             stat_data = await self._common_stat_data_manager.get_data(adv, keywords, 2)
             mean_price_for_order_for_two_days = stat_data.mean_price_for_order
@@ -102,26 +101,40 @@ class WhiteListUpdateManager:
                 and mean_price_for_order_for_two_days < adv.max_price_for_order
             ):
                 await self._add_phrase_to_white_list(adv, keywords)
-            return None
+                return None
+            elif mean_price_for_order_for_two_days > adv.max_price_for_order:
+                await self.__check_spend_and_delete_phrase_from_white_list(
+                    adv, keywords
+                )
+            else:
+                return None
 
-        """Здесь уже есть превышение расхода, нужно проверить прошел ли новый расход для нового ключа"""
-        last_spend_sum: float | None = (
-            await self.redis_manager.delete_key_data.get_last_spend_sum(auto_adv_id)
+        await self.__check_spend_and_delete_phrase_from_white_list(adv, keywords)
+        return None
+
+    async def __check_spend_and_delete_phrase_from_white_list(
+        self, adv: AdvSetting, keywords: list[CalculatedKeyword]
+    ) -> None:
+        """Проверяет расход и удаляет фразу при необходимости"""
+        auto_adv_id = adv.adv_id
+        auction_adv_id = adv.auction_adv_id
+
+        # Получаем текущие значения расходов
+        last_spend_sum = await self.redis_manager.delete_key_data.get_last_spend_sum(
+            auto_adv_id
         )
-        sum_spend_now: float = await click_house_manager.get_sum_spend_for_complex_adv(
+        sum_spend_now = await click_house_manager.get_sum_spend_for_complex_adv(
             auto_adv_id, auction_adv_id
         )
-        if last_spend_sum:
-            max_spend_diff: float = self._get_max_spend_diff(adv)
 
-            if sum_spend_now - last_spend_sum < max_spend_diff:
-                return None
-            else:
-                await self._delete_last_white_phrase(adv, keywords, sum_spend_now)
-                return None
-        else:
+        # Проверяем условия для удаления
+        should_delete = not last_spend_sum or (  # Если нет данных о прошлых расходах
+            sum_spend_now - last_spend_sum
+        ) >= self._get_max_spend_diff(adv)
+
+        if should_delete:
             await self._delete_last_white_phrase(adv, keywords, sum_spend_now)
-            return None
+        return None
 
     @staticmethod
     def _get_max_spend_diff(adv: AdvSetting) -> float:
