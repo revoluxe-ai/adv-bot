@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -29,14 +28,13 @@ from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
 from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import (
     SettingAuctionBoostMode,
 )
-from app.modules.shop_runner.modules.auto_updater_target_place import (
+from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
     AutoUpdateTargetPlaceSettingCallBack,
 )
-from app.modules.shop_runner.modules.auto_white_list_updater.telegram.callbacks import (
-    RelevantKeywordStatusSetting,
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
     AutoUpdateWhiteListSetting,
+    RelevantKeywordStatusSetting,
 )
-from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
@@ -359,16 +357,13 @@ def get_advs_keyboard_with_paginator(
     keyboard_buttons = []
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
-    loop = asyncio.get_event_loop()
     filtred_advs = []
     for adv in adv_settings:
         if adv.active_status == "done" and adv.bot_active or adv.type == 8:
             filtred_advs.append(adv)
     adv_settings = filtred_advs
     for adv in adv_settings[start_index:end_index]:
-        check_last_24_hours = loop.run_until_complete(
-            redis_manager.check_last_24_hours(adv.id)
-        )
+        check_last_24_hours = adv.check_last_24_hours
         check_text = "✅" if check_last_24_hours else "❓"
         button_text = (
             f'{"(" + str(adv.worst_promo_position) + ")" if adv.worst_promo_position else ""}{check_text} {adv.name} (Бот включен)'

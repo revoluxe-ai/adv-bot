@@ -2,14 +2,13 @@ from arq import create_pool
 from app.modules.balance_manager import balance_service
 from app.arq_workers.arq_redis_settings import arq_redis_settings
 from . import messages
-from aiogram import Bot
+from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy import select
 from app.client_bot.user_interface.handlers.start import start_registration
 from app.utils.db.session_maker import get_async_session_maker as sm
-from app import ao
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from ..into_callback import CreateNewAdvs as CreateNewAdvsCallbackData
 from .states import CreateCompamyStates as states
@@ -18,7 +17,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = ao.Router()
+router = Router()
 
 
 def extract_nmid_list(input_text):
@@ -32,10 +31,10 @@ def extract_nmid_from_file(file_content):
 
 
 @router.callback_query(CreateNewAdvsCallbackData.filter())
-async def create_new_adv(callback: ao.CallbackQuery,
+async def create_new_adv(callback: CallbackQuery,
                          callback_data: CreateNewAdvsCallbackData,
-                         bot: ao.Bot,
-                         state: ao.FSMContext) -> None:
+                         bot: Bot,
+                         state: FSMContext) -> None:
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with (sm() as session):
         stmt = select(WBCabinet.id)\

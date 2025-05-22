@@ -7,14 +7,11 @@ from sqlalchemy import select
 from app.utils.db.session_maker import get_async_session_maker
 from . import models
 from . import wb_db_manager
-
-if typing.TYPE_CHECKING:
-    from app.modules.common_slaves.wildberries.super_cabinet_manager import (
-        WBCabinetAccess,
-    )
-from app.modules.common_slaves.wildberries.api import WBApi
 from .data_classes.adv import Adv
 from .models import WBCabinet
+
+if typing.TYPE_CHECKING:
+    from ...shop_runner.modules.wb_api import WBApi
 
 sm = get_async_session_maker
 
@@ -47,9 +44,11 @@ class ShopDataUpdater:
     def __repr__(self):
         return f"{self.wb_cabinet.shop_id}"
 
-    def __init__(self, wb_access: "WBCabinetAccess"):
-        self.wb_api = WBApi(wb_access)
-        self.wb_cabinet: WBCabinet = wb_access.wb_cabinet
+    def __init__(self, wb_api: "WBApi"):
+        self.wb_api = wb_api
+        wb_cabinet = wb_api.wb_cabinet
+        assert wb_cabinet, "Нет кабинета"
+        self.wb_cabinet: WBCabinet = wb_cabinet
         pass
 
     async def quick_update_all_data(self):
@@ -57,8 +56,8 @@ class ShopDataUpdater:
 
     async def __quick_update_advs(self):
         wb_api = self.wb_api
-        advert_api = wb_api.advert
-        adv_ids: list[Adv] = await advert_api.get_advertIds()
+        advert_api = wb_api
+        adv_ids: list[int] = await advert_api.get_advertIds()
         async with sm() as session:
             stmt = select(models.AdvSetting).where(
                 models.AdvSetting.adv_id.in_(adv_ids)
@@ -74,7 +73,7 @@ class ShopDataUpdater:
 
     async def __quick_update_advs_in_db(self, adv_ids: set[int]):
         wb_api = self.wb_api
-        advs = await wb_api.advert.get_advs(list(adv_ids))
+        advs = await wb_api.get_advs(list(adv_ids))
         nmids_collection = set()
         async with sm() as session:
             await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id, session)
@@ -83,13 +82,13 @@ class ShopDataUpdater:
                 if nmids:
                     for nmid in nmids:
                         nmids_collection.add(nmid)
-            cards = await wb_api.content.get_all_cards()
+            cards = await wb_api.get_all_cards()
             await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet, session)
 
     async def update_advs_data(self) -> list[Adv]:
         logger.debug(f"Обновление данных для кабинета {self.wb_cabinet.shop_id}")
         wb_api: WBApi = self.wb_api
-        advert_api = wb_api.advert
+        advert_api = wb_api
         adv_ids: list[int] = await advert_api.get_advertIds()
         if not adv_ids:
             return []
@@ -102,7 +101,7 @@ class ShopDataUpdater:
 
     async def update_cards_data(self) -> None:
         wb_api = self.wb_api
-        cards = await wb_api.content.get_all_cards()
+        cards = await wb_api.get_all_cards()
         async with sm() as session:
             await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet, session)
         logger.debug(f"Обновление карточек в базе завершено")

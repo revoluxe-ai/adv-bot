@@ -5,9 +5,6 @@ from aiogram import Bot
 
 from app.core.wb_api.data_classes.advs.base_adv import Adv
 from app.modules.adv_creator.backend import MainAdvManager
-from app.modules.shop_runner.modules.auto_white_list_updater.test_white_list_updater import (
-    adv_setting_mock,
-)
 
 
 @pytest.fixture

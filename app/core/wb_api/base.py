@@ -30,6 +30,7 @@ class BaseAPI:
         self._headers = Headers(current_token)
         self._shop_id = current_token.shop_id
         self.api_call_state: dict[str, dict[str, str]] = {}
+        self.wb_cabinet = wb_access.wb_cabinet
 
     @property
     def headers(self) -> Headers:

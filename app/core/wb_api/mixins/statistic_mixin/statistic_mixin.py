@@ -1,15 +1,18 @@
 import json
-import aiohttp
-from app.core.wb_api.http_request import try_except_decorator, requests
 from datetime import datetime, timedelta
+
+import aiohttp
+
+from app.core.wb_api.http_request import try_except_decorator, requests
 from .wb_statistic_obj import CommonStat
-from ...base import BaseAPI
+from ...protocols import WBAPIProtocol
+
+PREFIX = "https://seller-analytics-api"
 
 
-class CommonStatMinix(BaseAPI):
+class CommonStatMinix(WBAPIProtocol):
 
-    HOST = 'https://seller-analytics-api.wildberries.ru'
-
+    HOST = "wildberries.ru"
 
     @try_except_decorator(1, 60)
     async def _get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int):
@@ -34,36 +37,40 @@ class CommonStatMinix(BaseAPI):
                 "end": end_date.isoformat(),
             },
             "timezone": "Europe/Moscow",
-            "aggregationLevel": "day"
+            "aggregationLevel": "day",
         }
 
-        url = f'{self.HOST}/api/v2/nm-report/detail/history'
+        url = f"{PREFIX}.{self.HOST}/api/v2/nm-report/detail/history"
 
         async with aiohttp.ClientSession() as session:
-            response = await requests(session, 'POST', url=url,
-
-                                      json_data=data_for_req,
-                                      headers=self.headers.standart)
+            response = await requests(
+                session,
+                "POST",
+                url=url,
+                json_data=data_for_req,
+                headers=self.headers.standart,
+            )
 
             response = json.loads(response)
             stats = []
-            for data in response['data']:
-                for history in data['history']:
-                    date = datetime.strptime(history['dt'], '%Y-%m-%d')
+            for data in response["data"]:
+                for history in data["history"]:
+                    date = datetime.strptime(history["dt"], "%Y-%m-%d")
                     stat = CommonStat(
-                        nmid=data['nmID'],
+                        nmid=data["nmID"],
                         date=date,
-                        open_card=history['openCardCount'],
-                        add_to_cart=history['addToCartCount'],
-                        orders=history['ordersCount'],
-                        orders_sum=history['ordersSumRub'],
-                        buy_outs=history['buyoutsCount'],
-                        )
+                        open_card=history["openCardCount"],
+                        add_to_cart=history["addToCartCount"],
+                        orders=history["ordersCount"],
+                        orders_sum=history["ordersSumRub"],
+                        buy_outs=history["buyoutsCount"],
+                    )
                     stats.append(stat)
         return stats
 
-
-    async def get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int) -> list[CommonStat]:
+    async def get_cards_stats_by_days(
+        self, nmIDs: list[int], pass_days: int
+    ) -> list[CommonStat]:
         """
         Разбивает запрос на несколько частей, если nmIDs больше 20, и вызывает _get_cards_stats_by_days.
 
@@ -77,8 +84,10 @@ class CommonStatMinix(BaseAPI):
 
         # Разделение nmIDs на части по 20 товаров
         for i in range(0, len(nmIDs), part):
-            part_nmids = nmIDs[i:i + part]
-            result: list[CommonStat] = await self._get_cards_stats_by_days(part_nmids, pass_days)
+            part_nmids = nmIDs[i : i + part]
+            result: list[CommonStat] = await self._get_cards_stats_by_days(
+                part_nmids, pass_days
+            )
             results.extend(result)
 
         return results

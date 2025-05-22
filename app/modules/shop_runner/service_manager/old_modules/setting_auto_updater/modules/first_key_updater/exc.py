@@ -1,0 +1,2 @@
+﻿class FirstKeyUpdaterError(Exception):
+    pass

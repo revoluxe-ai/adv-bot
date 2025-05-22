@@ -1,9 +1,14 @@
-from .utils.redis_func_cache import set_config
-set_config()
+import sys
+
+if sys.platform != "win32":
+    import uvloop
+
+    uvloop.install()
 
 
-from app.modules.common_slaves.wildberries import exceptions as exc
-# from app.modules.wb_adv_updater import wb_manager
-from app.core.telegram import aiogram_objects as ao
-
-
+async def run() -> None:
+    while True:
+        try:
+            await app.run()
+        except AdvBotMainLoopCriticalError as exc:
+            logge

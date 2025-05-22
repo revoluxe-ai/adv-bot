@@ -68,7 +68,12 @@ class SmallFullAdvStatPerDay:
     spend: float
     added_to_cart: int
     orders: int
-    sum_price: float
+    sum_price: float  # deprecated
+
+    @property
+    def mean_pay_for_order(self) -> float:
+        orders = max(self.orders, 1)
+        return self.spend / orders
 
 
 @dataclass

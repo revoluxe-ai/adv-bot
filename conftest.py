@@ -35,9 +35,15 @@ def tokens_mock() -> list[MagicMock]:
 
 
 @pytest.fixture
-def access_mock(tokens_mock):
+def wb_cabinet_mock() -> MagicMock():
+    return MagicMock()
+
+
+@pytest.fixture
+def access_mock(tokens_mock, wb_cabinet_mock):
     access_mock = MagicMock(spec=WBCabinetAccess)
     access_mock.tokens = tokens_mock
+    access_mock.wb_cabinet = wb_cabinet_mock
     return access_mock
 
 
@@ -65,29 +71,49 @@ def get_async_session_mock(session_mock) -> MagicMock:
     return get_session_maker_mock
 
 
-@pytest.fixture
+from pytest import fixture
+from unittest.mock import MagicMock
+
+
+@fixture
 def keywords_mocks() -> list[MagicMock]:
-    keyword_1 = MagicMock(spec=CalculatedKeyword)
-    keyword_1.best_keyword_status = True
-    keyword_1.baes_ctr = 0.5
-    keyword_1.hard_status = 2
-    keyword_1.spend = 100
+    """Фикстура для генерации моков CalculatedKeyword с заданными параметрами"""
+    keyword_params = [
+        {
+            "best_keyword_status": True,
+            "baes_ctr": 0.5,
+            "hard_status": 2,
+            "spend": 100,
+            "relevant": True,
+        },
+        {
+            "best_keyword_status": False,
+            "baes_ctr": 0.2,
+            "hard_status": 2,
+            "spend": 10,
+            "relevant": False,
+        },
+        {
+            "best_keyword_status": False,
+            "baes_ctr": 0.1,
+            "hard_status": 2,
+            "spend": 40,
+            "relevant": True,
+        },
+        {
+            "best_keyword_status": False,
+            "baes_ctr": 0.4,
+            "hard_status": 1,
+            "spend": 0,
+            "relevant": False,
+        },
+    ]
 
-    keyword_2 = MagicMock(spec=CalculatedKeyword)
-    keyword_2.best_keyword_status = False
-    keyword_2.baes_ctr = 0.2
-    keyword_2.hard_status = 2
-    keyword_2.spend = 10
+    mocks = []
+    for params in keyword_params:
+        mock = MagicMock(spec=CalculatedKeyword)
+        for key, value in params.items():
+            setattr(mock, key, value)
+        mocks.append(mock)
 
-    keyword_3 = MagicMock(spec=CalculatedKeyword)
-    keyword_3.best_keyword_status = False
-    keyword_3.baes_ctr = 0.1
-    keyword_3.hard_status = 2
-    keyword_3.spend = 40
-
-    keyword_4 = MagicMock(spec=CalculatedKeyword)
-    keyword_4.best_keyword_status = False
-    keyword_4.baes_ctr = 0.4
-    keyword_4.hard_status = 1
-    keyword_4.spend = 0
-    return [keyword_1, keyword_2, keyword_3, keyword_4]
+    return mocks

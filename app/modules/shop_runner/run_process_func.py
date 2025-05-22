@@ -3,50 +3,40 @@ from asyncio import Task
 
 from sqlalchemy import select
 
+from app.core.wb_api.exceptions import ApiForbiddenError
+from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
-from app.modules.shop_runner.exceptions import ShopRunnerCriticalError
+from app.modules.shop_runner.modules.wb_api import WBApi
+from app.modules.shop_runner.service_manager.while_coroutines_decorator import (
+    MainCoroutineRuntimeError,
+)
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
-
-
 import asyncio
 
 
-async def run_shop(shop_id: str, wb_cabinet_original_id: int) -> None:
-    logger.debug(
-        f"Запускаю асинхронную функцию старта обновления магазина с shop_id: {shop_id}"
-    )
-    await _run_shop_async(shop_id, wb_cabinet_original_id)
-
-
-async def _run_shop_async(shop_id: str, wb_cabinet_original_id: int) -> None:
-    wb_shop = WBShop(shop_id, wb_cabinet_original_id)
+async def run_shop_task(shop_id: str) -> None:
     while True:
         try:
+            access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
+            wb_api = WBApi(access)
+            wb_shop = WBShop(wb_api)
             await wb_shop.run()
-        except Exception as e:
-            logger.error(f"Ошибка в процессе обновления магазина: {e}", exc_info=True)
-        finally:
-            await asyncio.sleep(15)
+        except MainCoroutineRuntimeError as exc:
+            logger.error(f"Ошибка обработки магазина {shop_id}, {exc}", exc_info=True)
+            await asyncio.sleep(1)
+        except ApiForbiddenError as exc:
+            logger.error(f"Нет доступов в магазин {shop_id} с активными РК {exc}")
+            return None
 
 
-async def run_shop_task(shop_id: str, wb_cabinet_original_id: int) -> None:
-    while True:
-        try:
-            await run_shop(shop_id, wb_cabinet_original_id)
-        except Exception as e:
-            logger.error(f"Ошибка в процессе обновления магазина: {e}", exc_info=True)
-        finally:
-            await asyncio.sleep(15)
-
-
-async def __shop_update(active_tasks: dict[str, Task[None]]) -> None:
+async def _update_tasks(active_tasks: dict[str, Task[None]]) -> None:
     # Получение списка магазинов с активными настройками
     stmt = (
-        select(WBCabinet.shop_id, WBCabinet.id)
+        select(WBCabinet.shop_id)
         .distinct()
         .join(WBCabinet.adv_settings)
         .filter(
@@ -61,43 +51,51 @@ async def __shop_update(active_tasks: dict[str, Task[None]]) -> None:
     async with sm() as session:
         result = await session.execute(stmt)
         data_rows = result.all()
-    all_shop_ids = []
+    all_needs_for_run_shop_ids = []
     for row in data_rows:
         shop_id = row[0]
-        all_shop_ids.append(shop_id)
-        wb_cabinet_original_id = row[1]
+        all_needs_for_run_shop_ids.append(shop_id)
         if shop_id not in active_tasks:
             # Создание асинхронной задачи
-            task = asyncio.create_task(run_shop_task(shop_id, wb_cabinet_original_id))
+            task = asyncio.create_task(run_shop_task(shop_id))
             active_tasks[shop_id] = task
             logger.debug(f"Процесс обновления магазина {shop_id} запущен")
             await asyncio.sleep(1)
 
-    # Завершение задач для неактуальных магазинов
-    for shop_id in list(active_tasks.keys()):
+        else:
+            task = active_tasks[shop_id]
+            if task.done():
+                if exc := task.exception():
+                    logger.error(
+                        f"Не обработанная ошибка выполнения задачи магазина: {exc}"
+                    )
+                del active_tasks[shop_id]
+
+        await asyncio.sleep(0.1)
+
+    all_shop_ids = tuple(list(active_tasks.keys()))
+    for shop_id in all_shop_ids:
         if shop_id not in all_shop_ids:
             task = active_tasks.pop(shop_id)
             if not task.done():
                 task.cancel()
                 logger.debug(f"Обновление магазина {shop_id} остановлено")
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.1)
 
 
-async def shop_update_run() -> None:
+async def run() -> None:
     active_tasks: dict[str, Task[None]] = {}
+    import redis
+
     while True:
         try:
-            await __shop_update(active_tasks)
-        except ShopRunnerCriticalError as e:
-            raise e
-        except Exception as e:
-            logger.error(f"Ошибка цикла постановки задач {e}", exc_info=True)
-            await asyncio.sleep(15)
-
-
-def run() -> None:
-    try:
-        asyncio.run(shop_update_run())
-    except Exception as e:
-        logger.error(f"Необработанная ошибка: {e}", exc_info=True)
-        raise ShopRunnerCriticalError from e
+            await _update_tasks(active_tasks)
+            await asyncio.sleep(60)
+        except redis.exceptions.BusyLoadingError:
+            logger.warning("Редис еще не загрузилась")
+            await asyncio.sleep(15 * 60)
+            continue
+        except Exception as exc:
+            logger.error(
+                f"Ошибка обработки задач обновления магазина: {exc}", exc_info=True
+            )

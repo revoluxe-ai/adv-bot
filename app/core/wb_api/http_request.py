@@ -115,6 +115,7 @@ def try_except_decorator(
                     ServerDisconnectedError,
                     ClientResponseError,
                     ClientConnectionError,
+                    NotMatchWBApiError,
                 ) as e:
                     if state["_attempts"] >= max_attempts:
                         raise e

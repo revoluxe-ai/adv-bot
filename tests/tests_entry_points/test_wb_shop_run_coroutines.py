@@ -18,11 +18,11 @@ async def test_wb_shop_run_calls_all_coroutines():
 
     # Мокируем все методы, которые должны вызываться из _run
     wb_shop._update_access = AsyncMock()
-    wb_shop.parsing_keywords_run = AsyncMock()
-    wb_shop.update_advs_data_from_wb_to_pg = AsyncMock()
-    wb_shop.update_cards_data_from_wb_to_pf = AsyncMock()
-    wb_shop.update_cpm_run = AsyncMock()
-    wb_shop.update_common_sale_stat = AsyncMock()
+    wb_shop._parsing_keywords_run = AsyncMock()
+    wb_shop._update_advs_data_from_wb_to_pg = AsyncMock()
+    wb_shop._update_cards_data_from_wb_to_pf = AsyncMock()
+    wb_shop._update_cpm_run = AsyncMock()
+    wb_shop._update_common_sale_stat = AsyncMock()
     wb_shop.update_full_adv_stat = AsyncMock()
 
     # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
@@ -41,11 +41,11 @@ async def test_wb_shop_run_calls_all_coroutines():
         # wb_shop._update_access.assert_called_once()
 
         # Проверяем, что все ожидаемые корутины были вызваны
-        wb_shop.parsing_keywords_run.assert_called_once()
-        wb_shop.update_advs_data_from_wb_to_pg.assert_called_once()
-        wb_shop.update_cards_data_from_wb_to_pf.assert_called_once()
-        wb_shop.update_cpm_run.assert_called_once()
-        wb_shop.update_common_sale_stat.assert_called_once()
+        wb_shop._parsing_keywords_run.assert_called_once()
+        wb_shop._update_advs_data_from_wb_to_pg.assert_called_once()
+        wb_shop._update_cards_data_from_wb_to_pf.assert_called_once()
+        wb_shop._update_cpm_run.assert_called_once()
+        wb_shop._update_common_sale_stat.assert_called_once()
         wb_shop.update_full_adv_stat.assert_called_once()
 
 
@@ -61,11 +61,11 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
     wb_shop = WBShop(shop_id, wb_cabinet_original_id)
 
     # Мокируем все методы, которые должны вызываться из _run
-    wb_shop.parsing_keywords_run = AsyncMock()
-    wb_shop.update_advs_data_from_wb_to_pg = AsyncMock()
-    wb_shop.update_cards_data_from_wb_to_pf = AsyncMock()
-    wb_shop.update_cpm_run = AsyncMock()
-    wb_shop.update_common_sale_stat = AsyncMock()
+    wb_shop._parsing_keywords_run = AsyncMock()
+    wb_shop._update_advs_data_from_wb_to_pg = AsyncMock()
+    wb_shop._update_cards_data_from_wb_to_pf = AsyncMock()
+    wb_shop._update_cpm_run = AsyncMock()
+    wb_shop._update_common_sale_stat = AsyncMock()
     wb_shop.update_full_adv_stat = AsyncMock()
 
     # Мокируем asyncio.gather для проверки количества аргументов
@@ -88,11 +88,11 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
         ), f"asyncio.gather должен быть вызван с 6 аргументами, получено {len(call_args)}"
 
         # Проверяем, что все методы были вызваны по одному разу
-        wb_shop.parsing_keywords_run.assert_called_once()
-        wb_shop.update_advs_data_from_wb_to_pg.assert_called_once()
-        wb_shop.update_cards_data_from_wb_to_pf.assert_called_once()
-        wb_shop.update_cpm_run.assert_called_once()
-        wb_shop.update_common_sale_stat.assert_called_once()
+        wb_shop._parsing_keywords_run.assert_called_once()
+        wb_shop._update_advs_data_from_wb_to_pg.assert_called_once()
+        wb_shop._update_cards_data_from_wb_to_pf.assert_called_once()
+        wb_shop._update_cpm_run.assert_called_once()
+        wb_shop._update_common_sale_stat.assert_called_once()
         wb_shop.update_full_adv_stat.assert_called_once()
 
 
@@ -108,11 +108,11 @@ async def test_wb_shop_run_coroutines_without_errors_for_one_minute():
     wb_shop = WBShop(shop_id, wb_cabinet_original_id)
 
     # Мокируем все методы, которые должны вызываться из _run
-    wb_shop.parsing_keywords_run = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop.update_advs_data_from_wb_to_pg = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop.update_cards_data_from_wb_to_pf = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop.update_cpm_run = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop.update_common_sale_stat = AsyncMock(side_effect=mock_infinite_run)
+    wb_shop._parsing_keywords_run = AsyncMock(side_effect=mock_infinite_run)
+    wb_shop._update_advs_data_from_wb_to_pg = AsyncMock(side_effect=mock_infinite_run)
+    wb_shop._update_cards_data_from_wb_to_pf = AsyncMock(side_effect=mock_infinite_run)
+    wb_shop._update_cpm_run = AsyncMock(side_effect=mock_infinite_run)
+    wb_shop._update_common_sale_stat = AsyncMock(side_effect=mock_infinite_run)
     wb_shop.update_full_adv_stat = AsyncMock(side_effect=mock_infinite_run)
 
     # Запускаем _run и ждем минуту
