@@ -639,9 +639,12 @@ async def get_good_bad_phrases_for_min_ctr(
         keyword_stats = await convert_keyword_stats_in_clusters(keyword_stats)
         logger.debug("В кластеры сконвертировали")
     logger.debug("Начинаю установку позиций")
-    keyword_stats: list[CalculatedKeyword] = await set_positions(
-        keyword_stats, adv_setting
-    )
+    try:
+        keyword_stats: list[CalculatedKeyword] = await set_positions(
+            keyword_stats, adv_setting
+        )
+    except Exception as exc:
+        raise exc
     async with _sm(read_only=False) as session:  # type: AsyncSession
         for keyword_stat in keyword_stats:
             keyword_text = keyword_stat.text

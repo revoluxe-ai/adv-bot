@@ -1,4 +1,5 @@
 from abc import ABC
+from asyncio import Protocol
 
 import redis
 
@@ -13,23 +14,8 @@ class BaseRedis(ABC):
         """Геттер для доступа к клиенту Redis"""
         return self._client
 
-    # @abstractmethod
-    # def _get_key(self, *args, **kwargs) -> str:
-    #     pass
-    #
-    # @abstractmethod
-    # async def get_one(self, *arg, **kwarg) -> T:
-    #     pass
 
-    # @abstractmethod
-    # async def get_many(self, *args, **kwargs) -> list[T]:
-    #     pass
-    #
-
-    # @abstractmethod
-    # async def set_one(self, *arg: Any, **kwarg: Any):
-    #     pass
-
-    # @abstractmethod
-    # async def set_many(self, objs: list[T], *arg, **kwarg):
-    #     pass
+class BaseRedisProtocol(Protocol):
+    _key: str = ...
+    prefix: str = ...
+    client: redis.asyncio.Redis

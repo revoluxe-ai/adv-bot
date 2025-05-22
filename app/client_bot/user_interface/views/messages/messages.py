@@ -42,9 +42,6 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
-from app.modules.shop_runner.modules.auto_updater_target_place import (
-    LastTargetPlaceUpdateRedisManager,
-)
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import (
     KeywordStatUpdateState,
@@ -234,9 +231,14 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         )
 
         full_stat_update_time = await self._get_last_full_stat_update(self.adv.adv_id)
-        self.full_stat_update_time = (
-            full_stat_update_time if full_stat_update_time else "Нет данных"
-        )
+        if not full_stat_update_time:
+            full_stat_update_time_str = "Нет данных"
+        else:
+            full_stat_update_time_str = full_stat_update_time.strftime(
+                "%d.%m.%Y %H:%M:%S"
+            )
+
+        self.full_stat_update_time = full_stat_update_time_str
 
         try:
             nmids = self.adv.nmids
@@ -283,57 +285,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         # self.bid_update_time: datetime  = await redis_manager.get_last_bid_update(self.adv.adv_id)
         # self.bid_update_time = self.bid_update_time.timestamp()
+        from .last_auto_update_informer import LastAutoUpdateSettingInformer
 
-        from app.modules.shop_runner.modules.auto_white_list_updater.redis_data_manager import (
-            MainRedisManager as WhiteListUpdateRedisManager,
-        )
-
-        white_list_update_redis_manager = WhiteListUpdateRedisManager()
-        result: tuple[datetime, int] | None = (
-            await white_list_update_redis_manager.adding_key_data.get_last_adding_to_white_list(
-                self.adv
-            )
-        )
-
-        if result:
-            last_adding_keyword_to_white_list, _ = result
-            last_adding_keyword_to_white_list_str = (
-                last_adding_keyword_to_white_list.strftime("%d.%m.%Y %H:%M:%S")
-            )
-        else:
-            last_adding_keyword_to_white_list_str = "Нет данных"
-
-        self.last_adding_keyword_to_white_list = last_adding_keyword_to_white_list_str
-
-        last_delete_phrase_from_white_list: datetime | None = (
-            await white_list_update_redis_manager.delete_last_datetime.get_last_delete_datetime(
-                self.adv
-            )
-        )
-
-        if last_delete_phrase_from_white_list:
-            self.last_delete_phrase_from_white_list = (
-                last_delete_phrase_from_white_list.strftime("%d.%m.%Y %H:%M:%S")
-            )
-        else:
-            self.last_delete_phrase_from_white_list = "Нет данных"
-
-        last_target_place_update_manager = LastTargetPlaceUpdateRedisManager()
-
-        last_target_place_update_result: tuple[datetime, float] | None = (
-            await last_target_place_update_manager.get_last_target_place_update(
-                self.adv
-            )
-        )
-        if not last_target_place_update_result:
-            last_target_place_update_str: str = "Нет данных"
-        else:
-            last_target_place_update, _ = last_target_place_update_result
-            last_target_place_update_str = last_target_place_update.strftime(
-                "%d.%m.%Y %H:%M:%S"
-            )
-        self.last_target_place_update_str = last_target_place_update_str
-
+        last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
+        await last_auto_setting_inform.update_data()
+        self._update_informer = last_auto_setting_inform
         return await super().__call__()
 
     @property
@@ -354,9 +310,16 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n"
             f"Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n"
             f"Последнее обновление полной статистики: {self.full_stat_update_time}\n"
-            f"Последнее автоматическое добавление ключа в белый список: {self.last_adding_keyword_to_white_list}\n"
-            f"Последнее автоматическое удаление ключа из белого списка: {self.last_delete_phrase_from_white_list}\n"
-            f"Последнее автоматическое обновление целевой позиции: {self.last_target_place_update_str}\n"
+            f"Последнее автоматическое добавление ключа в белый список:"
+            f" {self._update_informer.add_to_white_list_str}\n"
+            f"Последнее автоматическое удаление ключа из белого списка:"
+            f" {self._update_informer.delete_from_white_list_str}\n"
+            f"Последнее автоматическое повышение целевой позиции:"
+            f" {self._update_informer.up_target_place_str}\n"
+            f"Последнее автоматическое понижение целевой позиции:"
+            f" {self._update_informer.down_target_place_str}\n"
+            f"Последнее добавление верхнего ключа в БС:"
+            f" {self._update_informer.update_top_key_str}\n"
             # f'Последнее обновление ставки: {self.bid_update_time}'
         )
 

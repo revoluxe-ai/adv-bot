@@ -1,7 +1,8 @@
 import asyncio
+import datetime
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 from typing import TypeVar
 
 import aiohttp
@@ -9,6 +10,7 @@ import aiohttp
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
 from app.modules.common_slaves.wildberries.data_classes.adv import Balances
+from app.modules.full_stat_adv_updater.types import FullAdvStat
 from .excs import (
     StartAdvError,
     ItemCategoryNotInStockError,
@@ -330,3 +332,98 @@ class AdvMixin(WBAPIProtocol):
                 logger.error(
                     f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}"
                 )
+
+    @try_except_decorator(1, 60)
+    async def get_adv_full_state(
+        self, adv_ids: list[int], dates: list[datetime.datetime.date] = None
+    ) -> Optional[list[FullAdvStat]]:
+        assert [isinstance(dt, datetime.date) for dt in dates]
+        assert [isinstance(adv_id, int) for adv_id in adv_ids]
+        """Пример даты [
+  {
+    "id": 8960367,
+    "dates": [
+      "2023-10-07",
+      "2023-10-06"
+    ]
+  },
+  {
+    "id": 9876543,
+    "dates": [
+      "2023-10-07",
+      "2023-12-06"
+    ]
+  }
+       ]"""
+        dates = [date.isoformat() for date in dates]
+        url = "https://advert-api.wildberries.ru/adv/v2/fullstats"
+        query_data = []
+        for adv_id in adv_ids:
+            query_data.append({"id": adv_id, "dates": dates})
+
+        async with aiohttp.ClientSession() as session:
+            response_text = await requests(
+                session,
+                "POST",
+                url,
+                json_data=query_data,
+                headers=self.headers.standart,
+            )
+            answer = json.loads(response_text)
+            """
+
+            Пример ответа от API по полной статистики рекламы:
+            [
+            {
+            "views": 1052,
+            "clicks": 2,
+            "ctr": 0.19,
+            "cpc": 0.09,
+            "sum": 177.7,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "dates": [
+            "2023-10-07",
+            "2023-10-06"
+            ],
+            "days": [
+            {
+            "date": "2023-10-06T03:00:00+03:00",
+            "views": 414,
+            "clicks": 1,
+            "ctr": 0.24,
+            "cpc": 70,
+            "sum": 70,
+            "atbs": 0,
+            "orders": 0,
+            "cr": 0,
+            "shks": 0,
+            "sum_price": 0,
+            "apps": []
+            }
+            ],
+            "boosterStats": [
+            {
+            "date": "2023-10-07T00:00:00Z",
+            "nm": 170095908,
+            "avg_position": 348
+            }
+            ],
+            "advertId": 10524818
+            }
+            ]
+
+
+            """
+
+            full_stats = []
+            if not answer:
+                return None
+            for data in answer:
+                full_stat = FullAdvStat(**data)
+                full_stats.append(full_stat)
+
+            return full_stats

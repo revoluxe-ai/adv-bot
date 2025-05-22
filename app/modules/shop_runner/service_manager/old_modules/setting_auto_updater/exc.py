@@ -1,0 +1,2 @@
+﻿class SettingAutoUpdaterCriticalError(Exception):
+    pass

@@ -3,7 +3,8 @@
 
 """
 
-from time import sleep
+import asyncio
+import platform
 
 import dotenv
 
@@ -17,16 +18,18 @@ setup_logging()
 import logging
 
 
+system = platform.system()
+if system == "Linux":
+    import uvloop
+
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+
 logger = logging.getLogger(__name__)
 
+
 if __name__ == "__main__":
-    while True:
-        try:
-            run_process_func.run()
-        except ShopRunnerCriticalError as e:
-            raise e
-        except Exception as e:
-            logger.error(
-                f"Ошибка точки входа Нового Апдейтера магазинов {e}", exc_info=True
-            )
-            sleep(5)
+    try:
+        asyncio.run(run_process_func.run())
+    except Exception as exc:
+        raise ShopRunnerCriticalError from exc

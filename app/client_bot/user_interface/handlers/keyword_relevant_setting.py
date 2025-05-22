@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery
 from sqlalchemy import update
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
-from app.modules.shop_runner.modules.auto_white_list_updater.telegram.callbacks import (
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
     RelevantKeywordStatusSetting,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
