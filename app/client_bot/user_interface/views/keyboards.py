@@ -29,12 +29,12 @@ from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
 from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import (
     SettingAuctionBoostMode,
 )
-from app.modules.shop_runner.modules.auto_updater_target_place import (
+from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
     AutoUpdateTargetPlaceSettingCallBack,
 )
-from app.modules.shop_runner.modules.auto_white_list_updater.telegram.callbacks import (
-    RelevantKeywordStatusSetting,
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
     AutoUpdateWhiteListSetting,
+    RelevantKeywordStatusSetting,
 )
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker

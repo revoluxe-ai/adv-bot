@@ -10,5 +10,5 @@ class FullAdvStatUpdateCriticalError(Exception):
     pass
 
 
-class AutoUpdateTargetPlaceError(Exception):
+class CommonCoroutineError(Exception):
     pass

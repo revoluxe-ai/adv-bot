@@ -5,10 +5,9 @@ from typing import List, Optional
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.shop_runner.modules.wb_api import WBApi
 from app.utils.click_house.client import get_clickhouse_client
 from .types.common_card_stat import CommonCardStat
-from .wb_api import WBApi
 
 logger = logging.getLogger(__name__)
 
@@ -127,9 +126,9 @@ async def get_stats_by_days(nmid: int, last_days: int) -> list[CommonCardStat]:
 
 class WBCommonStatManager:
 
-    def __init__(self, wb_access: WBCabinetAccess):
-        self.wb_access = wb_access
-        self.wb_api = WBApi(wb_access=wb_access)
+    def __init__(self, wb_api: WBApi):
+        self.wb_api = wb_api
+        self.wb_access = wb_api.access
 
     async def update_common_statistic(self, nmids: List[int]):
         try:
@@ -145,7 +144,8 @@ class WBCommonStatManager:
         # Добавляем статистику в ClickHouse
         await self._add_common_statistic_to_clickhouse(statistics)
 
-    async def _add_common_statistic_to_clickhouse(self, statistics: List[CommonStat]):
+    @staticmethod
+    async def _add_common_statistic_to_clickhouse(statistics: List[CommonStat]):
         # Подготовка данных для вставки в таблицу
         values = [
             (

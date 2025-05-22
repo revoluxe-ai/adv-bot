@@ -14,10 +14,10 @@ from app.modules.sales_plan_settings import SalesPlanSettingsMenuRouter
 from app.modules.shop_runner.auction_boost_mode_settings import (
     AuctionBoostModeSettingsRouter,
 )
-from app.modules.shop_runner.modules.auto_updater_target_place import (
+from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
     auto_updater_target_place_setting_router,
 )
-from app.modules.shop_runner.modules.auto_white_list_updater import (
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater import (
     AutoWhiteListUpdaterRouter,
 )
 from app.modules.user_message_sender import middleware_for_adding_task

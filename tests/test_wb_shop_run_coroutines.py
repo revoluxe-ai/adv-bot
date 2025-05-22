@@ -17,12 +17,12 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
     wb_shop = WBShop(shop_id, wb_cabinet_original_id)
 
     # Мокируем все методы, которые должны вызываться из _run
-    wb_shop.parsing_keywords_run = AsyncMock()
-    wb_shop.update_advs_data_from_wb_to_pg = AsyncMock()
-    wb_shop.update_cards_data_from_wb_to_pf = AsyncMock()
-    wb_shop.update_cpm_run = AsyncMock()
-    wb_shop.update_common_sale_stat = AsyncMock()
-    wb_shop.update_full_stat_run = AsyncMock()
+    wb_shop._parsing_keywords_run = AsyncMock()
+    wb_shop._update_advs_data_from_wb_to_pg = AsyncMock()
+    wb_shop._update_cards_data_from_wb_to_pf = AsyncMock()
+    wb_shop._update_cpm_run = AsyncMock()
+    wb_shop._update_common_sale_stat = AsyncMock()
+    wb_shop._update_full_stat_run = AsyncMock()
 
     # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
     original_gather = asyncio.gather
@@ -39,12 +39,12 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
         # Проверяем, что _update_access был вызван
 
         # Проверяем, что все ожидаемые корутины были вызваны
-        wb_shop.parsing_keywords_run.assert_called_once()
-        wb_shop.update_advs_data_from_wb_to_pg.assert_called_once()
-        wb_shop.update_cards_data_from_wb_to_pf.assert_called_once()
-        wb_shop.update_cpm_run.assert_called_once()
-        wb_shop.update_common_sale_stat.assert_called_once()
-        wb_shop.update_full_stat_run.assert_called_once()
+        wb_shop._parsing_keywords_run.assert_called_once()
+        wb_shop._update_advs_data_from_wb_to_pg.assert_called_once()
+        wb_shop._update_cards_data_from_wb_to_pf.assert_called_once()
+        wb_shop._update_cpm_run.assert_called_once()
+        wb_shop._update_common_sale_stat.assert_called_once()
+        wb_shop._update_full_stat_run.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -59,12 +59,12 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
     wb_shop = WBShop(shop_id, wb_cabinet_original_id)
 
     # Мокируем все методы, которые должны вызываться из _run
-    wb_shop.parsing_keywords_run = AsyncMock()
-    wb_shop.update_advs_data_from_wb_to_pg = AsyncMock()
-    wb_shop.update_cards_data_from_wb_to_pf = AsyncMock()
-    wb_shop.update_cpm_run = AsyncMock()
-    wb_shop.update_common_sale_stat = AsyncMock()
-    wb_shop.update_full_stat_run = AsyncMock()
+    wb_shop._parsing_keywords_run = AsyncMock()
+    wb_shop._update_advs_data_from_wb_to_pg = AsyncMock()
+    wb_shop._update_cards_data_from_wb_to_pf = AsyncMock()
+    wb_shop._update_cpm_run = AsyncMock()
+    wb_shop._update_common_sale_stat = AsyncMock()
+    wb_shop._update_full_stat_run = AsyncMock()
     wb_shop.update_phrases_in_white_list_run = AsyncMock()
 
     # Мокируем asyncio.gather для проверки количества аргументов
@@ -89,10 +89,10 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
         ), f"asyncio.gather должен быть вызван с 7 аргументами, получено {len(call_args)}"
 
         # Проверяем, что все методы были вызваны по одному разу
-        wb_shop.parsing_keywords_run.assert_called_once()
-        wb_shop.update_advs_data_from_wb_to_pg.assert_called_once()
-        wb_shop.update_cards_data_from_wb_to_pf.assert_called_once()
-        wb_shop.update_cpm_run.assert_called_once()
-        wb_shop.update_common_sale_stat.assert_called_once()
-        wb_shop.update_full_stat_run.assert_called_once()
+        wb_shop._parsing_keywords_run.assert_called_once()
+        wb_shop._update_advs_data_from_wb_to_pg.assert_called_once()
+        wb_shop._update_cards_data_from_wb_to_pf.assert_called_once()
+        wb_shop._update_cpm_run.assert_called_once()
+        wb_shop._update_common_sale_stat.assert_called_once()
+        wb_shop._update_full_stat_run.assert_called_once()
         wb_shop.update_phrases_in_white_list_run.assert_called_once()

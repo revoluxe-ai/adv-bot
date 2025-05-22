@@ -12,7 +12,7 @@ from app.client_bot.user_interface.views.messages import KeywordGraphicPart_1
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
 )
-from app.modules.common_advs_stat import CommonAdvsStatDataManager
+from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -99,7 +99,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         # Получаем данные через CommonAdvsStatDataManager
         common_stat_data_manager = CommonAdvsStatDataManager()
-        stat_data = await common_stat_data_manager.get_data(
+        stat_data: CommonAdvsStatData = await common_stat_data_manager.get_data(
             self._adv_setting, self._keywords, 2
         )
 
