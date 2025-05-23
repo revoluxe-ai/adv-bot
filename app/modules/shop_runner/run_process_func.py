@@ -7,9 +7,7 @@ from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.modules.shop_runner.modules.wb_api import WBApi
-from app.modules.shop_runner.service_manager.while_coroutines_decorator import (
-    MainCoroutineRuntimeError,
-)
+from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -25,12 +23,11 @@ async def run_shop_task(shop_id: str) -> None:
             wb_api = WBApi(access)
             wb_shop = WBShop(wb_api)
             await wb_shop.run()
-        except MainCoroutineRuntimeError as exc:
+        except (NotFoundActiveAdvCompany, ApiForbiddenError):
+            return None
+        except Exception as exc:
             logger.error(f"Ошибка обработки магазина {shop_id}, {exc}", exc_info=True)
             await asyncio.sleep(1)
-        except ApiForbiddenError as exc:
-            logger.error(f"Нет доступов в магазин {shop_id} с активными РК {exc}")
-            return None
 
 
 async def _update_tasks(active_tasks: dict[str, Task[None]]) -> None:
@@ -97,6 +94,6 @@ async def run() -> None:
             continue
         except Exception as exc:
             logger.error(
-                f"Ошибка обработки задач обновления магазина: {exc}", exc_info=True
+                f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
             )
             raise exc

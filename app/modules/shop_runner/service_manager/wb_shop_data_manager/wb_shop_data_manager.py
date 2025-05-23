@@ -6,6 +6,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
 )
@@ -41,4 +42,6 @@ class WBShopDataManager:
             result = await session.execute(stmt)
             advs: Sequence[AdvSetting] = result.scalars().all()
         adv_settings_list = list(advs)
+        if not adv_settings_list:
+            raise NotFoundActiveAdvCompany("Нет активных кампаний")
         return adv_settings_list
