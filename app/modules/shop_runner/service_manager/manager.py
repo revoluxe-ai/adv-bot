@@ -57,6 +57,7 @@ class CoroutinesManager:
 
     def __init__(self, wb_api: WBApi):
         wb_cabinet = wb_api.wb_cabinet
+        assert wb_cabinet
         self._wb_shop_data_manager = WBShopDataManager(wb_cabinet)
 
         self._wb_api = wb_api
@@ -72,7 +73,7 @@ class CoroutinesManager:
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
             return None
-        adv_settings = [adv for adv in self._adv_settings_list if adv.bidder_active]
+        adv_settings = [adv for adv in adv_settings if adv.bidder_active]
         if not adv_settings:
             return None
         logger.debug(f"Обновляю ставки для магазина {self.shop_id}")
@@ -289,7 +290,6 @@ class CoroutinesManager:
             await self._wb_shop_data_manager.get_active_advs()
         )
         tasks = []
-
         for adv in all_active_advs:
             if not adv.auto_update_white_list:
                 continue

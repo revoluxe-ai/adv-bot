@@ -4,6 +4,7 @@ from functools import wraps
 from typing import ParamSpec, TypeVar, Callable, Awaitable
 
 from app.core.wb_api.exceptions import ApiForbiddenError
+from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ def while_coroutine_decorator(
                     await asyncio.sleep(pause_on_success)
                     continue
                 except (NotFoundActiveAdvCompany, ApiForbiddenError) as exc:
-                    raise exc
+                    raise StopShopUpdateException from exc
                 except Exception as exc:
                     logger.error(f"Ошибка: {exc}", exc_info=True)
                     await asyncio.sleep(pause_on_error)

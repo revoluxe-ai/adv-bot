@@ -1,13 +1,13 @@
 import logging
 from asyncio import Task
 
+import redis
 from sqlalchemy import select
 
-from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.modules.shop_runner.modules.wb_api import WBApi
-from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
+from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -23,7 +23,7 @@ async def run_shop_task(shop_id: str) -> None:
             wb_api = WBApi(access)
             wb_shop = WBShop(wb_api)
             await wb_shop.run()
-        except (NotFoundActiveAdvCompany, ApiForbiddenError):
+        except StopShopUpdateException:
             return None
         except Exception as exc:
             logger.error(f"Ошибка обработки магазина {shop_id}, {exc}", exc_info=True)
@@ -83,17 +83,9 @@ async def _update_tasks(active_tasks: dict[str, Task[None]]) -> None:
 
 async def run() -> None:
     active_tasks: dict[str, Task[None]] = {}
-    import redis
-
     while True:
         try:
             await _update_tasks(active_tasks)
         except redis.exceptions.BusyLoadingError:
             logger.warning("Редис еще не загрузилась")
             await asyncio.sleep(15 * 60)
-            continue
-        except Exception as exc:
-            logger.error(
-                f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
-            )
-            raise exc

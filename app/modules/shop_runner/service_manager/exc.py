@@ -1,0 +1,2 @@
+﻿class StopShopUpdateException(Exception):
+    pass

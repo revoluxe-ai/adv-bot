@@ -1,5 +1,5 @@
 ﻿import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import AsyncGenerator, Tuple, Awaitable
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
