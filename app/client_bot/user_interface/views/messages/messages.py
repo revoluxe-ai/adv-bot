@@ -148,6 +148,10 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_page=self._page,
         )
         # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
+
+        for adv in adv_settings:
+            adv.check_last_24_hours = await redis_manager.check_last_24_hours(adv.id)
+
         return await super().__call__()
 
     async def _filter_advs(self, adv_settings: list[AdvSetting]) -> list[AdvSetting]:

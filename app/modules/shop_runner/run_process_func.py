@@ -66,8 +66,7 @@ async def _update_tasks(active_tasks: dict[str, Task[None]]) -> None:
                     logger.error(
                         f"Не обработанная ошибка выполнения задачи магазина: {exc}"
                     )
-                    del active_tasks[shop_id]
-                    # raise exc
+                del active_tasks[shop_id]
 
         await asyncio.sleep(0.1)
 
@@ -89,3 +88,7 @@ async def run() -> None:
         except redis.exceptions.BusyLoadingError:
             logger.warning("Редис еще не загрузилась")
             await asyncio.sleep(15 * 60)
+        except Exception as exc:
+            logger.error(
+                f"Ошибка обработки задач обновления магазина: {exc}", exc_info=True
+            )

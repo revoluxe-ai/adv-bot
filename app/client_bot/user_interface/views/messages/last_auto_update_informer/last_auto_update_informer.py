@@ -46,5 +46,5 @@ class LastAutoUpdateSettingInformer:
 
     @staticmethod
     def to_str_timestamp(timestamp: datetime.datetime | None) -> str:
-        fmt = "%H:%M:%S %m-%d-%Y"
+        fmt = "%H:%M:%S %d-%m-%Y"
         return timestamp.strftime(fmt) if timestamp else "Нет данных"

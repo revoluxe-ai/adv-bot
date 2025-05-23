@@ -37,9 +37,7 @@ from app.settings import settings
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
-from .old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.exceptions import (
-    AutoUpdateWhiteListFatalError,
-)
+
 from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
 
@@ -68,7 +66,7 @@ class CoroutinesManager:
         self._adv_settings_dict: dict[int, AdvSetting] | None = None
         self._adv_settings_list: list[AdvSetting] | None = None
 
-    @while_coroutine_decorator(10 * 60, 60)
+    @while_coroutine_decorator(5 * 60, 60)
     async def update_cpm_bid(self) -> None:
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
@@ -92,21 +90,21 @@ class CoroutinesManager:
         keywords = await self._wb_shop_data_manager.get_calculated_keywords(adv_setting)
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
-    @while_coroutine_decorator(15 * 60)
+    @while_coroutine_decorator(5 * 60)
     async def update_common_sale_stat(self) -> None:
         wb_api = self._wb_api
         ping_manager = PingManager(wb_api.access)
         await ping_manager.ping_analytics_rights_and_connect()
         wb_stat_manager = WBCommonStatManager(wb_api)
         advs = await self._wb_shop_data_manager.get_active_advs()
-        active_nmids = [adv.adv_id for adv in advs]
+        active_nmids = [adv.nmids[0] for adv in advs]
         await wb_stat_manager.update_common_statistic(active_nmids)
 
     @staticmethod
     async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]) -> None:
         await full_wb_adv_stat.insert(stats)
 
-    @while_coroutine_decorator(15 * 60, 1)
+    @while_coroutine_decorator(5 * 60, 1)
     async def update_full_adv_stat(self) -> None:
         wb_api = self._wb_api
         auto_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
@@ -114,7 +112,8 @@ class CoroutinesManager:
         all_adv_ids = set()
         for adv in auto_advs:
             all_adv_ids.add(adv.adv_id)
-            all_adv_ids.add(adv.auction_adv_id)
+            if auction_adv_id := adv.search_adv_id:
+                all_adv_ids.add(auction_adv_id)
 
         full_stats: list[FullAdvStat] = (
             await wb_data_getter.get_full_adv_stat_for_adv_ids(
@@ -129,14 +128,12 @@ class CoroutinesManager:
         return None
 
     @staticmethod
-    @while_coroutine_decorator(15 * 60, 5)
     async def _update_adv_data_from_wb_to_pg(
         shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_advs_data()
 
     @staticmethod
-    @while_coroutine_decorator(15 * 60, 5)
     async def _update_cards_data_from_wb_to_pg(
         shop_data_updater: ShopDataUpdater,
     ) -> None:
@@ -169,14 +166,14 @@ class CoroutinesManager:
                     row.append(fillvalue)
             yield tuple(row)
 
-    @while_coroutine_decorator(60 * 60)
+    @while_coroutine_decorator(60 * 15)
     async def update_cards_data_from_wb_to_pf(self) -> None:
         wb_api = self._wb_api
         shop_data_updater = ShopDataUpdater(wb_api)
         await self._update_cards_data_from_wb_to_pg(shop_data_updater)
         logger.debug("Обновление карточек завершено")
 
-    @while_coroutine_decorator(1, 1)
+    @while_coroutine_decorator(60, 1)
     async def parsing_keywords_run(self) -> None:
         from .services import parsing_keywords_from_wb
 
@@ -204,55 +201,6 @@ class CoroutinesManager:
                     logger.info(
                         f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
                     )
-
-    async def _update_phrases_in_white_list_run(self) -> None:
-        """
-        Проверяет себестоимость заказа и убирает ключи из белого списка, если себес превышен
-        Returns:
-            None
-        """
-        try:
-            await self._update_advs_models()
-        except Exception as exc:
-            raise AutoUpdateWhiteListFatalError from exc
-
-        advs = self._adv_settings
-
-        from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater import (
-            WhiteListUpdateManager,
-        )
-
-        update_manager = WhiteListUpdateManager()
-
-        tasks = []
-        for adv in advs:
-            if adv.auto_update_white_list:
-                try:
-                    keywords = await self.get_calculated_keywords(adv.adv_id)
-                except Exception as exc:
-                    raise AutoUpdateWhiteListFatalError from exc
-
-                task = asyncio.create_task(
-                    update_manager.auto_update_phrases_in_white_list(adv, keywords)
-                )
-                tasks.append(task)
-        for task in tasks:
-            try:
-                await task
-            except AutoUpdateWhiteListFatalError as exc:
-                logger.error(
-                    f"Ошибка автообновления белого списка {exc}", exc_info=True
-                )
-
-    #
-    # async def update_phrases_in_white_list_run(self) -> None:
-    #     while True:
-    #         try:
-    #             await self._update_phrases_in_white_list_run()
-    #             await asyncio.sleep(60 * 15)
-    #         except AutoUpdateWhiteListFatalError as exc:
-    #             logger.error(f"Ошибка обновления белого списка: {exc}", exc_info=True)
-    #             await asyncio.sleep(60 * 15)
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):

@@ -1,8 +1,7 @@
 import os
-from abc import ABC
+from abc import ABC, abstractmethod
 
 import redis
-from mypy.semanal_shared import abstractmethod
 
 redis_host = os.environ.get("REDIS_HOST")
 
