@@ -90,5 +90,5 @@ async def run() -> None:
             await asyncio.sleep(15 * 60)
         except Exception as exc:
             logger.error(
-                f"Ошибка обработки задач обновления магазина: {exc}", exc_info=True
+                f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
             )

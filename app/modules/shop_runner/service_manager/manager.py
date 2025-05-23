@@ -37,7 +37,6 @@ from app.settings import settings
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
-
 from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
 
