@@ -102,7 +102,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
         stmt = select(AdvSetting).filter(AdvSetting.bot_active == True)
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
-        nmids_in_active_adv = set([nmid for adv in adv_settings for nmid in adv.nmid])
+        nmids_in_active_adv = set([nmid for adv in adv_settings for nmid in adv.nmids])
         logger.debug("Формирование подзапроса для WBCabinet")
         subquery = (
             select(WBCabinet.id)
@@ -138,7 +138,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
 
     for n, adv in enumerate(adv_settings):
         logger.info(f"Обработка кампании {n + 1} из {total_count} (ID: {adv.adv_id})")
-        nmids = adv.nmid
+        nmids = adv.nmids
         if len(nmids) > 1:
             logger.debug(
                 f"Кампания {adv.adv_id} содержит более одного артикула, происходит пропуск"
@@ -217,7 +217,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
                         "views": keyword_stat.views,
                         "clicks": keyword_stat.clicks,
                         "spend": keyword_stat.spend,
-                        "nmids": adv.nmid,
+                        "nmids": adv.nmids,
                         **avg_item_features,
                         **{
                             f"keyword_feature_{i}": keyword_feature[i]
