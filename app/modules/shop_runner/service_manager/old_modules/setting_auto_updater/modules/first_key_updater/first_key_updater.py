@@ -42,13 +42,20 @@ class FirstKeyUpdater:
         top_key = clear_keywords[0]
         if top_key.hard_status == 2:
             return None
-        if not top_key.relevant:
+
+        relevant_phrases = [kw for kw in clear_keywords if kw.relevant]
+        if not relevant_phrases:
+            return None
+        top_relevant_phrase = relevant_phrases[0]
+        if top_relevant_phrase.hard_status == 2:
             return None
 
         async with sm(read_only=False) as session:
             stmt = (
                 update(KeywordSetting)
-                .where(KeywordSetting.id == top_key.keyword_setting_original_id)
+                .where(
+                    KeywordSetting.id == top_relevant_phrase.keyword_setting_original_id
+                )
                 .values(hard_status=2)
             )
             await session.execute(stmt)
