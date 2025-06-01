@@ -85,32 +85,36 @@ class CommonAdvsStatDataManager:
         )
 
         # Общая статистика
-        common_stat: CommonCardStat = (
+        common_stat: CommonCardStat | None = (
             await common_stat_manager.get_stats_for_last_period(
                 int(adv_setting.nmids[0]), pass_days
             )
         )
 
         # Рассчитываем дополнительные метрики
-        all_orders_for_last_days = None
+        base_common_orders = None
+        all_orders_from_advs = (
+            full_adv_stat_for_last_days_for_auto_adv.orders
+            + full_adv_stat_for_last_days_for_auction.orders
+        )
         mean_orders_for_days = None
         mean_price_for_order = None
         spend_for_inner_advs_for_days = None
 
         if common_stat:
-            all_orders_for_last_days = common_stat.orders
-            if all_orders_for_last_days == 0:
-                all_orders_for_last_days = 1
+            base_common_orders = common_stat.orders
+            if base_common_orders < all_orders_from_advs:
+                base_common_orders = all_orders_from_advs
+            if base_common_orders == 0:
+                base_common_orders = 1
             spend_for_inner_advs_for_days = full_spend_for_all_advs
 
             now = datetime.now()
             hours_passed = now.hour + now.minute / 60 + now.second / 3600
             fraction_of_day = hours_passed / 24 + pass_days
 
-            mean_orders_for_days = all_orders_for_last_days / fraction_of_day
-            mean_price_for_order = (
-                spend_for_inner_advs_for_days / all_orders_for_last_days
-            )
+            mean_orders_for_days = base_common_orders / fraction_of_day
+            mean_price_for_order = spend_for_inner_advs_for_days / base_common_orders
 
         # Получаем расходы на ключевые слова
         spend_for_keywords_in_auto_adv = await full_wb_adv_stat.get_keywords_spend(
@@ -130,7 +134,7 @@ class CommonAdvsStatDataManager:
             auction_cpm=auction_cpm,
             total_spend=full_spend_for_all_advs,
             addition_spend_in_adv=addition_spend_in_adv,
-            all_orders_for_last_days=all_orders_for_last_days,
+            all_orders_for_last_days=base_common_orders,
             mean_orders_for_last_days=mean_orders_for_days,
             mean_price_for_order=mean_price_for_order,
             spend_for_inner_advs=spend_for_inner_advs_for_days,
