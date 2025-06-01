@@ -17,6 +17,9 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
+    AdvSettingAutoUpdater,
+)
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
 
 logger = logging.getLogger(__name__)
@@ -136,6 +139,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._adv_setting, 2
         )
 
+        auto_update_manager = AdvSettingAutoUpdater(self._adv_setting, 2)
+
+        fact_data = auto_update_manager.get_fact_data(stat_data)
+
+        self._fact_data = fact_data
+
         await super().__call__()
         return
 
@@ -191,8 +200,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         text += (
             f"\nВ среднем в день (срез за 2 дня):\n"
-            f"Заказов: {self._mean_orders_for_days:.2f} (цель: {plan_for_sales_for_day_str})\n"
-            f"Себестоимость: {round(order_cost, 2)} р."
+            f"Прогноз средних заказов в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
+            f"Себестоимость: {round(self._fact_data.pay_for_order, 2)} р."
             f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})"
         )
 

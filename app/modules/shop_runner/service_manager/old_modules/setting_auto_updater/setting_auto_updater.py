@@ -33,7 +33,7 @@ class AdvSettingAutoUpdater:
 
         self._max_last_period = max_last_period
 
-    async def get_fact_data(self, common_stat_data: CommonAdvsStatData) -> FactData:
+    def get_fact_data(self, common_stat_data: CommonAdvsStatData) -> FactData:
         fact_data = self.__get_fact_data_from_stats(common_stat_data)
         return fact_data
 
@@ -48,7 +48,7 @@ class AdvSettingAutoUpdater:
         stat: CommonAdvsStatData = await common_stat_manager.get_data(
             self._adv, keywords, last_days=self._max_last_period
         )
-        fact = await self.get_fact_data(stat)
+        fact = self.get_fact_data(stat)
 
         plan_fact_change = ChangePlanFact(self._adv)
         if await plan_fact_change.check_equal_in_cache(plan, fact):
