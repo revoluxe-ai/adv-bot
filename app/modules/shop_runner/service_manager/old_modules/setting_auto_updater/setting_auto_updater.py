@@ -62,9 +62,9 @@ class AdvSettingAutoUpdater:
         self,
         common_stat_data: CommonAdvsStatData,
     ) -> FactData:
-        assert common_stat_data.mean_orders_for_last_days
-        assert common_stat_data.mean_price_for_order
-        assert common_stat_data.all_orders_for_last_days
+        assert common_stat_data.mean_orders_for_last_days is not None
+        assert common_stat_data.mean_price_for_order is not None
+        assert common_stat_data.all_orders_for_last_days is not None
         mean_orders = round(
             common_stat_data.mean_orders_for_last_days, self._max_last_period
         )
