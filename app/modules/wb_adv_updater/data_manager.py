@@ -1513,8 +1513,9 @@ async def add_relevant_phrases(keywords, adv_setting_id) -> None:
             )
             result = await session.execute(stmt)
             keyword_setting = result.scalar()
-            keyword_setting.relevant = True
-            if not keyword_setting:
+            if keyword_setting:
+                keyword_setting.relevant = True
+            else:
                 adv_keyword = AdvKeyword(
                     text=text,
                     adv_setting_id=adv_setting_id,
