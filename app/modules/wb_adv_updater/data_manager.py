@@ -743,11 +743,11 @@ async def get_good_bad_phrases_for_min_ctr(
 
     for keyword_stat in keyword_stats:
         clicks = keyword_stat.calculated_clicks
-        assert clicks
+        assert clicks is not None
         views = keyword_stat.calculated_views
-        assert views
+        assert views is not None
         enough_views = keyword_stat.enough_views
-        assert enough_views
+        assert enough_views is not None
         original_predict_ctr = keyword_stat.original_predict_ctr
         hard_status = int(keyword_stat.hard_status)
         keyword_setting = text_to_keyword_setting.get(keyword_stat.text)
