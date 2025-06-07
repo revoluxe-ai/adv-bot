@@ -823,26 +823,25 @@ def get_keyword_setting_keyboard(
         ]
         buttons.append(button)
 
-    if chat_id in const.ADMINS:
-        if keyword.relevant:
-            text = "Удалить из релевантных фраз"
-            new_relevant_status = False
-        else:
-            text = "Добавить в релевантные фразы"
-            new_relevant_status = True
+    if keyword.relevant:
+        text = "Удалить из релевантных фраз"
+        new_relevant_status = False
+    else:
+        text = "Добавить в релевантные фразы"
+        new_relevant_status = True
 
-        callback = RelevantKeywordStatusSetting(
-            new_relevant_status=new_relevant_status,
-            keyword_setting_original_id=keyword_setting_original_id,
+    callback = RelevantKeywordStatusSetting(
+        new_relevant_status=new_relevant_status,
+        keyword_setting_original_id=keyword_setting_original_id,
+    )
+
+    buttons_row = [
+        InlineKeyboardButton(
+            text=text,
+            callback_data=callback.pack(),
         )
-
-        buttons_row = [
-            InlineKeyboardButton(
-                text=text,
-                callback_data=callback.pack(),
-            )
-        ]
-        buttons.append(buttons_row)
+    ]
+    buttons.append(buttons_row)
 
     if (
         keyword.hard_status in [AUTO_MODE, WHITE_LIST]
