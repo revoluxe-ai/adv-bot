@@ -20,15 +20,20 @@ async def update_adv_setting(
     plan_data: PlanData,
     fact_data: FactData,
 ) -> bool:
-
     white_list_update_manager = WhiteListUpdateManager(adv)
     target_place_update_manager = TargetPlaceUpdater(adv)
     if fact_data.pay_for_order > plan_data.max_pay_for_order:
-        change_success_delete_phrase, _ = (
+        change_success_delete_phrase, touch_setting_limit_delete_last_white_phrase = (
             await white_list_update_manager.delete_last_white_phrase(keywords)
         )
-        change_success_target_place, _ = await target_place_update_manager.set_down()
-        return change_success_delete_phrase or change_success_target_place
+        if touch_setting_limit_delete_last_white_phrase:
+            change_success_target_place, _ = (
+                await target_place_update_manager.set_down()
+            )
+
+            return change_success_delete_phrase or change_success_target_place
+        else:
+            return change_success_delete_phrase
     if fact_data.pay_for_order == plan_data.max_pay_for_order:
         change_success_target_place, _ = await target_place_update_manager.set_down()
         return change_success_target_place
