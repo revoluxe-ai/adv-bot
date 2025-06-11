@@ -35,16 +35,41 @@ router = Router()
 
 @router.callback_query(callbacks.AddBalance.filter())
 async def add_balance(
-    callback: types.CallbackQuery,
-    callback_data: callbacks.AddBalance,
-    state: FSMContext,
-    bot: aiogram.Bot,
+        callback: types.CallbackQuery,
+        callback_data: callbacks.AddBalance,
+        state: FSMContext,
 ):
-
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
     await state.update_data(
         wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id
     )
+
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [
+            types.InlineKeyboardButton(
+                text="Подтвердить✅",
+                callback_data=callbacks.ConfirmAddBalance(
+                    wb_cabinet_original_id=wb_cabinet_original_id
+                ).pack()
+            )
+        ]
+    ])
+
+    await callback.message.answer(
+        "Оплачивая сервис вы соглашаетесь с  [публичной офертой](https://docs.google.com/document/d/12o...byQwzBJ4o/) и [пользовательким соглашением](https://docs.google.com/document/d/1fx...Yx3Mxqg40/).",
+        reply_markup=keyboard
+    )
+    await callback.answer()
+
+
+@router.callback_query(callbacks.ConfirmAddBalance.filter())
+async def confirm_add_balance(
+        callback: types.CallbackQuery,
+        callback_data: callbacks.ConfirmAddBalance,
+        state: FSMContext,
+        bot: aiogram.Bot,
+):
+    wb_cabinet_original_id = callback_data.wb_cabinet_original_id
     await state.set_state(states.AddBalance.awaiting_amount)
     cabinet_balance, cabinet_bonus = await get_cabinet_balance(wb_cabinet_original_id)
 
@@ -75,7 +100,7 @@ async def add_balance(
 
 @router.message(StateFilter(states.AddBalance.awaiting_amount))
 async def waiting_for_amount(
-    message: types.Message, state: FSMContext, bot: aiogram.Bot
+        message: types.Message, state: FSMContext, bot: aiogram.Bot
 ):
     amount: str = message.text
     min_sum = const.min_sum
@@ -130,14 +155,14 @@ async def waiting_for_amount(
 
 @router.pre_checkout_query()
 async def pre_checkout_query_handler(
-    pre_checkout_query: types.PreCheckoutQuery, bot: aiogram.Bot
+        pre_checkout_query: types.PreCheckoutQuery, bot: aiogram.Bot
 ):
     await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
 
 @router.message(aiogram.F.successful_payment)
 async def successful_payment_handler(
-    message: types.Message, state: FSMContext, bot: aiogram.Bot
+        message: types.Message, state: FSMContext, bot: aiogram.Bot
 ):
     successful_payment = message.successful_payment
     cost = successful_payment.total_amount / 100

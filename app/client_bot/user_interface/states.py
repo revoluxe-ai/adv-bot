@@ -43,6 +43,7 @@ class ChangeMinViewsForPredictCTR(StatesGroup):
 
 
 class AddBalance(StatesGroup):
+    awaiting_confirmation = State()
     awaiting_amount = State()
 
 
