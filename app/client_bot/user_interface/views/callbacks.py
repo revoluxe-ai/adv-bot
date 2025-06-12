@@ -114,6 +114,10 @@ class AddBalance(CallbackData, prefix="add_balance"):
     wb_cabinet_original_id: int
 
 
+class ConfirmAddBalance(CallbackData, prefix="confirm_add_balance"):
+    wb_cabinet_original_id: str
+
+
 class KeywordPositionHistory(CallbackData, prefix="keyword_position_history"):
     adv_original_id: int
 
