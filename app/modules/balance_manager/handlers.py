@@ -144,7 +144,7 @@ async def waiting_for_amount(
                     {
                         "description": "Пополнение баланса",
                         "quantity": "1",
-                        "amount": {"value": amount, "currency": "RUB"},
+                        "amount": {"value": amount_int, "currency": "RUB"},
                         "vat_code": 1,
                     }
                 ],
@@ -154,8 +154,8 @@ async def waiting_for_amount(
     )
 
     user_telegram_id = message.chat.id
-    sum_for_adding = amount * 100
-    prices = [LabeledPrice(label=f"Пополнение баланса", amount=int(sum_for_adding))]
+    sum_for_adding = int(amount) * 100
+    prices = [LabeledPrice(label=f"Пополнение баланса", amount=str(sum_for_adding))]
     await bot.send_invoice(
         user_telegram_id,
         title="Подписка на бота",
@@ -203,7 +203,7 @@ async def successful_payment_handler(
         await process_payment_with_bonus(
             user_id=user_id,
             cabinet_id=wb_cabinet_original_id,
-            amount=cost,
+            amount=float(cost),
             bonus_percent=0,  # Пока без бонусов
             description=f"Пополнение баланса через Telegram",
         )
