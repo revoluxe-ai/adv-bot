@@ -219,7 +219,7 @@ async def successful_payment_handler(
             .where(WBCabinet.id == wb_cabinet_original_id)
         )
         wb_user_cabinet_id_result = await session.execute(stmt)
-        wb_user_cabinet_id = wb_user_cabinet_id_result.scalar_one()
+        wb_user_cabinet_id = wb_user_cabinet_id_result.scalars.first()
 
     logger.debug(f"wb_user_cabinet_id: {wb_user_cabinet_id}")
     await asyncio.sleep(1)
