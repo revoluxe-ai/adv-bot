@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 async def parsing_keywords_for_adv_generator(
     adv: AdvSetting, keywords: Awaitable[list[CalculatedKeyword]]
 ) -> AsyncGenerator[Tuple[str, int], None]:
-    keywords = await keywords
+    keywords_result = await keywords
     if not keywords:
         logger.error(f"Нет ключевых для кампании {adv.adv_id}")
         return
@@ -27,7 +27,7 @@ async def parsing_keywords_for_adv_generator(
     keywords_with_positions: list[CalculatedKeyword] = []
     keywords_without_positions: list[CalculatedKeyword] = []
 
-    for keyword in keywords:
+    for keyword in keywords_result:
         last_position = await redis_manager.get_keyword_position(keyword.text, nmid)
         if last_position:
             last_positions[keyword.text] = last_position
