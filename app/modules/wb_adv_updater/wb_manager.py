@@ -3,8 +3,8 @@ import datetime
 import logging
 from typing import List
 
-from sqlalchemy import and_
-from sqlalchemy import exists
+from sqlalchemy import and_, exists
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
@@ -53,6 +53,21 @@ def get_count_advs_for_wb_cabinet(
     return len(advs_for_wb_cabinet)
 
 
+async def check_adv_payment(
+        session: AsyncSession,
+        adv_setting: AdvSetting,
+        current_date: datetime.date
+) -> bool:
+    """Проверяет наличие платежа для настройки рекламы на указанную дату."""
+    adv_payment_check_stmt = select(exists().where(
+        AdvPayment.adv_setting_id == adv_setting.id,
+        AdvPayment.date == current_date
+    ))
+
+    result = await session.execute(adv_payment_check_stmt)
+    return result.scalar()
+
+
 async def process_payment_for_advs() -> None:
     current_date = datetime.datetime.now().date()
     async with sm(read_only=False) as session:
@@ -67,15 +82,9 @@ async def process_payment_for_advs() -> None:
                     WBCabinet.bonus_payments
                 ),
             )
-            .filter(
+            .where(
                 and_(
                     AdvSetting.bot_active == True,
-                    ~exists().where(
-                        and_(
-                            AdvPayment.adv_setting_id == AdvSetting.id,
-                            AdvPayment.date == current_date,
-                        )
-                    ),
                 )
             )
         )
@@ -83,6 +92,8 @@ async def process_payment_for_advs() -> None:
         adv_settings: list[AdvSetting] = result.unique().scalars().all()
         pricer = Pricer()
         for adv_setting in adv_settings:
+            if await check_adv_payment(session, adv_setting, current_date):
+                continue
             wb_cabinet: WBCabinet = adv_setting.wb_cabinet
             shop_id: str = str(wb_cabinet.shop_id)
             PRICE_FOR_SHOP_FOR_DAY = await pricer.get_price_for_day_for_shop(shop_id)
@@ -121,7 +132,7 @@ async def process_payment_for_advs() -> None:
             else:
                 # Если недостаточно средств, деактивируем бота
                 adv_setting.bot_active = False
-            await session.commit()
+        await session.commit()
 
 
 async def graph_vector_update() -> None:
