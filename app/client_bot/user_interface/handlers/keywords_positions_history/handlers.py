@@ -6,6 +6,10 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 
 from app.client_bot.user_interface.views import messages, callbacks
+from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
+    KeywordGraphicPart_1,
+    KeywordGraphicPart_2,
+)
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
@@ -44,13 +48,13 @@ async def keyword_position_history(
         return
     graphic, legend = result
     if legend:
-        await messages.KeywordGraphicPart_1(
+        await KeywordGraphicPart_1(
             bot, callback.message.chat.id, graphic, adv_original_id
         )()
-        await messages.KeywordGraphicPart_2(
+        await KeywordGraphicPart_2(
             bot, callback.message.chat.id, legend, adv_original_id
         )()
     else:
-        await messages.KeywordGraphicPart_2(
+        await KeywordGraphicPart_2(
             bot, callback.message.chat.id, graphic, adv_original_id
         )()

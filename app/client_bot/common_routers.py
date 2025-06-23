@@ -7,6 +7,9 @@ from app.modules.bidder_auto_mode import router as BidderAutoModeRouter
 from app.modules.bidder_step_setting.telegram_handler import (
     router as bidder_step_setting_router,
 )
+from app.modules.manual_phrase_positions_update import (
+    manual_update_phrase_position_router,
+)
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingRouter,
 )
@@ -60,6 +63,7 @@ if not settings.test_mode:
 
 common_router.message.middleware.register(ReturnToStart())
 
+common_router.include_routers(manual_update_phrase_position_router)
 common_router.include_router(auto_updater_target_place_setting_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)

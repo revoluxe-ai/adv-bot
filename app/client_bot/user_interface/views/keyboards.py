@@ -21,6 +21,9 @@ from app.modules.common_slaves.wildberries.models import (
     KeywordSetting,
     WBCabinet,
 )
+from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
+    UpdatePositionsForActivePhrase,
+)
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
@@ -750,6 +753,32 @@ def get_keywords_setting_keyboard(
     ]
 
     bottoms.append(botton)
+
+    button = [
+        InlineKeyboardButton(
+            text="Перепроверить позиции ключей из БС",
+            callback_data=UpdatePositionsForActivePhrase(
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                target="white_list",
+            ).pack(),
+        )
+    ]
+
+    bottoms.append(button)
+
+    button = [
+        InlineKeyboardButton(
+            text="Перепроверить позиции активный ключей",
+            callback_data=UpdatePositionsForActivePhrase(
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                target="active_phrases",
+            ).pack(),
+        )
+    ]
+
+    bottoms.append(button)
 
     bottoms.append(
         [

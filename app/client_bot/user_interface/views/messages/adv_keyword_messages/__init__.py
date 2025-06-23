@@ -1,1 +1,5 @@
-﻿from .adv_keyword_messages import AdvKeywordsSetting
+﻿
+
+__all__ = ['AdvKeywordsSetting']
+
+from .adv_keyword_messages import AdvKeywordsSetting

@@ -8,9 +8,11 @@ from app.client_bot.user_interface.message_templates import (
     LastMessage,
 )
 from app.client_bot.user_interface.views import keyboards
-from app.client_bot.user_interface.views.messages import KeywordGraphicPart_1
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
+)
+from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
+    KeywordGraphicPart_1,
 )
 from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
