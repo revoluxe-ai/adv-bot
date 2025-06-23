@@ -46,33 +46,32 @@ async def _update_tasks(active_tasks: dict[str, Task[None]]) -> None:
     if shop_filter_list:
         stmt = stmt.filter(WBCabinet.shop_id.in_(shop_filter_list))
     async with sm() as session:
-        result = await session.execute(stmt)
-        data_rows = result.all()
-    all_needs_for_run_shop_ids = []
-    for row in data_rows:
-        shop_id = row[0]
-        all_needs_for_run_shop_ids.append(shop_id)
-        if shop_id not in active_tasks:
-            # Создание асинхронной задачи
-            task = asyncio.create_task(run_shop_task(shop_id))
-            active_tasks[shop_id] = task
-            logger.debug(f"Процесс обновления магазина {shop_id} запущен")
-            await asyncio.sleep(1)
+        result = await session.stream(stmt)
+        data_rows = result.scalars().yield_per(10)
+        all_needs_for_run_shop_ids = []
+        async for shop_id in data_rows:
+            all_needs_for_run_shop_ids.append(shop_id)
+            if shop_id not in active_tasks:
+                # Создание асинхронной задачи
+                task = asyncio.create_task(run_shop_task(shop_id))
+                active_tasks[shop_id] = task
+                logger.debug(f"Процесс обновления магазина {shop_id} запущен")
+                await asyncio.sleep(1)
 
-        else:
-            task = active_tasks[shop_id]
-            if task.done():
-                if exc := task.exception():
-                    logger.error(
-                        f"Не обработанная ошибка выполнения задачи магазина: {exc}"
-                    )
-                del active_tasks[shop_id]
+            else:
+                task = active_tasks[shop_id]
+                if task.done():
+                    if exc := task.exception():
+                        logger.error(
+                            f"Не обработанная ошибка выполнения задачи магазина: {exc}"
+                        )
+                    del active_tasks[shop_id]
 
-        await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
 
     all_shop_ids = tuple(list(active_tasks.keys()))
     for shop_id in all_shop_ids:
-        if shop_id not in all_shop_ids:
+        if shop_id not in all_needs_for_run_shop_ids:
             task = active_tasks.pop(shop_id)
             if not task.done():
                 task.cancel()
