@@ -64,6 +64,7 @@ class CoroutinesManager:
         )
         self._adv_settings_dict: dict[int, AdvSetting] | None = None
         self._adv_settings_list: list[AdvSetting] | None = None
+        self._session = wb_api.session
 
     @while_coroutine_decorator(5 * 60, 60)
     async def update_cpm_bid(self) -> None:
@@ -92,7 +93,7 @@ class CoroutinesManager:
     @while_coroutine_decorator(5 * 60)
     async def update_common_sale_stat(self) -> None:
         wb_api = self._wb_api
-        ping_manager = PingManager(wb_api.access)
+        ping_manager = PingManager(wb_api.access, self._session)
         await ping_manager.ping_analytics_rights_and_connect()
         wb_stat_manager = WBCommonStatManager(wb_api)
         advs = await self._wb_shop_data_manager.get_active_advs()

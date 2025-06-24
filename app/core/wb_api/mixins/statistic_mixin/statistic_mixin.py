@@ -1,8 +1,6 @@
 import json
 from datetime import datetime, timedelta
 
-import aiohttp
-
 from app.core.wb_api.http_request import try_except_decorator, requests
 from .wb_statistic_obj import CommonStat
 from ...protocols import WBAPIProtocol
@@ -42,30 +40,29 @@ class CommonStatMinix(WBAPIProtocol):
 
         url = f"{PREFIX}.{self.HOST}/api/v2/nm-report/detail/history"
 
-        async with aiohttp.ClientSession() as session:
-            response = await requests(
-                session,
-                "POST",
-                url=url,
-                json_data=data_for_req,
-                headers=self.headers.standart,
-            )
+        response = await requests(
+            self.session,
+            "POST",
+            url=url,
+            json_data=data_for_req,
+            headers=self.headers.standart,
+        )
 
-            response = json.loads(response)
-            stats = []
-            for data in response["data"]:
-                for history in data["history"]:
-                    date = datetime.strptime(history["dt"], "%Y-%m-%d")
-                    stat = CommonStat(
-                        nmid=data["nmID"],
-                        date=date,
-                        open_card=history["openCardCount"],
-                        add_to_cart=history["addToCartCount"],
-                        orders=history["ordersCount"],
-                        orders_sum=history["ordersSumRub"],
-                        buy_outs=history["buyoutsCount"],
-                    )
-                    stats.append(stat)
+        response = json.loads(response)
+        stats = []
+        for data in response["data"]:
+            for history in data["history"]:
+                date = datetime.strptime(history["dt"], "%Y-%m-%d")
+                stat = CommonStat(
+                    nmid=data["nmID"],
+                    date=date,
+                    open_card=history["openCardCount"],
+                    add_to_cart=history["addToCartCount"],
+                    orders=history["ordersCount"],
+                    orders_sum=history["ordersSumRub"],
+                    buy_outs=history["buyoutsCount"],
+                )
+                stats.append(stat)
         return stats
 
     async def get_cards_stats_by_days(

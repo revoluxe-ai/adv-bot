@@ -7,7 +7,6 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.wb_adv_updater import data_manager, search_advs_manager
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.modules.white_list_updater.backend.white_list_updater import WhiteListUpdater
@@ -20,9 +19,11 @@ _sm = get_async_session_maker
 
 
 class DataSetter:
-    def __init__(self, access: WBCabinetAccess):
-        self._wb_api = WBApi(access)
+    def __init__(self, wb_api: WBApi) -> None:
+        access = wb_api.wb_access
         self._wb_cabinet = access.wb_cabinet
+        self._wb_api = wb_api
+        self._client_session = wb_api.client_session
 
     async def _update_minus_keywords_in_adv(
         self, adv_setting: AdvSetting, keywords: list[CalculatedKeyword]
@@ -92,9 +93,12 @@ class DataSetter:
             #                  f' {e}', exc_info=True)
         try:
             await asyncio.gather(
-                self._update_minus_keywords_in_adv(adv_setting, keywords),
+                self._update_minus_keywords_in_adv(
+                    adv_setting,
+                    keywords,
+                ),
                 search_advs_manager.update_keyword_phrases_for_search_adv(
-                    adv_setting, keywords
+                    adv_setting, keywords, self._wb_api.client_session
                 ),
             )
         except Exception as e:

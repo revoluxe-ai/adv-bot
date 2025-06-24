@@ -1,6 +1,8 @@
 import asyncio
 import logging
 
+from aiohttp import ClientSession
+
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
 from . import wb_manager
@@ -19,12 +21,13 @@ async def run_update_predict_ctr():
 
 
 async def run_update_all_keywords_on_wb():
-    while True:
-        try:
-            await wb_manager.update_all_keywords_on_wb()
-        except Exception:
-            logger.error("Ошибка обновления фраз", exc_info=True)
-        await asyncio.sleep(5)
+    async with ClientSession() as client_session:
+        while True:
+            try:
+                await wb_manager.update_all_keywords_on_wb(client_session)
+            except Exception:
+                logger.error("Ошибка обновления фраз", exc_info=True)
+            await asyncio.sleep(5)
 
 
 async def sender_message_to_not_pay_users():
@@ -62,23 +65,24 @@ async def run_update_model():
         await asyncio.sleep(0)
 
 
-async def update_wb_config_data() -> None:
-    await wb_manager.update_wb_config_data_run()
+async def update_wb_config_data(client_session) -> None:
+    await wb_manager.update_wb_config_data_run(client_session)
 
 
-async def main_loop():
+async def main_loop(client_session):
     await asyncio.gather(
         process_payment_for_advs(),
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),
-        update_wb_config_data(),
+        update_wb_config_data(client_session),
     )
 
 
 async def run_main_coroutines():
-    while True:
-        try:
-            await main_loop()
-        except Exception as e:
-            logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
-            await asyncio.sleep(0)
+    async with ClientSession() as client_session:
+        while True:
+            try:
+                await main_loop(client_session)
+            except Exception as e:
+                logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
+                await asyncio.sleep(0)

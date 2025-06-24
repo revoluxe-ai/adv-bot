@@ -5,8 +5,6 @@ import logging
 from typing import Any, Optional
 from typing import TypeVar
 
-import aiohttp
-
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
 from app.modules.common_slaves.wildberries.data_classes.adv import Balances
@@ -50,36 +48,35 @@ class AdvMixin(WBAPIProtocol):
     @try_except_decorator(1, 60)
     async def get_min_cpm_adv_data(self) -> MinCPMData:
         url = f"{self.PREFIX}.{self.HOST}/adv/v0/config"
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "GET", url, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            return MinCPMData(answer)
+
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
+        answer = json.loads(response_text)
+        return MinCPMData(answer)
 
     @try_except_decorator(1, 3)
     async def get_advertIds(self: T) -> list[int]:
         advertIds: list[int] = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/count"
 
-        async with aiohttp.ClientSession() as session:
-            response_text: str = await requests(
-                session, "GET", url, headers=self.headers.standart
-            )
-            answer: dict[str, Any] = json.loads(response_text)
+        response_text: str = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
+        answer: dict[str, Any] = json.loads(response_text)
 
-            adverts: list[dict[str, Any]] = answer.get("adverts", [])
+        adverts: list[dict[str, Any]] = answer.get("adverts", [])
 
-            if not adverts:
-                return []
+        if not adverts:
+            return []
 
-            for advert in adverts:
-                advert_type = advert.get("type")
-                if isinstance(advert_type, int) and advert_type == 8:
-                    advert_list: list[dict[str, Any]] = advert.get("advert_list", [])
-                    for advert_item in advert_list:
-                        advertId = advert_item["advertId"]
-                        advertIds.append(advertId)
+        for advert in adverts:
+            advert_type = advert.get("type")
+            if isinstance(advert_type, int) and advert_type == 8:
+                advert_list: list[dict[str, Any]] = advert.get("advert_list", [])
+                for advert_item in advert_list:
+                    advertId = advert_item["advertId"]
+                    advertIds.append(advertId)
 
         return advertIds
 
@@ -87,15 +84,15 @@ class AdvMixin(WBAPIProtocol):
     async def _get_advs(self, adv_ids: list[int]) -> list[Adv]:
         advs = []
         url = f"https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "POST", url, json_data=adv_ids, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            for advert in answer:
-                adv: Adv | None = adv_fabric.get_adv_data_class(advert)
-                if adv:
-                    advs.append(adv)
+
+        response_text = await requests(
+            self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
+        )
+        answer = json.loads(response_text)
+        for advert in answer:
+            adv: Adv | None = adv_fabric.get_adv_data_class(advert)
+            if adv:
+                advs.append(adv)
         return advs
 
     @try_except_decorator(1, 1)
@@ -118,12 +115,11 @@ class AdvMixin(WBAPIProtocol):
 
         data = {"campaignName": adv_name, "nms": nmids}
 
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "POST", url, json_data=data, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            return answer
+        response_text = await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
+        answer = json.loads(response_text)
+        return answer
 
     @try_except_decorator(1, 60)
     async def create_auto_adv(
@@ -139,43 +135,42 @@ class AdvMixin(WBAPIProtocol):
             "on_pause": False if start_status else True,
         }
 
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "POST", url, json_data=data, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            if isinstance(answer, int):
-                return answer
-            elif "error" in answer:
-                error_text = answer["error"]
-                if (
-                    error_text == "Invalid Params or payload:"
-                    " Товары выбранной категории не в наличии, размещение невозможно"
-                ):
-                    raise ItemCategoryNotInStockError()
+        response_text = await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
+        answer = json.loads(response_text)
+        if isinstance(answer, int):
+            return answer
+        else:
+            error_text = answer["error"]
+            if (
+                error_text == "Invalid Params or payload:"
+                " Товары выбранной категории не в наличии, размещение невозможно"
+            ):
+                raise ItemCategoryNotInStockError()
             else:
                 raise Exception("Неизвестная ошибка создания РК")
 
     @try_except_decorator(1, 20)
     async def check_balance(self, adv_id: int):
         url = f"https://advert-api.wildberries.ru/adv/v0/get-balance/{adv_id}"
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "GET", url, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            return answer
+
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
+        answer = json.loads(response_text)
+        return answer
 
     @try_except_decorator(1, 10)
     async def start_adv(self, adv_id: int) -> None:
         try:
             url = f"https://advert-api.wildberries.ru/adv/v0/start?id={adv_id}"
-            async with aiohttp.ClientSession() as session:
-                response = await requests(
-                    session, "GET", url, headers=self.headers.standart
-                )
-                if response != "":
-                    raise StartAdvError()
+
+            response = await requests(
+                self.session, "GET", url, headers=self.headers.standart
+            )
+            if response != "":
+                raise StartAdvError()
         except Exception as exc:
             raise StartAdvError(
                 f"Не удалось запустить компанию {adv_id}. Ошибка: {exc}"
@@ -184,14 +179,14 @@ class AdvMixin(WBAPIProtocol):
     @try_except_decorator(1, 10)
     async def get_adv_balances(self) -> Balances:
         url = "https://advert-api.wildberries.ru/adv/v1/balance"
-        async with aiohttp.ClientSession() as session:
-            response = await requests(
-                session, "GET", url=url, headers=self.headers.standart
-            )
-            response = json.loads(response)
-            logger.debug(f"Ответ на получение баланса: {response}")
-            balance = Balances(response)
-            return balance
+
+        response = await requests(
+            self.session, "GET", url=url, headers=self.headers.standart
+        )
+        response = json.loads(response)
+        logger.debug(f"Ответ на получение баланса: {response}")
+        balance = Balances(response)
+        return balance
 
     @try_except_decorator(1, 1)
     async def rename_adv(self, adv_id: int, new_name: str) -> None:
@@ -199,11 +194,10 @@ class AdvMixin(WBAPIProtocol):
 
         data = {"advertId": adv_id, "name": new_name}
 
-        async with aiohttp.ClientSession() as session:
-            await requests(
-                session, "POST", url, json_data=data, headers=self.headers.standart
-            )
-            return None
+        await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
+        return None
 
     async def update_nmids_in_adv(
         self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
@@ -211,22 +205,21 @@ class AdvMixin(WBAPIProtocol):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
-        async with aiohttp.ClientSession() as session:
-            await requests(
-                session, "POST", url, json_data=data, headers=self.headers.standart
-            )
+        await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
 
     @try_except_decorator(1, 2)
     async def get_nmids_to_add(self, adv_id: int) -> list[int]:
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/getnmtoadd?id={adv_id}"
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "GET", url, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            if answer is None:
-                return []
-            return answer
+
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
+        answer = json.loads(response_text)
+        if answer is None:
+            return []
+        return answer
 
     @try_except_decorator(1, 2)
     async def update_nmids_in_auto_adv(
@@ -235,47 +228,45 @@ class AdvMixin(WBAPIProtocol):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
-        async with aiohttp.ClientSession() as session:
-            await requests(
-                session, "POST", url, json_data=data, headers=self.headers.standart
-            )
+        await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
 
     async def add_to_balance(self, adv_id: int, balance_type: int, sum_: int):
         url = f"https://advert-api.wildberries.ru/adv/v1/budget/deposit?id={adv_id}"
 
         data = {"sum": sum_, "type": balance_type, "return": True}
 
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "POST", url, json_data=data, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            new_balance = answer["total"]
-            return new_balance
+        response_text = await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
+        answer = json.loads(response_text)
+        new_balance = answer["total"]
+        return new_balance
 
     async def stop_adv(self, adv_id: int):
         url = f"https://advert-api.wildberries.ru/adv/v0/pause?id={adv_id}"
-        async with aiohttp.ClientSession() as session:
-            await requests(session, "GET", url, headers=self.headers.standart)
-            return None
+
+        await requests(self.session, "GET", url, headers=self.headers.standart)
+        return None
 
     @try_except_decorator(1, 3)
     async def get_all_adv_ids(self) -> list[int]:
         advertIds = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/count"
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session, "GET", url, headers=self.headers.standart
-            )
-            answer = json.loads(response_text)
-            # Используем json.loads для преобразования текста ответа в JSON
-            adverts: list = answer["adverts"]
-            if not adverts:
-                return []
-            for advert_data in adverts:
-                for advert in advert_data["advert_list"]:
-                    advertId = advert["advertId"]
-                    advertIds.append(advertId)
+
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
+        answer = json.loads(response_text)
+        # Используем json.loads для преобразования текста ответа в JSON
+        adverts: list = answer["adverts"]
+        if not adverts:
+            return []
+        for advert_data in adverts:
+            for advert in advert_data["advert_list"]:
+                advertId = advert["advertId"]
+                advertIds.append(advertId)
 
         return advertIds
 
@@ -291,47 +282,46 @@ class AdvMixin(WBAPIProtocol):
     async def update_cpm(self, adv_id: int, nmid: int, new_bid: int) -> None:
         url = "https://advert-api.wildberries.ru/adv/v0/bids"
         max_attempts = 2
-        async with aiohttp.ClientSession() as session:
-            attempts = 0
-            while True:
-                data = self.__get_update_cpm_data(adv_id, nmid, new_bid)
-                try:
-                    attempts += 1
-                    await requests(
-                        session,
-                        "PATCH",
-                        url,
-                        json_data=data,
-                        headers=self.headers.standart,
+        attempts = 0
+        while True:
+            data = self.__get_update_cpm_data(adv_id, nmid, new_bid)
+            try:
+                attempts += 1
+                await requests(
+                    self.session,
+                    "PATCH",
+                    url,
+                    json_data=data,
+                    headers=self.headers.standart,
+                )
+                break
+            except MinAdvBidWBApiError as exc:
+                if attempts >= max_attempts:
+                    logger.error(
+                        "Не удалось обновить ставку для {adv_id}, {nmid}, {new_bid}"
                     )
-                    break
-                except MinAdvBidWBApiError as exc:
-                    if attempts >= max_attempts:
-                        logger.error(
-                            "Не удалось обновить ставку для {adv_id}, {nmid}, {new_bid}"
-                        )
-                        raise BadRequestError from exc
-                    new_bid = exc.new_min_bid
-                    await asyncio.sleep(1)
-                    continue
-                except Exception as exc:
-                    raise exc
+                    raise BadRequestError from exc
+                new_bid = exc.new_min_bid
+                await asyncio.sleep(1)
+                continue
+            except Exception as exc:
+                raise exc
 
     @try_except_decorator(1, 1)
     async def set_search_cpm(self, search_adv_id: int, cpm: int) -> None:
         url = "https://advert-api.wildberries.ru/adv/v0/cpm"
         data = {"advertId": search_adv_id, "type": 9, "cpm": cpm}
-        async with aiohttp.ClientSession() as session:
-            response = await requests(
-                session, "POST", url, json_data=data, headers=self.headers.standart
+
+        response = await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
+        if response == "":
+            logger.debug(f"CPM для поисковой кампании {search_adv_id} установлен")
+            return
+        else:
+            logger.error(
+                f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}"
             )
-            if response == "":
-                logger.debug(f"CPM для поисковой кампании {search_adv_id} установлен")
-                return
-            else:
-                logger.error(
-                    f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}"
-                )
 
     @try_except_decorator(1, 60)
     async def get_adv_full_state(
@@ -361,69 +351,68 @@ class AdvMixin(WBAPIProtocol):
         for adv_id in adv_ids:
             query_data.append({"id": adv_id, "dates": dates})
 
-        async with aiohttp.ClientSession() as session:
-            response_text = await requests(
-                session,
-                "POST",
-                url,
-                json_data=query_data,
-                headers=self.headers.standart,
-            )
-            answer = json.loads(response_text)
-            """
+        response_text = await requests(
+            self.session,
+            "POST",
+            url,
+            json_data=query_data,
+            headers=self.headers.standart,
+        )
+        answer = json.loads(response_text)
+        """
 
-            Пример ответа от API по полной статистики рекламы:
-            [
-            {
-            "views": 1052,
-            "clicks": 2,
-            "ctr": 0.19,
-            "cpc": 0.09,
-            "sum": 177.7,
-            "atbs": 0,
-            "orders": 0,
-            "cr": 0,
-            "shks": 0,
-            "sum_price": 0,
-            "dates": [
-            "2023-10-07",
-            "2023-10-06"
-            ],
-            "days": [
-            {
-            "date": "2023-10-06T03:00:00+03:00",
-            "views": 414,
-            "clicks": 1,
-            "ctr": 0.24,
-            "cpc": 70,
-            "sum": 70,
-            "atbs": 0,
-            "orders": 0,
-            "cr": 0,
-            "shks": 0,
-            "sum_price": 0,
-            "apps": []
-            }
-            ],
-            "boosterStats": [
-            {
-            "date": "2023-10-07T00:00:00Z",
-            "nm": 170095908,
-            "avg_position": 348
-            }
-            ],
-            "advertId": 10524818
-            }
-            ]
+        Пример ответа от API по полной статистики рекламы:
+        [
+        {
+        "views": 1052,
+        "clicks": 2,
+        "ctr": 0.19,
+        "cpc": 0.09,
+        "sum": 177.7,
+        "atbs": 0,
+        "orders": 0,
+        "cr": 0,
+        "shks": 0,
+        "sum_price": 0,
+        "dates": [
+        "2023-10-07",
+        "2023-10-06"
+        ],
+        "days": [
+        {
+        "date": "2023-10-06T03:00:00+03:00",
+        "views": 414,
+        "clicks": 1,
+        "ctr": 0.24,
+        "cpc": 70,
+        "sum": 70,
+        "atbs": 0,
+        "orders": 0,
+        "cr": 0,
+        "shks": 0,
+        "sum_price": 0,
+        "apps": []
+        }
+        ],
+        "boosterStats": [
+        {
+        "date": "2023-10-07T00:00:00Z",
+        "nm": 170095908,
+        "avg_position": 348
+        }
+        ],
+        "advertId": 10524818
+        }
+        ]
 
 
-            """
+        """
 
-            full_stats = []
-            if not answer:
-                return None
-            for data in answer:
-                full_stat = FullAdvStat(**data)
-                full_stats.append(full_stat)
+        full_stats = []
+        if not answer:
+            return None
+        for data in answer:
+            full_stat = FullAdvStat(**data)
+            full_stats.append(full_stat)
 
-            return full_stats
+        return full_stats

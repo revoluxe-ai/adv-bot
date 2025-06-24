@@ -17,7 +17,6 @@ from python_modules.logger import setup_logging
 setup_logging()
 import logging
 
-
 system = platform.system()
 if system == "Linux":
     import uvloop

@@ -5,6 +5,8 @@
 
 from typing import Protocol, runtime_checkable, Any
 
+from aiohttp import ClientSession
+
 from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
 
@@ -17,6 +19,7 @@ class WBAPIProtocol(Protocol):
     HOST: str
     api_call_state: dict[str, dict[str, Any]]
     shop_id: str
+    session: ClientSession
 
     async def set_next_token(self) -> None:
         """Устанавливает следующий токен для работы с API"""

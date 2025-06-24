@@ -1,9 +1,14 @@
 import logging
+import typing
 from typing import Generator, TypeVar
+
+from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exceptions import ApiForbiddenError
-from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
+
+if typing.TYPE_CHECKING:
+    from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
 from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
@@ -16,7 +21,11 @@ T = TypeVar("T")
 class BaseAPI:
     HOST = "wildberries.ru"
 
-    def __init__(self, wb_access: WBCabinetAccess) -> None:
+    def __init__(
+        self, wb_access: WBCabinetAccess, client_session: ClientSession
+    ) -> None:
+        from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
+
         tokens: list[WBToken] = wb_access.tokens
         self.access: WBCabinetAccess = wb_access
         if not tokens:
@@ -31,13 +40,14 @@ class BaseAPI:
         self._shop_id = current_token.shop_id
         self.api_call_state: dict[str, dict[str, str]] = {}
         self.wb_cabinet = wb_access.wb_cabinet
+        self.session: ClientSession = client_session
 
     @property
-    def headers(self) -> Headers:
+    def headers(self) -> "Headers":
         return self._headers
 
     @headers.setter
-    def headers(self, value: Headers) -> None:
+    def headers(self, value: "Headers") -> None:
         self._headers = value
 
     @property
@@ -50,6 +60,8 @@ class BaseAPI:
             yield lst[i : i + n]
 
     async def set_next_token(self) -> None:
+        from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
+
         if self._free_tokens:
             self.headers = Headers(self._free_tokens.pop())
         else:

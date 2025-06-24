@@ -2,8 +2,6 @@ import json
 import logging
 from typing import Union
 
-import aiohttp
-
 from app.core.wb_api.data_classes.card_from_wb import CardFromWB
 from app.core.wb_api.http_request import try_except_decorator, requests
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
@@ -31,19 +29,18 @@ class ContentMixin(WBAPIProtocol):
             }
         }
 
-        async with aiohttp.ClientSession() as session:
-            response = await requests(
-                session,
-                "POST",
-                url=url,
-                json_data=data_for_req,
-                headers=self.headers.standart,
+        response = await requests(
+            self.session,
+            "POST",
+            url=url,
+            json_data=data_for_req,
+            headers=self.headers.standart,
+        )
+        if response is None:
+            raise CardNotFoundInWB(
+                f"Карточка с текстом {text} не найдена на Wildberries"
             )
-            if response is None:
-                raise CardNotFoundInWB(
-                    f"Карточка с текстом {text} не найдена на Wildberries"
-                )
-            answer = json.loads(response)
+        answer = json.loads(response)
         cards = answer["cards"]
         if not cards:
             raise CardNotFoundInWB(
@@ -63,37 +60,35 @@ class ContentMixin(WBAPIProtocol):
         }
 
         all_cards = []  # Список для хранения всех карточек
+        while True:
+            response = await requests(
+                self.session,
+                "POST",
+                url=url,
+                json_data=data_for_req,
+                headers=self.headers.standart,
+            )
+            answer = json.loads(response)
 
-        async with aiohttp.ClientSession() as session:
-            while True:
-                response = await requests(
-                    session,
-                    "POST",
-                    url=url,
-                    json_data=data_for_req,
-                    headers=self.headers.standart,
-                )
-                answer = json.loads(response)
+            # Проверяем наличие ключа 'cards' в ответе
+            cards_data = answer.get("cards", [])
+            if not cards_data:
+                break
 
-                # Проверяем наличие ключа 'cards' в ответе
-                cards_data = answer.get("cards", [])
-                if not cards_data:
-                    break
+            # Добавляем карточки в общий список
+            all_cards.extend([CardFromWB(card_json) for card_json in cards_data])
 
-                # Добавляем карточки в общий список
-                all_cards.extend([CardFromWB(card_json) for card_json in cards_data])
+            # Проверяем, есть ли еще данные для пагинации
+            if len(cards_data) < data_for_req["settings"]["cursor"]["limit"]:
+                break
 
-                # Проверяем, есть ли еще данные для пагинации
-                if len(cards_data) < data_for_req["settings"]["cursor"]["limit"]:
-                    break
-
-                # Обновляем курсор для следующего запроса
-                last_card = cards_data[-1]
-                data_for_req["settings"]["cursor"].update(
-                    {
-                        "updatedAt": last_card.get("updatedAt"),
-                        "nmID": last_card.get("nmID"),
-                    }
-                )
+            # Обновляем курсор для следующего запроса
+            last_card = cards_data[-1]
+            data_for_req["settings"]["cursor"].update(
+                {
+                    "updatedAt": last_card.get("updatedAt"),
+                    "nmID": last_card.get("nmID"),
+                }
+            )
 
         return all_cards

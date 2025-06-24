@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from aiogram import Dispatcher, types
 from aiogram.exceptions import TelegramAPIError
+from aiohttp import ClientSession
 from fastapi import FastAPI, Request
 from fastapi import Response
 
@@ -18,8 +19,7 @@ logger = logging.getLogger(__name__)
 setup_logging()
 
 bot = get_bot()
-dp = Dispatcher()
-dp.include_router(global_router)
+
 
 WEBHOOK_SECRET_TOKEN = settings.WEBHOOK_SECRET
 
@@ -29,26 +29,32 @@ POLLING_MODE = settings.polling_mode
 
 @asynccontextmanager
 async def lifespan(app_fast_api: FastAPI):
-    if POLLING_MODE:
-        logger.info("⚙️ POLLING_MODE=True: FastAPI только для health-check и info.")
-        yield  # FastAPI просто живёт, бот живёт отдельно
-    else:
-        full_url = settings.WEBHOOK_URL + settings.WEBHOOK_PATH
-        await bot.set_webhook(
-            url=full_url,
-            allowed_updates=dp.resolve_used_update_types(),
-            drop_pending_updates=True,
-            secret_token=WEBHOOK_SECRET_TOKEN,
-        )
-        logger.info(f"✅ Вебхук установлен: {full_url}")
 
-        try:
-            yield
-        finally:
-            logger.info("🧹 Удаление вебхука и закрытие сессии...")
-            await bot.delete_webhook()
-            await bot.session.close()
-            logger.info("✅ Завершено.")
+    async with ClientSession() as client_session:
+
+        dp = Dispatcher(client_session=client_session)
+        dp.include_router(global_router)
+
+        if POLLING_MODE:
+            logger.info("⚙️ POLLING_MODE=True: FastAPI только для health-check и info.")
+            yield  # FastAPI просто живёт, бот живёт отдельно
+        else:
+            full_url = settings.WEBHOOK_URL + settings.WEBHOOK_PATH
+            await bot.set_webhook(
+                url=full_url,
+                allowed_updates=dp.resolve_used_update_types(),
+                drop_pending_updates=True,
+                secret_token=WEBHOOK_SECRET_TOKEN,
+            )
+            logger.info(f"✅ Вебхук установлен: {full_url}")
+
+            try:
+                yield
+            finally:
+                logger.info("🧹 Удаление вебхука и закрытие сессии...")
+                await bot.delete_webhook()
+                await bot.session.close()
+                logger.info("✅ Завершено.")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -89,6 +95,9 @@ async def telegram_webhook(request: Request):
         return Response(status_code=403, content="Forbidden")
 
     update = types.Update.model_validate(await request.json())
+    async with ClientSession() as client_session:
+        dp = Dispatcher(client_session=client_session)
+        dp.include_router(global_router)
     await dp.feed_update(bot, update)
     return {"status": "ok"}
 
@@ -128,7 +137,13 @@ if __name__ == "__main__":
                 logger.info("⚠️ Продолжаем запуск несмотря на ошибку.")
 
             try:
-                await dp.start_polling(bot)
+                async with ClientSession() as client_session:
+                    dp = Dispatcher(client_session=client_session)
+                    dp.include_router(global_router)
+
+                    logger.info("🔄 Запуск бота в режиме POLLING...")
+                    # Запуск бота с использованием long polling
+                    await dp.start_polling(bot)
             finally:
                 await bot.session.close()
                 logger.info("✅ Сессия бота завершена.")

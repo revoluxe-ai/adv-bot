@@ -2,6 +2,8 @@ import asyncio
 import logging
 from typing import Iterable
 
+from aiohttp import ClientSession
+
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -46,12 +48,14 @@ logger = logging.getLogger(__name__)
 #             )
 
 
-async def set_fix_keywords_phrases_for_search_adv(adv_setting, keywords):
+async def set_fix_keywords_phrases_for_search_adv(
+    adv_setting, keywords, client_session: ClientSession
+):
     search_adv_id = adv_setting.search_adv_id
     adv_update_state_manager = AdvActiveKeywordUpdateStateManager()
     wb_cabinet_id = adv_setting.wb_cabinet_id
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
-    api = WBApi(access)
+    api = WBApi(access, client_session)
     if not keywords:
         return
     keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
@@ -71,12 +75,14 @@ async def set_fix_keywords_phrases_for_search_adv(adv_setting, keywords):
         return
 
 
-async def set_minus_keywords_for_search_adv(adv_setting, keywords):
+async def set_minus_keywords_for_search_adv(
+    adv_setting, keywords, client_session: ClientSession
+):
     search_adv_id = adv_setting.search_adv_id
     adv_update_state_manager = AdvActiveKeywordUpdateStateManager()
     wb_cabinet_id = adv_setting.wb_cabinet_id
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
-    api = WBApi(access)
+    api = WBApi(access, client_session)
     if not keywords:
         return
     keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=False)
@@ -101,23 +107,25 @@ async def set_minus_keywords_for_search_adv(adv_setting, keywords):
 
 
 async def update_keyword_phrases_for_search_adv(
-    adv_setting: AdvSetting, keywords: Iterable[CalculatedKeyword]
+    adv_setting: AdvSetting, keywords: Iterable[CalculatedKeyword], client_session
 ):
     search_adv_id = adv_setting.search_adv_id
     if not search_adv_id:
         return None
     if adv_setting.auction_boost_all_phrase_mode is False:
-        await set_fix_keywords_phrases_for_search_adv(adv_setting, keywords)
+        await set_fix_keywords_phrases_for_search_adv(
+            adv_setting, keywords, client_session
+        )
     else:
-        await set_minus_keywords_for_search_adv(adv_setting, keywords)
+        await set_minus_keywords_for_search_adv(adv_setting, keywords, client_session)
 
 
-async def _set_keyword_phrases_for_search_advs(adv_settinds) -> None:
+async def _set_keyword_phrases_for_search_advs(adv_settinds, client_session) -> None:
     tasks = []
     for adv_setting in adv_settinds:
         keywords = await data_manager.get_good_bad_phrases(adv_setting)
         task = asyncio.create_task(
-            update_keyword_phrases_for_search_adv(adv_setting, keywords)
+            update_keyword_phrases_for_search_adv(adv_setting, keywords, client_session)
         )
         tasks.append(task)
     for task in tasks:
@@ -155,7 +163,7 @@ async def update_search_advs_module_run():
         try:
             adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
             await asyncio.gather(
-                _set_keyword_phrases_for_search_advs(adv_settinds),
+                _set_keyword_phrases_for_search_advs(adv_settinds, client_session),
             )
         except:
             logger.error(

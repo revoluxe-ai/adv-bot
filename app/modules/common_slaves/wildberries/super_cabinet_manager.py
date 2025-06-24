@@ -2,6 +2,7 @@ import logging
 import typing
 from dataclasses import dataclass
 
+from aiohttp import ClientSession
 from sqlalchemy import select
 
 from app.core.wb_api.check_righter import CheckRighter
@@ -77,14 +78,16 @@ async def get_access_for_wb_cabinet(
         return access
 
 
-async def get_common_access() -> WBCabinetAccess:
+async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
     stmt = select(WBToken)
     async with sm() as session:
         async for wb_token in await session.stream_scalars(stmt):
             if not wb_token.check_valid():
                 logger.debug(f"Не валидный токен {wb_token.api_key}")
                 continue
-            result = await token_check_righter.check_all_rights(wb_token)
+            result = await token_check_righter.check_all_rights(
+                wb_token, client_session
+            )
             if result:
                 access = WBCabinetAccess(
                     tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None

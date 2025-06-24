@@ -2,6 +2,7 @@ import logging
 from asyncio import Task
 
 import redis
+from aiohttp import ClientSession
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
@@ -16,11 +17,11 @@ logger = logging.getLogger(__name__)
 import asyncio
 
 
-async def run_shop_task(shop_id: str) -> None:
+async def run_shop_task(shop_id: str, client_session: ClientSession) -> None:
     while True:
         try:
             access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
-            wb_api = WBApi(access)
+            wb_api = WBApi(access, client_session)
             wb_shop = WBShop(wb_api)
             await wb_shop.run()
         except StopShopUpdateException:
@@ -30,7 +31,9 @@ async def run_shop_task(shop_id: str) -> None:
             await asyncio.sleep(1)
 
 
-async def _update_tasks(active_tasks: dict[str, Task[None]]) -> None:
+async def _update_tasks(
+    active_tasks: dict[str, Task[None]], client_session: ClientSession
+) -> None:
     # Получение списка магазинов с активными настройками
     stmt = (
         select(WBCabinet.shop_id)
@@ -53,7 +56,7 @@ async def _update_tasks(active_tasks: dict[str, Task[None]]) -> None:
             all_needs_for_run_shop_ids.append(shop_id)
             if shop_id not in active_tasks:
                 # Создание асинхронной задачи
-                task = asyncio.create_task(run_shop_task(shop_id))
+                task = asyncio.create_task(run_shop_task(shop_id, client_session))
                 active_tasks[shop_id] = task
                 logger.debug(f"Процесс обновления магазина {shop_id} запущен")
                 await asyncio.sleep(1)
@@ -80,14 +83,15 @@ async def _update_tasks(active_tasks: dict[str, Task[None]]) -> None:
 
 
 async def run() -> None:
-    active_tasks: dict[str, Task[None]] = {}
-    while True:
-        try:
-            await _update_tasks(active_tasks)
-        except redis.exceptions.BusyLoadingError:
-            logger.warning("Редис еще не загрузилась")
-            await asyncio.sleep(15 * 60)
-        except Exception as exc:
-            logger.error(
-                f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
-            )
+    async with ClientSession() as session:
+        active_tasks: dict[str, Task[None]] = {}
+        while True:
+            try:
+                await _update_tasks(active_tasks, session)
+            except redis.exceptions.BusyLoadingError:
+                logger.warning("Редис еще не загрузилась")
+                await asyncio.sleep(15 * 60)
+            except Exception as exc:
+                logger.error(
+                    f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
+                )

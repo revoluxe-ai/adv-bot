@@ -1,12 +1,9 @@
 import asyncio
 import json
 import logging
-import typing
 
-import aiohttp
+from aiohttp import ClientSession
 
-if typing.TYPE_CHECKING:
-    from app.core.wb_api.base import Headers
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.http_request import requests
 from app.modules.common_slaves.wildberries.models import WBToken
@@ -29,10 +26,13 @@ class CheckRighter:
         ],
     ]
 
-    async def check_all_rights(self, token: WBToken) -> bool:
+    async def check_all_rights(self, token: WBToken, session: ClientSession) -> bool:
+        from app.modules.common_slaves.wildberries.ABC_WB_API import Headers
+
         self.headers = Headers(token)
         check_tasks = [
-            self.ping_rights(entry_point) for entry_point in self.check_entry_points
+            self.ping_rights(entry_point, session)
+            for entry_point in self.check_entry_points
         ]
         try:
             await asyncio.gather(*check_tasks)
@@ -41,17 +41,17 @@ class CheckRighter:
             return False
         return True
 
-    async def ping_rights(self, entry_point: list[str]) -> str:
+    async def ping_rights(self, entry_point: list[str], session) -> str:
         url = entry_point[0]
         name = entry_point[1]
-        async with aiohttp.ClientSession() as session:
-            response = await requests(
-                session, "GET", url=url, headers=self.headers.standart
-            )
-            response = json.loads(response)
-            status = response["Status"]
-            if status == "OK":
-                return "OK"
-            else:
-                logging.error(f"Нет доступов для аналитики: {response}")
-                raise ApiForbiddenError(f"Нет прав для {name}")
+
+        response = await requests(
+            session, "GET", url=url, headers=self.headers.standart
+        )
+        response = json.loads(response)
+        status = response["Status"]
+        if status == "OK":
+            return "OK"
+        else:
+            logging.error(f"Нет доступов для аналитики: {response}")
+            raise ApiForbiddenError(f"Нет прав для {name}")

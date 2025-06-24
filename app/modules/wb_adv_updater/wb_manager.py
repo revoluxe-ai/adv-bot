@@ -3,6 +3,7 @@ import datetime
 import logging
 from typing import List
 
+from aiohttp import ClientSession
 from sqlalchemy import and_, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -54,15 +55,14 @@ def get_count_advs_for_wb_cabinet(
 
 
 async def check_adv_payment(
-        session: AsyncSession,
-        adv_setting: AdvSetting,
-        current_date: datetime.date
+    session: AsyncSession, adv_setting: AdvSetting, current_date: datetime.date
 ) -> bool:
     """Проверяет наличие платежа для настройки рекламы на указанную дату."""
-    adv_payment_check_stmt = select(exists().where(
-        AdvPayment.adv_setting_id == adv_setting.id,
-        AdvPayment.date == current_date
-    ))
+    adv_payment_check_stmt = select(
+        exists().where(
+            AdvPayment.adv_setting_id == adv_setting.id, AdvPayment.date == current_date
+        )
+    )
 
     result = await session.execute(adv_payment_check_stmt)
     return result.scalar()
@@ -177,7 +177,8 @@ async def insert_or_update_keywords(client, keyword_stats, adv_id, table_name: s
 async def update_keywords_stat_in_click_house(
     client, keyword_stats: List[KeywordStat], adv_id: int, table_name: str
 ) -> None:
-    await insert_or_update_keywords(client, keyword_stats, adv_id, table_name)
+    if keyword_stats:
+        await insert_or_update_keywords(client, keyword_stats, adv_id, table_name)
 
 
 async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
@@ -202,28 +203,25 @@ async def update_predict_ctr():
 
 
 async def update_all_keyword_data(
-    access,
     adv_setting,
-    wb_cabinet: WBCabinet,
-    keywords: list[KeywordStat] = None,
-    wb_api: WBApi = None,
+    wb_api: WBApi,
 ):
-
+    wb_cabinet = wb_api.wb_access.wb_cabinet
+    assert wb_cabinet is not None, "WBCabinet is None"
     try:
-        if not wb_api:
-            wb_api = WBApi(access)
         async with get_clickhouse_client() as client:
             await common_keyword_stat_update(client, adv_setting, wb_api)
     except ApiForbiddenError:
         logger.error(
-            f"Нет доступов для обновления данных магазина: {access.wb_cabinet.shop_id}"
+            f"Нет доступов для обновления данных магазина: {wb_api.wb_access.wb_cabinet.shop_id}"
         )
         return
     except Exception as exc:
         logger.error("Ошибка обновления статистики ключевых слов", exc_info=True)
         raise exc
     try:
-        data_setter = DataSetter(access)
+        keywords = await data_manager.get_good_bad_phrases(adv_setting)
+        data_setter = DataSetter(wb_api)
         await data_setter.update_minus_keywords_in_adv(
             adv_setting, wb_cabinet, keywords
         )
@@ -233,7 +231,7 @@ async def update_all_keyword_data(
     return
 
 
-async def update_all_keywords_on_wb() -> None:
+async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
         async with sm() as session:
@@ -251,10 +249,9 @@ async def update_all_keywords_on_wb() -> None:
                     if not access:
                         logger.error(f"Нет доступа к кабинету {wb_cabinet_id}")
                         continue
+                    wb_api = WBApi(access, client_session)
                     task = asyncio.create_task(
-                        update_all_keyword_data(
-                            access, adv_setting, wb_cabinet=access.wb_cabinet
-                        )
+                        update_all_keyword_data(adv_setting, wb_api)
                     )
                     update_tasks[adv_setting.id] = task
                 else:
@@ -415,17 +412,17 @@ class MessageCounter:
 message_counter = MessageCounter()
 
 
-async def update_wb_config_data() -> None:
-    access = await super_cabinet_manager.get_common_access()
-    wb_api = WBAdvAPI(access)
+async def update_wb_config_data(client_session: ClientSession) -> None:
+    access = await super_cabinet_manager.get_common_access(client_session)
+    wb_api = WBAdvAPI(access, client_session)
     min_cpm_data: MinCPMData = await wb_api.get_min_cpm_adv_data()
     await redis_manager.set_min_cpm_data(min_cpm_data)
 
 
-async def update_wb_config_data_run() -> None:
+async def update_wb_config_data_run(client_session) -> None:
     while True:
         try:
-            await update_wb_config_data()
+            await update_wb_config_data(client_session)
         except Exception as exc:
             logger.error(f"Ошибка обновления данных {exc}", exc_info=True)
             raise exc

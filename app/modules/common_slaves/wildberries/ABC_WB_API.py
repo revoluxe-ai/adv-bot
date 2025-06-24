@@ -3,6 +3,8 @@ import os
 from abc import ABC
 from typing import TYPE_CHECKING
 
+from aiohttp import ClientSession
+
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.utils.db.session_maker import get_async_session_maker as sm
 from . import models
@@ -39,7 +41,7 @@ class ABC_WB_API(WbRequestApiMixin):
     _single_adv_files = os.path.join(current_path, "singe_adv_files")
     _single_advs_report = os.path.join(current_path, "single_advs_report.csv")
 
-    def __init__(self, wb_access: "WBCabinetAccess"):
+    def __init__(self, wb_access: "WBCabinetAccess", session: ClientSession) -> None:
         tokens: list[WBToken] = wb_access.tokens
         self.access = wb_access
         wb_cabinet: WBCabinet = wb_access.wb_cabinet
@@ -57,6 +59,7 @@ class ABC_WB_API(WbRequestApiMixin):
         shop_id = current_token.shop_id
         self._shop_id = shop_id
         self.shop_id = shop_id
+        self.session = session
 
     # @property
     # @abstractmethod
