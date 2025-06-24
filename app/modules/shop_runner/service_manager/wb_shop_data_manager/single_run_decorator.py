@@ -1,17 +1,14 @@
 ﻿import asyncio
-import hashlib
-import json
 import logging
+from collections import Counter
 from functools import wraps
-from typing import Callable, Awaitable, Any, Dict
+from typing import Callable, Awaitable, Any
 
 logger = logging.getLogger(__name__)
 
 
-def make_key(func_name: str, args: Any, kwargs: Any) -> str:
-    key_data = {"func_name": func_name, "args": args, "kwargs": kwargs}
-    key_json = json.dumps(key_data, sort_keys=True, default=str)
-    return hashlib.md5(key_json.encode()).hexdigest()
+def make_key(func_name: str, args: tuple[Any], kwargs: dict[Any, Any]) -> str:
+    return f"{func_name}:{args}:{frozenset(kwargs.items())}"
 
 
 def single_run() -> (
@@ -20,43 +17,52 @@ def single_run() -> (
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         @wraps(func)
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+
             if not hasattr(self, "_single_run_events"):
                 self._single_run_events = {}
             if not hasattr(self, "_single_run_results"):
                 self._single_run_results = {}
+            if not hasattr(self, "_single_run_call_counter"):
+                self._single_run_call_counter = Counter()
 
-            events: Dict[str, asyncio.Event] = self._single_run_events
+            events: dict[str, asyncio.Event] = self._single_run_events
+            results: dict[str, Any] = self._single_run_results
 
-            # Генерируем уникальный ключ для набора параметров
             key = make_key(func.__name__, args, kwargs)
 
-            event = events.get(key)
-            if event is None:
-                event = asyncio.Event()
-                event.set()
-                events[key] = event
+            # Если уже запущена функция — ждём
+            if key in events:
+                self._single_run_call_counter[key] += 1
+                try:
+                    await events[key].wait()
+                    return results[key]
+                finally:
+                    self._single_run_call_counter[key] -= 1
+                    if self._single_run_call_counter[key] <= 0:
+                        del events[key]
+                        del results[key]
 
-            if not event.is_set():
-                await event.wait()
-                result = self._single_run_results[key]
-                return result
+            # Первый вызов
+            event = asyncio.Event()
+            event.clear()
+            events[key] = event
+            self._single_run_call_counter[key] = 0  # Никто ещё не ждёт
 
             try:
-                event.clear()
-                try:
-                    result = await func(self, *args, **kwargs)
-                except Exception as exc:
-                    logger.error(
-                        f"Ошибка обернутой функции: {func.__name__}", exc_info=True
-                    )
-                    raise exc
-                self._single_run_results[key] = result
-                event.set()
+                result = await func(self, *args, **kwargs)
+                results[key] = result
                 return result
-            except Exception as e:
-                # Здесь можно вставить свой логгер
-                print(f"Ошибка в {func.__name__}: {e}", flush=True)
+            except Exception:
+                logger.error(
+                    f"Ошибка обернутой функции: {func.__name__}", exc_info=True
+                )
                 raise
+            finally:
+                event.set()
+                if self._single_run_call_counter[key] <= 0:
+                    del events[key]
+                    del results[key]
+                    del self._single_run_call_counter[key]
 
         return wrapper
 
