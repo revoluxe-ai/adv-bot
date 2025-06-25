@@ -79,9 +79,19 @@ async def update_cards_in_db(
 async def _update_cards_in_db(
     cards: Sequence[CardFromWB], wb_cabinet: WBCabinet, session: AsyncSession
 ) -> None:
+
     if not cards:
         return
 
+    pass_nmids = set()
+    clear_cards = []
+    for card in cards:
+        nmid = card.nmid
+        if nmid not in pass_nmids:
+            clear_cards.append(card)
+            pass_nmids.add(card)
+
+    cards = clear_cards
     # Получаем уникальные имена категорий
     category_names = {card.wb_category_name for card in cards}
 
@@ -122,5 +132,8 @@ async def _update_cards_in_db(
         },
     )
 
-    await session.execute(stmt_on_conflict)
-    await session.commit()
+    try:
+        await session.execute(stmt_on_conflict)
+        await session.commit()
+    except Exception:
+        raise
