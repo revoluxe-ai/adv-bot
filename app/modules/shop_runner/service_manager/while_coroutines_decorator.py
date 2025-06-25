@@ -3,6 +3,8 @@ import logging
 from functools import wraps
 from typing import ParamSpec, TypeVar, Callable, Awaitable
 
+from sqlalchemy.exc import InterfaceError
+
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
@@ -33,6 +35,9 @@ def while_coroutine_decorator(
                     await func(*args, **kwargs)
                     await asyncio.sleep(pause_on_success)
                     continue
+                except InterfaceError:
+                    logger.exception(f"Корутина: {func.__name__}")
+                    await asyncio.sleep(1)
                 except (NotFoundActiveAdvCompany, ApiForbiddenError) as exc:
                     raise StopShopUpdateException from exc
                 except Exception as exc:
