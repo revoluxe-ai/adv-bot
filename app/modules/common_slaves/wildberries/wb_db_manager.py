@@ -20,6 +20,16 @@ _sm = get_async_session_maker
 async def update_advs_in_db(
     advs: list[Adv], wb_cabinet_id: int, session: AsyncSession
 ) -> None:
+    part = 10
+    # Разбиваем список advs на части по 10 элементов
+    for i in range(0, len(advs), part):
+        advs_part = advs[i : i + part]
+        await _update_advs_in_db(advs_part, wb_cabinet_id, session)
+
+
+async def _update_advs_in_db(
+    advs: list[Adv], wb_cabinet_id: int, session: AsyncSession
+) -> None:
     # Преобразуем в список словарей
     adv_data = [
         {
