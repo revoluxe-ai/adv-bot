@@ -49,9 +49,7 @@ async def get_access_for_wb_cabinet(
         wb_cabinet_id = wb_cabinet_id_or_shop_id
 
     async with sm() as session:
-        stmt_wb_cabinet_getting = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
-        result_from_pg = await session.execute(stmt_wb_cabinet_getting)
-        wb_cabinet: WBCabinet | None = result_from_pg.scalar()
+        wb_cabinet: WBCabinet | None = await session.get(WBCabinet, wb_cabinet_id)
 
         if wb_cabinet is None:
             raise exceptions.WBCabinetNotFoundError(wb_cabinet_id)
