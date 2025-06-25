@@ -62,47 +62,52 @@ async def _update_advs_in_db(
     await session.commit()
 
 
+
+
+
 async def update_cards_in_db(
     cards: list[CardFromWB], wb_cabinet: WBCabinet, session: AsyncSession
 ) -> None:
-    # Получаем все nmid из списка карточек
-    nmids = [card.nmid for card in cards]
+    if not cards:
+        return
 
-    # Делаем один запрос для получения всех карточек
-    stmt = select(WBCard).where(WBCard.nmid.in_(nmids))
+    # Подготовим список данных
+    card_values = []
+    category_names = {card.wb_category_name for card in cards}
+
+    # Получаем или создаём категории
+    stmt = select(WBCategory).where(WBCategory.wb_category_name.in_(category_names))
     result = await session.execute(stmt)
-    existing_cards = result.scalars().all()
+    existing_categories = {cat.wb_category_name: cat for cat in result.scalars().all()}
 
-    # Создаём словарь для быстрого поиска
-    cards_by_nmid = {card.nmid: card for card in existing_cards}
+    # Добавляем недостающие категории
+    for name in category_names - existing_categories.keys():
+        new_cat = WBCategory(wb_category_name=name, wb_cabinet=wb_cabinet)
+        session.add(new_cat)
+        existing_categories[name] = new_cat
 
-    # Теперь можем итерироваться по исходным карточкам
+    await session.flush()  # чтобы получить id категорий
+
+    # Готовим данные для upsert
     for card in cards:
-        existing_card = cards_by_nmid.get(card.nmid)
-        if existing_card:
-            # Если карточка уже существует, обновляем ее
-            existing_card.json = json.dumps(card.data)
-            existing_card.name = card.name
-        else:
-            # Если карточка новая, добавляем ее в список для последующего добавления в базу
-            db_card = WBCard()
-            db_card.nmid = card.nmid
-            db_card.name = card.name
-            db_card.json = json.dumps(card.data)
-            session.add(db_card)  # Используем add вместо merge
-            # Проверяем существование категории и добавляем ее, если необходимо
-            stmt_for_wb_category = select(WBCategory).where(
-                WBCategory.wb_category_name == card.wb_category_name
-            )
-            result_for_category = await session.execute(stmt_for_wb_category)
-            exist_category = result_for_category.scalars().first()
-            if not exist_category:
-                category: WBCategory = WBCategory()
-                category.wb_category_name = card.wb_category_name
-                category.wb_cabinet = wb_cabinet
-                session.add(category)
-                db_card.wb_category = category
-            else:
-                db_card.wb_category = exist_category
+        wb_category_id = existing_categories[card.wb_category_name].id
+        card_values.append(
+            {
+                "nmid": card.nmid,
+                "name": card.name,
+                "json": json.dumps(card.data),
+                "wb_category_id": wb_category_id,
+            }
+        )
 
-        await session.commit()
+    # Выполняем bulk upsert
+    stmt = insert(WBCard).values(card_values)
+    update_dict = {
+        "name": stmt.excluded.name,
+        "json": stmt.excluded.json,
+        "wb_category_id": stmt.excluded.wb_category_id,
+    }
+    stmt = stmt.on_conflict_do_update(index_elements=["nmid"], set_=update_dict)
+
+    await session.execute(stmt)
+    await session.commit()
