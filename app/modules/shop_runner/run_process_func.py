@@ -53,7 +53,6 @@ async def _update_tasks(
         result = await session.execute(stmt)
         all_needs_for_run_shop_ids = result.scalars().all()
         for shop_id in all_needs_for_run_shop_ids:
-            all_needs_for_run_shop_ids.append(shop_id)
             if shop_id not in active_tasks:
                 # Создание асинхронной задачи
                 task = asyncio.create_task(run_shop_task(shop_id, client_session))
