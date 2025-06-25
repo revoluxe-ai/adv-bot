@@ -623,6 +623,7 @@ async def get_clusters_and_presets(texts: list[str]) -> dict[str, [tuple[str, in
             logger.error(
                 f"Ошибка при парсинге значения {value} из Redis с ключом {key}: {e}"
             )
+            del e
             clusters_and_presets[text] = (None, None)
 
     return clusters_and_presets

@@ -19,6 +19,7 @@ class WBShopDataManager:
         self._wb_cabinet = wb_cabinet
         self.shop_id = wb_cabinet.shop_id
 
+    # @profile
     @single_run()
     async def get_calculated_keywords(self, adv: AdvSetting) -> list[CalculatedKeyword]:
         if not adv:

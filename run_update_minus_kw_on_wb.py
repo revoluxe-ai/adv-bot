@@ -28,4 +28,5 @@ if __name__ == "__main__":
                 asyncio.run(runner.run_update_all_keywords_on_wb(semaphore))
             except Exception as e:
                 logger.exception(e)
+                del e
                 sleep(70)

@@ -69,6 +69,7 @@ class ParserService:
             logger.debug(
                 f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True
             )
+            del e
             return []
         if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
@@ -165,7 +166,7 @@ class ParserService:
             assert data["payloadVersion"] == 2
         except Exception as e:
             logger.debug(f"Ошибка в проверке версии данных: {e}", exc_info=True)
-            raise DataError(f"{e}", text)
+            raise DataError(f"{e}", text) from e
 
         metadata = data["metadata"]
         catalog_type = metadata["catalog_type"]
@@ -228,6 +229,7 @@ async def add_positions_from_page(
             f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True
         )
         logger.debug(f"{get_parse_url(text, page)}")
+        del e
 
 
 async def add_wb_positions_to_clickhouse(positions) -> None:
@@ -329,6 +331,7 @@ async def _add_wb_positions(
             )
         except Exception as e:
             logger.error(f"Ошибка при парсинге страницы {page}: {e}")
+            del e
         checked_pages.add(page)
         await asyncio.sleep(delay)
 

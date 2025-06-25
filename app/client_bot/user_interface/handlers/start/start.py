@@ -424,6 +424,8 @@ async def update_company_from_wb(
             chat_id,
             f"Ошибка при обновлении данных, обратитесь в поддержку {const.SUPPORT_LINK}",
         )
+        exc.__traceback__ = None
+        del exc
 
     # Получаем список рекламных кампаний
     async with sm() as session:

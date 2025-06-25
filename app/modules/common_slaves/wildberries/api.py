@@ -140,7 +140,6 @@ class AdvertApi(ABC_WB_API):
         date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
         url = f"https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}"
-
         response_text = await requests(
             self.session, "GET", url, headers=self.headers.standart
         )
@@ -171,7 +170,6 @@ class AdvertApi(ABC_WB_API):
     ) -> list[KeywordStat]:
         keywords = []
         url = f"https://advert-api.wildberries.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}"
-
         response_text = await requests(
             self.session, "GET", url, headers=self.headers.standart
         )
@@ -220,7 +218,6 @@ class AdvertApi(ABC_WB_API):
     async def get_advertIds(self) -> list[int]:
         advertIds = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/count"
-
         response_text = await requests(
             self.session, "GET", url, headers=self.headers.standart
         )
@@ -241,7 +238,6 @@ class AdvertApi(ABC_WB_API):
     async def _get_advs(self, adv_ids: list) -> list[Adv]:
         advs = []
         url = f"https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
-
         response_text = await requests(
             self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
         )
@@ -311,14 +307,13 @@ class AdvertApi(ABC_WB_API):
             "on_pause": True,
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, json=data_json, headers=self.headers.standart
-            ) as response:
-                answer = await response.text()
-                if "error" in answer:
-                    error = json.loads(answer)["error"]
-                    return error
+        async with self.session.post(
+            url, json=data_json, headers=self.headers.standart
+        ) as response:
+            answer = await response.text()
+            if "error" in answer:
+                error = json.loads(answer)["error"]
+                return error
         adv_id = int(
             answer
         )  # Это предполагает, что ответ содержит ID рекламной кампании
@@ -379,7 +374,7 @@ class ContentApi(ABC_WB_API):
 
         while True:
             url = f"https://suppliers-api.wildberries.ru/content/v2/object/all?offset={offset}&limit={limit}"
-            categories = await request(url)
+            categories = await request(self.session, url)
             if categories:
                 all_categories.extend(categories)
             if not categories:
@@ -476,9 +471,9 @@ class ContentApi(ABC_WB_API):
 
 class WBApi:
     def __init__(
-        self, wb_access: WBCabinetAccess, session: aiohttp.ClientSession
-    ) -> None:
-        self.advert = AdvertApi(wb_access, session)
-        self.content = ContentApi(wb_access, session)
+        self, wb_access: WBCabinetAccess, client_session: aiohttp.ClientSession
+    ):
+        self.advert = AdvertApi(wb_access, client_session)
+        self.content = ContentApi(wb_access, client_session)
         self.wb_access = wb_access
-        self.client_session = session
+        self.client_session = client_session

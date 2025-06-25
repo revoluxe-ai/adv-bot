@@ -468,6 +468,7 @@ class ContentApi(BaseAPI, ContentMixin):
 
 
 class WBApi:
+
     def __init__(self, wb_access: WBCabinetAccess, session: ClientSession) -> None:
         self.advert = AdvertApi(wb_access, session)
         self.content = ContentApi(wb_access, session)

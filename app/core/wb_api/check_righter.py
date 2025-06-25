@@ -38,6 +38,7 @@ class CheckRighter:
             await asyncio.gather(*check_tasks)
         except ApiForbiddenError as e:
             logging.error(f"У токена нет достаточных прав: {e}")
+            del e
             return False
         return True
 

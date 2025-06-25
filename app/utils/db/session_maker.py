@@ -55,8 +55,8 @@ class AnalyticAsyncSession(AsyncSession):
                 )
             return result
         except Exception as e:
-            logger.error(f"Query error: {e}")
-            raise
+            logger.exception(f"Query error during execution:")
+            raise e
 
 
 # def log_checkout(dbapi_con, con_record, con_proxy):

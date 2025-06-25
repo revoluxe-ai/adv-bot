@@ -135,6 +135,7 @@ if __name__ == "__main__":
             except Exception as e:
                 logger.error(f"❌ Непредвиденная ошибка при удалении вебхука: {e}")
                 logger.info("⚠️ Продолжаем запуск несмотря на ошибку.")
+                del e
 
             try:
                 async with ClientSession() as client_session:

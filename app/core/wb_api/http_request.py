@@ -126,6 +126,7 @@ def try_except_decorator(
                     logger.debug(
                         f'Следующая пауза между запросами: {state["_current_pause"]} секунд для shop_id: {shop_id}'
                     )
+                    del e
                 except Exception as e:
                     raise e
 

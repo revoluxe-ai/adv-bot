@@ -1,4 +1,5 @@
 import json
+from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -62,52 +63,64 @@ async def _update_advs_in_db(
     await session.commit()
 
 
-
-
-
 async def update_cards_in_db(
     cards: list[CardFromWB], wb_cabinet: WBCabinet, session: AsyncSession
 ) -> None:
     if not cards:
         return
 
-    # Подготовим список данных
-    card_values = []
+    part = 3
+
+    for i in range(0, len(cards), part):
+        cards_part = cards[i : i + part]
+        await _update_cards_in_db(cards_part, wb_cabinet, session)
+
+
+async def _update_cards_in_db(
+    cards: Sequence[CardFromWB], wb_cabinet: WBCabinet, session: AsyncSession
+) -> None:
+    if not cards:
+        return
+
+    # Получаем уникальные имена категорий
     category_names = {card.wb_category_name for card in cards}
 
-    # Получаем или создаём категории
+    # Получаем уже существующие категории
     stmt = select(WBCategory).where(WBCategory.wb_category_name.in_(category_names))
     result = await session.execute(stmt)
-    existing_categories = {cat.wb_category_name: cat for cat in result.scalars().all()}
+    existing_categories = {
+        category.wb_category_name: category for category in result.scalars().all()
+    }
 
     # Добавляем недостающие категории
     for name in category_names - existing_categories.keys():
-        new_cat = WBCategory(wb_category_name=name, wb_cabinet=wb_cabinet)
-        session.add(new_cat)
-        existing_categories[name] = new_cat
+        new_category = WBCategory(wb_category_name=name, wb_cabinet=wb_cabinet)
+        session.add(new_category)
+        existing_categories[name] = new_category
 
-    await session.flush()  # чтобы получить id категорий
+    await session.flush()  # Чтобы получить id новых категорий
 
-    # Готовим данные для upsert
-    for card in cards:
-        wb_category_id = existing_categories[card.wb_category_name].id
-        card_values.append(
-            {
-                "nmid": card.nmid,
-                "name": card.name,
-                "json": json.dumps(card.data),
-                "wb_category_id": wb_category_id,
-            }
-        )
+    # Подготавливаем данные для UPSERT
+    card_values = [
+        {
+            "nmid": card.nmid,
+            "name": card.name,
+            "json": json.dumps(card.data),
+            "wb_category_id": existing_categories[card.wb_category_name].id,
+        }
+        for card in cards
+    ]
 
-    # Выполняем bulk upsert
-    stmt = insert(WBCard).values(card_values)
-    update_dict = {
-        "name": stmt.excluded.name,
-        "json": stmt.excluded.json,
-        "wb_category_id": stmt.excluded.wb_category_id,
-    }
-    stmt = stmt.on_conflict_do_update(index_elements=["nmid"], set_=update_dict)
+    # Выполняем UPSERT (insert ... on conflict do update)
+    stmt_for_insert_cards = insert(WBCard).values(card_values)
+    stmt_on_conflict = stmt_for_insert_cards.on_conflict_do_update(
+        index_elements=["nmid"],
+        set_={
+            "name": stmt_for_insert_cards.excluded.name,
+            "json": stmt_for_insert_cards.excluded.json,
+            "wb_category_id": stmt_for_insert_cards.excluded.wb_category_id,
+        },
+    )
 
-    await session.execute(stmt)
+    await session.execute(stmt_on_conflict)
     await session.commit()

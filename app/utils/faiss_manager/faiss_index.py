@@ -11,9 +11,18 @@ logger = logging.getLogger(__name__)
 
 
 class Index:
-    def __init__(self, objects: Union[Query, List], vector_property_name, file_path, index_type, batch_size):
+    def __init__(
+        self,
+        objects: Union[Query, List],
+        vector_property_name,
+        file_path,
+        index_type,
+        batch_size,
+    ):
         if not os.path.exists(file_path):
-            index = self.__create_new_index(objects, vector_property_name, file_path, index_type, batch_size)
+            index = self.__create_new_index(
+                objects, vector_property_name, file_path, index_type, batch_size
+            )
         else:
             try:
                 index: faiss.IndexIDMap = faiss.read_index(file_path)
@@ -24,17 +33,29 @@ class Index:
                 else:
                     total = len(objects)
                 if ntotal != total:
-                    index = self.__create_new_index(objects, vector_property_name, file_path, index_type,  batch_size)
+                    index = self.__create_new_index(
+                        objects, vector_property_name, file_path, index_type, batch_size
+                    )
             except RuntimeError as exc:
                 logger.error(exc)
-                index = self.__create_new_index(objects, vector_property_name, file_path, index_type,  batch_size)
+                del e
+                index = self.__create_new_index(
+                    objects, vector_property_name, file_path, index_type, batch_size
+                )
         self.index = index
         self._file_path = file_path
 
-
-
-    def __create_new_index(self, objects: Union[Query,Generator], vector_property_name, file_path, index_type, batch_size: int):
-        index = getattr(faiss, index_type)(len(getattr(objects[0], vector_property_name)))
+    def __create_new_index(
+        self,
+        objects: Union[Query, Generator],
+        vector_property_name,
+        file_path,
+        index_type,
+        batch_size: int,
+    ):
+        index = getattr(faiss, index_type)(
+            len(getattr(objects[0], vector_property_name))
+        )
         index = faiss.IndexIDMap(index)
 
         vectors = []
@@ -69,8 +90,6 @@ class Index:
         # Сохраняем индекс в файл
         faiss.write_index(index, file_path)
         return index
-
-
 
     def get_near_object_id(self, vector: list[float]):
         vector_matrix = np.expand_dims(vector, axis=0)

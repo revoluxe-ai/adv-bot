@@ -28,6 +28,7 @@ async def run_shop_task(shop_id: str, client_session: ClientSession) -> None:
             return None
         except Exception as exc:
             logger.error(f"Ошибка обработки магазина {shop_id}, {exc}", exc_info=True)
+            del exc
             await asyncio.sleep(1)
 
 
@@ -49,23 +50,20 @@ async def _update_tasks(
     if shop_filter_list:
         stmt = stmt.filter(WBCabinet.shop_id.in_(shop_filter_list))
     async with sm() as session:
-        result = await session.stream(stmt)
-        data_rows = result.scalars().yield_per(10)
-        all_needs_for_run_shop_ids = []
-        async for shop_id in data_rows:
+        result = await session.execute(stmt)
+        all_needs_for_run_shop_ids = result.scalars().all()
+        for shop_id in all_needs_for_run_shop_ids:
             all_needs_for_run_shop_ids.append(shop_id)
             if shop_id not in active_tasks:
                 # Создание асинхронной задачи
                 task = asyncio.create_task(run_shop_task(shop_id, client_session))
                 active_tasks[shop_id] = task
                 logger.debug(f"Процесс обновления магазина {shop_id} запущен")
-                await asyncio.sleep(1)
-
             else:
                 task = active_tasks[shop_id]
                 if task.done():
                     if exc := task.exception():
-                        logger.error(
+                        logger.exception(
                             f"Не обработанная ошибка выполнения задачи магазина: {exc}"
                         )
                     del active_tasks[shop_id]
@@ -95,3 +93,6 @@ async def run() -> None:
                 logger.error(
                     f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
                 )
+                exc.__traceback__ = None
+                del exc
+                await asyncio.sleep(1)

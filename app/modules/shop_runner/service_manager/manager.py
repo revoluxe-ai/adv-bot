@@ -127,11 +127,11 @@ class CoroutinesManager:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
         return None
 
-    @staticmethod
-    async def _update_adv_data_from_wb_to_pg(
-        shop_data_updater: ShopDataUpdater,
-    ) -> None:
-        await shop_data_updater.update_advs_data()
+    # @staticmethod
+    # async def _update_adv_data_from_wb_to_pg(
+    #     shop_data_updater: ShopDataUpdater,
+    # ) -> None:
+    #     await shop_data_updater.update_advs_data()
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
@@ -226,6 +226,8 @@ class CoroutinesManager:
                     f"Критическая ошибка автообновления настроек РК {exc}",
                     exc_info=True,
                 )
+                exc.__traceback__ = None
+                del exc
 
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:

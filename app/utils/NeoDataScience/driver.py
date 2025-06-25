@@ -366,10 +366,12 @@ RETURN graphName
             await self.linking_images()
         except neo4j.exceptions.ClientError as e:
             logger.error(f"Ошибка при склейке графа изображений {e}")
+            del e
         try:
             await self.linking_keywords()
         except neo4j.exceptions.ClientError as e:
             logger.error(f"Ошибка при склейке графа ключевых слов {e}")
+            del e
 
     async def linking_images(self):
         name = "images"

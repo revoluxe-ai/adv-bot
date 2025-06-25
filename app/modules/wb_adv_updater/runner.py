@@ -36,6 +36,7 @@ async def sender_message_to_not_pay_users():
             await message_for_not_pay_user_sender.send_messages_to_users()
         except Exception as e:
             logger.error(f"Ошибка отправки сообщений {e}", exc_info=True)
+            del e
         await asyncio.sleep(60 * 5)
 
 
@@ -45,6 +46,7 @@ async def process_payment_for_advs() -> None:
             await wb_manager.process_payment_for_advs()
         except Exception as e:
             logger.error(f"Ошибка обработки платежей {e}", exc_info=True)
+            del e
         await asyncio.sleep(60 * 60)
 
 
@@ -62,6 +64,7 @@ async def run_update_model():
             await update_model()
         except Exception as e:
             logger.error(f"Ошибка обновления модели {e}", exc_info=True)
+            del e
         await asyncio.sleep(0)
 
 
@@ -85,4 +88,5 @@ async def run_main_coroutines():
                 await main_loop(client_session)
             except Exception as e:
                 logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
+                del e
                 await asyncio.sleep(0)

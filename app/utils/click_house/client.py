@@ -13,7 +13,7 @@ from app.settings import settings
 
 system_name = platform.system()
 
-pool_mgr = PoolManager(num_pools=10, maxsize=20)  # Пример настройки пула соединений
+pool_mgr = PoolManager(num_pools=10, maxsize=100)  # Пример настройки пула соединений
 
 logger = logging.getLogger(__name__)
 

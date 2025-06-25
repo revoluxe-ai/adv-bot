@@ -89,4 +89,5 @@ if __name__ == "__main__":
             raise  # Перевыбрасывание исключения
         except Exception as e:
             logging.error("Произошла ошибка:", exc_info=True)
+            del e
             continue  # Продолжение работы программы после других исключений

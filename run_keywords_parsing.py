@@ -1,8 +1,11 @@
 import asyncio
 import logging
+
 from dotenv import load_dotenv
+
 from app.modules.wb_keywords_parser.parser_worker import ParserWorker
 from app.settings import settings
+
 load_dotenv()
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -18,10 +21,11 @@ async def main():
         # Создаем и запускаем воркер
         worker = ParserWorker(max_parallel_tasks=max_parallel_parsing_tasks)
         await worker.run()
-        
+
     except Exception as e:
         logger.error(f"Error in main: {e}")
-        raise
+        raise e
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -59,7 +59,7 @@ class ABC_WB_API(WbRequestApiMixin):
         shop_id = current_token.shop_id
         self._shop_id = shop_id
         self.shop_id = shop_id
-        self.session = session
+        self.session: ClientSession = session
 
     # @property
     # @abstractmethod

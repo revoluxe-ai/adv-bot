@@ -47,9 +47,10 @@ class Word2Vec:
                 os.remove(self.model_path)
             # Повторный вызов _load_model для перезагрузки
             await self._load_model()
+            del e
         except Exception as e:
             logger.error(f"Произошла ошибка при загрузке модели: {e}")
-            raise
+            raise e
 
     def _most_similar(self, word):
         return self._model.most_similar(word)

@@ -32,7 +32,11 @@ class KeywordStatus:
 
 
 class CalculatedKeyword(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
+    # model_config = ConfigDict(
+    #     extra="forbid",
+    #     arbitrary_types_allowed=True,
+    #     frozen=True,  # Если возможно
+    # )
 
     text: str
     clicks: int
@@ -65,6 +69,12 @@ class CalculatedKeyword(BaseModel):
     keyword_setting_original_id: int | None = None
     adv_id: int | None = None
     relevant: bool | None = None
+
+    def clear_cache(self):
+        """Очистка кэшированных свойств"""
+        for attr in ["_query_static", "_mean_ctr_cache", "_rating_cache"]:
+            if hasattr(self, attr):
+                delattr(self, attr)
 
     @property
     def mean_ctr(self):

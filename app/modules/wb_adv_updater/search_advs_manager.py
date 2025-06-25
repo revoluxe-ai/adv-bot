@@ -72,6 +72,7 @@ async def set_fix_keywords_phrases_for_search_adv(
         logger.error(
             f"Ошибка установки фраз для {adv_setting.name}: {e}", exc_info=True
         )
+        del e
         return
 
 
@@ -103,6 +104,7 @@ async def set_minus_keywords_for_search_adv(
                 f" {adv_setting.adv_id}: {e}",
                 exc_info=True,
             )
+            del e
             return
 
 

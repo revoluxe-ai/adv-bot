@@ -1,24 +1,34 @@
-import docker
-import time
-from python_modules.logger import setup_logging
 import logging
+import time
 
+import docker
+
+from python_modules.logger import setup_logging
 
 setup_logging()
 
 logger = logging.getLogger(__name__)
 
+
 class PriorityManager:
     def __init__(self):
         self.client = docker.from_env()
-        self.bot = self.client.containers.get('wb_bot')
-        self.backend = self.client.containers.get('adv_wb_bot_backend')
-        self.activity_threshold = 30  # Процент нагрузки на CPU, при котором бот считается активным
+        self.bot = self.client.containers.get("wb_bot")
+        self.backend = self.client.containers.get("adv_wb_bot_backend")
+        self.activity_threshold = (
+            30  # Процент нагрузки на CPU, при котором бот считается активным
+        )
         self.check_interval = 0.5  # Интервал проверки активности
 
     def calculate_cpu_usage(self, stats):
-        cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
-        system_delta = stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
+        cpu_delta = (
+            stats["cpu_stats"]["cpu_usage"]["total_usage"]
+            - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+        )
+        system_delta = (
+            stats["cpu_stats"]["system_cpu_usage"]
+            - stats["precpu_stats"]["system_cpu_usage"]
+        )
         num_cores = len(stats["cpu_stats"]["cpu_usage"]["percpu_usage"])
 
         if system_delta > 0 and num_cores > 0:
@@ -34,6 +44,7 @@ class PriorityManager:
             return cpu_usage > self.activity_threshold
         except Exception as e:
             logger.error(f"Error checking activity: {e}", exc_info=True)
+            del e
             return False
 
     def run(self):
@@ -50,8 +61,8 @@ class PriorityManager:
                 time.sleep(self.check_interval)
             except Exception as e:
                 logger.error(f"Error in run loop: {e}")
+                del e
                 time.sleep(5)
-
 
 
 if __name__ == "__main__":

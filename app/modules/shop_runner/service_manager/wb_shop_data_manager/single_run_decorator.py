@@ -7,7 +7,7 @@ from typing import Callable, Awaitable, Any
 logger = logging.getLogger(__name__)
 
 
-def make_key(func_name: str, args: tuple[Any], kwargs: dict[Any, Any]) -> str:
+def make_key(func_name: str, args: tuple[Any, ...], kwargs: dict[Any, Any]) -> str:
     return f"{func_name}:{args}:{frozenset(kwargs.items())}"
 
 
@@ -35,12 +35,17 @@ def single_run() -> (
                 self._single_run_call_counter[key] += 1
                 try:
                     await events[key].wait()
-                    return results[key]
+                    try:
+                        return results[key]
+                    except KeyError:
+                        pass
+
                 finally:
                     self._single_run_call_counter[key] -= 1
                     if self._single_run_call_counter[key] <= 0:
-                        del events[key]
-                        del results[key]
+                        events.pop(key, None)
+                        results.pop(key, None)
+                        self._single_run_call_counter.pop(key, None)
 
             # Первый вызов
             event = asyncio.Event()
@@ -59,10 +64,11 @@ def single_run() -> (
                 raise
             finally:
                 event.set()
+                await asyncio.sleep(1)  # Даем время другим задачам обработать событие
                 if self._single_run_call_counter[key] <= 0:
-                    del events[key]
-                    del results[key]
-                    del self._single_run_call_counter[key]
+                    events.pop(key, None)
+                    results.pop(key, None)
+                    self._single_run_call_counter.pop(key, None)
 
         return wrapper
 

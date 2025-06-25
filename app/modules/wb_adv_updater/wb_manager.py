@@ -149,6 +149,7 @@ async def update_vectors_update_in_graph() -> None:
             await graph_vector_update()
         except Exception as exc:
             logger.error(f"Ошибка векторизации {exc}", exc_info=True)
+            del e
         await asyncio.sleep(0)
 
 
@@ -199,22 +200,22 @@ async def update_predict_ctr():
             await predictor.predict_ctr_for_keywords()
         except Exception as exc:
             logger.error(f"Ошибка предсказания CTR {exc}")
+            del e
         await asyncio.sleep(0)
 
 
 async def update_all_keyword_data(
-    adv_setting,
     wb_api: WBApi,
+    adv_setting,
+    wb_cabinet: WBCabinet,
 ):
-    wb_cabinet = wb_api.wb_access.wb_cabinet
-    assert wb_cabinet is not None, "WBCabinet is None"
+    shop_id = wb_api.wb_access.shop_id
     try:
         async with get_clickhouse_client() as client:
             await common_keyword_stat_update(client, adv_setting, wb_api)
     except ApiForbiddenError:
-        logger.error(
-            f"Нет доступов для обновления данных магазина: {wb_api.wb_access.wb_cabinet.shop_id}"
-        )
+        logger.error(f"Нет доступов для обновления данных магазина: {shop_id}")
+
         return
     except Exception as exc:
         logger.error("Ошибка обновления статистики ключевых слов", exc_info=True)
@@ -232,6 +233,8 @@ async def update_all_keyword_data(
 
 
 async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
+    from app.modules.common_slaves.wildberries.api import WBApi
+
     update_tasks: dict[int, asyncio.Task] = {}
     while True:
         async with sm() as session:
@@ -251,7 +254,9 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                         continue
                     wb_api = WBApi(access, client_session)
                     task = asyncio.create_task(
-                        update_all_keyword_data(adv_setting, wb_api)
+                        update_all_keyword_data(
+                            wb_api, adv_setting, wb_cabinet=access.wb_cabinet
+                        )
                     )
                     update_tasks[adv_setting.id] = task
                 else:
@@ -281,6 +286,7 @@ async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
                 await redis_manager.set_keyword_cluster(keyword_text, cluster_name)
     except Exception as e:
         logger.debug(f"Error getting clusters for adv {adv.id}: {e}", exc_info=True)
+        del e
         return
 
 
@@ -304,6 +310,7 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
             f"shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}",
             exc_info=True,
         )
+        del exc
     try:
         if not auction_adv_id:
             keywords_from_search_adv = []
@@ -319,6 +326,7 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
         logger.error(
             f"Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}"
         )
+        del exc
 
     if not keywords_from_auto and not keywords_from_search_adv:
         logger.debug(f"Пустой список ключевых слов для {adv_setting.adv_id}")

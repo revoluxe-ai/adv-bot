@@ -80,6 +80,7 @@ async def _create_complex_advs(
             f" для пополнения РК для артикула {nmid} "
             f"ADV ID кампанию, которую не смогли пополнить: {adv_id}",
         )
+        del exc
 
     except AdvNotFoundInWBError as exc:
         auto_adv_id = exc.auto_adv_id
@@ -90,6 +91,7 @@ async def _create_complex_advs(
             f"самостоятельно найти нет ли новой РК в кабинете WB и "
             f"обратитесь в поддержку -> {const.SUPPORT_LINK}",
         )
+        del exc
 
     except StartComplexAdvError as exc:
         auto_adv_id = exc.auto_adv_id
@@ -101,3 +103,5 @@ async def _create_complex_advs(
             f" самостоятельно запустились ли кампании и правильность их создания,"
             f" а также при необходимости обратитесь в поддержку -> {const.SUPPORT_LINK}",
         )
+
+        del exc

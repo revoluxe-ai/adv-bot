@@ -2,6 +2,7 @@ import logging
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api.data_classes.adv import Adv
+from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.bidder.excs import CpmNotFoundError
@@ -91,6 +92,8 @@ async def run_bidder_process_for_adv(
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение ставок для биддера")
         cpms: set[int] | None = await get_cpms_from_wb(adv_setting, wb_api)
+    except ApiForbiddenError as e:
+        raise e
     except Exception:
         logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
         return

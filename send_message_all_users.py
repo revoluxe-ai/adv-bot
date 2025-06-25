@@ -118,6 +118,7 @@ async def send_message_to_users():
             send_count += 1
         except Exception as e:
             logger.error(e)
+            del e
             not_send_count += 1
         print("Отправлено сообщений: ", send_count)
         print("Не отправлено сообщений: ", not_send_count)

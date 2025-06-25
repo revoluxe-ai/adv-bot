@@ -615,6 +615,7 @@ def __set_predict_ctr(
     return keyword_stats
 
 
+# @profile
 async def get_good_bad_phrases_for_min_ctr(
     adv_setting: AdvSetting,
     max_cpc=None,
