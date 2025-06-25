@@ -294,5 +294,21 @@ class Settings:
             return "ERROR"
         return value
 
+    @property
+    def PG_POOL_SIZE(self) -> int:
+        value = os.getenv("PG_POOL_SIZE")
+        if not value:
+            return 200
+        else:
+            return int(value)
+
+    @property
+    def PG_MAX_OVERFLOW(self) -> int:
+        value = os.getenv("PG_MAX_OVERFLOW")
+        if not value:
+            return 250
+        else:
+            return int(value)
+
 
 settings = Settings()

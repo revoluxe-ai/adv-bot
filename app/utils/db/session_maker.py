@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 conn_counter = 0
 
-pool_size = 150
-max_overflow = 200
+pool_size = settings.PG_POOL_SIZE
+max_overflow = settings.PG_MAX_OVERFLOW
 
 
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
