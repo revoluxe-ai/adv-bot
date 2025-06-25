@@ -541,6 +541,7 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullA
 #         return max_cpc
 
 
+# @profile
 async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     max_cpc = None
     if not max_cpc:
@@ -559,6 +560,7 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
     keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
     keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
+
     keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
     keywords = keywords_with_rating + keywords_without_rating
     return keywords
@@ -1164,13 +1166,15 @@ async def _get_new_min_ctr(adv: AdvSetting):
 
 async def _get_min_ctr(adv: AdvSetting):
     async with _sm(read_only=True) as session:
-        stmt = select(KeywordSetting).where(
+        stmt = select(KeywordSetting.text).where(
             KeywordSetting.hard_status == 2,
             KeywordSetting.adv_setting_id == adv.id,
         )
         result = await session.execute(stmt)
-        keyword_settings = result.unique().scalars().all()
-    texts = [kw.text for kw in keyword_settings]
+        texts = result.all()
+
+    texts = [text[0] for text in texts if text[0]]
+
     if texts:
         adv_id = adv.adv_id
         query = """
@@ -1235,11 +1239,11 @@ async def _get_min_ctr(adv: AdvSetting):
         text_to_real_ctr = {row[0]: row[1] for row in rows}
         real_ctrs = []
         predict_ctrs = []
-        for kw in keyword_settings:
-            real_ctr = text_to_real_ctr.get(kw.text)
+        for text in texts:
+            real_ctr = text_to_real_ctr.get(text)
             if real_ctr:
-                real_ctrs.append(text_to_real_ctr[kw.text])
-            predict_ctr = await redis_manager.get_predict_ctr(adv_id, kw.text)
+                real_ctrs.append(text_to_real_ctr[text])
+            predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
             if predict_ctr:
                 predict_ctrs.append(predict_ctr)
         if predict_ctrs:
