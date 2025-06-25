@@ -272,6 +272,7 @@ class WBCategory(BaseTable):
     wb_cards: Mapped[list["WBCard"]] = relationship(
         "WBCard", back_populates="wb_category", uselist=True
     )
+    Index("ix_wb_category_name", "wb_category_name")
 
 
 class WBCard(BaseTable):  # Изменено название таблицы
@@ -335,7 +336,9 @@ class AdvSetting(BaseTable):
         "User", secondary=favorite_advs_association, back_populates="favorites_advs"
     )
     adv_id: Mapped[int] = mapped_column(
-        BIGINT(), unique=True
+        BIGINT(),
+        unique=True,
+        nullable=True,
     )  # Автоматическая рекламная кампания
     name = mapped_column(String, nullable=False)
     wb_cabinet_id: Mapped[int] = mapped_column(
@@ -376,7 +379,9 @@ class AdvSetting(BaseTable):
     )
     parsing_active = mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
-    bidder_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    bidder_active: Mapped[bool | None] = mapped_column(
+        Boolean, default=False, nullable=True
+    )
     max_cpm = mapped_column(Integer, nullable=True)
     max_place = mapped_column(Integer, nullable=True)
     min_block_position = mapped_column(Integer, nullable=True, default=0)
