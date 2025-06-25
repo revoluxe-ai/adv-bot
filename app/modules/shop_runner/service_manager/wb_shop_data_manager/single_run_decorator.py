@@ -38,7 +38,7 @@ def single_run() -> (
                     try:
                         return results[key]
                     except KeyError:
-                        pass
+                        raise
 
                 finally:
                     self._single_run_call_counter[key] -= 1
