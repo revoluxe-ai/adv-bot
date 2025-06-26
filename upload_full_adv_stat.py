@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 import aiofiles
+from aiohttp import ClientSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
@@ -10,9 +11,9 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 
-async def upload_full_adv_stat(wb_cabinet_id: int):
+async def upload_full_adv_stat(wb_cabinet_id: int, client_session):
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
-    wb_api = WBApi(access)
+    wb_api = WBApi(access, client_session)
 
     stmt = select(AdvSetting.adv_id).where(
         AdvSetting.wb_cabinet_id == wb_cabinet_id, AdvSetting.bidder_active == True
@@ -41,7 +42,7 @@ async def get_adv_setting(adv_id: int):
     return adv_setting
 
 
-async def get_csv_stat(shop_ids: list[str]):
+async def get_csv_stat(shop_ids: list[str], client_session):
     header = None
     rows = []
     for shop_id in shop_ids:
@@ -60,7 +61,9 @@ async def get_csv_stat(shop_ids: list[str]):
         if not (bonus := wb_cabinet.bonus):
             bonus = 0
         total = balance + bonus
-        stats: list[FullAdvStat] = asyncio.run(upload_full_adv_stat(wb_cabinet_id))
+        stats: list[FullAdvStat] = asyncio.run(
+            upload_full_adv_stat(wb_cabinet_id, client_session),
+        )
         max_stat_days = max([len(stat.days) for stat in stats])
         if header is None:
             header = "shop_id; adv_id; name; " + ";".join(
@@ -94,4 +97,5 @@ shop_ids = [
 if __name__ == "__main__":
     import asyncio
 
-    asyncio.run(get_csv_stat(shop_ids))
+    async with ClientSession() as session:
+        asyncio.run(get_csv_stat(shop_ids, session))
