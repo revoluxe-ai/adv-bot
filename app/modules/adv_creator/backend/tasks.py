@@ -43,8 +43,9 @@ async def _create_complex_advs(
     ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
     bot = ctx["bot"]
+    client_session = ctx["client_session"]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
-    manager = MainAdvManager(access)
+    manager = MainAdvManager(access, client_session)
     await bot.send_message(
         user_telegram_id, f"Создаю комплексную кампанию для артикула {nmid}"
     )
@@ -83,6 +84,7 @@ async def _create_complex_advs(
         del exc
 
     except AdvNotFoundInWBError as exc:
+        assert exc.auto_adv_id is not None
         auto_adv_id = exc.auto_adv_id
         await bot.send_message(
             user_telegram_id,

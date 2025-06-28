@@ -1,6 +1,7 @@
 from typing import Any
 
 import dotenv
+from aiohttp import ClientSession
 
 dotenv.load_dotenv()
 from app.arq_workers.arq_redis_settings import arq_redis_settings
@@ -18,6 +19,9 @@ async def startup(ctx: dict[str, Any]) -> None:
     """Инициализация бота при запуске воркера."""
     logger.debug("Инициализация воркера. ctx перед запуском: %s", ctx)
     ctx["bot"] = get_bot()
+    client_session = ClientSession()
+    ctx["client_session"] = client_session
+
     logger.debug("Бот успешно создан и сохранен в ctx")
 
 
@@ -27,6 +31,8 @@ async def shutdown(ctx: dict[str, Any]) -> None:
         logger.debug("Закрытие сессии бота")
         await ctx["bot"].session.close()
         logger.debug("Сессия бота закрыта")
+    client_session: ClientSession = ctx["client_session"]
+    await client_session.close()
 
 
 class WorkerSettings:

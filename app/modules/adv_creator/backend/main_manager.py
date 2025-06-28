@@ -2,6 +2,7 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from aiogram import Bot
+from aiohttp import ClientSession
 from sqlalchemy import select, or_, and_
 
 from app.core.wb_api.data_classes.adv import Balances
@@ -29,11 +30,11 @@ logger = logging.getLogger(__name__)
 
 
 class MainAdvManager:
-    def __init__(self, access: "WBCabinetAccess"):
+    def __init__(self, access: "WBCabinetAccess", client_session: ClientSession):
         self.access = access
-        self.wb_api = WBApi(access)
+        self.wb_api = WBApi(access, client_session)
 
-    async def _create_search_adv(self, nmid: int, name) -> int:
+    async def _create_search_adv(self, nmid: int, name: str) -> int:
         adv_name = name
         adv_adv = await self.wb_api.create_search_adv([nmid], adv_name)
         await self.wb_api.rename_adv(adv_adv, new_name=adv_name)
@@ -41,14 +42,14 @@ class MainAdvManager:
         return adv_adv
 
     async def _create_auto_adv(
-        self, name, SubjectID: int, balance_type: int, start_status: bool
+        self, name: str, SubjectID: int, balance_type: int, start_status: bool
     ) -> int:
         return await self.wb_api.create_auto_adv(
             name, SubjectID, balance_type, start_status
         )
 
     async def upcast_auto_adv(
-        self, nmid: int, auto_adv_id, user_telegram_id: int, bot: Bot
+        self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot
     ):
         await bot.send_message(
             user_telegram_id, f"Пытаюсь найти и настроить Авто-РК для артикула {nmid}"

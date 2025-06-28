@@ -119,12 +119,12 @@ class AdvMixin(WBAPIProtocol):
             self.session, "POST", url, json_data=data, headers=self.headers.standart
         )
         answer = json.loads(response_text)
-        return answer
+        return int(answer)
 
     @try_except_decorator(1, 60)
     async def create_auto_adv(
         self, name: str, SubjectID: int, balance_type: int, start_status: bool
-    ) -> int | None:
+    ) -> int:
         url = f"https://advert-api.wildberries.ru/adv/v1/save-ad"
         data = {
             "type": 8,
