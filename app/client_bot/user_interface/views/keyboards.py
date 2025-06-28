@@ -92,32 +92,31 @@ def get_adv_setting_keyboard(
         )
     )
 
-    if chat_id in const.ADMINS:
-        if adv_setting.auto_update_white_list:
-            text = "Выключить автообновление белого списка"
-            new_status = False
-        else:
-            text = "Включить автообновление белого списка"
-            new_status = True
+    if adv_setting.auto_update_white_list:
+        text = "Выключить автообновление белого списка"
+        new_status = False
+    else:
+        text = "Включить автообновление белого списка"
+        new_status = True
 
-        callback = AutoUpdateWhiteListSetting(
-            new_status=new_status, adv_setting_original_id=adv_setting.id
-        ).pack()
-        button = InlineKeyboardButton(text=text, callback_data=callback)
-        builder.row(button)
+    callback = AutoUpdateWhiteListSetting(
+        new_status=new_status, adv_setting_original_id=adv_setting.id
+    ).pack()
+    button = InlineKeyboardButton(text=text, callback_data=callback)
+    builder.row(button)
 
-        if adv_setting.auto_update_target_place:
-            text = "Выключить автоуправление целевой позицией"
-            new_status = False
-        else:
-            text = "Включить автоуправление целевой позицией"
-            new_status = True
+    if adv_setting.auto_update_target_place:
+        text = "Выключить автоуправление целевой позицией"
+        new_status = False
+    else:
+        text = "Включить автоуправление целевой позицией"
+        new_status = True
 
-        callback = AutoUpdateTargetPlaceSettingCallBack(
-            new_status=new_status, adv_setting_original_id=adv_setting.id
-        ).pack()
-        button = InlineKeyboardButton(text=text, callback_data=callback)
-        builder.row(button)
+    callback = AutoUpdateTargetPlaceSettingCallBack(
+        new_status=new_status, adv_setting_original_id=adv_setting.id
+    ).pack()
+    button = InlineKeyboardButton(text=text, callback_data=callback)
+    builder.row(button)
 
     button = InlineKeyboardButton(
         text="План продаж",
