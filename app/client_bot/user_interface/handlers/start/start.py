@@ -8,6 +8,7 @@ from aiogram import Router, types
 from aiogram.filters import StateFilter, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
+from aiohttp import ClientSession
 from sqlalchemy import Select
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -351,6 +352,7 @@ async def update_company_from_wb(
     bot: aiogram.Bot,
     callback_data: callbacks.UpdateCompanyFromWB,
     state: FSMContext,
+    client_session: ClientSession,
 ):
     await messages.LongTimeOperation(bot, callback_query.message.chat.id)()
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
@@ -367,7 +369,7 @@ async def update_company_from_wb(
         wb_user_cabinet: WBUserCabinet = result.scalar()
     wb_cabinet = wb_user_cabinet.wb_cabinet
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
-    wb_api = WBApi(access)
+    wb_api = WBApi(access, client_session)
     shop_updater = ShopDataUpdater(wb_api)
     chat_id = callback_query.message.chat.id
     try:
