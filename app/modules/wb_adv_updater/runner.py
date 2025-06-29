@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 
 from aiohttp import ClientSession
@@ -43,11 +44,13 @@ async def sender_message_to_not_pay_users():
 async def process_payment_for_advs() -> None:
     while True:
         try:
-            await wb_manager.process_payment_for_advs()
+            time_now = datetime.datetime.now()
+            if 2 < time_now.hour < 5:
+                await wb_manager.process_payment_for_advs()
         except Exception as e:
             logger.error(f"Ошибка обработки платежей {e}", exc_info=True)
             del e
-        await asyncio.sleep(60 * 60)
+        await asyncio.sleep(30 * 60)
 
 
 async def run_update_vectors_in_redis() -> None:
