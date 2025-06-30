@@ -103,7 +103,7 @@ async def update_keyword_stat(
 
     wb_cabinet = wb_user_cabinet.wb_cabinet
     wb_api = WBApi(access, client_session)
-    await wb_manager.update_all_keyword_data(adv, wb_api, wb_cabinet)
+    await wb_manager.update_all_keyword_data(wb_api, adv, wb_cabinet)
     chat_id = callback.message.chat.id
     await messages.KeywordStatUpdated(bot, chat_id)()
     await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
