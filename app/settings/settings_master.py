@@ -324,5 +324,12 @@ class Settings:
             return 2500
         return int(value)
 
+    @property
+    def SHOP_UPDATE_TIMEOUT_MINUTES(self) -> int:
+        value = os.getenv("SHOP_UPDATE_TIMEOUT_MINUTES")
+        if not value:
+            return 60
+        return int(value)
+
 
 settings = Settings()

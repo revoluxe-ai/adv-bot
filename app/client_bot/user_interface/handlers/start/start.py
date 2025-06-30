@@ -37,6 +37,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.shop_menu.message import ShopMenu
+from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from .wb_api import WBApi
@@ -377,7 +378,9 @@ async def update_company_from_wb(
             chat_id, "Начинаю обновление РК, процесс может занять длительное время."
         )
         try:
-            await asyncio.wait_for(shop_updater.update_advs_data(), timeout=10 * 60)
+            timeout_min = settings.SHOP_UPDATE_TIMEOUT_MINUTES
+            timeout_sec = timeout_min * 60
+            await asyncio.wait_for(shop_updater.update_advs_data(), timeout=timeout_sec)
         except ApiForbiddenError:
             await bot.send_message(
                 chat_id,
