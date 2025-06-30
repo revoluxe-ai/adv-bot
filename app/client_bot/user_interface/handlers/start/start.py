@@ -373,13 +373,13 @@ async def update_company_from_wb(
     wb_api = WBApi(access, client_session)
     shop_updater = ShopDataUpdater(wb_api)
     chat_id = callback_query.message.chat.id
+    timeout_min = settings.SHOP_UPDATE_TIMEOUT_MINUTES
+    timeout_sec = timeout_min * 60
     try:
         await bot.send_message(
             chat_id, "Начинаю обновление РК, процесс может занять длительное время."
         )
         try:
-            timeout_min = settings.SHOP_UPDATE_TIMEOUT_MINUTES
-            timeout_sec = timeout_min * 60
             await asyncio.wait_for(shop_updater.update_advs_data(), timeout=timeout_sec)
         except ApiForbiddenError:
             await bot.send_message(
@@ -403,7 +403,9 @@ async def update_company_from_wb(
             " процесс может занять длительное время.",
         )
         try:
-            await asyncio.wait_for(shop_updater.update_cards_data(), timeout=10 * 60)
+            await asyncio.wait_for(
+                shop_updater.update_cards_data(), timeout=timeout_sec
+            )
         except ApiForbiddenError:
             await bot.send_message(
                 chat_id,
