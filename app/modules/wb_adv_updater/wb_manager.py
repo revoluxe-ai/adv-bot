@@ -214,7 +214,7 @@ async def update_all_keyword_data(
     adv_setting,
     wb_cabinet: WBCabinet,
 ):
-    shop_id = wb_api.wb_access.shop_id
+    shop_id = wb_cabinet.shop_id
     try:
         async with get_clickhouse_client() as client:
             await common_keyword_stat_update(client, adv_setting, wb_api)
