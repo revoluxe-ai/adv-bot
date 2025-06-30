@@ -93,15 +93,17 @@ async def update_keyword_stat(
             .options(selectinload(WBUserCabinet.wb_cabinet))
             .where(WBCabinet.id == wb_cabinet_id)
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        result = await session.execute(stmt)
+        wb_user_cabinet: WBUserCabinet | None = result.scalar()
+    assert wb_user_cabinet is not None
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
     if not access:
         raise ApiForbiddenError("Не удалось получить доступ к Wildberries")
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
 
+    wb_cabinet = wb_user_cabinet.wb_cabinet
     wb_api = WBApi(access, client_session)
-    await wb_manager.update_all_keyword_data(adv, wb_api)
+    await wb_manager.update_all_keyword_data(adv, wb_api, wb_cabinet)
     chat_id = callback.message.chat.id
     await messages.KeywordStatUpdated(bot, chat_id)()
     await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
