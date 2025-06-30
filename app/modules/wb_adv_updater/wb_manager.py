@@ -303,7 +303,7 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
             auto_adv_id
         )
         await update_keywords_stat_in_click_house(
-            client, keywords_from_auto, auto_adv_id, "advkeyword_new"
+            client, keywords_from_auto, auto_adv_id, "advkeyword"
         )
 
     except ApiForbiddenError as exc:
@@ -324,7 +324,7 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
                 auction_adv_id
             )
             await update_keywords_stat_in_click_house(
-                client, keywords_from_search_adv, auction_adv_id, "advkeyword_new"
+                client, keywords_from_search_adv, auction_adv_id, "advkeyword"
             )
     except Exception as exc:
         keywords_from_search_adv = []
