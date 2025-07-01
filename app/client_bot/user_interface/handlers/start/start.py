@@ -37,10 +37,10 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.shop_menu.message import ShopMenu
+from app.modules.shop_runner.modules.wb_api import WBApi
 from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-from .wb_api import WBApi
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ async def callback_start_registration(
 @router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(
     callback_query: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext
-):
+) -> None:
     await bot.send_message(
         callback_query.message.chat.id, "Добавление нового магазина (кабинета)"
     )
@@ -128,7 +128,9 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 
 
 @router.message(StateFilter(states.CabinetRegistration.api))
-async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMContext):
+async def process_cabinet_api(
+    message: Message, bot: aiogram.Bot, state: FSMContext, client_session: ClientSession
+) -> None:
     """
     Юзер вводит токен, который проверяется на валидность.
     Если токен не валиден, то юзеру отправляется сообщение об этом.
@@ -255,7 +257,7 @@ async def process_cabinet_api(message: Message, bot: aiogram.Bot, state: FSMCont
         access.wb_cabinet = wb_cabinet
         access.wb_user_cabinet = wb_user_cabinet
 
-        wb_api = WBApi(access)
+        wb_api = WBApi(access, client_session)
 
         shop_updater = ShopDataUpdater(wb_api)
         await shop_updater.update_advs_data()
