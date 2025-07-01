@@ -420,11 +420,12 @@ class AdvSetting(BaseTable):
     auto_update_target_place: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
+    max_balance_adding_for_day: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=0, server_default="0"
+    )
 
-    # auto_adv_target_status = mapped_column(Boolean,
-    #                                        nullable=True,
-    #                                        default=None)
-    # auction_adv_target_status = mapped_column(Boolean)
+    auto_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
+    auction_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
 
     __table_args__ = (
         # Составной индекс для основного запроса
