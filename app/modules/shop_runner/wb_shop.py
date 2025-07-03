@@ -23,7 +23,7 @@ class WBShop:
         await asyncio.gather(
             coroutines_manager.parsing_keywords_run(),
             coroutines_manager.update_advs_data_from_wb_to_pg(),
-            coroutines_manager.update_cards_data_from_wb_to_pf(),
+            coroutines_manager.update_cards_data_from_wb_to_pg(),
             coroutines_manager.update_cpm_bid(),
             coroutines_manager.update_common_sale_stat(),
             coroutines_manager.update_full_adv_stat(),
