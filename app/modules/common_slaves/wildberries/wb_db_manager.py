@@ -66,11 +66,11 @@ async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet) -> 
 
     for i in range(0, len(cards), part):
         cards_part = cards[i : i + part]
-        await _update_cards_in_db(cards_part, wb_cabinet, session)
+        await _update_cards_in_db(cards_part, wb_cabinet)
 
 
 async def _update_cards_in_db(
-    cards: Sequence[CardFromWB], wb_cabinet: WBCabinet, session: AsyncSession
+    cards: Sequence[CardFromWB], wb_cabinet: WBCabinet
 ) -> None:
 
     if not cards:
