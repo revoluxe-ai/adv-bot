@@ -17,13 +17,13 @@ def get_adv_data_class(data_from_wb: dict[str, Any]) -> Adv | None:
         try:
             return AutoAdv(**data)
         except ValidationError as exc:
-            logger.error(f"{exc}", exc_info=True)
+            logger.error(f"{exc}")
             raise exc
     elif _type == 9:
         try:
             return AuctionAdv(**data)
         except ValidationError as exc:
-            logger.error(f"{exc}", exc_info=True)
+            logger.error(f"{exc}")
             raise exc
     else:
         logger.debug(f"Неизвестный типа кампании: тип {_type}")
