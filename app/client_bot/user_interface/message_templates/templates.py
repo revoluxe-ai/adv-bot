@@ -8,7 +8,7 @@ from typing import Union, Optional
 
 import aiogram
 from aiogram import types
-from aiogram.types import BufferedInputFile, Message
+from aiogram.types import BufferedInputFile, Message, InlineKeyboardMarkup
 
 from app import file_handler
 from .base import Base
@@ -60,15 +60,15 @@ def manage_file_id(func) -> Callable:
 class TextWithKeyboard(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
     @property
     @abstractmethod
-    def keyboard(self):
+    def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
-    async def __call__(self) -> tuple[LastMessage, str]:
+    async def __call__(self) -> tuple[Message, str]:
         await super().__call__()
         text = self.text
         parse_mode = getattr(self, "parse_mode", None)
@@ -81,7 +81,10 @@ class TextWithKeyboard(Base):
             parse_mode=self.parse_mode,
             disable_web_page_preview=True,
         )
-        return last_message, self.get_content_type()
+        return (
+            last_message,
+            self.get_content_type(),
+        )
 
 
 class TextWithImage(Base):
