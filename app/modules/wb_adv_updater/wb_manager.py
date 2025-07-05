@@ -205,7 +205,7 @@ async def update_predict_ctr():
             await predictor.predict_ctr_for_keywords()
         except Exception as exc:
             logger.error(f"Ошибка предсказания CTR {exc}")
-            del e
+            del exc
         await asyncio.sleep(0)
 
 
