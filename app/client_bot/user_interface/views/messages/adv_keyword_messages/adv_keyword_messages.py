@@ -164,6 +164,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Страница: {self._page}/{total_page + 1}\n"
             f"Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n"
             f"Общий расход на рекламу: {self.total_spend:.2f}\n"
+            f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
+            f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
             f"Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n"
             f"Общее число заказов: {self._all_orders_for_last_days}\n"
             f"Заказов из Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
