@@ -3,7 +3,6 @@ from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.wb_api.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
@@ -18,19 +17,15 @@ from app.utils.db.session_maker import get_async_session_maker
 _sm = get_async_session_maker
 
 
-async def update_advs_in_db(
-    advs: list[Adv], wb_cabinet_id: int, session: AsyncSession
-) -> None:
+async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int) -> None:
     part = 10
     # Разбиваем список advs на части по 10 элементов
     for i in range(0, len(advs), part):
         advs_part = advs[i : i + part]
-        await _update_advs_in_db(advs_part, wb_cabinet_id, session)
+        await _update_advs_in_db(advs_part, wb_cabinet_id)
 
 
-async def _update_advs_in_db(
-    advs: list[Adv], wb_cabinet_id: int, session: AsyncSession
-) -> None:
+async def _update_advs_in_db(advs: list[Adv], wb_cabinet_id: int) -> None:
     # Преобразуем в список словарей
     adv_data = [
         {
@@ -58,14 +53,12 @@ async def _update_advs_in_db(
             "cpm": stmt.excluded.cpm,
         },
     )
+    async with _sm() as session:
+        await session.execute(stmt)
+        await session.commit()
 
-    await session.execute(stmt)
-    await session.commit()
 
-
-async def update_cards_in_db(
-    cards: list[CardFromWB], wb_cabinet: WBCabinet, session: AsyncSession
-) -> None:
+async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet) -> None:
     if not cards:
         return
 
@@ -97,18 +90,19 @@ async def _update_cards_in_db(
 
     # Получаем уже существующие категории
     stmt = select(WBCategory).where(WBCategory.wb_category_name.in_(category_names))
-    result = await session.execute(stmt)
-    existing_categories = {
-        category.wb_category_name: category for category in result.scalars().all()
-    }
+    async with _sm(read_only=True) as session:
+        result = await session.execute(stmt)
+        existing_categories = {
+            category.wb_category_name: category for category in result.scalars().all()
+        }
 
-    # Добавляем недостающие категории
-    for name in category_names - existing_categories.keys():
-        new_category = WBCategory(wb_category_name=name, wb_cabinet=wb_cabinet)
-        session.add(new_category)
-        existing_categories[name] = new_category
+        # Добавляем недостающие категории
+        for name in category_names - existing_categories.keys():
+            new_category = WBCategory(wb_category_name=name, wb_cabinet=wb_cabinet)
+            session.add(new_category)
+            existing_categories[name] = new_category
 
-    await session.flush()  # Чтобы получить id новых категорий
+        await session.flush()  # Чтобы получить id новых категорий
 
     # Подготавливаем данные для UPSERT
     card_values = [
@@ -132,8 +126,6 @@ async def _update_cards_in_db(
         },
     )
 
-    try:
+    async with _sm(read_only=False) as session:
         await session.execute(stmt_on_conflict)
         await session.commit()
-    except Exception:
-        raise

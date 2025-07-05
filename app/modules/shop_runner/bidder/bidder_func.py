@@ -33,9 +33,9 @@ async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: BidderAPI) -> set[int] 
 
     advs: list[Adv] = await wb_api.get_advs(adv_ids)
     try:
-        wb_cabinet_original_id: int = wb_api.access.wb_cabinet.id
-        async with sm(read_only=False) as session:
-            await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id, session)
+        assert wb_api.access.wb_cabinet is not None
+        wb_cabinet_original_id: int = int(wb_api.access.wb_cabinet.id)
+        await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id)
     except Exception:
         logger.error("Ошибка обновления РК в базе", exc_info=True)
 

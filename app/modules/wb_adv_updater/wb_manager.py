@@ -162,7 +162,7 @@ async def update_vectors_in_redis() -> None:
     await gds.update_vectors_in_redis()
 
 
-async def insert_or_update_keywords(client, keyword_stats, adv_id, table_name: str):
+async def insert_or_update_keywords(keyword_stats, adv_id, table_name: str):
     # Подготовка данных для вставки
     new_version = int(datetime.datetime.now().timestamp())
     data_to_insert = []
@@ -173,18 +173,27 @@ async def insert_or_update_keywords(client, keyword_stats, adv_id, table_name: s
         data_to_insert.append(
             [kw.text, date_time, adv_id, kw.views, kw.clicks, kw.spend, new_version]
         )
-    await client.insert(
-        table=f"default_db.{table_name}",
-        data=data_to_insert,
-        column_names=["text", "date", "adv_id", "views", "clicks", "spend", "version"],
-    )
+    async with get_clickhouse_client() as client:
+        await client.insert(
+            table=f"default_db.{table_name}",
+            data=data_to_insert,
+            column_names=[
+                "text",
+                "date",
+                "adv_id",
+                "views",
+                "clicks",
+                "spend",
+                "version",
+            ],
+        )
 
 
 async def update_keywords_stat_in_click_house(
-    client, keyword_stats: List[KeywordStat], adv_id: int, table_name: str
+    keyword_stats: List[KeywordStat], adv_id: int, table_name: str
 ) -> None:
     if keyword_stats:
-        await insert_or_update_keywords(client, keyword_stats, adv_id, table_name)
+        await insert_or_update_keywords(keyword_stats, adv_id, table_name)
 
 
 async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
@@ -216,8 +225,7 @@ async def update_all_keyword_data(
 ):
     shop_id = wb_cabinet.shop_id
     try:
-        async with get_clickhouse_client() as client:
-            await common_keyword_stat_update(client, adv_setting, wb_api)
+        await common_keyword_stat_update(adv_setting, wb_api)
     except ApiForbiddenError:
         logger.error(f"Нет доступов для обновления данных магазина: {shop_id}")
 
@@ -295,7 +303,7 @@ async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
         return
 
 
-async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
+async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     auto_adv_id = adv_setting.adv_id
     auction_adv_id = adv_setting.search_adv_id
     try:
@@ -303,7 +311,7 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
             auto_adv_id
         )
         await update_keywords_stat_in_click_house(
-            client, keywords_from_auto, auto_adv_id, "advkeyword"
+            keywords_from_auto, auto_adv_id, "advkeyword"
         )
 
     except ApiForbiddenError as exc:
@@ -324,7 +332,7 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
                 auction_adv_id
             )
             await update_keywords_stat_in_click_house(
-                client, keywords_from_search_adv, auction_adv_id, "advkeyword"
+                keywords_from_search_adv, auction_adv_id, "advkeyword"
             )
     except Exception as exc:
         keywords_from_search_adv = []

@@ -71,19 +71,18 @@ class ShopDataUpdater:
             func = self.__quick_update_advs_in_db(existind_advs_ids)
             await _coroutine_parallel_run_queue.put(func)
 
-    async def __quick_update_advs_in_db(self, adv_ids: set[int]):
+    async def __quick_update_advs_in_db(self, adv_ids: set[int]) -> None:
         wb_api = self.wb_api
         advs = await wb_api.get_advs(list(adv_ids))
         nmids_collection = set()
-        async with sm() as session:
-            await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id, session)
-            for adv in advs:
-                nmids = adv.nmids
-                if nmids:
-                    for nmid in nmids:
-                        nmids_collection.add(nmid)
-            cards = await wb_api.get_all_cards()
-            await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet, session)
+        await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
+        for adv in advs:
+            nmids = adv.nmids
+            if nmids:
+                for nmid in nmids:
+                    nmids_collection.add(nmid)
+        cards = await wb_api.get_all_cards()
+        await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
 
     async def update_advs_data(self) -> list[Adv]:
         logger.debug(f"Обновление данных для кабинета {self.wb_cabinet.shop_id}")
@@ -94,14 +93,12 @@ class ShopDataUpdater:
             return []
         logger.debug(f"Получены adv_ids: {len(adv_ids)} штук")
         advs: list[Adv] = await advert_api.get_advs()
-        async with sm() as session:
-            await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id, session)
+        await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
         logger.debug(f"Обновление в базе advs завершено")
         return advs
 
     async def update_cards_data(self) -> None:
         wb_api = self.wb_api
         cards = await wb_api.get_all_cards()
-        async with sm() as session:
-            await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet, session)
+        await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
         logger.debug(f"Обновление карточек в базе завершено")
