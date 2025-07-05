@@ -395,10 +395,6 @@ async def common_keyword_stat_update(client, adv_setting: AdvSetting, wb_api):
         )
         raise exc
 
-    await update_keywords_stat_in_click_house(
-        client, full_stat_keywords, auto_adv_id, "advkeyword"
-    )
-
     keyword_stat_update_state = KeywordStatUpdateState()
 
     await keyword_stat_update_state.set_one(adv_setting.adv_id)
