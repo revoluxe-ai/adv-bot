@@ -155,9 +155,12 @@ class get_clickhouse_client:
         global caller_function_connection_count
         global grand_caller_function_connection_count
         global function_count_lock
-
-        if self.client is not None:
-            self.client.close()  # type: ignore
+        client = self.client
+        if client is not None:
+            if system_name == "Linux":
+                await client.close()
+            else:
+                client.close()
 
         if (
             system_name == "Linux"
