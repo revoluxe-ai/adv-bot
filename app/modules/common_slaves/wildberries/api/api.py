@@ -301,7 +301,6 @@ class AdvertApi(ABC_WB_API):
                 advs.append(adv)
         return advs
 
-    @try_except_decorator(1, 1)
     async def get_advs(self, adv_ids: list[int] = None) -> list[Adv]:
         if not adv_ids:
             adv_ids: list[int] = await self.get_advertIds()
