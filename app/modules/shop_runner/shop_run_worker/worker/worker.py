@@ -47,7 +47,7 @@ class ShopWorker:
 
             if new_free_shop_id not in tasks:
                 task: asyncio.Task[None] = asyncio.create_task(
-                    run_shop_task(new_free_shop_id, self._client_session)
+                    run_shop_task(new_free_shop_id, self._client_session, redis_manager)
                 )
                 task.add_done_callback(
                     self._on_shop_task_done(new_free_shop_id, redis_manager)
@@ -56,7 +56,6 @@ class ShopWorker:
                 logger.debug(f"Процесс обновления магазина {new_free_shop_id} запущен")
             else:
                 shop_id = new_free_shop_id
-                await redis_manager.renew_shop_ttl(shop_id)
                 task = tasks[shop_id]
                 if task.done():
                     if exc := task.exception():

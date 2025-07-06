@@ -9,6 +9,7 @@ from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
+from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.wb_shop import WBShop
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -17,12 +18,14 @@ logger = logging.getLogger(__name__)
 import asyncio
 
 
-async def run_shop_task(shop_id: str, client_session: ClientSession) -> None:
+async def run_shop_task(
+    shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
+) -> None:
     while True:
         try:
             access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
             wb_api = WBApi(access, client_session)
-            wb_shop = WBShop(wb_api)
+            wb_shop = WBShop(wb_api, redis_manager)
             await wb_shop.run()
         except StopShopUpdateException:
             return None
