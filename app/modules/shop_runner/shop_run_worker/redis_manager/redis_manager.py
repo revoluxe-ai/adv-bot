@@ -3,6 +3,7 @@
 import redis
 
 from app.core.redis_manager.base_redis_manager import BaseRedis
+from app.settings import settings
 
 
 class RedisShopManager(BaseRedis):
@@ -22,10 +23,10 @@ class RedisShopManager(BaseRedis):
         return nil
         """
 
-    def __init__(self, tll: int) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self._script_sha = None
-        self.DEFAULT_TTL = tll
+        self.DEFAULT_TTL = settings.SHOPS_WORKS_TLL
 
     async def initialize_lua_script(self) -> None:
         """Загрузка скрипта при инициализации"""

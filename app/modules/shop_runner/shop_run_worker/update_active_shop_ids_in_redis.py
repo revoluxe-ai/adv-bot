@@ -5,7 +5,6 @@ from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
-from .consts import default_tll
 from .redis_manager import RedisShopManager
 
 
@@ -37,7 +36,7 @@ async def update_active_shop_ids(redis_manager: RedisShopManager) -> None:
 
 
 async def run_shop_ids_update() -> None:
-    redis_manager = RedisShopManager(default_tll)
+    redis_manager = RedisShopManager()
     while True:
         await update_active_shop_ids(redis_manager)
         await asyncio.sleep(15)

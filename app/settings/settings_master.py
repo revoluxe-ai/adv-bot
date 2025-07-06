@@ -331,5 +331,13 @@ class Settings:
             return 60
         return int(value)
 
+    @property
+    def SHOPS_WORKS_TLL(self) -> int:
+        value = os.getenv("SHOPS_WORKS_TLL")
+        if not value:
+            return 60 * 5
+        else:
+            return int(value)
+
 
 settings = Settings()

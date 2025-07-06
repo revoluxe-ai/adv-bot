@@ -3,7 +3,6 @@ import logging
 
 from aiohttp import ClientSession
 
-from ..consts import default_tll
 from ..redis_manager import RedisShopManager
 from ...run_process_func import run_shop_task
 
@@ -38,7 +37,7 @@ class ShopWorker:
 
     async def update_active_shop_update_tasks_run(self) -> None:
         tasks = self._tasks
-        redis_manager = RedisShopManager(default_tll)
+        redis_manager = RedisShopManager()
 
         while True:
             new_free_shop_id = await redis_manager.get_next_free_shop_id()
