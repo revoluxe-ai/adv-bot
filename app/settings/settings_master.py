@@ -260,11 +260,13 @@ class Settings:
 
 
     @property
-    def DEFAULT_MIN_CTR(self):
+    def DEFAULT_MIN_CTR(self) -> float:
         value = os.getenv('DEFAULT_MIN_CTR')
         if not value:
-            return 10
-        return int(value)
+            return 0.1
+        return float(value)
+
+
 
 
 
