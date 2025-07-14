@@ -396,7 +396,7 @@ class AdvSetting(BaseTable):
     new_auto_min_ctr_mode = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
-    reset_place = mapped_column(Boolean, nullable=True, default=True)
+    reset_place = mapped_column(Boolean, nullable=True, default=True, server_default=text('true'))
     _search_adv_id = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=DEFAULT_BIDDER_STEP)
     exponent_predict_ctr = mapped_column(Float,
