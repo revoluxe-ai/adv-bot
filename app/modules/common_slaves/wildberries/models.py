@@ -15,6 +15,7 @@ from sqlalchemy import JSON
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
 from app.modules.wb_adv_updater.models import AdvPayment
+from app.settings import settings
 from app.utils.db.base import BaseTable
 
 from app.utils.db.models import User, favorite_advs_association
@@ -305,7 +306,8 @@ class AdvSetting(BaseTable):
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text('1'))
     type: Mapped[int] = Column(Integer, nullable=True)
-    hard_min_ctr = Column(Float, nullable=True)
+    hard_min_ctr = Column(Float, nullable=True, default=settings.DEFAULT_MIN_CTR,
+                          server_default=text(str(settings.DEFAULT_MIN_CTR)))
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text('0'))
     payments = relationship(AdvPayment, back_populates='adv_setting', uselist=True)
@@ -329,8 +331,8 @@ class AdvSetting(BaseTable):
     bidder_step = mapped_column(Integer, nullable=True, default=DEFAULT_BIDDER_STEP)
     exponent_predict_ctr = mapped_column(Float,
                                          nullable=False,
-                                         default=3,
-                                         server_default='3')
+                                         default=settings.DEFAULT_CTR_EXPONENTA,
+                                         server_default=text(str(settings.DEFAULT_CTR_EXPONENTA)))
 
     auction_boost_all_phrase_mode = mapped_column(Boolean,
                                                   nullable=False,

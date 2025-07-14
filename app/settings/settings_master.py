@@ -251,4 +251,21 @@ class Settings:
             return 1
         return int(value)
 
+    @property
+    def DEFAULT_CTR_EXPONENTA(self):
+        value = os.getenv('MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS')
+        if not value:
+            return 20
+        return int(value)
+
+
+    @property
+    def DEFAULT_MIN_CTR(self):
+        value = os.getenv('DEFAULT_MIN_CTR')
+        if not value:
+            return 10
+        return int(value)
+
+
+
 settings = Settings()
