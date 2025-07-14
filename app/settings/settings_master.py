@@ -267,6 +267,19 @@ class Settings:
         return float(value)
 
 
+    @property
+    def START_AUCTION_ON_CREATING_ADV(self) -> bool:
+        value = os.environ.get('START_AUCTION_ON_CREATING_ADV')
+        if value is None:
+            return False
+        value = value.lower()
+        if value == 'false':
+            return False
+        elif value == 'true':
+            return True
+        raise ValueError('Не верное значение')
+
+
 
 
 

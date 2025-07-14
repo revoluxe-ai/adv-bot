@@ -12,6 +12,7 @@ from app.core.wb_api.mixins.excs import (
     CardNotFoundInWB,
 )
 from app.modules.common_slaves.wildberries import wb_db_manager
+from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exc import (
     CardsNotFoundForShopError,
@@ -225,7 +226,11 @@ class MainAdvManager:
         return auto_adv_id, search_adv_id
 
     async def start_complex_advs(self, nmid, auto_adv_id, search_adv_id):
-        advs = await self.wb_api.get_advs([auto_adv_id, search_adv_id])
+        advs_for_start = [auto_adv_id]
+        if settings.START_AUCTION_ON_CREATING_ADV:
+            advs_for_start.append(search_adv_id)
+
+        advs = await self.wb_api.get_advs(advs_for_start)
         auto_adv = advs[0]
         if auto_adv.nmids != [nmid]:
             raise NotChangeError("Артикулы не соответствуют")
