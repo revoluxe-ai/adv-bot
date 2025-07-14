@@ -87,6 +87,10 @@ class MainAdvManager:
                 )
                 nmids_for_add = list({nmid} - set(nmids_in_adv))
                 nmids_for_del = list(set(nmids_in_adv) - {nmid})
+                if len(nmids_for_del) >= 100:
+                    nmids_for_del = nmids_for_del[:99]
+                    nmids_for_add = []
+
                 if nmid not in nmids_in_adv:
                     try:
                         await self.wb_api.update_nmids_in_adv(
