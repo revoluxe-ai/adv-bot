@@ -131,7 +131,7 @@ class MainAdvManager:
             assert wb_cabinet is not None
             async with sm() as session:
                 await wb_db_manager.update_cards_in_db(
-                    [target_card], wb_cabinet, session
+                    [target_card], wb_cabinet,
                 )
             name = target_card.name
             new_adv_name = str(nmid) + " " + name
