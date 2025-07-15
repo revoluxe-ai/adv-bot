@@ -323,8 +323,27 @@ class AdvMixin(WBAPIProtocol):
                 f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}"
             )
 
-    @try_except_decorator(1, 60)
     async def get_adv_full_state(
+        self, adv_ids: list[int], dates: list[datetime.datetime.date] = None
+    ) -> Optional[list[FullAdvStat]]:
+
+        if not adv_ids:
+            return []
+
+        all_stats = []
+
+        # Разбиваем список adv_ids на чанки по 100
+        for i in range(0, len(adv_ids), 100):
+            chunk = adv_ids[i:i + 100]
+            stats_chunk = await self._get_adv_full_state(chunk, dates)
+            if stats_chunk:
+                all_stats.extend(stats_chunk)
+
+        return all_stats
+
+
+    @try_except_decorator(1, 60)
+    async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.datetime.date] = None
     ) -> Optional[list[FullAdvStat]]:
         assert [isinstance(dt, datetime.date) for dt in dates]
