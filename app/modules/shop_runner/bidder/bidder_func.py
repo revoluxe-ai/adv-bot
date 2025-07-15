@@ -78,7 +78,7 @@ async def run_bidder_process_for_adv(
         return
 
     text = best_keyword.text
-    nmid = adv_setting.nmids[0]
+    nmid = int(adv_setting.nmids[0])
 
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
@@ -139,7 +139,7 @@ async def run_bidder_process_for_adv(
             await session.commit()
 
     if adv_setting.bidder_for_auto:
-        auto_adv_id = adv_setting.adv_id
+        auto_adv_id = int(adv_setting.adv_id)
         assert auto_adv_id is not None
         await wb_api.update_cpm(
             auto_adv_id,

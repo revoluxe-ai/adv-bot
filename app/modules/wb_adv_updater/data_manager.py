@@ -1604,7 +1604,7 @@ async def get_keywords_statistic(adv_setting) -> list[CalculatedKeyword]:
     return keywords
 
 
-async def get_max_adv_bid(adv_setting: AdvSetting):
+async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
     setting_max_bid = adv_setting.max_cpm
     max_pay_for_order = adv_setting.max_pay_for_order
     if not max_pay_for_order:
