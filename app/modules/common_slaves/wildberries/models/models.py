@@ -429,6 +429,12 @@ class AdvSetting(BaseTable):
 
     auto_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
     auction_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
+    auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(Boolean,
+                                                                nullable=True,
+                                                                default=True,
+                                                                server_default=text('true')
+                                                                )
+
 
     __table_args__ = (
         # Составной индекс для основного запроса
