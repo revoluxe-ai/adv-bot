@@ -44,6 +44,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.keywords_query import keywords_query
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
+from app.settings import settings
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.assoc_tables import favorite_advs_association
@@ -1255,7 +1256,7 @@ async def _get_min_ctr(adv: AdvSetting):
 
     category = await get_wb_category(adv)
     if not category:
-        return 0.1
+        return settings.DEFAULT_MIN_CTR
     category_name = category.wb_category_name
     async with _sm() as session:
         stmt = select(GlobalCategorySetting.min_ctr).where(
@@ -1265,7 +1266,7 @@ async def _get_min_ctr(adv: AdvSetting):
         try:
             min_ctr = result.scalar_one()
         except NoResultFound:
-            return 0.03
+            return settings.DEFAULT_MIN_CTR
     return float(min_ctr)
 
 
