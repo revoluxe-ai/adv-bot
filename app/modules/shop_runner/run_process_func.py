@@ -52,13 +52,14 @@ async def _update_tasks(
 
     if shop_filter_list:
         stmt = stmt.filter(WBCabinet.shop_id.in_(shop_filter_list))
+    redis_manager = RedisShopManager()
     async with sm() as session:
         result = await session.execute(stmt)
         all_needs_for_run_shop_ids = result.scalars().all()
         for shop_id in all_needs_for_run_shop_ids:
             if shop_id not in active_tasks:
                 # Создание асинхронной задачи
-                task = asyncio.create_task(run_shop_task(shop_id, client_session))
+                task = asyncio.create_task(run_shop_task(shop_id, client_session, redis_manager))
                 active_tasks[shop_id] = task
                 logger.debug(f"Процесс обновления магазина {shop_id} запущен")
             else:
