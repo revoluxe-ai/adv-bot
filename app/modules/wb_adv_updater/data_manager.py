@@ -142,8 +142,12 @@ async def get_keywords_statistic_clickhouse(
 ) -> List[CalculatedKeyword]:
 
     async with get_clickhouse_client() as ch_client:
-        adv_id = int(adv_setting.adv_id)
-        query = _build_clickhouse_query(adv_id, pass_time, last_views)
+        advs: set[int] = set()
+        auto_adv_id = int(adv_setting.adv_id)
+        advs.add(auto_adv_id)
+        if search_adv_id := adv_setting.search_adv_id:
+            advs.add(search_adv_id)
+        query = _build_clickhouse_query(advs, pass_time, last_views)
         result = await ch_client.query(query)
         rows = result.result_rows
         keywords = []
@@ -177,8 +181,13 @@ async def _get_keyword_settings(
 
 
 def _build_clickhouse_query(
-    adv_id: int, pass_time: Optional[timedelta], last_views: Optional[int] = None
+    adv_ids: set[int],
+    pass_time: Optional[timedelta],
+    last_views: Optional[int] = None,
 ) -> str:
+    # Преобразуем список ID в строку для SQL
+    adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
+
     # Формируем основной запрос
     query = f"""
         SELECT
@@ -197,14 +206,14 @@ def _build_clickhouse_query(
             FROM
                 default_db.advkeyword
             WHERE
-                adv_id = {adv_id}
+                adv_id IN ({adv_ids_str})
                 AND (text, date, version) IN (
                     SELECT
                         text, date, MAX(version) AS version
                     FROM
                         default_db.advkeyword
                     WHERE
-                        adv_id = {adv_id}
+                        adv_id IN ({adv_ids_str})
                     GROUP BY
                         text, date
                 )
