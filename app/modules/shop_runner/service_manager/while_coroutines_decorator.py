@@ -5,7 +5,7 @@ from typing import ParamSpec, TypeVar, Callable, Awaitable
 
 from sqlalchemy.exc import InterfaceError
 
-from app.core.wb_api.exceptions import ApiForbiddenError
+from app.core.wb_api.exceptions import ApiForbiddenError, MaxAttemptsError
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 
@@ -40,6 +40,13 @@ def while_coroutine_decorator(
                     await asyncio.sleep(1)
                 except (NotFoundActiveAdvCompany, ApiForbiddenError) as exc:
                     raise StopShopUpdateException from exc
+                except MaxAttemptsError as exc:
+                    logger.error(
+                        f"Максимальное количество попыток для {func.__name__} "
+                        f"достигнуто: {exc}",
+                        exc_info=True,
+                    )
+                    await asyncio.sleep(pause_on_error)
                 except Exception as exc:
                     logger.error(f"Ошибка: {exc}", exc_info=True)
                     await asyncio.sleep(pause_on_error)
