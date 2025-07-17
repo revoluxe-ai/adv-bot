@@ -187,8 +187,8 @@ class MainAdvManager:
                 new_adv.parsing_active = False
                 new_adv.bot_active = True
                 new_adv.auto_adv_target_status = False
-                new_adv.auto_update_white_list = True
-                new_adv.auto_update_target_place = True
+                new_adv.auto_update_white_list = False
+                new_adv.auto_update_target_place = False
                 new_adv.active_status = "created_by_bot"
                 new_adv.type = 8
                 new_adv.nmids = [nmid]
