@@ -13,6 +13,8 @@ import aiogram
 from PIL import Image
 from aiogram.utils import deep_linking
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
+import asyncpg
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
@@ -663,33 +665,44 @@ async def get_good_bad_phrases_for_min_ctr(
             keyword_text = keyword_stat.text
             keyword_setting = texts_to_keyword_setting.get(keyword_text)
             if not keyword_setting:
-                clusters = keyword_stat.childs_keywords
-                if not clusters:
-                    clusters = []
+                clusters = keyword_stat.childs_keywords or []
                 clusters.append(keyword_stat)
+
                 stat_hard_statuses = defaultdict(int)
                 for kw in clusters:
                     original_text = kw.text
-                    if not (
-                        keyword_setting := texts_to_keyword_setting.get(original_text)
-                    ):
-                        continue
-                    hard_status = keyword_setting.hard_status
-                    stat_hard_statuses[hard_status] += 1
-                try:
-                    result_hard_status = max(
-                        stat_hard_statuses.items(), key=lambda x: x[1]
-                    )[0]
-                except:
-                    result_hard_status = 1
-                keyword_setting = KeywordSetting()
-                keyword_setting.text = keyword_text
-                keyword_setting.adv_setting = adv_setting
-                keyword_setting.hard_status = result_hard_status
-                session.add(keyword_setting)
-                await session.commit()
-                await session.refresh(keyword_setting)
+                    if keyword := texts_to_keyword_setting.get(original_text):
+                        stat_hard_statuses[keyword.hard_status] += 1
+
+                result_hard_status = (
+                    max(stat_hard_statuses.items(), key=lambda x: x[1])[0]
+                    if stat_hard_statuses
+                    else 1
+                )
+
+                stmt = (
+                    insert(KeywordSetting)
+                    .values(
+                        text=keyword_text,
+                        adv_setting_id=adv_setting.id,
+                        hard_status=result_hard_status,
+                    )
+                    .on_conflict_do_nothing(
+                        index_elements=["text", "adv_setting_id"]
+                    )
+                )
+                await session.execute(stmt)
+
+                # теперь получаем из БД (он там точно есть: либо только что вставили, либо уже был)
+                keyword_setting = await session.scalar(
+                    select(KeywordSetting).where(
+                        KeywordSetting.text == keyword_text,
+                        KeywordSetting.adv_setting_id == adv_setting.id,
+                    )
+                )
+
                 text_to_keyword_setting[keyword_text] = keyword_setting
+
     for keyword_setting in keyword_settings:
         text = str(keyword_setting.text)
         if text not in texts_in_keyword_stat:
