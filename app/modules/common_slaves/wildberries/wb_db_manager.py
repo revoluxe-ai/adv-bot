@@ -72,25 +72,24 @@ async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet) -> 
 async def _update_cards_in_db(
     cards: Sequence[CardFromWB], wb_cabinet: WBCabinet
 ) -> None:
-
     if not cards:
         return
 
+    # Удаляем дубликаты по nmid
     pass_nmids = set()
     clear_cards = []
     for card in cards:
-        nmid = card.nmid
-        if nmid not in pass_nmids:
+        if card.nmid not in pass_nmids:
             clear_cards.append(card)
-            pass_nmids.add(card)
-
+            pass_nmids.add(card.nmid)
     cards = clear_cards
+
     # Получаем уникальные имена категорий
     category_names = {card.wb_category_name for card in cards}
 
-    # Получаем уже существующие категории
-    stmt = select(WBCategory).where(WBCategory.wb_category_name.in_(category_names))
-    async with _sm(read_only=True) as session:
+    async with _sm(read_only=False) as session:
+        # Получаем уже существующие категории
+        stmt = select(WBCategory).where(WBCategory.wb_category_name.in_(category_names))
         result = await session.execute(stmt)
         existing_categories = {
             category.wb_category_name: category for category in result.scalars().all()
@@ -102,30 +101,31 @@ async def _update_cards_in_db(
             session.add(new_category)
             existing_categories[name] = new_category
 
-        await session.flush()  # Чтобы получить id новых категорий
+        # Flush — получаем ID для новых категорий
+        await session.flush()
 
-    # Подготавливаем данные для UPSERT
-    card_values = [
-        {
-            "nmid": card.nmid,
-            "name": card.name,
-            "json": json.dumps(card.data),
-            "wb_category_id": existing_categories[card.wb_category_name].id,
-        }
-        for card in cards
-    ]
+        # Подготавливаем данные для UPSERT
+        card_values = [
+            {
+                "nmid": card.nmid,
+                "name": card.name,
+                "json": json.dumps(card.data),
+                "wb_category_id": existing_categories[card.wb_category_name].id,
+            }
+            for card in cards
+        ]
 
-    # Выполняем UPSERT (insert ... on conflict do update)
-    stmt_for_insert_cards = insert(WBCard).values(card_values)
-    stmt_on_conflict = stmt_for_insert_cards.on_conflict_do_update(
-        index_elements=["nmid"],
-        set_={
-            "name": stmt_for_insert_cards.excluded.name,
-            "json": stmt_for_insert_cards.excluded.json,
-            "wb_category_id": stmt_for_insert_cards.excluded.wb_category_id,
-        },
-    )
+        # Выполняем UPSERT
+        stmt_for_insert_cards = insert(WBCard).values(card_values)
+        stmt_on_conflict = stmt_for_insert_cards.on_conflict_do_update(
+            index_elements=["nmid"],
+            set_={
+                "name": stmt_for_insert_cards.excluded.name,
+                "json": stmt_for_insert_cards.excluded.json,
+                "wb_category_id": stmt_for_insert_cards.excluded.wb_category_id,
+            },
+        )
 
-    async with _sm(read_only=False) as session:
         await session.execute(stmt_on_conflict)
         await session.commit()
+
