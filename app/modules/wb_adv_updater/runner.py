@@ -17,7 +17,7 @@ sm = get_async_session_maker
 logger = logging.getLogger(__name__)
 
 
-async def run_update_predict_ctr():
+async def run_update_predict_ctr() -> None:
     await wb_manager.update_predict_ctr()
 
 
