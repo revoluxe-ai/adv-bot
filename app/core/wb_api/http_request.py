@@ -36,7 +36,7 @@ from .exceptions import (
     NotValidDataError,
     ApiErrorWithCode,
     NotMatchWBApiError,
-    MinAdvBidWBApiError,
+    MinAdvBidWBApiError, MaxAttemptsError,
 )
 from .protocols import WBAPIProtocol
 
@@ -130,7 +130,7 @@ def try_except_decorator(
                 except Exception as e:
                     raise e
 
-            raise RuntimeError(
+            raise MaxAttemptsError(
                 f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
             )
 
