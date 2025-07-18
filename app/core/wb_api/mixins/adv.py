@@ -104,7 +104,8 @@ class AdvMixin(WBAPIProtocol):
         for i in range(0, len(adv_ids), part):
             part_of_advs = adv_ids[i : i + part]
             advs = await self._get_advs(part_of_advs)
-            all_advs.extend(advs)
+            if advs:
+                all_advs.extend(advs)
         return all_advs
 
     @try_except_decorator(5, 60)
