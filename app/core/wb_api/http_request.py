@@ -119,7 +119,9 @@ def try_except_decorator(
                     NotMatchWBApiError,
                 ) as e:
                     if state["_attempts"] >= max_attempts:
-                        raise e
+                        raise MaxAttemptsError(
+                            f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
+                        ) from e
                     state["_attempts"] += 1
                     state["_current_pause"] = min(
                         max(state["_current_pause"], 1) * 2, max_delay
@@ -127,14 +129,8 @@ def try_except_decorator(
                     logger.debug(
                         f'Следующая пауза между запросами: {state["_current_pause"]} секунд для shop_id: {shop_id}'
                     )
-                    last_error = e
                 except Exception as e:
                     raise e
-
-            raise MaxAttemptsError(
-                f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
-            ) from last_error
-
         return cast(F, wrapper)
 
     return decorator
