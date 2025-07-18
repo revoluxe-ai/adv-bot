@@ -21,6 +21,7 @@ from app.utils.image_master.image_master2 import ImageMaster
 from .gds_object import gds
 from .update_wb_adv_phrases_in_neo import update_wb_adv_phrases_in_neo
 from .word_to_vec_object import word2vec
+from ...core.redis_manager.base_redis_manager import BaseRedis
 from ...utils import redis_manager, text_cleaner
 
 logger = logging.getLogger(__name__)
@@ -269,20 +270,26 @@ async def update_keywords_ctr_by_similary():
 
         # Поиск ближайших векторов
         D, I = index.search(vector, index.ntotal)
-        for idx in I[0]:
-            if idx == -1:
-                break
-            adv_id, text = keywords[idx]
-            adv_id = int(adv_id)
-            if text == target_text:
-                continue
-            if adv_id != target_adv_id:
-                continue
-            predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
-            if predict_ctr:
-                logger.debug(
-                    f"Обновление CTR для ключевого слова {target_text} и объявления {adv_id} "
-                    f"на значение {predict_ctr}"
-                )
-                await redis_manager.set_predict_ctr(adv_id, target_text, predict_ctr)
-                break
+        redis_base_manager = BaseRedis()
+        async with redis_base_manager.client.pipeline() as redis_pipeline:
+            for idx in I[0]:
+                if idx == -1:
+                    break
+                adv_id, text = keywords[idx]
+                adv_id = int(adv_id)
+                if text == target_text:
+                    continue
+                if adv_id != target_adv_id:
+                    continue
+                predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
+                if predict_ctr:
+                    logger.debug(
+                        f"Обновление CTR для ключевого слова {target_text} и объявления {adv_id} "
+                        f"на значение {predict_ctr}"
+                    )
+                    await redis_manager.set_predict_ctr_with_pipeline(redis_pipeline,
+                                                                      adv_id,
+                                                                      target_text,
+                                                                      predict_ctr)
+                    break
+            await redis_pipeline.execute()

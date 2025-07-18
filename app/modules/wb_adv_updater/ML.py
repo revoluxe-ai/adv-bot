@@ -20,6 +20,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from . import data_manager, fitter
 from .data_getter import DataGetter
 from .ml_common_funcs import load_model
+from ...core.redis_manager.base_redis_manager import BaseRedis
 from ...utils import redis_manager, text_cleaner
 from ...utils.click_house.client import get_clickhouse_client
 
@@ -155,20 +156,21 @@ class Predictor:
             keyword_settings: typing.Sequence[KeywordSetting] = result.scalars().all()
 
         adv_id_to_min_ctr = {}
-        redis_pipeline =  redis_manager.get_pipeline()
-        async with get_clickhouse_client() as client:
-            for keyword_setting in keyword_settings:
-                adv = keyword_setting.adv_setting
-                adv_id = adv.adv_id
-                if not adv_id in adv_id_to_min_ctr:
-                    adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
-                min_ctr = adv_id_to_min_ctr[adv_id]
+        redis_manager = BaseRedis()
+        async with redis_manager.client.pipeline() as redis_pipeline:
+            async with get_clickhouse_client() as client:
+                for keyword_setting in keyword_settings:
+                    adv = keyword_setting.adv_setting
+                    adv_id = adv.adv_id
+                    if not adv_id in adv_id_to_min_ctr:
+                        adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
+                    min_ctr = adv_id_to_min_ctr[adv_id]
 
-                await self.__update_predict_ctr(
-                        client, redis_pipeline, keyword_setting, predict_df, min_ctr
-                    )
+                    await self.__update_predict_ctr(
+                            client, redis_pipeline, keyword_setting, predict_df, min_ctr
+                        )
 
-        await redis_pipeline.execute()
+            await redis_pipeline.execute()
 
 
 
