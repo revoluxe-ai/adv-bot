@@ -6,7 +6,7 @@ import redis
 from .redis_client import redis_client
 
 
-class BaseRedis(ABC):
+class BaseRedis:
     _client = redis_client
 
     @property
