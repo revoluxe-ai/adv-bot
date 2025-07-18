@@ -633,18 +633,21 @@ async def change_keyword_hard_status(
             )
             keyword_setting: KeywordSetting | None = keyword_setting.scalar()
             assert keyword_setting
-            adv_setting = keyword_setting.adv_setting
+            adv_setting: AdvSetting = keyword_setting.adv_setting
             if new_hard_status >= 0:
                 keyword_setting.hard_status = new_hard_status
                 if new_hard_status == 2:
                     keyword_setting.relevant = True
-
+            adv_ids = set()
+            adv_ids.add(adv_setting.adv_id)
+            if search_adv_id := adv_setting.search_adv_id:
+                adv_ids.add(search_adv_id)
             elif new_hard_status == -1:
                 min_ctr = await data_manager.get_min_ctr(adv_setting)
                 async with get_clickhouse_client() as client:
                     clicks, views, _ = (
                         await data_manager.get_keyword_statistic_clickhouse(
-                            client, keyword_setting.text, adv_setting.adv_id
+                            client, keyword_setting.text, adv_ids
                         )
                     )
                 if keyword_setting.added_clicks:

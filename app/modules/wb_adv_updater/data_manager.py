@@ -74,10 +74,17 @@ async def measure_time(function):
 
 
 async def get_keyword_statistic_clickhouse(
-    client, text: str, adv_id: int, pass_days: Union[int, None] = 7
+    client, text: str, adv_ids: set[int], pass_days: Union[int, None] = 7
 ) -> tuple[int, int, int]:
 
     today = datetime.now().date()
+    start_date_clause = ""
+    if pass_days:
+        start_date = today - timedelta(days=pass_days)
+        start_date_clause = f"AND date >= '{start_date}'"
+
+    adv_ids_str = ', '.join(map(str, adv_ids))  # безопасно вставляем в IN (...)
+
     query = f"""
         SELECT
             COALESCE(SUM(total_clicks), 0) AS total_clicks,
@@ -91,7 +98,7 @@ async def get_keyword_statistic_clickhouse(
             FROM
                 default_db.advkeyword
             WHERE
-                adv_id = {adv_id}
+                adv_id IN ({adv_ids_str})
                 AND text = %(text)s
                 AND (text, date, version) IN (
                     SELECT
@@ -101,34 +108,21 @@ async def get_keyword_statistic_clickhouse(
                     FROM
                         default_db.advkeyword
                     WHERE
-                        adv_id = {adv_id}
+                        adv_id IN ({adv_ids_str})
                         AND text = %(text)s
-                    """
-
-    # Добавление условия для фильтрации по дате внутри подзапроса
-    if pass_days:
-        start_date = today - timedelta(days=pass_days)
-        query += f" AND date >= '{start_date}'"
-
-    query += """
-                    GROUP BY
-                        text,
-                        date
+                        {start_date_clause}
+                    GROUP BY text, date
                 )
         ) AS latest_records
     """
 
-    # Выполнение запроса
     result = await client.query(query, {"text": text})
 
-    # Проверка наличия результатов
     if not result.result_rows:
-        logger.warning("No results found for the query.")
         return 0, 0, 0
 
     total_clicks, total_views, total_spend = result.result_rows[0]
 
-    # Коррекция значений, если количество кликов больше количества просмотров
     if total_clicks > total_views:
         total_views = total_clicks
 
