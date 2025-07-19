@@ -45,6 +45,7 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.keywords_query import keywords_query
+from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
 from app.settings import settings
 from app.utils import redis_manager
@@ -1136,15 +1137,8 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 async def get_min_ctr(adv: AdvSetting) -> float:
-    if not adv.new_auto_min_ctr_mode:
-        hard_min_ctr = adv.hard_min_ctr
-        if not hard_min_ctr:
-            return 0.1
-        else:
-            return adv.hard_min_ctr
-    min_ctr = await _get_min_ctr(adv)
-    # else:
-    #     min_ctr = await _get_new_min_ctr(adv)
+    ctr_manager = MinCtrManager(adv)
+    min_ctr = await ctr_manager.get_min_ctr()
     return min_ctr
 
 
@@ -1194,7 +1188,13 @@ async def _get_min_ctr(adv: AdvSetting):
     texts = [text[0] for text in texts if text[0]]
 
     if texts:
-        adv_id = adv.adv_id
+        adv_ids: set[int] = set()
+        auto_adv_id = adv.adv_id
+        adv_ids.add(auto_adv_id)
+        if search_adv_id := adv.search_adv_id:
+            adv_ids.add(search_adv_id)
+
+        adv_ids_list_str = ", ".join(str(adv_id) for adv_id in adv_ids)
         query = """
         WITH
             latest_versions AS (
@@ -1205,8 +1205,8 @@ async def _get_min_ctr(adv: AdvSetting):
                 FROM
                     default_db.advkeyword
                 WHERE
-                    adv_id = %(adv_id)s
-                    AND text IN %(texts)s
+                    adv_id IN %(adv_ids_list_str)s
+                    AND text = %(texts)s
                 GROUP BY
                     text, date
             ),
@@ -1224,7 +1224,7 @@ async def _get_min_ctr(adv: AdvSetting):
                     AND a.date = lv.date
                     AND a.version = lv.latest_version
                 WHERE
-                    a.adv_id = %(adv_id)s
+                    a.adv_id IN %(adv_ids_list_str)s
                 GROUP BY
                     a.text
             )
@@ -1242,7 +1242,7 @@ async def _get_min_ctr(adv: AdvSetting):
         """
 
         params = {
-            "adv_id": adv_id,
+            "adv_ids_list_str": adv_ids_list_str,
             "texts": tuple(texts),
         }
 
@@ -1261,7 +1261,7 @@ async def _get_min_ctr(adv: AdvSetting):
             real_ctr = text_to_real_ctr.get(text)
             if real_ctr:
                 real_ctrs.append(text_to_real_ctr[text])
-            predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
+            predict_ctr = await redis_manager.get_predict_ctr(auto_adv_id, text)
             if predict_ctr:
                 predict_ctrs.append(predict_ctr)
         if predict_ctrs:
