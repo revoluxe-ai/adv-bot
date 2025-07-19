@@ -22,6 +22,8 @@ class MinCtrManager:
             else:
                 return float(adv.hard_min_ctr)
         min_ctr = await self._get_min_ctr()
+        if not min_ctr:
+            min_ctr = settings.DEFAULT_MIN_CTR
         return min_ctr
 
 
