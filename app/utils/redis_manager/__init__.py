@@ -273,7 +273,7 @@ async def set_predict_ctr_with_pipeline(
     predict_ctr: float
 ) -> None:
     key = f"predict_ctr:{adv_id}:{clear(keyword)}"
-    await redis_pipeline.set(key, predict_ctr)
+    redis_pipeline.set(key, predict_ctr)
 
 
 async def get_adv_id_to_text_predict_ctr_dict(
@@ -439,21 +439,7 @@ async def add_phrase_hash_like_is_in_neo(hash_text):
     return None
 
 
-async def get_black_phrases(advsetting_id):
-    key = "black_phrases:" + str(advsetting_id)
-    answer = await redis_replica_client.get(key)
-    if answer == b"" or not answer:
-        return []
-    answer = answer.decode("utf-8")
-    answer = answer.split(",")
-    return answer
 
-
-async def set_black_phrases(advsetting_id, black_phrases: list[str]):
-    key = "black_phrases:" + str(advsetting_id)
-    black_phrases = ",".join(black_phrases)
-    await redis_master_client.set(key, black_phrases)
-    return None
 
 
 async def set_keyword_cluster(keyword: str, cluster_name: str):
