@@ -512,10 +512,16 @@ class KeywordSettingMessage(TextWithKeyboard):
         else:
             self.last_full_update = None
 
+        adv_ids = set()
+        auto_adv_id = adv_id
+        adv_ids.add(auto_adv_id)
+        if search_adv_id := adv_setting.search_adv_id:
+            adv_ids.add(search_adv_id)
+
         async with get_clickhouse_client() as client:
             total_clicks, total_views, total_spend = (
                 await data_manager.get_keyword_statistic_clickhouse(
-                    client, text, adv_id
+                    client, text, adv_ids
                 )
             )
         self.clicks = total_clicks

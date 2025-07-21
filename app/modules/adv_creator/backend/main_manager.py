@@ -12,6 +12,7 @@ from app.core.wb_api.mixins.excs import (
     CardNotFoundInWB,
 )
 from app.modules.common_slaves.wildberries import wb_db_manager
+from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exc import (
     CardsNotFoundForShopError,
@@ -86,6 +87,10 @@ class MainAdvManager:
                 )
                 nmids_for_add = list({nmid} - set(nmids_in_adv))
                 nmids_for_del = list(set(nmids_in_adv) - {nmid})
+                if len(nmids_for_del) >= 100:
+                    nmids_for_del = nmids_for_del[:99]
+                    nmids_for_add = []
+
                 if nmid not in nmids_in_adv:
                     try:
                         await self.wb_api.update_nmids_in_adv(
@@ -131,7 +136,7 @@ class MainAdvManager:
             assert wb_cabinet is not None
             async with sm() as session:
                 await wb_db_manager.update_cards_in_db(
-                    [target_card], wb_cabinet, session
+                    [target_card], wb_cabinet,
                 )
             name = target_card.name
             new_adv_name = str(nmid) + " " + name
@@ -174,13 +179,16 @@ class MainAdvManager:
                 new_adv.adv_id = auto_adv_id
                 new_adv.search_adv_id = search_adv_id
                 new_adv.max_place = 1
-                new_adv.max_cpm = 150
-                new_adv.reset_place = False
+                new_adv.max_cpm = 250
+                new_adv.reset_place = True
                 new_adv.name = new_adv_name
                 new_adv.bidder_active = False
                 new_adv.wb_cabinet = wb_cabinet
                 new_adv.parsing_active = False
                 new_adv.bot_active = True
+                new_adv.auto_adv_target_status = False
+                new_adv.auto_update_white_list = False
+                new_adv.auto_update_target_place = False
                 new_adv.active_status = "created_by_bot"
                 new_adv.type = 8
                 new_adv.nmids = [nmid]
@@ -225,7 +233,11 @@ class MainAdvManager:
         return auto_adv_id, search_adv_id
 
     async def start_complex_advs(self, nmid, auto_adv_id, search_adv_id):
-        advs = await self.wb_api.get_advs([auto_adv_id, search_adv_id])
+        advs_for_start = [auto_adv_id]
+        if settings.START_AUCTION_ON_CREATING_ADV:
+            advs_for_start.append(search_adv_id)
+
+        advs = await self.wb_api.get_advs(advs_for_start)
         auto_adv = advs[0]
         if auto_adv.nmids != [nmid]:
             raise NotChangeError("Артикулы не соответствуют")

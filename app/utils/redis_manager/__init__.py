@@ -7,10 +7,13 @@ import typing
 from types import NoneType
 from typing import Union
 
+from redis.asyncio.client import Pipeline
+
 from app.core.wb_api.mixins.adv import MinCPMData
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.utils import text_cleaner
 from app.utils.redis_manager.exc import DataNotFoundError
+from app.utils.text_cleaner import clear
 
 logger = logging.getLogger(__name__)
 
@@ -263,9 +266,14 @@ async def set_position_to_out_index(position):
     await add_positions_to_redis([position_out_index])
 
 
-async def set_predict_ctr(adv_id, keyword, predict_ctr):
-    key = f"predict_ctr:{adv_id}:{text_cleaner.clear(keyword)}"
-    await redis_master_client.set(key, predict_ctr)
+async def set_predict_ctr_with_pipeline(
+    redis_pipeline: Pipeline,
+    adv_id: Union[int, str],
+    keyword: str,
+    predict_ctr: float
+) -> None:
+    key = f"predict_ctr:{adv_id}:{clear(keyword)}"
+    redis_pipeline.set(key, predict_ctr)
 
 
 async def get_adv_id_to_text_predict_ctr_dict(
@@ -431,21 +439,7 @@ async def add_phrase_hash_like_is_in_neo(hash_text):
     return None
 
 
-async def get_black_phrases(advsetting_id):
-    key = "black_phrases:" + str(advsetting_id)
-    answer = await redis_replica_client.get(key)
-    if answer == b"" or not answer:
-        return []
-    answer = answer.decode("utf-8")
-    answer = answer.split(",")
-    return answer
 
-
-async def set_black_phrases(advsetting_id, black_phrases: list[str]):
-    key = "black_phrases:" + str(advsetting_id)
-    black_phrases = ",".join(black_phrases)
-    await redis_master_client.set(key, black_phrases)
-    return None
 
 
 async def set_keyword_cluster(keyword: str, cluster_name: str):
@@ -806,3 +800,8 @@ async def get_min_cpm_by_category_name(category_name: str) -> int | None:
     if min_cpm_data is None:
         return 125
     return int(min_cpm_data)
+
+
+def get_pipeline() -> Pipeline:
+    pipeline = redis_master_client.pipeline()
+    return pipeline

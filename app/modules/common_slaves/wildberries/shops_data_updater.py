@@ -85,7 +85,6 @@ class ShopDataUpdater:
         await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
 
     async def update_advs_data(self) -> list[Adv]:
-        logger.debug(f"Обновление данных для кабинета {self.wb_cabinet.shop_id}")
         wb_api: WBApi = self.wb_api
         advert_api = wb_api
         adv_ids: list[int] = await advert_api.get_advertIds()

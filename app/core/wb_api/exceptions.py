@@ -4,6 +4,12 @@ if TYPE_CHECKING:
     import new
 
 
+
+class MaxAttemptsError(Exception):
+    pass
+
+
+
 class UnknownApiRequestError(Exception):
     pass
 

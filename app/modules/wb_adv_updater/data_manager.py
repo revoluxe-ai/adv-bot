@@ -13,6 +13,8 @@ import aiogram
 from PIL import Image
 from aiogram.utils import deep_linking
 from sqlalchemy import and_, func, select, case, cast, Float, distinct
+import asyncpg
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
@@ -43,7 +45,9 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.keywords_query import keywords_query
+from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting
+from app.settings import settings
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.assoc_tables import favorite_advs_association
@@ -71,10 +75,17 @@ async def measure_time(function):
 
 
 async def get_keyword_statistic_clickhouse(
-    client, text: str, adv_id: int, pass_days: Union[int, None] = 7
+    client, text: str, adv_ids: set[int], pass_days: Union[int, None] = 7
 ) -> tuple[int, int, int]:
 
     today = datetime.now().date()
+    start_date_clause = ""
+    if pass_days:
+        start_date = today - timedelta(days=pass_days)
+        start_date_clause = f"AND date >= '{start_date}'"
+
+    adv_ids_str = ', '.join(map(str, adv_ids))  # безопасно вставляем в IN (...)
+
     query = f"""
         SELECT
             COALESCE(SUM(total_clicks), 0) AS total_clicks,
@@ -88,7 +99,7 @@ async def get_keyword_statistic_clickhouse(
             FROM
                 default_db.advkeyword
             WHERE
-                adv_id = {adv_id}
+                adv_id IN ({adv_ids_str})
                 AND text = %(text)s
                 AND (text, date, version) IN (
                     SELECT
@@ -98,34 +109,21 @@ async def get_keyword_statistic_clickhouse(
                     FROM
                         default_db.advkeyword
                     WHERE
-                        adv_id = {adv_id}
+                        adv_id IN ({adv_ids_str})
                         AND text = %(text)s
-                    """
-
-    # Добавление условия для фильтрации по дате внутри подзапроса
-    if pass_days:
-        start_date = today - timedelta(days=pass_days)
-        query += f" AND date >= '{start_date}'"
-
-    query += """
-                    GROUP BY
-                        text,
-                        date
+                        {start_date_clause}
+                    GROUP BY text, date
                 )
         ) AS latest_records
     """
 
-    # Выполнение запроса
     result = await client.query(query, {"text": text})
 
-    # Проверка наличия результатов
     if not result.result_rows:
-        logger.warning("No results found for the query.")
         return 0, 0, 0
 
     total_clicks, total_views, total_spend = result.result_rows[0]
 
-    # Коррекция значений, если количество кликов больше количества просмотров
     if total_clicks > total_views:
         total_views = total_clicks
 
@@ -141,8 +139,12 @@ async def get_keywords_statistic_clickhouse(
 ) -> List[CalculatedKeyword]:
 
     async with get_clickhouse_client() as ch_client:
-        adv_id = int(adv_setting.adv_id)
-        query = _build_clickhouse_query(adv_id, pass_time, last_views)
+        advs: set[int] = set()
+        auto_adv_id = int(adv_setting.adv_id)
+        advs.add(auto_adv_id)
+        if search_adv_id := adv_setting.search_adv_id:
+            advs.add(search_adv_id)
+        query = _build_clickhouse_query(advs, pass_time, last_views)
         result = await ch_client.query(query)
         rows = result.result_rows
         keywords = []
@@ -176,8 +178,13 @@ async def _get_keyword_settings(
 
 
 def _build_clickhouse_query(
-    adv_id: int, pass_time: Optional[timedelta], last_views: Optional[int] = None
+    adv_ids: set[int],
+    pass_time: Optional[timedelta],
+    last_views: Optional[int] = None,
 ) -> str:
+    # Преобразуем список ID в строку для SQL
+    adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
+
     # Формируем основной запрос
     query = f"""
         SELECT
@@ -196,14 +203,14 @@ def _build_clickhouse_query(
             FROM
                 default_db.advkeyword
             WHERE
-                adv_id = {adv_id}
+                adv_id IN ({adv_ids_str})
                 AND (text, date, version) IN (
                     SELECT
                         text, date, MAX(version) AS version
                     FROM
                         default_db.advkeyword
                     WHERE
-                        adv_id = {adv_id}
+                        adv_id IN ({adv_ids_str})
                     GROUP BY
                         text, date
                 )
@@ -653,33 +660,44 @@ async def get_good_bad_phrases_for_min_ctr(
             keyword_text = keyword_stat.text
             keyword_setting = texts_to_keyword_setting.get(keyword_text)
             if not keyword_setting:
-                clusters = keyword_stat.childs_keywords
-                if not clusters:
-                    clusters = []
+                clusters = keyword_stat.childs_keywords or []
                 clusters.append(keyword_stat)
+
                 stat_hard_statuses = defaultdict(int)
                 for kw in clusters:
                     original_text = kw.text
-                    if not (
-                        keyword_setting := texts_to_keyword_setting.get(original_text)
-                    ):
-                        continue
-                    hard_status = keyword_setting.hard_status
-                    stat_hard_statuses[hard_status] += 1
-                try:
-                    result_hard_status = max(
-                        stat_hard_statuses.items(), key=lambda x: x[1]
-                    )[0]
-                except:
-                    result_hard_status = 1
-                keyword_setting = KeywordSetting()
-                keyword_setting.text = keyword_text
-                keyword_setting.adv_setting = adv_setting
-                keyword_setting.hard_status = result_hard_status
-                session.add(keyword_setting)
-                await session.commit()
-                await session.refresh(keyword_setting)
+                    if keyword := texts_to_keyword_setting.get(original_text):
+                        stat_hard_statuses[keyword.hard_status] += 1
+
+                result_hard_status = (
+                    max(stat_hard_statuses.items(), key=lambda x: x[1])[0]
+                    if stat_hard_statuses
+                    else 1
+                )
+
+                stmt = (
+                    insert(KeywordSetting)
+                    .values(
+                        text=keyword_text,
+                        adv_setting_id=adv_setting.id,
+                        hard_status=result_hard_status,
+                    )
+                    .on_conflict_do_nothing(
+                        index_elements=["text", "adv_setting_id"]
+                    )
+                )
+                await session.execute(stmt)
+
+                # теперь получаем из БД (он там точно есть: либо только что вставили, либо уже был)
+                keyword_setting = await session.scalar(
+                    select(KeywordSetting).where(
+                        KeywordSetting.text == keyword_text,
+                        KeywordSetting.adv_setting_id == adv_setting.id,
+                    )
+                )
+
                 text_to_keyword_setting[keyword_text] = keyword_setting
+
     for keyword_setting in keyword_settings:
         text = str(keyword_setting.text)
         if text not in texts_in_keyword_stat:
@@ -1119,15 +1137,8 @@ async def get_mean_ctr(adv: AdvSetting):
 
 
 async def get_min_ctr(adv: AdvSetting) -> float:
-    if not adv.new_auto_min_ctr_mode:
-        hard_min_ctr = adv.hard_min_ctr
-        if not hard_min_ctr:
-            return 0.1
-        else:
-            return adv.hard_min_ctr
-    min_ctr = await _get_min_ctr(adv)
-    # else:
-    #     min_ctr = await _get_new_min_ctr(adv)
+    ctr_manager = MinCtrManager(adv)
+    min_ctr = await ctr_manager.get_min_ctr()
     return min_ctr
 
 
@@ -1177,7 +1188,13 @@ async def _get_min_ctr(adv: AdvSetting):
     texts = [text[0] for text in texts if text[0]]
 
     if texts:
-        adv_id = adv.adv_id
+        adv_ids: set[int] = set()
+        auto_adv_id = adv.adv_id
+        adv_ids.add(auto_adv_id)
+        if search_adv_id := adv.search_adv_id:
+            adv_ids.add(search_adv_id)
+
+        adv_ids_list_str = ", ".join(str(adv_id) for adv_id in adv_ids)
         query = """
         WITH
             latest_versions AS (
@@ -1188,8 +1205,8 @@ async def _get_min_ctr(adv: AdvSetting):
                 FROM
                     default_db.advkeyword
                 WHERE
-                    adv_id = %(adv_id)s
-                    AND text IN %(texts)s
+                    adv_id IN %(adv_ids_list_str)s
+                    AND text = %(texts)s
                 GROUP BY
                     text, date
             ),
@@ -1207,7 +1224,7 @@ async def _get_min_ctr(adv: AdvSetting):
                     AND a.date = lv.date
                     AND a.version = lv.latest_version
                 WHERE
-                    a.adv_id = %(adv_id)s
+                    a.adv_id IN %(adv_ids_list_str)s
                 GROUP BY
                     a.text
             )
@@ -1225,7 +1242,7 @@ async def _get_min_ctr(adv: AdvSetting):
         """
 
         params = {
-            "adv_id": adv_id,
+            "adv_ids_list_str": adv_ids_list_str,
             "texts": tuple(texts),
         }
 
@@ -1244,7 +1261,7 @@ async def _get_min_ctr(adv: AdvSetting):
             real_ctr = text_to_real_ctr.get(text)
             if real_ctr:
                 real_ctrs.append(text_to_real_ctr[text])
-            predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
+            predict_ctr = await redis_manager.get_predict_ctr(auto_adv_id, text)
             if predict_ctr:
                 predict_ctrs.append(predict_ctr)
         if predict_ctrs:
@@ -1255,7 +1272,7 @@ async def _get_min_ctr(adv: AdvSetting):
 
     category = await get_wb_category(adv)
     if not category:
-        return 0.1
+        return settings.DEFAULT_MIN_CTR
     category_name = category.wb_category_name
     async with _sm() as session:
         stmt = select(GlobalCategorySetting.min_ctr).where(
@@ -1265,7 +1282,7 @@ async def _get_min_ctr(adv: AdvSetting):
         try:
             min_ctr = result.scalar_one()
         except NoResultFound:
-            return 0.03
+            return settings.DEFAULT_MIN_CTR
     return float(min_ctr)
 
 
@@ -1603,7 +1620,7 @@ async def get_keywords_statistic(adv_setting) -> list[CalculatedKeyword]:
     return keywords
 
 
-async def get_max_adv_bid(adv_setting: AdvSetting):
+async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
     setting_max_bid = adv_setting.max_cpm
     max_pay_for_order = adv_setting.max_pay_for_order
     if not max_pay_for_order:

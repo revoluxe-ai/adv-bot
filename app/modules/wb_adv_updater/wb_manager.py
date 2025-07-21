@@ -206,16 +206,12 @@ async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
     return {ks.text for ks in existing_keyword_settings}
 
 
-async def update_predict_ctr():
+async def update_predict_ctr() -> None:
     while True:
-        try:
-            logger.debug("Начинаю прогноз CTR")
-            predictor = Predictor()
-            await predictor.predict_ctr_for_keywords()
-        except Exception as exc:
-            logger.error(f"Ошибка предсказания CTR {exc}")
-            del exc
-        await asyncio.sleep(0)
+        logger.debug("Начинаю прогноз CTR")
+        predictor = Predictor()
+        await predictor.predict_ctr_for_keywords()
+
 
 
 async def update_all_keyword_data(

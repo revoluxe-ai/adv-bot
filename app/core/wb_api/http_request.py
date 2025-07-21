@@ -36,7 +36,7 @@ from .exceptions import (
     NotValidDataError,
     ApiErrorWithCode,
     NotMatchWBApiError,
-    MinAdvBidWBApiError,
+    MinAdvBidWBApiError, MaxAttemptsError,
 )
 from .protocols import WBAPIProtocol
 
@@ -82,6 +82,7 @@ def try_except_decorator(
 
             state = instance.api_call_state[method_name]
             shop_id = instance.shop_id
+            last_error: Optional[Exception] = None
             while state["_attempts"] < max_attempts:
                 last_query_time: Optional[float] = state["_last_query_time"]
                 if last_query_time:
@@ -118,7 +119,9 @@ def try_except_decorator(
                     NotMatchWBApiError,
                 ) as e:
                     if state["_attempts"] >= max_attempts:
-                        raise e
+                        raise MaxAttemptsError(
+                            f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
+                        ) from e
                     state["_attempts"] += 1
                     state["_current_pause"] = min(
                         max(state["_current_pause"], 1) * 2, max_delay
@@ -126,14 +129,8 @@ def try_except_decorator(
                     logger.debug(
                         f'Следующая пауза между запросами: {state["_current_pause"]} секунд для shop_id: {shop_id}'
                     )
-                    del e
                 except Exception as e:
                     raise e
-
-            raise RuntimeError(
-                f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
-            )
-
         return cast(F, wrapper)
 
     return decorator

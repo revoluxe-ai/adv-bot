@@ -27,6 +27,7 @@ from app.core.wb_api import exceptions
 
 # Добавляем правильный импорт AdvPayment
 from app.modules.wb_adv_updater.models import AdvPayment
+from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
 from app.utils.db.models import User
@@ -361,7 +362,7 @@ class AdvSetting(BaseTable):
         uselist=True,
     )
     bot_active: Mapped[bool] = mapped_column(Boolean, default=False)
-    nmids: Mapped[list[int]] = Column(JSONB, default=[])
+    nmids: Mapped[list[int]] = mapped_column(JSONB, default=[])
     keyword_settings: Mapped[list["KeywordSetting"]] = relationship(
         "KeywordSetting",
         cascade="all, delete-orphan",
@@ -371,7 +372,8 @@ class AdvSetting(BaseTable):
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text("1"))
     type: Mapped[int] = Column(Integer, nullable=True)
-    hard_min_ctr = Column(Float, nullable=True)
+    hard_min_ctr = Column(Float, nullable=True, default=settings.DEFAULT_MIN_CTR,
+                          server_default=text(str(settings.DEFAULT_MIN_CTR)))
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
     payments: Mapped[list[AdvPayment]] = relationship(
@@ -394,12 +396,13 @@ class AdvSetting(BaseTable):
     new_auto_min_ctr_mode = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
-    reset_place = mapped_column(Boolean, nullable=True, default=True)
+    reset_place = mapped_column(Boolean, nullable=True, default=True, server_default=text('true'))
     _search_adv_id = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=DEFAULT_BIDDER_STEP)
-    exponent_predict_ctr = mapped_column(
-        Float, nullable=False, default=3, server_default="3"
-    )
+    exponent_predict_ctr = mapped_column(Float,
+                                        nullable=False,
+                                        default=settings.DEFAULT_CTR_EXPONENTA,
+                                        server_default=text(str(settings.DEFAULT_CTR_EXPONENTA)))
 
     auction_boost_all_phrase_mode = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
@@ -426,6 +429,12 @@ class AdvSetting(BaseTable):
 
     auto_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
     auction_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
+    auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(Boolean,
+                                                                nullable=True,
+                                                                default=True,
+                                                                server_default=text('true')
+                                                                )
+
 
     __table_args__ = (
         # Составной индекс для основного запроса

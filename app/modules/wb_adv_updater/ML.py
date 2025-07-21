@@ -6,6 +6,8 @@ from ast import literal_eval
 import numpy as np
 import pandas as pd
 import xgboost
+from clickhouse_connect.driver import AsyncClient
+from redis.asyncio.client import Pipeline
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -18,6 +20,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from . import data_manager, fitter
 from .data_getter import DataGetter
 from .ml_common_funcs import load_model
+from ...core.redis_manager.base_redis_manager import BaseRedis
 from ...utils import redis_manager, text_cleaner
 from ...utils.click_house.client import get_clickhouse_client
 
@@ -101,34 +104,8 @@ class Predictor:
         df["predicted_ctr"] = y
         return df
 
-    @staticmethod
-    async def __update_predict_ctr(client, keyword_setting, predict_df, min_ctr):
-        async with update_predict_ctr_process_semaphore:
-            try:
-                adv_id = keyword_setting.adv_setting.adv_id
-                keyword = keyword_setting.text
-                if not keyword:
-                    return
 
-                # Получаем строку с прогнозом для текущего ключевого слова
-                row = predict_df[
-                    (predict_df["adv_id"] == adv_id)
-                    & (predict_df["keyword"] == keyword)
-                ]
-                if row.empty:
-                    return
-
-                # Извлекаем предсказанный CTR
-                predicted_ctr = float(row["predicted_ctr"].values[0])
-                logger.debug("Начинаю запись predict ctr в redis")
-                await redis_manager.set_predict_ctr(adv_id, keyword, predicted_ctr)
-                logger.debug("Записали прогноз в redis")
-            except Exception as exc:
-                logger.error(
-                    f"Ошибка при обновлении предсказания для ключевого слова {keyword_setting.text}: {exc}"
-                )
-
-    async def predict_ctr_for_keywords(self):
+    async def predict_ctr_for_keywords(self) -> None:
         logger.debug("Начинаю получать кампании для формирования DF для предсказаний")
         async with sm() as session:
             stmt = (
@@ -143,6 +120,7 @@ class Predictor:
             all_adv_settings = result.scalars().unique().all()
         try:
             logger.debug("Начинаю получать DF  для предсказаний")
+            all_adv_settings: list[AdvSetting] = list(all_adv_settings)  # Приводим к списку для обработки
             df_for_predict = await self._get_df_for_predict(all_adv_settings)
             logger.debug("Получили DF для предсказаний")
         except Exception as exc:
@@ -175,54 +153,29 @@ class Predictor:
                 )
             )
             result = await session.execute(stmt)
-            keyword_settings = result.scalars().all()
+            keyword_settings: typing.Sequence[KeywordSetting] = result.scalars().all()
 
         adv_id_to_min_ctr = {}
+        redis_manager = BaseRedis()
+        async with redis_manager.client.pipeline() as redis_pipeline:
+            async with get_clickhouse_client() as client:
+                for keyword_setting in keyword_settings:
+                    adv = keyword_setting.adv_setting
+                    adv_id = adv.adv_id
+                    if not adv_id in adv_id_to_min_ctr:
+                        adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
+                    min_ctr = adv_id_to_min_ctr[adv_id]
 
-        tasks = []
-        async with get_clickhouse_client() as client:
-            for keyword_setting in keyword_settings:
-                adv = keyword_setting.adv_setting
-                adv_id = adv.adv_id
-                if not adv_id in adv_id_to_min_ctr:
-                    adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
-                min_ctr = adv_id_to_min_ctr[adv_id]
-                task = asyncio.create_task(
-                    self.__update_predict_ctr(
-                        client, keyword_setting, predict_df, min_ctr
-                    )
-                )
-                tasks.append(task)
-                await asyncio.sleep(0)
+                    await self.__update_predict_ctr(
+                            client, redis_pipeline, keyword_setting, predict_df, min_ctr
+                        )
 
-        part = 100
-        for i in range(0, len(tasks), part):
-            excs = await asyncio.gather(*tasks[i : i + part], return_exceptions=True)
-            await asyncio.sleep(0)
-            for ecv in excs:
-                if ecv:
-                    logger.error(ecv)
+            await redis_pipeline.execute()
 
-        logger.debug("Предсказания обновлены")
 
-    # async def __write_predict_ctr_to_redis(self, adv, keyword, predict_ctr):
-    #     logger.debug(f'Обновление предсказания для ключевого слова {keyword} в кампании {adv.name}')
-    #     min_ctr = await data_manager.get_min_ctr(adv)
-    #     enough_views = int(1 / min_ctr)
-    #     async with sm() as session:
-    #         stmt = select(KeywordSetting).where(and_(KeywordSetting.adv_setting_id == adv.id,
-    #                                                  KeywordSetting.text == keyword))
-    #         keyword_setting = await session.execute(stmt)
-    #         keyword_setting = keyword_setting.scalar()
-    #     clicks, views, _ = await data_manager.get_keyword_statistic(keyword_setting)
-    #     if clicks == 0:
-    #         clicks = 1
-    #         views += enough_views
-    #     real_ctr = clicks / views
-    #     predict_ctr = (real_ctr + predict_ctr) / 2
-    #     adv_id = adv.adv_id
-    #     await redis_manager.set_predict_ctr(adv_id, keyword, predict_ctr)
-    #     logger.debug(f'Предсказание для ключевого слова {keyword} в кампании {adv.name} обновлено')
+
+
+
 
     async def _get_df_for_predict(self, adv_settings: list[AdvSetting]) -> pd.DataFrame:
         data_rows = []
@@ -288,3 +241,32 @@ class Predictor:
     async def get_keyword_features(self, clear_keywords):
         result = await data_getter.get_keyword_features_from_redis(clear_keywords)
         return result
+
+    @staticmethod
+    async def __update_predict_ctr(client: AsyncClient,
+                                   redis_pipeline: Pipeline,
+                                   keyword_setting: KeywordSetting,
+                                   predict_df: pd.DataFrame,
+                                   min_ctr: float) -> None:
+
+        adv_id = keyword_setting.adv_setting.adv_id
+        keyword = keyword_setting.text
+        if not keyword:
+            return
+
+        # Получаем строку с прогнозом для текущего ключевого слова
+        row = predict_df[
+            (predict_df["adv_id"] == adv_id)
+            & (predict_df["keyword"] == keyword)
+            ]
+        if row.empty:
+            return
+
+        # Извлекаем предсказанный CTR
+        predicted_ctr = float(row["predicted_ctr"].values[0])
+        logger.debug("Начинаю запись predict ctr в redis")
+        await redis_manager.set_predict_ctr_with_pipeline(redis_pipeline,
+                                                          adv_id,
+                                                          keyword,
+                                                          predicted_ctr)
+        logger.debug("Записали прогноз в redis")

@@ -54,8 +54,8 @@ class TargetPlaceUpdater:
         adv = self._adv
         target_place = self._target_place
         new_target_place = target_place + 1
-        if new_target_place > 30:
-            new_target_place = 30
+        if new_target_place > 100_000:
+            new_target_place = 100_000
         if new_target_place != target_place:
             async with sm() as session:
                 stmt = (

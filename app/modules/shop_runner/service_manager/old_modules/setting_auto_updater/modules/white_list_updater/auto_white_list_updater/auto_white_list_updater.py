@@ -107,14 +107,26 @@ class WhiteListUpdateManager:
             return False, False
 
         def candidate_for_white_list_filter(keyword: CalculatedKeyword) -> bool:
-            if (
-                keyword.relevant
-                and keyword.hard_status == 1
-                and keyword.status == KeywordStatus.BAD
-            ):
-                return True
+            if self._adv.auto_add_only_relevant_phrase:
+                if (
+                    keyword.relevant
+                    and keyword.hard_status == 1
+                    and keyword.status == KeywordStatus.BAD
+                ):
+                    return True
+                else:
+                    return False
             else:
-                return False
+                if (
+                    keyword.hard_status == 1
+                    and keyword.status == KeywordStatus.BAD
+                ):
+                    return True
+                else:
+                    return False
+
+
+
 
         keywords_for_adding = list(filter(candidate_for_white_list_filter, keywords))
         if not keywords_for_adding:
