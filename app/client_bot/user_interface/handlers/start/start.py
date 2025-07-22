@@ -11,7 +11,7 @@ from aiogram.types import Message, CallbackQuery
 from aiohttp import ClientSession
 from sqlalchemy import Select
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload, load_only
 
 from app.client_bot import const
 from app.client_bot.redis_manager import RedisManager
@@ -156,7 +156,11 @@ async def process_cabinet_api(
         return
 
     user_telegram_id = message.from_user.id
-    wb_token = wb_models.WBToken(api_key=text)
+    chat_id = message.chat.id
+
+    wb_token = wb_models.WBToken(
+        api_key=text,
+    )
     try:
         shop_id = wb_token.get_shop_id_from_token()
     except NotValidTokenError:
@@ -164,15 +168,6 @@ async def process_cabinet_api(
             message.chat.id, "Токен не валиден, попробуйте еще раз: "
         )
         return
-
-    wb_token.shop_id = shop_id
-    access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
-    chat_id = message.chat.id
-    await messages.ShopUpdateInfo(bot, chat_id)()
-
-    data_state = await state.get_data()
-    cabinet_name = data_state["cabinet_name"].strip()
-
     async with sm() as session:
         # Получаем ID пользователя
         stmt_for_select_user_id: Select = select(User.id).where(
@@ -184,18 +179,36 @@ async def process_cabinet_api(
             await bot.send_message(chat_id, "Ошибка: пользователь не найден.")
             return
 
+    wb_token.shop_id = shop_id
+    wb_token.user_id = user_id
+    access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
+    chat_id = message.chat.id
+    await messages.ShopUpdateInfo(bot, chat_id)()
+
+    data_state = await state.get_data()
+    cabinet_name = data_state["cabinet_name"].strip()
+
+    async with sm() as session:
+        session.add(wb_token)
         # Проверка, что токен не используется другим пользователем
-        stmt_for_wb_token = select(WBToken).where(
-            WBToken.api_key == wb_token.api_key,
-            WBToken.user_id != user_id,
+        stmt_for_wb_token = (
+            select(WBToken)
+            .options(load_only(WBToken.user_id))
+            .where(
+                WBToken.api_key == wb_token.api_key,
+                WBToken.shop_id == wb_token.shop_id,
+            )
         )
         result = await session.execute(stmt_for_wb_token)
         existing_token = result.scalar()
         if existing_token:
-            await bot.send_message(
-                chat_id, "Этот токен уже используется другим пользователем."
-            )
-            return
+            if existing_token.user_id == user_id:
+                await bot.send_message(chat_id, "Этот токен уже используется вами.")
+            else:
+                await bot.send_message(
+                    chat_id, "Этот токен уже используется другим пользователем."
+                )
+                return
 
         # Проверка существования кабинета по shop_id
         stmt_for_cabinet = select(WBCabinet).where(
@@ -206,10 +219,15 @@ async def process_cabinet_api(
 
         if wb_cabinet:
             await messages.CabinetExistsForUser(bot, chat_id)()
-            stmt_for_select_user_id = select(WBUserCabinet).where(
-                and_(
-                    WBUserCabinet.wb_cabinet_id == wb_cabinet.id,
-                    WBUserCabinet.user_id == user_id,
+            stmt_for_select_user_id = (
+                select(WBUserCabinet)
+                .join(WBUserCabinet.user, WBUserCabinet.wb_cabinet)
+                .options(selectinload(WBUserCabinet.user, WBUserCabinet.wb_cabinet))
+                .where(
+                    and_(
+                        WBUserCabinet.wb_cabinet_id == wb_cabinet.id,
+                        WBUserCabinet.user_id == user_id,
+                    )
                 )
             )
             result = await session.execute(stmt_for_select_user_id)
@@ -228,8 +246,6 @@ async def process_cabinet_api(
                 await session.commit()
             wb_user_cabinet_original_id = wb_user_cabinet.id
             adv_settings = list(adv_settings)
-            wb_token.user_id = user_id
-            session.add(wb_token)
             await session.commit()
             await messages.AdvCompanyChoicing(
                 bot, chat_id, wb_user_cabinet_original_id, adv_settings, state
@@ -248,15 +264,12 @@ async def process_cabinet_api(
             wb_user_cabinet.wb_cabinet_id = wb_cabinet.id
             wb_user_cabinet.user_id = user_id
             session.add(wb_user_cabinet)
-            await session.flush()
-            wb_token.user_id = user_id
             await session.commit()
-            await session.refresh(wb_user_cabinet)
 
         await messages.ShopAddedSuccess(bot, chat_id, cabinet_name)()
         access.wb_cabinet = wb_cabinet
         access.wb_user_cabinet = wb_user_cabinet
-
+        # Обновляем данные магазина
         wb_api = WBApi(access, client_session)
 
         shop_updater = ShopDataUpdater(wb_api)

@@ -84,7 +84,7 @@ async def get_keyword_statistic_clickhouse(
         start_date = today - timedelta(days=pass_days)
         start_date_clause = f"AND date >= '{start_date}'"
 
-    adv_ids_str = ', '.join(map(str, adv_ids))  # безопасно вставляем в IN (...)
+    adv_ids_str = ", ".join(map(str, adv_ids))  # безопасно вставляем в IN (...)
 
     query = f"""
         SELECT
@@ -682,9 +682,7 @@ async def get_good_bad_phrases_for_min_ctr(
                         adv_setting_id=adv_setting.id,
                         hard_status=result_hard_status,
                     )
-                    .on_conflict_do_nothing(
-                        index_elements=["text", "adv_setting_id"]
-                    )
+                    .on_conflict_do_nothing(index_elements=["text", "adv_setting_id"])
                 )
                 await session.execute(stmt)
 
@@ -697,6 +695,8 @@ async def get_good_bad_phrases_for_min_ctr(
                 )
 
                 text_to_keyword_setting[keyword_text] = keyword_setting
+
+        await session.commit()
 
     for keyword_setting in keyword_settings:
         text = str(keyword_setting.text)
