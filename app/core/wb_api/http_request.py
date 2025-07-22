@@ -36,7 +36,8 @@ from .exceptions import (
     NotValidDataError,
     ApiErrorWithCode,
     NotMatchWBApiError,
-    MinAdvBidWBApiError, MaxAttemptsError,
+    MinAdvBidWBApiError,
+    MaxAttemptsError,
 )
 from .protocols import WBAPIProtocol
 
@@ -82,7 +83,6 @@ def try_except_decorator(
 
             state = instance.api_call_state[method_name]
             shop_id = instance.shop_id
-            last_error: Optional[Exception] = None
             while state["_attempts"] < max_attempts:
                 last_query_time: Optional[float] = state["_last_query_time"]
                 if last_query_time:
