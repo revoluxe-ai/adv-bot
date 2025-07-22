@@ -8,7 +8,7 @@ from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, Message
 from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select
+from sqlalchemy import select, Result
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -484,15 +484,15 @@ class KeywordSettingMessage(TextWithKeyboard):
         keyword = await redis_manager.get_calculated_keyword(adv_id, text)
         return keyword
 
-    async def __call__(self) -> tuple[LastMessage, str]:
+    async def __call__(self) -> tuple[Message, str]:
         async with sm(read_only=True) as session:
             stmt = (
                 select(KeywordSetting)
                 .options(selectinload(KeywordSetting.adv_setting))
                 .where(KeywordSetting.id == self._keyword_original_id)
             )
-            result = await session.execute(stmt)
-            keyword_setting: KeywordSetting = result.scalars().one()
+            result: Result[tuple[KeywordSetting,]] = await session.execute(stmt)
+            keyword_setting: KeywordSetting = result.scalar_one()
         adv_setting: AdvSetting = keyword_setting.adv_setting
         self._keyword_setting = keyword_setting
         adv_id = adv_setting.adv_id
