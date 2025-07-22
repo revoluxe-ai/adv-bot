@@ -1,6 +1,5 @@
 ﻿from app.core.redis_manager.base_redis_manager import (
     BaseRedisProtocol,
-    PersonalObjectRedisBase,
 )
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
@@ -8,7 +7,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.modules.common_slaves.wildberries.models import AdvSetting
 
 
-class AdvBaseRedis(PersonalObjectRedisBase, BaseRedisProtocol):
+class AdvBaseRedis(BaseRedisProtocol):
     def __init__(self, adv: AdvSetting):
         self._adv = adv
 

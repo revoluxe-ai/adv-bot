@@ -143,7 +143,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         auto_update_manager = AdvSettingAutoUpdater(self._adv_setting, 2)
 
-        fact_data = auto_update_manager.get_fact_data(stat_data)
+        fact_data = auto_update_manager.get_fact_data_from_stat(stat_data)
 
         self._fact_data = fact_data
 

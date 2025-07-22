@@ -16,6 +16,9 @@ class BaseRedis:
 
 
 class BaseRedisProtocol(Protocol):
-    _key: str = ...
-    prefix: str = ...
+    _key: str
+    prefix: str
     client: redis.asyncio.Redis
+
+
+

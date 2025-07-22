@@ -42,6 +42,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import (
     KeywordStatUpdateState,
@@ -223,12 +224,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
     async def __call__(self) -> Message:
         self._min_ctr: float | str
-        try:
-            self._min_ctr = await data_manager.get_min_ctr(self.adv)
-            if not self._min_ctr:
-                raise NoResultFound
-        except NoResultFound:
+        self._min_ctr = await data_manager.get_min_ctr(self.adv)
+        if not self._min_ctr:
             self._min_ctr = "Минимальный CTR не определен"
+        else:
+            self._min_ctr = round(self._min_ctr, 2)
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
             self.adv.id, self.wb_user_cabinet.user_id
@@ -308,7 +308,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
             f"📌 Статус: {self.adv.active_status}\n"
-            f"🎯 Минимальный CTR для кампании: {round(self._min_ctr*100, 2)} %\n"
+            f"🎯 Минимальный CTR для кампании: {self._min_ctr} \n"
             f"🔢 Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n"
             f"Последнее обновление обобщенной статистики ключевых слов в базе: {self.last_update_keyword_stat_str}\n"
             f"Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n"
@@ -1175,9 +1175,11 @@ class ManualCPMSetting(Text):
 class WaitingForBlackPhrases(TextWithKeyboard):
     async def __call__(self, adv_setting_id):
         self.adv_setting_id = adv_setting_id
-        black_phrases: Optional[list[str]] = await redis_manager.get_black_phrases(
-            adv_setting_id
-        )
+        async with sm() as session:
+            adv: AdvSetting = await session.get(AdvSetting, adv_setting_id)
+        rel_manager = RelevantPhraseManager(adv)
+
+        black_phrases: Optional[list[str]] = await rel_manager.get_relevant_template_data()
         self.black_phrases = black_phrases
         await super().__call__()
 
@@ -1194,6 +1196,9 @@ class WaitingForBlackPhrases(TextWithKeyboard):
                 "платье вечернее\n"
                 "платье летнее\n"
                 '"женское летнее"\n'
+                '\nЕсли перед фразой стоит восклицательный знак (!), то вхождение одной из обозначенных фраз ОБЯЗАТЕЛЬНО, '
+                'иначе фраза будет добавлена в не релевантные.\n'
+
             )
 
     @property
