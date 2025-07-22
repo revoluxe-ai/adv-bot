@@ -224,12 +224,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
     async def __call__(self) -> Message:
         self._min_ctr: float | str
-        try:
-            self._min_ctr = await data_manager.get_min_ctr(self.adv)
-            if not self._min_ctr:
-                raise NoResultFound
-        except NoResultFound:
+        self._min_ctr = await data_manager.get_min_ctr(self.adv)
+        if not self._min_ctr:
             self._min_ctr = "Минимальный CTR не определен"
+        else:
+            self._min_ctr = round(self._min_ctr, 2)
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
             self.adv.id, self.wb_user_cabinet.user_id
@@ -309,7 +308,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
             f"📌 Статус: {self.adv.active_status}\n"
-            f"🎯 Минимальный CTR для кампании: {round(self._min_ctr*100, 2)} %\n"
+            f"🎯 Минимальный CTR для кампании: {self._min_ctr} \n"
             f"🔢 Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n"
             f"Последнее обновление обобщенной статистики ключевых слов в базе: {self.last_update_keyword_stat_str}\n"
             f"Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n"
