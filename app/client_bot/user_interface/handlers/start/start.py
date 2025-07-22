@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from operator import and_
 from typing import Union
 
 import aiogram
@@ -11,7 +10,7 @@ from aiogram.types import Message, CallbackQuery
 from aiohttp import ClientSession
 from sqlalchemy import Select
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload, selectinload, load_only
+from sqlalchemy.orm import joinedload, load_only
 
 from app.client_bot import const
 from app.client_bot.redis_manager import RedisManager
@@ -219,16 +218,9 @@ async def process_cabinet_api(
 
         if wb_cabinet:
             await messages.CabinetExistsForUser(bot, chat_id)()
-            stmt_for_select_user_id = (
-                select(WBUserCabinet)
-                .join(WBUserCabinet.user, WBUserCabinet.wb_cabinet)
-                .options(selectinload(WBUserCabinet.user, WBUserCabinet.wb_cabinet))
-                .where(
-                    and_(
-                        WBUserCabinet.wb_cabinet_id == wb_cabinet.id,
-                        WBUserCabinet.user_id == user_id,
-                    )
-                )
+            stmt_for_select_user_id = select(WBUserCabinet).where(
+                WBUserCabinet.wb_cabinet_id == wb_cabinet.id,
+                WBUserCabinet.user_id == user_id,
             )
             result = await session.execute(stmt_for_select_user_id)
             wb_user_cabinet: WBUserCabinet | None = result.scalar_one_or_none()
