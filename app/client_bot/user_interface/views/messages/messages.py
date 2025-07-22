@@ -42,6 +42,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import (
     KeywordStatUpdateState,
@@ -1175,9 +1176,11 @@ class ManualCPMSetting(Text):
 class WaitingForBlackPhrases(TextWithKeyboard):
     async def __call__(self, adv_setting_id):
         self.adv_setting_id = adv_setting_id
-        black_phrases: Optional[list[str]] = await redis_manager.get_black_phrases(
-            adv_setting_id
-        )
+        async with sm() as session:
+            adv: AdvSetting = await session.get(AdvSetting, adv_setting_id)
+        rel_manager = RelevantPhraseManager(adv)
+
+        black_phrases: Optional[list[str]] = await rel_manager.get_relevant_template_data()
         self.black_phrases = black_phrases
         await super().__call__()
 
@@ -1194,6 +1197,9 @@ class WaitingForBlackPhrases(TextWithKeyboard):
                 "платье вечернее\n"
                 "платье летнее\n"
                 '"женское летнее"\n'
+                '\nЕсли перед фразой стоит восклицательный знак (!), то вхождение одной из обозначенных фраз ОБЯЗАТЕЛЬНО, '
+                'иначе фраза будет добавлена в не релевантные.\n'
+
             )
 
     @property
