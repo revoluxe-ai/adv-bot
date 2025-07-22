@@ -9,7 +9,6 @@ from aiogram.types import InlineKeyboardButton, Message
 from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select, Result
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.client_bot import const
@@ -228,7 +227,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         if not self._min_ctr:
             self._min_ctr = "Минимальный CTR не определен"
         else:
-            self._min_ctr = round(self._min_ctr, 2)
+            self._min_ctr = str(round(self._min_ctr, 2) * 10) + "%"
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
             self.adv.id, self.wb_user_cabinet.user_id
@@ -1179,7 +1178,9 @@ class WaitingForBlackPhrases(TextWithKeyboard):
             adv: AdvSetting = await session.get(AdvSetting, adv_setting_id)
         rel_manager = RelevantPhraseManager(adv)
 
-        black_phrases: Optional[list[str]] = await rel_manager.get_relevant_template_data()
+        black_phrases: Optional[list[str]] = (
+            await rel_manager.get_relevant_template_data()
+        )
         self.black_phrases = black_phrases
         await super().__call__()
 
@@ -1196,9 +1197,8 @@ class WaitingForBlackPhrases(TextWithKeyboard):
                 "платье вечернее\n"
                 "платье летнее\n"
                 '"женское летнее"\n'
-                '\nЕсли перед фразой стоит восклицательный знак (!), то вхождение одной из обозначенных фраз ОБЯЗАТЕЛЬНО, '
-                'иначе фраза будет добавлена в не релевантные.\n'
-
+                "\nЕсли перед фразой стоит восклицательный знак (!), то вхождение одной из обозначенных фраз ОБЯЗАТЕЛЬНО, "
+                "иначе фраза будет добавлена в не релевантные.\n"
             )
 
     @property
