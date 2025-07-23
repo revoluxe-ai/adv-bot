@@ -227,7 +227,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         if not self._min_ctr:
             self._min_ctr = "Минимальный CTR не определен"
         else:
-            self._min_ctr = str(round(self._min_ctr, 2) * 10) + "%"
+            self._min_ctr = str(round(self._min_ctr, 2) * 100) + "%"
 
         self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
             self.adv.id, self.wb_user_cabinet.user_id
