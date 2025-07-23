@@ -66,7 +66,7 @@ class CoroutinesManager:
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
 
-    @while_coroutine_decorator(1, 60)
+    @while_coroutine_decorator(3, 60)
     async def update_cpm_bid(self) -> None:
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
@@ -90,7 +90,7 @@ class CoroutinesManager:
         keywords = await self._wb_shop_data_manager.get_calculated_keywords(adv_setting)
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
-    @while_coroutine_decorator(1)
+    @while_coroutine_decorator(5 * 60)
     async def update_common_sale_stat(self) -> None:
         wb_api = self._wb_api
         ping_manager = PingManager(wb_api.access, self._session)
@@ -104,7 +104,7 @@ class CoroutinesManager:
     async def _update_full_stat_in_click_house(stats: Iterable[FullAdvStat]) -> None:
         await full_wb_adv_stat.insert(stats)
 
-    @while_coroutine_decorator(1, 1)
+    @while_coroutine_decorator(5 * 60, 1)
     async def update_full_adv_stat(self) -> None:
         wb_api = self._wb_api
         auto_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
@@ -139,7 +139,7 @@ class CoroutinesManager:
     ) -> None:
         await shop_data_updater.update_cards_data()
 
-    @while_coroutine_decorator(1)
+    @while_coroutine_decorator(1 * 60)
     async def update_advs_data_from_wb_to_pg(self) -> None:
         wb_api = self._wb_api
         shop_data_updater = ShopDataUpdater(wb_api)
