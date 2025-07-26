@@ -146,7 +146,7 @@ class CoroutinesManager:
         await shop_data_updater.update_advs_data()
 
     @staticmethod
-    async def async_zip_longest(
+    async def _async_zip_longest(
         *async_gens, fillvalue=None
     ) -> AsyncGenerator[Tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
@@ -188,7 +188,7 @@ class CoroutinesManager:
                 )
             )
             generators.append(generator)
-        zipped_generators = self.async_zip_longest(*generators)
+        zipped_generators = self._async_zip_longest(*generators)
         parsing_queue = GlobalParsingQueueManager()
         async for row in zipped_generators:
             for item in row:
