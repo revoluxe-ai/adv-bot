@@ -18,6 +18,7 @@ from ...settings import settings
 
 logger = logging.getLogger(__name__)
 
+
 async def _run_bidder_process():
     adv_tasks = {}
     while True:
@@ -121,8 +122,8 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
         if new_cpm < 125:
             new_cpm = 125
         await wb_api.advert.update_cpm(adv_id, new_cpm)
-        if new_cpm < 150:
-            new_cpm = 150
+        if new_cpm < 250:
+            new_cpm = 250
         adv_id = adv_setting.search_adv_id
         if adv_id:
             await wb_api.advert.set_search_cpm(adv_id, new_cpm)
