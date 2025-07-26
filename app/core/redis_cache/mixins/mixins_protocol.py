@@ -7,3 +7,5 @@ class RedisCacheMixinsProtocol(Protocol):
     _prefix: str
     _client: redis.asyncio.Redis
     _key: str
+    key: str
+    client: redis.asyncio.Redis

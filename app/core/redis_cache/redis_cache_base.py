@@ -25,3 +25,11 @@ class RedisCacheBase(ABC):
     @property
     def _key(self) -> str:
         return f"{self._prefix}:{self._unique_id}"
+
+    @property
+    def client(self) -> redis.asyncio.Redis:
+        return self._client
+
+    @property
+    def key(self) -> str:
+        return self._key
