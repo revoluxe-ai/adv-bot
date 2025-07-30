@@ -139,7 +139,7 @@ async def process_payment_for_advs() -> None:
                 adv_setting.auto_update_white_list = False
                 adv_setting.auto_update_target_place = False
 
-        await session.commit()
+            await session.commit()
 
 
 async def graph_vector_update() -> None:
@@ -213,7 +213,6 @@ async def update_predict_ctr() -> None:
         logger.debug("Начинаю прогноз CTR")
         predictor = Predictor()
         await predictor.predict_ctr_for_keywords()
-
 
 
 async def update_all_keyword_data(
