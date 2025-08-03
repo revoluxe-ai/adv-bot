@@ -2,7 +2,6 @@ import asyncio
 import logging
 import time
 import typing
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -10,13 +9,12 @@ import xgboost
 from sklearn.model_selection import cross_validate, KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from sqlalchemy import select, or_, func
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBCabinet,
 )
 from app.utils.db.session_maker import get_async_session_maker
 from . import data_manager
@@ -104,40 +102,18 @@ async def _get_df_for_fit() -> pd.DataFrame:
         adv_settings = result.scalars().all()
         nmids_in_active_adv = set([nmid for adv in adv_settings for nmid in adv.nmids])
         logger.debug("Формирование подзапроса для WBCabinet")
-        subquery = (
-            select(WBCabinet.id)
-            .where(
-                or_(
-                    WBCabinet.expiration_time > datetime.now(),
-                    WBCabinet.bonus > 0,
-                    WBCabinet.balance > 0,
-                )
-            )
-            .exists()
-        )
-
-        # Подсчет общего количества записей
-        logger.debug("Подсчет общего количества кампаний")
-        count_stmt = (
-            select(func.count())
-            .select_from(AdvSetting)
-            .where(subquery, AdvSetting.type == 8)
-        )
-        total_count = await session.scalar(count_stmt)
-        logger.info(f"Всего найдено кампаний: {total_count}")
 
         # Основной запрос
         logger.debug("Выполнение основного запроса для получения AdvSetting")
         stmt = (
             select(AdvSetting)
             .options(selectinload(AdvSetting.wb_cabinet))
-            .where(subquery, AdvSetting.type == 8)
+            .where(AdvSetting.bot_active == True)
         )
         result = await session.execute(stmt)
         adv_settings = result.scalars()
 
     for n, adv in enumerate(adv_settings):
-        logger.info(f"Обработка кампании {n + 1} из {total_count} (ID: {adv.adv_id})")
         nmids = adv.nmids
         if len(nmids) > 1:
             logger.debug(
