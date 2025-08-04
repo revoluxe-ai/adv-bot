@@ -105,7 +105,7 @@ def try_except_decorator(
                     state["_attempts"] = 0
                     return result
                 except ApiForbiddenError:
-                    await instance.set_next_token()
+                    await instance.set_next_token(method_name)
                     state["_current_pause"] = 0
                 except (
                     TooManyRequests,
@@ -131,6 +131,7 @@ def try_except_decorator(
                     )
                 except Exception as e:
                     raise e
+
         return cast(F, wrapper)
 
     return decorator
