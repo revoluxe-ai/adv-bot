@@ -156,7 +156,7 @@ async def update_vectors_update_in_graph() -> None:
             await graph_vector_update()
         except Exception as exc:
             logger.error(f"Ошибка векторизации {exc}", exc_info=True)
-            del e
+            del exc
         await asyncio.sleep(0)
 
 
