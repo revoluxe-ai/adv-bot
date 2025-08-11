@@ -805,3 +805,28 @@ async def get_min_cpm_by_category_name(category_name: str) -> int | None:
 def get_pipeline() -> Pipeline:
     pipeline = redis_master_client.pipeline()
     return pipeline
+
+
+
+
+async def set_black_phrases(self, black_phrases: list[str]) -> None:
+    """Сохраняет фразы в новом JSON-формате."""
+    await self.client.set(self.key, json.dumps(black_phrases))
+
+async def get_black_phrases(self) -> list[str]:
+    """Получает фразы, автоматически конвертируя старый формат в новый."""
+    answer = await self.client.get(self.key)
+
+    if not answer or answer == b"":
+        return []
+
+    data = answer.decode("utf-8")
+
+    if self._is_legacy_format(data):
+        # Конвертируем старый CSV-формат в новый JSON-формат
+        phrases = data.split(",")
+        await self.set_black_phrases(phrases)  # Миграция на новый формат
+        return phrases
+    else:
+        # Это уже JSON, просто парсим
+        return json.loads(data)
