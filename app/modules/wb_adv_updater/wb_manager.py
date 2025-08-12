@@ -156,7 +156,7 @@ async def update_vectors_update_in_graph() -> None:
             await graph_vector_update()
         except Exception as exc:
             logger.error(f"Ошибка векторизации {exc}", exc_info=True)
-            del e
+            del exc
         await asyncio.sleep(0)
 
 
@@ -245,41 +245,37 @@ async def update_all_keyword_data(
 async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
     from app.modules.common_slaves.wildberries.api import WBApi
 
-    update_tasks: dict[int, asyncio.Task] = {}
+    update_tasks: dict[int, asyncio.Task[None]] = {}
     while True:
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.bot_active)
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
-            for adv_setting in adv_settings:
-                if adv_setting.id not in update_tasks:
-                    wb_cabinet_id = adv_setting.wb_cabinet_id
-                    access: WBCabinetAccess = (
-                        await super_cabinet_manager.get_access_for_wb_cabinet(
-                            wb_cabinet_id
+        for adv_setting in adv_settings:
+            if adv_setting.id not in update_tasks:
+                wb_cabinet_id = adv_setting.wb_cabinet_id
+                access: WBCabinetAccess = (
+                    await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
+                )
+                if not access:
+                    logger.error(f"Нет доступа к кабинету {wb_cabinet_id}")
+                    continue
+                wb_api = WBApi(access, client_session)
+                wb_cabinet = access.wb_cabinet
+                assert wb_cabinet
+                task = asyncio.create_task(
+                    update_all_keyword_data(wb_api, adv_setting, wb_cabinet=wb_cabinet)
+                )
+                update_tasks[adv_setting.id] = task
+            else:
+                if update_tasks[adv_setting.id].done():
+                    if update_tasks[adv_setting.id].exception():
+                        logger.error(
+                            f"Ошибка обновления ключей:"
+                            f" {update_tasks[adv_setting.id].exception()}"
                         )
-                    )
-                    if not access:
-                        logger.error(f"Нет доступа к кабинету {wb_cabinet_id}")
-                        continue
-                    wb_api = WBApi(access, client_session)
-                    task = asyncio.create_task(
-                        update_all_keyword_data(
-                            wb_api, adv_setting, wb_cabinet=access.wb_cabinet
-                        )
-                    )
-                    update_tasks[adv_setting.id] = task
-                else:
-                    if update_tasks[adv_setting.id].done():
-                        if update_tasks[adv_setting.id].exception():
-                            logger.error(
-                                f"Ошибка обновления ключей  для shop_id: {access.wb_cabinet.shop_id} "
-                                f"Кампания: {adv_setting.adv_id} "
-                                f" {update_tasks[adv_setting.id].exception()}",
-                                exc_info=True,
-                            )
-                        del update_tasks[adv_setting.id]
-                await asyncio.sleep(0)
+                    del update_tasks[adv_setting.id]
+            await asyncio.sleep(0)
 
 
 async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
