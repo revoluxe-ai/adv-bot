@@ -245,7 +245,7 @@ async def update_all_keyword_data(
 async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
     from app.modules.common_slaves.wildberries.api import WBApi
 
-    update_tasks: dict[int, asyncio.Task] = {}
+    update_tasks: dict[int, asyncio.Task[None]] = {}
     while True:
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.bot_active)
@@ -261,20 +261,18 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                     logger.error(f"Нет доступа к кабинету {wb_cabinet_id}")
                     continue
                 wb_api = WBApi(access, client_session)
+                wb_cabinet = access.wb_cabinet
+                assert wb_cabinet
                 task = asyncio.create_task(
-                    update_all_keyword_data(
-                        wb_api, adv_setting, wb_cabinet=access.wb_cabinet
-                    )
+                    update_all_keyword_data(wb_api, adv_setting, wb_cabinet=wb_cabinet)
                 )
                 update_tasks[adv_setting.id] = task
             else:
                 if update_tasks[adv_setting.id].done():
                     if update_tasks[adv_setting.id].exception():
                         logger.error(
-                            f"Ошибка обновления ключей  для shop_id: {access.wb_cabinet.shop_id} "
-                            f"Кампания: {adv_setting.adv_id} "
-                            f" {update_tasks[adv_setting.id].exception()}",
-                            exc_info=True,
+                            f"Ошибка обновления ключей:"
+                            f" {update_tasks[adv_setting.id].exception()}"
                         )
                     del update_tasks[adv_setting.id]
             await asyncio.sleep(0)
