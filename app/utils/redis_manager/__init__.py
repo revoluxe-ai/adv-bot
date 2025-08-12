@@ -267,10 +267,7 @@ async def set_position_to_out_index(position):
 
 
 async def set_predict_ctr_with_pipeline(
-    redis_pipeline: Pipeline,
-    adv_id: Union[int, str],
-    keyword: str,
-    predict_ctr: float
+    redis_pipeline: Pipeline, adv_id: Union[int, str], keyword: str, predict_ctr: float
 ) -> None:
     key = f"predict_ctr:{adv_id}:{clear(keyword)}"
     redis_pipeline.set(key, predict_ctr)
@@ -437,9 +434,6 @@ async def add_phrase_hash_like_is_in_neo(hash_text):
     key = "phrase_in_neo:" + str(hash_text)
     await redis_master_client.set(key, 1)
     return None
-
-
-
 
 
 async def set_keyword_cluster(keyword: str, cluster_name: str):
@@ -807,11 +801,10 @@ def get_pipeline() -> Pipeline:
     return pipeline
 
 
-
-
 async def set_black_phrases(self, black_phrases: list[str]) -> None:
     """Сохраняет фразы в новом JSON-формате."""
     await self.client.set(self.key, json.dumps(black_phrases))
+
 
 async def get_black_phrases(self) -> list[str]:
     """Получает фразы, автоматически конвертируя старый формат в новый."""
