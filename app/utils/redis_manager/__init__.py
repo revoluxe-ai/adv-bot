@@ -29,9 +29,11 @@ from app import settings
 
 
 redis_host_master = settings.REDIS_MASTER_HOST
+assert redis_host_master
 redis_master_client = redis.asyncio.StrictRedis(host=redis_host_master, port=6379, db=0)
 
 redis_host_replica = settings.REDIS_REPLICA_HOST
+assert redis_host_replica
 redis_replica_client = redis.asyncio.StrictRedis(
     host=redis_host_replica, port=6379, db=0
 )
@@ -101,13 +103,13 @@ async def get_token_rights(hash_token):
     return answer
 
 
-async def set_check_last_24_hours(adv_original_id) -> None:
+async def set_check_last_24_hours(adv_original_id: int) -> None:
     await redis_master_client.set(
         "check_adv_last_24_hours:" + str(adv_original_id), "True", ex=60 * 60 * 24
     )
 
 
-async def check_last_24_hours(adv_original_id):
+async def check_last_24_hours(adv_original_id: int) -> typing.Any:
     answer = await redis_replica_client.get(
         "check_adv_last_24_hours:" + str(adv_original_id)
     )
