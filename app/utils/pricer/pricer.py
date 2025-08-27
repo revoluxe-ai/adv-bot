@@ -36,9 +36,9 @@ class Pricer:
         count = await self.get_advs_count(shop_id)
         base_tariff: int = self.get_price_for_count_advs_in_cabinet_for_month(count)
 
-        automatic_tariff: int = await self.get_automactic_tariff(shop_id)
+        # automatic_tariff: int = await self.get_automactic_tariff(shop_id)
 
-        return base_tariff + automatic_tariff
+        return base_tariff
 
     @staticmethod
     def get_tariff_for_day(tariff_for_month) -> float:
