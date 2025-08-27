@@ -85,12 +85,12 @@ async def process_payment_for_advs() -> None:
                 ),
             )
             .where(
-                    AdvSetting.bot_active == True,
+                AdvSetting.bot_active == True,
             )
         )
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.unique().scalars().all()
-        pricer = Pricer()
+        pricer: Pricer = Pricer()
         for adv_setting in adv_settings:
             if await check_adv_payment(session, adv_setting, current_date):
                 continue
