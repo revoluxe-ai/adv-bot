@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import logging
-from typing import List
+from typing import List, Sequence
 
 from aiohttp import ClientSession
 from sqlalchemy import exists
@@ -89,20 +89,25 @@ async def process_payment_for_advs() -> None:
             )
         )
         result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = result.unique().scalars().all()
+        adv_settings_result: Sequence[AdvSetting] = result.unique().scalars().all()
+        adv_settings = list(adv_settings_result)
         pricer: Pricer = Pricer()
         for adv_setting in adv_settings:
             if await check_adv_payment(session, adv_setting, current_date):
                 continue
             wb_cabinet: WBCabinet = adv_setting.wb_cabinet
             shop_id: str = str(wb_cabinet.shop_id)
-            PRICE_FOR_SHOP_FOR_DAY = await pricer.get_price_for_day_for_shop(shop_id)
+            PRICE_FOR_SHOP_FOR_DAY: float = await pricer.get_price_for_day_for_shop(
+                shop_id
+            )
             count_advs_for_wb_cabinet: int = get_count_advs_for_wb_cabinet(
                 wb_cabinet, adv_settings
             )
-            PRICE_FOR_ADV_FOR_DAY = PRICE_FOR_SHOP_FOR_DAY / count_advs_for_wb_cabinet
+            PRICE_FOR_ADV_FOR_DAY = float(
+                PRICE_FOR_SHOP_FOR_DAY / count_advs_for_wb_cabinet
+            )
             # Используем гибридные свойства вместо прямого доступа к полям
-            calculated_bonus = wb_cabinet.calculated_bonus
+            calculated_bonus = float(wb_cabinet.calculated_bonus)
             calculated_balance = wb_cabinet.calculated_balance
 
             # Сначала проверяем наличие средств
