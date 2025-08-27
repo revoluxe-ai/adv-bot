@@ -4,7 +4,7 @@ import logging
 from typing import List
 
 from aiohttp import ClientSession
-from sqlalchemy import exists, or_
+from sqlalchemy import exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -85,11 +85,7 @@ async def process_payment_for_advs() -> None:
                 ),
             )
             .where(
-                or_(
                     AdvSetting.bot_active == True,
-                    AdvSetting.auto_update_white_list == True,
-                    AdvSetting.auto_update_target_place == True,
-                )
             )
         )
         result = await session.execute(stmt)
