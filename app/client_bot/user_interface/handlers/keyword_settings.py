@@ -638,6 +638,8 @@ async def change_keyword_hard_status(
                 keyword_setting.hard_status = new_hard_status
                 if new_hard_status == 2:
                     keyword_setting.relevant = True
+                elif new_hard_status == 0:
+                    keyword_setting.relevant = False
             adv_ids = set()
             adv_ids.add(adv_setting.adv_id)
             if search_adv_id := adv_setting.search_adv_id:
