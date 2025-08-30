@@ -261,8 +261,6 @@ class Predictor:
 
         # Извлекаем предсказанный CTR
         predicted_ctr = float(row["predicted_ctr"].values[0])
-        logger.debug("Начинаю запись predict ctr в redis")
         await redis_manager.set_predict_ctr_with_pipeline(
             redis_pipeline, adv_id, keyword, predicted_ctr
         )
-        logger.debug("Записали прогноз в redis")
