@@ -104,7 +104,6 @@ class Predictor:
         df["predicted_ctr"] = y
         return df
 
-
     async def predict_ctr_for_keywords(self) -> None:
         logger.debug("Начинаю получать кампании для формирования DF для предсказаний")
         async with sm() as session:
@@ -120,7 +119,9 @@ class Predictor:
             all_adv_settings = result.scalars().unique().all()
         try:
             logger.debug("Начинаю получать DF  для предсказаний")
-            all_adv_settings: list[AdvSetting] = list(all_adv_settings)  # Приводим к списку для обработки
+            all_adv_settings: list[AdvSetting] = list(
+                all_adv_settings
+            )  # Приводим к списку для обработки
             df_for_predict = await self._get_df_for_predict(all_adv_settings)
             logger.debug("Получили DF для предсказаний")
         except Exception as exc:
@@ -167,15 +168,10 @@ class Predictor:
                     min_ctr = adv_id_to_min_ctr[adv_id]
 
                     await self.__update_predict_ctr(
-                            client, redis_pipeline, keyword_setting, predict_df, min_ctr
-                        )
+                        client, redis_pipeline, keyword_setting, predict_df, min_ctr
+                    )
 
             await redis_pipeline.execute()
-
-
-
-
-
 
     async def _get_df_for_predict(self, adv_settings: list[AdvSetting]) -> pd.DataFrame:
         data_rows = []
@@ -243,11 +239,13 @@ class Predictor:
         return result
 
     @staticmethod
-    async def __update_predict_ctr(client: AsyncClient,
-                                   redis_pipeline: Pipeline,
-                                   keyword_setting: KeywordSetting,
-                                   predict_df: pd.DataFrame,
-                                   min_ctr: float) -> None:
+    async def __update_predict_ctr(
+        client: AsyncClient,
+        redis_pipeline: Pipeline,
+        keyword_setting: KeywordSetting,
+        predict_df: pd.DataFrame,
+        min_ctr: float,
+    ) -> None:
 
         adv_id = keyword_setting.adv_setting.adv_id
         keyword = keyword_setting.text
@@ -256,17 +254,15 @@ class Predictor:
 
         # Получаем строку с прогнозом для текущего ключевого слова
         row = predict_df[
-            (predict_df["adv_id"] == adv_id)
-            & (predict_df["keyword"] == keyword)
-            ]
+            (predict_df["adv_id"] == adv_id) & (predict_df["keyword"] == keyword)
+        ]
         if row.empty:
             return
 
         # Извлекаем предсказанный CTR
         predicted_ctr = float(row["predicted_ctr"].values[0])
         logger.debug("Начинаю запись predict ctr в redis")
-        await redis_manager.set_predict_ctr_with_pipeline(redis_pipeline,
-                                                          adv_id,
-                                                          keyword,
-                                                          predicted_ctr)
+        await redis_manager.set_predict_ctr_with_pipeline(
+            redis_pipeline, adv_id, keyword, predicted_ctr
+        )
         logger.debug("Записали прогноз в redis")
