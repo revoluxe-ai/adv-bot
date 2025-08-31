@@ -19,7 +19,6 @@ from app.modules.common_slaves.wildberries.models import (
 from app.utils.db.session_maker import get_async_session_maker
 from . import data_manager
 from .data_getter import DataGetter
-from .ml_common_funcs import save_model
 from ..common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -90,7 +89,6 @@ async def _fit_modelGradientBoosting() -> xgboost.XGBModel | None:
         model.fit(X, y)
         logger.debug("Модель обучена")
         xgb_model: xgboost.XGBModel = model.named_steps["xgbregressor"]
-        await asyncio.to_thread(save_model, xgb_model, time_stamp=None)
         return xgb_model
 
     except Exception as exc:
