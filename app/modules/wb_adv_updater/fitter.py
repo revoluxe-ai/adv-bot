@@ -38,17 +38,17 @@ async def getGradientBoostingFullFitModel():
     logger.debug("Модель обучена")
 
 
-async def _fit_modelGradientBoosting():
+async def _fit_modelGradientBoosting() -> xgboost.XGBModel | None:
     logger.debug("Поток обучения запущен, получение данных")
     try:
-        df = await _get_df_for_fit()
+        df: pd.DataFrame = await _get_df_for_fit()
     except Exception as exc:
         logger.error(f"Ошибка при получении данных для обучения: {exc}", exc_info=True)
         raise exc
     logger.debug("Данные получены")
     if len(df) == 0:
         logger.info("Нет данных для обучения")
-        return
+        return None
     df: pd.DataFrame = await _bayesian_apply(df)
     try:
         await asyncio.to_thread(df.to_csv, "work_folder/df_for_fit.csv", index=False)
@@ -84,8 +84,10 @@ async def _fit_modelGradientBoosting():
         logger.debug("Обучение модели на полных данных")
         model.fit(X, y)
         logger.debug("Модель обучена")
-        model = typing.cast(xgboost.XGBModel, model.named_steps["xgbregressor"])
-        await asyncio.to_thread(save_model, model, time_stamp=None)
+        xgb_model: xgboost.XGBModel = model.named_steps["xgbregressor"]
+        await asyncio.to_thread(save_model, xgb_model, time_stamp=None)
+        return xgb_model
+
     except Exception as exc:
         logger.error(f"Ошибка при обучении модели: {exc}", exc_info=True)
         raise exc
@@ -226,7 +228,7 @@ async def __fetch_keyword_features(
     return result
 
 
-async def _bayesian_apply(df: pd.DataFrame):
+async def _bayesian_apply(df: pd.DataFrame) -> pd.DataFrame:
     adv_ids = df["adv_id"].unique()
     adv_ids = adv_ids.tolist()
     adv_id_keyword_text_to_status: dict[typing.Tuple[int, "str"], int] = (
