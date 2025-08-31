@@ -38,6 +38,11 @@ async def getGradientBoostingFullFitModel():
     logger.debug("Модель обучена")
 
 
+async def fit_modelGradientBoosting() -> xgboost.XGBModel | None:
+    model = await _fit_modelGradientBoosting()
+    return model
+
+
 async def _fit_modelGradientBoosting() -> xgboost.XGBModel | None:
     logger.debug("Поток обучения запущен, получение данных")
     try:
