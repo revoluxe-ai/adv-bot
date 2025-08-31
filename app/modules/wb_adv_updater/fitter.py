@@ -45,15 +45,15 @@ async def fit_and_get_new_model() -> xgboost.XGBModel | None:
 async def _fit_modelGradientBoosting() -> xgboost.XGBModel | None:
     logger.debug("Поток обучения запущен, получение данных")
     try:
-        df: pd.DataFrame = await _get_df_for_fit()
+        base_df: pd.DataFrame = await _get_df_for_fit()
     except Exception as exc:
         logger.error(f"Ошибка при получении данных для обучения: {exc}", exc_info=True)
         raise exc
     logger.debug("Данные получены")
-    if len(df) == 0:
+    if len(base_df) == 0:
         logger.info("Нет данных для обучения")
         return None
-    df: pd.DataFrame = await _bayesian_apply(df)
+    df: pd.DataFrame = await _bayesian_apply(base_df)
     try:
         await asyncio.to_thread(df.to_csv, "work_folder/df_for_fit.csv", index=False)
     except Exception:
