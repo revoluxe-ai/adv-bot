@@ -34,6 +34,7 @@ class RelevantPhraseManager:
                 text = str(keyword_setting.text)
                 if not templator.is_relevant(text):
                     keyword_setting.hard_status = 0
+                    keyword_setting.relevant = False
 
             await session.commit()
 
