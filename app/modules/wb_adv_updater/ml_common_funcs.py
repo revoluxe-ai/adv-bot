@@ -35,7 +35,9 @@ def load_model() -> xgboost.XGBModel:
     logger.debug("Загрузка модели")
     with model_lock:
         logger.debug("Прошли lock")
-        model: xgboost.XGBModel = joblib.load(os.path.join(path, "model.json"))
+        path = "model/model.json"
+        assert os.path.exists(path)
+        model: xgboost.XGBModel = joblib.load(path)
         logger.debug("Модель загружена")
         # with open(f'{path}/time_stamp.txt', 'r') as file:
         #     time_stamp = file.read()
