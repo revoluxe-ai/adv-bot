@@ -1,6 +1,5 @@
 import logging
 import typing
-from collections import defaultdict
 from typing import Generator, TypeVar
 
 from aiohttp import ClientSession
@@ -17,9 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 T = TypeVar("T")
-
-
-bad_tokens_original_ids: dict[str, set[int]] = defaultdict(set)
 
 
 class BaseAPI:
@@ -39,8 +35,7 @@ class BaseAPI:
             )
         tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
         self._free_tokens = tokens
-        current_token = self._free_tokens[0]
-        self._current_token = current_token
+        current_token = self._free_tokens.pop()
         self._headers = Headers(current_token)
         self._shop_id = current_token.shop_id
         self.api_call_state: dict[str, dict[str, str]] = {}
@@ -64,23 +59,11 @@ class BaseAPI:
         for i in range(0, len(lst), n):
             yield lst[i : i + n]
 
-    async def set_next_token(self, method_name: str) -> None:
+    async def set_next_token(self) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
-        current_token_original_id = self._current_token.id
-        bad_tokens_original_ids[method_name].add(current_token_original_id)
-
-        all_bad_token_original_ids: set[int] = bad_tokens_original_ids[method_name]
-
-        free_tokens = [
-            token
-            for token in self._free_tokens
-            if token.id not in all_bad_token_original_ids
-        ]
-
-        if free_tokens:
-            self._current_token = free_tokens[0]
-            self.headers = Headers(self._current_token)
+        if self._free_tokens:
+            self.headers = Headers(self._free_tokens.pop())
         else:
             wb_cabinet: WBCabinet | None = self.access.wb_cabinet
             if wb_cabinet is None:

@@ -21,7 +21,7 @@ class WBAPIProtocol(Protocol):
     shop_id: str
     session: ClientSession
 
-    async def set_next_token(self, method_name: str) -> None:
+    async def set_next_token(self) -> None:
         """Устанавливает следующий токен для работы с API"""
 
     ...
