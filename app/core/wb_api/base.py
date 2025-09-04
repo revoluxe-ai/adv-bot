@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-bad_tokens_original_ids: dict[str, set[int]] = defaultdict(set)
-
-
+# TODO: АРХИТЕКТУРНАЯ ПРОБЛЕМА - Дублирование базовых классов API [СРЕДНИЙ ПРИОРИТЕТ]
+# Существует два похожих базовых класса: BaseAPI и ABC_WB_API (app/modules/common_slaves/wildberries/ABC_WB_API.py)
+# Нужно провести рефакторинг для объединения или четкого разделения ответственности
+# Дата: 04.09.2025
 class BaseAPI:
     HOST = "wildberries.ru"
 
@@ -46,6 +47,7 @@ class BaseAPI:
         self.api_call_state: dict[str, dict[str, str]] = {}
         self.wb_cabinet = wb_access.wb_cabinet
         self.session: ClientSession = client_session
+        self._bad_tokens_original_ids: dict[str, set[int]] = defaultdict(set)
 
     @property
     def headers(self) -> "Headers":
@@ -68,9 +70,11 @@ class BaseAPI:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
         current_token_original_id = self._current_token.id
-        bad_tokens_original_ids[method_name].add(current_token_original_id)
+        self._bad_tokens_original_ids[method_name].add(current_token_original_id)
 
-        all_bad_token_original_ids: set[int] = bad_tokens_original_ids[method_name]
+        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[
+            method_name
+        ]
 
         free_tokens = [
             token

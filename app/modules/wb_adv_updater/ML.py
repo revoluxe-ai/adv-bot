@@ -6,7 +6,6 @@ from ast import literal_eval
 import numpy as np
 import pandas as pd
 import xgboost
-from clickhouse_connect.driver import AsyncClient
 from redis.asyncio.client import Pipeline
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -17,12 +16,11 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.utils.db.session_maker import get_async_session_maker
-from . import data_manager, fitter
+from . import fitter
 from .data_getter import DataGetter
 from .ml_common_funcs import load_model
 from ...core.redis_manager.base_redis_manager import BaseRedis
 from ...utils import redis_manager, text_cleaner
-from ...utils.click_house.client import get_clickhouse_client
 
 sm = get_async_session_maker
 
@@ -156,20 +154,14 @@ class Predictor:
             result = await session.execute(stmt)
             keyword_settings: typing.Sequence[KeywordSetting] = result.scalars().all()
 
-        adv_id_to_min_ctr = {}
         redis_manager = BaseRedis()
         async with redis_manager.client.pipeline() as redis_pipeline:
-            async with get_clickhouse_client() as client:
-                for keyword_setting in keyword_settings:
-                    adv = keyword_setting.adv_setting
-                    adv_id = adv.adv_id
-                    if not adv_id in adv_id_to_min_ctr:
-                        adv_id_to_min_ctr[adv_id] = await data_manager.get_min_ctr(adv)
-                    min_ctr = adv_id_to_min_ctr[adv_id]
-
-                    await self.__update_predict_ctr(
-                        client, redis_pipeline, keyword_setting, predict_df, min_ctr
-                    )
+            for keyword_setting in keyword_settings:
+                await self.__update_predict_ctr(
+                    redis_pipeline,
+                    keyword_setting,
+                    predict_df,
+                )
 
             await redis_pipeline.execute()
 
@@ -240,11 +232,9 @@ class Predictor:
 
     @staticmethod
     async def __update_predict_ctr(
-        client: AsyncClient,
         redis_pipeline: Pipeline,
         keyword_setting: KeywordSetting,
         predict_df: pd.DataFrame,
-        min_ctr: float,
     ) -> None:
 
         adv_id = keyword_setting.adv_setting.adv_id
