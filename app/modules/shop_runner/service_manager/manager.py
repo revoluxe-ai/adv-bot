@@ -13,6 +13,7 @@ from typing import (
     Protocol,
 )
 
+
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
@@ -259,3 +260,31 @@ class CoroutinesManager:
             except FirstKeyUpdaterError as exc:
                 logger.error(f"Ошибка обновления верхнего ключа: {exc}", exc_info=True)
                 raise exc
+
+
+    @while_coroutine_decorator(60, 1)
+    async def update_features_in_redis(self):
+        from .services.redis_features_update_manager import RedisFeaturesUpdateManager
+        advs = await self._wb_shop_data_manager.get_active_advs()
+        redis_update_manager = RedisFeaturesUpdateManager()
+        all_coroutines = []
+        for adv in advs:
+            item_features_update_coro = redis_update_manager.update_items_features(adv)
+            all_coroutines.append(item_features_update_coro)
+            keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
+            keywords_features_update_coroutines = redis_update_manager.update_keyword_features(keywords)
+            all_coroutines.append(keywords_features_update_coroutines)
+
+        await asyncio.gather(*all_coroutines)
+
+
+    @while_coroutine_decorator(60, 1)
+    async def update_predict_ctr(self):...
+        # from app.modules.predict_ctr_service.predict_ctr_client import
+
+
+
+
+
+
+
