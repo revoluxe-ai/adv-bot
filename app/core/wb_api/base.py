@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+# !!!устаревший класс, новый тут app/core/wb_api/base_wb_api_v2.py!!!
+
+
 # TODO: АРХИТЕКТУРНАЯ ПРОБЛЕМА - Дублирование базовых классов API [СРЕДНИЙ ПРИОРИТЕТ]
 # Существует два похожих базовых класса: BaseAPI и ABC_WB_API (app/modules/common_slaves/wildberries/ABC_WB_API.py)
 # Нужно провести рефакторинг для объединения или четкого разделения ответственности
