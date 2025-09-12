@@ -103,5 +103,22 @@ __all__ = [
     "WBApiAdapterError",
     "WBApiVersionError",
     "MinAdvBidWBApiError",  # Для совместимости
-    "BadRequestError",  # Для совместимости
+    "BadRequestError",
 ]
+
+
+# Для совместимости
+class NotValidTokenError(WBApiError):
+    """Исключение для недействительного/tокена невалидного токена (совместимость)."""
+
+    pass
+
+
+# Backwards-compatibility aliases for older imports
+# Expose common names expected by the rest of the codebase.
+TooManyRequests = WBApiTooManyRequestsError
+UnknownApiRequestError = WBApiError
+NotValidDataError = WBApiValidationError
+ApiErrorWithCode = WBApiError
+NotMatchWBApiError = WBApiError
+MaxAttemptsError = WBApiError
