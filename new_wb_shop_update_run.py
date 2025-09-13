@@ -1,6 +1,7 @@
-"""Новая точка входа для обработки магазинов"""
+"""
+Новая точка входа для обработки магазинов
 
-# TODO: Внедрить проверку библиотек-зависимостей перед деплоем
+"""
 
 import asyncio
 import platform
@@ -53,9 +54,10 @@ async def run_process() -> None:
         logger.error(f"Ошибка в процессе: {exc}", exc_info=True)
         raise exc
     finally:
-        pass
+        result = container.shutdown_resources()
+        if result is not None:
+            await result
 
 
 if __name__ == "__main__":
-    # TODO: Проверять активность кампаний перед обновлением ставок
     asyncio.run(run_process())
