@@ -49,7 +49,10 @@ async def run_process() -> None:
     except Exception as exc:
         logger.error(f"Ошибка в процессе: {exc}", exc_info=True)
         raise exc
+    finally:
+        pass
 
 
 if __name__ == "__main__":
+    # TODO: Проверять активность кампаний перед обновлением ставок
     asyncio.run(run_process())
