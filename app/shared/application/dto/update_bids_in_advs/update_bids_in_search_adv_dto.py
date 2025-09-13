@@ -13,6 +13,10 @@ class UpdateBidsInSearchAdvDTO:
     calculated_keywords_coro: "Awaitable[list[CalculatedKeyword]]"
 
     @property
+    def bidder_step(self) -> int:
+        return self.__adv_setting.bidder_step
+
+    @property
     def adv_id(self) -> int:
         return self.__adv_setting.search_adv_id
 

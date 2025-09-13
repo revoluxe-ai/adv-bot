@@ -96,15 +96,16 @@ class BaseWBApi(ABC):
             Экземпляр адаптера
         """
         if domain == "promotion":
-            # Используем DI контейнер для создания адаптеров
-            from .containers import WBApiContainer
+            # Разрешаем адаптеры исключительно через централизованный DI-контейнер
+            from app.core.di.wb_api.wb_api_container import WBApiDIContainer
 
-            container = WBApiContainer()
-
+            container = WBApiDIContainer()
+            # Если нужна конкретная версия — возвращаем её адаптер
             if version == "v1":
-                return container.promotion_adapter_v1(wb_access=self.access)
-            else:
-                raise ValueError(f"Unsupported promotion API version: {version}")
+                return container.promotion.v1.adapter()
+
+            # По умолчанию возвращаем текущий адаптер (alias current_adapter)
+            return container.current_adapter()
         else:
             raise NotImplementedError(
                 f"Domain adapter creation for '{domain}' not implemented"

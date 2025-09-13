@@ -1,14 +1,13 @@
 import asyncio
-from dataclasses import dataclass
-from typing import List, Dict, Optional
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import List, Dict, Optional
 
 from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
     UpdateBidsSearchAdvInShopBatch,
     UpdateBidForNmidTask,
 )
-from ....core.mp.wb.adapters.promotion.v1_adapter import PromotionV1Adapter
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ class BidUpdateOrchestrator:
 
     def __init__(
         self,
-        api_adapter: PromotionV1Adapter,
+        api_adapter,
         max_batch_size: int = 50,
         queue_size: int = 200,
     ):

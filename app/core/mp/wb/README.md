@@ -245,6 +245,33 @@ async def test_wb_api_client():
     assert wb_api.shop_id == mock_access.shop_id
 ```
 
+### Подмена адаптеров в тестах
+
+В тестах удобно подменять адаптеры через DI контейнер `WBApiDIContainer`.
+
+Пример подмены адаптера в pytest:
+
+```python
+from app.core.di.wb_api.wb_api_container import WBApiDIContainer
+from app.core.mp.wb.adapters.promotion.v1_adapter import PromotionV1Adapter
+
+def test_with_mock_adapter(monkeypatch):
+    container = WBApiDIContainer()
+
+    # Заменяем провайдер адаптера на мок
+    container.promotion.v1.adapter.override(lambda: MockPromotionAdapter())
+
+    # В процессе вызовов Provide[...] будет возвращён мок
+    wb_api = create_wb_api_client(WBApi, mock_access)
+    # Ваши тесты...
+
+    # Сбросить переопределение
+    container.promotion.v1.adapter.reset_override()
+```
+
+Также доступен `WBApiDIContainer.current_adapter` — alias на текущий адаптер, его удобно подменять целиком.
+
+
 ## Миграция со старого API
 
 Если вы используете старый `app/core/wb_api`, вот как мигрировать:

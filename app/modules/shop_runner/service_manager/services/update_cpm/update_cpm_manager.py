@@ -22,8 +22,6 @@ from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_b
 from .bid_orchestrator import BidUpdateOrchestrator
 from .redis_manager import RedisManager
 
-# from app.core.mp.wb.token_management.token_context import WBAccessContext
-
 logger = logging.getLogger(__name__)
 
 
@@ -31,15 +29,13 @@ class UpdateCPMManager:
     _DEFAULT_BIDDER_STEP = 2
 
     def __init__(self, access: WBCabinetAccess) -> None:
-        from .wb_api import WBApi
 
         self._shop_id = access.shop_id
         self._redis_manager = RedisManager()
         # Создаем WB API через фабрику с DI в контексте WBAccessContext
-        from app.core.mp.wb.factory import create_wb_api_client
 
         # Контекст гарантирует, что фабрика токен-менеджеров увидит корректный access
-        self._wb_api = create_wb_api_client(WBApi, access)
+
         # Сохраним доступ для асинхронных вызовов
         self._access = access
 
@@ -65,13 +61,13 @@ class UpdateCPMManager:
         else:
             return best_keyword
 
-    async def __get_min_cpm_from_wb(
+    async def __get_min_cpms_from_wb(
         self, adv_id: int, nmids: list[int]
     ) -> dict[int, int]:
-        min_cpm: dict[int, int] = await self._wb_api.get_min_bid_for_nmids(
+        min_cpms: dict[int, int] = await self._wb_api.get_min_cpms_for_adv_setting(
             adv_id, nmids
         )
-        return min_cpm
+        return min_cpms
 
     async def _get_new_bid(
         self,
@@ -83,7 +79,7 @@ class UpdateCPMManager:
         max_position: int | None = None,
         min_bid_in_adv: Task[dict[int, int]],
     ) -> int | None:
-        best_keyword: CalculatedKeyword | None = await best_keyword
+        best_keyword: CalculatedKeyword | None = await best_keyword_task
         if not best_keyword:
             return None
         max_cpm: int = max_bid
@@ -91,7 +87,6 @@ class UpdateCPMManager:
         if not best_keyword:
             return None
         text = best_keyword.text
-        nmid = search_adv_id
         try:
             current_cpm_from_wb_api: int = await self.__get_current_cpm_bid_from_wb_api(
                 search_adv_id
@@ -141,15 +136,16 @@ class UpdateCPMManager:
             adv_id = dto.adv_id
             nmids = dto.nmids
             min_bid_in_adv_task: Task[dict[int, int]] = asyncio.create_task(
-                self.__get_min_cpm_from_wb(adv_id, nmids)
+                self.__get_min_cpms_from_wb(adv_id, nmids)
             )
             max_bid = dto.max_cpm_bid
             for nmid in nmids:
                 new_bid_coro = self._get_new_bid(
-                    search_adv_id=adv_id,
+                    adv_id=adv_id,
+                    nmid=nmid,
                     max_bid=max_bid,
-                    best_keyword=best_keyword_task,
-                    bidder_step=None,
+                    best_keyword_task=best_keyword_task,
+                    bidder_step=dto.bidder_step,
                     max_position=dto.target_place,
                     min_bid_in_adv=min_bid_in_adv_task,
                 )

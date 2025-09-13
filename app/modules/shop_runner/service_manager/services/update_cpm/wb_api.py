@@ -6,6 +6,4 @@ from app.core.mp.wb import BaseWBApi, mixins
 
 
 class WBApi(mixins.CPMUpdateMixin, mixins.MinBidMixin, BaseWBApi):
-    """Специализированный WB API клиент для обновления CPM ставок."""
-
     pass
