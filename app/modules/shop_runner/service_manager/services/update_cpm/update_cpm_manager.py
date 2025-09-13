@@ -3,7 +3,6 @@ import logging
 from asyncio import Task
 from typing import Awaitable
 
-
 from app.client_bot.user_interface.views.messages import ApiForrbidenError
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -20,9 +19,10 @@ from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_b
     UpdateBidsSearchAdvInShopBatch,
     UpdateBidForNmidTask,
 )
-from .redis_manager import RedisManager
 from .bid_orchestrator import BidUpdateOrchestrator
-from app.core.mp.wb.token_management.token_context import WBAccessContext
+from .redis_manager import RedisManager
+
+# from app.core.mp.wb.token_management.token_context import WBAccessContext
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,7 @@ class UpdateCPMManager:
         from app.core.mp.wb.factory import create_wb_api_client
 
         # Контекст гарантирует, что фабрика токен-менеджеров увидит корректный access
-        with WBAccessContext(access):
-            self._wb_api = create_wb_api_client(WBApi, access)
+        self._wb_api = create_wb_api_client(WBApi, access)
         # Сохраним доступ для асинхронных вызовов
         self._access = access
 
@@ -54,8 +53,7 @@ class UpdateCPMManager:
         update_batch = self.__get_update_batch(update_bids_in_search_adv_dtos)
         orchestrator = BidUpdateOrchestrator(self._wb_api)
         # Запускаем в асинхронном контексте доступа к WB
-        async with WBAccessContext(self._access):
-            await orchestrator.process_updates(update_batch)
+        await orchestrator.process_updates(update_batch)
 
     async def __get_best_keyword(
         self, keywords_coro: Awaitable[list[CalculatedKeyword]]
@@ -147,7 +145,7 @@ class UpdateCPMManager:
             )
             max_bid = dto.max_cpm_bid
             for nmid in nmids:
-                new_bid_coro: Awaitable[int] = self._get_new_bid(
+                new_bid_coro = self._get_new_bid(
                     search_adv_id=adv_id,
                     max_bid=max_bid,
                     best_keyword=best_keyword_task,
@@ -155,5 +153,7 @@ class UpdateCPMManager:
                     max_position=dto.target_place,
                     min_bid_in_adv=min_bid_in_adv_task,
                 )
-                update_task = UpdateBidForNmidTask(adv_id, nmid, new_bid_coro)
+                # Schedule the coroutine to avoid "coroutine was never awaited" warnings
+                new_bid_coro_task = asyncio.create_task(new_bid_coro)  # type: ignore[arg-type]
+                update_task = UpdateBidForNmidTask(adv_id, nmid, new_bid_coro_task)
                 update_batch.add_task(update_task)

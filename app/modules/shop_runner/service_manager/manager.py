@@ -30,6 +30,9 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
+from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
+    UpdateBidsInSearchAdvDTO,
+)
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -61,9 +64,28 @@ class CoroutinesManager:
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
 
-    async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: WBApi) -> None:
-        keywords = await self._wb_shop_data_manager.get_calculated_keywords(adv_setting)
-        await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
+    @while_coroutine_decorator(1 * 60, 60)
+    async def update_cpm_bid_in_search_advs(self) -> None:
+        from .services.update_cpm import UpdateCPMManager
+
+        adv_settings = await self._wb_shop_data_manager.get_active_advs()
+        if not adv_settings:
+            return None
+
+        update_bid_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO] = []
+
+        for adv in adv_settings:
+            keywords_coro = self._wb_shop_data_manager.get_calculated_keywords(adv)
+            update_bid_in_search_adv_dto = UpdateBidsInSearchAdvDTO(adv, keywords_coro)
+            update_bid_in_search_adv_dtos.append(update_bid_in_search_adv_dto)
+
+        update_cpm_manager = UpdateCPMManager(self._access)
+        await update_cpm_manager.update_cpms_in_search_advs(
+            update_bid_in_search_adv_dtos
+        )
+
+        return None
+
 
     @while_coroutine_decorator(5 * 60)
     async def update_common_sale_stat(self) -> None:
@@ -200,8 +222,8 @@ class CoroutinesManager:
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:
         from .old_modules.setting_auto_updater.modules.first_key_updater import (
-            FirstKeyUpdater,
             FirstKeyUpdaterError,
+            FirstKeyUpdater,
         )
 
         all_active_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
@@ -311,6 +333,3 @@ class CoroutinesManager:
         finally:
             # Закрываем соединения
             await predict_ctr_manager.close()
-
-    async def update_cpm_bid_in_search_advs(self):
-        ...

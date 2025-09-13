@@ -1,18 +1,10 @@
 __all__ = ("RedisClient",)
 
-from abc import ABC
-from typing import cast, Optional, List, Dict, Set, Any
-
-try:
-    from aioredis import Redis
-except Exception:
-    # Fallback stub to avoid hard dependency during progressive refactor
-    class Redis:  # type: ignore
-        pass
-
-from dependency_injector.wiring import Provide, inject
-
-from app.core.di import AppContainer
+from abc import ABC, abstractmethod
+from typing import List, Optional, Dict, Union, Any
+from typing import cast
+from aioredis import Redis
+from app.core.di import Provide, AppContainer, inject
 
 
 class RedisClient(ABC):
