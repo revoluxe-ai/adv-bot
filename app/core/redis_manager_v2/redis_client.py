@@ -91,7 +91,7 @@ class RedisClient(ABC):
         return cast(int, await ensure_awaitable(self._replica_write_client.delete(*keys)))
 
     async def expire(self, key: str, time: int) -> bool:
-        return cast(bool, await ensure_awaitable(self._replica_write_client.expire(key, time)))
+        return cast(bool, await self._replica_write_client.expire(key, time))
 
     async def hset(self, name: str, key: str, value: str | bytes) -> int:
         if isinstance(value, bytes):
@@ -137,6 +137,7 @@ class RedisClient(ABC):
         return self._replica_write_client.pipeline()
 
     async def execute_read_pipeline(self, commands: list[list[Any]]) -> list[Any]:
+        """Выполняет список команд чтения через pipeline"""
         async with self._replica_read_client.pipeline() as pipe:
             for command in commands:
                 cmd = command[0]
@@ -146,6 +147,7 @@ class RedisClient(ABC):
         return cast(list[Any], results)
 
     async def execute_write_pipeline(self, commands: list[list[Any]]) -> list[Any]:
+        """Выполняет список команд записи через pipeline"""
         async with self._replica_write_client.pipeline() as pipe:
             for command in commands:
                 cmd = command[0]

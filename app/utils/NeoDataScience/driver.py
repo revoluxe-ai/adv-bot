@@ -157,7 +157,7 @@ class DataScience(metaclass=AsyncMeta):
 ) YIELD graphName, nodeProjection, nodeCount, relationshipProjection, relationshipCount, projectMillis
 RETURN graphName
         """
-
+        logger.debug(query, graph_name, properties_for_all_nodes)
         with self._neo_driver.driver.session() as s:
             result = s.run(
                 query, graph_name=graph_name, properties=properties_for_all_nodes

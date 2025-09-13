@@ -30,6 +30,9 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
+from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
+    UpdateBidsInSearchAdvDTO,
+)
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -79,6 +82,7 @@ class CoroutinesManager:
     async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: WBApi) -> None:
         keywords = await self._wb_shop_data_manager.get_calculated_keywords(adv_setting)
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
+
 
     @while_coroutine_decorator(5 * 60)
     async def update_common_sale_stat(self) -> None:
@@ -215,8 +219,8 @@ class CoroutinesManager:
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:
         from .old_modules.setting_auto_updater.modules.first_key_updater import (
-            FirstKeyUpdater,
             FirstKeyUpdaterError,
+            FirstKeyUpdater,
         )
 
         all_active_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
@@ -238,3 +242,38 @@ class CoroutinesManager:
             except FirstKeyUpdaterError as exc:
                 logger.error(f"Ошибка обновления верхнего ключа: {exc}", exc_info=True)
                 raise exc
+
+    @while_coroutine_decorator(60, 10)
+    async def update_predict_ctr(self) -> None:
+        """Обновление прогнозов CTR для всех активных кампаний"""
+        from .services.predict_ctr_update_manager import PredictCTRUpdateManager
+
+        advs = await self._wb_shop_data_manager.get_active_advs()
+
+        if not advs:
+            logger.debug(f"Нет активных кампаний для магазина {self.shop_id}")
+            return
+
+        predict_ctr_manager = PredictCTRUpdateManager()
+
+        try:
+            all_coroutines = []
+
+            logger.info(
+                f"Начинаем обновление прогнозов CTR для {len(advs)} кампаний магазина {self.shop_id}"
+            )
+
+            # Собираем корутины для всех кампаний
+            for adv in advs:
+                # Получаем корутину для ключевых слов (не await!)
+                keywords_coro = self._wb_shop_data_manager.get_calculated_keywords(adv)
+
+                # Создаем корутину обновления прогнозов CTR
+                update_coro = predict_ctr_manager.update_predict_ctr(adv, keywords_coro)
+                all_coroutines.append(update_coro)
+
+            await asyncio.gather(*all_coroutines)
+
+        finally:
+            # Закрываем соединения
+            await predict_ctr_manager.close()
