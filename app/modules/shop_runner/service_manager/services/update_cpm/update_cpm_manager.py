@@ -31,11 +31,6 @@ class UpdateCPMManager:
 
         self._shop_id = access.shop_id
         self._redis_manager = RedisManager()
-        # Создаем WB API через фабрику с DI в контексте WBAccessContext
-
-        # Контекст гарантирует, что фабрика токен-менеджеров увидит корректный access
-
-        # Сохраним доступ для асинхронных вызовов
         self._access = access
 
     async def update_cpms_in_search_advs(
