@@ -1,6 +1,5 @@
-import asyncio
 import logging
-from asyncio import Task
+from asyncio import Task, TaskGroup
 from typing import Awaitable
 
 from app.client_bot.user_interface.views.messages import ApiForrbidenError
@@ -45,11 +44,13 @@ class UpdateCPMManager:
     ) -> None:
         if not update_bids_in_search_adv_dtos:
             return None
-
-        update_batch = self.__get_update_batch(update_bids_in_search_adv_dtos)
-        orchestrator = BidUpdateOrchestrator(self._wb_api)
-        # Запускаем в асинхронном контексте доступа к WB
-        await orchestrator.process_updates(update_batch)
+        async with TaskGroup() as tg:
+            update_batch = self.__get_update_batch(
+                tg, update_bids_in_search_adv_dtos
+            )
+            orchestrator = BidUpdateOrchestrator(self._wb_api)
+            # Запускаем в асинхронном контексте доступа к WB
+            await orchestrator.process_updates(update_batch)
 
     async def __get_best_keyword(
         self, keywords_coro: Awaitable[list[CalculatedKeyword]]
@@ -88,8 +89,8 @@ class UpdateCPMManager:
             return None
         text = best_keyword.text
         try:
-            current_cpm_from_wb_api: int = await self.__get_current_cpm_bid_from_wb_api(
-                search_adv_id
+            current_bids_map: dict[int, int] = (
+                await self.__get_current_cpm_bids_from_wb_api(adv_id)
             )
         except ApiForrbidenError as e:
             raise e
@@ -125,17 +126,20 @@ class UpdateCPMManager:
         }
 
     def __get_update_batch(
-        self, update_bids_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO]
+        self,
+        tg: TaskGroup,
+        update_bids_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO],
     ) -> UpdateBidsSearchAdvInShopBatch:
+
         update_batch = UpdateBidsSearchAdvInShopBatch(self._shop_id)
         for dto in update_bids_in_search_adv_dtos:
             keywords_coro = dto.calculated_keywords_coro
-            best_keyword_task: Task[CalculatedKeyword | None] = asyncio.create_task(
+            best_keyword_task: Task[CalculatedKeyword | None] = tg.create_task(
                 self.__get_best_keyword(keywords_coro)
             )
             adv_id = dto.adv_id
             nmids = dto.nmids
-            min_bid_in_adv_task: Task[dict[int, int]] = asyncio.create_task(
+            min_bid_in_adv_task: Task[dict[int, int]] = tg.create_task(
                 self.__get_min_cpms_from_wb(adv_id, nmids)
             )
             max_bid = dto.max_cpm_bid
@@ -150,6 +154,6 @@ class UpdateCPMManager:
                     min_bid_in_adv=min_bid_in_adv_task,
                 )
                 # Schedule the coroutine to avoid "coroutine was never awaited" warnings
-                new_bid_coro_task = asyncio.create_task(new_bid_coro)  # type: ignore[arg-type]
+                new_bid_coro_task = tg.create_task(new_bid_coro)  # type: ignore[arg-type]
                 update_task = UpdateBidForNmidTask(adv_id, nmid, new_bid_coro_task)
                 update_batch.add_task(update_task)
