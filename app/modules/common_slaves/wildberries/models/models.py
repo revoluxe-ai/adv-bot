@@ -117,16 +117,6 @@ class WBBonusPayment(BaseTable):
     )
 
 
-class WBCategory(BaseTable):
-    cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped['WBCabinet'] = relationship(
-        "WBCabinet", back_populates="wb_categories"
-    )
-    wb_category_name: Mapped[str] = mapped_column(String, nullable=False)
-    wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_category", uselist=True)
-    __table_args__ = (Index("ix_wb_category_name", "wb_category_name"),)
-
-
 class WBCabinet(BaseTable):
     shop_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_cabinet", uselist=True)
@@ -183,6 +173,10 @@ class WBToken(BaseTable):
         UniqueConstraint("api_key", "user_id", name="_api_key_user_id_uc"),
         Index("idx_shop_id", "shop_id"),  # Индекс для shop_id
     )
+
+    @property
+    def hash(self):
+        return hash(self.api_key)
 
     @property
     def __payload(self) -> dict[str, object]:
@@ -640,15 +634,10 @@ class WBItemPosition:
         else:
             position.timestamp = None
 
-        raw_kw = data.get("keyword_text")
-        position.keyword_text = raw_kw if isinstance(raw_kw, str) else None
-
-        raw_adv_type = data.get("adv_type")
-        if isinstance(raw_adv_type, int):
-            position.adv_type = raw_adv_type
-        elif isinstance(raw_adv_type, str) and raw_adv_type.isdigit():
-            position.adv_type = int(raw_adv_type)
-        else:
+        position.keyword_text = data["keyword_text"]
+        try:
+            position.adv_type = data["adv_type"]
+        except KeyError:
             position.adv_type = None
 
         return position
