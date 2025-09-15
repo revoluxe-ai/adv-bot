@@ -36,12 +36,8 @@ class BidUpdateOrchestrator:
         self._logger = logger
 
     async def _process_bid_task(self, task: UpdateBidForNmidTask) -> BidUpdateResult:
-        try:
-            new_bid = await task.new_bid_coro
-            return BidUpdateResult(adv_id=task.adv_id, nmid=task.nmid, new_bid=new_bid)
-        except Exception as e:
-            self._logger.exception("Error processing bid task")
-            return BidUpdateResult(adv_id=task.adv_id, nmid=task.nmid, error=str(e))
+        new_bid = await task.new_bid_coro
+        return BidUpdateResult(adv_id=task.adv_id, nmid=task.nmid, new_bid=new_bid)
 
     async def _producer(
         self, task: UpdateBidForNmidTask, queue: asyncio.Queue[BidUpdateResult]
