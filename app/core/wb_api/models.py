@@ -1,7 +1,7 @@
 """Compatibility shim for WB API models used by WB API code path.
 
 This module re-exports models from the canonical location so that
-older imports like `from app.core.wb_api.models import WBToken, WBCabinetAccess`
+older imports like `from app.core.legacy-wb_api_clients.models import WBToken, WBCabinetAccess`
 continue to work without requiring deeper architectural changes.
 """
 
