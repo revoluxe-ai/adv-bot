@@ -236,6 +236,16 @@ class WBToken(BaseTable):
                 categories.add(category_name)
         return categories
 
+    @property
+    def is_expired(self) -> bool:
+        """Проверяет, истёк ли токен"""
+        try:
+            return datetime.datetime.utcnow() >= self.__expires
+        except Exception:
+            return (
+                True  # Если нет exp в payload или ошибка — считаем токен просроченным
+            )
+
 
 class AdvKeyword(BaseTable):
     adv_setting_id = Column(Integer, ForeignKey("advsetting.id"), nullable=False)
