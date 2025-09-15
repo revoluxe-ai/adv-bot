@@ -1,1 +1,0 @@
-# Promotion API client
