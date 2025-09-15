@@ -171,6 +171,10 @@ class WBToken(BaseTable):
     )
 
     @property
+    def hash(self):
+        return hash(self.api_key)
+
+    @property
     def __payload(self):
         from .excs import NotValidTokenError
         try:
