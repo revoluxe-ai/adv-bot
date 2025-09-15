@@ -77,8 +77,9 @@ print("✅ WB API модуль установлен корректно")
 ### 1. Создание специализированного клиента
 
 ```python
-# app/modules/your_module/wb_api.py
+# app/modules/your_module/legacy-wb_api_clients.py
 from app.core.mp.wb import BaseWBApi, mixins
+
 
 class WBApi(mixins.CPMUpdateMixin, BaseWBApi):
     """Специализированный WB API клиент для работы со ставками."""
@@ -201,12 +202,12 @@ class MyWBApi(MyCustomMixin, mixins.CPMUpdateMixin, BaseWBApi):
 ### Настройка версий API
 
 ```python
-# app/settings/wb_api.py
+# app/settings/legacy-wb_api_clients.py
 class WBApiVersionConfig:
     DOMAIN_VERSIONS: Dict[str, str] = {
-        "promotion": "v1",    # Рекламные кампании
-        "media": "v1",        # Медиа контент  
-        "statistics": "v1",   # Статистика
+        "promotion": "v1",  # Рекламные кампании
+        "media": "v1",  # Медиа контент  
+        "statistics": "v1",  # Статистика
     }
 ```
 
@@ -232,15 +233,16 @@ import pytest
 from app.core.mp.wb.factory import create_wb_api_client
 from app.modules.your_module.wb_api import WBApi
 
+
 @pytest.mark.asyncio
 async def test_wb_api_client():
     """Тест создания WB API клиента."""
     # Мокаем access
     mock_access = MockWBCabinetAccess()
-    
+
     # Создаем клиент
     wb_api = create_wb_api_client(WBApi, mock_access)
-    
+
     assert wb_api is not None
     assert wb_api.shop_id == mock_access.shop_id
 ```
@@ -252,8 +254,9 @@ async def test_wb_api_client():
 Пример подмены адаптера в pytest:
 
 ```python
-from app.core.di.wb_api.wb_api_container import WBApiDIContainer
+from app.core.di.wb_api_clients.wb_api_container import WBApiDIContainer
 from app.core.mp.wb.adapters.promotion.v1_adapter import PromotionV1Adapter
+
 
 def test_with_mock_adapter(monkeypatch):
     container = WBApiDIContainer()
@@ -270,7 +273,6 @@ def test_with_mock_adapter(monkeypatch):
 ```
 
 Также доступен `WBApiDIContainer.current_adapter` — alias на текущий адаптер, его удобно подменять целиком.
-
 
 ## Миграция со старого API
 

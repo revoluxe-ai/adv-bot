@@ -132,6 +132,7 @@ result = await retry_wb_api_call(
 from contextlib import asynccontextmanager
 from app.core.mp.wb.exceptions import WBApiError
 
+
 @asynccontextmanager
 async def wb_api_error_handler(operation_name: str, shop_id: int):
     """
@@ -145,24 +146,25 @@ async def wb_api_error_handler(operation_name: str, shop_id: int):
         logger.info(f"[{shop_id}] Начало операции: {operation_name}")
         yield
         logger.info(f"[{shop_id}] Операция завершена успешно: {operation_name}")
-        
+
     except WBApiForbiddenError as e:
         logger.error(f"[{shop_id}] Доступ запрещен в операции {operation_name}: {e}")
         # Можно добавить уведомление администратора
         await notify_token_expired(shop_id)
         raise
-        
+
     except WBApiTooManyRequestsError as e:
         logger.warning(f"[{shop_id}] Rate limit в операции {operation_name}: {e}")
         raise
-        
+
     except WBApiError as e:
         logger.error(f"[{shop_id}] Ошибка WB API в операции {operation_name}: {e}")
         raise
-        
+
     except Exception as e:
         logger.error(f"[{shop_id}] Неожиданная ошибка в операции {operation_name}: {e}", exc_info=True)
         raise
+
 
 # Использование
 async def update_campaign_bids(adv_setting: AdvSetting, new_bids: dict):
@@ -236,7 +238,7 @@ formatter = logging.Formatter(
 )
 
 # Обработчик для файла
-file_handler = logging.FileHandler('wb_api.log')
+file_handler = logging.FileHandler('legacy-wb_api_clients.log')
 file_handler.setFormatter(formatter)
 wb_api_logger.addHandler(file_handler)
 ```
@@ -280,35 +282,37 @@ def log_wb_api_error(error: WBApiError, context: dict = None):
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+
 class WBApiErrorMonitor:
     """Монитор ошибок WB API."""
-    
+
     def __init__(self):
         self.error_counts = defaultdict(int)
         self.last_reset = datetime.utcnow()
-    
+
     def record_error(self, error: WBApiError, shop_id: int):
         """Записать ошибку для мониторинга."""
         error_key = f"{type(error).__name__}:{shop_id}"
         self.error_counts[error_key] += 1
-        
+
         # Сброс счетчиков каждый час
         if datetime.utcnow() - self.last_reset > timedelta(hours=1):
             self.reset_counters()
-    
+
     def reset_counters(self):
         """Сбросить счетчики ошибок."""
         self.error_counts.clear()
         self.last_reset = datetime.utcnow()
-    
+
     def get_error_rate(self, error_type: str, shop_id: int) -> int:
         """Получить количество ошибок за текущий час."""
         error_key = f"{error_type}:{shop_id}"
         return self.error_counts.get(error_key, 0)
-    
+
     def should_alert(self, error_type: str, shop_id: int, threshold: int = 10) -> bool:
         """Проверить, нужно ли отправлять алерт."""
         return self.get_error_rate(error_type, shop_id) >= threshold
+
 
 # Глобальный монитор
 error_monitor = WBApiErrorMonitor()
