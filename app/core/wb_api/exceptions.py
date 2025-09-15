@@ -68,6 +68,13 @@ class MinAdvBidWBApiError(Exception):
         m = "Минимальная ставка изменена"
         super().__init__(f"{m} new_min_bid: {self.new_min_bid}")
 
-
 class BadRequestError(Exception):
+    """Ошибка плохого запроса (для совместимости)."""
+
+    def __init__(self, message="Bad request", response_text=None):
+        super().__init__(message, 400, response_text)
+
+class NotValidTokenError(Exception):
+    """Исключение для недействительного/tокена невалидного токена (совместимость)."""
+
     pass
