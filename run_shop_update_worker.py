@@ -13,20 +13,9 @@ setup_logging()
 
 
 async def run_shop_update_worker() -> None:
-    from app.core.di import AppContainer
-
-    container = AppContainer()
-    result =  container.init_resources()
-    if result is not None:
-        await result
-    try:
-        async with ClientSession() as session:
-            worker = ShopWorker(session)
-            await worker.update_active_shop_update_tasks_run()
-    finally:
-        result = container.shutdown_resources()
-        if result is not None:
-            await result
+    async with ClientSession() as session:
+        worker = ShopWorker(session)
+        await worker.update_active_shop_update_tasks_run()
 
 
 if __name__ == "__main__":
