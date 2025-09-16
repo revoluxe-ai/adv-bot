@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from functools import partial
+from typing import Union
 
 import numpy as np
 from gensim.models.keyedvectors import KeyedVectors
@@ -56,7 +57,7 @@ class Word2Vec:
 
     async def average_vector_from_sentence(
         self, phrase
-    ) -> float | np.ndarray | None:
+    ) -> Union[float, np.ndarray] | None:
         async with self._load_model_lock:
             if self._model is None:
                 await self._load_model()

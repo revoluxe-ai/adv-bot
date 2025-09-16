@@ -1,5 +1,4 @@
 from aiogram import Router
-
 from . import on_off_controller
 
 router = Router()

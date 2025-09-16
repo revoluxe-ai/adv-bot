@@ -1,4 +1,4 @@
-from aiogram import Bot, Router
+from aiogram import Router, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -6,8 +6,10 @@ from aiogram.types import CallbackQuery, Message
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.wb_adv_updater import data_manager
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 
 router = Router()
 

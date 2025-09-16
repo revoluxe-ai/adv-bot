@@ -1,11 +1,12 @@
+from typing import List, Set
 
 
 class NotRelevantTemplate:
-    def __init__(self, row_template: list[str]):
+    def __init__(self, row_template: List[str]):
         self._row_template = row_template
 
     @property
-    def _negative_contains(self) -> set[str]:
+    def _negative_contains(self) -> Set[str]:
         phrases = set()
         for row in self._row_template:
             row = row.strip()
@@ -19,7 +20,7 @@ class NotRelevantTemplate:
         return phrases
 
     @property
-    def _negative_exact(self) -> set[str]:
+    def _negative_exact(self) -> Set[str]:
         phrases = set()
         for row in self._row_template:
             row = row.strip()

@@ -3,7 +3,7 @@
 
 """
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable, Any
 
 from aiohttp import ClientSession
 

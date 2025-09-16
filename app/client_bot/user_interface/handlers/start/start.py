@@ -1,11 +1,12 @@
 import asyncio
 import logging
+from typing import Union
 
 import aiogram
 from aiogram import Router, types
-from aiogram.filters import CommandStart, StateFilter
+from aiogram.filters import StateFilter, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message, CallbackQuery
 from aiohttp import ClientSession
 from sqlalchemy import Select
 from sqlalchemy.future import select
@@ -20,16 +21,17 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 )
 from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.callbacks import Action
-from app.core.wb_api.exceptions import ApiForbiddenError, NotValidTokenError
+from app.core.wb_api.exceptions import ApiForbiddenError
+from app.core.wb_api.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries import (
     models as wb_models,
     super_cabinet_manager,
 )
+from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    WBCabinet,
-    WBToken,
     WBUserCabinet,
+    WBToken,
+    AdvSetting,
 )
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -85,7 +87,7 @@ async def add_shop(
 
 @router.message(StateFilter(states.CabinetRegistration.cabinet_name))
 async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMContext):
-    catch_cab: WBUserCabinet | None = None
+    catch_cab: Union[WBUserCabinet, None] = None
     cabinet_name = message.text
     if cabinet_name is None or not cabinet_name.strip():
         await bot.send_message(
@@ -389,8 +391,8 @@ async def update_company_from_wb(
         except ApiForbiddenError:
             await bot.send_message(
                 chat_id,
-                "Нет прав для доступа в РК, обновите токен,"
-                " в случае проблем обратитесь в поддержку -> ",
+                f"Нет прав для доступа в РК, обновите токен,"
+                f" в случае проблем обратитесь в поддержку -> ",
             )
             return
         except TimeoutError:
@@ -414,9 +416,9 @@ async def update_company_from_wb(
         except ApiForbiddenError:
             await bot.send_message(
                 chat_id,
-                "Нет прав для доступа в РК,"
-                " обновите токен,"
-                " в случае проблем обратитесь в поддержку -> ",
+                f"Нет прав для доступа в РК,"
+                f" обновите токен,"
+                f" в случае проблем обратитесь в поддержку -> ",
             )
             return
         except TimeoutError:

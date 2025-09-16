@@ -6,15 +6,15 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.modules.common_slaves.wildberries.api import WBApi
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
-
-from ...settings import settings
 from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
+from ...settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ async def _run_bidder_process():
                 wb_cabinet_id = adv_setting.wb_cabinet_id
                 if adv_setting.id not in adv_tasks:
                     task = asyncio.create_task(
-                        run_bidder_process_for_adv(adv_setting)
+                        (run_bidder_process_for_adv(adv_setting))
                     )
                     adv_tasks[adv_setting.id] = task
                 else:

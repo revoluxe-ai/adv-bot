@@ -2,7 +2,7 @@ from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
 from app.modules.common_slaves.wildberries.models import WBUserCabinet

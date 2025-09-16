@@ -3,25 +3,25 @@ import json
 import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 import jwt
 from jwt import DecodeError
 from sqlalchemy import (
-    BIGINT,
-    Boolean,
     Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Index,
     Integer,
     String,
-    UniqueConstraint,
+    ForeignKey,
+    BIGINT,
+    Boolean,
+    Float,
+    DateTime,
     text,
 )
+from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
@@ -499,7 +499,7 @@ class AdvSetting(BaseTable):
         self._search_adv_id = value
 
     @property
-    def max_pay_for_order(self) -> int | None:
+    def max_pay_for_order(self) -> Optional[int]:
         pattern = re.compile(
             r"<MAX_PAY>(\d+)!?</MAX_PAY>"
         )  # Добавили !? для необязательного символа "!"

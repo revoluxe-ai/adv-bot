@@ -1,18 +1,18 @@
 import logging
 import time
 from datetime import datetime, timedelta
+from typing import List, Optional
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.utils.click_house.client import get_clickhouse_client
-
 from .types.common_card_stat import CommonCardStat
 
 logger = logging.getLogger(__name__)
 
 
-async def get_stats_for_last_period(nmid: int, days: int) -> CommonCardStat | None:
+async def get_stats_for_last_period(nmid: int, days: int) -> Optional[CommonCardStat]:
     """
     Получает статистику за последний период в количестве дней.
     :param nmid: Идентификатор nmids для получения статистики.
@@ -130,9 +130,9 @@ class WBCommonStatManager:
         self.wb_api = wb_api
         self.wb_access = wb_api.access
 
-    async def update_common_statistic(self, nmids: list[int]):
+    async def update_common_statistic(self, nmids: List[int]):
         try:
-            statistics: list[CommonStat] = await self.wb_api.get_cards_stats_by_days(
+            statistics: List[CommonStat] = await self.wb_api.get_cards_stats_by_days(
                 nmids, 6
             )
         except ApiForbiddenError as exc:
@@ -145,7 +145,7 @@ class WBCommonStatManager:
         await self._add_common_statistic_to_clickhouse(statistics)
 
     @staticmethod
-    async def _add_common_statistic_to_clickhouse(statistics: list[CommonStat]):
+    async def _add_common_statistic_to_clickhouse(statistics: List[CommonStat]):
         # Подготовка данных для вставки в таблицу
         values = [
             (

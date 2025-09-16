@@ -1,16 +1,16 @@
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting
 from app.modules.white_list_updater.backend.excs import NotEnoughKeywordsError
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-
 class WhiteListUpdater:
     async def update_white_list(self, keywords: list[CalculatedKeyword], min_all_keywords: int):
         if len([keyword for keyword in keywords if keyword.predict_ctr is not None]) < min_all_keywords:
-             raise NotEnoughKeywordsError('Not enough keywords for white list update. ')
+             raise NotEnoughKeywordsError(f'Not enough keywords for white list update. ')
         assert [isinstance(keyword, CalculatedKeyword) for keyword in keywords]
         keywords.sort(key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
         top_keyword: CalculatedKeyword = keywords[0]

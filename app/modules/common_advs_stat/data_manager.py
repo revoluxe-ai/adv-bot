@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Optional, List
 
 from sqlalchemy import select
 
@@ -24,19 +25,19 @@ class CommonAdvsStatData:
     """Класс для хранения данных о ключевых словах рекламной кампании"""
 
     adv_setting: AdvSetting
-    keywords: list[CalculatedKeyword]
+    keywords: List[CalculatedKeyword]
     min_ctr: float
     auto_cpm: int
-    auction_cpm: int | None
+    auction_cpm: Optional[int]
     total_spend: float
     addition_spend_in_adv: float
-    all_orders_for_last_days: int | None
-    mean_orders_for_last_days: float | None
-    mean_price_for_order: float | None
-    spend_for_inner_advs: float | None
+    all_orders_for_last_days: Optional[int]
+    mean_orders_for_last_days: Optional[float]
+    mean_price_for_order: Optional[float]
+    spend_for_inner_advs: Optional[float]
     full_adv_stat_for_last_days_for_auto_adv: SmallFullAdvStat
     full_adv_stat_for_last_days_for_auction: SmallFullAdvStat
-    common_stat: CommonCardStat | None
+    common_stat: Optional[CommonCardStat]
 
 
 class CommonAdvsStatDataManager:
@@ -44,7 +45,7 @@ class CommonAdvsStatDataManager:
 
     @staticmethod
     async def get_data(
-        adv_setting: AdvSetting, keywords: list[CalculatedKeyword], last_days: int
+        adv_setting: AdvSetting, keywords: List[CalculatedKeyword], last_days: int
     ) -> CommonAdvsStatData:
         """Получает все необходимые данные для отображения информации о ключевых словах"""
 

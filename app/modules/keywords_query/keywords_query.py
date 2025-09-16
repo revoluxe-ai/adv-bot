@@ -1,5 +1,5 @@
+from typing import Union
 import os
-
 import pandas as pd
 
 # Определяем абсолютный путь к файлу requests.csv
@@ -21,7 +21,7 @@ del df
 
 min_query = list(queries_dict.values())[-1]
 
-def get_queries_of_keyword(keyword: str) -> int | str:
+def get_queries_of_keyword(keyword: str) -> Union[int, str]:
     # Попытка получить значение из словаря
     if keyword in queries_dict:
         return queries_dict[keyword]

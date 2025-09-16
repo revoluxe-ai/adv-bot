@@ -1,7 +1,7 @@
-import logging
-
-import numpy as np
 import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +63,10 @@ def get_adv_costs(adv_setting, start_date, end_date):
         pd.DataFrame: DataFrame с затратами по дням
     """
     logger.info(f"Получение затрат на рекламу для кампании {adv_setting.adv_id} с {start_date} по {end_date}")
-
+    
     # Создаем диапазон дат
     date_range = pd.date_range(start=start_date, end=end_date)
-
+    
     # Создаем данные для каждого дня
     data = []
     for date in date_range:
@@ -77,7 +77,7 @@ def get_adv_costs(adv_setting, start_date, end_date):
             'date': day_date,
             'sum': day_sum
         })
-
+    
     # Создаем DataFrame
     df = pd.DataFrame(data)
     return df
@@ -95,18 +95,18 @@ def get_position_from_bet(bet, min_bet, bets):
         int: позиция (0-based index)
     """
     logger.info(f"Получение позиции для ставки {bet} (мин. ставка: {min_bet})")
-
+    
     # Если ставка меньше минимальной, товар не показывается
     if bet < min_bet:
         return -1
-
+    
     # Сортируем ставки по убыванию
     sorted_bets = sorted(bets, reverse=True)
-
+    
     # Ищем позицию для нашей ставки
     for i, other_bet in enumerate(sorted_bets):
         if bet >= other_bet:
             return i
-
+    
     # Если наша ставка меньше всех, возвращаем последнюю позицию
-    return len(sorted_bets)
+    return len(sorted_bets) 

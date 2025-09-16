@@ -1,6 +1,5 @@
 import json
 
-
 class DayStat:
     def __init__(self, data):
         self.date = data['date']

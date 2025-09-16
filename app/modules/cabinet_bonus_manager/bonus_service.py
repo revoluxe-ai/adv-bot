@@ -2,11 +2,10 @@
 Сервис для управления бонусами кабинетов.
 Позволяет администраторам пополнять, убирать и обнулять бонусы кабинетов по shop_id.
 """
-from sqlalchemy import Result, select
-from sqlalchemy.orm import selectinload
-
-from app.modules.common_slaves.wildberries.models import WBBonusPayment, WBCabinet
+from sqlalchemy import select, Result
 from app.utils.db.session_maker import get_async_session_maker as sm
+from sqlalchemy.orm import selectinload
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBBonusPayment
 
 
 async def get_cabinet_by_id(cabinet_id: int) -> WBCabinet:
@@ -50,7 +49,7 @@ async def add_bonus(wb_cabinet_original_id: int, amount: float, admin_user_id: i
             cabinet = await session.get(WBCabinet, wb_cabinet_original_id)
             if not cabinet:
                 return False
-
+                
             # Создаем запись о начислении бонусов
             bonus_payment = WBBonusPayment(
                 wb_cabinet_id=cabinet.id,
@@ -123,7 +122,7 @@ async def reset_bonus(cabinet_id: int, admin_user_id: int, description: str) -> 
             calculated_bonus = cabinet.calculated_bonus
             if calculated_bonus <= 0:
                 return True
-
+                
             # Создаем запись об обнулении бонусов с отрицательной суммой, равной текущему расчетному бонусу
             bonus_payment = WBBonusPayment(
                 wb_cabinet_id=cabinet.id,

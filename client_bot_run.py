@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager
 from aiogram import Dispatcher, types
 from aiogram.exceptions import TelegramAPIError
 from aiohttp import ClientSession
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
+from fastapi import Response
 
 from app.client_bot.bot import get_bot
 from app.client_bot.global_router import global_router
@@ -122,7 +123,7 @@ if __name__ == "__main__":
                         delete_task = asyncio.create_task(bot.delete_webhook())
                         await asyncio.wait_for(delete_task, timeout=5)
                         logger.info("✅ Вебхук удалён.")
-                    except TimeoutError:
+                    except asyncio.TimeoutError:
                         logger.warning(
                             "⚠️ Таймаут при удалении вебхука. Продолжаем работу."
                         )

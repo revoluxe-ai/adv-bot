@@ -1,6 +1,7 @@
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
+import aiogram
 from aiogram import types as tp
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ class LastMessage(tp.Message):
         if isinstance(message_date, str):
             message_date = datetime.fromisoformat(message_date)
         # Определяем текущее время
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         # Рассчитываем разницу времени
         time_diff = now - message_date
         # Сообщение можно редактировать в течение 48 часов

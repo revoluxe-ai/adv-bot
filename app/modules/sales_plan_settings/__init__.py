@@ -3,4 +3,5 @@ from .telegram.main_callback import (
 )
 from .telegram.routers import router as SalesPlanSettingsMenuRouter
 
+
 __all__ = ["SalesPlanSettingsMenuRouter"]

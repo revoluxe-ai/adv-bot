@@ -1,9 +1,9 @@
 import logging
 
-from aiogram import Bot, F, Router
+from aiogram import Bot, Router, F
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy import update
 
 from app.client_bot.user_interface.handlers.start import start_registration

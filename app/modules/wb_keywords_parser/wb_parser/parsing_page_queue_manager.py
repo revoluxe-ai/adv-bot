@@ -1,9 +1,8 @@
-import logging
 import random
 from collections import OrderedDict
-
 from app.modules.common_slaves.wildberries.models import WBItemPosition
 from app.modules.wb_keywords_parser.parsing_found_redis_manager import ParsingFoundRedisManager
+import logging
 
 logger = logging.getLogger(__name__)
 

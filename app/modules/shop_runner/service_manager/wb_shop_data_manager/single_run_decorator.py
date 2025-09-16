@@ -1,9 +1,8 @@
 ﻿import asyncio
 import logging
 from collections import Counter
-from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Any
+from typing import Callable, Awaitable, Any
 
 logger = logging.getLogger(__name__)
 

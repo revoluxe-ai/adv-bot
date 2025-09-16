@@ -3,29 +3,29 @@ from typing import TYPE_CHECKING
 
 from aiogram import Bot
 from aiohttp import ClientSession
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select, or_, and_
 
 from app.core.wb_api.data_classes.adv import Balances
 from app.core.wb_api.mixins.excs import (
+    NotChangeError,
     AdvNotFoundInWBError,
     CardNotFoundInWB,
-    NotChangeError,
 )
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
-
-from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
 from .exc import (
     CardsNotFoundForShopError,
     NotEnoughBalanceOnShopError,
     StartComplexAdvError,
 )
 from .wb_api import WBApi
+from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
 
 if TYPE_CHECKING:
     from ...common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 import logging
+
 
 logger = logging.getLogger(__name__)
 

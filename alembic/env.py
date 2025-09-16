@@ -1,20 +1,20 @@
 #alembic/env.py
 import dotenv
-
 dotenv.load_dotenv()
 from logging.config import fileConfig
-
-from sqlalchemy import engine_from_config, pool
-from sqlalchemy.orm import configure_mappers
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
 
 from alembic import context
-from app.admin_bot.sender.utils.db.models import *
-from app.modules.common_slaves.wildberries.models import *
+from sqlalchemy.orm import configure_mappers
+
 from app.modules.wb_adv_updater.models import *
-from app.payments.db.models import *
-from app.utils.db.base import BaseTable as Base
+from app.modules.common_slaves.wildberries.models import *
 from app.utils.db.models import *
+from app.admin_bot.sender.utils.db.models import *
+from app.payments.db.models import *
 from app.utils.db.session_maker import get_alchemy_row_for_migration
+from app.utils.db.base import BaseTable as Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

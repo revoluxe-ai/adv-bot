@@ -16,12 +16,11 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.utils.db.session_maker import get_async_session_maker
-
-from ...core.redis_manager.base_redis_manager import BaseRedis
-from ...utils import redis_manager, text_cleaner
 from . import fitter
 from .data_getter import DataGetter
 from .ml_common_funcs import load_model
+from ...core.redis_manager.base_redis_manager import BaseRedis
+from ...utils import redis_manager, text_cleaner
 
 sm = get_async_session_maker
 
@@ -29,7 +28,7 @@ sm = get_async_session_maker
 logger = logging.getLogger(__name__)
 
 
-global_model: xgboost.XGBModel | None = None
+global_model: typing.Union[xgboost.XGBModel, None] = None
 
 
 update_predict_ctr_process_semaphore = asyncio.Semaphore(10)
@@ -88,7 +87,7 @@ class Fitter(AbcManager):
 
 class Predictor:
 
-    def _predict(self, df: pd.DataFrame) -> pd.DataFrame | None:
+    def _predict(self, df: pd.DataFrame) -> typing.Union[pd.DataFrame, None]:
         logger.debug("начинаю _predict")
         model = load_model()
         logger.debug("Модель загружена")
@@ -216,7 +215,7 @@ class Predictor:
                         },
                     }
                     data_rows.append(row)
-            except Exception:
+            except Exception as e:
                 logger.error("Ошибка обработки РК", exc_info=True)
         logger.debug("Формирование df")
         df = pd.DataFrame(data_rows)

@@ -1,8 +1,10 @@
 import re
+from typing import List, Optional
 
 from pydantic import BaseModel
 
 from .base_adv import Adv
+
 
 
 class Subject(BaseModel):
@@ -19,9 +21,9 @@ class Active(BaseModel):
 class AutoParams(BaseModel):
     subject: Subject
     active: Active
-    nms: list[int]
-    cpm: int | None = None
-    nms: list[int] | None = None
+    nms: List[int]
+    cpm: Optional[int] = None
+    nms: Optional[list[int]] = None
 
 
 class AutoAdv(Adv):

@@ -8,7 +8,6 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
-
 from .redis_cache.redis_cache import AdvSettingRedisCache
 
 T = TypeVar("T")

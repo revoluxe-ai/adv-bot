@@ -7,10 +7,9 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
-
-from ..setting_auto_updater.data_classes import FactData, PlanData
 from . import LastTargetPlaceUpdateRedisManager
 from .exc import AutoUpdateTargetPlaceError
+from ..setting_auto_updater.data_classes import PlanData, FactData
 
 
 class AutoUpdaterTargetPlace:

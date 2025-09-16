@@ -2,19 +2,18 @@ import dotenv
 
 dotenv.load_dotenv()
 
-import asyncio
-import logging
-import time
-from functools import partial
-from multiprocessing import Process
-
-import psutil
-
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     run_update_all_keywords_on_wb,
 )
 from python_modules.logger import setup_logging
+import logging
+import asyncio
+from multiprocessing import Process
+from functools import partial
+import time
+import psutil
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ run_own_process_list = [
 def process_controller(process_pids: list[int], process_names: list[str]):
     time.sleep(10)
     while True:
-        for pid, name in zip(process_pids, process_names, strict=False):
+        for pid, name in zip(process_pids, process_names):
             logger.debug(f"Проверка процесса: {name}")
             try:
                 proc = psutil.Process(pid)

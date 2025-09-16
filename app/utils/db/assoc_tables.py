@@ -1,6 +1,7 @@
-from sqlalchemy import BIGINT, Column, ForeignKey, Table
+from sqlalchemy import Table, Column, BIGINT, ForeignKey
 
 from app.utils.db.base import Base
+
 
 user_reflink_association = Table(
     'user_reflink_association', Base.metadata,

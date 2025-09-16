@@ -7,9 +7,8 @@ from neo4j.exceptions import Neo4jError
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.utils.db.session_maker import get_async_session_maker
 from app.utils.NeoDataScience.driver import DataScience
-
+from app.utils.db.session_maker import get_async_session_maker
 from .ABC_manager import AbcManager
 from .data_getter import DataGetter
 from .models import ItemFeature, KeywordFeature
@@ -41,7 +40,7 @@ class GraphUpdater:
 
     def _check_file_hash(self):
         if os.path.exists(self._hash_file_path):
-            with open(self._hash_file_path) as file:
+            with open(self._hash_file_path, "r") as file:
                 hash_in_file = file.read()
         hash_now = self.__calculate_file_hash(self._hash_file_path)
         return hash_now == hash_in_file

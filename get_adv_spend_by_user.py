@@ -1,17 +1,14 @@
 import datetime
-from collections import defaultdict
 
-from sqlalchemy import and_, select
+from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
 
-from app.modules.common_slaves.wildberries.models import (
-    AdvKeyword,
-    AdvSetting,
-    WBCabinet,
-    WBToken,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet, WBCabinet, AdvKeyword, WBToken
+from app.modules.wb_adv_updater.data_managers import get_keyword_statistic
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker, get_session_maker
+from collections import defaultdict
+
 
 aio_sm = get_async_session_maker()
 sm = get_session_maker()

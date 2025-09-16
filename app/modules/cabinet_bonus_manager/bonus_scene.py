@@ -3,26 +3,17 @@
 Обеспечивает изоляцию интерфейса управления бонусами от основной части приложения.
 """
 import logging
-
-from aiogram import Bot, F, Router
+from aiogram import F, Router, Bot
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.scene import Scene, SceneRegistry, SceneWizard, on
-from aiogram.types import CallbackQuery, Message
-
+from aiogram.fsm.scene import Scene, SceneRegistry, on, SceneWizard
 from app.client_bot.const import ADMINS
 from app.modules.cabinet_bonus_manager.bonus_service import (
-    add_bonus,
-    get_cabinet_by_id,
-    get_wb_cabinet_by_shop_id,
-    reset_bonus,
-    subtract_bonus,
+    add_bonus, subtract_bonus, reset_bonus, get_wb_cabinet_by_shop_id, get_cabinet_by_id
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
-from app.modules.cabinet_bonus_manager.keyboards import (
-    get_confirm_keyboard,
-    get_shop_bonus_keyboard,
-)
+from app.modules.cabinet_bonus_manager.keyboards import (get_confirm_keyboard, get_shop_bonus_keyboard)
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +43,7 @@ class BonusScene(Scene, state="bonus_scene"):
         """Вход в сцену управления бонусами"""
         logger.info("Вход в сцену управления бонусами")
         self.state_context: FSMContext = state  # Сохраняем контекст состояния
-
+        
         await message.answer("Введите shop_id кабинета для управления бонусами:")
         await state.update_data(action="menu")
 
@@ -64,7 +55,7 @@ class BonusScene(Scene, state="bonus_scene"):
         """Вход в сцену управления бонусами через callback"""
         logger.info("Вход в сцену управления бонусами через callback")
         self.state_context = state  # Сохраняем контекст состояния
-
+        
         await state.update_data(action="menu")
         await bot.send_message(callback.from_user.id, "Введите shop_id кабинета для управления бонусами:")
         return
@@ -139,7 +130,7 @@ class BonusScene(Scene, state="bonus_scene"):
             if cabinet is None:
                 await message.answer(f"Кабинет с shop_id {shop_id} не найден. Попробуйте еще раз:")
                 return
-
+                
             wb_cabinet_original_id = cabinet.id
             await state.update_data(wb_cabinet_original_id=wb_cabinet_original_id)
 
@@ -301,7 +292,7 @@ class BonusScene(Scene, state="bonus_scene"):
                                           state: FSMContext):
         """Обработчик действий с бонусами конкретного магазина"""
         logger.info(f"Обработка callback бонусов: {callback_data.action}")
-
+        
         data = await state.get_data()
         current_bonus = data.get("current_bonus", 0)
         current_balance = data.get("current_balance", 0)
@@ -375,7 +366,7 @@ class BonusScene(Scene, state="bonus_scene"):
                 new_balance = cabinet.calculated_balance if cabinet else 0
 
                 self.state_context = state
-
+                
                 await state.update_data(
                     action="menu",
                     shop_id=shop_id,
@@ -383,7 +374,7 @@ class BonusScene(Scene, state="bonus_scene"):
                     current_bonus=new_bonus,
                     current_balance=new_balance
                 )
-
+                
                 logger.info(f"Обновляем состояние после операции {operation}")
 
                 await callback.message.edit_text(
@@ -406,10 +397,10 @@ class BonusScene(Scene, state="bonus_scene"):
     @on.callback_query(AdminBonus.filter(F.action == "cancel"))
     async def process_cancel_callback(self, callback: CallbackQuery, state: FSMContext):
         """Обработчик отмены операции"""
-        logger.info("Отмена операции")
-
+        logger.info(f"Отмена операции")
+        
         self.state_context = state
-
+            
         data = await state.get_data()
         shop_id = data.get("shop_id")
         current_bonus = data.get("current_bonus")
@@ -456,9 +447,9 @@ def register_bonus_scene(router: Router):
 
     router.message.register(BonusScene.as_handler(), Command("bonus_menu"), F.from_user.id.in_(ADMINS))
     router.message.register(BonusScene.as_handler(), Command("check_bonus"), F.from_user.id.in_(ADMINS))
-
+    
     # Регистрируем только один обработчик для входа через callback
     router.callback_query.register(BonusScene.as_handler(),
                                    AdminBonus.filter(F.action == "menu"), F.from_user.id.in_(ADMINS))
-
+    
     logger.info("Сцена управления бонусами успешно зарегистрирована")

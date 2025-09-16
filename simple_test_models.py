@@ -1,20 +1,11 @@
 """
 Простой тест для проверки моделей с использованием SQLAlchemy.
 """
-import os
-
 import pytest
-from sqlalchemy import (
-    Boolean,
-    Column,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    create_engine,
-    text,
-)
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+import os
+from sqlalchemy import create_engine, Column, Integer, Float, String, Boolean, ForeignKey, DateTime, text
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+from datetime import datetime, timedelta
 
 # Создаем базу тестов
 Base = declarative_base()
@@ -39,16 +30,16 @@ class WBCabinet(Base):
         """Вычисляет баланс на основе начального значения balance и всех платежей"""
         if not hasattr(self, 'balance_payments') or not self.balance_payments:
             return self.balance  # Возвращаем текущее значение, если нет платежей
-
+        
         # Суммируем все платежи и начальное значение баланса
         return self.balance + sum(payment.amount for payment in self.balance_payments)
-
+    
     @property
     def calculated_bonus(self):
         """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
         if not hasattr(self, 'bonus_payments') or not self.bonus_payments:
             return self.bonus  # Возвращаем текущее значение, если нет платежей
-
+        
         # Суммируем все платежи и начальное значение бонусов
         return self.bonus + sum(payment.amount for payment in self.bonus_payments)
 
@@ -80,21 +71,21 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def db_session():
     # Создаем все таблицы
     Base.metadata.create_all(engine)
-
+    
     # Создаем сессию
     session = SessionLocal()
-
+    
     try:
         yield session
     finally:
         session.close()
-
+    
     # Удаляем все таблицы
     Base.metadata.drop_all(engine)
-
+    
     # Закрываем соединение с базой данных
     engine.dispose()
-
+    
     # Удаляем файл базы данных
     if os.path.exists(DB_PATH):
         try:
@@ -105,7 +96,7 @@ def db_session():
 
 def test_wb_cabinet_calculated_balance(db_session):
     """Тестирование свойства calculated_balance"""
-
+    
     # Создаем тестовый кабинет с начальным балансом
     cabinet = WBCabinet(
         shop_id="test_shop_1",
@@ -113,11 +104,11 @@ def test_wb_cabinet_calculated_balance(db_session):
     )
     db_session.add(cabinet)
     db_session.commit()
-
+    
     # Проверяем, что calculated_balance возвращает начальное значение баланса,
     # когда нет платежей
     assert cabinet.calculated_balance == 100.0
-
+    
     # Добавляем платеж
     payment1 = WBBalancePayment(
         wb_cabinet_id=cabinet.id,
@@ -127,10 +118,10 @@ def test_wb_cabinet_calculated_balance(db_session):
     db_session.add(payment1)
     db_session.commit()
     db_session.refresh(cabinet)
-
+    
     # Проверяем, что calculated_balance суммирует начальный баланс и платеж
     assert cabinet.calculated_balance == 150.0
-
+    
     # Добавляем еще один платеж
     payment2 = WBBalancePayment(
         wb_cabinet_id=cabinet.id,
@@ -140,10 +131,10 @@ def test_wb_cabinet_calculated_balance(db_session):
     db_session.add(payment2)
     db_session.commit()
     db_session.refresh(cabinet)
-
+    
     # Проверяем, что calculated_balance суммирует начальный баланс и все платежи
     assert cabinet.calculated_balance == 175.0
-
+    
     # Добавляем отрицательный платеж (списание)
     payment3 = WBBalancePayment(
         wb_cabinet_id=cabinet.id,
@@ -153,14 +144,14 @@ def test_wb_cabinet_calculated_balance(db_session):
     db_session.add(payment3)
     db_session.commit()
     db_session.refresh(cabinet)
-
+    
     # Проверяем, что calculated_balance правильно учитывает отрицательные платежи
     assert cabinet.calculated_balance == 145.0
 
 
 def test_wb_cabinet_calculated_bonus(db_session):
     """Тестирование свойства calculated_bonus"""
-
+    
     # Создаем тестовый кабинет с начальными бонусами
     cabinet = WBCabinet(
         shop_id="test_shop_2",
@@ -168,11 +159,11 @@ def test_wb_cabinet_calculated_bonus(db_session):
     )
     db_session.add(cabinet)
     db_session.commit()
-
+    
     # Проверяем, что calculated_bonus возвращает начальное значение бонусов,
     # когда нет транзакций
     assert cabinet.calculated_bonus == 50.0
-
+    
     # Добавляем бонусную транзакцию
     bonus1 = WBBonusPayment(
         wb_cabinet_id=cabinet.id,
@@ -182,10 +173,10 @@ def test_wb_cabinet_calculated_bonus(db_session):
     db_session.add(bonus1)
     db_session.commit()
     db_session.refresh(cabinet)
-
+    
     # Проверяем, что calculated_bonus суммирует начальные бонусы и транзакцию
     assert cabinet.calculated_bonus == 75.0
-
+    
     # Добавляем еще одну бонусную транзакцию
     bonus2 = WBBonusPayment(
         wb_cabinet_id=cabinet.id,
@@ -195,10 +186,10 @@ def test_wb_cabinet_calculated_bonus(db_session):
     db_session.add(bonus2)
     db_session.commit()
     db_session.refresh(cabinet)
-
+    
     # Проверяем, что calculated_bonus суммирует начальные бонусы и все транзакции
     assert cabinet.calculated_bonus == 85.0
-
+    
     # Добавляем отрицательную бонусную транзакцию (списание)
     bonus3 = WBBonusPayment(
         wb_cabinet_id=cabinet.id,
@@ -208,10 +199,10 @@ def test_wb_cabinet_calculated_bonus(db_session):
     db_session.add(bonus3)
     db_session.commit()
     db_session.refresh(cabinet)
-
+    
     # Проверяем, что calculated_bonus правильно учитывает отрицательные транзакции
     assert cabinet.calculated_bonus == 70.0
 
 
 if __name__ == "__main__":
-    pytest.main(["-v", __file__])
+    pytest.main(["-v", __file__]) 

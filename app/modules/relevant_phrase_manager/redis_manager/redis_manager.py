@@ -4,6 +4,7 @@ from app.core.redis_manager.base_redis_manager import BaseRedis
 from app.modules.common_slaves.wildberries.models import AdvSetting
 
 
+
 class RedisManager(BaseRedis):
 
     def __init__(self, adv: AdvSetting):

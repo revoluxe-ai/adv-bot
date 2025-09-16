@@ -2,7 +2,9 @@ import asyncio
 import functools
 import json
 import logging
+import re
 import time
+from typing import Union
 
 import aiohttp
 from exceptions import UnauthorizedError
@@ -10,7 +12,7 @@ from exceptions import UnauthorizedError
 from python_modules.pause_func import get_pause
 
 from .ABC_WB_API import ABC_WB_API
-from .data_classes.adv import Adv
+from .data_classes.adv import Adv, Balances
 from .data_classes.card_from_wb import CardFromWB
 from .data_classes.interfaces import ShopInterface
 
@@ -58,7 +60,7 @@ class async_WBApi(ABC_WB_API):
 
 
 
-    async def create_adv_company(self, nmids: list, budget_type: int, budget: int) -> Adv | str:
+    async def create_adv_company(self, nmids: list, budget_type: int, budget: int) -> Union[Adv, str]:
         """
         0 - balance
         1 - net
@@ -157,9 +159,9 @@ class async_WBApi(ABC_WB_API):
 
 
     # @async_cache_ttl(60*30)
-    async def get_all_adv_companies(self, queue_for_advs: asyncio.Queue | None = None,
-                                    success_even: asyncio.Event | None = None,
-                                    error_event: asyncio.Event | None = None)-> list[Adv]:
+    async def get_all_adv_companies(self, queue_for_advs: Union[asyncio.Queue, None] = None,
+                                    success_even: Union[asyncio.Event, None] = None,
+                                    error_event: Union[asyncio.Event, None] = None)-> list[Adv]:
         MAX_ITER_PER_MINUTE = 300
         url = 'https://advert-api.wildberries.ru/adv/v1/promotion/adverts'
         adversIds = await self._get_all_advertIds(success_even, error_event)
@@ -182,7 +184,7 @@ class async_WBApi(ABC_WB_API):
             if isinstance(answer, dict):
                 if code := answer.get('code', None):
                     if code in [401, 403]:
-                        logger.error('Доступ к API запрещен')
+                        logger.error(f'Доступ к API запрещен')
                         error_event.set()
                         return []
 

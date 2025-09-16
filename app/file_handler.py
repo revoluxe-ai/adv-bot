@@ -1,9 +1,8 @@
 import hashlib
 import io
-import logging
-import os
 from io import BytesIO
-
+from typing import Union
+import os
 import aiofiles
 import aiogram
 from aiogram import Bot
@@ -14,12 +13,16 @@ from PIL import Image as PilImage
 from app.admin_bot.sender.utils.db import db
 from app.utils.image_master import image_tools
 
+
+
+import logging
+
 logger = logging.getLogger(__name__)
 
 
 
 
-async def get_telegram_image(image_path: str, bot: aiogram.Bot) -> InputFile | str:
+async def get_telegram_image(image_path: str, bot: aiogram.Bot) -> Union[InputFile, str]:
     result = await _get_telegram_file(image_path, bot)
     return result
 
@@ -48,7 +51,7 @@ async def save_image_to_disc(url: str, image: BytesIO):
         await f.write(image.getvalue())
 
 
-async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFile:
+async def _get_telegram_file(image_path: Union[str, None], bot: Bot) -> Union[str, InputFile]:
     logger.debug(f"Начало обработки файла: {image_path}")
 
     if isinstance(image_path, BytesIO):

@@ -1,10 +1,9 @@
 from aiogram import Router
 from aiogram.utils import callback_answer
-
-from ..modules.balance_manager import add_balance_router
-from ..modules.cabinet_bonus_manager.bonus_scene import register_bonus_scene
 from .common_routers import common_router
 from .user_interface.handlers import ref_program, start
+from ..modules.balance_manager import add_balance_router
+from ..modules.cabinet_bonus_manager.bonus_scene import register_bonus_scene
 
 global_router = Router()
 global_router.callback_query.middleware(callback_answer.CallbackAnswerMiddleware(pre=True,

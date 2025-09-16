@@ -1,5 +1,6 @@
-
 from app import settings
+import os
+
 
 redis_master_host = settings.REDIS_MASTER_HOST
 

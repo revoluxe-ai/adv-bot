@@ -7,23 +7,22 @@ import aiohttp
 import faiss
 import numpy as np
 from PIL import Image as PilImage, UnidentifiedImageError
-from sqlalchemy import Row, Sequence, select
+from sqlalchemy import select, Row, Sequence
 
 from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
     KeywordSetting,
+    AdvSetting,
     WBCard,
 )
 from app.modules.wb_adv_updater.ML import Predictor
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.image_master import image_tools
 from app.utils.image_master.image_master2 import ImageMaster
-
-from ...core.redis_manager.base_redis_manager import BaseRedis
-from ...utils import redis_manager, text_cleaner
 from .gds_object import gds
 from .update_wb_adv_phrases_in_neo import update_wb_adv_phrases_in_neo
 from .word_to_vec_object import word2vec
+from ...core.redis_manager.base_redis_manager import BaseRedis
+from ...utils import redis_manager, text_cleaner
 
 logger = logging.getLogger(__name__)
 from . import fitter

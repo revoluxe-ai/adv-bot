@@ -7,9 +7,8 @@ from sqlalchemy import select
 
 from app.core.wb_api.check_righter import CheckRighter
 from app.core.wb_api.exceptions import ApiForbiddenError
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
-
 from . import exceptions
 from .models import WBToken
 
@@ -36,7 +35,7 @@ class WBCabinetAccess:
 
 
 async def get_access_for_wb_cabinet(
-    wb_cabinet_id_or_shop_id: int | str,
+    wb_cabinet_id_or_shop_id: typing.Union[int, str],
 ) -> WBCabinetAccess:
     if isinstance(wb_cabinet_id_or_shop_id, str):
         shop_id: str = wb_cabinet_id_or_shop_id

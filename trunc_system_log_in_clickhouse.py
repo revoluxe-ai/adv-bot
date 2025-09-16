@@ -1,10 +1,9 @@
 import dotenv
-
 dotenv.load_dotenv()
-import asyncio
 import logging
-
+import asyncio
 from app.utils.click_house.client import get_clickhouse_client
+
 
 logger = logging.getLogger(__name__)
 

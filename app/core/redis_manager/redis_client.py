@@ -1,6 +1,6 @@
+import redis
 import os
 
-import redis
 
 redis_host = os.environ.get('REDIS_HOST')
 

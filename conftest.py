@@ -1,14 +1,14 @@
 import os
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken
+from app.modules.common_slaves.wildberries.models import WBToken, AdvSetting
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 # Добавляем корневую директорию проекта в PYTHONPATH
@@ -71,9 +71,8 @@ def get_async_session_mock(session_mock) -> MagicMock:
     return get_session_maker_mock
 
 
-from unittest.mock import MagicMock
-
 from pytest import fixture
+from unittest.mock import MagicMock
 
 
 @fixture

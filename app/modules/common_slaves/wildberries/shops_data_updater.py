@@ -5,8 +5,8 @@ import typing
 from sqlalchemy import select
 
 from app.utils.db.session_maker import get_async_session_maker
-
-from . import models, wb_db_manager
+from . import models
+from . import wb_db_manager
 from .data_classes.adv import Adv
 from .models import WBCabinet
 
@@ -93,11 +93,11 @@ class ShopDataUpdater:
         logger.debug(f"Получены adv_ids: {len(adv_ids)} штук")
         advs: list[Adv] = await advert_api.get_advs()
         await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
-        logger.debug("Обновление в базе advs завершено")
+        logger.debug(f"Обновление в базе advs завершено")
         return advs
 
     async def update_cards_data(self) -> None:
         wb_api = self.wb_api
         cards = await wb_api.get_all_cards()
         await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
-        logger.debug("Обновление карточек в базе завершено")
+        logger.debug(f"Обновление карточек в базе завершено")

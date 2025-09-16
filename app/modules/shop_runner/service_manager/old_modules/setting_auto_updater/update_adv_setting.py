@@ -3,8 +3,8 @@
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
-    FactData,
     PlanData,
+    FactData,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.target_place_updater import (
     TargetPlaceUpdater,

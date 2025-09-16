@@ -1,15 +1,11 @@
 import logging
-
 import aiogram
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
-
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
-
 from ..views import callbacks, messages
-
 sm = get_async_session_maker
 
 router = Router()

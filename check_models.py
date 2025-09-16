@@ -1,5 +1,5 @@
-from app.modules.common_slaves.wildberries.models import AdvPayment as AP2
 from app.modules.wb_adv_updater.models import AdvPayment as AP1
+from app.modules.common_slaves.wildberries.models import AdvPayment as AP2
 
 print(f'AP1 tablename: {AP1.__tablename__}')
 print(f'AP2 tablename: {AP2.__tablename__}')
@@ -18,4 +18,4 @@ for fk in AP1.__table__.foreign_keys:
 
 print("\nAP2 foreign keys:")
 for fk in AP2.__table__.foreign_keys:
-    print(f"- {fk.column.name} -> {fk.target_fullname}")
+    print(f"- {fk.column.name} -> {fk.target_fullname}") 

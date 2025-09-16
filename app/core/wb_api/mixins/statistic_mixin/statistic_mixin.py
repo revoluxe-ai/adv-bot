@@ -1,10 +1,9 @@
 import json
 from datetime import datetime, timedelta
 
-from app.core.wb_api.http_request import requests, try_except_decorator
-
-from ...protocols import WBAPIProtocol
+from app.core.wb_api.http_request import try_except_decorator, requests
 from .wb_statistic_obj import CommonStat
+from ...protocols import WBAPIProtocol
 
 PREFIX = "https://seller-analytics-api"
 

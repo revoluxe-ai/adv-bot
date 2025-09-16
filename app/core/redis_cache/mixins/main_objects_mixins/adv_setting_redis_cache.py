@@ -1,7 +1,6 @@
 ﻿from abc import ABC
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
-
 from ..mixins_protocol import RedisCacheMixinsProtocol
 
 

@@ -1,11 +1,11 @@
-import aiogram
 from aiogram import Router, types
-from sqlalchemy import delete, select
-
-from app.client_bot.user_interface.views import callbacks, messages
-from app.modules.common_slaves.wildberries.models import WBUserCabinet
+import aiogram
+from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
+from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBToken, WBCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app.client_bot.user_interface.views import callbacks, messages
 
 router = Router()
 

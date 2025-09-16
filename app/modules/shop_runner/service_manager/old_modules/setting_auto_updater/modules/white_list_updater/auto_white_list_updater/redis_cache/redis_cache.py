@@ -1,8 +1,7 @@
 ﻿from app.modules.common_slaves.wildberries.models import AdvSetting
-
 from .last_auto_update_phrases_to_white_list import (
-    LastAutoAddPhraseToWhiteList,
     LastAutoDeleteFromWhiteList,
+    LastAutoAddPhraseToWhiteList,
 )
 
 

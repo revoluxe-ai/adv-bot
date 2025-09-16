@@ -1,6 +1,6 @@
 import logging
 import os
-from collections.abc import Generator
+from typing import Generator, List, Union
 
 import faiss
 import numpy as np
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class Index:
     def __init__(
         self,
-        objects: Query | list,
+        objects: Union[Query, List],
         vector_property_name,
         file_path,
         index_type,
@@ -47,7 +47,7 @@ class Index:
 
     def __create_new_index(
         self,
-        objects: Query | Generator,
+        objects: Union[Query, Generator],
         vector_property_name,
         file_path,
         index_type,

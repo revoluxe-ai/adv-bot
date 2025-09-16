@@ -1,19 +1,37 @@
-import logging
 import tempfile
 
+from app.client_bot import utils
+
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+
+
 import aiogram
-from aiogram import Router
+from aiogram import F, Router, types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import BufferedInputFile, CallbackQuery
+from aiogram.types import CallbackQuery, BufferedInputFile
+from sqlalchemy import and_
+from sqlalchemy.orm import selectinload
+
 from sqlalchemy.future import select
 
 from app.client_bot import utils
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
+    KeywordSetting,
+    WBCabinet,
+    WBUserCabinet,
 )
+from app.modules.wb_adv_updater import data_manager
+from app.utils import redis_manager
+from app.utils.click_house.client import get_clickhouse_client
+from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-
-from ..views import callbacks
+from .start import start_registration
+from ..views import callbacks, messages
+from app.client_bot.user_interface import states
+import logging
 
 logger = logging.getLogger(__name__)
 

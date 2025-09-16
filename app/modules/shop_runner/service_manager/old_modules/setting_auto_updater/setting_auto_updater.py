@@ -1,10 +1,10 @@
 ﻿import datetime
 import logging
-from collections.abc import Awaitable
+from typing import Awaitable
 
 from sqlalchemy import update
 
-from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
+from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -15,7 +15,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
-
 from .plan_fact_change_redis_caches import ChangePlanFact
 from .update_adv_setting import update_adv_setting
 

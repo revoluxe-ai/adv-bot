@@ -1,5 +1,4 @@
 import dataclasses
-
 from app.modules.common_slaves.wildberries.models import WBItemPosition
 
 

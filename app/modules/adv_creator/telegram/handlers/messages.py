@@ -4,9 +4,8 @@ from sqlalchemy import select
 
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
-from app.modules.common_slaves.wildberries.models import WBUserCabinet
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
-
 
 class NotEnoughMoneyMessage(TextWithKeyboard):
     async def __call__(self, wb_user_cabinet_original_id: int, *args, **kwargs):

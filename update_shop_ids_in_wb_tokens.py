@@ -1,8 +1,7 @@
-from sqlalchemy import select
-
 from app.core.wb_api.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models import WBToken
 from app.utils.db.session_maker import get_async_session_maker as sm
+from sqlalchemy import select, delete
 
 
 async def update_shop_ids_in_wb_tokens() -> None:

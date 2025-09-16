@@ -1,5 +1,4 @@
-from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Awaitable, Callable, Dict
 
 from aiogram import BaseMiddleware
 from aiogram.types import Message
@@ -22,7 +21,7 @@ _sm = get_async_session_maker
 class UserDataMiddleware(BaseMiddleware):
     async def __call__(
             self,
-            handler: Callable[[Message, dict[str, Any]], Awaitable[Any]], event: Message, data: dict[str, Any]) -> Any:
+            handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]], event: Message, data: Dict[str, Any]) -> Any:
         async with _sm(read_only=False) as session:
             user_telegram_id = event.from_user.id
             stmt = select(User).options(joinedload(User.wb_user_cabinets).joinedload(

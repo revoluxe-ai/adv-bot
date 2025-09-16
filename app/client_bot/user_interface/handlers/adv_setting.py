@@ -1,13 +1,12 @@
 import logging
-
+from typing import Union
 import aiogram
-from aiogram import Bot, F, Router, types
+from aiogram import Router, types, F, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-
 from app.modules import balance_manager
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
@@ -15,10 +14,9 @@ from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.pricer.pricer import Pricer
-
 from .. import states
-from ..views import callbacks, messages
-
+from ..views import messages
+from ..views import callbacks
 sm = get_async_session_maker
 
 router = Router()
@@ -88,7 +86,7 @@ async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, stat
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
-async def choice_adv_paginator(callback: types.CallbackQuery | types.Message,
+async def choice_adv_paginator(callback: Union[types.CallbackQuery, types.Message],
                                callback_data: callbacks.ChoiceAdvPaginator,
                                bot: aiogram.Bot,
                                state: FSMContext):

@@ -6,7 +6,7 @@ from aiohttp import ClientSession
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager

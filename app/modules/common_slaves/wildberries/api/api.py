@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import json
 import logging
-from collections.abc import Iterable
+from typing import Union, Optional, Iterable
 
 from aiohttp import ClientSession
 
@@ -11,7 +11,6 @@ from app.core.wb_api.data_classes.advs import adv_fabric
 from app.core.wb_api.http_request import requests, try_except_decorator
 from app.core.wb_api.mixins.content import ContentMixin
 from app.modules.full_stat_adv_updater.types import FullAdvStat
-
 from .. import api_rights
 from ..ABC_WB_API import ABC_WB_API
 from ..data_classes.adv import Adv
@@ -148,7 +147,7 @@ class AdvertApi(ABC_WB_API):
 
     async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
-    ) -> list[FullAdvStat] | None:
+    ) -> Optional[list[FullAdvStat]]:
         dates = [date.isoformat() for date in dates]
         url = "https://advert-api.wildberries.ru/adv/v2/fullstats"
         query_data = []
@@ -180,7 +179,7 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 60)
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
-    ) -> list[FullAdvStat] | None:
+    ) -> Optional[list[FullAdvStat]]:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
         full_stats = []
@@ -290,14 +289,14 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list) -> list[Adv]:
         advs = []
-        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        url = f"https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
 
         response_text = await requests(
             self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
         )
         answer = json.loads(response_text)
         for advert in answer:
-            adv: Adv | None = adv_fabric.get_adv_data_class(advert)
+            adv: Optional[Adv] = adv_fabric.get_adv_data_class(advert)
             if adv:
                 advs.append(adv)
         return advs
@@ -406,7 +405,7 @@ class ContentApi(BaseAPI, ContentMixin):
         return cards
 
     @try_except_decorator(1, 2)
-    async def get_card_by_text(self, text: str | int):
+    async def get_card_by_text(self, text: Union[str, int]):
         url = f"{self.HOST}/content/v2/get/cards/list"
         text = str(text)
         data_for_req = {

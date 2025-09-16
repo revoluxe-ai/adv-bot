@@ -2,15 +2,16 @@ import csv
 import logging
 from dataclasses import dataclass
 from io import StringIO
+from typing import Union
 
 from sqlalchemy import and_, select
 
-from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
+from app.client_bot.const import BLACK_LIST, TURN_OFF, WHITE_LIST, AUTO_MODE
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
     KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
@@ -29,7 +30,7 @@ class KeywordForKeyboard:
     keyword_settings: KeywordSetting
     adv_setting: AdvSetting
     turn_on: bool
-    bad_reason: str | None = None
+    bad_reason: Union[str, None] = None
 
 
 async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
@@ -100,7 +101,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
         turn_on = "✅Включен" if keyword.status == KeywordStatus.GOOD else "❌Выключен"
 
         # Определение позиции (единое поле)
-        first_position: str | int = ""
+        first_position: Union[str, int] = ""
         if adv_setting.parsing_active:
             if keyword.position:
                 first_position = keyword.position

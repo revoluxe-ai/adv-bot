@@ -1,8 +1,9 @@
 import json
 import logging
+from typing import Union
 
 from app.core.wb_api.data_classes.card_from_wb import CardFromWB
-from app.core.wb_api.http_request import requests, try_except_decorator
+from app.core.wb_api.http_request import try_except_decorator, requests
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
 from app.core.wb_api.protocols import WBAPIProtocol
 
@@ -16,7 +17,7 @@ class ContentMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 2)
     async def get_card_by_text(
-        self: WBAPIProtocol, text: str | int
+        self: WBAPIProtocol, text: Union[str, int]
     ) -> CardFromWB:
         url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
         text = str(text)

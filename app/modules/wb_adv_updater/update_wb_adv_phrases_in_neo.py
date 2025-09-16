@@ -1,20 +1,19 @@
 import asyncio
 import logging
-from collections.abc import Sequence
+from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
-
-from ...core.wb_api.data_classes.namedtuples import KeywordStatForNeo
-from ...utils import redis_manager, text_cleaner
-from ...utils.click_house.client import get_clickhouse_client
-from ..common_slaves.wildberries.data_classes.namedtuples import KeywordPhrase
 from .gds_object import gds
 from .get_text_hash import get_text_hash
 from .word_to_vec_object import word2vec
+from ..common_slaves.wildberries.data_classes.namedtuples import KeywordPhrase
+from ...core.wb_api.data_classes.namedtuples import KeywordStatForNeo
+from ...utils import redis_manager, text_cleaner
+from ...utils.click_house.client import get_clickhouse_client
 
 logger = logging.getLogger(__name__)
 

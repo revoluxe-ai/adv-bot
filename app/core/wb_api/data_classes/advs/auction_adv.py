@@ -1,12 +1,14 @@
+from typing import Optional
 
 from pydantic import BaseModel
 
 from .base_adv import Adv
 
 
+
 class UnitedParams(BaseModel):
     nms: list[int]
-    searchCPM: int | None = None
+    searchCPM: Optional[int] = None
 
 class Multibids(BaseModel):
     nm: int
@@ -15,12 +17,12 @@ class Multibids(BaseModel):
 
 
 class AuctionAdv(Adv):
-    unitedParams: list[UnitedParams] | None = None
+    unitedParams: Optional[list[UnitedParams]] = None
     auction_multibids: list[Multibids] | None = None
 
 
     @property
-    def nmids(self) -> list[int] | None:
+    def nmids(self) -> Optional[list[int]]:
         up = self.unitedParams
         if up:
             return up[0].nms

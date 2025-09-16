@@ -8,8 +8,8 @@ from app.core.redis_cache.mixins.main_objects_mixins.adv_setting_redis_cache imp
 )
 from app.core.redis_cache.redis_cache_base import RedisCacheBase
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
-    FactData,
     PlanData,
+    FactData,
 )
 
 logger = logging.getLogger(__name__)

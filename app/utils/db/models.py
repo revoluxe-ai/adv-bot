@@ -1,16 +1,18 @@
+# -*- coding: utf-8 -*-
 
 __all__ = ("User", "RefLink", "user_reflink_association", "Payment")
 
 import typing
 
-from sqlalchemy import BIGINT, Column, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import Column, ForeignKey, Index, String, DateTime, BIGINT
+from sqlalchemy import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import (
-        AdvSetting,
-        WBToken,
         WBUserCabinet,
+        WBToken,
+        AdvSetting,
     )
 from app.payments.db.models import Payment
 from app.utils.db.assoc_tables import (

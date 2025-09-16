@@ -1,5 +1,5 @@
+from .http_request import requests
 from asyncio import Lock
-
 
 class OnlyRead:
     TRUE = True
@@ -22,9 +22,9 @@ class Rights:
 
 
 
+import aiohttp
 import logging
 
-import aiohttp
 
 logger = logging.getLogger(__name__)
 

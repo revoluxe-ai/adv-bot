@@ -1,3 +1,4 @@
+from abc import ABC
 from asyncio import Protocol
 
 import redis

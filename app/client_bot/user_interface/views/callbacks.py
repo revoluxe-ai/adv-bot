@@ -1,3 +1,4 @@
+from typing import Optional
 
 from aiogram.filters.callback_data import CallbackData
 
@@ -29,13 +30,13 @@ class ShopNew(CallbackData, prefix="shop_new"):
 
 class Adv(CallbackData, prefix="adv"):
     adv_original_id: int
-    action: str | None = "select"
-    wb_user_cabinet_original_id: int | None = None
+    action: Optional[str] = "select"
+    wb_user_cabinet_original_id: Optional[int] = None
 
 
 class TurnBot(CallbackData, prefix="turn_bot"):
     action: str
-    adv_original_id: int | None = None
+    adv_original_id: Optional[int] = None
     wb_user_cabinet_original_id: int
 
 

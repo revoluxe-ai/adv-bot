@@ -1,6 +1,8 @@
 import re
 
-from pydantic import BaseModel
+from .adv_stat_classes import SimpleStat
+from pydantic import BaseModel, Field, validator
+from typing import Optional, List, Union, Dict
 
 
 class Subject(BaseModel):
@@ -16,10 +18,10 @@ class UnitedParams(BaseModel):
     searchCPM: int
     subject: Subject
     # menus: List[Menu]
-    nms: list[int]
+    nms: List[int]
 
 class AutoParams(BaseModel):
-    active: dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
+    active: Dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
     # Добавьте другие поля, которые ожидаются в `autoParams`
 
 class AdvData(BaseModel):
@@ -28,12 +30,12 @@ class AdvData(BaseModel):
     changeTime: str
     startTime: str
     name: str
-    unitedParams: list[UnitedParams] | None = None
+    unitedParams: Optional[List[UnitedParams]] = None
     dailyBudget: int
     advertId: int
     status: int
     type: int
-    autoParams: AutoParams | None = None
+    autoParams: Optional[AutoParams] = None
 
 
 

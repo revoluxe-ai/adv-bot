@@ -6,9 +6,8 @@ from app.client_bot.bot import get_bot
 from python_modules.logger import setup_logging
 
 dotenv.load_dotenv()
-import asyncio
-
 from app.modules.adv_creator.backend.tasks import create_complex_advs
+import asyncio
 
 setup_logging()
 shop_id: str = ...

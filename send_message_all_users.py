@@ -9,8 +9,8 @@ from app.admin_bot.sender import redis_manager
 from app.client_bot import single_messages
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.models.models import (
-    AdvSetting,
     WBUserCabinet,
+    AdvSetting,
 )
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm

@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import logging
-from collections.abc import Sequence
+from typing import List, Sequence
 
 from aiohttp import ClientSession
 from sqlalchemy import exists
@@ -10,33 +10,31 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
 from app.modules.common_slaves.wildberries.api import WBApi
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
     WBBalancePayment,
     WBBonusPayment,
-    WBCabinet,
 )
+from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.my_types import KeywordStat
 from app.utils import redis_manager
+from app.utils.NeoDataScience.driver import DataScience
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker
-from app.utils.NeoDataScience.driver import DataScience
-
-from ...core.wb_api.exceptions import ApiForbiddenError
-from ...core.wb_api.mixins.adv import MinCPMData
-from ...utils.pricer.pricer import Pricer
+from .ML import Predictor
+from .data_setter import DataSetter
+from .graph_vector_updater import GraphUpdater
+from .wb_adv_api import WBAdvAPI
 from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..relevant_phrase_manager import RelevantPhraseManager
 from ..relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
 from ..wb_update_state_manager import KeywordStatUpdateState
-from .data_setter import DataSetter
-from .graph_vector_updater import GraphUpdater
-from .ML import Predictor
-from .wb_adv_api import WBAdvAPI
+from ...core.wb_api.exceptions import ApiForbiddenError
+from ...core.wb_api.mixins.adv import MinCPMData
+from ...utils.pricer.pricer import Pricer
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +193,7 @@ async def insert_or_update_keywords(keyword_stats, adv_id, table_name: str):
 
 
 async def update_keywords_stat_in_click_house(
-    keyword_stats: list[KeywordStat], adv_id: int, table_name: str
+    keyword_stats: List[KeywordStat], adv_id: int, table_name: str
 ) -> None:
     if keyword_stats:
         await insert_or_update_keywords(keyword_stats, adv_id, table_name)

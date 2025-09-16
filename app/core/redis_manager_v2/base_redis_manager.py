@@ -1,7 +1,7 @@
 ﻿from abc import abstractmethod
 from typing import Any
 
-from dependency_injector.wiring import Provide, inject
+from dependency_injector.wiring import inject, Provide
 from redis.asyncio import Redis
 
 from app.core.di.app_container import AppContainer

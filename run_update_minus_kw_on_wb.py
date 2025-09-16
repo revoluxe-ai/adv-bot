@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 import asyncio
-
 from app import settings
 
 predicted = RedisEvent(key="predicted")

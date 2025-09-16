@@ -6,7 +6,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
     KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.modules.wb_adv_updater import data_manager, search_advs_manager
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.modules.white_list_updater.backend.white_list_updater import WhiteListUpdater

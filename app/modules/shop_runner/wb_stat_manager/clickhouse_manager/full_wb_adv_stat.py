@@ -1,8 +1,7 @@
 import logging
 import time
-from collections.abc import Iterable
 from datetime import datetime
-from typing import TypedDict
+from typing import Iterable, List, TypedDict
 
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import (
@@ -296,7 +295,7 @@ async def get_keywords_spend(
 
 async def get_keyword_stats_by_last_days(
     adv_ids: list[int], start_date: datetime, end_date: datetime
-) -> list[KeywordStat]:
+) -> List[KeywordStat]:
     """
     Получает статистику по ключевым словам за указанный период.
 

@@ -4,12 +4,11 @@ import dotenv
 from aiohttp import ClientSession
 
 dotenv.load_dotenv()
-import logging
-
 from app.arq_workers.arq_redis_settings import arq_redis_settings
+import logging
+from python_modules.logger import setup_logging
 from app.client_bot.bot import get_bot
 from app.modules.adv_creator.backend.tasks import create_complex_advs
-from python_modules.logger import setup_logging
 
 # Настраиваем логирование
 setup_logging()

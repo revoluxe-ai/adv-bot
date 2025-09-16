@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Dict
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.http_request import requests, try_except_decorator
@@ -19,7 +20,7 @@ class WBAdvPingMixin(WBAPIProtocol):
         )
         if response:
             response_data = json.loads(response)
-            if isinstance(response_data, dict) and "Status" in response_data:
+            if isinstance(response_data, Dict) and "Status" in response_data:
                 status = response_data["Status"]
                 if status == "OK":
                     return "OK"

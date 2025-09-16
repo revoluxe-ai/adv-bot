@@ -5,7 +5,7 @@ import yaml
 
 
 def get_document_by_key_name(file_path, key_name):
-    with open(file_path, encoding='utf8') as file:
+    with open(file_path, 'r', encoding='utf8') as file:
         doc = yaml.load_all(file, Loader=yaml.FullLoader)
         for dict_ in doc:
             if key_name in dict_:
@@ -16,7 +16,7 @@ def get_document_by_key_name(file_path, key_name):
 
 
 async def get_document_by_key_name_async(file_path, key_name):
-    async with aiofiles.open(file_path, encoding='utf8') as file:
+    async with aiofiles.open(file_path, 'r', encoding='utf8') as file:
         content = await file.read()
     doc = yaml.load_all(content, Loader=yaml.FullLoader)
     for dict_ in doc:

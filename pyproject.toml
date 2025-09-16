@@ -1,6 +1,8 @@
 ﻿[tool.pytest.ini_options]
 asyncio_mode = "auto"
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [tool.black]
 line-length = 100
@@ -20,6 +22,7 @@ exclude = [
 # База: pycodestyle/pyflakes + расширения: bugbear, isort, pyupgrade
 select = ["E", "F", "W", "B", "I", "UP"]
 ignore = ["E501"]  # длина строки отдает Black [10]
+fix = true
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

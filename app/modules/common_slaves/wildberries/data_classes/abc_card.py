@@ -4,7 +4,6 @@ from collections import namedtuple
 Path = namedtuple('Path', ['position', 'path'])
 from app.utils.image_master import image_tools
 
-
 class WbItem(metaclass=ABCMeta):
 
     def __init__(self):

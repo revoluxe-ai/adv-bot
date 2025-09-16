@@ -4,7 +4,7 @@ import typing
 
 import aiogram
 from aiogram import Router
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types.error_event import ErrorEvent
