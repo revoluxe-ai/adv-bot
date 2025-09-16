@@ -10,8 +10,8 @@
 
 ```bash
 # Активируйте виртуальное окружение
-.\.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # Linux/MacOS
+source ./.venv/Scripts/activate  # Windows (Git Bash)
+source .venv/bin/activate        # Linux/MacOS
 
 # Запустите скрипт проверки
 python tests/run_circular_imports_test.py
