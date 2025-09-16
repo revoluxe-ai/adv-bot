@@ -356,11 +356,8 @@ async def set_positions(
         keyword_stat.cluster_name = cluster
         keyword_stat.preset = preset
         if position := text_to_position.get(text):
-            keyword_stat.base_position = position.base_position
-            keyword_stat.promo_position = position.promo_position
-            keyword_stat.real_position = position.real_position
-            keyword_stat.cpm = position.cpm
-            keyword_stat.position = position
+            # После изменений WB у нас одна позиция
+            keyword_stat.position = position.position
         else:
             keywords = keyword_stat.childs_keywords
             if keywords:
@@ -372,13 +369,7 @@ async def set_positions(
                     position = max(
                         positions, key=lambda kw: __sort_by_update_keyword(kw)
                     )
-                    base_position = position.base_position
-                    promo_position = position.promo_position
-                    real_position = position.real_position
-                    keyword_stat.base_position = base_position
-                    keyword_stat.promo_position = promo_position
-                    keyword_stat.real_position = real_position
-                    keyword_stat.cpm = position.cpm
+                    keyword_stat.position = position.position
 
     return keyword_stats
 
@@ -390,13 +381,7 @@ async def set_position(
     main_nmid = int(adv_setting.nmids[0])
     position = await redis_manager.get_keyword_position(text, main_nmid)
     if position:
-        base_position = position.base_position
-        promo_position = position.promo_position
-        real_position = position.real_position
-        keyword_stat.base_position = base_position
-        keyword_stat.promo_position = promo_position
-        keyword_stat.real_position = real_position
-        keyword_stat.cpm = position.cpm
+        keyword_stat.position = position.position
 
     else:
         keywords = keyword_stat.childs_keywords
@@ -406,13 +391,7 @@ async def set_position(
             if positions:
                 position = max(positions, key=lambda kw: __sort_by_update_keyword(kw))
                 assert position
-                base_position = position.base_position
-                promo_position = position.promo_position
-                real_position = position.real_position
-                keyword_stat.base_position = base_position
-                keyword_stat.promo_position = promo_position
-                keyword_stat.real_position = real_position
-                keyword_stat.cpm = position.cpm
+                keyword_stat.position = position.position
 
     return keyword_stat
 
@@ -478,34 +457,8 @@ async def convert_keyword_stats_in_clusters(
     return keyword_stats
 
 
-async def get_cpm_by_nmid(nmid, texts) -> Optional[int]:
-    try:
-        cpm = await __get_cpm_from_positions(nmid, texts)
-    except (NotFoundPositionWithCMPError, PositionNotFoundError):
-        logger.debug(f"Не найдены позиции из выдачи для {nmid} - {texts}")
-        cpm = None
-    return cpm
-
-
-async def __get_cpm_from_positions(nmid: int, texts) -> Optional[int]:
-    positions = await redis_manager.get_keywords_positions_by_nmid(nmid, texts)
-    if not positions:
-        raise PositionNotFoundError(f"Позиции не найдены для nmid в редис {nmid}")
-
-    positions = [position for position in positions if position.cpm]
-    if not positions:
-        raise NotFoundPositionWithCMPError(
-            f"Позиции не найдены с cpm для nmid в редис {nmid}"
-        )
-
-    def __get_last_update(position: WBItemPosition) -> datetime:
-        # Выводим значение timestamp для отладки
-        logger.debug(f"Timestamp: {position.timestamp}")
-        return position.timestamp
-
-    last_position = sorted(positions, key=__get_last_update, reverse=True)[0]
-    cpm = last_position.cpm
-    return cpm
+# Функции get_cpm_by_nmid и __get_cpm_from_positions удалены,
+# так как CPM больше не доступен из позиций парсинга
 
 
 async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullAdvStat]:
@@ -714,11 +667,8 @@ async def get_good_bad_phrases_for_min_ctr(
                 text, adv_setting.nmids[0]
             )
             if position:
-                keyword.real_position = position.real_position
-                keyword.base_position = position.base_position
-                keyword.promo_position = position.promo_position
+                keyword.position = position.position
                 keyword.position_update = position.timestamp
-                keyword.cpm = position.cpm
             keyword.query = keywords_query.get_queries_of_keyword(text)
             keyword_stats.append(keyword)
 
@@ -779,7 +729,7 @@ async def get_good_bad_phrases_for_min_ctr(
                 logger.error("Не удалось получить позицию")
                 position = None
             if position:
-                organic_position = position.base_position
+                organic_position = position.position
                 if 0 < organic_position <= max_position:
                     keyword_stat.status = KeywordStatus.BAD
                     keyword_stat.reason = "max_position"
@@ -1161,7 +1111,7 @@ async def _get_new_min_ctr(adv: AdvSetting):
 
     for keyword in keywords:
         position = await redis_manager.get_keyword_position(keyword.text, adv.nmids[0])
-        if not position or position.base_position == 0:
+        if not position or position.position == 0:
             continue
         keyword.predict_ctr = await redis_manager.get_predict_ctr(
             adv.adv_id, keyword.text
@@ -1657,16 +1607,16 @@ async def _get_down_scale_white_list_bust_wb_item_position(adv) -> Optional[int]
     )
     if positions:
         positions = [position for position in positions.values()]
-        positions = [position for position in positions if position.promo_position]
+        positions = [position for position in positions if position.position]
         if positions:
             position: WBItemPosition = sorted(
-                positions, key=lambda x: x.promo_position, reverse=True
+                positions, key=lambda x: x.position, reverse=True
             )[0]
         else:
             return None
     else:
         return None
-    return position.promo_position
+    return position.position
 
 
 async def is_adv_in_favorites(
@@ -1722,7 +1672,7 @@ ORDER BY date, text
         result = await client.query(query, parameters=parameters)
         result = result.result_rows
         return [
-            WBItemPosition(nmid=nmid, base_position=row[1], timestamp=row[0])
+            WBItemPosition(nmid=nmid, position=row[1], timestamp=row[0])
             for row in result
         ]
 
@@ -1750,9 +1700,9 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
                 VALUES (
                     {position.nmid},
                     '{position.keyword_text.replace("'", "''")}',  # Экранирование одинарных кавычек
-                    {position.promo_position if position.promo_position else 0},
-                    {position.base_position if position.base_position else 0},
-                    {position.cpm if position.cpm else 0},
+                    {position.position if position.position else 0},
+                    {position.position if position.position else 0},
+                    {0},
                     {int(position.adv_type) if position.adv_type else 0},
                     '{timestamp_str}',
                     {version}
@@ -1790,9 +1740,9 @@ async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
         position = WBItemPosition()
         position.nmid = nmid
         position.keyword_text = row[0]
-        position.promo_position = row[2] if row[2] else 6000
-        position.base_position = row[3] if row[3] else 6000
-        position.cpm = row[4]
+        avg_promo = row[2] if row[2] else 0
+        avg_base = row[3] if row[3] else 0
+        position.position = int(avg_base or avg_promo or 6000)
         position.timestamp = datetime.combine(row[1], datetime.min.time())
         positions.append(position)
 
@@ -1832,8 +1782,7 @@ async def get_cpm(auto_adv: AdvSetting, keywords):
     nmid = auto_adv.nmids[0]
     texts = [kw.text for kw in keywords]
 
-    # Получаем CPM из парсинга
-    cpm_from_parsing = await get_cpm_by_nmid(nmid, texts)
+    # CPM из парсинга больше недоступен, используем только настройки кампаний
     # Проверяем, есть ли CPM из аукциона
     auction_adv_id: int = auto_adv.search_adv_id
     cpm_from_auction = None
@@ -1853,7 +1802,7 @@ async def get_cpm(auto_adv: AdvSetting, keywords):
     cpm_from_auto = auto_adv.cpm
     cpm_values = [
         cpm
-        for cpm in [cpm_from_parsing, cpm_from_auction, cpm_from_auto]
+        for cpm in [cpm_from_auction, cpm_from_auto]
         if cpm is not None
     ]
 

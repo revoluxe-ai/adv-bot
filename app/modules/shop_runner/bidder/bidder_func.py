@@ -4,7 +4,7 @@ from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import wb_db_manager
-from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 from app.modules.shop_runner.bidder.excs import CpmNotFoundError
 from app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_manager.adv_parameter_manager import (
     AdvParameterManager,
@@ -104,20 +104,22 @@ async def run_bidder_process_for_adv(
 
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
-        wb_position = await redis_manager.get_keyword_position(text, nmid)
+        wb_position: WBItemPosition = await redis_manager.get_keyword_position(
+            text, nmid
+        )
     except Exception:
         logger.error(
             f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
         )
         return
 
-    if not wb_position or wb_position.promo_position is None:
+    if not wb_position or wb_position.position is None:
         logger.error(
             f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции"
         )
         return
 
-    promo_position = wb_position.promo_position
+    promo_position = wb_position.position
     if promo_position <= max_position or promo_position == 1:
         new_cpm: int = min(cpms) - step
     else:

@@ -557,19 +557,12 @@ def get_keywords_setting_keyboard(
             text += "🟢"
         text += f"""{clicks}/{views}/{round(ctr *100,2)}%"""
         text += "|"
-        if keyword.cpm:
-            first_position = keyword.base_position
-            second_position = keyword.promo_position
-            text += f"{first_position}>{second_position}"
-        elif keyword.real_position:
-            first_position = keyword.real_position
-            text += f"{first_position}"
-        elif keyword.real_position == 0:
-            first_position = ">i"
-            text += f"{first_position}"
+        if keyword.position:
+            text += f"{keyword.position}"
+        elif keyword.position == 0:
+            text += ">i"
         else:
-            first_position = "?"
-            text += f"{first_position}"
+            text += "?"  # TODO: Проверить логику: кажется позиция не может быть None
         text += f"{turn_on}({message_status}) {keyword.text}"
 
         text += f"({keyword.query})"

@@ -84,7 +84,7 @@ async def check_last_position(last_position: Optional[WBItemPosition],
         cluster_name, _ = await redis_manager.get_cluster_and_preset(text)
         if not cluster_name:
             return
-        if last_position.base_position > 0 and new_position.base_position == 0:
+        if last_position.position > 0 and new_position.position == 0:
 
             keyword_send_status: str = await redis_manager.get_keyword_send_status(cluster_name, new_position.nmid)
             if keyword_send_status == 'ItemIsOutOfIndex':
@@ -99,7 +99,7 @@ async def check_last_position(last_position: Optional[WBItemPosition],
                 except Exception as exc:
                     logger.error(f'Ошибка при отправке сообщения пользователю {user.username}: {exc}')
             await redis_manager.set_keyword_send_status(cluster_name, nmid,  'ItemIsOutOfIndex')
-        elif last_position.base_position == 0 and new_position.base_position > 0:
+        elif last_position.position == 0 and new_position.position > 0:
             keyword_send_status: str = await redis_manager.get_keyword_send_status(cluster_name, nmid)
             if keyword_send_status == 'ItemIsInIndex':
                 return

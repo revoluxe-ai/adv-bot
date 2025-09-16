@@ -258,13 +258,10 @@ async def get_keywords_positions(adv_setting, texts):
 
 async def set_position_to_out_index(position):
     position_out_index = WBItemPosition()
-    position_out_index.real_position = 0
-    position_out_index.base_position = 0
-    position_out_index.promo_position = 0
-    position_out_index.keyword = position.keyword
+    position_out_index.position = 0
+    position_out_index.keyword_text = position.keyword_text if hasattr(position, "keyword_text") else None
     position_out_index.adv_id = position.adv_id
     position_out_index.nmid = position.nmid
-    position_out_index.cpm = None
     await add_positions_to_redis([position_out_index])
 
 

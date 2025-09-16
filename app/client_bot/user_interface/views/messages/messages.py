@@ -566,9 +566,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         )
         if self.position:
             text += (
-                f"🏆 *Органическая позиция:* {self.position.base_position}\n"
-                f"""🚀 *Буст-позиция:* {self.position.promo_position if self.position.promo_position else "Нет"}\n"""
-                f"""💰 *Ставка из выдачи WB :* {self.position.cpm if self.position.cpm else "Нет"}\n"""
+                f"📈 *Позиция:* {self.position.position}\n"
                 f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n"""
                 f"""Тип кампании: {self.position.type_native if self.position.type_native else "Нет"}\n"""
             )
