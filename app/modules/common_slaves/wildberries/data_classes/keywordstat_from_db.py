@@ -130,9 +130,7 @@ class CalculatedKeyword(BaseModel):
             "hard_status": self.hard_status,
             "reason": self.reason,
             "position": self.position,
-            "position_update": (
-                self.position_update.isoformat() if self.position_update else None
-            ),
+            "position_update": (self.position_update.isoformat() if self.position_update else None),
             "query_static": self._query_static,
             "cluster_name": self.cluster_name,
             "preset": self.preset,
@@ -151,9 +149,7 @@ class CalculatedKeyword(BaseModel):
     def from_json(cls, json_str: str) -> "CalculatedKeyword":
         data = json.loads(json_str)
         data["position_update"] = (
-            validate_datetime(data["position_update"])
-            if data["position_update"]
-            else None
+            validate_datetime(data["position_update"]) if data["position_update"] else None
         )
         # Backward compatibility
         # 1) Map real_position -> position if no position

@@ -69,9 +69,7 @@ class ParserService:
             if total_items:
                 total_pages.total_pages = total_items // 100 + 1
         except Exception as e:
-            logger.debug(
-                f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True
-            )
+            logger.debug(f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True)
             del e
             return []
         if cluster:
@@ -98,9 +96,7 @@ class ParserService:
                     elif adv_type_original == "b":
                         adv_type = 8
                     elif isinstance(adv_type_original, int):
-                        raise DataError(
-                            f"Неизвестный тип рекламы {adv_type_original}", text
-                        )
+                        raise DataError(f"Неизвестный тип рекламы {adv_type_original}", text)
                 else:
                     adv_id = None
 
@@ -131,9 +127,7 @@ class ParserService:
         return positions
 
     @staticmethod
-    async def __parse_keywords_from_wb(
-        text: str, page: int
-    ) -> tuple[
+    async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
         list[dict] | None,
         str | None,
         int | None,
@@ -151,9 +145,7 @@ class ParserService:
         data = json.loads(response_text)
 
         if data == {}:
-            logger.warning(
-                f"Получены пустые данные для ключа {text} на странице {page}"
-            )
+            logger.warning(f"Получены пустые данные для ключа {text} на странице {page}")
             return None, None, None, None
 
         try:
@@ -219,9 +211,7 @@ async def add_positions_from_page(
         logger.debug("Проверенные позиции добавили")
         logger.debug(f"Проверенные страницы: {checked_pages}")
     except Exception as e:
-        logger.error(
-            f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True
-        )
+        logger.error(f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True)
         logger.debug(f"{get_parse_url(text, page)}")
         del e
 
@@ -230,9 +220,7 @@ async def add_wb_positions_to_clickhouse(positions) -> None:
     await data_manager.add_positions_to_clickhouse(positions)
 
 
-async def add_wb_positions_to_all_bases(
-    positions: list[WBItemPosition], need_nmids: set[int]
-):
+async def add_wb_positions_to_all_bases(positions: list[WBItemPosition], need_nmids: set[int]):
     my_positions = [position for position in positions if position.nmid in need_nmids]
     await asyncio.gather(
         add_wb_positions_to_redis(my_positions),
@@ -261,9 +249,7 @@ async def _add_positions_from_page(
     catch_any_position.set()
     logger.debug(f"Найдено {len(positions)}")
     if positions:
-        await parsing_queue_manager.add_found_not_found_page(
-            text, positions, need_nmids, page
-        )
+        await parsing_queue_manager.add_found_not_found_page(text, positions, need_nmids, page)
         await add_wb_positions_to_all_bases(positions, need_nmids)
         logger.debug("Записали позиции в базы")
         # Ставка больше не доступна при парсинге, блок вычисления max_bet удален
@@ -276,15 +262,11 @@ async def _add_positions_from_page(
     return positions
 
 
-async def add_wb_positions(
-    text: str, need_nmids: set[int], delay, page_limit=60
-) -> None:
+async def add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60) -> None:
     await _add_wb_positions(text, set(need_nmids), delay, page_limit)
 
 
-async def _add_wb_positions(
-    text: str, need_nmids: set[int], delay, page_limit=60
-) -> None:
+async def _add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=60) -> None:
     total_pages = TotalPages()
     stop_event = asyncio.Event()
     catch_any_position = asyncio.Event()

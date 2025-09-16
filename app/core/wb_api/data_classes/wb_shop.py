@@ -9,9 +9,7 @@ class WbShop(interfaces.ShopInterface):
         self._name_shop = name_shop
 
     def _load_settings(self):
-        shops_dict = path_setting_funcs.get_document_by_key_name(
-            self._setting_path, "shops"
-        )
+        shops_dict = path_setting_funcs.get_document_by_key_name(self._setting_path, "shops")
         for shop in shops_dict:
             if shop["name"] == self._name_shop:
                 return shop

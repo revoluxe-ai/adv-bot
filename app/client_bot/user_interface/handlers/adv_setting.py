@@ -70,9 +70,7 @@ async def reset_filter(
 
 
 @router.message(StateFilter(states.AdvCompanyCatalog.waiting_for_keywords_for_filter))
-async def waiting_for_keywords_for_filter(
-    message: types.Message, bot: Bot, state: FSMContext
-):
+async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, state: FSMContext):
     chat_id = message.chat.id
     text = message.text
     filter_advs = text.splitlines()
@@ -109,9 +107,7 @@ async def choice_adv_paginator(
     chat_id = callback.message.chat.id
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-    await state.set_state(
-        state=states.AdvCompanyCatalog.waiting_for_keywords_for_filter
-    )
+    await state.set_state(state=states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
     page = callback_data.page
     check_data = await state.get_data()
     logger.debug(f"check_data: {check_data}")
@@ -155,8 +151,7 @@ async def adv_handler(
                 .filter(
                     User.user_telegram_id
                     == callback.from_user.id,  # Фильтрация по user_telegram_id
-                    AdvSetting.id
-                    == adv_original_id,  # Фильтрация по нужному AdvSetting
+                    AdvSetting.id == adv_original_id,  # Фильтрация по нужному AdvSetting
                 )
             )
             result = await session.execute(stmt)
@@ -164,15 +159,11 @@ async def adv_handler(
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
 
     async with sm() as session:
-        adv = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
+        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
 
     if not adv:
-        await bot.send_message(
-            callback.message.chat.id, "Кампания не найдена, попробуйте еще раз"
-        )
+        await bot.send_message(callback.message.chat.id, "Кампания не найдена, попробуйте еще раз")
         stmt = (
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
@@ -239,15 +230,11 @@ async def turn_adv_on(
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
         tariff_for_month = await pricer.get_price_for_day_for_shop(wb_cabinet.shop_id)
         price_for_adv_for_day = pricer.get_tariff_for_day(tariff_for_month)
-        balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
-            wb_cabinet.id
-        )
+        balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(wb_cabinet.id)
         sum_balance = balance + bonus
         if not sum_balance >= price_for_adv_for_day:
             await bot.send_message(callback.message.chat.id, "Недостаточно средств")
-            await ShopMenu(
-                bot, callback.message.chat.id, state, wb_user_cabinet_original_id
-            )()
+            await ShopMenu(bot, callback.message.chat.id, state, wb_user_cabinet_original_id)()
             return
         await bot.send_message(callback.message.chat.id, "Включаю бота")
         adv.bot_active = True
@@ -256,9 +243,7 @@ async def turn_adv_on(
         await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
         await state.update_data(adv_original_id=adv.id)
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-        stmt = select(WBUserCabinet).where(
-            WBUserCabinet.id == wb_user_cabinet_original_id
-        )
+        stmt = select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
         chat_id = callback.message.chat.id
@@ -322,9 +307,7 @@ async def turn_adv_off(
     )()
 
 
-@router.callback_query(
-    callbacks.ChangeAutoMinCTR.filter(F.action == "turn_on_auto_min_ctr")
-)
+@router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == "turn_on_auto_min_ctr"))
 async def turn_on_auto_min_ctr(
     callback: types.CallbackQuery, bot: Bot, callback_data: callbacks.ChangeAutoMinCTR
 ):
@@ -341,9 +324,7 @@ async def turn_on_auto_min_ctr(
     await messages.SettingMinCTR(bot, callback.message.chat.id)(adv_setting_original_id)
 
 
-@router.callback_query(
-    callbacks.ChangeAutoMinCTR.filter(F.action == "turn_off_auto_min_ctr")
-)
+@router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == "turn_off_auto_min_ctr"))
 async def turn_off_auto_min_ctr(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChangeAutoMinCTR,

@@ -68,9 +68,7 @@ async def test_update_white_list_threshold_triggered(
     redis_manager_mock.set_last_spend_sum = AsyncMock()
 
     click_house_manager_mock = MagicMock()
-    click_house_manager_mock.get_sum_spend_for_complex_adv = AsyncMock(
-        return_value=clickhouse_sum
-    )
+    click_house_manager_mock.get_sum_spend_for_complex_adv = AsyncMock(return_value=clickhouse_sum)
 
     with (
         patch(
@@ -93,18 +91,14 @@ async def test_update_white_list_threshold_triggered(
         ),
     ):
         manager = WhiteListUpdateManager()
-        await manager.auto_update_phrases_in_white_list(
-            adv_setting_mock, keywords_mocks
-        )
+        await manager.auto_update_phrases_in_white_list(adv_setting_mock, keywords_mocks)
 
         if expected_change:
             assert session_mock.add.call_count == 1
             assert session_mock.flush.call_count == 1
             assert session_mock.commit.call_count == 1
             assert keywords_mocks[-2].hard_status == 1
-            assert redis_manager_mock.set_last_spend_sum.await_args(
-                auto_adv_id, clickhouse_sum
-            )
+            assert redis_manager_mock.set_last_spend_sum.await_args(auto_adv_id, clickhouse_sum)
 
         else:
             assert session_mock.add.call_count == 0
@@ -115,9 +109,7 @@ async def test_update_white_list_threshold_triggered(
 
 
 @pytest.mark.asyncio
-async def test_WBShop_delete_phrase_from_white_list_run(
-    adv_setting_mock, keywords_mocks
-):
+async def test_WBShop_delete_phrase_from_white_list_run(adv_setting_mock, keywords_mocks):
     wb_shop = WBShop("тест shop_id", 123456)
     wb_shop._update_advs_models = AsyncMock()
     wb_shop._adv_settings = [adv_setting_mock]

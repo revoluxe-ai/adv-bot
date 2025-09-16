@@ -44,9 +44,7 @@ async def add_balance(
     state: FSMContext,
 ) -> None:
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
-    await state.update_data(
-        wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id
-    )
+    await state.update_data(wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id)
 
     keyboard = types.InlineKeyboardMarkup(
         inline_keyboard=[
@@ -70,9 +68,7 @@ async def add_balance(
         "(https://docs.google.com/document/d/1fxmcwfZUwoHqDUQenHq31eHjcg641vef1ZYx3Mxqg40/)"
     )
 
-    await bot.send_message(
-        chat_id, text, reply_markup=keyboard, parse_mode="MarkdownV2"
-    )
+    await bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode="MarkdownV2")
 
     return
 
@@ -93,9 +89,7 @@ async def confirm_add_balance(
     time_from = "2024-07-01 00:00:00"
     time_from_datetime = datetime.datetime.strptime(time_from, "%Y-%m-%d %H:%M:%S")
     async with sm() as session:
-        stmt = select(func.max(Payment.amount)).where(
-            Payment.timestamp > time_from_datetime
-        )
+        stmt = select(func.max(Payment.amount)).where(Payment.timestamp > time_from_datetime)
         result_max_amount = await session.execute(stmt)
         max_amount = result_max_amount.scalar()
         if not max_amount:
@@ -115,9 +109,7 @@ async def confirm_add_balance(
 
 
 @router.message(StateFilter(states.AddBalance.awaiting_amount))
-async def waiting_for_amount(
-    message: types.Message, state: FSMContext, bot: aiogram.Bot
-) -> None:
+async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot) -> None:
     assert message.text is not None
     amount: str = message.text
     min_sum = const.min_sum
@@ -194,9 +186,7 @@ async def successful_payment_handler(
 
         if not user_id:
             logger.error(f"Пользователь с telegram_id {message.chat.id} не найден")
-            await message.answer(
-                "Произошла ошибка при обработке платежа. Обратитесь в поддержку."
-            )
+            await message.answer("Произошла ошибка при обработке платежа. Обратитесь в поддержку.")
             return
 
     # Используем новый сервис для обработки платежа

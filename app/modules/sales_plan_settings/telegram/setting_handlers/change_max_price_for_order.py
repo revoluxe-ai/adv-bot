@@ -31,12 +31,8 @@ async def change_max_for_sales_for_day_handler(
 
 
 @router.message(StateFilter("waiting_for_new_max_price_for_order"))
-async def set_new_exponent_for_predict_ctr(
-    message: Message, state: FSMContext, bot: Bot
-):
-    text_message = (
-        "Введите новую максимальную себестоимость число с плавающей точкой  от 1):"
-    )
+async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, bot: Bot):
+    text_message = "Введите новую максимальную себестоимость число с плавающей точкой  от 1):"
     text = message.text
     if not text.isdigit():
         await message.answer(text_message)

@@ -66,9 +66,7 @@ class TaskQueueManager(BaseRedis):
             # Добавляем в очередь с приоритетом по времени добавления
             await pipe.zadd(self.queue_key, {task_id: timestamp})
             # Индексируем по тексту
-            result: Awaitable[int] | int = pipe.sadd(
-                f"{self.text_index_prefix}{text}", task_id
-            )
+            result: Awaitable[int] | int = pipe.sadd(f"{self.text_index_prefix}{text}", task_id)
             if isinstance(result, Awaitable):
                 await result
             await pipe.execute()
@@ -121,9 +119,7 @@ class TaskQueueManager(BaseRedis):
         async with self.client.pipeline() as pipe:
             await pipe.zrem(self.queue_key, task_id)
             await pipe.delete(f"{self.task_data_prefix}{task_id}")
-            result: Awaitable[int] | int = pipe.srem(
-                f"{self.text_index_prefix}{text}", task_id
-            )
+            result: Awaitable[int] | int = pipe.srem(f"{self.text_index_prefix}{text}", task_id)
             if isinstance(result, Awaitable):
                 await result
             await pipe.execute()

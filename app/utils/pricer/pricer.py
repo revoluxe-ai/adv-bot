@@ -68,10 +68,7 @@ class Pricer:
         month_tariff_for_autoupdate_target_place = (
             await self._get_month_tariff_for_autoupdate_target_place(shop_id)
         )
-        return (
-            month_tariff_for_white_list_auto_updater
-            + month_tariff_for_autoupdate_target_place
-        )
+        return month_tariff_for_white_list_auto_updater + month_tariff_for_autoupdate_target_place
 
     async def _get_month_tariff_for_white_list_updater(self, shop_id: str) -> int:
         async with sm(read_only=True) as session:

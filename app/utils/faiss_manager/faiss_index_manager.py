@@ -151,12 +151,7 @@ class FaissManager:
         index_file_path = self.__get_file_path(index_file_name)
         # pickle_file_path = self.__get_file_path(object_pickle_name)
         s = self._session_maker()
-        images = (
-            s.query(Image)
-            .join(Image.items)
-            .filter(Image.items.any())
-            .distinct(Image.id)
-        )
+        images = s.query(Image).join(Image.items).filter(Image.items.any()).distinct(Image.id)
         # images = self._get_objects(images, pickle_file_path)
         index = Index(
             images,

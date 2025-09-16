@@ -79,9 +79,7 @@ def remove_white_space(img: PilImg):
             np.max(non_white_pixel_coords[1]),
             np.max(non_white_pixel_coords[0]),
         )
-        cropped_img = img.crop(
-            (top_left[0], top_left[1], bottom_right[0], bottom_right[1])
-        )
+        cropped_img = img.crop((top_left[0], top_left[1], bottom_right[0], bottom_right[1]))
         return cropped_img
     else:
         # Если не белых пикселей нет, возвращаем исходное изображение
@@ -128,9 +126,7 @@ def resize_image_proportionally(image, min_side_length) -> PilImg:
     return resized_image
 
 
-def get_full_image(
-    image, padding_left, padding_right, padding_top, padding_bottom, fill_color
-):
+def get_full_image(image, padding_left, padding_right, padding_top, padding_bottom, fill_color):
     # Расчет новых размеров изображения с учетом дополнительных полей
     new_width = image.width + padding_left + padding_right
     new_height = image.height + padding_top + padding_bottom
@@ -154,9 +150,7 @@ def hamming_distance(dhash1, dhash2):
     bin_dhash2 = bin(int(dhash2, 16))[2:].zfill(64)
 
     # Расчет расстояния Хэмминга
-    distance = sum(
-        char1 != char2 for char1, char2 in zip(bin_dhash1, bin_dhash2, strict=False)
-    )
+    distance = sum(char1 != char2 for char1, char2 in zip(bin_dhash1, bin_dhash2, strict=False))
 
     return distance
 

@@ -18,9 +18,7 @@ def ensure_used_with_with(func):
     """Декоратор для проверки использования объекта с оператором `with`"""
 
     def wrapper(instance, *args, **kwargs):
-        assert instance._used_with_with, (
-            "Объект должен быть использован с оператором `with`"
-        )
+        assert instance._used_with_with, "Объект должен быть использован с оператором `with`"
         return func(instance, *args, **kwargs)
 
     return wrapper
@@ -93,9 +91,7 @@ class ImageMaster:
         vector = self.get_vector(img)
         vector_matrix = np.expand_dims(vector, axis=0)
         target_index = (
-            self._indexes.background_images
-            if is_background
-            else self._indexes.all_images
+            self._indexes.background_images if is_background else self._indexes.all_images
         )
 
         if min_level > 0 and is_background == False:
@@ -141,12 +137,8 @@ class ImageMaster:
     def add_background_image(self, img: PilImg):
         self._add_image_common(img, is_background=True)
 
-    def add_main_image(
-        self, img: PilImg, dhash, min_level=0.24, keywords=None
-    ) -> Image:
-        return self._add_image_common(
-            img, dhash, min_level=min_level, keywords=keywords
-        )
+    def add_main_image(self, img: PilImg, dhash, min_level=0.24, keywords=None) -> Image:
+        return self._add_image_common(img, dhash, min_level=min_level, keywords=keywords)
 
     def check_as_background(self, vector: np.ndarray):
         """

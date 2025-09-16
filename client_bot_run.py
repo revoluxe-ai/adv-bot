@@ -121,9 +121,7 @@ if __name__ == "__main__":
                         await asyncio.wait_for(delete_task, timeout=5)
                         logger.info("✅ Вебхук удалён.")
                     except TimeoutError:
-                        logger.warning(
-                            "⚠️ Таймаут при удалении вебхука. Продолжаем работу."
-                        )
+                        logger.warning("⚠️ Таймаут при удалении вебхука. Продолжаем работу.")
                 else:
                     logger.info("ℹ️ Вебхук не был установлен, пропускаем удаление.")
             except TelegramAPIError as e:

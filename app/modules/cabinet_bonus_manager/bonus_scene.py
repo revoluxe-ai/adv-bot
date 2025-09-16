@@ -76,9 +76,7 @@ class BonusScene(Scene, state="bonus_scene"):
         """
         # Проверяем, что state_context инициализирован
         if not self.state_context:
-            logger.warning(
-                "state_context не инициализирован, использую стандартный выход"
-            )
+            logger.warning("state_context не инициализирован, использую стандартный выход")
             await self.wizard.exit()
 
         # Если нужно сохранить данные, создаем их копию перед выходом
@@ -139,9 +137,7 @@ class BonusScene(Scene, state="bonus_scene"):
             # Проверяем существование кабинета и получаем информацию о нем
             cabinet = await get_wb_cabinet_by_shop_id(shop_id)
             if cabinet is None:
-                await message.answer(
-                    f"Кабинет с shop_id {shop_id} не найден. Попробуйте еще раз:"
-                )
+                await message.answer(f"Кабинет с shop_id {shop_id} не найден. Попробуйте еще раз:")
                 return
 
             wb_cabinet_original_id = cabinet.id
@@ -152,15 +148,11 @@ class BonusScene(Scene, state="bonus_scene"):
             current_balance = 0
             if hasattr(cabinet, "calculated_bonus"):
                 current_bonus = (
-                    cabinet.calculated_bonus
-                    if cabinet.calculated_bonus is not None
-                    else 0
+                    cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
                 )
             if hasattr(cabinet, "calculated_balance"):
                 current_balance = (
-                    cabinet.calculated_balance
-                    if cabinet.calculated_balance is not None
-                    else 0
+                    cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
                 )
 
             # Сохраняем информацию о кабинете
@@ -277,9 +269,7 @@ class BonusScene(Scene, state="bonus_scene"):
             # Проверяем существование кабинета и получаем информацию о нем
             cabinet = await get_wb_cabinet_by_shop_id(shop_id)
             if cabinet is None:
-                await message.answer(
-                    f"Кабинет с shop_id {shop_id} не найден. Попробуйте еще раз:"
-                )
+                await message.answer(f"Кабинет с shop_id {shop_id} не найден. Попробуйте еще раз:")
                 return
 
             # Безопасно получаем значения баланса и бонусов
@@ -287,15 +277,11 @@ class BonusScene(Scene, state="bonus_scene"):
             current_balance = 0
             if hasattr(cabinet, "calculated_bonus"):
                 current_bonus = (
-                    cabinet.calculated_bonus
-                    if cabinet.calculated_bonus is not None
-                    else 0
+                    cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
                 )
             if hasattr(cabinet, "calculated_balance"):
                 current_balance = (
-                    cabinet.calculated_balance
-                    if cabinet.calculated_balance is not None
-                    else 0
+                    cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
                 )
 
             # Обновляем данные о кабинете в хранилище
@@ -314,9 +300,7 @@ class BonusScene(Scene, state="bonus_scene"):
                 f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
                 f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
                 f"Выберите операцию:",
-                reply_markup=get_shop_bonus_keyboard(
-                    cabinet.id
-                ),  # Используем cabinet.id
+                reply_markup=get_shop_bonus_keyboard(cabinet.id),  # Используем cabinet.id
             )
 
     @on.callback_query(AdminBonus.filter(F.action.in_(["add", "subtract", "reset"])))
@@ -345,9 +329,7 @@ class BonusScene(Scene, state="bonus_scene"):
             )
         else:
             await state.update_data(action="amount")
-            operation_name = (
-                "пополнения" if callback_data.action == "add" else "списания"
-            )
+            operation_name = "пополнения" if callback_data.action == "add" else "списания"
             await callback.message.edit_text(
                 f"🏪 Магазин: {shop_id}\n"
                 f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
@@ -361,9 +343,7 @@ class BonusScene(Scene, state="bonus_scene"):
         await callback.answer()
         await state.clear()
         await state.update_data(action="menu")
-        await callback.message.edit_text(
-            "Введите shop_id кабинета для управления бонусами:"
-        )
+        await callback.message.edit_text("Введите shop_id кабинета для управления бонусами:")
 
     @on.callback_query(AdminBonus.filter(F.action == "confirm"))
     async def process_confirm_callback(
@@ -373,9 +353,7 @@ class BonusScene(Scene, state="bonus_scene"):
         data = await state.get_data()
         shop_id = data.get("shop_id")
         if not shop_id:
-            await callback.message.edit_text(
-                "❌ Ошибка: не найден shop_id. Попробуйте еще раз."
-            )
+            await callback.message.edit_text("❌ Ошибка: не найден shop_id. Попробуйте еще раз.")
 
         description = data.get("description")
         wb_cabinet_original_id = callback_data.wb_cabinet_original_id

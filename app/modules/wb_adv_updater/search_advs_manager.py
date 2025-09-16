@@ -59,9 +59,7 @@ async def set_fix_keywords_phrases_for_search_adv(
     if not keywords:
         return
     keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
-    texts = [
-        keyword.text for keyword in keywords if keyword.status == KeywordStatus.GOOD
-    ][:100]
+    texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.GOOD][:100]
 
     texts = [text.replace('"', "") for text in texts]
     try:
@@ -69,16 +67,12 @@ async def set_fix_keywords_phrases_for_search_adv(
         await api.advert.set_search_keywords(search_adv_id, texts)
         await adv_update_state_manager.set_one(search_adv_id)
     except Exception as e:
-        logger.error(
-            f"Ошибка установки фраз для {adv_setting.name}: {e}", exc_info=True
-        )
+        logger.error(f"Ошибка установки фраз для {adv_setting.name}: {e}", exc_info=True)
         del e
         return
 
 
-async def set_minus_keywords_for_search_adv(
-    adv_setting, keywords, client_session: ClientSession
-):
+async def set_minus_keywords_for_search_adv(adv_setting, keywords, client_session: ClientSession):
     search_adv_id = adv_setting.search_adv_id
     adv_update_state_manager = AdvActiveKeywordUpdateStateManager()
     wb_cabinet_id = adv_setting.wb_cabinet_id
@@ -87,9 +81,7 @@ async def set_minus_keywords_for_search_adv(
     if not keywords:
         return
     keywords = sorted(keywords, key=lambda kw: kw.rating_by_predict_ctr, reverse=False)
-    texts = [
-        keyword.text for keyword in keywords if keyword.status == KeywordStatus.BAD
-    ]
+    texts = [keyword.text for keyword in keywords if keyword.status == KeywordStatus.BAD]
     texts = texts[:1000]
     if texts:
         texts = [text.replace('"', "") for text in texts]
@@ -114,9 +106,7 @@ async def update_keyword_phrases_for_search_adv(
     if not search_adv_id:
         return None
     if adv_setting.auction_boost_all_phrase_mode is False:
-        await set_fix_keywords_phrases_for_search_adv(
-            adv_setting, keywords, client_session
-        )
+        await set_fix_keywords_phrases_for_search_adv(adv_setting, keywords, client_session)
     else:
         await set_minus_keywords_for_search_adv(adv_setting, keywords, client_session)
 
@@ -167,8 +157,6 @@ async def update_search_advs_module_run():
                 _set_keyword_phrases_for_search_advs(adv_settinds, client_session),
             )
         except:
-            logger.error(
-                "Ошибка обновления статистики по ключам для поисковых РК", exc_info=True
-            )
+            logger.error("Ошибка обновления статистики по ключам для поисковых РК", exc_info=True)
         finally:
             await asyncio.sleep(0)

@@ -29,9 +29,7 @@ async def add_white_phrases(
 
 
 @router.message(StateFilter(states.AddBlackPhrasesTemplates.waiting_for_black_phrases))
-async def waiting_for_black_phrases(
-    message: Message, bot: Bot, state: FSMContext
-) -> None:
+async def waiting_for_black_phrases(message: Message, bot: Bot, state: FSMContext) -> None:
     text = message.text
     if not text:
         return None
@@ -61,6 +59,4 @@ async def reset_black_phrases(
             raise
     manager = RelevantPhraseManager(adv)
     await manager.update_black_phrases([])
-    await messages.WaitingForBlackPhrases(bot, callback.from_user.id)(
-        callback_data.adv_setting_id
-    )
+    await messages.WaitingForBlackPhrases(bot, callback.from_user.id)(callback_data.adv_setting_id)

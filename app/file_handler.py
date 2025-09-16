@@ -70,9 +70,7 @@ async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFil
                         buffered_image = BytesIO(image_bytes)
                         await save_image_to_disc(image_path, buffered_image)
                     else:
-                        raise Exception(
-                            f"Ошибка загрузки изображения: HTTP {response.status}"
-                        )
+                        raise Exception(f"Ошибка загрузки изображения: HTTP {response.status}")
         else:
             logger.debug(f"Загрузка изображения из локального файла: {image_path}")
             async with aiofiles.open(image_path, "rb") as f:

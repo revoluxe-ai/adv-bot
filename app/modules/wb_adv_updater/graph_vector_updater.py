@@ -57,13 +57,9 @@ class GraphUpdater:
                 if message and "a job running with jobId 'fastrp'" in message:
                     while True:
                         try:
-                            fastrp_status = await self._data_getter.get_list_progress(
-                                "fastrp"
-                            )
+                            fastrp_status = await self._data_getter.get_list_progress("fastrp")
                             logger.info(f"Выполнено на {fastrp_status[0]}")
-                            await asyncio.sleep(
-                                60
-                            )  # Подождите немного перед повторной попыткой
+                            await asyncio.sleep(60)  # Подождите немного перед повторной попыткой
                         except:
                             break
                     break
@@ -76,9 +72,7 @@ class GraphUpdater:
             result = await session.execute(stmt)
             nmids = result.scalars().all()
         nmids = list(nmids)
-        nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors(
-            nmids
-        )
+        nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors(nmids)
 
         async with sm(read_only=False) as session:
             for nmid, vector in nmids_vectors:
@@ -86,9 +80,7 @@ class GraphUpdater:
                     pg_insert(ItemFeature)
                     .values(nmid=nmid, vector=vector)
                     .on_conflict_do_update(
-                        index_elements=[
-                            "nmid"
-                        ],  # Specify the column(s) that trigger a conflict
+                        index_elements=["nmid"],  # Specify the column(s) that trigger a conflict
                         set_=dict(vector=vector),  # Specify which columns to update
                     )
                 )
@@ -97,16 +89,12 @@ class GraphUpdater:
         logger.debug("Вектора для nmids обновлены")
 
     async def _update_keywords_vectors(self) -> None:
-        keywords_vectors: list[
-            tuple[str, list[float]]
-        ] = await self._gds.get_keywords_vectors()
+        keywords_vectors: list[tuple[str, list[float]]] = await self._gds.get_keywords_vectors()
         async with sm(read_only=False) as session:
             count = 0  # Счетчик для отслеживания количества обработанных записей
             BATCH_SIZE = 100  # Размер порции для коммита
             for keyword_text, vector in keywords_vectors:
-                stmt = select(KeywordFeature).where(
-                    KeywordFeature.keyword == keyword_text
-                )
+                stmt = select(KeywordFeature).where(KeywordFeature.keyword == keyword_text)
                 result = await session.execute(stmt)
                 existing_keyword = result.scalar()
                 if existing_keyword:

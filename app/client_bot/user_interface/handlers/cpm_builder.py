@@ -16,9 +16,7 @@ sm = get_async_session_maker
 router = Router()
 
 
-@router.callback_query(
-    callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page")
-)
+@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page"))
 async def to_page_for_cpm_setting(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
@@ -68,9 +66,7 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        adv = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
+        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_place = data["min_position"]
         adv.max_cpm = max_cpm
@@ -113,9 +109,7 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
     adv_original_id = state_data["last_adv_original_id"]
 
     async with sm(read_only=False) as session:
-        adv = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
+        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_cpm = manual_cpm
         await session.commit()
@@ -135,9 +129,7 @@ async def set_max_position(
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_max_position)
-    await messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(
-        adv_original_id
-    )
+    await messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(adv_original_id)
     return
 
 
@@ -158,9 +150,7 @@ async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMC
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        adv = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
+        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
         adv = adv.scalar()
         adv.max_place = max_position
         await session.commit()

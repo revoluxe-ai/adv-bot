@@ -48,13 +48,7 @@ async def keyword_position_history(
         return
     graphic, legend = result
     if legend:
-        await KeywordGraphicPart_1(
-            bot, callback.message.chat.id, graphic, adv_original_id
-        )()
-        await KeywordGraphicPart_2(
-            bot, callback.message.chat.id, legend, adv_original_id
-        )()
+        await KeywordGraphicPart_1(bot, callback.message.chat.id, graphic, adv_original_id)()
+        await KeywordGraphicPart_2(bot, callback.message.chat.id, legend, adv_original_id)()
     else:
-        await KeywordGraphicPart_2(
-            bot, callback.message.chat.id, graphic, adv_original_id
-        )()
+        await KeywordGraphicPart_2(bot, callback.message.chat.id, graphic, adv_original_id)()

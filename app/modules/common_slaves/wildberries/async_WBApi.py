@@ -21,9 +21,7 @@ def async_cache_ttl(seconds: int):
     cache = {}
 
     def decorator(func):
-        @functools.wraps(
-            func
-        )  # И использование wraps для сохранения метаданных функции
+        @functools.wraps(func)  # И использование wraps для сохранения метаданных функции
         async def wrapper(*args, **kwargs):
             key = (args, frozenset(kwargs.items()))
             if key in cache and time.time() - cache[key]["time"] < seconds:
@@ -49,15 +47,11 @@ class async_WBApi(ABC_WB_API):
         data = {"recom": False, "booster": True, "carousel": False}
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, json=data, headers=self.headers.standart
-            ) as response:
+            async with session.post(url, json=data, headers=self.headers.standart) as response:
                 response_text = await response.text()
                 logger.debug(response_text)
 
-    async def create_adv_company(
-        self, nmids: list, budget_type: int, budget: int
-    ) -> Adv | str:
+    async def create_adv_company(self, nmids: list, budget_type: int, budget: int) -> Adv | str:
         """
         0 - balance
         1 - net
@@ -90,16 +84,12 @@ class async_WBApi(ABC_WB_API):
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, json=data_json, headers=self.headers.standart
-            ) as response:
+            async with session.post(url, json=data_json, headers=self.headers.standart) as response:
                 answer = await response.text()
                 if "error" in answer:
                     error = json.loads(answer)["error"]
                     return error
-        adv_id = int(
-            answer
-        )  # Это предполагает, что ответ содержит ID рекламной кампании
+        adv_id = int(answer)  # Это предполагает, что ответ содержит ID рекламной кампании
         company = (await self.get_adv_companies([adv_id]))[0]
         await asyncio.sleep(60)  # Замена sleep на асинхронный asyncio.sleep
         await self.tune_company(company, nmids)
@@ -117,9 +107,7 @@ class async_WBApi(ABC_WB_API):
                 headers=self.headers.standart,
             ) as response:
                 # Убедитесь, что ответ от сервера соответствует ожидаемому формату
-                response_data = (
-                    await response.json()
-                )  # предполагается, что API возвращает JSON
+                response_data = await response.json()  # предполагается, что API возвращает JSON
                 for data in response_data:
                     adv = Adv(data)
                     advs.append(adv)
@@ -147,15 +135,11 @@ class async_WBApi(ABC_WB_API):
     async def update_nmids_in_adv(
         self, adv: Adv, nmids_for_add: list[int], nmids_for_del: list[int]
     ):
-        url = (
-            f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv.advertId}"
-        )
+        url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv.advertId}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url, json=data, headers=self.headers.standart
-            ) as response:
+            async with session.post(url, json=data, headers=self.headers.standart) as response:
                 response_text = await response.text()
                 logger.debug(response_text)
 
@@ -293,9 +277,7 @@ class async_WBApi(ABC_WB_API):
                     if (
                         response is None or response.status == 500
                     ):  # Теперь это условие безопасно для проверки
-                        logger.error(
-                            "Временно возврат только полученных карт! Переделать!"
-                        )
+                        logger.error("Временно возврат только полученных карт! Переделать!")
                         return cards
                     await asyncio.sleep(10)
                     continue

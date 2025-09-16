@@ -31,8 +31,7 @@ class CheckRighter:
 
         self.headers = Headers(token)
         check_tasks = [
-            self.ping_rights(entry_point, session)
-            for entry_point in self.check_entry_points
+            self.ping_rights(entry_point, session) for entry_point in self.check_entry_points
         ]
         try:
             await asyncio.gather(*check_tasks)
@@ -46,9 +45,7 @@ class CheckRighter:
         url = entry_point[0]
         name = entry_point[1]
 
-        response = await requests(
-            session, "GET", url=url, headers=self.headers.standart
-        )
+        response = await requests(session, "GET", url=url, headers=self.headers.standart)
         response = json.loads(response)
         status = response["Status"]
         if status == "OK":

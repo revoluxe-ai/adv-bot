@@ -11,6 +11,4 @@ class AdvKeyword(BaseTable):
     clicks = Column(Int32, default=0)
     spend = Column(Float, default=0)
     adv_id = Column(Int32, nullable=True)
-    __table_args__ = (
-        UniqueConstraint("text", "date", "adv_id", name="_text_date_adv_id_uc"),
-    )
+    __table_args__ = (UniqueConstraint("text", "date", "adv_id", name="_text_date_adv_id_uc"),)
