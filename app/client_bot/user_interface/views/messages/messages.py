@@ -572,7 +572,7 @@ class KeywordSettingMessage(TextWithKeyboard):
             )
 
         else:
-            text += "📉 *Позиция на Wildberries:* не определена\n"
+            text += "📉 *Позиция не определена *\n"
 
         return text
 

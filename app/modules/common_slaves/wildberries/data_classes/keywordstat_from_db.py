@@ -156,7 +156,18 @@ class CalculatedKeyword(BaseModel):
             if data["position_update"]
             else None
         )
-        # Backward compatibility: map real_position to position
+        # Backward compatibility
+        # 1) Map real_position -> position if no position
         if "position" not in data and "real_position" in data:
             data["position"] = data.get("real_position")
+        # 2) If position is a dict (legacy WBItemPosition), extract integer
+        if isinstance(data.get("position"), dict):
+            legacy = data["position"]
+            data["position"] = (
+                legacy.get("position")
+                or legacy.get("real_position")
+                or legacy.get("base_position")
+                or legacy.get("promo_position")
+                or 0
+            )
         return cls(**data)
