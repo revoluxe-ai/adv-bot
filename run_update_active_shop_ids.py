@@ -1,4 +1,4 @@
-﻿import dotenv
+import dotenv
 
 dotenv.load_dotenv()
 from python_modules.logger import setup_logging

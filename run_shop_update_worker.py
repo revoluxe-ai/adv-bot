@@ -1,4 +1,4 @@
-﻿import dotenv
+import dotenv
 
 dotenv.load_dotenv()
 import asyncio
