@@ -2,11 +2,11 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Union
 
 import aiohttp
 
-from app.core.wb_api.http_request import try_except_decorator, requests
+from app.core.wb_api.http_request import requests, try_except_decorator
+
 from . import api_rights
 from .ABC_WB_API import ABC_WB_API
 from .data_classes.adv import Adv
@@ -80,7 +80,6 @@ def escape_special_characters(text):
 
 # TODO: Выпилить этот модуль из проекта.
 class AdvertApi(ABC_WB_API):
-
     _rights: set = {api_rights.Rights.PROMOTION}
     _only_read = api_rights.OnlyRead.FALSE
     live_company_status = [4, 9, 11]
@@ -89,7 +88,9 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 1)
     async def get_search_keywords_stat(self, adv_id):
         url = f"https://advert-api.wildberries.ru/adv/v1/stat/words?id={adv_id}"
-        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
         answer = json.loads(response_text)
         keywords = []
         update_timestamp = datetime.datetime.now()
@@ -117,7 +118,9 @@ class AdvertApi(ABC_WB_API):
         url = f"https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={search_adv_id}"
         data = {"pluse": texts}
 
-        await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
+        await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
         logger.debug("Плюс-фразы установлены")
 
     @try_except_decorator(1, 1)
@@ -137,7 +140,9 @@ class AdvertApi(ABC_WB_API):
         date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
         url = f"https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}"
-        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
         answer = json.loads(response_text)
         update_timestamp = datetime.datetime.now()
         if not answer:
@@ -160,10 +165,14 @@ class AdvertApi(ABC_WB_API):
         return keywords
 
     @try_except_decorator(2, 1)
-    async def get_keywords_stat_depr(self, adv_setting: AdvSetting) -> list[KeywordStat]:
+    async def get_keywords_stat_depr(
+        self, adv_setting: AdvSetting
+    ) -> list[KeywordStat]:
         keywords = []
         url = f"https://advert-api.wildberries.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}"
-        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
 
         response_text = escape_special_characters(response_text)
         answer = json.loads(response_text)
@@ -209,7 +218,9 @@ class AdvertApi(ABC_WB_API):
     async def get_advertIds(self) -> list[int]:
         advertIds = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/count"
-        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
         answer = json.loads(response_text)
         # Используем json.loads для преобразования текста ответа в JSON
         adverts: list = answer["adverts"]
@@ -226,7 +237,7 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list) -> list[Adv]:
         advs = []
-        url = f"https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
         response_text = await requests(
             self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
         )
@@ -257,12 +268,14 @@ class AdvertApi(ABC_WB_API):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}"
         data = {"excluded": phrases}
 
-        await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
+        await requests(
+            self.session, "POST", url, json_data=data, headers=self.headers.standart
+        )
         logger.debug("Минус-фразы установлены")
 
     async def create_adv_company(
         self, nmids: list, budget_type: int, budget: int
-    ) -> Union[Adv, str]:
+    ) -> Adv | str:
         """
         0 - balance
         1 - net
@@ -301,7 +314,9 @@ class AdvertApi(ABC_WB_API):
             if "error" in answer:
                 error = json.loads(answer)["error"]
                 return error
-        adv_id = int(answer)  # Это предполагает, что ответ содержит ID рекламной кампании
+        adv_id = int(
+            answer
+        )  # Это предполагает, что ответ содержит ID рекламной кампании
         company = (await self.get_adv_companies([adv_id]))[0]
         await asyncio.sleep(60)  # Замена sleep на асинхронный asyncio.sleep
         await self.tune_company(company, nmids)
@@ -319,9 +334,13 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 2)
     async def get_clusters_for_adv(self, adv: AdvSetting):
-        url = f"https://advert-api.wildberries.ru/adv/v2/auto/stat-words?id={adv.adv_id}"
+        url = (
+            f"https://advert-api.wildberries.ru/adv/v2/auto/stat-words?id={adv.adv_id}"
+        )
 
-        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
         if response_text:
             answer = json.loads(response_text)
             return answer
@@ -339,7 +358,9 @@ class ContentApi(ABC_WB_API):
         @try_except_decorator(1, 1)
         async def request(session, url) -> list[Subcategory]:
             all_categories = []
-            response = await requests(session, "GET", url, headers=self.headers.standart)
+            response = await requests(
+                session, "GET", url, headers=self.headers.standart
+            )
             answer = json.loads(response)
             for data in answer["data"]:
                 subcategory = Subcategory(**data)
@@ -366,7 +387,9 @@ class ContentApi(ABC_WB_API):
     async def get_patent_categories(self):
         url = "https://suppliers-api.wildberries.ru/content/v2/object/parent/all"
 
-        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
+        response_text = await requests(
+            self.session, "GET", url, headers=self.headers.standart
+        )
         answer = json.loads(response_text)
         return answer["data"]
 
@@ -385,7 +408,7 @@ class ContentApi(ABC_WB_API):
         return cards
 
     @try_except_decorator(1, 2)
-    async def get_card_by_text(self, text: Union[str, int]):
+    async def get_card_by_text(self, text: str | int):
         url = f"{self.HOST}/content/v2/get/cards/list"
         text = str(text)
         data_for_req = {
@@ -406,7 +429,9 @@ class ContentApi(ABC_WB_API):
         answer = json.loads(response)
         cards = answer["cards"]
         if not cards:
-            raise CardNotFoundInWB(f"Карточка с текстом {text} не найдена на Wildberries")
+            raise CardNotFoundInWB(
+                f"Карточка с текстом {text} не найдена на Wildberries"
+            )
         card_json = answer["cards"][0]
         card = CardFromWB(card_json)
         return card
@@ -445,7 +470,9 @@ class ContentApi(ABC_WB_API):
 
 
 class WBApi:
-    def __init__(self, wb_access: WBCabinetAccess, client_session: aiohttp.ClientSession):
+    def __init__(
+        self, wb_access: WBCabinetAccess, client_session: aiohttp.ClientSession
+    ):
         self.advert = AdvertApi(wb_access, client_session)
         self.content = ContentApi(wb_access, client_session)
         self.wb_access = wb_access

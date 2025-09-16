@@ -1,9 +1,10 @@
-﻿from aiogram import Router, Bot
+from aiogram import Bot, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy import update
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .callbacks import AutoUpdateTargetPlaceSetting
 
 router = Router()

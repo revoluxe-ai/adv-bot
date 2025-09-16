@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class RedisCalculatedKeywordsCacheManager(RedisManager):
-
     async def set_calculated_keywords(
         self, keywords: list[CalculatedKeyword], adv_id: int
     ) -> None:

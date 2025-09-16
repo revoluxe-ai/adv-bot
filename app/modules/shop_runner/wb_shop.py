@@ -14,7 +14,6 @@ T = TypeVar("T")
 
 
 class WBShop:
-
     def __init__(self, wb_api: WBApi, redis_manager: RedisShopManager):
         self._wb_api = wb_api
         self._redis_manager = redis_manager

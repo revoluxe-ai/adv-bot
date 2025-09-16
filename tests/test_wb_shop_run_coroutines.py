@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -84,9 +84,9 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
         call_args = mock_gather.call_args[0]
 
         # Проверяем, что gather был вызван с 6 аргументами (по количеству методов)
-        assert (
-            len(call_args) == 7
-        ), f"asyncio.gather должен быть вызван с 7 аргументами, получено {len(call_args)}"
+        assert len(call_args) == 7, (
+            f"asyncio.gather должен быть вызван с 7 аргументами, получено {len(call_args)}"
+        )
 
         # Проверяем, что все методы были вызваны по одному разу
         wb_shop._parsing_keywords_run.assert_called_once()

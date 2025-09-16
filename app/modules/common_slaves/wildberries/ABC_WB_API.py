@@ -8,8 +8,9 @@ from aiohttp import ClientSession
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from . import models
-from .models import WBToken, WBCabinet
+from .models import WBCabinet, WBToken
 
 __all__ = ["Headers"]
 

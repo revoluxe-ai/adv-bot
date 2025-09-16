@@ -1,4 +1,4 @@
-﻿from aiogram import Bot
+from aiogram import Bot
 
 from app.client_bot.user_interface.message_templates import Text
 from app.utils.pricer.pricer import Pricer

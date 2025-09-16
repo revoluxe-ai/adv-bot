@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 
 from app.core.redis_manager.base_redis_manager import BaseRedis
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -7,7 +7,6 @@ __all__ = ["MainRedisManager"]
 
 
 class LastSpendSumRedisManager(BaseRedis):
-
     @staticmethod
     def _get_key(adv: AdvSetting) -> str:
         auto_adv_id = adv.adv_id
@@ -24,7 +23,6 @@ class LastSpendSumRedisManager(BaseRedis):
 
 
 class LastDateTimeDeleteWhiteListRedisManager(BaseRedis):
-
     @staticmethod
     def _get_key(adv: AdvSetting) -> str:
         adv_id = adv.adv_id
@@ -48,7 +46,6 @@ class LastDateTimeDeleteWhiteListRedisManager(BaseRedis):
 
 
 class LastAddingToWhiteListRedisData(BaseRedis):
-
     @staticmethod
     def _get_key(adv: AdvSetting) -> str:
         return f"white_list:add:{adv.adv_id}"

@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
@@ -5,14 +7,14 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker as sm
-import logging
 
 logger = logging.getLogger(__name__)
 
-class MinCtrManager:
 
+class MinCtrManager:
     def __init__(self, adv: AdvSetting):
         self._adv = adv
+
     async def get_min_ctr(self) -> float:
         adv = self._adv
         if not adv.new_auto_min_ctr_mode:
@@ -25,7 +27,6 @@ class MinCtrManager:
         if not min_ctr:
             min_ctr = settings.DEFAULT_MIN_CTR
         return min_ctr
-
 
     async def _get_min_ctr(self) -> float:
         adv = self._adv
@@ -102,7 +103,7 @@ class MinCtrManager:
                     result_from_click_house = await client.query(query, params)
                     rows = result_from_click_house.result_rows
             except Exception:
-                logger.error(f"Ошибка получения статистики из ch", exc_info=True)
+                logger.error("Ошибка получения статистики из ch", exc_info=True)
                 raise
 
             text_to_real_ctr = {row[0]: row[1] for row in rows}
@@ -120,5 +121,3 @@ class MinCtrManager:
             if real_ctrs:
                 return float(min(real_ctrs))
             return settings.DEFAULT_MIN_CTR
-
-

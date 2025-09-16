@@ -1,11 +1,11 @@
-﻿import logging
+import logging
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 
 from app.client_bot.user_interface.message_templates import (
-    TextWithKeyboardAndImage,
     LastMessage,
+    TextWithKeyboardAndImage,
 )
 from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
@@ -14,7 +14,7 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.c
 from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
     KeywordGraphicPart_1,
 )
-from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
+from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -156,7 +156,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text = (
             "Название кампании: " + str(self._adv_setting.name) + "\n"
             f"Статус: {self._adv_setting.active_status}\n"
-            f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""
+            f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
             "ID кампании: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аукциона: {self._adv_setting.search_adv_id}\n"
             f"Общая статистика за 2 дня:\n"
@@ -170,10 +170,13 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Общее число заказов: {self._all_orders_for_last_days}\n"
             f"Заказов из Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
             f"Заказов из Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
-            f"""Заказов из Органики: {self._all_orders_for_last_days
-                                                                  - self.full_adv_stat_for_last_days_for_auction.orders
-                                                                  - self.full_adv_stat_for_last_days_for_auto_adv.orders
-                                        if self._all_orders_for_last_days else 0}"""
+            f"""Заказов из Органики: {
+                self._all_orders_for_last_days
+                - self.full_adv_stat_for_last_days_for_auction.orders
+                - self.full_adv_stat_for_last_days_for_auto_adv.orders
+                if self._all_orders_for_last_days
+                else 0
+            }"""
         )
 
         # Получаем целевые значения из настроек
@@ -214,7 +217,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += "\n"
 
         text += f"\nСтавка из Авто: {self.auto_cpm} р. "
-        text += f"""(Биддер для Авто: {' Включен' if self._adv_setting.bidder_for_auto else ' Выключен'})\n"""
+        text += f"""(Биддер для Авто: {" Включен" if self._adv_setting.bidder_for_auto else " Выключен"})\n"""
         text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
         text += f"Максимальная ставка: {self._adv_setting.max_cpm}\n"

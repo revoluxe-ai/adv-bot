@@ -1,14 +1,4 @@
-import cv2
-import numpy as np
-from PIL import Image
-
-
-
-
-
-
-#эта функция теперь в ImageTools
-
+# эта функция теперь в ImageTools
 
 
 # def remove_white_space(img: Image):
@@ -19,15 +9,3 @@ from PIL import Image
 #     bottom_right = (np.max(non_white_pixel_coords[1]), np.max(non_white_pixel_coords[0]))
 #     cropped_img = img.crop((top_left[0], top_left[1], bottom_right[0], bottom_right[1]))
 #     return cropped_img
-
-
-
-
-
-
-
-
-
-
-
-

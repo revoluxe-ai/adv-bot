@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, List
 
 from sqlalchemy import select
 
@@ -25,19 +24,19 @@ class CommonAdvsStatData:
     """Класс для хранения данных о ключевых словах рекламной кампании"""
 
     adv_setting: AdvSetting
-    keywords: List[CalculatedKeyword]
+    keywords: list[CalculatedKeyword]
     min_ctr: float
     auto_cpm: int
-    auction_cpm: Optional[int]
+    auction_cpm: int | None
     total_spend: float
     addition_spend_in_adv: float
-    all_orders_for_last_days: Optional[int]
-    mean_orders_for_last_days: Optional[float]
-    mean_price_for_order: Optional[float]
-    spend_for_inner_advs: Optional[float]
+    all_orders_for_last_days: int | None
+    mean_orders_for_last_days: float | None
+    mean_price_for_order: float | None
+    spend_for_inner_advs: float | None
     full_adv_stat_for_last_days_for_auto_adv: SmallFullAdvStat
     full_adv_stat_for_last_days_for_auction: SmallFullAdvStat
-    common_stat: Optional[CommonCardStat]
+    common_stat: CommonCardStat | None
 
 
 class CommonAdvsStatDataManager:
@@ -45,7 +44,7 @@ class CommonAdvsStatDataManager:
 
     @staticmethod
     async def get_data(
-        adv_setting: AdvSetting, keywords: List[CalculatedKeyword], last_days: int
+        adv_setting: AdvSetting, keywords: list[CalculatedKeyword], last_days: int
     ) -> CommonAdvsStatData:
         """Получает все необходимые данные для отображения информации о ключевых словах"""
 
@@ -85,10 +84,10 @@ class CommonAdvsStatDataManager:
         )
 
         # Общая статистика
-        common_stat: CommonCardStat | None = (
-            await common_stat_manager.get_stats_for_last_period(
-                int(adv_setting.nmids[0]), pass_days
-            )
+        common_stat: (
+            CommonCardStat | None
+        ) = await common_stat_manager.get_stats_for_last_period(
+            int(adv_setting.nmids[0]), pass_days
         )
 
         # Рассчитываем дополнительные метрики

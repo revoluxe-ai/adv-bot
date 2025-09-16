@@ -16,7 +16,7 @@ def retry_on_error(max_attempts=10, delay_seconds=3):
                         print(f"Retrying in {delay_seconds} seconds...")
                         sleep(delay_seconds)
                     else:
-                        print(f"Max retry attempts reached. Exiting...")
+                        print("Max retry attempts reached. Exiting...")
                         raise
 
         return wrapper

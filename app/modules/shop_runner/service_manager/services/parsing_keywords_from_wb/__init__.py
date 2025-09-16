@@ -1,8 +1,9 @@
 """Парсинг ключевых слов для рекламных кампаний Wildberries."""
 
 import logging
+from collections.abc import AsyncGenerator, Awaitable
 from datetime import datetime, timedelta
-from typing import AsyncGenerator, Tuple, Awaitable
+from typing import Tuple
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
@@ -16,16 +17,7 @@ logger = logging.getLogger(__name__)
 
 async def parsing_keywords_for_adv_generator(
     adv: AdvSetting, keywords: Awaitable[list[CalculatedKeyword]]
-) -> AsyncGenerator[Tuple[str, int], None]:
-    """
-    Генератор для получения ключевых слов, которые нужно парсить для рекламной кампании.
-    Args:
-        adv:
-        keywords:
-
-    Returns:
-
-    """
+) -> AsyncGenerator[tuple[str, int], None]:
     keywords_result = await keywords
     if not keywords:
         logger.error(f"Нет ключевых для кампании {adv.adv_id}")

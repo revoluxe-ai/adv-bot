@@ -5,18 +5,17 @@ import logging
 import pstats
 import time
 from collections import defaultdict
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Union, Optional, List, Callable, Sequence
 
 import aiogram
-from PIL import Image
 from aiogram.utils import deep_linking
-from sqlalchemy import and_, func, select, case, cast, Float, distinct
+from PIL import Image
+from sqlalchemy import Float, and_, case, cast, distinct, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, subqueryload, aliased, load_only
+from sqlalchemy.orm import aliased, load_only, selectinload, subqueryload
 from sqlalchemy.sql.functions import coalesce
 
 from app.exc import (
@@ -32,12 +31,12 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
     AdvKeyword,
+    AdvSetting,
     KeywordSetting,
     WBCabinet,
     WBCard,
     WBCategory,
     WBItemPosition,
-    AdvSetting,
     WBUserCabinet,
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
@@ -48,7 +47,7 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.assoc_tables import favorite_advs_association
-from app.utils.db.models import User, RefLink, user_reflink_association, Payment
+from app.utils.db.models import Payment, RefLink, User, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
 
@@ -72,9 +71,8 @@ async def measure_time(function):
 
 
 async def get_keyword_statistic_clickhouse(
-    client, text: str, adv_ids: set[int], pass_days: Union[int, None] = 7
+    client, text: str, adv_ids: set[int], pass_days: int | None = 7
 ) -> tuple[int, int, int]:
-
     today = datetime.now().date()
     start_date_clause = ""
     if pass_days:
@@ -129,12 +127,11 @@ async def get_keyword_statistic_clickhouse(
 
 async def get_keywords_statistic_clickhouse(
     adv_setting: AdvSetting,
-    pass_time: Optional[timedelta] = timedelta(days=7),
+    pass_time: timedelta | None = timedelta(days=7),
     last_views=None,
-    hard_statuses: Optional[List[int]] = None,
+    hard_statuses: list[int] | None = None,
     cache_timeout: int = 60 * 15,
-) -> List[CalculatedKeyword]:
-
+) -> list[CalculatedKeyword]:
     async with get_clickhouse_client() as ch_client:
         advs: set[int] = set()
         auto_adv_id = int(adv_setting.adv_id)
@@ -162,8 +159,8 @@ async def get_keywords_statistic_clickhouse(
 
 
 async def _get_keyword_settings(
-    adv_setting_id: int, hard_statuses: Optional[List[int]]
-) -> List[KeywordSetting]:
+    adv_setting_id: int, hard_statuses: list[int] | None
+) -> list[KeywordSetting]:
     async with _sm() as session:
         stmt = select(KeywordSetting).where(
             KeywordSetting.adv_setting_id == adv_setting_id
@@ -176,8 +173,8 @@ async def _get_keyword_settings(
 
 def _build_clickhouse_query(
     adv_ids: set[int],
-    pass_time: Optional[timedelta],
-    last_views: Optional[int] = None,
+    pass_time: timedelta | None,
+    last_views: int | None = None,
 ) -> str:
     # Преобразуем список ID в строку для SQL
     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
@@ -432,9 +429,9 @@ async def convert_keyword_stats_in_clusters(
     preset_to_cluster_name = {}
     texts = [keyword.text for keyword in keyword_stats]
     try:
-        text_to_custer_and_present: dict[str, [tuple[str, int]]] = (
-            await redis_manager.get_clusters_and_presets(texts)
-        )
+        text_to_custer_and_present: dict[
+            str, [tuple[str, int]]
+        ] = await redis_manager.get_clusters_and_presets(texts)
     except:
         logger.error(f"Ошибка получения кластеров и пресетов: {texts}", exc_info=True)
         return keyword_stats
@@ -458,7 +455,7 @@ async def convert_keyword_stats_in_clusters(
 # так как CPM больше не доступен из позиций парсинга
 
 
-async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> Optional[FullAdvStat]:
+async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> FullAdvStat | None:
     """Получение Полной статистики из Redis по adv_id"""
     try:
         full_stat_json = await redis_manager.get_full_stat_adv(adv_id)
@@ -523,7 +520,7 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     return keywords
 
 
-async def get_cached_keyword(adv: AdvSetting, text: str) -> Optional[CalculatedKeyword]:
+async def get_cached_keyword(adv: AdvSetting, text: str) -> CalculatedKeyword | None:
     """Получить закешированное ключевое слово"""
     cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}"
     cached_data = await redis_manager.get(cache_key)
@@ -671,9 +668,9 @@ async def get_good_bad_phrases_for_min_ctr(
 
     adv_id = adv_setting.adv_id
     texts = [kw.text for kw in keyword_stats]
-    text_to_predict_ctr: dict[str, float] = (
-        await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
-    )
+    text_to_predict_ctr: dict[
+        str, float
+    ] = await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
     # keyword_positions = await redis_manager.get_keywords_positions(adv_setting, texts)
     # text_to_keyword_position: dict[str, WBItemPosition]\
     #     = {position.keyword_text: position for position in keyword_positions}
@@ -705,7 +702,7 @@ async def get_good_bad_phrases_for_min_ctr(
         keyword_stats, min_ctr, adv_setting
     )
 
-    best_keyword: Optional[KeywordSetting] = get_best_keyword(keyword_stats)
+    best_keyword: KeywordSetting | None = get_best_keyword(keyword_stats)
     if best_keyword:
         best_keyword.best_keyword_status = True
 
@@ -832,7 +829,7 @@ async def get_good_bad_phrases_for_min_ctr(
             value = getattr(keyword_stat, property)
             try:
                 assert value is not None
-            except AssertionError as e:
+            except AssertionError:
                 logger.error(
                     f"Ошибка в значении {property} для {keyword_stat.text}: {value}"
                 )
@@ -842,7 +839,7 @@ async def get_good_bad_phrases_for_min_ctr(
     return keyword_stats
 
 
-async def get_wb_category(adv_setting: AdvSetting) -> Union[WBCategory, None]:
+async def get_wb_category(adv_setting: AdvSetting) -> WBCategory | None:
     try:
         nmid = adv_setting.nmids[0]
     except:
@@ -993,7 +990,7 @@ class ReferralStatistic:
     total_payments: float
 
 
-async def get_ref_statistic(user_telegram_id: int) -> Optional[list[ReferralStatistic]]:
+async def get_ref_statistic(user_telegram_id: int) -> list[ReferralStatistic] | None:
     """НУЖНО ЧИНИТЬ,ПОКА НЕ РАБОТАЕТ ПАРТНЕРКА"""
     async with _sm() as session:
         # Сначала найдем пользователя по telegram_id
@@ -1089,7 +1086,7 @@ async def get_min_ctr(adv: AdvSetting) -> float:
     return min_ctr
 
 
-def get_best_keyword(keywords: list[CalculatedKeyword]) -> Optional[CalculatedKeyword]:
+def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | None:
     if not keywords:
         return None
     best_keyword = sorted(
@@ -1198,7 +1195,7 @@ async def _get_min_ctr(adv: AdvSetting):
                 result_from_click_house = await client.query(query, params)
                 rows = result_from_click_house.result_rows
         except Exception:
-            logger.error(f"Ошибка получения статистики из ch", exc_info=True)
+            logger.error("Ошибка получения статистики из ch", exc_info=True)
             raise
 
         text_to_real_ctr = {row[0]: row[1] for row in rows}
@@ -1467,7 +1464,7 @@ async def get_users_from_nmid(nmid: int):
             result = await session.execute(stmt)
             users = result.scalars().all()
             return users
-    except Exception as e:
+    except Exception:
         logger.error("Ошибка при получении пользователей по nmid", exc_info=True)
         return []
 
@@ -1592,7 +1589,7 @@ async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
     return setting_max_bid
 
 
-async def _get_down_scale_white_list_bust_wb_item_position(adv) -> Optional[int]:
+async def _get_down_scale_white_list_bust_wb_item_position(adv) -> int | None:
     stmt = select(KeywordSetting.text).where(
         KeywordSetting.hard_status == 2, KeywordSetting.adv_setting_id == adv.id
     )
@@ -1715,7 +1712,7 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
                 )
 
 
-async def get_keyword_positions_from_click_house(nmid) -> List[WBItemPosition]:
+async def get_keyword_positions_from_click_house(nmid) -> list[WBItemPosition]:
     query = f"""
     SELECT
         text,
@@ -1755,7 +1752,7 @@ async def get_last_full_stat_update(adv_id: int):
 
 
 async def get_all_keywords_from_ch(last_days=7) -> set[str]:
-    ch_query = f"""
+    ch_query = """
     SELECT DISTINCT text FROM default_db.advkeyword 
     WHERE date >= today() - %(last_days)s
     """
@@ -1797,11 +1794,7 @@ async def get_cpm(auto_adv: AdvSetting, keywords):
 
     # CPM из настроек рекламного объявления
     cpm_from_auto = auto_adv.cpm
-    cpm_values = [
-        cpm
-        for cpm in [cpm_from_auction, cpm_from_auto]
-        if cpm is not None
-    ]
+    cpm_values = [cpm for cpm in [cpm_from_auction, cpm_from_auto] if cpm is not None]
 
     if not cpm_values:
         return None

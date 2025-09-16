@@ -8,7 +8,7 @@ from aiogram import Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from app.client_bot import const
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
@@ -24,6 +24,7 @@ from app.payments.db.models import Payment
 from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
 from . import messages
 
 logger = logging.getLogger(__name__)
@@ -155,11 +156,11 @@ async def waiting_for_amount(
 
     user_telegram_id = message.chat.id
     sum_for_adding = int(amount) * 100
-    prices = [LabeledPrice(label=f"Пополнение баланса", amount=str(sum_for_adding))]
+    prices = [LabeledPrice(label="Пополнение баланса", amount=str(sum_for_adding))]
     await bot.send_invoice(
         user_telegram_id,
         title="Подписка на бота",
-        description=f"Пополнение баланса магазина \n" f" на {amount} рублей. \n",
+        description=f"Пополнение баланса магазина \n на {amount} рублей. \n",
         provider_data=provider_data,
         payload=payload,
         provider_token=provider_token,
@@ -199,14 +200,17 @@ async def successful_payment_handler(
             return
 
     # Используем новый сервис для обработки платежа
-    balance_payment, bonus_payment, amount, bonus_amount = (
-        await process_payment_with_bonus(
-            user_id=user_id,
-            cabinet_id=wb_cabinet_original_id,
-            amount=float(cost),
-            bonus_percent=0,  # Пока без бонусов
-            description=f"Пополнение баланса через Telegram",
-        )
+    (
+        balance_payment,
+        bonus_payment,
+        amount,
+        bonus_amount,
+    ) = await process_payment_with_bonus(
+        user_id=user_id,
+        cabinet_id=wb_cabinet_original_id,
+        amount=float(cost),
+        bonus_percent=0,  # Пока без бонусов
+        description="Пополнение баланса через Telegram",
     )
 
     await messages.BalanceUpdated(bot, message.chat.id, amount, bonus_amount)()

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import typing
 from collections import defaultdict
 
 import neo4j
@@ -83,7 +82,6 @@ class DataScience(metaclass=AsyncMeta):
         return vector
 
     def set_direct_dist_item_to_keywords(self, offer_ids: list[str]):
-
         query = """
         MATCH(source: Item
         {offer_id: $offer_id})
@@ -359,7 +357,7 @@ RETURN graphName
                 query, graph_name=self.SHOP_GRAPH_NAME, offer_ids=offer_ids
             ).data()
             logger.debug(result)
-            print(f"""Граф  создан""")
+            print("""Граф  создан""")
 
     async def linking_images_and_keyword(self):
         try:
@@ -420,7 +418,6 @@ RETURN graphName
                 logger.debug(result)
 
     async def _set_knn_on_images(self, name):
-
         async def execute_knn_process(tx, name):
             stream_query = """
                                CALL gds.knn.stream(
@@ -778,9 +775,7 @@ UNWIND phrase.words AS word
 
         return result
 
-    async def get_nmid_vectors(
-        self, nmids: list[int]
-    ) -> typing.List[typing.Tuple[int, typing.List[float]]]:
+    async def get_nmid_vectors(self, nmids: list[int]) -> list[tuple[int, list[float]]]:
         query = """
         MATCH (item:Item) WHERE  item.nmid  IN  $nmids 
         AND item.fastrp IS NOT NULL
@@ -812,7 +807,7 @@ UNWIND phrase.words AS word
 
     async def get_keywords_vectors(
         self,
-    ) -> typing.List[typing.Tuple[str, typing.List[float]]]:
+    ) -> list[tuple[str, list[float]]]:
         query = """
         MATCH (k:KeywordPhrase) WHERE k.fastrp IS NOT NULL
         RETURN k.text as keyword, k.fastrp as vector
@@ -941,7 +936,6 @@ UNWIND phrase.words AS word
         dhash: str,
         vector: list[float],
     ):
-
         nmid = wbcard.nmid
         wb_category: WBCategory = wbcard.wb_category
         category_name = wb_category.wb_category_name

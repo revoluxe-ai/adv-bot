@@ -1,6 +1,3 @@
-
-
-
 def get_day_suffix(number):
     if 11 <= number % 100 <= 14:
         return f"{number} дней"

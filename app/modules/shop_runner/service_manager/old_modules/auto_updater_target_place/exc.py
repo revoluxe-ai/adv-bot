@@ -1,2 +1,2 @@
-﻿class AutoUpdateTargetPlaceError(Exception):
+class AutoUpdateTargetPlaceError(Exception):
     pass

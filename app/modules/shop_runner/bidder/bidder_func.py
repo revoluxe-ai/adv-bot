@@ -13,15 +13,17 @@ from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
-from ..bidder.wb_api import WBApi as BidderAPI
-from ..modules.wb_api import WBApi
+
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
+from ..bidder.wb_api import WBApi as BidderAPI
+from ..modules.wb_api import WBApi
 
 logger = logging.getLogger(__name__)
 
 # TODO: включить проверку РК: обновлять только если РК активна и не приостановлена
+
 
 async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: BidderAPI) -> set[int] | None:
     adv_ids = []

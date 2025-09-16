@@ -1,7 +1,7 @@
 import logging
 
 import aiogram
-from aiogram import Router, types, Bot
+from aiogram import Bot, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
@@ -9,6 +9,7 @@ from sqlalchemy.future import select
 from app.client_bot.user_interface.handlers import start
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
+
 from .. import states
 from ..views import callbacks, messages
 
@@ -26,7 +27,6 @@ async def setting_min_views_for_predict_ctr(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     adv_original_id = callback_data.adv_setting_original_id
     await state.set_state(states.ChangeMinViewsForPredictCTR.waiting_for_new_min_views)
     await messages.SettingMinViewsForPredictCTR(bot, callback.message.chat.id)(

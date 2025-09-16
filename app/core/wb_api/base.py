@@ -1,11 +1,13 @@
 import logging
 import typing
 from collections import defaultdict
-from typing import Generator, TypeVar
+from collections.abc import Generator
+from typing import TypeVar
 
 from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .exceptions import ApiForbiddenError
 
 if typing.TYPE_CHECKING:

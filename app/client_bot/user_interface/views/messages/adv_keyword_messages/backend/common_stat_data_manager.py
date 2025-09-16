@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
@@ -10,7 +10,6 @@ from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat
 
 
 class CommonStatDataManager:
-
     async def get_days_static_text(
         self, adv_setting: AdvSetting, last_days: int
     ) -> str:

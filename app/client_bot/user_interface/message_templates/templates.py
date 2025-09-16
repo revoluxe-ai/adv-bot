@@ -1,16 +1,16 @@
 import io
 import logging
 from abc import abstractmethod
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable
 from typing import TypeVar
-from typing import Union, Optional
 
 import aiogram
 from aiogram import types
-from aiogram.types import BufferedInputFile, Message, InlineKeyboardMarkup
+from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, Message
 
 from app import file_handler
+
 from .base import Base
 
 logger = logging.getLogger(__name__)
@@ -25,13 +25,13 @@ T = TypeVar("T")
 
 def manage_file_id(func) -> Callable:
     @wraps(func)
-    async def wrapper(self, *args, **kwargs) -> Optional[T]:
+    async def wrapper(self, *args, **kwargs) -> T | None:
         logger.debug("Вызов обертки manage_file_id")
         # Получение и изменение file_id перед вызовом основной функции
         old_image = self.image
         if old_image:
             logger.debug("Получение изображения")
-            image: Union[io.BytesIO, str] = await file_handler.get_telegram_image(
+            image: io.BytesIO | str = await file_handler.get_telegram_image(
                 old_image, self.bot
             )
 
@@ -73,7 +73,7 @@ class TextWithKeyboard(Base):
         text = self.text
         parse_mode = getattr(self, "parse_mode", None)
         if parse_mode == "Markdown":
-            text = text.replace("_", "\_")
+            text = text.replace("_", r"\_")
         last_message = await self.bot.send_message(
             chat_id=self.chat_id,
             text=text,
@@ -88,7 +88,6 @@ class TextWithKeyboard(Base):
 
 
 class TextWithImage(Base):
-
     @property
     @abstractmethod
     def text(self):
@@ -113,7 +112,6 @@ class TextWithImage(Base):
 
 
 class Text(Base):
-
     @property
     @abstractmethod
     def text(self):
@@ -147,7 +145,6 @@ class TextWithKeyboardPagination(Base):
         pass
 
     async def __call__(self) -> (LastMessage, str):
-
         last_message = await self.bot.send_message(
             chat_id=self.chat_id,
             text=self.text,
@@ -158,7 +155,6 @@ class TextWithKeyboardPagination(Base):
 
 
 class TextWithKeyboardAndImage(Base):
-
     @property
     @abstractmethod
     def text(self):

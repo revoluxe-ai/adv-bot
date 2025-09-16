@@ -1,8 +1,9 @@
-﻿from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.modules.shop_runner.modules.wb_api import WBApi
+
 from .service_manager.manager import CoroutinesManager
 from .service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,

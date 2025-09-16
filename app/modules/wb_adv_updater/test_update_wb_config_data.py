@@ -1,4 +1,4 @@
-﻿# import pytest
+# import pytest
 #
 # from .wb_manager import update_wb_config_data
 #

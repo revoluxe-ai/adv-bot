@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 
 from .common_stat_data_manager import CommonStatDataManager
 

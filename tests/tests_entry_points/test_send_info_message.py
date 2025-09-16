@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -23,14 +23,17 @@ async def test_message_sender_initialization():
         # Для класса MessageSender
 
         # Мокируем зависимости
-        with patch(
-            "run_send_info_message_to_users_process.get_config"
-        ) as mock_get_config, patch(
-            "run_send_info_message_to_users_process.setup_logging"
-        ) as mock_setup_logging, patch(
-            "run_send_info_message_to_users_process.init_db_connection"
-        ) as mock_init_db:
-
+        with (
+            patch(
+                "run_send_info_message_to_users_process.get_config"
+            ) as mock_get_config,
+            patch(
+                "run_send_info_message_to_users_process.setup_logging"
+            ) as mock_setup_logging,
+            patch(
+                "run_send_info_message_to_users_process.init_db_connection"
+            ) as mock_init_db,
+        ):
             # Настраиваем мок-конфиг
             mock_get_config.return_value = {
                 "db_connection": "test_connection_string",
@@ -47,21 +50,22 @@ async def test_message_sender_initialization():
             mock_init_db.assert_called_once()
 
             # Проверяем, что атрибуты настроены правильно
-            assert hasattr(
-                sender, "config"
-            ), "У объекта MessageSender должен быть атрибут config"
+            assert hasattr(sender, "config"), (
+                "У объекта MessageSender должен быть атрибут config"
+            )
     else:
         # Для функции main
 
         # Мокируем функции инициализации
-        with patch(
-            "run_send_info_message_to_users_process.setup_logging"
-        ) as mock_setup_logging, patch(
-            "run_send_info_message_to_users_process.load_config"
-        ) as mock_load_config, patch(
-            "run_send_info_message_to_users_process.init_db"
-        ) as mock_init_db:
-
+        with (
+            patch(
+                "run_send_info_message_to_users_process.setup_logging"
+            ) as mock_setup_logging,
+            patch(
+                "run_send_info_message_to_users_process.load_config"
+            ) as mock_load_config,
+            patch("run_send_info_message_to_users_process.init_db") as mock_init_db,
+        ):
             # Настраиваем мок-функции
             mock_load_config.return_value = {
                 "db_connection": "test_connection_string",
@@ -108,29 +112,32 @@ async def test_message_sender_run_processes_messages():
         sender.get_pending_messages.assert_called_once()
 
         # Проверяем, что метод отправки сообщения был вызван для каждого сообщения
-        assert (
-            sender.send_message.call_count == 2
-        ), "Метод send_message должен вызываться для каждого сообщения"
+        assert sender.send_message.call_count == 2, (
+            "Метод send_message должен вызываться для каждого сообщения"
+        )
 
         # Проверяем, что метод пометки сообщения был вызван для каждого сообщения
-        assert (
-            sender.mark_message_as_sent.call_count == 2
-        ), "Метод mark_message_as_sent должен вызываться для каждого сообщения"
+        assert sender.mark_message_as_sent.call_count == 2, (
+            "Метод mark_message_as_sent должен вызываться для каждого сообщения"
+        )
     else:
         # Для функции main
 
         # Мокируем функции
-        with patch(
-            "run_send_info_message_to_users_process.get_pending_messages",
-            new_callable=AsyncMock,
-        ) as mock_get_messages, patch(
-            "run_send_info_message_to_users_process.send_message",
-            new_callable=AsyncMock,
-        ) as mock_send_message, patch(
-            "run_send_info_message_to_users_process.mark_message_as_sent",
-            new_callable=AsyncMock,
-        ) as mock_mark_sent:
-
+        with (
+            patch(
+                "run_send_info_message_to_users_process.get_pending_messages",
+                new_callable=AsyncMock,
+            ) as mock_get_messages,
+            patch(
+                "run_send_info_message_to_users_process.send_message",
+                new_callable=AsyncMock,
+            ) as mock_send_message,
+            patch(
+                "run_send_info_message_to_users_process.mark_message_as_sent",
+                new_callable=AsyncMock,
+            ) as mock_mark_sent,
+        ):
             # Настраиваем мок-функции
             mock_get_messages.return_value = [
                 {"user_id": 123, "message": "Test message 1"},
@@ -144,14 +151,14 @@ async def test_message_sender_run_processes_messages():
             mock_get_messages.assert_called_once()
 
             # Проверяем, что функция отправки сообщения была вызвана для каждого сообщения
-            assert (
-                mock_send_message.call_count == 2
-            ), "Функция send_message должна вызываться для каждого сообщения"
+            assert mock_send_message.call_count == 2, (
+                "Функция send_message должна вызываться для каждого сообщения"
+            )
 
             # Проверяем, что функция пометки сообщения была вызвана для каждого сообщения
-            assert (
-                mock_mark_sent.call_count == 2
-            ), "Функция mark_message_as_sent должна вызываться для каждого сообщения"
+            assert mock_mark_sent.call_count == 2, (
+                "Функция mark_message_as_sent должна вызываться для каждого сообщения"
+            )
 
 
 @pytest.mark.asyncio
@@ -181,9 +188,9 @@ async def test_message_sender_handles_errors():
         await sender.run()
 
         # Проверяем, что метод отправки сообщения был вызван для каждого сообщения
-        assert (
-            sender.send_message.call_count == 2
-        ), "Метод send_message должен вызываться для каждого сообщения"
+        assert sender.send_message.call_count == 2, (
+            "Метод send_message должен вызываться для каждого сообщения"
+        )
 
         # Проверяем, что метод пометки сообщения как отправленного был вызван для первого сообщения
         sender.mark_message_as_sent.assert_called_once_with(
@@ -198,22 +205,25 @@ async def test_message_sender_handles_errors():
         # Для функции main
 
         # Мокируем функции
-        with patch(
-            "run_send_info_message_to_users_process.get_pending_messages",
-            new_callable=AsyncMock,
-        ) as mock_get_messages, patch(
-            "run_send_info_message_to_users_process.send_message",
-            new_callable=AsyncMock,
-        ) as mock_send_message, patch(
-            "run_send_info_message_to_users_process.mark_message_as_sent",
-            new_callable=AsyncMock,
-        ) as mock_mark_sent, patch(
-            "run_send_info_message_to_users_process.mark_message_as_failed",
-            new_callable=AsyncMock,
-        ) as mock_mark_failed, patch(
-            "run_send_info_message_to_users_process.log_error"
-        ) as mock_log_error:
-
+        with (
+            patch(
+                "run_send_info_message_to_users_process.get_pending_messages",
+                new_callable=AsyncMock,
+            ) as mock_get_messages,
+            patch(
+                "run_send_info_message_to_users_process.send_message",
+                new_callable=AsyncMock,
+            ) as mock_send_message,
+            patch(
+                "run_send_info_message_to_users_process.mark_message_as_sent",
+                new_callable=AsyncMock,
+            ) as mock_mark_sent,
+            patch(
+                "run_send_info_message_to_users_process.mark_message_as_failed",
+                new_callable=AsyncMock,
+            ) as mock_mark_failed,
+            patch("run_send_info_message_to_users_process.log_error") as mock_log_error,
+        ):
             # Настраиваем мок-функции
             mock_get_messages.return_value = [
                 {"user_id": 123, "message": "Test message 1"},
@@ -226,9 +236,9 @@ async def test_message_sender_handles_errors():
             await main()
 
             # Проверяем, что функция отправки сообщения была вызвана для каждого сообщения
-            assert (
-                mock_send_message.call_count == 2
-            ), "Функция send_message должна вызываться для каждого сообщения"
+            assert mock_send_message.call_count == 2, (
+                "Функция send_message должна вызываться для каждого сообщения"
+            )
 
             # Проверяем, что функция логирования ошибки была вызвана
             mock_log_error.assert_called_once()

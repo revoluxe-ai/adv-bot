@@ -1,15 +1,14 @@
-﻿from sqlalchemy import update
+from sqlalchemy import update
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.target_place_updater.redis_cache import (
-    LastSetUpTargetPlace,
     LastSetDownTargetPlace,
+    LastSetUpTargetPlace,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 
 class TargetPlaceUpdater:
-
     def __init__(self, adv: AdvSetting):
         self._adv: AdvSetting = adv
 

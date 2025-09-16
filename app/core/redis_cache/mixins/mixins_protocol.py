@@ -1,4 +1,4 @@
-﻿from asyncio import Protocol
+from asyncio import Protocol
 
 import redis.asyncio
 

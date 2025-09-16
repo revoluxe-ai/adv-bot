@@ -1,9 +1,6 @@
 import logging
 
 
-
-
-
 class ScriptHandler(logging.Handler):
     def emit(self, record):
         log_message = self.format(record)

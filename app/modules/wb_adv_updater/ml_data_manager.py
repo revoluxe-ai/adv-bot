@@ -7,22 +7,23 @@ import aiohttp
 import faiss
 import numpy as np
 from PIL import Image as PilImage, UnidentifiedImageError
-from sqlalchemy import select, Row, Sequence
+from sqlalchemy import Row, Sequence, select
 
 from app.modules.common_slaves.wildberries.models import (
-    KeywordSetting,
     AdvSetting,
+    KeywordSetting,
     WBCard,
 )
 from app.modules.wb_adv_updater.ML import Predictor
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.image_master import image_tools
 from app.utils.image_master.image_master2 import ImageMaster
+
+from ...core.redis_manager.base_redis_manager import BaseRedis
+from ...utils import redis_manager, text_cleaner
 from .gds_object import gds
 from .update_wb_adv_phrases_in_neo import update_wb_adv_phrases_in_neo
 from .word_to_vec_object import word2vec
-from ...core.redis_manager.base_redis_manager import BaseRedis
-from ...utils import redis_manager, text_cleaner
 
 logger = logging.getLogger(__name__)
 from . import fitter
@@ -76,16 +77,16 @@ async def process_product_data(wbcard: WBCard):
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
             continue
-        characteristics_words[char_name]: tuple[str, list[float]] = (
-            await get_words_from_char_value(char_value)
-        )
-    characteristics_words["name"]: tuple[str, list[float]] = (
-        await get_words_from_char_value(wbcard.name)
-    )
+        characteristics_words[char_name]: tuple[
+            str, list[float]
+        ] = await get_words_from_char_value(char_value)
+    characteristics_words["name"]: tuple[
+        str, list[float]
+    ] = await get_words_from_char_value(wbcard.name)
     if "description" in characteristics_words:
-        characteristics_words["description"]: tuple[str, list[float]] = (
-            await get_words_from_char_value(wbcard.description)
-        )
+        characteristics_words["description"]: tuple[
+            str, list[float]
+        ] = await get_words_from_char_value(wbcard.description)
     return characteristics_words
 
 
@@ -287,9 +288,8 @@ async def update_keywords_ctr_by_similary():
                         f"Обновление CTR для ключевого слова {target_text} и объявления {adv_id} "
                         f"на значение {predict_ctr}"
                     )
-                    await redis_manager.set_predict_ctr_with_pipeline(redis_pipeline,
-                                                                      adv_id,
-                                                                      target_text,
-                                                                      predict_ctr)
+                    await redis_manager.set_predict_ctr_with_pipeline(
+                        redis_pipeline, adv_id, target_text, predict_ctr
+                    )
                     break
             await redis_pipeline.execute()

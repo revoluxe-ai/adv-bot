@@ -7,7 +7,7 @@ from app.client_bot import const
 from app.client_bot.bot import get_bot
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
-from app.modules.adv_creator.backend import MainAdvManager, CardsNotFoundForShopError
+from app.modules.adv_creator.backend import CardsNotFoundForShopError, MainAdvManager
 from app.modules.adv_creator.backend.exc import (
     NotEnoughBalanceOnShopError,
     StartComplexAdvError,

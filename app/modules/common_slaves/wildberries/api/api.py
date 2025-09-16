@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Union, Optional, Iterable
+from collections.abc import Iterable
 
 from aiohttp import ClientSession
 
@@ -11,6 +11,7 @@ from app.core.wb_api.data_classes.advs import adv_fabric
 from app.core.wb_api.http_request import requests, try_except_decorator
 from app.core.wb_api.mixins.content import ContentMixin
 from app.modules.full_stat_adv_updater.types import FullAdvStat
+
 from .. import api_rights
 from ..ABC_WB_API import ABC_WB_API
 from ..data_classes.adv import Adv
@@ -83,7 +84,6 @@ def escape_special_characters(text):
 
 
 class AdvertApi(ABC_WB_API):
-
     _rights: set[str] = {api_rights.Rights.PROMOTION}
     _only_read = api_rights.OnlyRead.FALSE
     live_company_status = [4, 9, 11]
@@ -147,7 +147,7 @@ class AdvertApi(ABC_WB_API):
 
     async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
-    ) -> Optional[list[FullAdvStat]]:
+    ) -> list[FullAdvStat] | None:
         dates = [date.isoformat() for date in dates]
         url = "https://advert-api.wildberries.ru/adv/v2/fullstats"
         query_data = []
@@ -179,7 +179,7 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 60)
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.date] = None
-    ) -> Optional[list[FullAdvStat]]:
+    ) -> list[FullAdvStat] | None:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
         full_stats = []
@@ -289,14 +289,14 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list) -> list[Adv]:
         advs = []
-        url = f"https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
 
         response_text = await requests(
             self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
         )
         answer = json.loads(response_text)
         for advert in answer:
-            adv: Optional[Adv] = adv_fabric.get_adv_data_class(advert)
+            adv: Adv | None = adv_fabric.get_adv_data_class(advert)
             if adv:
                 advs.append(adv)
         return advs
@@ -405,7 +405,7 @@ class ContentApi(BaseAPI, ContentMixin):
         return cards
 
     @try_except_decorator(1, 2)
-    async def get_card_by_text(self, text: Union[str, int]):
+    async def get_card_by_text(self, text: str | int):
         url = f"{self.HOST}/content/v2/get/cards/list"
         text = str(text)
         data_for_req = {
@@ -467,7 +467,6 @@ class ContentApi(BaseAPI, ContentMixin):
 
 
 class WBApi:
-
     def __init__(self, wb_access: WBCabinetAccess, session: ClientSession) -> None:
         self.advert = AdvertApi(wb_access, session)
         self.content = ContentApi(wb_access, session)

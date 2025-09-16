@@ -1,9 +1,8 @@
 import datetime
 import json
-from typing import Optional, Union, List, Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, PlainValidator
-from typing_extensions import Annotated
 
 from app.modules.keywords_query import keywords_query
 
@@ -40,26 +39,26 @@ class CalculatedKeyword(BaseModel):
     clicks: int
     views: int
     spend: float
-    baes_ctr: Optional[float] = None
-    predict_ctr: Optional[float] = None
-    status: Union[str, None] = None
-    hard_status: Union[int, None] = None
-    reason: Optional[str] = None
-    position: Optional[int] = None
-    position_update: Optional[DatetimeType] = None
-    childs_keywords: Optional[List["CalculatedKeyword"]] = None
-    _query_static: Optional[int] = None
-    cluster_name: Optional[str] = None
-    preset: Optional[int] = None
-    original_predict_ctr: Optional[float] = None
-    predict_ctr_exponent: Optional[float] = None
-    k: Optional[float] = None
-    best_keyword_status: Optional[bool] = None
-    baes_predict_ctr: Optional[float] = None
-    calculated_clicks: Optional[int] = None
-    calculated_views: Optional[int] = None
-    enough_views: Optional[int] = None
-    added_clicks: Optional[int] = None
+    baes_ctr: float | None = None
+    predict_ctr: float | None = None
+    status: str | None = None
+    hard_status: int | None = None
+    reason: str | None = None
+    position: int | None = None
+    position_update: DatetimeType | None = None
+    childs_keywords: list["CalculatedKeyword"] | None = None
+    _query_static: int | None = None
+    cluster_name: str | None = None
+    preset: int | None = None
+    original_predict_ctr: float | None = None
+    predict_ctr_exponent: float | None = None
+    k: float | None = None
+    best_keyword_status: bool | None = None
+    baes_predict_ctr: float | None = None
+    calculated_clicks: int | None = None
+    calculated_views: int | None = None
+    enough_views: int | None = None
+    added_clicks: int | None = None
     keyword_setting_original_id: int | None = None
     adv_id: int | None = None
     relevant: bool | None = None
@@ -84,14 +83,14 @@ class CalculatedKeyword(BaseModel):
         return rating
 
     @property
-    def query(self) -> Union[int, str]:
+    def query(self) -> int | str:
         if self._query_static is None:
             return keywords_query.get_queries_of_keyword(self.text)
         else:
             return self._query_static
 
     @query.setter
-    def query(self, value: Union[int, str]):
+    def query(self, value: int | str):
         self._query_static = value
 
     def __repr__(self) -> str:

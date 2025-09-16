@@ -4,12 +4,11 @@ import logging
 from collections.abc import Sequence
 
 from aiohttp import ClientSession
-from sqlalchemy import exists
+from sqlalchemy import exists, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
-from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -17,6 +16,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBBonusPayment,
     WBCabinet,
 )
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.my_types import KeywordStat
@@ -47,9 +47,13 @@ sm = get_async_session_maker
 keywords_hashs_in_neo = set()
 
 
-def get_count_advs_for_wb_cabinet(wb_cabinet: WBCabinet, adv_settings: list[AdvSetting]) -> int:
+def get_count_advs_for_wb_cabinet(
+    wb_cabinet: WBCabinet, adv_settings: list[AdvSetting]
+) -> int:
     advs_for_wb_cabinet = [
-        adv_setting for adv_setting in adv_settings if adv_setting.wb_cabinet_id == wb_cabinet.id
+        adv_setting
+        for adv_setting in adv_settings
+        if adv_setting.wb_cabinet_id == wb_cabinet.id
     ]
     return len(advs_for_wb_cabinet)
 
@@ -59,7 +63,10 @@ async def check_adv_payment(
 ) -> bool:
     """Проверяет наличие платежа для настройки рекламы на указанную дату."""
     adv_payment_check_stmt = select(
-        exists().where(AdvPayment.adv_setting_id == adv_setting.id, AdvPayment.date == current_date)
+        exists().where(and_(
+            AdvPayment.adv_setting_id == adv_setting.id,
+            AdvPayment.date == current_date
+        ))
     )
 
     result = await session.execute(adv_payment_check_stmt)
@@ -240,7 +247,7 @@ async def update_all_keyword_data(
 
 
 async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
-    from app.modules.common_slaves.wildberries.api import WBApi
+    from app.modules.common_slaves.wildberries.wb_api import WBApi
 
     update_tasks: dict[int, asyncio.Task[None]] = {}
     while True:

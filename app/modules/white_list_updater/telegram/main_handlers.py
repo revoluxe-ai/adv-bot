@@ -1,4 +1,4 @@
-from aiogram import Router, F, Bot
+from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy import select, update
 
@@ -15,7 +15,6 @@ async def turn_white_list_update_on(
     callback_data: callbacks.TurnWhiteListUpdate,
     bot: Bot,
 ):
-
     async with sm(read_only=False) as session:
         stmt = (
             update(WBCabinet)

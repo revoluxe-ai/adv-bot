@@ -1,4 +1,5 @@
-from typing import Any, Awaitable, Callable, Dict
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from aiogram import BaseMiddleware
 from aiogram.dispatcher.flags import get_flag
@@ -10,14 +11,14 @@ class ThrottlingMiddleware(BaseMiddleware):
     def __init__(self, throttle_time_spin: int = 1, throttle_time_other: int = 1):
         self.caches = {
             "spin": TTLCache(maxsize=10_000, ttl=throttle_time_spin),
-            "default": TTLCache(maxsize=10_000, ttl=throttle_time_other)
+            "default": TTLCache(maxsize=10_000, ttl=throttle_time_other),
         }
 
     async def __call__(
-            self,
-            handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
-            event: Message,
-            data: Dict[str, Any],
+        self,
+        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
+        event: Message,
+        data: dict[str, Any],
     ) -> Any:
         throttling_key = get_flag(data, "throttling_key")
         if throttling_key is not None and throttling_key in self.caches:
