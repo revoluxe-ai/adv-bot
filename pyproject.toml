@@ -27,7 +27,6 @@ combine-as-imports = true
 # Скорректировано под вашу структуру проекта
 known-first-party = ["app"]
 split-on-trailing-comma = true
-force-grid-wrap = 0
 
 # Пер-файловые послабления
 [tool.ruff.lint.per-file-ignores]
