@@ -97,7 +97,7 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
     ]
     best_white_keyword = data_manager.get_best_keyword(white_keywords)
     if best_white_keyword:
-        promo_position = best_white_keyword.real_position
+        promo_position = best_white_keyword.position
     else:
         promo_position = None
     if promo_position:

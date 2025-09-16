@@ -61,8 +61,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             "Прогнозируемый CTR",
             "Включен-Выключен",
             "Статус",
-            "Начальная позиция",
-            "Текущая позиция",
+            "Позиция",
             "Дополнительные клики",
             "Рейтинг",
         ]
@@ -101,22 +100,15 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
 
         turn_on = "✅Включен" if keyword.status == KeywordStatus.GOOD else "❌Выключен"
 
-        # Определение позиций
+        # Определение позиции (единое поле)
         first_position: Union[str, int] = ""
-        second_position: Union[str, int] = ""
         if adv_setting.parsing_active:
-            if keyword.cpm:
-                assert keyword.base_position is not None
-                assert keyword.promo_position is not None
-                first_position = keyword.base_position
-                second_position = keyword.promo_position
-            elif keyword.real_position:
-                first_position = keyword.real_position
-            elif keyword.real_position == 0:
+            if keyword.position:
+                first_position = keyword.position
+            elif keyword.position == 0:
                 first_position = ">i"
             else:
-                first_position = "?"
-
+                first_position = "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
         rows.append(
             [
                 keyword.text,
@@ -129,7 +121,6 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
                 turn_on,
                 hard_status,
                 str(first_position),
-                str(second_position),
                 str(added_clicks),
                 str(round(keyword.rating_by_predict_ctr * 100, 4)).replace(".", ","),
             ]

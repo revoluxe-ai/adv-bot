@@ -829,7 +829,7 @@ async def show_only_on_out_index(
         result = await session.execute(stmt)
         adv_setting: AdvSetting = result.scalar()
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
-    keywords = [keyword for keyword in keywords if keyword.base_position == 0]
+    keywords = [keyword for keyword in keywords if keyword.position == 0]
     keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)

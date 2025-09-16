@@ -60,7 +60,7 @@ async def get_keyword_history_graphic(
         if not common_keywords:
             return
         common_keywords.sort(
-            key=lambda x: min([pos.promo_position for pos in x.wb_item_positions])
+            key=lambda x: min([pos.position for pos in x.wb_item_positions])
         )
         common_keywords = common_keywords[:5]
         end_date = datetime.datetime.now()
@@ -69,7 +69,7 @@ async def get_keyword_history_graphic(
         frames = []
         # Создание DataFrame
         for keyword in common_keywords:
-            data = {"Ключи": [], "Дата": [], "Базовая Позиция": []}
+            data = {"Ключи": [], "Дата": [], "Позиция": []}
             positions = keyword.wb_item_positions
             if not positions:
                 return None
@@ -92,13 +92,13 @@ async def get_keyword_history_graphic(
                 # Поиск ближайшей позиции
                 close_position = min(
                     positions, key=lambda x: abs(x.timestamp - date)
-                ).base_position
+                ).position
 
                 # Заполнение данных
-                data["Ключи"].append(keyword.text + f"({last_position.base_position})")
+                data["Ключи"].append(keyword.text + f"({last_position.position})")
                 data["Дата"].append(date)
                 beautify_position = close_position - 0.5 + random.randint(1, 9) * 0.1
-                data["Базовая Позиция"].append(beautify_position)
+                data["Позиция"].append(beautify_position)
 
             # Добавление в итоговый список
             frames.append(pd.DataFrame(data))
@@ -113,14 +113,7 @@ async def get_keyword_history_graphic(
             def get_graphic_and_legend(plt, df, title_text):
                 import seaborn as sns
 
-                sns.lineplot(
-                    data=df,
-                    x="Дата",
-                    y="Базовая Позиция",
-                    hue="Ключи",
-                    marker="o",
-                    legend=False,
-                )
+                sns.lineplot(data=df, x="Дата", y="Позиция", hue="Ключи", marker="o", legend=False)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
                 plt.tight_layout()
@@ -153,14 +146,7 @@ async def get_keyword_history_graphic(
             def get_graphic(plt, df, title_text):
                 import seaborn as sns
 
-                sns.lineplot(
-                    data=df,
-                    x="Дата",
-                    y="Базовая Позиция",
-                    hue="Ключи",
-                    marker="o",
-                    legend=True,
-                )
+                sns.lineplot(data=df, x="Дата", y="Позиция", hue="Ключи", marker="o", legend=True)
                 plt.xticks(rotation=45)
                 plt.title(title_text)
                 plt.tight_layout()

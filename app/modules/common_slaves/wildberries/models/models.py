@@ -25,6 +25,7 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api import exceptions
+
 # Добавляем правильный импорт AdvPayment
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.settings import settings
@@ -599,11 +600,8 @@ class KeywordSetting(BaseTable):
 @dataclass
 class WBItemPosition:
     nmid: int = None
-    base_position: int = None
-    real_position: int = None
+    position: int = None
     timestamp: datetime.datetime = None
-    promo_position: int = None
-    cpm: int | None = None
     adv_id: int = None
     keyword_text: str = None
     adv_type: int | None = None
@@ -619,11 +617,11 @@ class WBItemPosition:
         timestamp: datetime.datetime = self.timestamp
         str_timestamp = timestamp.isoformat()
         return {
-            "real_position": self.real_position,
-            "promo_position": self.promo_position,
-            "base_position": self.base_position,
+            "real_position": self.position,  # Backward compatibility
+            "promo_position": self.position,  # Backward compatibility
+            "base_position": self.position,  # Backward compatibility
+            "position": self.position,  # Current key
             "keyword_text": self.keyword_text,
-            "cpm": self.cpm,
             "adv_id": self.adv_id,
             "nmid": self.nmid,
             "timestamp": str_timestamp,
@@ -633,10 +631,11 @@ class WBItemPosition:
     @staticmethod
     def from_dict(data):
         position = WBItemPosition()
-        position.real_position = data["real_position"]
-        position.promo_position = data["promo_position"]
-        position.base_position = data["base_position"]
-        position.cpm = data["cpm"]
+        # Backward compatibility: accept both keys
+        try:
+            position.position = data["position"]
+        except KeyError:
+            position.position = data.get("base_position", 0)
         position.adv_id = data["adv_id"]
         position.nmid = data["nmid"]
         try:

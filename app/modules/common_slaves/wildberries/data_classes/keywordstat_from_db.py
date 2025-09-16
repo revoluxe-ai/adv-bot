@@ -1,12 +1,10 @@
 import datetime
 import json
-import math
 from typing import Optional, Union, List, Any
 
 from pydantic import BaseModel, PlainValidator
 from typing_extensions import Annotated
 
-from app.modules.common_slaves.wildberries.models.models import WBItemPosition
 from app.modules.keywords_query import keywords_query
 
 
@@ -47,16 +45,12 @@ class CalculatedKeyword(BaseModel):
     status: Union[str, None] = None
     hard_status: Union[int, None] = None
     reason: Optional[str] = None
-    cpm: Optional[int] = None
-    real_position: Optional[int] = None
-    base_position: Optional[int] = None
-    promo_position: Optional[int] = None
+    position: Optional[int] = None
     position_update: Optional[DatetimeType] = None
     childs_keywords: Optional[List["CalculatedKeyword"]] = None
     _query_static: Optional[int] = None
     cluster_name: Optional[str] = None
     preset: Optional[int] = None
-    position: Optional[WBItemPosition] = None
     original_predict_ctr: Optional[float] = None
     predict_ctr_exponent: Optional[float] = None
     k: Optional[float] = None
@@ -84,17 +78,9 @@ class CalculatedKeyword(BaseModel):
 
     @property
     def rating_by_predict_ctr(self) -> float:
-        k = 1
         predict_ctr_exponent = self.predict_ctr_exponent
-        if not self.base_position:
-            return 0
-        if self.predict_ctr is None:
-            return 0
-        rating = (
-            self.predict_ctr**predict_ctr_exponent
-            * self.views
-            / (k * math.log(1 + self.base_position))
-        )
+        assert predict_ctr_exponent is not None
+        rating = self.predict_ctr**predict_ctr_exponent * self.views
         return rating
 
     @property
@@ -144,17 +130,13 @@ class CalculatedKeyword(BaseModel):
             "status": self.status,
             "hard_status": self.hard_status,
             "reason": self.reason,
-            "cpm": self.cpm,
-            "real_position": self.real_position,
-            "base_position": self.base_position,
-            "promo_position": self.promo_position,
+            "position": self.position,
             "position_update": (
                 self.position_update.isoformat() if self.position_update else None
             ),
             "query_static": self._query_static,
             "cluster_name": self.cluster_name,
             "preset": self.preset,
-            "position": self.position.to_dict() if self.position else None,
             "original_predict_ctr": self.original_predict_ctr,
             "predict_ctr_exponent": self.predict_ctr_exponent,
             "k": self.k,
@@ -174,7 +156,7 @@ class CalculatedKeyword(BaseModel):
             if data["position_update"]
             else None
         )
-        data["position"] = (
-            WBItemPosition.from_dict(data["position"]) if data["position"] else None
-        )
+        # Backward compatibility: map real_position to position
+        if "position" not in data and "real_position" in data:
+            data["position"] = data.get("real_position")
         return cls(**data)
