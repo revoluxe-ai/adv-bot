@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 
 from app.client_bot.user_interface import states
-from app.client_bot.user_interface.views import callbacks, messages
+from app.client_bot.user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -24,7 +24,9 @@ async def get_min_position(
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_min_position)
-    await messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(adv_original_id)
+    import app.client_bot.user_interface.views.messages as ui_messages
+
+    await ui_messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(adv_original_id)
     return
 
 
@@ -41,5 +43,7 @@ async def off_auto_cpm(
         adv = adv.scalar()
         adv.bidder_active = False
         await session.commit()
-        await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
+        import app.client_bot.user_interface.views.messages as ui_messages
+
+        await ui_messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
     return
