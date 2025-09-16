@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import TypedDict
 
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import (
     SmallFullAdvStat,
     SmallFullAdvStatPerDay,

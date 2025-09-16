@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from dataclasses import dataclass
 from datetime import date, datetime
 
 from pydantic import BaseModel, Field

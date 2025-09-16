@@ -39,7 +39,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBItemPosition,
     WBUserCabinet,
 )
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.keywords_query import keywords_query
 from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
 from app.modules.wb_adv_updater.models import GlobalCategorySetting

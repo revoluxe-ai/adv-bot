@@ -18,7 +18,7 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater import wb_data_getter
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat

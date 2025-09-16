@@ -10,7 +10,7 @@ from app.core.wb_api.base import BaseAPI
 from app.core.wb_api.data_classes.advs import adv_fabric
 from app.core.wb_api.http_request import requests, try_except_decorator
 from app.core.wb_api.mixins.content import ContentMixin
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 
 from .. import api_rights
 from ..ABC_WB_API import ABC_WB_API

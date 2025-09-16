@@ -10,7 +10,7 @@ from typing import Union
 from redis.asyncio.client import Pipeline
 
 from app.core.wb_api.mixins.adv import MinCPMData
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.utils import text_cleaner
 from app.utils.redis_manager.exc import DataNotFoundError
 from app.utils.text_cleaner import clear
