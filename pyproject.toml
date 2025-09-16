@@ -1,0 +1,35 @@
+﻿[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"  # выставить под свою версию Python [3.10/3.11/3.12]
+exclude = [
+    ".git",
+    ".venv",
+    "build",
+    "dist",
+    "migrations",
+]
+
+[tool.ruff.lint]
+# База: pycodestyle/pyflakes + расширения: bugbear, isort, pyupgrade
+select = ["E", "F", "W", "B", "I", "UP"]
+ignore = ["E501"]  # длина строки отдает Black [10]
+fix = true
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+# поменяй на имя своего пакета(ов) для корректной группировки импортов
+known-first-party = ["your_package"]
+
+# Пример пер-файловых послаблений (опционально)
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # пример: разрешить assert в тестах
+"**/__init__.py" = ["E402"]  # импорты не вверху файла
