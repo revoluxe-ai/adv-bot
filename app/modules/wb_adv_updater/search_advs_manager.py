@@ -5,7 +5,7 @@ from typing import Iterable
 from aiohttp import ClientSession
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.api import WBApi
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     KeywordStatus,
     CalculatedKeyword,

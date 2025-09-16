@@ -5,7 +5,7 @@ from sqlalchemy import or_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.modules.common_slaves.wildberries.api import WBApi
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models import WBCabinet
 from app.modules.wb_adv_updater import data_manager

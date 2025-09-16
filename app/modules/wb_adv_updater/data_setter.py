@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from app.modules.common_slaves.wildberries.api import WBApi
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
     KeywordStatus,

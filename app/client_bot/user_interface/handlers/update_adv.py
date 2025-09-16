@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.api import WBApi
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBCabinet,

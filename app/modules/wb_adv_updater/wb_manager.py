@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
-from app.modules.common_slaves.wildberries.api import WBApi
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.common_slaves.wildberries.models import (
     WBBalancePayment,
@@ -244,7 +244,7 @@ async def update_all_keyword_data(
 
 
 async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
-    from app.modules.common_slaves.wildberries.api import WBApi
+    from app.modules.common_slaves.wildberries.wb_api import WBApi
 
     update_tasks: dict[int, asyncio.Task[None]] = {}
     while True:

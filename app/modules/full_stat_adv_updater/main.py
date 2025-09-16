@@ -5,7 +5,7 @@
 # from app.modules.common_slaves.wildberries import super_cabinet_manager
 # from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 # from . import db_data_manager
-# from ..common_slaves.wildberries.api import WBApi
+# from ..common_slaves.wildberries.wb_api import WBApi
 #
 # logger = logging.getLogger(__name__)
 #
