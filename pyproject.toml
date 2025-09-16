@@ -29,6 +29,7 @@ known-first-party = ["your_package"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # пример: разрешить assert в тестах
 "**/__init__.py" = ["E402"]  # импорты не вверху файла
+"alembic/**" = ["F403"]  # star imports needed for migrations
 
 # Import Linter configuration
 [tool.importlinter]
