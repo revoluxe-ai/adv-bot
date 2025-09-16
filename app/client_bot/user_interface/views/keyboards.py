@@ -21,9 +21,6 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBUserCabinet,
 )
-from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
-    UpdatePositionsForActivePhrase,
-)
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
@@ -717,6 +714,10 @@ def get_keywords_setting_keyboard(
 
     bottoms.append(botton)
 
+    from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
+        UpdatePositionsForActivePhrase,
+    )
+
     button = [
         InlineKeyboardButton(
             text="Перепроверить позиции ключей из БС",
@@ -729,6 +730,10 @@ def get_keywords_setting_keyboard(
     ]
 
     bottoms.append(button)
+
+    from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
+        UpdatePositionsForActivePhrase,
+    )
 
     button = [
         InlineKeyboardButton(

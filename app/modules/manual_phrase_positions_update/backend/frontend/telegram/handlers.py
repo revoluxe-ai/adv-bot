@@ -2,9 +2,6 @@ from aiogram import Bot, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from app.client_bot.user_interface.views.messages.adv_keyword_messages import (
-    AdvKeywordsSetting,
-)
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
     KeywordStatus,
@@ -75,6 +72,11 @@ async def update_positions_for_active_phrase(
     adv_choice_last_page = 1
     page = 1
 
+    from importlib import import_module
+
+    AdvKeywordsSetting = import_module(
+        "app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages"
+    ).AdvKeywordsSetting
     await AdvKeywordsSetting(
         bot,
         chat_id,
