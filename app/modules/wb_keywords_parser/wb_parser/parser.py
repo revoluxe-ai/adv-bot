@@ -43,6 +43,11 @@ class DataError(Exception):
 
 
 def get_parse_url(text: str, page: int) -> str:
+    """
+    https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&page=1&query=картина&resultset=catalog&sort=popular&suppressSpellcheck=false
+
+
+    """
     assert 60 >= page > 0
     url = (
         f"https://search.wb.ru/exactmatch/ru/common/v5/search?ab_testing=false&appType=32&curr=rub&dest=-1257786&"
@@ -84,10 +89,7 @@ class ParserService:
                 if "log" in product:
                     log = product["log"]
                     adv_id = log["advertId"]
-                    cpm = log["cpm"]
-                    base_position = log["position"]
-                    promo_position = log["promoPosition"]
-                    real_position = promo_position
+
                     try:
                         adv_type_original = log["tp"]
                     except KeyError:
@@ -103,19 +105,14 @@ class ParserService:
                         )
                 else:
                     adv_id = None
-                    cpm = None
-                    promo_position = None
-                    base_position = real_position
+
             except KeyError:
                 logger.error("Ошибка парсинга данных о позициях с WB")
                 continue
             position = WBItemPosition(
                 nmid=nmid,
-                base_position=base_position,
-                promo_position=promo_position,
-                cpm=cpm,
                 adv_id=adv_id,
-                real_position=real_position,
+                position=real_position,
                 keyword_text=text,
                 timestamp=datetime.datetime.now(),
                 adv_type=adv_type,
@@ -125,11 +122,8 @@ class ParserService:
             if cluster and cluster != text:
                 position = WBItemPosition(
                     nmid=nmid,
-                    base_position=base_position,
-                    promo_position=promo_position,
-                    cpm=cpm,
                     adv_id=adv_id,
-                    real_position=real_position,
+                    position=real_position,
                     keyword_text=cluster,
                     timestamp=datetime.datetime.now(),
                 )
@@ -272,17 +266,7 @@ async def _add_positions_from_page(
         )
         await add_wb_positions_to_all_bases(positions, need_nmids)
         logger.debug("Записали позиции в базы")
-        positions_for_catch_max_bet = [
-            position
-            for position in positions
-            if position.promo_position and position.promo_position <= 40
-        ]
-        cpms = [position.cpm for position in positions_for_catch_max_bet]
-        if cpms:
-            max_bet = max(cpms)
-            await redis_manager.set_max_bet_for_keyword(text, max_bet)
-        else:
-            logger.debug(f"Не найдена максимальная ставка для ключа {text}")
+        # Ставка больше не доступна при парсинге, блок вычисления max_bet удален
         for position in positions:
             nmid: int = position.nmid
             need_nmids.discard(nmid)
@@ -337,13 +321,10 @@ async def _add_wb_positions(
 
     not_found_positions = [
         WBItemPosition(
-            real_position=0,
-            base_position=0,
-            promo_position=0,
+            position=0,
             keyword_text=text,
             timestamp=datetime.datetime.now(),
             nmid=nmid,
-            cpm=0,
         )
         for nmid in need_nmids
     ]
