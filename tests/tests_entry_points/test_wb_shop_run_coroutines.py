@@ -1,144 +1,158 @@
-﻿import asyncio
-from unittest.mock import AsyncMock, patch
+import asyncio
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from app.modules.shop_runner.modules.wb_api import WBApi
+from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.wb_shop import WBShop
+
+
+async def mock_infinite_run():
+    """Мок-функция для имитации бесконечного выполнения корутины"""
+    while True:
+        await asyncio.sleep(0.1)
 
 
 @pytest.mark.asyncio
 async def test_wb_shop_run_calls_all_coroutines():
     """
-    Тест проверяет, что метод _run класса WBShop запускает необходимые корутины
+    Тест проверяет, что метод run класса WBShop запускает необходимые корутины
     """
-    # Создаем экземпляр WBShop
-    shop_id = "test_shop_id"
-    wb_cabinet_original_id = 12345
-    wb_shop = WBShop(shop_id, wb_cabinet_original_id)
+    # Создаем моки для зависимостей
+    mock_wb_api = Mock(spec=WBApi)
+    mock_wb_api.shop_id = "test_shop_id"
+    mock_redis_manager = Mock(spec=RedisShopManager)
+    mock_redis_manager.DEFAULT_TTL = 300
 
-    # Мокируем все методы, которые должны вызываться из _run
-    wb_shop._update_access = AsyncMock()
-    wb_shop._parsing_keywords_run = AsyncMock()
-    wb_shop._update_advs_data_from_wb_to_pg = AsyncMock()
-    wb_shop._update_cards_data_from_wb_to_pf = AsyncMock()
-    wb_shop._update_cpm_run = AsyncMock()
-    wb_shop._update_common_sale_stat = AsyncMock()
-    wb_shop.update_full_adv_stat = AsyncMock()
+    # Создаем экземпляр WBShop
+    wb_shop = WBShop(mock_wb_api, mock_redis_manager)
+
+    # Мокируем метод _alive_worker_run
+    wb_shop._alive_worker_run = AsyncMock()
 
     # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
-    original_gather = asyncio.gather
-
     async def mock_gather(*args, **kwargs):
         # Создаем задачи для каждой корутины, но не запускаем их
         return [arg for arg in args]
 
     # Применяем наш мок-метод
     with patch("asyncio.gather", side_effect=mock_gather):
-        # Вызываем тестируемый метод
-        await wb_shop._run()
+        with patch(
+            "app.modules.shop_runner.wb_shop.CoroutinesManager"
+        ) as mock_coroutines_manager:
+            # Настраиваем мок CoroutinesManager
+            mock_manager_instance = mock_coroutines_manager.return_value
+            mock_manager_instance.parsing_keywords_run = AsyncMock()
+            mock_manager_instance.update_advs_data_from_wb_to_pg = AsyncMock()
+            mock_manager_instance.update_cards_data_from_wb_to_pg = AsyncMock()
+            mock_manager_instance.update_cpm_bid = AsyncMock()
+            mock_manager_instance.update_common_sale_stat = AsyncMock()
+            mock_manager_instance.update_full_adv_stat = AsyncMock()
+            mock_manager_instance.adv_settings_auto_update = AsyncMock()
+            mock_manager_instance.update_top_key_in_advs = AsyncMock()
 
-        # Проверяем, что _update_access был вызван
-        # wb_shop._update_access.assert_called_once()
+            # Вызываем тестируемый метод
+            await wb_shop.run()
 
-        # Проверяем, что все ожидаемые корутины были вызваны
-        wb_shop._parsing_keywords_run.assert_called_once()
-        wb_shop._update_advs_data_from_wb_to_pg.assert_called_once()
-        wb_shop._update_cards_data_from_wb_to_pf.assert_called_once()
-        wb_shop._update_cpm_run.assert_called_once()
-        wb_shop._update_common_sale_stat.assert_called_once()
-        wb_shop.update_full_adv_stat.assert_called_once()
+            # Проверяем, что CoroutinesManager был создан с правильным аргументом
+            mock_coroutines_manager.assert_called_once_with(mock_wb_api)
+
+            # Проверяем, что _alive_worker_run был вызван
+            wb_shop._alive_worker_run.assert_called_once()
+
+            # Проверяем, что все методы CoroutinesManager были вызваны
+            mock_manager_instance.parsing_keywords_run.assert_called_once()
+            mock_manager_instance.update_advs_data_from_wb_to_pg.assert_called_once()
+            mock_manager_instance.update_cards_data_from_wb_to_pg.assert_called_once()
+            mock_manager_instance.update_cpm_bid.assert_called_once()
+            mock_manager_instance.update_common_sale_stat.assert_called_once()
+            mock_manager_instance.update_full_adv_stat.assert_called_once()
+            mock_manager_instance.adv_settings_auto_update.assert_called_once()
+            mock_manager_instance.update_top_key_in_advs.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_wb_shop_run_gathers_correct_number_of_coroutines():
     """
-    Тест проверяет, что метод _run класса WBShop передает правильное количество
+    Тест проверяет, что метод run класса WBShop передает правильное количество
     корутин в asyncio.gather
     """
-    # Создаем экземпляр WBShop
-    shop_id = "test_shop_id"
-    wb_cabinet_original_id = 12345
-    wb_shop = WBShop(shop_id, wb_cabinet_original_id)
+    # Создаем моки для зависимостей
+    mock_wb_api = Mock(spec=WBApi)
+    mock_wb_api.shop_id = "test_shop_id"
+    mock_redis_manager = Mock(spec=RedisShopManager)
+    mock_redis_manager.DEFAULT_TTL = 300
 
-    # Мокируем все методы, которые должны вызываться из _run
-    wb_shop._parsing_keywords_run = AsyncMock()
-    wb_shop._update_advs_data_from_wb_to_pg = AsyncMock()
-    wb_shop._update_cards_data_from_wb_to_pf = AsyncMock()
-    wb_shop._update_cpm_run = AsyncMock()
-    wb_shop._update_common_sale_stat = AsyncMock()
-    wb_shop.update_full_adv_stat = AsyncMock()
+    # Создаем экземпляр WBShop
+    wb_shop = WBShop(mock_wb_api, mock_redis_manager)
+
+    # Мокируем метод _alive_worker_run
+    wb_shop._alive_worker_run = AsyncMock()
 
     # Мокируем asyncio.gather для проверки количества аргументов
     with patch("asyncio.gather") as mock_gather:
-        # Настраиваем mock_gather, чтобы он возвращал корутину
-        mock_gather.return_value = asyncio.create_task(asyncio.sleep(0))
+        with patch(
+            "app.modules.shop_runner.wb_shop.CoroutinesManager"
+        ) as mock_coroutines_manager:
+            # Настраиваем mock_gather, чтобы он возвращал корутину
+            mock_gather.return_value = asyncio.create_task(asyncio.sleep(0))
 
-        # Вызываем тестируемый метод
-        await wb_shop._run()
+            # Настраиваем мок CoroutinesManager
+            mock_manager_instance = mock_coroutines_manager.return_value
+            mock_manager_instance.parsing_keywords_run = AsyncMock()
+            mock_manager_instance.update_advs_data_from_wb_to_pg = AsyncMock()
+            mock_manager_instance.update_cards_data_from_wb_to_pg = AsyncMock()
+            mock_manager_instance.update_cpm_bid = AsyncMock()
+            mock_manager_instance.update_common_sale_stat = AsyncMock()
+            mock_manager_instance.update_full_adv_stat = AsyncMock()
+            mock_manager_instance.adv_settings_auto_update = AsyncMock()
+            mock_manager_instance.update_top_key_in_advs = AsyncMock()
 
-        # Проверяем, что gather был вызван ровно один раз
-        mock_gather.assert_called_once()
+            # Вызываем тестируемый метод
+            await wb_shop.run()
 
-        # Получаем все аргументы, с которыми был вызван gather
-        call_args = mock_gather.call_args[0]
+            # Проверяем, что gather был вызван ровно один раз
+            mock_gather.assert_called_once()
 
-        # Проверяем, что gather был вызван с 6 аргументами (по количеству методов)
-        assert (
-            len(call_args) == 6
-        ), f"asyncio.gather должен быть вызван с 6 аргументами, получено {len(call_args)}"
+            # Получаем все аргументы, с которыми был вызван gather
+            call_args = mock_gather.call_args[0]
 
-        # Проверяем, что все методы были вызваны по одному разу
-        wb_shop._parsing_keywords_run.assert_called_once()
-        wb_shop._update_advs_data_from_wb_to_pg.assert_called_once()
-        wb_shop._update_cards_data_from_wb_to_pf.assert_called_once()
-        wb_shop._update_cpm_run.assert_called_once()
-        wb_shop._update_common_sale_stat.assert_called_once()
-        wb_shop.update_full_adv_stat.assert_called_once()
+            # Проверяем, что gather был вызван с 9 аргументами (1 _alive_worker_run + 8 методов CoroutinesManager)
+            assert len(call_args) == 9, (
+                f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
+            )
 
 
 @pytest.mark.asyncio
-async def test_wb_shop_run_coroutines_without_errors_for_one_minute():
+async def test_wb_shop_alive_worker_run():
     """
-    Тест проверяет, что все корутины из метода _run класса WBShop
-    запускаются без ошибок в течение минуты.
+    Тест проверяет работу метода _alive_worker_run
     """
+    # Создаем моки для зависимостей
+    mock_wb_api = Mock(spec=WBApi)
+    mock_wb_api.shop_id = "test_shop_id"
+    mock_redis_manager = Mock(spec=RedisShopManager)
+    mock_redis_manager.DEFAULT_TTL = 300
+    mock_redis_manager.renew_shop_ttl = AsyncMock()
+
     # Создаем экземпляр WBShop
-    shop_id = "test_shop_id"
-    wb_cabinet_original_id = 12345
-    wb_shop = WBShop(shop_id, wb_cabinet_original_id)
+    wb_shop = WBShop(mock_wb_api, mock_redis_manager)
 
-    # Мокируем все методы, которые должны вызываться из _run
-    wb_shop._parsing_keywords_run = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop._update_advs_data_from_wb_to_pg = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop._update_cards_data_from_wb_to_pf = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop._update_cpm_run = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop._update_common_sale_stat = AsyncMock(side_effect=mock_infinite_run)
-    wb_shop.update_full_adv_stat = AsyncMock(side_effect=mock_infinite_run)
+    # Создаем задачу для тестирования _alive_worker_run
+    task = asyncio.create_task(wb_shop._alive_worker_run())
 
-    # Запускаем _run и ждем минуту
-    task = asyncio.create_task(wb_shop._run())
+    # Подождем немного, чтобы убедиться, что метод работает
+    await asyncio.sleep(0.2)
 
-    # Подождем 60 секунд (минуту)
-    try:
-        await asyncio.wait_for(task, timeout=60.0)
-    except asyncio.TimeoutError:
-        # Тайм-аут ожидаем, так как корутины должны работать бесконечно
-        pass
-
-    # Проверяем, что задача не завершилась с исключением
-    if task.done() and not task.cancelled():
-        # Если задача завершилась и не была отменена, проверяем наличие исключения
-        try:
-            task.result()
-        except Exception as e:
-            pytest.fail(f"Корутина завершилась с исключением: {e}")
-
-    # Отменяем задачу, так как она бесконечна
+    # Отменяем задачу
     task.cancel()
 
-    # Подождем отмену задачи
+    # Ждем завершения отмены
     try:
-        await asyncio.wait_for(task, timeout=1.0)
-    except (asyncio.TimeoutError, asyncio.CancelledError):
-        # Мы ожидаем, что задача будет отменена
+        await task
+    except asyncio.CancelledError:
         pass
+
+    # Проверяем, что renew_shop_ttl был вызван хотя бы один раз
+    mock_redis_manager.renew_shop_ttl.assert_called_with("test_shop_id")
