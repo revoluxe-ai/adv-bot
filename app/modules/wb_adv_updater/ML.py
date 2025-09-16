@@ -154,12 +154,13 @@ class Predictor:
             result = await session.execute(stmt)
             keyword_settings: typing.Sequence[KeywordSetting] = result.scalars().all()
 
-
         redis_manager = BaseRedis()
         async with redis_manager.client.pipeline() as redis_pipeline:
             for keyword_setting in keyword_settings:
                 await self.__update_predict_ctr(
-                    redis_pipeline, keyword_setting, predict_df,
+                    redis_pipeline,
+                    keyword_setting,
+                    predict_df,
                 )
 
             await redis_pipeline.execute()
