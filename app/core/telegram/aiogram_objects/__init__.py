@@ -12,11 +12,10 @@ __all__ = [
 ]
 
 
-from aiogram.filters.callback_data import CallbackData
-from aiogram import Router, Bot
+from aiogram import Bot, Router
 from aiogram.filters import StateFilter
-from aiogram.fsm.context import FSMContext
+from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm import state
-from aiogram.types import CallbackQuery
-from aiogram.types import Message
+from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
 

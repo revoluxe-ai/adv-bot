@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Set, Optional
 
 
 @dataclass
@@ -13,8 +12,8 @@ class ParsingTask:
         adv_id_order: ID заказа (опционально)
     """
     keyword: str
-    nmids: Set[int]
-    adv_id_order: Optional[str] = None
+    nmids: set[int]
+    adv_id_order: str | None = None
 
     @property
     def id(self) -> str:

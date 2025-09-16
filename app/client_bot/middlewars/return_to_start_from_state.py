@@ -1,4 +1,6 @@
-from typing import Any, Awaitable, Callable, Dict
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -9,9 +11,9 @@ from app.client_bot.user_interface.handlers.start_registration_func import start
 class ReturnToStart(BaseMiddleware):
     async def __call__(
             self,
-            handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
+            handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
             event: Message,
-            data: Dict[str, Any],
+            data: dict[str, Any],
     ) -> Any:
         text = event.text
         if '/start' in text:

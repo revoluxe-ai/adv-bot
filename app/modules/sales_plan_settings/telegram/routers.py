@@ -1,6 +1,7 @@
 from aiogram import Router
-from .setting_handlers import SettingHandlersRouter
+
 from .main_handler import router as MainRouter
+from .setting_handlers import SettingHandlersRouter
 
 router = Router()
 

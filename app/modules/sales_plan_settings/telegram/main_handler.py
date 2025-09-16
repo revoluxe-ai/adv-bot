@@ -1,8 +1,8 @@
-from aiogram import Router, Bot
+from aiogram import Bot, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
-from . import main_message
-from . import main_callback
+
+from . import main_callback, main_message
 
 router = Router()
 

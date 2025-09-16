@@ -1,13 +1,13 @@
 ﻿import json
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiohttp import ClientResponseError
 
-from .wb_api import WBApi as BidderAPI
 from ...common_slaves.wildberries.ABC_WB_API import Headers
 from ...common_slaves.wildberries.models import WBToken
 from ...common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from .wb_api import WBApi as BidderAPI
 
 
 def get_test_response_for_min_bid_error(wrong_bid: int, min_bid: int) -> str:

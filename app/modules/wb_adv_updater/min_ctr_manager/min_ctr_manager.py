@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
@@ -5,7 +7,6 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker as sm
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ class MinCtrManager:
                     result_from_click_house = await client.query(query, params)
                     rows = result_from_click_house.result_rows
             except Exception:
-                logger.error(f"Ошибка получения статистики из ch", exc_info=True)
+                logger.error("Ошибка получения статистики из ch", exc_info=True)
                 raise
 
             text_to_real_ctr = {row[0]: row[1] for row in rows}

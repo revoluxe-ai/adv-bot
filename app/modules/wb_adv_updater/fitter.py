@@ -6,7 +6,7 @@ import typing
 import numpy as np
 import pandas as pd
 import xgboost
-from sklearn.model_selection import cross_validate, KFold
+from sklearn.model_selection import KFold, cross_validate
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sqlalchemy import select
@@ -17,13 +17,14 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
 from app.utils.db.session_maker import get_async_session_maker
-from . import data_manager
-from .data_getter import DataGetter
-from .ml_common_funcs import save_model
+
+from ... import settings
 from ..common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from ... import settings
+from . import data_manager
+from .data_getter import DataGetter
+from .ml_common_funcs import save_model
 
 sm = get_async_session_maker
 
@@ -128,7 +129,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
 
         nmid_in_adv = nmids[0]
         if nmid_in_adv not in nmids_in_active_adv:
-            logger.debug(f"Артикулы данной рк не участвуют в активных кампаниях")
+            logger.debug("Артикулы данной рк не участвуют в активных кампаниях")
             continue
         logger.debug(f"Получение features для {len(nmids)} nmids кампании {adv.adv_id}")
         nmid_to_item_features = await get_nmid_to_item_features(nmids)
@@ -229,7 +230,7 @@ async def __fetch_keyword_features(
 async def _bayesian_apply(df: pd.DataFrame):
     adv_ids = df["adv_id"].unique()
     adv_ids = adv_ids.tolist()
-    adv_id_keyword_text_to_status: dict[typing.Tuple[int, "str"], int] = (
+    adv_id_keyword_text_to_status: dict[tuple[int, str], int] = (
         await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
     )
 

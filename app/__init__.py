@@ -10,5 +10,5 @@ async def run() -> None:
     while True:
         try:
             await app.run()
-        except AdvBotMainLoopCriticalError as exc:
+        except AdvBotMainLoopCriticalError:
             logge

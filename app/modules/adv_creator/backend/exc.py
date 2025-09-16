@@ -1,4 +1,3 @@
-from typing import Optional
 
 
 class CardsNotFoundForShopError(Exception):
@@ -13,7 +12,7 @@ class ComplexAdvsExistsError(Exception):
 
 
 class NotEnoughBalanceOnShopError(Exception):
-    adv_id: Optional[int] = None
+    adv_id: int | None = None
 
 
 class StartComplexAdvError(Exception):

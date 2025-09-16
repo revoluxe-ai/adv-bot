@@ -1,5 +1,5 @@
 import json
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -7,8 +7,8 @@ from sqlalchemy.dialects.postgresql import insert
 from app.core.wb_api.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import (
-    WBCabinet,
     AdvSetting,
+    WBCabinet,
     WBCard,
     WBCategory,
 )

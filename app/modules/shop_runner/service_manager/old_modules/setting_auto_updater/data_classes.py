@@ -1,4 +1,4 @@
-﻿from pydantic import BaseModel, field_validator, ConfigDict
+﻿from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class FactData(BaseModel):

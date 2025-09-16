@@ -10,7 +10,7 @@ from sqlalchemy import and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.client_bot import utils, const
+from app.client_bot import const, utils
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.start_registration_func import (
     start_registration,
@@ -31,6 +31,7 @@ from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
 from ..views import callbacks, messages
 
 logger = logging.getLogger(__name__)

@@ -4,11 +4,11 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
-from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
+from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
-    TurnBot,
     Action,
+    TurnBot,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -16,10 +16,10 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import (
-    WBUserCabinet,
     AdvSetting,
     KeywordSetting,
     WBCabinet,
+    WBUserCabinet,
 )
 from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
     UpdatePositionsForActivePhrase,
@@ -1036,14 +1036,14 @@ def get_setting_min_ctr_keyboard(adv: AdvSetting):
     )
     if adv.new_auto_min_ctr_mode:
         button = InlineKeyboardButton(
-            text=f"Выключить управление CTR по белому списку",
+            text="Выключить управление CTR по белому списку",
             callback_data=callbacks.ChangeAutoMinCTR(
                 action="turn_off_auto_min_ctr", adv_setting_original_id=adv.id
             ).pack(),
         )
     else:
         button = InlineKeyboardButton(
-            text=f"Включить управление CTR по белому списку",
+            text="Включить управление CTR по белому списку",
             callback_data=callbacks.ChangeAutoMinCTR(
                 action="turn_on_auto_min_ctr", adv_setting_original_id=adv.id
             ).pack(),

@@ -1,14 +1,13 @@
-from aiogram import Router, Bot, F
+from aiogram import Bot, F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import update
+
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from .. import main_callback
-from .. import callbacks
-from .. import main_message
 from app.utils.db.session_maker import get_async_session_maker as sm
 
+from .. import callbacks, main_callback, main_message
 
 router = Router()
 
@@ -23,14 +22,14 @@ async def change_max_for_sales_for_day_handler(
     await state.update_data(adv_id=adv_id)
     await state.set_state('waiting_for_new_max_price_for_order')
     message = callback.message
-    await message.answer(f'Введите новую максимальную себестоимость число с плавающей точкой  от 1):')
+    await message.answer('Введите новую максимальную себестоимость число с плавающей точкой  от 1):')
 
 
 @router.message(StateFilter('waiting_for_new_max_price_for_order'))
 async def set_new_exponent_for_predict_ctr(message: Message,
                                            state: FSMContext,
                                             bot: Bot):
-    text_message = f'Введите новую максимальную себестоимость число с плавающей точкой  от 1):'
+    text_message = 'Введите новую максимальную себестоимость число с плавающей точкой  от 1):'
     text = message.text
     if not text.isdigit():
 

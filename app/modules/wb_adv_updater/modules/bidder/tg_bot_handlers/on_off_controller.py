@@ -8,6 +8,7 @@ from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
+
 sm = get_async_session_maker
 
 router = Router()

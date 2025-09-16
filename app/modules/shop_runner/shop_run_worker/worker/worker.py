@@ -4,13 +4,13 @@ from asyncio import Task
 
 from aiohttp import ClientSession
 
-from .excs import ShopNotFoundInRedisQueueError
-from ..redis_manager import RedisShopManager
 from ...run_process_func import run_shop_task
+from ..redis_manager import RedisShopManager
+from .excs import ShopNotFoundInRedisQueueError
 
 logger = logging.getLogger(__name__)
 
-from typing import Callable
+from collections.abc import Callable
 
 
 class ShopWorker:

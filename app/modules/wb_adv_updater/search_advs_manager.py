@@ -1,14 +1,14 @@
 import asyncio
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from aiohttp import ClientSession
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    KeywordStatus,
     CalculatedKeyword,
+    KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_adv_updater import data_manager

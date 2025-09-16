@@ -18,6 +18,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.wb_adv_updater import wb_manager
 from app.modules.wb_adv_updater.data_setter import DataSetter
 from app.utils.db.session_maker import get_async_session_maker
+
 from ..views import callbacks, messages
 
 sm = get_async_session_maker

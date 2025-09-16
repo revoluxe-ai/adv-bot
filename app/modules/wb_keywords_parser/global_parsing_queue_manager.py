@@ -2,12 +2,12 @@ import hashlib
 import json
 import logging
 import time
-from typing import Optional, Set, Awaitable
+from collections.abc import Awaitable
 
 from redis.asyncio.client import Pipeline
 
-from .parsing_task import ParsingTask
 from ...core.redis_manager.base_redis_manager import BaseRedis
+from .parsing_task import ParsingTask
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class GlobalParsingQueueManager(BaseRedis):
         """Генерирует уникальный ID задачи на основе текста"""
         return hashlib.sha1(text.encode()).hexdigest()[:12]
 
-    async def add_or_update_task(self, text: str, nmids: Set[int]) -> str:
+    async def add_or_update_task(self, text: str, nmids: set[int]) -> str:
         """
         Добавляет новую задачу или обновляет существующую
 
@@ -84,7 +84,7 @@ class GlobalParsingQueueManager(BaseRedis):
 
         return task_id
 
-    async def get_next_task(self) -> Optional[ParsingTask]:
+    async def get_next_task(self) -> ParsingTask | None:
         """
         Получает следующую задачу из очереди по приоритету
 

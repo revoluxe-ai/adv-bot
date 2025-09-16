@@ -1,4 +1,5 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 
 

@@ -121,7 +121,7 @@ async def test_wb_shop_run_coroutines_without_errors_for_one_minute():
     # Подождем 60 секунд (минуту)
     try:
         await asyncio.wait_for(task, timeout=60.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         # Тайм-аут ожидаем, так как корутины должны работать бесконечно
         pass
 
@@ -139,6 +139,6 @@ async def test_wb_shop_run_coroutines_without_errors_for_one_minute():
     # Подождем отмену задачи
     try:
         await asyncio.wait_for(task, timeout=1.0)
-    except (asyncio.TimeoutError, asyncio.CancelledError):
+    except (TimeoutError, asyncio.CancelledError):
         # Мы ожидаем, что задача будет отменена
         pass

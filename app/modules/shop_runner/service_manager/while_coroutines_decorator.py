@@ -1,7 +1,8 @@
 ﻿import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import ParamSpec, TypeVar, Callable, Awaitable
+from typing import ParamSpec, TypeVar
 
 from sqlalchemy.exc import InterfaceError
 

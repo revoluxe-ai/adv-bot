@@ -1,12 +1,11 @@
-from aiogram import Bot
 import aiogram
-from aiogram import F, Router, types
-from sqlalchemy.future import select
+from aiogram import Bot, F, Router, types
+
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
+
 sm = get_async_session_maker
 from sqlalchemy import update
-
 
 router = Router()
 

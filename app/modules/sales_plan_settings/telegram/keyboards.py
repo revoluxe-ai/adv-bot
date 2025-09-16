@@ -1,10 +1,11 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aiogram.utils.keyboard import KeyboardBuilder, InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from app.client_bot.user_interface.views.callbacks import Adv as ReturnToAdvCallback
+from app.modules.common_slaves.wildberries.models import AdvSetting
+
 from . import callbacks
 
-
-from app.modules.common_slaves.wildberries.models import AdvSetting
 
 class KeyboardsGetter:
 

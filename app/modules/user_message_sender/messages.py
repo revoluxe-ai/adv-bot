@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardButton
-from aiogram.utils.keyboard import  InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 

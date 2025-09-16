@@ -4,8 +4,8 @@ from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 
 from app.client_bot.user_interface.message_templates import (
-    TextWithKeyboardAndImage,
     LastMessage,
+    TextWithKeyboardAndImage,
 )
 from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
@@ -14,7 +14,7 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.c
 from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
     KeywordGraphicPart_1,
 )
-from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
+from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )

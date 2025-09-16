@@ -1,21 +1,14 @@
-import asyncio
 import logging
-from hashlib import sha256
-from typing import Optional
+
 # from app.client_bot.user_interface.
-import aiogram
-from aiogram.exceptions import TelegramForbiddenError
-from .utils import utils
 from app.client_bot.bot import bot
+from app.client_bot.user_interface.views import messages
 from app.client_bot.utils import data_manager
 from python_modules.logger import setup_logging
 
-from python_modules.logger import setup_logging
-from ...modules.common_slaves.wildberries.models import WBUserCabinet, WBItemPosition
+from ...modules.common_slaves.wildberries.models import WBItemPosition, WBUserCabinet
 from ...utils import redis_manager
 from ...utils.db.models import User
-from app.client_bot.user_interface.views import messages
-
 
 setup_logging()
 
@@ -74,7 +67,7 @@ async def get_users_from_nmid(nmid: int):
     return users
 
 
-async def check_last_position(last_position: Optional[WBItemPosition],
+async def check_last_position(last_position: WBItemPosition | None,
                               new_position: WBItemPosition):
     try:
         nmid = new_position.nmid

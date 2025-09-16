@@ -11,7 +11,6 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
-    create_engine,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.declarative import declarative_base
@@ -19,7 +18,6 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
 from app.utils.image_master import image_tools
-from python_modules import path_setting_funcs
 
 logger  = logging.getLogger(__name__)
 

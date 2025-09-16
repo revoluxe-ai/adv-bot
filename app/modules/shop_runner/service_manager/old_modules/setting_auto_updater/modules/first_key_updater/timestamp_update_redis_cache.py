@@ -1,4 +1,4 @@
-﻿from app.core.redis_cache import AdvSettingRedisCache, SimpleTimeStamp, RedisCacheBase
+﻿from app.core.redis_cache import AdvSettingRedisCache, RedisCacheBase, SimpleTimeStamp
 
 
 class LastUpdateFirstPhrase(

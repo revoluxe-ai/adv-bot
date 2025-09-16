@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import typing
 from collections import defaultdict
 
 import neo4j
@@ -359,7 +358,7 @@ RETURN graphName
                 query, graph_name=self.SHOP_GRAPH_NAME, offer_ids=offer_ids
             ).data()
             logger.debug(result)
-            print(f"""Граф  создан""")
+            print("""Граф  создан""")
 
     async def linking_images_and_keyword(self):
         try:
@@ -780,7 +779,7 @@ UNWIND phrase.words AS word
 
     async def get_nmid_vectors(
         self, nmids: list[int]
-    ) -> typing.List[typing.Tuple[int, typing.List[float]]]:
+    ) -> list[tuple[int, list[float]]]:
         query = """
         MATCH (item:Item) WHERE  item.nmid  IN  $nmids 
         AND item.fastrp IS NOT NULL
@@ -812,7 +811,7 @@ UNWIND phrase.words AS word
 
     async def get_keywords_vectors(
         self,
-    ) -> typing.List[typing.Tuple[str, typing.List[float]]]:
+    ) -> list[tuple[str, list[float]]]:
         query = """
         MATCH (k:KeywordPhrase) WHERE k.fastrp IS NOT NULL
         RETURN k.text as keyword, k.fastrp as vector

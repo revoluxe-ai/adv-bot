@@ -1,28 +1,28 @@
 import logging
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, Message
 from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select, Result
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy import Result, select
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.client_bot import const
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.client_bot.message_manager import LastMessage
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.message_templates.templates import (
-    TextWithKeyboard,
     Text,
     TextWithImage,
-    TextWithKeyboardPagination,
+    TextWithKeyboard,
     TextWithKeyboardAndImage,
+    TextWithKeyboardPagination,
 )
-from app.client_bot.user_interface.views import keyboards, callbacks
+from app.client_bot.user_interface.views import callbacks, keyboards
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
     RedisCalculatedKeywordsCacheManager,
 )
@@ -31,21 +31,19 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import (
-    WBItemPosition,
-    WBBalancePayment,
-)
-from app.modules.common_slaves.wildberries.models import (
-    WBUserCabinet,
     AdvSetting,
     KeywordSetting,
+    WBBalancePayment,
     WBCabinet,
+    WBItemPosition,
+    WBUserCabinet,
 )
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import (
-    KeywordStatUpdateState,
     AdvActiveKeywordUpdateStateManager,
+    KeywordStatUpdateState,
 )
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
@@ -206,7 +204,7 @@ class ShopUpdateInfo(Text):
 
     @property
     def text(self):
-        return f"Обновление данных для магазина, немного подождите..."
+        return "Обновление данных для магазина, немного подождите..."
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
@@ -1176,7 +1174,7 @@ class WaitingForBlackPhrases(TextWithKeyboard):
             adv: AdvSetting = await session.get(AdvSetting, adv_setting_id)
         rel_manager = RelevantPhraseManager(adv)
 
-        black_phrases: Optional[list[str]] = (
+        black_phrases: list[str] | None = (
             await rel_manager.get_relevant_template_data()
         )
         self.black_phrases = black_phrases

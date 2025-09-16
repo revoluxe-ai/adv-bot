@@ -1,11 +1,14 @@
 import asyncio
 
 import dotenv
+
 dotenv.load_dotenv()
 from python_modules.logger import setup_logging
+
 setup_logging()
-from app.modules.wb_adv_updater import ml_data_manager
 import logging
+
+from app.modules.wb_adv_updater import ml_data_manager
 
 logger = logging.getLogger(__name__)
 

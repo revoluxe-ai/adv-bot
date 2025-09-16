@@ -2,13 +2,13 @@ from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.client_bot import const
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import Action
 from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
-from app.client_bot import const
 
 
 class ShopChoice(TextWithKeyboard):
@@ -33,11 +33,11 @@ class ShopChoice(TextWithKeyboard):
 def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> InlineKeyboardMarkup:
     # Создаем список для строк кнопок
     keyboard_buttons = []
-    
+
     # Добавляем кнопку админ-панели в самый верх, если пользователь - администратор
     if user_telegram_id in const.ADMINS:
         admin_button = InlineKeyboardButton(
-            text='Панель администратора', 
+            text='Панель администратора',
             callback_data=AdminBonus(action="menu").pack()
         )
         keyboard_buttons.append([admin_button])

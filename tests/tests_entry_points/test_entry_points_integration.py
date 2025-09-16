@@ -1,5 +1,5 @@
 import subprocess
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

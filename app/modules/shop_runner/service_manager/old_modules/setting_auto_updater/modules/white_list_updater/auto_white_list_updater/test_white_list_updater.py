@@ -1,11 +1,12 @@
-﻿from unittest.mock import MagicMock, AsyncMock, patch
+﻿from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
-from .auto_white_list_updater import WhiteListUpdateManager
 from app.modules.shop_runner.wb_shop import WBShop
+
+from .auto_white_list_updater import WhiteListUpdateManager
 
 auto_adv_id = 25031215
 

@@ -3,6 +3,7 @@
 import pytest
 
 from app.modules.shop_runner.modules.wb_api import WBApi
+
 from .service_manager.manager import CoroutinesManager
 from .service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,

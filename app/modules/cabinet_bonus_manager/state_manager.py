@@ -2,10 +2,9 @@
 Менеджер состояний для модуля управления бонусами кабинетов.
 Обеспечивает изоляцию состояний этого модуля от остальных частей приложения.
 """
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.context import FSMContext
-from typing import Dict, Any, Optional, Union
 import logging
+
+from aiogram.fsm.state import State, StatesGroup
 
 logger = logging.getLogger(__name__)
 

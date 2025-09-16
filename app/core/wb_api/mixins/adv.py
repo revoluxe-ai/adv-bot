@@ -2,20 +2,20 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Any, Optional
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
 from app.modules.common_slaves.wildberries.data_classes.adv import Balances
 from app.modules.full_stat_adv_updater.types import FullAdvStat
-from .excs import (
-    StartAdvError,
-    ItemCategoryNotInStockError,
-)
+
 from ..data_classes.advs import adv_fabric
-from ..exceptions import MinAdvBidWBApiError, BadRequestError
-from ..http_request import try_except_decorator, requests
+from ..exceptions import BadRequestError, MinAdvBidWBApiError
+from ..http_request import requests, try_except_decorator
+from .excs import (
+    ItemCategoryNotInStockError,
+    StartAdvError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ class AdvMixin(WBAPIProtocol):
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list[int]) -> list[Adv]:
         advs = []
-        url = f"https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
 
         response_text = await requests(
             self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
@@ -112,7 +112,7 @@ class AdvMixin(WBAPIProtocol):
     async def create_search_adv(self, nmids: list[int], adv_name: str) -> int:
         assert len(nmids) <= 50
 
-        url = f"https://advert-api.wildberries.ru/adv/v2/seacat/save-ad"
+        url = "https://advert-api.wildberries.ru/adv/v2/seacat/save-ad"
 
         data = {"campaignName": adv_name, "nms": nmids}
 
@@ -126,7 +126,7 @@ class AdvMixin(WBAPIProtocol):
     async def create_auto_adv(
         self, name: str, SubjectID: int, balance_type: int, start_status: bool
     ) -> int:
-        url = f"https://advert-api.wildberries.ru/adv/v1/save-ad"
+        url = "https://advert-api.wildberries.ru/adv/v1/save-ad"
         data = {
             "type": 8,
             "name": name[:128],
@@ -326,7 +326,7 @@ class AdvMixin(WBAPIProtocol):
 
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.datetime.date] | None = None
-    ) -> Optional[list[FullAdvStat]]:
+    ) -> list[FullAdvStat] | None:
 
         if not adv_ids:
             return []
@@ -346,7 +346,7 @@ class AdvMixin(WBAPIProtocol):
     @try_except_decorator(1, 60)
     async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.datetime.date] = None
-    ) -> Optional[list[FullAdvStat]]:
+    ) -> list[FullAdvStat] | None:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
         """Пример даты [

@@ -1,7 +1,6 @@
 import logging
 import os
 import pickle
-from typing import List, Union
 
 import faiss
 from sqlalchemy.orm import Query
@@ -80,7 +79,7 @@ class FaissManager:
         faiss.write_index(index, file_path)
         return index
 
-    def __get_index(self, images:  Union[Query, List[Image]], file_path):
+    def __get_index(self, images:  Query | list[Image], file_path):
         if not os.path.exists(file_path):
             index = self.__create_new_index(images, file_path)
             return index

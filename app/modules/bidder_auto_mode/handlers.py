@@ -1,10 +1,11 @@
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy import select
+
+from app.client_bot.user_interface.views.callbacks import CPMSettingMenu
+from app.client_bot.user_interface.views.messages import CPMSetting
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
-from app.client_bot.user_interface.views.messages import CPMSetting
-from app.client_bot.user_interface.views.callbacks import CPMSettingMenu
 
 router = Router()
 
@@ -16,7 +17,7 @@ async def on_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSettingM
         stmt = select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         result = await session.execute(stmt)
         adv_setting = result.scalar_one_or_none()
-        
+
         if not adv_setting:
             await callback.answer("Рекламная кампания не найдена")
             return
@@ -38,7 +39,7 @@ async def off_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSetting
         stmt = select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         result = await session.execute(stmt)
         adv_setting = result.scalar_one_or_none()
-        
+
         if not adv_setting:
             await callback.answer("Рекламная кампания не найдена")
             return
@@ -50,4 +51,4 @@ async def off_bidder_for_auto(callback: CallbackQuery, callback_data: CPMSetting
         # Обновляем сообщение с настройками
         message = CPMSetting(callback.bot, callback.message.chat.id)
         await message(callback_data.adv_original_id)
-        await callback.answer("Автоматический биддер выключен") 
+        await callback.answer("Автоматический биддер выключен")

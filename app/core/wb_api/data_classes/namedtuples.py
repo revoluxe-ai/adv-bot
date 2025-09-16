@@ -1,6 +1,5 @@
-from typing import NamedTuple, Union
-
 import logging
+from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
 

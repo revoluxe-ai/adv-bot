@@ -2,11 +2,11 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Union
 
 import aiohttp
 
-from app.core.wb_api.http_request import try_except_decorator, requests
+from app.core.wb_api.http_request import requests, try_except_decorator
+
 from . import api_rights
 from .ABC_WB_API import ABC_WB_API
 from .data_classes.adv import Adv
@@ -237,7 +237,7 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list) -> list[Adv]:
         advs = []
-        url = f"https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
         response_text = await requests(
             self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
         )
@@ -275,7 +275,7 @@ class AdvertApi(ABC_WB_API):
 
     async def create_adv_company(
         self, nmids: list, budget_type: int, budget: int
-    ) -> Union[Adv, str]:
+    ) -> Adv | str:
         """
         0 - balance
         1 - net
@@ -408,7 +408,7 @@ class ContentApi(ABC_WB_API):
         return cards
 
     @try_except_decorator(1, 2)
-    async def get_card_by_text(self, text: Union[str, int]):
+    async def get_card_by_text(self, text: str | int):
         url = f"{self.HOST}/content/v2/get/cards/list"
         text = str(text)
         data_for_req = {

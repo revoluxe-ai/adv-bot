@@ -9,7 +9,7 @@ class Single_message(Text):
         super().__init__(bot, chat_id)
         self.parse_mode: str = ParseMode.MARKDOWN_V2
 
-    """
+    r"""
     Нужно экранировать:
     \ — обратный слэш
 

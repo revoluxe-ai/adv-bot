@@ -3,7 +3,6 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils import redis_manager
 
 
-
 async def calculate_keywords_for_keyboard(adv_setting: AdvSetting)-> list[KeywordForKeyboard]:
     keywords: list[KeywordForKeyboard] = await get_keywords_for_keyboard(adv_setting)
     return keywords

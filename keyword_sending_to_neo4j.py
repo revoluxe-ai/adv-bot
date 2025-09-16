@@ -3,9 +3,10 @@ import dotenv
 from python_modules.logger import setup_logging
 
 dotenv.load_dotenv()
-from app.modules.wb_adv_updater import ml_data_manager
-import logging
 import asyncio
+import logging
+
+from app.modules.wb_adv_updater import ml_data_manager
 
 setup_logging()
 

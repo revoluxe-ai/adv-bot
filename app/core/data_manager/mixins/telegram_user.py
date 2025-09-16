@@ -1,4 +1,3 @@
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
@@ -11,7 +10,7 @@ class TelegramUserMixin:
 
     @staticmethod
     async def get_telegram_user_model(user_telegram_id: int,
-                                      load_only_options: Optional[list]=None) -> User:
+                                      load_only_options: list | None=None) -> User:
         stmt = select(User).filter(User.user_telegram_id == user_telegram_id)
 
         # Если load_only передан, добавляем его в запрос

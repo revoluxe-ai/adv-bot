@@ -10,7 +10,7 @@ class TelegramBotUser(HttpUser):
     @task
     def send_message(self):
         headers = {'X-Telegram-Bot-Api-Secret-Token': '89779uoiugkftyeoilyeligoyuv'}
-        self.client.post(f"/telegram_webhook", json={
+        self.client.post("/telegram_webhook", json={
             "update_id": 123456789,
             "message": {
                 "message_id": 123,

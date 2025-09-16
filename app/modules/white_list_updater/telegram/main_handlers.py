@@ -1,4 +1,4 @@
-from aiogram import Router, F, Bot
+from aiogram import Bot, F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy import select, update
 

@@ -1,7 +1,7 @@
-from typing import Optional
+from datetime import datetime
 
 from app.core.redis_manager.base_redis_manager import BaseRedis
-from datetime import datetime
+
 
 class KeywordStatUpdateState(BaseRedis):
 
@@ -26,7 +26,7 @@ class KeywordStatUpdateState(BaseRedis):
         datetime_str = update_time_stamp.strftime(self.time_str_format)  # Преобразование в строку
         await self._client.set(key, datetime_str)  # Асинхронная установка значения
 
-    async def get_one(self, adv_id: int) -> Optional[datetime]:
+    async def get_one(self, adv_id: int) -> datetime | None:
         """
         Получает метку времени обновления из Redis.
 

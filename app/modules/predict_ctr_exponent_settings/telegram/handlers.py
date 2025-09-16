@@ -1,4 +1,4 @@
-from aiogram import Router, Bot
+from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -8,10 +8,10 @@ from app.client_bot import utils
 from app.client_bot.user_interface.handlers.start_registration_func import start_registration
 from app.client_bot.user_interface.views import messages
 from app.utils.db.session_maker import get_async_session_maker as sm
-from .callbacks import ChangeExponentSettinginAdvSettingCallback
 
 from ...common_slaves.wildberries.models import AdvSetting
 from ...wb_adv_updater import data_manager
+from .callbacks import ChangeExponentSettinginAdvSettingCallback
 
 router = Router()
 
@@ -26,7 +26,7 @@ async def change_exponent_setting(
     await state.update_data(adv_id=adv_id)
     await state.set_state('waiting_for_new_exponent')
     message = callback.message
-    await message.answer(f'Введите новое значение для экспоненты прогнозируемого CTR:')
+    await message.answer('Введите новое значение для экспоненты прогнозируемого CTR:')
 
 @router.message(StateFilter('waiting_for_new_exponent'))
 async def set_new_exponent_for_predict_ctr(message: Message,

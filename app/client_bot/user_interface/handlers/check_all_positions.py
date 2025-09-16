@@ -1,16 +1,18 @@
-from app.modules.wb_keywords_parser.parser import fast_queue
-import logging
+
 import aiogram
 from aiogram import F, Router, types
-from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet, KeywordSetting
+
+from app.modules.common_slaves.wildberries.models import (
+     AdvSetting,
+     KeywordSetting,
+)
+from app.modules.wb_keywords_parser.parser import fast_queue
 from app.utils.db.session_maker import get_async_session_maker
-from . import start
-from .. import states
-from ..views import callbacks, messages
-from ..views.callbacks import Action
+
+from ..views import callbacks
+
 sm = get_async_session_maker
 
 router = Router()

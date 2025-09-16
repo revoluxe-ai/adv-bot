@@ -1,16 +1,12 @@
 ﻿import asyncio
 import logging
 from collections import defaultdict
+from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable
 from datetime import datetime
 from typing import (
-    Iterable,
-    AsyncGenerator,
-    TypeVar,
-    Tuple,
-    Awaitable,
     Any,
-    Coroutine,
     Protocol,
+    TypeVar,
 )
 
 from app.core.wb_api.ping_manager import PingManager
@@ -34,6 +30,7 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
+
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -148,7 +145,7 @@ class CoroutinesManager:
     @staticmethod
     async def _async_zip_longest(
         *async_gens, fillvalue=None
-    ) -> AsyncGenerator[Tuple[Any, ...], None]:
+    ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
 
@@ -182,7 +179,7 @@ class CoroutinesManager:
         for adv in active_advs:
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
 
-            generator: AsyncGenerator[Tuple[str, int], None] = (
+            generator: AsyncGenerator[tuple[str, int], None] = (
                 parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
                     adv, keywords
                 )
@@ -232,8 +229,8 @@ class CoroutinesManager:
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:
         from .old_modules.setting_auto_updater.modules.first_key_updater import (
-            FirstKeyUpdaterError,
             FirstKeyUpdater,
+            FirstKeyUpdaterError,
         )
 
         all_active_advs: list[AdvSetting] = (

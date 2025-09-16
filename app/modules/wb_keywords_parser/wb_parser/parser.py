@@ -3,7 +3,6 @@ import datetime
 import json
 import logging
 import re
-import typing
 
 from aiogram.client.session import aiohttp
 
@@ -134,10 +133,10 @@ class ParserService:
 
     @staticmethod
     async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
-        typing.Optional[list[dict]],
-        typing.Optional[str],
-        typing.Optional[int],
-        typing.Optional[int],
+        list[dict] | None,
+        str | None,
+        int | None,
+        int | None,
     ]:
         url = get_parse_url(text, page)
         logger.debug(f"Запрос к URL: {url}")

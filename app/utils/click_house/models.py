@@ -1,9 +1,7 @@
-from clickhouse_sqlalchemy.types import DateTime, String, Int32, Float
+from clickhouse_sqlalchemy.types import DateTime, Float, Int32, String
 from sqlalchemy import Column, UniqueConstraint
 
 from .base import BaseTable
-
-
 
 
 class AdvKeyword(BaseTable):

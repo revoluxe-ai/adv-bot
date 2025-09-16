@@ -1,6 +1,5 @@
-from typing import Optional
-from aiogram.filters.callback_data import CallbackData
 
+from aiogram.filters.callback_data import CallbackData
 
 
 class AdminBonus(CallbackData, prefix="admin_bonus"):
@@ -8,4 +7,4 @@ class AdminBonus(CallbackData, prefix="admin_bonus"):
     action: str
     operation: str | None = None
     wb_cabinet_original_id: int | None = None
-    amount: Optional[float] = None
+    amount: float | None = None

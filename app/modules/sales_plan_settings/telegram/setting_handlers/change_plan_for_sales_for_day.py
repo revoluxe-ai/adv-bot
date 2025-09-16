@@ -1,14 +1,13 @@
-from aiogram import Router, Bot, F
+from aiogram import Bot, F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import update
+
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from .. import main_callback
-from .. import callbacks
-from .. import main_message
 from app.utils.db.session_maker import get_async_session_maker as sm
 
+from .. import callbacks, main_callback, main_message
 
 router = Router()
 
@@ -23,7 +22,7 @@ async def change_plan_for_sales_for_day_handler(
     await state.update_data(adv_id=adv_id)
     await state.set_state('waiting_for_new_plan_for_sales_for_day')
     message = callback.message
-    await message.answer(f'Введите новый план по продажам в день (целое число от 1):')
+    await message.answer('Введите новый план по продажам в день (целое число от 1):')
 
 
 @router.message(StateFilter('waiting_for_new_plan_for_sales_for_day'))

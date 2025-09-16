@@ -3,7 +3,6 @@ import datetime
 import random
 from collections import defaultdict
 from io import BytesIO
-from typing import Optional
 
 import matplotlib
 import pandas as pd
@@ -12,13 +11,14 @@ from sqlalchemy import select
 
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
+
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.graphic_positions_creator.classes import CommonKeyword
 
 
-async def get_common_keywords_with_positions(nmid) -> Optional[list[CommonKeyword]]:
+async def get_common_keywords_with_positions(nmid) -> list[CommonKeyword] | None:
     positions: list[WBItemPosition] = (
         await data_manager.get_keyword_positions_from_click_house(nmid)
     )
@@ -38,7 +38,7 @@ async def get_common_keywords_with_positions(nmid) -> Optional[list[CommonKeywor
 
 async def get_keyword_history_graphic(
     adv_original_id, keywords
-) -> Optional[tuple[BytesIO, Optional[BytesIO]]]:
+) -> tuple[BytesIO, BytesIO | None] | None:
     async with sm() as session:
         stmt = select(AdvSetting.nmids).filter(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
@@ -78,7 +78,7 @@ async def get_keyword_history_graphic(
             for position in positions:
                 if position.timestamp.tzinfo is None:
                     position.timestamp = position.timestamp.replace(
-                        tzinfo=datetime.timezone.utc
+                        tzinfo=datetime.UTC
                     )
 
             # Последняя позиция по времени
@@ -87,7 +87,7 @@ async def get_keyword_history_graphic(
             # Приведение всех дат в date_range к UTC (tz-aware)
             for date in date_range:
                 if date.tzinfo is None:
-                    date = date.replace(tzinfo=datetime.timezone.utc)
+                    date = date.replace(tzinfo=datetime.UTC)
 
                 # Поиск ближайшей позиции
                 close_position = min(
