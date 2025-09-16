@@ -32,3 +32,6 @@ if __name__ == "__main__":
         asyncio.run(run_process_func.run())
     except Exception as exc:
         raise ShopRunnerCriticalError from exc
+
+
+# TODO: Проверять активность кампаний перед обновлением ставок
