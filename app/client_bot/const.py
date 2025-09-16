@@ -4,7 +4,6 @@ PRICE_PER_MONTH = 4500
 EMAIL_FOR_PAYMENT_RECEIPT = 'revoluxe@gmail.com'
 
 CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'
-import os
 
 MAX_MESSAGE_LENGTH = 4096
 
