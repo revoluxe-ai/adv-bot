@@ -34,11 +34,11 @@ def run_circular_imports_tests():
     cmd = []
 
     if sys.platform == "win32":
-        # Для Windows используем powershell
+        # Для Windows используем Git Bash
         cmd = [
-            "powershell",
-            "-Command",
-            ".\\.\\.venv\\Scripts\\activate; python -m pytest tests/test_circular_imports.py -xvs",
+            "bash",
+            "-lc",
+            "source ./.venv/Scripts/activate && python -m pytest tests/test_circular_imports.py -xvs",
         ]
     else:
         # Для Linux/MacOS
