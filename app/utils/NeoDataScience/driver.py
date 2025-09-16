@@ -38,9 +38,7 @@ def async_try_wrapper():
                         raise
                     else:
                         total_tries += 1
-                        logger.debug(
-                            "Ошибка взаимной блокировки, повтор транзакции через 5 сек"
-                        )
+                        logger.debug("Ошибка взаимной блокировки, повтор транзакции через 5 сек")
                         await asyncio.sleep(5)
 
         return wrapper
@@ -108,9 +106,7 @@ class DataScience(metaclass=AsyncMeta):
         with self._neo_driver.driver.session() as s:
             for n, offer_id in enumerate(offer_ids):
                 print(n)
-                result = s.run(
-                    query, offer_id=offer_id[0], g_name=self.MAIN_GRAPH_NAME
-                ).data()
+                result = s.run(query, offer_id=offer_id[0], g_name=self.MAIN_GRAPH_NAME).data()
                 logger.debug(result)
 
     def create_graph(self, graph_name, properties_for_all_nodes: list[str]):
@@ -189,9 +185,7 @@ RETURN graphName
 
     async def drop_graph(self, graph_name):
         if await self._graph_exists(graph_name):
-            async with AsyncGraphDatabase.driver(
-                self.__uri, auth=self.__auth
-            ) as driver:
+            async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
                 async with driver.session() as session:
                     result = await session.execute_write(self.__drop_graph, graph_name)
 
@@ -332,9 +326,7 @@ RETURN graphName
         """
 
         with self._neo_driver.driver.session() as s:
-            s.run(
-                query, name=graph_name, labels=labels, rels=rels, topK=topK, jobid=jobid
-            )
+            s.run(query, name=graph_name, labels=labels, rels=rels, topK=topK, jobid=jobid)
 
     def create_shop_graph(self, offer_ids):
         query = """
@@ -353,9 +345,7 @@ RETURN graphName
     """
 
         with self._neo_driver.driver.session() as s:
-            result = s.run(
-                query, graph_name=self.SHOP_GRAPH_NAME, offer_ids=offer_ids
-            ).data()
+            result = s.run(query, graph_name=self.SHOP_GRAPH_NAME, offer_ids=offer_ids).data()
             logger.debug(result)
             print("""Граф  создан""")
 
@@ -378,24 +368,18 @@ RETURN graphName
 
     @staticmethod
     async def __create_graph_if_not_exists(tx, name):
-        result = await tx.run(
-            "CALL gds.graph.exists($name) YIELD exists RETURN exists", name=name
-        )
+        result = await tx.run("CALL gds.graph.exists($name) YIELD exists RETURN exists", name=name)
         record = await result.single()
         exists = record["exists"]
         return exists
 
     async def _create_images_graph_if_not_exists(self, name):
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
 
                 async def transaction(tx, name):
                     # Проверяем, существует ли граф
-                    result = await tx.run(
-                        "CALL gds.graph.exists($name) YIELD exists", name=name
-                    )
+                    result = await tx.run("CALL gds.graph.exists($name) YIELD exists", name=name)
                     exists = await result.single()
 
                     # Если граф существует, удаляем его
@@ -620,9 +604,7 @@ RETURN graphName
             return await result.single()
 
         async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
-            result = await driver.session().execute_write(
-                fit_fastrp, graph_name, fastrp_vector_len
-            )
+            result = await driver.session().execute_write(fit_fastrp, graph_name, fastrp_vector_len)
 
             logger.debug(result)
 
@@ -744,9 +726,7 @@ RETURN graphName
                 logger.error("Ошибка в фразе: нет слов")
             phrase_dict = {
                 "text": phrase_data.text,
-                "words": [
-                    {"text": kw.text, "word2vec": kw.vector} for kw in phrase_data.words
-                ],
+                "words": [{"text": kw.text, "word2vec": kw.vector} for kw in phrase_data.words],
                 "dist_to_word": phrase_data.dist_to_word,
                 "word2vec": phrase_data.word2vec,
             }
@@ -787,13 +767,9 @@ UNWIND phrase.words AS word
             records = await result.data()
             return records
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                records = await session.execute_read(
-                    get_nmid_vectors, query, list(nmids)
-                )
+                records = await session.execute_read(get_nmid_vectors, query, list(nmids))
 
         data = []
         for record in records:
@@ -824,9 +800,7 @@ UNWIND phrase.words AS word
                     data.append((keyword, vector))
             return data
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 data = await session.execute_read(get_keywords_vectors, query)
 
@@ -868,9 +842,7 @@ UNWIND phrase.words AS word
                 RETURN
              g.graphName AS graph, g.nodeCount AS nodes, g.relationshipCount AS rels
         """
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
 
                 async def create_sub_graph(tx, graph_name):
@@ -922,9 +894,7 @@ UNWIND phrase.words AS word
         """
         async with AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                result = await session.execute_write(
-                    lambda tx: tx.run(query, jobid=jobid)
-                )
+                result = await session.execute_write(lambda tx: tx.run(query, jobid=jobid))
         return result
 
     def add_wb_cards(self, cards: list[CardFromWB]): ...
@@ -940,9 +910,7 @@ UNWIND phrase.words AS word
         wb_category: WBCategory = wbcard.wb_category
         category_name = wb_category.wb_category_name
         brand = wbcard.brand
-        characteristics = [
-            [char, list(words)] for char, words in characteristics.items()
-        ]
+        characteristics = [[char, list(words)] for char, words in characteristics.items()]
 
         query = """
             MERGE (item:Item {nmid: $nmid})
@@ -966,9 +934,7 @@ UNWIND phrase.words AS word
                             
             """
 
-        async def update_wb_card(
-            tx, nmid, dhash, vector, category_name, brand, characteristics
-        ):
+        async def update_wb_card(tx, nmid, dhash, vector, category_name, brand, characteristics):
             result = await tx.run(
                 query,
                 nmid=nmid,
@@ -1005,9 +971,7 @@ UNWIND phrase.words AS word
             records = await result.data()
             return [record["keyword"] for record in records]
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 data = await session.execute_read(get_keyword_phrases, query)
 
@@ -1025,9 +989,7 @@ UNWIND phrase.words AS word
         async def clear_cards(tx, query, need_nmids):
             await tx.run(query, need_nmids=need_nmids)
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 await session.execute_write(clear_cards, query, need_nmids)
 
@@ -1045,9 +1007,7 @@ UNWIND phrase.words AS word
         async def clear_keywords(tx, query, need_keywords):
             await tx.run(query, need_keywords=need_keywords)
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 await session.execute_write(clear_keywords, query, need_keywords)
         return
@@ -1062,9 +1022,7 @@ UNWIND phrase.words AS word
         async def clear_dead_nodes(tx, query):
             await tx.run(query)
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 await session.execute_write(clear_dead_nodes, query)
 
@@ -1085,13 +1043,9 @@ UNWIND phrase.words AS word
                     data.append((keyword, vector))
             return data
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                data = await session.execute_read(
-                    get_keywords_vectors_by_keywords, query, keywords
-                )
+                data = await session.execute_read(get_keywords_vectors_by_keywords, query, keywords)
 
         return data
 
@@ -1105,9 +1059,7 @@ UNWIND phrase.words AS word
             result = await tx.run(query, text=text)
             return await result.single()
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 result = await session.execute_read(check_phrase, query, text)
         return result
@@ -1230,9 +1182,7 @@ UNWIND phrase.words AS word
             records = await result.data()
             return records
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 records = await session.execute_read(get_items_vectors, query)
 
@@ -1242,9 +1192,7 @@ UNWIND phrase.words AS word
             try:
                 await redis_manager.set_item_vector(nmid, vector)
             except Exception as exc:
-                logger.error(
-                    f"Ошибка при записи вектора товара в Redis: {exc}", exc_info=True
-                )
+                logger.error(f"Ошибка при записи вектора товара в Redis: {exc}", exc_info=True)
 
     async def _update_keywords_vectors_in_redis(self, need_keywords_texts: list[str]):
         query = """
@@ -1259,9 +1207,7 @@ UNWIND phrase.words AS word
             records = await result.data()
             return records
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 records = await session.execute_read(
                     get_keywords_vectors, query, need_keywords_texts
@@ -1287,9 +1233,7 @@ UNWIND phrase.words AS word
             result = await tx.run(query, nmid=nmid)
             return await result.single()
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
                 result = await session.execute_read(check_wb_card, query, nmid)
         return result
@@ -1306,12 +1250,8 @@ UNWIND phrase.words AS word
             nmids = [record["nmid"] for record in records]
             return nmids
 
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
+        async with neo4j.AsyncGraphDatabase.driver(self.__uri, auth=self.__auth) as driver:
             async with driver.session() as session:
-                nmids_in_neo = await session.execute_read(
-                    get_nmids_not_in_neo, query, all_nmids
-                )
+                nmids_in_neo = await session.execute_read(get_nmids_not_in_neo, query, all_nmids)
         nmids_not_in_neo = [nmid for nmid in all_nmids if nmid not in nmids_in_neo]
         return set(nmids_not_in_neo)

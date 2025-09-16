@@ -45,9 +45,7 @@ class AdvSettingAutoUpdater:
         fact = self.get_fact_data_from_stat(stat)
         return fact
 
-    async def update(
-        self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]
-    ) -> None:
+    async def update(self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]) -> None:
         keywords = await keywords_coroutine
         plan = self.get_plan_data(self._adv)
         if not plan:
@@ -68,12 +66,8 @@ class AdvSettingAutoUpdater:
         assert common_stat_data.mean_orders_for_last_days is not None
         assert common_stat_data.mean_price_for_order is not None
         assert common_stat_data.all_orders_for_last_days is not None
-        mean_orders = round(
-            common_stat_data.mean_orders_for_last_days, self._max_last_period
-        )
-        mean_pay_for_order = round(
-            common_stat_data.mean_price_for_order, self._max_last_period
-        )
+        mean_orders = round(common_stat_data.mean_orders_for_last_days, self._max_last_period)
+        mean_pay_for_order = round(common_stat_data.mean_price_for_order, self._max_last_period)
         fact_data = FactData(
             predict_orders=mean_orders,
             pay_for_order=mean_pay_for_order,
@@ -98,9 +92,7 @@ class AdvSettingAutoUpdater:
 
         return plan
 
-    async def add_top_keyword_to_white_list(
-        self, keywords: list[CalculatedKeyword]
-    ) -> None:
+    async def add_top_keyword_to_white_list(self, keywords: list[CalculatedKeyword]) -> None:
         if not keywords:
             return None
         assert keywords

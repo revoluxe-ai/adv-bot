@@ -29,11 +29,7 @@ class UserDataMiddleware(BaseMiddleware):
             user_telegram_id = event.from_user.id
             stmt = (
                 select(User)
-                .options(
-                    joinedload(User.wb_user_cabinets).joinedload(
-                        WBUserCabinet.wb_cabinet
-                    )
-                )
+                .options(joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet))
                 .where(User.user_telegram_id == user_telegram_id)
             )
             result = await session.execute(stmt)

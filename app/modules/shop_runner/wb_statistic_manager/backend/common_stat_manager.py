@@ -131,9 +131,7 @@ class WBCommonStatManager:
 
     async def update_common_statistic(self, nmids: list[int]):
         try:
-            statistics: list[CommonStat] = await self.wb_api.get_cards_stats_by_days(
-                nmids, 6
-            )
+            statistics: list[CommonStat] = await self.wb_api.get_cards_stats_by_days(nmids, 6)
         except ApiForbiddenError as exc:
             logger.error("Нет доступов к статистике")
             raise exc
@@ -169,9 +167,7 @@ class WBCommonStatManager:
         """
 
         # Добавляем значения для вставки
-        query += ",".join(
-            [f"({', '.join(map(str, value))}, {version})" for value in values]
-        )
+        query += ",".join([f"({', '.join(map(str, value))}, {version})" for value in values])
 
         async with get_clickhouse_client() as client:
             await client.query(query)

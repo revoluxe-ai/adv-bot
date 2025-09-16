@@ -9,9 +9,7 @@ _sm = get_async_session_maker
 
 async def add_file(telegram_file_id: str, dhash: str, bot_id: int):
     async with _sm(read_only=False) as session:
-        file = TelegramFile(
-            file_telegram_id=telegram_file_id, dhash=dhash, bot_id=bot_id
-        )
+        file = TelegramFile(file_telegram_id=telegram_file_id, dhash=dhash, bot_id=bot_id)
         session.add(file)
         await session.commit()
     return

@@ -308,7 +308,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             auto_adv_id
         )
         await update_keywords_stat_in_click_house(
-            keywords_from_auto, auto_adv_id, "advkeyword"
+            keywords_from_auto, auto_adv_id, "advkeyword_new"
         )
 
     except ApiForbiddenError as exc:
@@ -358,7 +358,8 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     full_stat_keywords = full_stat
 
     logger.debug(
-        f"Получено {len(full_stat_keywords)} ключевых слов для {adv_setting.name}"
+        f"Получено %s ключевых слов для %s",
+        len(full_stat_keywords), adv_setting.name
     )
     texts_for_adv_setting = {keyword.text for keyword in full_stat_keywords}
     clusters = set()
@@ -397,7 +398,9 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             await session.commit()
     except Exception as exc:
         logger.error(
-            f"Ошибка добавления ключевых слов в базу данных: {exc}", exc_info=True
+            f"Ошибка добавления ключевых слов в базу данных: %s",
+            exc,
+            exc_info=True
         )
         raise exc
 

@@ -106,9 +106,7 @@ async def test_all_entry_points_can_start():
 
         # Проверяем Keywords Parsing
         try:
-            with patch(
-                "run_keywords_parsing.main", new_callable=AsyncMock
-            ) as mock_main:
+            with patch("run_keywords_parsing.main", new_callable=AsyncMock) as mock_main:
                 from run_keywords_parsing import cli as keywords_cli
 
                 keywords_cli()

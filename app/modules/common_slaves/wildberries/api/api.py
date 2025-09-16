@@ -120,29 +120,21 @@ class AdvertApi(ABC_WB_API):
     async def set_search_keywords(self, search_adv_id, texts):
         url = f"https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={search_adv_id}"
         data = {"pluse": texts}
-        await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         logger.debug("Плюс-фразы установлены")
 
     @try_except_decorator(1, 1)
-    async def set_minus_phrase_for_search_adv(
-        self, search_adv_id, texts: Iterable[str]
-    ):
+    async def set_minus_phrase_for_search_adv(self, search_adv_id, texts: Iterable[str]):
         url = f"https://advert-api.wildberries.ru/adv/v1/search/set-excluded?id={search_adv_id}"
         data = {"excluded": list(texts)}
-        await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         logger.debug("Минус-фразы в Аукцион установлены")
 
     @try_except_decorator(1, 1)
     async def set_pluse_status_in_search_adv(self, adv_id: int, status: bool):
         status = "true" if status else "false"
         url = f"https://advert-api.wildberries.ru/adv/v1/search/set-plus?id={adv_id}&fixed={status}"
-        response = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response = await requests(self.session, "GET", url, headers=self.headers.standart)
         logger.debug(f"Статус фиксированных фраз установлен: {response}")
 
     async def _get_adv_full_state(
@@ -169,9 +161,7 @@ class AdvertApi(ABC_WB_API):
             try:
                 full_stat = FullAdvStat(**data)
             except Exception as e:
-                logger.error(
-                    "Ошибка валидации данных по статистике рекламы", exc_info=True
-                )
+                logger.error("Ошибка валидации данных по статистике рекламы", exc_info=True)
                 raise e
             full_stats.append(full_stat)
         return full_stats
@@ -208,9 +198,7 @@ class AdvertApi(ABC_WB_API):
         date_from = date_to - datetime.timedelta(days=6)
         url = f"https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
         update_timestamp = datetime.datetime.now()
         if not answer:
@@ -233,15 +221,11 @@ class AdvertApi(ABC_WB_API):
         return keywords
 
     @try_except_decorator(2, 1)
-    async def get_keywords_stat_depr(
-        self, adv_setting: AdvSetting
-    ) -> list[KeywordStat]:
+    async def get_keywords_stat_depr(self, adv_setting: AdvSetting) -> list[KeywordStat]:
         keywords = []
         url = f"https://advert-api.wildberries.ru/adv/v2/auto/daily-words?id={adv_setting.adv_id}"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
 
         response_text = escape_special_characters(response_text)
         answer = json.loads(response_text)
@@ -271,9 +255,7 @@ class AdvertApi(ABC_WB_API):
         advertIds = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/count"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
         # Используем json.loads для преобразования текста ответа в JSON
         adverts: list = answer["adverts"]
@@ -316,9 +298,7 @@ class AdvertApi(ABC_WB_API):
     async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}"
         data = {"excluded": phrases}
-        await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         logger.debug("Минус-фразы установлены")
 
     @try_except_decorator(1, 1)
@@ -333,13 +313,9 @@ class AdvertApi(ABC_WB_API):
 
     @try_except_decorator(1, 2)
     async def get_clusters_for_adv(self, adv: AdvSetting):
-        url = (
-            f"https://advert-api.wildberries.ru/adv/v2/auto/stat-words?id={adv.adv_id}"
-        )
+        url = f"https://advert-api.wildberries.ru/adv/v2/auto/stat-words?id={adv.adv_id}"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         if response_text:
             answer = json.loads(response_text)
             return answer
@@ -355,9 +331,7 @@ class ContentApi(BaseAPI, ContentMixin):
         @try_except_decorator(1, 1)
         async def request(session, url) -> list[Subcategory]:
             all_categories = []
-            response = await requests(
-                session, "GET", url, headers=self.headers.standart
-            )
+            response = await requests(session, "GET", url, headers=self.headers.standart)
             answer = json.loads(response)
             for data in answer["data"]:
                 subcategory = Subcategory(**data)
@@ -384,9 +358,7 @@ class ContentApi(BaseAPI, ContentMixin):
     async def get_patent_categories(self):
         url = f"{self.HOST}/content/v2/object/parent/all"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
         return answer["data"]
 
@@ -426,9 +398,7 @@ class ContentApi(BaseAPI, ContentMixin):
         answer = json.loads(response)
         cards = answer["cards"]
         if not cards:
-            raise CardNotFoundInWB(
-                f"Карточка с текстом {text} не найдена на Wildberries"
-            )
+            raise CardNotFoundInWB(f"Карточка с текстом {text} не найдена на Wildberries")
         card_json = answer["cards"][0]
         card = CardFromWB(card_json)
         return card

@@ -5,9 +5,7 @@ from ..views import keyboards
 
 
 class UnknownInnerError(mt.Text):
-    text = (
-        "Произошла неизвестная ошибка. Администратор уже уведомлен. Попробуйте позже."
-    )
+    text = "Произошла неизвестная ошибка. Администратор уже уведомлен. Попробуйте позже."
 
 
 class AddNewToken(mt.TextWithKeyboard):

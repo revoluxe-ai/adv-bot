@@ -10,9 +10,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 
 class WhiteListUpdater:
-    async def update_white_list(
-        self, keywords: list[CalculatedKeyword], min_all_keywords: int
-    ):
+    async def update_white_list(self, keywords: list[CalculatedKeyword], min_all_keywords: int):
         if (
             len([keyword for keyword in keywords if keyword.predict_ctr is not None])
             < min_all_keywords
@@ -32,9 +30,7 @@ class WhiteListUpdater:
             await session.commit()
         return top_keyword
 
-    async def update_max_bid(
-        self, adv_setting: AdvSetting, best_keyword: CalculatedKeyword
-    ):
+    async def update_max_bid(self, adv_setting: AdvSetting, best_keyword: CalculatedKeyword):
         text = best_keyword.text
         max_bet = await redis_manager.get_max_bet(text)
         if not max_bet:

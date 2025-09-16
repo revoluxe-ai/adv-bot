@@ -78,21 +78,15 @@ class AdminsGetAdvByIdFilter(BaseFilter):
 
 
 @router.message(AdminsGetShopFilter())
-async def getting_shop_for_admin(
-    message: types.Message, bot: Bot, state: FSMContext
-) -> None:
+async def getting_shop_for_admin(message: types.Message, bot: Bot, state: FSMContext) -> None:
     text = message.text.strip()
     async with sm() as session:
         stmt = (
-            select(WBUserCabinet.id)
-            .join(WBUserCabinet.wb_cabinet)
-            .where(WBCabinet.shop_id == text)
+            select(WBUserCabinet.id).join(WBUserCabinet.wb_cabinet).where(WBCabinet.shop_id == text)
         )
         wb_user_cabinet_original_id = await session.execute(stmt)
         wb_user_cabinet_original_id = wb_user_cabinet_original_id.scalar()
-    await state.update_data(
-        last_wb_user_cabinet_original_id=wb_user_cabinet_original_id
-    )
+    await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await ShopMenu(
         bot,
         message.chat.id,

@@ -90,9 +90,7 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
             exc_info=True,
         )
         return
-    white_keywords: list[CalculatedKeyword] = [
-        kw for kw in keywords if kw.hard_status == 2
-    ]
+    white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.hard_status == 2]
     best_white_keyword = data_manager.get_best_keyword(white_keywords)
     if best_white_keyword:
         promo_position = best_white_keyword.position

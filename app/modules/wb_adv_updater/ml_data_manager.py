@@ -77,16 +77,16 @@ async def process_product_data(wbcard: WBCard):
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
             continue
-        characteristics_words[char_name]: tuple[
-            str, list[float]
-        ] = await get_words_from_char_value(char_value)
-    characteristics_words["name"]: tuple[
-        str, list[float]
-    ] = await get_words_from_char_value(wbcard.name)
+        characteristics_words[char_name]: tuple[str, list[float]] = await get_words_from_char_value(
+            char_value
+        )
+    characteristics_words["name"]: tuple[str, list[float]] = await get_words_from_char_value(
+        wbcard.name
+    )
     if "description" in characteristics_words:
-        characteristics_words["description"]: tuple[
-            str, list[float]
-        ] = await get_words_from_char_value(wbcard.description)
+        characteristics_words["description"]: tuple[str, list[float]] = (
+            await get_words_from_char_value(wbcard.description)
+        )
     return characteristics_words
 
 
@@ -136,9 +136,7 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                     f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует"
                 )
             else:
-                logger.error(
-                    f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}"
-                )
+                logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
         except UnidentifiedImageError as exc:
             logger.error(
                 f"Ошибка UnidentifiedImageError при обработке изображения nmid"
@@ -255,12 +253,8 @@ async def update_keywords_ctr_by_similary():
         if not target_text:
             continue
         target_adv_id = keyword_text_adv_id[1]
-        logger.debug(
-            f"Обработка ключевого слова {target_text} для объявления {target_adv_id}"
-        )
-        original_predict_ctr = await redis_manager.get_predict_ctr(
-            target_adv_id, target_text
-        )
+        logger.debug(f"Обработка ключевого слова {target_text} для объявления {target_adv_id}")
+        original_predict_ctr = await redis_manager.get_predict_ctr(target_adv_id, target_text)
         if original_predict_ctr:
             continue
         vector = await word2vec.average_vector_from_sentence(target_text)

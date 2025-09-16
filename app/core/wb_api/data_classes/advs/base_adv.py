@@ -5,9 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class Adv(BaseModel, ABC):
-    model_config = ConfigDict(
-        from_attributes=True
-    )  # Позволяет использовать obj.__dict__
+    model_config = ConfigDict(from_attributes=True)  # Позволяет использовать obj.__dict__
 
     advertId: int
     name: str

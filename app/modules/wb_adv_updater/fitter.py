@@ -57,18 +57,14 @@ async def _fit_modelGradientBoosting():
         logger.error("Ошибка при сохранении данных для обучения", exc_info=True)
     try:
         y = df["ctr"]
-        X = df.drop(
-            ["keyword", "views", "ctr", "clicks", "adv_id", "spend", "nmids"], axis=1
-        )
+        X = df.drop(["keyword", "views", "ctr", "clicks", "adv_id", "spend", "nmids"], axis=1)
         logger.debug("Данные подготовлены")
         # Создание модели градиентного бустинга
         model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
         if settings.cv:
             logger.debug("Начало кросс-валидации")
             cv = KFold(n_splits=5, random_state=42, shuffle=True)
-            scores = cross_validate(
-                model, X, y, scoring="neg_mean_squared_error", cv=cv
-            )
+            scores = cross_validate(model, X, y, scoring="neg_mean_squared_error", cv=cv)
             logger.debug("Кросс-валидация завершена")
             mse_scores = -scores["test_score"]
             # Вычисление и вывод метрик
@@ -122,9 +118,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
             )
             continue
         if len(nmids) == 0:
-            logger.debug(
-                f"Кампания {adv.adv_id} не содержит артикулов, происходит пропуск"
-            )
+            logger.debug(f"Кампания {adv.adv_id} не содержит артикулов, происходит пропуск")
             continue
 
         nmid_in_adv = nmids[0]
@@ -139,18 +133,15 @@ async def _get_df_for_fit() -> pd.DataFrame:
             item_features_list = list(nmid_to_item_features.values())
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
             avg_item_features = {
-                f"item_feature_{i}": avg_item_features[i]
-                for i in avg_item_features.keys()
+                f"item_feature_{i}": avg_item_features[i] for i in avg_item_features.keys()
             }
 
             logger.debug(
                 f"Получение статистики ключевых слов из ClickHouse для кампании {adv.adv_id}"
             )
             try:
-                keyword_stats: list[
-                    CalculatedKeyword
-                ] = await data_manager.get_keywords_statistic_clickhouse(
-                    adv, last_views=500
+                keyword_stats: list[CalculatedKeyword] = (
+                    await data_manager.get_keywords_statistic_clickhouse(adv, last_views=500)
                 )
                 logger.debug(
                     f"Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}"
@@ -159,8 +150,8 @@ async def _get_df_for_fit() -> pd.DataFrame:
                 logger.error("Ошибка получения ключей из Клик-хаус", exc_info=True)
                 continue
             logger.debug("Конвертация статистики ключевых слов в кластеры")
-            keywords_stats_by_clusters = (
-                await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
+            keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(
+                keyword_stats
             )
             logger.debug(f"Получено {len(keywords_stats_by_clusters)} кластеров")
 
@@ -171,15 +162,11 @@ async def _get_df_for_fit() -> pd.DataFrame:
                 if keyword_stat.text not in in_clusters:
                     clear_keyword_stat.append(keyword_stat)
 
-            logger.debug(
-                f"Найдено {len(clear_keyword_stat)} ключевых слов вне кластеров"
-            )
+            logger.debug(f"Найдено {len(clear_keyword_stat)} ключевых слов вне кластеров")
 
             keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
 
-            logger.debug(
-                f"Получение features для {len(keyword_stats)} ключевых слов из Redis"
-            )
+            logger.debug(f"Получение features для {len(keyword_stats)} ключевых слов из Redis")
             processed_keywords = 0
             for keyword_stat in keyword_stats:
                 keyword_features = await data_getter.get_keyword_features_from_redis(
@@ -221,22 +208,20 @@ async def _get_df_for_fit() -> pd.DataFrame:
 async def __fetch_keyword_features(
     keywords: list[str],
 ) -> list[tuple[str, list[float]]]:
-    result: list[
-        tuple[str, list[float]]
-    ] = await data_getter.get_keyword_features_from_redis(keywords)
+    result: list[tuple[str, list[float]]] = await data_getter.get_keyword_features_from_redis(
+        keywords
+    )
     return result
 
 
 async def _bayesian_apply(df: pd.DataFrame):
     adv_ids = df["adv_id"].unique()
     adv_ids = adv_ids.tolist()
-    adv_id_keyword_text_to_status: dict[
-        tuple[int, str], int
-    ] = await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
-
-    adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(
-        adv_ids
+    adv_id_keyword_text_to_status: dict[tuple[int, str], int] = (
+        await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
     )
+
+    adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(adv_ids)
 
     def calculate_ctr(row):
         clicks = row["clicks"]

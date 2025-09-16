@@ -60,9 +60,7 @@ _sm = get_async_session_maker
 async def measure_time(function):
     async def wrapper(*args, **kwargs):
         start_time = time.time()
-        result = await function(
-            *args, **kwargs
-        )  # Используйте await для асинхронного вызова
+        result = await function(*args, **kwargs)  # Используйте await для асинхронного вызова
         end_time = time.time()
         print(f"{function.__name__} выполнена за {end_time - start_time} секунд.")
         return result
@@ -149,9 +147,7 @@ async def get_keywords_statistic_clickhouse(
             spend = row[3]
             if clicks > views:
                 views = clicks
-            keyword = CalculatedKeyword(
-                text=text, clicks=clicks, views=views, spend=spend
-            )
+            keyword = CalculatedKeyword(text=text, clicks=clicks, views=views, spend=spend)
             keywords.append(keyword)
 
     keywords = await redis_manager.set_predict_ctrs(adv_setting.adv_id, keywords)
@@ -162,9 +158,7 @@ async def _get_keyword_settings(
     adv_setting_id: int, hard_statuses: list[int] | None
 ) -> list[KeywordSetting]:
     async with _sm() as session:
-        stmt = select(KeywordSetting).where(
-            KeywordSetting.adv_setting_id == adv_setting_id
-        )
+        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_id)
         if hard_statuses:
             stmt = stmt.where(KeywordSetting.hard_status.in_(hard_statuses))
         result = await session.execute(stmt)
@@ -333,9 +327,7 @@ async def set_positions(
     try:
         positions = await redis_manager.get_keywords_positions(adv_setting, texts)
     except:
-        logger.warning(
-            f"Ошибка получения позиций из Redis для арк {adv_setting.adv_id}"
-        )
+        logger.warning(f"Ошибка получения позиций из Redis для арк {adv_setting.adv_id}")
         return keyword_stats
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
@@ -343,9 +335,7 @@ async def set_positions(
         try:
             cluster, preset = await redis_manager.get_cluster_and_preset(text)
         except:
-            logger.error(
-                f"Ошибка получения кластера и пресета для {text}", exc_info=True
-            )
+            logger.error(f"Ошибка получения кластера и пресета для {text}", exc_info=True)
             continue
         keyword_stat.cluster_name = cluster
         keyword_stat.preset = preset
@@ -356,13 +346,9 @@ async def set_positions(
             keywords = keyword_stat.childs_keywords
             if keywords:
                 texts = [kw.text for kw in keywords]
-                positions = await redis_manager.get_keywords_positions(
-                    adv_setting, texts
-                )
+                positions = await redis_manager.get_keywords_positions(adv_setting, texts)
                 if positions:
-                    position = max(
-                        positions, key=lambda kw: __sort_by_update_keyword(kw)
-                    )
+                    position = max(positions, key=lambda kw: __sort_by_update_keyword(kw))
                     keyword_stat.position = position.position
 
     return keyword_stats
@@ -429,9 +415,9 @@ async def convert_keyword_stats_in_clusters(
     preset_to_cluster_name = {}
     texts = [keyword.text for keyword in keyword_stats]
     try:
-        text_to_custer_and_present: dict[
-            str, [tuple[str, int]]
-        ] = await redis_manager.get_clusters_and_presets(texts)
+        text_to_custer_and_present: dict[str, [tuple[str, int]]] = (
+            await redis_manager.get_clusters_and_presets(texts)
+        )
     except:
         logger.error(f"Ошибка получения кластеров и пресетов: {texts}", exc_info=True)
         return keyword_stats
@@ -507,9 +493,7 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
     keywords_redis_cache_manager = RedisCalculatedKeywordsCacheManager()
-    await keywords_redis_cache_manager.set_calculated_keywords(
-        keywords, int(adv.adv_id)
-    )
+    await keywords_redis_cache_manager.set_calculated_keywords(keywords, int(adv.adv_id))
     # Сортировка и возврат результатов
     keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
     keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
@@ -581,9 +565,7 @@ async def get_good_bad_phrases_for_min_ctr(
     keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time)
     async with _sm() as session:
         logger.debug("Начинаю получать фразы")
-        stmt = select(KeywordSetting).where(
-            KeywordSetting.adv_setting_id == adv_setting.id
-        )
+        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting.id)
         result = await session.execute(stmt)
         keyword_settings: Sequence[KeywordSetting] = result.unique().scalars().all()
         logger.debug("Получил ключи")
@@ -597,9 +579,7 @@ async def get_good_bad_phrases_for_min_ctr(
         logger.debug("В кластеры сконвертировали")
     logger.debug("Начинаю установку позиций")
     try:
-        keyword_stats: list[CalculatedKeyword] = await set_positions(
-            keyword_stats, adv_setting
-        )
+        keyword_stats: list[CalculatedKeyword] = await set_positions(keyword_stats, adv_setting)
     except Exception as exc:
         raise exc
     async with _sm(read_only=False) as session:  # type: AsyncSession
@@ -657,9 +637,7 @@ async def get_good_bad_phrases_for_min_ctr(
                 spend=0,
                 keyword_setting_original_id=keyword_setting.id,
             )
-            position = await redis_manager.get_keyword_position(
-                text, adv_setting.nmids[0]
-            )
+            position = await redis_manager.get_keyword_position(text, adv_setting.nmids[0])
             if position:
                 keyword.position = position.position
                 keyword.position_update = position.timestamp
@@ -668,9 +646,9 @@ async def get_good_bad_phrases_for_min_ctr(
 
     adv_id = adv_setting.adv_id
     texts = [kw.text for kw in keyword_stats]
-    text_to_predict_ctr: dict[
-        str, float
-    ] = await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
+    text_to_predict_ctr: dict[str, float] = await redis_manager.get_adv_id_to_text_predict_ctr_dict(
+        adv_id, texts
+    )
     # keyword_positions = await redis_manager.get_keywords_positions(adv_setting, texts)
     # text_to_keyword_position: dict[str, WBItemPosition]\
     #     = {position.keyword_text: position for position in keyword_positions}
@@ -698,9 +676,7 @@ async def get_good_bad_phrases_for_min_ctr(
         original_predict_ctr = text_to_predict_ctr.get(text, None)
         keyword_stat.original_predict_ctr = original_predict_ctr
 
-    keyword_stats: list[CalculatedKeyword] = __set_predict_ctr(
-        keyword_stats, min_ctr, adv_setting
-    )
+    keyword_stats: list[CalculatedKeyword] = __set_predict_ctr(keyword_stats, min_ctr, adv_setting)
 
     best_keyword: KeywordSetting | None = get_best_keyword(keyword_stats)
     if best_keyword:
@@ -830,9 +806,7 @@ async def get_good_bad_phrases_for_min_ctr(
             try:
                 assert value is not None
             except AssertionError:
-                logger.error(
-                    f"Ошибка в значении {property} для {keyword_stat.text}: {value}"
-                )
+                logger.error(f"Ошибка в значении {property} для {keyword_stat.text}: {value}")
 
     logger.debug("Слова по assert проверены")
     logger.debug("Возвращаю итоговую статистику")
@@ -846,9 +820,7 @@ async def get_wb_category(adv_setting: AdvSetting) -> WBCategory | None:
         raise NotItemsInAdvSetting("У кампании в базе нет товаров")
     async with _sm() as session:
         smtp = (
-            select(WBCard)
-            .where(WBCard.nmid == int(nmid))
-            .options(selectinload(WBCard.wb_category))
+            select(WBCard).where(WBCard.nmid == int(nmid)).options(selectinload(WBCard.wb_category))
         )
         result = await session.execute(smtp)
     wb_card: WBCard = result.scalar_one_or_none()
@@ -899,9 +871,7 @@ async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
     adv_keyword_text_in_black_list = []
     for keyword_setting in keyword_settings:
         adv_setting = keyword_setting.adv_setting
-        adv_keyword_text_in_black_list.append(
-            (adv_setting.adv_id, keyword_setting.text)
-        )
+        adv_keyword_text_in_black_list.append((adv_setting.adv_id, keyword_setting.text))
 
     return adv_keyword_text_in_black_list
 
@@ -918,9 +888,7 @@ async def get_adv_keyword_text_in_white_list():
     adv_keyword_text_in_white_list = []
     for keyword_setting in keyword_settings:
         adv_setting = keyword_setting.adv_setting
-        adv_keyword_text_in_white_list.append(
-            (adv_setting.adv_id, keyword_setting.text)
-        )
+        adv_keyword_text_in_white_list.append((adv_setting.adv_id, keyword_setting.text))
 
     return adv_keyword_text_in_white_list
 
@@ -976,9 +944,7 @@ async def get_adv_id_keyword_text_to_status(adv_ids: list[int]):
         result = await session.execute(stmt)
 
         # Извлекаем данные в виде словаря сразу в процессе итерации по результату
-        adv_id_keyword_text_to_status = {
-            (row.adv_id, row.text): row.hard_status for row in result
-        }
+        adv_id_keyword_text_to_status = {(row.adv_id, row.text): row.hard_status for row in result}
 
     return adv_id_keyword_text_to_status
 
@@ -1026,9 +992,7 @@ async def get_ref_statistic(user_telegram_id: int) -> list[ReferralStatistic] | 
 
         # Возвращаем результаты в удобном для использования виде
         return [
-            ReferralStatistic(
-                name=row[0], referrals_count=row[1], total_payments=min(row[2], 500)
-            )
+            ReferralStatistic(name=row[0], referrals_count=row[1], total_payments=min(row[2], 500))
             for row in stats
         ]
 
@@ -1044,9 +1008,7 @@ async def get_ref_names_and_links(user_telegram_id: int, bot: aiogram.Bot):
         stmt = select(User.id).where(User.user_telegram_id == user_telegram_id)
         result = await session.execute(stmt)
         user_id = result.scalar()
-        stmt = select(RefLink.name, RefLink.id).where(
-            RefLink.referrer_id == int(user_id)
-        )
+        stmt = select(RefLink.name, RefLink.id).where(RefLink.referrer_id == int(user_id))
         result = await session.execute(stmt)
         refs = result.fetchall()
 
@@ -1089,9 +1051,7 @@ async def get_min_ctr(adv: AdvSetting) -> float:
 def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | None:
     if not keywords:
         return None
-    best_keyword = sorted(
-        keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True
-    )[0]
+    best_keyword = sorted(keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True)[0]
     return best_keyword
 
 
@@ -1107,9 +1067,7 @@ async def _get_new_min_ctr(adv: AdvSetting):
         position = await redis_manager.get_keyword_position(keyword.text, adv.nmids[0])
         if not position or position.position == 0:
             continue
-        keyword.predict_ctr = await redis_manager.get_predict_ctr(
-            adv.adv_id, keyword.text
-        )
+        keyword.predict_ctr = await redis_manager.get_predict_ctr(adv.adv_id, keyword.text)
 
     logger.debug(
         f"Лучшее ключевое слово {best_keyword.text} с рейтингом {best_keyword.rating_by_predict_ctr}"
@@ -1333,9 +1291,7 @@ async def get_need_nmids_for_parsing(text, adv_id, adv_ids):
             nmids_need.add(nmid)
     if not_found_adv_id:
         async with _sm() as session:
-            stmt = select(distinct(AdvSetting.nmids)).where(
-                AdvSetting.adv_id.in_(not_found_adv_id)
-            )
+            stmt = select(distinct(AdvSetting.nmids)).where(AdvSetting.adv_id.in_(not_found_adv_id))
             result = await session.execute(stmt)
             nmids = result.scalars().all()
             if nmids:
@@ -1401,9 +1357,7 @@ async def update_black_phrases(adv_setting_id, keywords: list[str]):
         stmt = (
             select(KeywordSetting)
             .join(KeywordSetting.adv_setting)
-            .where(
-                AdvSetting.id == int(adv_setting_id), KeywordSetting.hard_status != 0
-            )
+            .where(AdvSetting.id == int(adv_setting_id), KeywordSetting.hard_status != 0)
         )
         result = await session.execute(stmt)
         keyword_settings = result.scalars().all()
@@ -1411,9 +1365,7 @@ async def update_black_phrases(adv_setting_id, keywords: list[str]):
             for black_phrase in keywords:
                 black_phrase_text = black_phrase.lower().strip()
                 if "'" in black_phrase_text or '"' in black_phrase_text:
-                    black_phrase_text = black_phrase_text.replace("'", "''").replace(
-                        '"', '""'
-                    )
+                    black_phrase_text = black_phrase_text.replace("'", "''").replace('"', '""')
                     if black_phrase_text == keyword_setting.text:
                         keyword_setting.hard_status = 0
                         break
@@ -1518,11 +1470,7 @@ async def get_active_search_advs() -> list[AdvSetting]:
 
 
 async def get_all_active_shop_ids_with_active_advs() -> list[str]:
-    stmt = (
-        select(WBCabinet.shop_id)
-        .join(WBCabinet.adv_settings)
-        .where(AdvSetting.bot_active)
-    )
+    stmt = select(WBCabinet.shop_id).join(WBCabinet.adv_settings).where(AdvSetting.bot_active)
     async with _sm() as session:
         result = await session.execute(stmt)
         shop_ids = result.scalars().all()
@@ -1543,9 +1491,7 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
         .distinct()
         .join(AdvSetting.wb_cabinet)
         .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active == True)
-        .options(
-            load_only(AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id)
-        )
+        .options(load_only(AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id))
     )
     async with _sm() as session:
         result = await session.execute(stmt)
@@ -1571,9 +1517,7 @@ async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
         return setting_max_bid
     if adv_setting.auto_max_bid:
         keywords: list[CalculatedKeyword] = await get_keywords_statistic(adv_setting)
-        full_keyword_stat = await get_full_adv_stat_for_adv_id_from_redis(
-            adv_setting.adv_id
-        )
+        full_keyword_stat = await get_full_adv_stat_for_adv_id_from_redis(adv_setting.adv_id)
         if not full_keyword_stat:
             return setting_max_bid
         views = full_keyword_stat.views + 1
@@ -1581,9 +1525,7 @@ async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
         best_keyword: CalculatedKeyword = get_best_keyword(keywords)
         convert_views_to_order = views / orders
         ctr = best_keyword.predict_ctr
-        max_bid_for_1000_views = (
-            (max_pay_for_order / convert_views_to_order) * ctr * 1000
-        )
+        max_bid_for_1000_views = (max_pay_for_order / convert_views_to_order) * ctr * 1000
         if setting_max_bid < max_bid_for_1000_views:
             setting_max_bid = max_bid_for_1000_views
     return setting_max_bid
@@ -1603,9 +1545,7 @@ async def _get_down_scale_white_list_bust_wb_item_position(adv) -> int | None:
         positions = [position for position in positions.values()]
         positions = [position for position in positions if position.position]
         if positions:
-            position: WBItemPosition = sorted(
-                positions, key=lambda x: x.position, reverse=True
-            )[0]
+            position: WBItemPosition = sorted(positions, key=lambda x: x.position, reverse=True)[0]
         else:
             return None
     else:
@@ -1613,9 +1553,7 @@ async def _get_down_scale_white_list_bust_wb_item_position(adv) -> int | None:
     return position.position
 
 
-async def is_adv_in_favorites(
-    adv_setting_original_id: int, user_original_id: int
-) -> bool:
+async def is_adv_in_favorites(adv_setting_original_id: int, user_original_id: int) -> bool:
     stmt = select(favorite_advs_association).where(
         favorite_advs_association.c.user_id == user_original_id,
         favorite_advs_association.c.adv_id == adv_setting_original_id,
@@ -1665,10 +1603,7 @@ ORDER BY date, text
     async with get_clickhouse_client() as client:
         result = await client.query(query, parameters=parameters)
         result = result.result_rows
-        return [
-            WBItemPosition(nmid=nmid, position=row[1], timestamp=row[0])
-            for row in result
-        ]
+        return [WBItemPosition(nmid=nmid, position=row[1], timestamp=row[0]) for row in result]
 
 
 async def add_positions_to_clickhouse(positions: list[WBItemPosition]):
@@ -1764,9 +1699,9 @@ async def get_all_keywords_from_ch(last_days=7) -> set[str]:
 
 
 async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(shop_id: str):
-    stmt = select(
-        func.sum(coalesce(WBCabinet.balance, 0) + coalesce(WBCabinet.bonus, 0))
-    ).where(WBCabinet.shop_id == shop_id)
+    stmt = select(func.sum(coalesce(WBCabinet.balance, 0) + coalesce(WBCabinet.bonus, 0))).where(
+        WBCabinet.shop_id == shop_id
+    )
     async with _sm() as session:
         result = await session.execute(stmt)
         return result.scalar_one()

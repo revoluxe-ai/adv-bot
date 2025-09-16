@@ -25,9 +25,7 @@ async def check_all_positions(
     state: FSMContext,
 ):
     adv_setting_original_id: int = callback_data.adv_original_id
-    stmt = select(KeywordSetting).where(
-        KeywordSetting.adv_setting_id == adv_setting_original_id
-    )
+    stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)
 
     async with sm() as session:
         keyword_settings = await session.execute(stmt)

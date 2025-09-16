@@ -29,14 +29,10 @@ class SeleniumMaster:
             )
         except TimeoutException:
             try:
-                element = wait.until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "content404"))
-                )
+                element = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "content404")))
             except:
                 Exception("Неизвестная ошибка!!! Проверить")
 
-        url = driver.find_elements(By.CLASS_NAME, "photo-zoom__preview")[
-            0
-        ].get_attribute("src")
+        url = driver.find_elements(By.CLASS_NAME, "photo-zoom__preview")[0].get_attribute("src")
 
         return url

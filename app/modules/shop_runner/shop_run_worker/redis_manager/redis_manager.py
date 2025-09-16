@@ -73,8 +73,6 @@ class RedisShopManager(BaseRedis):
         await self._client.srem(self._active_shops_set_name, *shop_ids)
 
         # Удалить heartbeat-ключи
-        heartbeat_keys = [
-            f"{self._shops_heartbeat_prefix}{shop_id}" for shop_id in shop_ids
-        ]
+        heartbeat_keys = [f"{self._shops_heartbeat_prefix}{shop_id}" for shop_id in shop_ids]
         if heartbeat_keys:
             await self._client.delete(*heartbeat_keys)

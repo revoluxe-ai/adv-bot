@@ -95,7 +95,9 @@ def test_no_circular_imports(entry_point):
     manual_check_needed = returncode != 0 and not success_message
 
     # Основной assert
-    assert success_message or manual_check_needed, f"""
+    assert (
+        success_message or manual_check_needed
+    ), f"""
     В точке входа {entry_point} найдены циклические импорты:
     
     {stdout}
@@ -115,6 +117,4 @@ def test_all_entry_points_exist():
 
     for entry_point in ENTRY_POINTS:
         file_path = project_root / entry_point
-        assert file_path.exists(), (
-            f"Точка входа '{entry_point}' не найдена по пути {file_path}"
-        )
+        assert file_path.exists(), f"Точка входа '{entry_point}' не найдена по пути {file_path}"

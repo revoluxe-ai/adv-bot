@@ -68,12 +68,8 @@ async def get_access_for_wb_cabinet(
             if token.shop_id == shop_id:
                 valited_tokens.append(token)
         if not valited_tokens:
-            raise ApiForbiddenError(
-                f"Нет валидных токенов для кабинета с shop_id {shop_id}"
-            )
-        access = WBCabinetAccess(
-            tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
-        )
+            raise ApiForbiddenError(f"Нет валидных токенов для кабинета с shop_id {shop_id}")
+        access = WBCabinetAccess(tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet)
         return access
 
 
@@ -84,12 +80,8 @@ async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
             if not wb_token.check_valid():
                 logger.debug(f"Не валидный токен {wb_token.api_key}")
                 continue
-            result = await token_check_righter.check_all_rights(
-                wb_token, client_session
-            )
+            result = await token_check_righter.check_all_rights(wb_token, client_session)
             if result:
-                access = WBCabinetAccess(
-                    tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None
-                )
+                access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
                 return access
     raise ApiForbiddenError("Нет валидных токенов для доступа к API")

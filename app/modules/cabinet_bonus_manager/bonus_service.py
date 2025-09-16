@@ -64,8 +64,7 @@ async def add_bonus(
                 amount=amount,
                 operation_type="add",
                 admin_user_id=admin_user_id,
-                description=description
-                or f"Пополнение бонусов администратором ID:{admin_user_id}",
+                description=description or f"Пополнение бонусов администратором ID:{admin_user_id}",
             )
             session.add(bonus_payment)
             await session.commit()
@@ -104,8 +103,7 @@ async def subtract_bonus(
             amount=-amount,  # Отрицательная сумма для снятия
             operation_type="subtract",
             admin_user_id=admin_user_id,
-            description=description
-            or f"Снятие бонусов администратором ID:{admin_user_id}",
+            description=description or f"Снятие бонусов администратором ID:{admin_user_id}",
         )
         session.add(bonus_payment)
         await session.commit()
@@ -141,8 +139,7 @@ async def reset_bonus(cabinet_id: int, admin_user_id: int, description: str) -> 
                 amount=-calculated_bonus,
                 operation_type="reset",
                 admin_user_id=admin_user_id,
-                description=description
-                or f"Обнуление бонусов администратором ID:{admin_user_id}",
+                description=description or f"Обнуление бонусов администратором ID:{admin_user_id}",
             )
             session.add(bonus_payment)
             await session.commit()

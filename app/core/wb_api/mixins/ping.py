@@ -13,9 +13,7 @@ class WBAdvPingMixin(WBAPIProtocol):
     async def ping_analytics_rights_and_connect(self) -> str:
         """Проверяет доступ к аналитике WB и подключение."""
         url = f"{self.PREFIX}.wildberries.ru/ping"
-        response = await requests(
-            self.session, "GET", url=url, headers=self.headers.standart
-        )
+        response = await requests(self.session, "GET", url=url, headers=self.headers.standart)
         if response:
             response_data = json.loads(response)
             if isinstance(response_data, dict) and "Status" in response_data:

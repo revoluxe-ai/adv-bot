@@ -27,30 +27,24 @@ class ParsingQueueManager:
         for nmid in need_nmids:
             position = my_positions_dict.get(nmid)
             if position:
-                await self.redis_manager.add_last_found_page_for_text_nmid(
-                    text, nmid, page
-                )
+                await self.redis_manager.add_last_found_page_for_text_nmid(text, nmid, page)
             else:
-                await self.redis_manager.add_last_not_found_page_for_text_nmid(
-                    text, nmid, page
-                )
+                await self.redis_manager.add_last_not_found_page_for_text_nmid(text, nmid, page)
 
         return
 
-    async def get_parsing_queue(
-        self, text: str, need_nmids: set[int], max_pages: int
-    ) -> list[int]:
+    async def get_parsing_queue(self, text: str, need_nmids: set[int], max_pages: int) -> list[int]:
         found_pages_all = []
         not_found_pages_all = []
         remaining_pages_all = set(range(1, max_pages + 1))
 
         for nmid in need_nmids:
-            found_pages: list[
-                int
-            ] = await self.redis_manager.get_found_pages_for_text_nmid(text, nmid)
-            not_found_pages: list[
-                int
-            ] = await self.redis_manager.get_not_found_pages_for_text_nmid(text, nmid)
+            found_pages: list[int] = await self.redis_manager.get_found_pages_for_text_nmid(
+                text, nmid
+            )
+            not_found_pages: list[int] = await self.redis_manager.get_not_found_pages_for_text_nmid(
+                text, nmid
+            )
 
             found_pages_all.extend(found_pages)
             not_found_pages_all.extend(not_found_pages)
@@ -64,9 +58,7 @@ class ParsingQueueManager:
 
         # Собираем итоговую очередь с приоритетом: найденные -> неизвестные -> не найденные
         final_queue = list(
-            OrderedDict.fromkeys(
-                found_pages_all + remaining_pages_all + not_found_pages_all
-            )
+            OrderedDict.fromkeys(found_pages_all + remaining_pages_all + not_found_pages_all)
         )
 
         # Проверяем, что все страницы присутствуют

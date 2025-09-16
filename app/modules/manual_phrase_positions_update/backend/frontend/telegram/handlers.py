@@ -68,10 +68,7 @@ async def update_positions_for_active_phrase(
     adv_id = adv_setting.adv_id
     await bot.send_message(
         chat_id,
-        (
-            f"Перепроверка позиций для РК с adv id {adv_id} завершена. "
-            "Отправляю эту РК..."
-        ),
+        (f"Перепроверка позиций для РК с adv id {adv_id} завершена. Отправляю эту РК..."),
     )
     nmid = adv_setting.nmids[0]
     main_photos = await data_manager.get_main_photos([nmid])

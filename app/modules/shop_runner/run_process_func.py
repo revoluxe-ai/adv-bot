@@ -35,9 +35,7 @@ async def run_shop_task(
             await asyncio.sleep(1)
 
 
-async def _update_tasks(
-    active_tasks: dict[str, Task[None]], client_session: ClientSession
-) -> None:
+async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: ClientSession) -> None:
     # Получение списка магазинов с активными настройками
     stmt = (
         select(WBCabinet.shop_id)
@@ -59,9 +57,7 @@ async def _update_tasks(
         for shop_id in all_needs_for_run_shop_ids:
             if shop_id not in active_tasks:
                 # Создание асинхронной задачи
-                task = asyncio.create_task(
-                    run_shop_task(shop_id, client_session, redis_manager)
-                )
+                task = asyncio.create_task(run_shop_task(shop_id, client_session, redis_manager))
                 active_tasks[shop_id] = task
                 logger.debug(f"Процесс обновления магазина {shop_id} запущен")
             else:
@@ -95,9 +91,7 @@ async def run() -> None:
                 logger.warning("Редис еще не загрузилась")
                 await asyncio.sleep(15 * 60)
             except Exception as exc:
-                logger.error(
-                    f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
-                )
+                logger.error(f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True)
                 exc.__traceback__ = None
                 del exc
                 await asyncio.sleep(1)

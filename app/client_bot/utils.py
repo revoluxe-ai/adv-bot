@@ -33,9 +33,7 @@ class KeywordForKeyboard:
 
 
 async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-    all_phrases: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(
-        adv_setting
-    )
+    all_phrases: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
     return all_phrases
 
 
@@ -107,7 +105,9 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             elif keyword.position == 0:
                 first_position = ">i"
             else:
-                first_position = "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
+                first_position = (
+                    "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
+                )
         rows.append(
             [
                 keyword.text,
@@ -145,9 +145,7 @@ async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink 
         ref_link = result_ref_link.scalar_one_or_none()
         if ref_link:
             return None
-        stmt_for_user_id = select(User.id).where(
-            User.user_telegram_id == user_telegram_id
-        )
+        stmt_for_user_id = select(User.id).where(User.user_telegram_id == user_telegram_id)
         result = await session.execute(stmt_for_user_id)
         user_id: int = result.scalar_one()
         ref_link = RefLink(name=ref_link_name, referrer_id=user_id)
