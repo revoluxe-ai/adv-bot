@@ -14,4 +14,4 @@ logger = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
-    asyncio.run(ml_data_manager.update_wb_adv_phrase_in_neo4j())
+    asyncio.run(main=ml_data_manager.update_wb_adv_phrase_in_neo4j())

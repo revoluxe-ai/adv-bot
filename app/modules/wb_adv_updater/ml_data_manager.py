@@ -183,7 +183,7 @@ async def update_wb_adv_phrase_in_neo_small_cycle():
         raise
 
 
-async def update_wb_adv_phrase_in_neo4j():
+async def update_wb_adv_phrase_in_neo4j() -> None:
     while True:
         try:
             await update_wb_adv_phrase_in_neo_small_cycle()
