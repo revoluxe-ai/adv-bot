@@ -13,18 +13,18 @@ from app.client_bot import const
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
+    ChoiceAdvPaginator,
     DeleteWbUserCabinet,
+    Start,
     TurnBot,
     TurnWhiteListUpdate,
-    Start,
-    ChoiceAdvPaginator,
 )
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBUserCabinet,
     WBCabinet,
     WBToken,
+    WBUserCabinet,
 )
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -291,7 +291,7 @@ class ShopMenu(TextWithKeyboard):
             last_for_days = "∞"
         text = (
             f"📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n"
-            f"""Ваш тариф в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else 'Нет активных РК'}"""
+            f"""Ваш тариф в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else "Нет активных РК"}"""
             f"(больше РК -> ниже цена, тарифы -> https://telegra.ph/Tarify-03-17)\n"
             f"💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n"
         )
@@ -302,7 +302,7 @@ class ShopMenu(TextWithKeyboard):
 💰 Денег хватит на {get_day_suffix(last_for_days)} работы бота. 💰
             """
             elif last_for_days == 0:
-                text += f"""
+                text += """
 ⚠️ Денег на продление кампаний больше нет! ⚠️
 
 💳 Срочно пополните баланс во избежание проблем с работой кампаний!

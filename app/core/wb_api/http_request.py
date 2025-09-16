@@ -9,35 +9,31 @@ import json
 import logging
 import re
 import time
+from collections.abc import Awaitable, Callable
 from typing import (
-    Callable,
-    Awaitable,
-    Optional,
-    Union,
     Any,
     TypeVar,
-    Dict,
     cast,
 )
 
 import aiohttp
 from aiohttp import (
-    ClientOSError,
-    ServerDisconnectedError,
-    ClientResponseError,
     ClientConnectionError,
+    ClientOSError,
+    ClientResponseError,
+    ServerDisconnectedError,
 )
 
 from .exceptions import (
+    ApiErrorWithCode,
     ApiForbiddenError,
+    BadRequestError,
+    MaxAttemptsError,
+    MinAdvBidWBApiError,
+    NotMatchWBApiError,
+    NotValidDataError,
     TooManyRequests,
     UnknownApiRequestError,
-    BadRequestError,
-    NotValidDataError,
-    ApiErrorWithCode,
-    NotMatchWBApiError,
-    MinAdvBidWBApiError,
-    MaxAttemptsError,
 )
 from .protocols import WBAPIProtocol
 
@@ -53,7 +49,7 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 def try_except_decorator(
     requests_per_interval: int,
-    interval_seconds: Union[int, float],
+    interval_seconds: int | float,
     max_attempts: int = 50,
     max_delay: int = 120,
 ) -> Callable[[F], F]:
@@ -84,7 +80,7 @@ def try_except_decorator(
             state = instance.api_call_state[method_name]
             shop_id = instance.shop_id
             while state["_attempts"] < max_attempts:
-                last_query_time: Optional[float] = state["_last_query_time"]
+                last_query_time: float | None = state["_last_query_time"]
                 if last_query_time:
                     current_time = time.time()
                     time_since_last_query = current_time - last_query_time
@@ -127,7 +123,7 @@ def try_except_decorator(
                         max(state["_current_pause"], 1) * 2, max_delay
                     )
                     logger.debug(
-                        f'Следующая пауза между запросами: {state["_current_pause"]} секунд для shop_id: {shop_id}'
+                        f"Следующая пауза между запросами: {state['_current_pause']} секунд для shop_id: {shop_id}"
                     )
                 except Exception as e:
                     raise e
@@ -141,9 +137,9 @@ async def requests(
     session: aiohttp.ClientSession,
     method: str,
     url: str,
-    data: Optional[Any] = None,
-    json_data: Optional[Any] = None,
-    headers: Optional[Dict[str, str]] = None,
+    data: Any | None = None,
+    json_data: Any | None = None,
+    headers: dict[str, str] | None = None,
 ) -> str:
     """Обертка для выполнения HTTP-запросов с обработкой ошибок и логированием."""
     async with session.request(

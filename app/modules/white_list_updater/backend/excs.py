@@ -1,4 +1,2 @@
-
-
 class NotEnoughKeywordsError(Exception):
     pass

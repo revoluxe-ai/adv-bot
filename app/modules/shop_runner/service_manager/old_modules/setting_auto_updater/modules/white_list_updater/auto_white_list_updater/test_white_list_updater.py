@@ -1,11 +1,12 @@
-﻿from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
-from .auto_white_list_updater import WhiteListUpdateManager
 from app.modules.shop_runner.wb_shop import WBShop
+
+from .auto_white_list_updater import WhiteListUpdateManager
 
 auto_adv_id = 25031215
 
@@ -117,7 +118,6 @@ async def test_update_white_list_threshold_triggered(
 async def test_WBShop_delete_phrase_from_white_list_run(
     adv_setting_mock, keywords_mocks
 ):
-
     wb_shop = WBShop("тест shop_id", 123456)
     wb_shop._update_advs_models = AsyncMock()
     wb_shop._adv_settings = [adv_setting_mock]

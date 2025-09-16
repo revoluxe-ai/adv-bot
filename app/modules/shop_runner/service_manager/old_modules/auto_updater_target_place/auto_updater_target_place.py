@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 
 from sqlalchemy import update
 
@@ -7,13 +7,13 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
+
+from ..setting_auto_updater.data_classes import FactData, PlanData
 from . import LastTargetPlaceUpdateRedisManager
 from .exc import AutoUpdateTargetPlaceError
-from ..setting_auto_updater.data_classes import PlanData, FactData
 
 
 class AutoUpdaterTargetPlace:
-
     def __init__(self, adv: AdvSetting):
         self._adv = adv
 
@@ -57,9 +57,9 @@ class AutoUpdaterTargetPlace:
         redis_manager = LastTargetPlaceUpdateRedisManager(adv)
         last_target_place_update_timestamp: datetime.datetime | None = None
         last_spend: float | None = None
-        result: tuple[datetime.datetime, float] | None = (
-            await redis_manager.get_last_target_place_update()
-        )
+        result: (
+            tuple[datetime.datetime, float] | None
+        ) = await redis_manager.get_last_target_place_update()
         if result:
             last_target_place_update_timestamp, last_spend = result
 

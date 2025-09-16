@@ -1,3 +1,3 @@
-﻿__all__ = ["RedisShopManager"]
+__all__ = ["RedisShopManager"]
 
 from .redis_manager import RedisShopManager

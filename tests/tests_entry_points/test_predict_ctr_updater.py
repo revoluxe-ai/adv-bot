@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 import pytest
@@ -47,16 +47,16 @@ async def test_ctr_predictor_loads_model():
         test_model = MagicMock()
 
         # Мокируем функции
-        with patch(
-            "run_update_predict_ctr.load_model", return_value=test_model
-        ) as mock_load_model, patch(
-            "run_update_predict_ctr.load_data", return_value={}
-        ) as mock_load_data, patch(
-            "run_update_predict_ctr.predict"
-        ) as mock_predict, patch(
-            "run_update_predict_ctr.save_predictions"
-        ) as mock_save:
-
+        with (
+            patch(
+                "run_update_predict_ctr.load_model", return_value=test_model
+            ) as mock_load_model,
+            patch(
+                "run_update_predict_ctr.load_data", return_value={}
+            ) as mock_load_data,
+            patch("run_update_predict_ctr.predict") as mock_predict,
+            patch("run_update_predict_ctr.save_predictions") as mock_save,
+        ):
             # Вызываем тестируемую функцию
             await main()
 
@@ -104,16 +104,18 @@ async def test_ctr_predictor_predicts_ctr():
         test_predictions = np.random.rand(100)
 
         # Мокируем функции
-        with patch(
-            "run_update_predict_ctr.load_model", return_value=test_model
-        ) as mock_load_model, patch(
-            "run_update_predict_ctr.load_data", return_value=test_data
-        ) as mock_load_data, patch(
-            "run_update_predict_ctr.predict", return_value=test_predictions
-        ) as mock_predict, patch(
-            "run_update_predict_ctr.save_predictions"
-        ) as mock_save:
-
+        with (
+            patch(
+                "run_update_predict_ctr.load_model", return_value=test_model
+            ) as mock_load_model,
+            patch(
+                "run_update_predict_ctr.load_data", return_value=test_data
+            ) as mock_load_data,
+            patch(
+                "run_update_predict_ctr.predict", return_value=test_predictions
+            ) as mock_predict,
+            patch("run_update_predict_ctr.save_predictions") as mock_save,
+        ):
             # Вызываем тестируемую функцию
             await main()
 
@@ -159,15 +161,19 @@ async def test_ctr_predictor_saves_predictions():
         test_predictions = np.random.rand(10)
 
         # Мокируем функции
-        with patch("run_update_predict_ctr.load_model") as mock_load_model, patch(
-            "run_update_predict_ctr.load_data",
-            return_value={"ids": test_ids, "features": np.random.rand(10, 5)},
-        ) as mock_load_data, patch(
-            "run_update_predict_ctr.predict", return_value=test_predictions
-        ) as mock_predict, patch(
-            "run_update_predict_ctr.save_predictions", new_callable=AsyncMock
-        ) as mock_save:
-
+        with (
+            patch("run_update_predict_ctr.load_model") as mock_load_model,
+            patch(
+                "run_update_predict_ctr.load_data",
+                return_value={"ids": test_ids, "features": np.random.rand(10, 5)},
+            ) as mock_load_data,
+            patch(
+                "run_update_predict_ctr.predict", return_value=test_predictions
+            ) as mock_predict,
+            patch(
+                "run_update_predict_ctr.save_predictions", new_callable=AsyncMock
+            ) as mock_save,
+        ):
             # Вызываем тестируемую функцию
             await main()
 
@@ -206,15 +212,15 @@ async def test_ctr_predictor_handles_empty_data():
         # Для функции main
 
         # Мокируем функции, чтобы load_data возвращал пустые данные
-        with patch("run_update_predict_ctr.load_model") as mock_load_model, patch(
-            "run_update_predict_ctr.load_data",
-            return_value={"ids": [], "features": np.array([]).reshape(0, 0)},
-        ) as mock_load_data, patch(
-            "run_update_predict_ctr.predict"
-        ) as mock_predict, patch(
-            "run_update_predict_ctr.save_predictions"
-        ) as mock_save:
-
+        with (
+            patch("run_update_predict_ctr.load_model") as mock_load_model,
+            patch(
+                "run_update_predict_ctr.load_data",
+                return_value={"ids": [], "features": np.array([]).reshape(0, 0)},
+            ) as mock_load_data,
+            patch("run_update_predict_ctr.predict") as mock_predict,
+            patch("run_update_predict_ctr.save_predictions") as mock_save,
+        ):
             # Вызываем тестируемую функцию
             await main()
 

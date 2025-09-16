@@ -29,10 +29,10 @@ async def test_wb_shop_run_calls_all_coroutines():
     wb_shop = WBShop(mock_wb_api, mock_redis_manager)
 
     # Мокируем метод _alive_worker_run
-    wb_shop._alive_worker_run = AsyncMock()
+    wb_shop._alive_worker_run = AsyncMock()  # type: ignore[method-assign]
 
     # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
-    async def mock_gather(*args, **kwargs):
+    async def mock_gather(*args, **kwargs) -> list:  # type: ignore[misc]
         # Создаем задачи для каждой корутины, но не запускаем их
         return [arg for arg in args]
 
@@ -73,7 +73,7 @@ async def test_wb_shop_run_calls_all_coroutines():
 
 
 @pytest.mark.asyncio
-async def test_wb_shop_run_gathers_correct_number_of_coroutines():
+async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
     """
     Тест проверяет, что метод run класса WBShop передает правильное количество
     корутин в asyncio.gather
@@ -88,7 +88,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
     wb_shop = WBShop(mock_wb_api, mock_redis_manager)
 
     # Мокируем метод _alive_worker_run
-    wb_shop._alive_worker_run = AsyncMock()
+    wb_shop._alive_worker_run = AsyncMock()  # type: ignore[method-assign]
 
     # Мокируем asyncio.gather для проверки количества аргументов
     with patch("asyncio.gather") as mock_gather:
@@ -125,7 +125,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
 
 
 @pytest.mark.asyncio
-async def test_wb_shop_alive_worker_run():
+async def test_wb_shop_alive_worker_run() -> None:
     """
     Тест проверяет работу метода _alive_worker_run
     """
@@ -140,7 +140,7 @@ async def test_wb_shop_alive_worker_run():
     wb_shop = WBShop(mock_wb_api, mock_redis_manager)
 
     # Создаем задачу для тестирования _alive_worker_run
-    task = asyncio.create_task(wb_shop._alive_worker_run())
+    task = asyncio.create_task(wb_shop._alive_worker_run())  # type: ignore[no-untyped-call]
 
     # Подождем немного, чтобы убедиться, что метод работает
     await asyncio.sleep(0.2)

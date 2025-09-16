@@ -1,4 +1,4 @@
-﻿#set_shop_id_for_all_wbtokens.py
+# set_shop_id_for_all_wbtokens.py
 # Добавляем настройку пути к корню проекта
 try:
     # Пытаемся импортировать напрямую, если скрипт запускается из директории scripts
@@ -10,12 +10,14 @@ except ImportError:
 add_project_root_to_path()
 
 import dotenv
+
 dotenv.load_dotenv()
-from app.modules.common_slaves.wildberries.models import WBToken
 from sqlalchemy import select
-from app.utils.db.session_maker import get_async_session_maker as sm
+
 # Импортируем исключение для обработки ошибки невалидного токена
 from app.core.wb_api.exceptions import NotValidTokenError
+from app.modules.common_slaves.wildberries.models import WBToken
+from app.utils.db.session_maker import get_async_session_maker as sm
 
 
 async def set_shop_id_for_all_wbtokens():
@@ -25,13 +27,13 @@ async def set_shop_id_for_all_wbtokens():
     tokens_processed = 0
     tokens_updated = 0
     tokens_invalid = 0
-    
+
     async with sm() as session:
         stmt = select(WBToken)
         result = await session.execute(stmt)
         wb_tokens: list[WBToken] = result.scalars().all()
         print(f"Найдено токенов: {len(wb_tokens)}")
-        
+
         for token in wb_tokens:
             tokens_processed += 1
             if token.shop_id:
@@ -49,13 +51,14 @@ async def set_shop_id_for_all_wbtokens():
             except Exception as e:
                 print(f"Ошибка при обработке токена {token.id}: {e}")
                 continue
-    
-    print(f"\nИтоги:")
+
+    print("\nИтоги:")
     print(f"Обработано токенов: {tokens_processed}")
     print(f"Обновлено токенов: {tokens_updated}")
     print(f"Невалидных токенов: {tokens_invalid}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import asyncio
+
     asyncio.run(set_shop_id_for_all_wbtokens())

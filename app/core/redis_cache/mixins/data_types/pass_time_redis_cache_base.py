@@ -1,11 +1,10 @@
-﻿import datetime
+import datetime
 from abc import ABC
 
 from ..mixins_protocol import RedisCacheMixinsProtocol
 
 
 class PassTimeRedisCacheBase(ABC, RedisCacheMixinsProtocol):
-
     async def check_pass_time(self, pass_time_sec: int) -> bool:
         timestamp = await self.get()
         if not timestamp:

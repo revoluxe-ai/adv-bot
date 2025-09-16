@@ -6,7 +6,6 @@ from app.utils.image_master import image_tools
 
 
 class WbItem(metaclass=ABCMeta):
-
     def __init__(self) -> None:
         self._brand = None
         self._image_tools = image_tools
@@ -18,7 +17,6 @@ class WbItem(metaclass=ABCMeta):
 
 
 class CardGroupABC(metaclass=ABCMeta):
-
     @property
     @abstractmethod
     def targetIMT(self) -> int:

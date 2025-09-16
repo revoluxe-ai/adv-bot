@@ -1,17 +1,17 @@
-﻿from typing import Awaitable
+from collections.abc import Awaitable
 
 from sqlalchemy import update
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .exc import FirstKeyUpdaterError
 
 
 class FirstKeyUpdater:
-
     def __init__(self, adv: AdvSetting):
         self._adv = adv
 
@@ -19,7 +19,6 @@ class FirstKeyUpdater:
         self,
         keywords_coroutine: Awaitable[list[CalculatedKeyword]],
     ) -> None:
-
         keywords = await keywords_coroutine
 
         try:

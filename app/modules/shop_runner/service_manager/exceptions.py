@@ -1,2 +1,2 @@
-﻿class NotFoundActiveAdvCompany(Exception):
+class NotFoundActiveAdvCompany(Exception):
     pass

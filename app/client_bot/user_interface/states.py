@@ -5,10 +5,10 @@ from aiogram.fsm.state import State, StatesGroup
 class GlobalState(StatesGroup):
     shop_choice = State()
 
+
 class CabinetRegistration(StatesGroup):
     cabinet_name = State()
     api = State()
-
 
 
 class ChangeMinCTR(StatesGroup):
@@ -28,10 +28,9 @@ class RefProgram(StatesGroup):
     getting_name = State()
 
 
-
 class AdvSetting(StatesGroup):
-   waiting_for_filter_by_query = State()
-   waiting_for_filter_keywords = State()
+    waiting_for_filter_by_query = State()
+    waiting_for_filter_keywords = State()
 
 
 class ChangeMaxCPC(StatesGroup):

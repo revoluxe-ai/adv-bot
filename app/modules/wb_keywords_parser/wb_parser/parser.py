@@ -3,7 +3,6 @@ import datetime
 import json
 import logging
 import re
-import typing
 
 from aiogram.client.session import aiohttp
 
@@ -57,7 +56,6 @@ def get_parse_url(text: str, page: int) -> str:
 
 
 class ParserService:
-
     async def parse_keywords_from_wb(
         self, text: str, page: int, total_pages: TotalPages
     ) -> list[WBItemPosition]:
@@ -133,11 +131,13 @@ class ParserService:
         return positions
 
     @staticmethod
-    async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
-        typing.Optional[list[dict]],
-        typing.Optional[str],
-        typing.Optional[int],
-        typing.Optional[int],
+    async def __parse_keywords_from_wb(
+        text: str, page: int
+    ) -> tuple[
+        list[dict] | None,
+        str | None,
+        int | None,
+        int | None,
     ]:
         url = get_parse_url(text, page)
         logger.debug(f"Запрос к URL: {url}")

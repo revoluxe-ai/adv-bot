@@ -1,16 +1,16 @@
 import asyncio
 import logging
-from typing import Iterable
+from collections.abc import Iterable
 
 from aiohttp import ClientSession
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    KeywordStatus,
     CalculatedKeyword,
+    KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 
@@ -100,8 +100,7 @@ async def set_minus_keywords_for_search_adv(
             await adv_update_state_manager.set_one(search_adv_id)
         except Exception as e:
             logger.error(
-                f"Ошибка установки минус-фраз для аукциона"
-                f" {adv_setting.adv_id}: {e}",
+                f"Ошибка установки минус-фраз для аукциона {adv_setting.adv_id}: {e}",
                 exc_info=True,
             )
             del e

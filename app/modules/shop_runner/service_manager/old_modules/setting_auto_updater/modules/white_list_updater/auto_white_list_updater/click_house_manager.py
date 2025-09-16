@@ -1,4 +1,4 @@
-﻿from app.utils.click_house.client import get_clickhouse_client
+from app.utils.click_house.client import get_clickhouse_client
 
 __all__ = ["get_sum_spend_for_complex_adv"]
 

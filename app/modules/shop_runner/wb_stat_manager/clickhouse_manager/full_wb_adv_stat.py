@@ -1,7 +1,8 @@
 import logging
 import time
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, List, TypedDict
+from typing import TypedDict
 
 from app.modules.full_stat_adv_updater.types import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import (
@@ -72,7 +73,6 @@ def concatenate_stats(
 async def get_daily_stats_by_last_days(
     adv_ids: list[int], start_date: datetime, end_date: datetime
 ) -> list[SmallFullAdvStatPerDay]:
-
     end_date_str = end_date.strftime("%Y-%m-%d")
     start_date_str = start_date.strftime("%Y-%m-%d")
 
@@ -295,7 +295,7 @@ async def get_keywords_spend(
 
 async def get_keyword_stats_by_last_days(
     adv_ids: list[int], start_date: datetime, end_date: datetime
-) -> List[KeywordStat]:
+) -> list[KeywordStat]:
     """
     Получает статистику по ключевым словам за указанный период.
 

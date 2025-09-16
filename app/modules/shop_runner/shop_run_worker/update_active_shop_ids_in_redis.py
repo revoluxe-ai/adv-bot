@@ -1,10 +1,11 @@
-﻿import asyncio
+import asyncio
 
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .redis_manager import RedisShopManager
 
 

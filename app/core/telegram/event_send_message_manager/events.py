@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class NotValidTokens:
-
     def __init__(self, wb_cabinet_id: int, shop_id: str):
         self.wb_cabinet_original_id = wb_cabinet_id
         self.shop_id = shop_id

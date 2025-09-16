@@ -73,9 +73,9 @@ async def test_updater_run_gathers_correct_number_of_coroutines():
         # Проверяем, что gather был вызван с ожидаемым количеством аргументов
         # Замените число 4 на реальное количество методов в updater.run
         expected_count = 4
-        assert (
-            len(call_args) == expected_count
-        ), f"asyncio.gather должен быть вызван с {expected_count} аргументами, получено {len(call_args)}"
+        assert len(call_args) == expected_count, (
+            f"asyncio.gather должен быть вызван с {expected_count} аргументами, получено {len(call_args)}"
+        )
 
         # Проверяем, что все методы были вызваны по одному разу
         updater.update_method1.assert_called_once()
@@ -115,7 +115,7 @@ async def test_updater_run_coroutines_without_errors_for_one_minute():
     # Подождем 60 секунд (минуту)
     try:
         await asyncio.wait_for(task, timeout=60.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         # Тайм-аут ожидаем, так как корутины должны работать бесконечно
         pass
 
@@ -133,6 +133,6 @@ async def test_updater_run_coroutines_without_errors_for_one_minute():
     # Подождем отмену задачи
     try:
         await asyncio.wait_for(task, timeout=1.0)
-    except (asyncio.TimeoutError, asyncio.CancelledError):
+    except (TimeoutError, asyncio.CancelledError):
         # Мы ожидаем, что задача будет отменена
         pass

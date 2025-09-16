@@ -1,4 +1,4 @@
-﻿from sqlalchemy import select
+from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, WBCategory
 from app.utils import redis_manager

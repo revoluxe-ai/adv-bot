@@ -1,34 +1,38 @@
 import json
-import aiohttp
-from app.core.wb_api.exceptions import ApiForbiddenError
-from .exceptions import (
-                         TooManyRequests,
-                         UnknownApiRequestError,
-                         BadRequestError,
-                         NotValidDataError,
-                         ApiErrorWithCode)
 import logging
+
+import aiohttp
+
+from app.core.wb_api.exceptions import ApiForbiddenError
+
+from .exceptions import (
+    ApiErrorWithCode,
+    BadRequestError,
+    NotValidDataError,
+    TooManyRequests,
+    UnknownApiRequestError,
+)
 
 logger = logging.getLogger(__name__)
 
 
-
-
 async def requests(session, method, url, data=None, json_data=None, headers=None):
-    async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
+    async with session.request(
+        method, url, data=data, headers=headers, json=json_data
+    ) as response:
         try:
-            logger.debug(f'Запрос к {url} выполнен. Статус: {response.status}')
+            logger.debug(f"Запрос к {url} выполнен. Статус: {response.status}")
             text = await response.text()
-            logger.debug(f'Ответ от сервера: {text}')
+            logger.debug(f"Ответ от сервера: {text}")
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
-                raise ApiForbiddenError('Неверный API ключ') from e
+                raise ApiForbiddenError("Неверный API ключ") from e
             if e.status == 429:
-                logger.debug(f'Превышен лимит запросов к API: {url}')
+                logger.debug(f"Превышен лимит запросов к API: {url}")
                 raise TooManyRequests(e) from e
             else:
-                logger.error(f'Ошибка при запросе к {url}: {text}', exc_info=True)
+                logger.error(f"Ошибка при запросе к {url}: {text}", exc_info=True)
                 raise BadRequestError(e) from e
         except NotValidDataError as e:
             raise NotValidDataError(e) from e
@@ -40,8 +44,9 @@ async def requests(session, method, url, data=None, json_data=None, headers=None
         if text:
             json_answer = json.loads(text)
             if isinstance(json_answer, dict):
-                if code := json_answer.get('code'):
-                    raise ApiErrorWithCode(code, \
-                                                      json_answer.get('message'), json_answer.get('rejection'))
+                if code := json_answer.get("code"):
+                    raise ApiErrorWithCode(
+                        code, json_answer.get("message"), json_answer.get("rejection")
+                    )
 
         return text

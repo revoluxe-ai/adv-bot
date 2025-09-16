@@ -1,9 +1,9 @@
-﻿import pytest
+import pytest
 from aioresponses import aioresponses
 
 from app.core.wb_api.base import BaseAPI
 from app.core.wb_api.data_classes.card_from_wb import CardFromWB
-from app.core.wb_api.mixins.content import ContentMixin, PREFIX
+from app.core.wb_api.mixins.content import PREFIX, ContentMixin
 
 
 class TestWBApi(BaseAPI, ContentMixin):

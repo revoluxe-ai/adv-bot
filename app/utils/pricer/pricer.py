@@ -1,14 +1,14 @@
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
+
+from ...settings import settings
 from .tariffs import tariffs
 from .tariffs_text import text
-from ...settings import settings
 
 
 class Pricer:
-
     @property
     def text(self):
         return text

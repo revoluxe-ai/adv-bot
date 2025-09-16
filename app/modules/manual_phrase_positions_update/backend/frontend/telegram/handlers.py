@@ -1,4 +1,4 @@
-﻿from aiogram import Router, Bot
+from aiogram import Bot, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
@@ -13,6 +13,7 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .buttons import UpdatePositionsForActivePhrase
 
 router = Router()
@@ -25,7 +26,6 @@ async def update_positions_for_active_phrase(
     bot: Bot,
     state: FSMContext,
 ) -> None:
-
     adv_setting_original_id = callback_data.adv_setting_original_id
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
 

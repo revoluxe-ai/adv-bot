@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess

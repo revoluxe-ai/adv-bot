@@ -4,11 +4,11 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
-from app.client_bot.const import BLACK_LIST, AUTO_MODE, WHITE_LIST, TURN_OFF
+from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
-    TurnBot,
     Action,
+    TurnBot,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -16,10 +16,10 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import (
-    WBUserCabinet,
     AdvSetting,
     KeywordSetting,
     WBCabinet,
+    WBUserCabinet,
 )
 from app.modules.manual_phrase_positions_update.backend.frontend.telegram.buttons import (
     UpdatePositionsForActivePhrase,
@@ -368,7 +368,7 @@ def get_advs_keyboard_with_paginator(
         check_last_24_hours = adv.check_last_24_hours
         check_text = "✅" if check_last_24_hours else "❓"
         button_text = (
-            f'{"(" + str(adv.worst_promo_position) + ")" if adv.worst_promo_position else ""}{check_text} {adv.name} (Бот включен)'
+            f"{'(' + str(adv.worst_promo_position) + ')' if adv.worst_promo_position else ''}{check_text} {adv.name} (Бот включен)"
             if adv.bot_active
             else f"{adv.name} (Бот отключен)"
         )
@@ -485,7 +485,6 @@ def get_keywords_setting_keyboard(
     sort_mode="default",
     image_mode="graphic",
 ):
-
     def sorting_keywords(keywords, sort_mode):
         if sort_mode in ["by_adv", "only_out_index"]:
             keywords_with_rating = [
@@ -555,7 +554,7 @@ def get_keywords_setting_keyboard(
         text = "🌟" if keyword.best_keyword_status else ""
         if keyword.relevant:
             text += "🟢"
-        text += f"""{clicks}/{views}/{round(ctr *100,2)}%"""
+        text += f"""{clicks}/{views}/{round(ctr * 100, 2)}%"""
         text += "|"
         if keyword.position:
             text += f"{keyword.position}"
@@ -567,10 +566,10 @@ def get_keywords_setting_keyboard(
 
         text += f"({keyword.query})"
 
-        text += f"({round(keyword.predict_ctr*100, 2)}%)"
+        text += f"({round(keyword.predict_ctr * 100, 2)}%)"
 
-        text += f"""{"(" + str(keyword.added_clicks) + ")" if keyword.added_clicks  else ''}"""
-        text += f"""{'❗' if not cluster_name else  ''}"""
+        text += f"""{"(" + str(keyword.added_clicks) + ")" if keyword.added_clicks else ""}"""
+        text += f"""{"❗" if not cluster_name else ""}"""
         inline_keyboard = [
             InlineKeyboardButton(
                 text=text,
@@ -791,7 +790,6 @@ def get_keyword_setting_keyboard(
     adv_setting: AdvSetting,
     page,
 ) -> InlineKeyboardMarkup:
-
     adv_setting_original_id = adv_setting.id
     keyword_setting_original_id = keyword.id
     assert keyword_setting_original_id
@@ -832,7 +830,6 @@ def get_keyword_setting_keyboard(
         buttons.append(button)
 
     if keyword.hard_status in [BLACK_LIST, TURN_OFF, AUTO_MODE]:
-
         button = [
             InlineKeyboardButton(
                 text="В белый список",
@@ -868,7 +865,6 @@ def get_keyword_setting_keyboard(
         keyword.hard_status in [AUTO_MODE, WHITE_LIST]
         or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH
     ):
-
         bottom = [
             InlineKeyboardButton(
                 text="Отключить (релевантная фраза)",
@@ -1036,14 +1032,14 @@ def get_setting_min_ctr_keyboard(adv: AdvSetting):
     )
     if adv.new_auto_min_ctr_mode:
         button = InlineKeyboardButton(
-            text=f"Выключить управление CTR по белому списку",
+            text="Выключить управление CTR по белому списку",
             callback_data=callbacks.ChangeAutoMinCTR(
                 action="turn_off_auto_min_ctr", adv_setting_original_id=adv.id
             ).pack(),
         )
     else:
         button = InlineKeyboardButton(
-            text=f"Включить управление CTR по белому списку",
+            text="Включить управление CTR по белому списку",
             callback_data=callbacks.ChangeAutoMinCTR(
                 action="turn_on_auto_min_ctr", adv_setting_original_id=adv.id
             ).pack(),

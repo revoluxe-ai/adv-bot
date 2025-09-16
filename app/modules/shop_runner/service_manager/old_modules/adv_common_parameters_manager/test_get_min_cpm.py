@@ -1,4 +1,4 @@
-﻿from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -11,7 +11,6 @@ adv_param_manager = AdvParameterManager()
 
 @pytest.mark.asyncio
 async def test_get_min_cpm_from_redis(adv_setting_mock):
-
     result_mock = MagicMock()
     result_mock.scalar_one.return_value = "Юбки"
     session_mock = MagicMock()

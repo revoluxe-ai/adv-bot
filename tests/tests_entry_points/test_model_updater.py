@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -51,18 +51,13 @@ async def test_model_updater_loads_data():
         test_data = {"X": np.random.rand(100, 10), "y": np.random.randint(0, 2, 100)}
 
         # Мокируем функции
-        with patch(
-            "run_update_model.load_data", return_value=test_data
-        ) as mock_load, patch(
-            "run_update_model.preprocess_data"
-        ) as mock_preprocess, patch(
-            "run_update_model.train_model"
-        ) as mock_train, patch(
-            "run_update_model.evaluate_model"
-        ) as mock_eval, patch(
-            "run_update_model.save_model"
-        ) as mock_save:
-
+        with (
+            patch("run_update_model.load_data", return_value=test_data) as mock_load,
+            patch("run_update_model.preprocess_data") as mock_preprocess,
+            patch("run_update_model.train_model") as mock_train,
+            patch("run_update_model.evaluate_model") as mock_eval,
+            patch("run_update_model.save_model") as mock_save,
+        ):
             # Вызываем тестируемую функцию
             await main()
 
@@ -129,18 +124,17 @@ async def test_model_updater_trains_model():
         test_model = MagicMock()
 
         # Мокируем функции
-        with patch(
-            "run_update_model.load_data", return_value=test_data
-        ) as mock_load, patch(
-            "run_update_model.preprocess_data", return_value=test_preprocessed
-        ) as mock_preprocess, patch(
-            "run_update_model.train_model", return_value=test_model
-        ) as mock_train, patch(
-            "run_update_model.evaluate_model"
-        ) as mock_eval, patch(
-            "run_update_model.save_model"
-        ) as mock_save:
-
+        with (
+            patch("run_update_model.load_data", return_value=test_data) as mock_load,
+            patch(
+                "run_update_model.preprocess_data", return_value=test_preprocessed
+            ) as mock_preprocess,
+            patch(
+                "run_update_model.train_model", return_value=test_model
+            ) as mock_train,
+            patch("run_update_model.evaluate_model") as mock_eval,
+            patch("run_update_model.save_model") as mock_save,
+        ):
             # Вызываем тестируемую функцию
             await main()
 
@@ -190,16 +184,15 @@ async def test_model_updater_saves_model():
         test_model = MagicMock()
 
         # Мокируем функции
-        with patch("run_update_model.load_data") as mock_load, patch(
-            "run_update_model.preprocess_data"
-        ) as mock_preprocess, patch(
-            "run_update_model.train_model", return_value=test_model
-        ) as mock_train, patch(
-            "run_update_model.evaluate_model"
-        ) as mock_eval, patch(
-            "run_update_model.save_model"
-        ) as mock_save:
-
+        with (
+            patch("run_update_model.load_data") as mock_load,
+            patch("run_update_model.preprocess_data") as mock_preprocess,
+            patch(
+                "run_update_model.train_model", return_value=test_model
+            ) as mock_train,
+            patch("run_update_model.evaluate_model") as mock_eval,
+            patch("run_update_model.save_model") as mock_save,
+        ):
             # Вызываем тестируемую функцию
             await main()
 

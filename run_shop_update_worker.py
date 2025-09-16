@@ -8,7 +8,6 @@ from aiohttp import ClientSession
 from app.modules.shop_runner.shop_run_worker.worker.worker import ShopWorker
 from python_modules.logger import setup_logging
 
-
 setup_logging()
 
 

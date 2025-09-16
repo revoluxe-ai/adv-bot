@@ -1,6 +1,7 @@
-﻿from app import settings
+from app import settings
 
 is_first = True
+
 
 # Функция для склонения слова "артикул"
 def declension(number: int) -> str:
@@ -12,6 +13,7 @@ def declension(number: int) -> str:
         return "артикула"
     else:  # Для остальных чисел
         return "артикулов"
+
 
 text = f"""
 Актуальный прайс  -> https://telegra.ph/Tarify-03-17

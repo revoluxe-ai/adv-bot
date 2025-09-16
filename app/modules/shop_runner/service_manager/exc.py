@@ -1,2 +1,2 @@
-﻿class StopShopUpdateException(Exception):
+class StopShopUpdateException(Exception):
     pass

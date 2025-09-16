@@ -1,11 +1,13 @@
 import dotenv
+
 dotenv.load_dotenv()
-import logging
 import asyncio
+import logging
+
 from app.utils.click_house.client import get_clickhouse_client
 
-
 logger = logging.getLogger(__name__)
+
 
 async def truncate_logs():
     tables = [
@@ -17,7 +19,7 @@ async def truncate_logs():
         "system.query_metric_log",
         "system.part_log",
         "system.trace_log",
-        "system.error_log"
+        "system.error_log",
     ]
 
     async with get_clickhouse_client() as client:
@@ -33,8 +35,9 @@ async def main():
         try:
             await truncate_logs()
         except Exception:
-            logger.error('Ошибка', exc_info=True)
+            logger.error("Ошибка", exc_info=True)
         await asyncio.sleep(60 * 10)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

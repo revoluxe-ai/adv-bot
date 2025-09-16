@@ -1,5 +1,5 @@
 import subprocess
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -78,10 +78,12 @@ async def test_all_entry_points_can_start():
     """
 
     # Мокируем основные функции asyncio для предотвращения реального запуска
-    with patch("asyncio.run"), patch("asyncio.gather"), patch(
-        "asyncio.create_task"
-    ), patch("sys.exit"):
-
+    with (
+        patch("asyncio.run"),
+        patch("asyncio.gather"),
+        patch("asyncio.create_task"),
+        patch("sys.exit"),
+    ):
         # Проверяем ARQ Worker
         try:
             with patch("app.arq_workers.workers.WorkerSettings.run") as mock_run:
@@ -136,10 +138,10 @@ async def test_entry_points_configuration_loading():
     Тест проверяет, что все точки входа корректно загружают конфигурацию
     """
     # Мокируем функции для загрузки конфигурации
-    with patch("os.environ.get") as mock_env, patch(
-        "dotenv.load_dotenv"
-    ) as mock_dotenv:
-
+    with (
+        patch("os.environ.get") as mock_env,
+        patch("dotenv.load_dotenv") as mock_dotenv,
+    ):
         # Устанавливаем тестовые значения переменных окружения
         mock_env.return_value = "test_value"
 

@@ -2,16 +2,16 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Column,
+    Date,
     Float,
+    ForeignKey,
     Integer,
     String,
-    ForeignKey,
     UniqueConstraint,
-    Date,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, mapped_column, Mapped
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.utils.db.base import BaseTable
 

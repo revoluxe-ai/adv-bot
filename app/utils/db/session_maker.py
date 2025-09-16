@@ -1,9 +1,10 @@
 import asyncio
 import logging
 import traceback
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from time import time
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from sqlalchemy import Result
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -55,7 +56,7 @@ class AnalyticAsyncSession(AsyncSession):
                 )
             return result
         except Exception as e:
-            logger.exception(f"Query error during execution:")
+            logger.exception("Query error during execution:")
             raise e
 
 

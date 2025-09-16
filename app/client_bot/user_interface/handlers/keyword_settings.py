@@ -10,7 +10,7 @@ from sqlalchemy import and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.client_bot import utils, const
+from app.client_bot import const, utils
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.start_registration_func import (
     start_registration,
@@ -31,6 +31,7 @@ from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
 from ..views import callbacks, messages
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,6 @@ async def setting_keywords_active_keywords(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -110,7 +110,6 @@ async def setting_keywords_sort_by_ctr_desc(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -161,7 +160,6 @@ async def setting_keywords_show_keywords_is_hard(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -210,7 +208,6 @@ async def setting_keywords_white_list(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     page = callback_data.page
@@ -269,7 +266,6 @@ async def setting_keywords_white_list(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     page = callback_data.page
@@ -416,7 +412,6 @@ async def setting_keywords_hide_keywords_is_hard(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     await state.update_data(hide_keywords_is_not_relevant=True)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -462,7 +457,6 @@ async def setting_keywords_hide_keywords_is_hard(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     await state.update_data(hide_keywords_is_not_relevant=False)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -602,7 +596,6 @@ async def setting_keyword(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     keyword_setting_original_id: int = callback_data.keyword_setting_original_id
 
     data = await state.get_data()
@@ -647,10 +640,12 @@ async def change_keyword_hard_status(
             elif new_hard_status == -1:
                 min_ctr = await data_manager.get_min_ctr(adv_setting)
                 async with get_clickhouse_client() as client:
-                    clicks, views, _ = (
-                        await data_manager.get_keyword_statistic_clickhouse(
-                            client, keyword_setting.text, adv_ids
-                        )
+                    (
+                        clicks,
+                        views,
+                        _,
+                    ) = await data_manager.get_keyword_statistic_clickhouse(
+                        client, keyword_setting.text, adv_ids
                     )
                 if keyword_setting.added_clicks:
                     clicks += keyword_setting.added_clicks
@@ -692,7 +687,6 @@ async def check_position(
     callback_data: callbacks.CheckPosition,
     bot: aiogram.Bot,
 ):
-
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     keyword_setting_original_id = callback_data.keyword_setting_original_id
     async with _sm() as session:
@@ -795,7 +789,6 @@ async def reset_added_clicks(
     callback_data: callbacks.ResetAddedClicks,
     bot: aiogram.Bot,
 ):
-
     adv_setting_original_id = callback_data.adv_setting_original_id
     async with _sm(read_only=False) as session:
         stmt = select(KeywordSetting).where(

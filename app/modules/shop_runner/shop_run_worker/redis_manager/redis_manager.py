@@ -1,4 +1,4 @@
-﻿from collections.abc import Awaitable
+from collections.abc import Awaitable
 
 import redis
 

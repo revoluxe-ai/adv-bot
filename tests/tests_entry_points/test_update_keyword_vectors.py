@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 import pytest
@@ -24,16 +24,14 @@ async def test_vector_updater_initialization():
         # Для класса VectorUpdater
 
         # Мокируем зависимости
-        with patch(
-            "run_update_keyword_vectors_in_redis.get_config"
-        ) as mock_get_config, patch(
-            "run_update_keyword_vectors_in_redis.setup_logging"
-        ) as mock_setup_logging, patch(
-            "run_update_keyword_vectors_in_redis.init_redis"
-        ) as mock_init_redis, patch(
-            "run_update_keyword_vectors_in_redis.init_neo4j"
-        ) as mock_init_neo4j:
-
+        with (
+            patch("run_update_keyword_vectors_in_redis.get_config") as mock_get_config,
+            patch(
+                "run_update_keyword_vectors_in_redis.setup_logging"
+            ) as mock_setup_logging,
+            patch("run_update_keyword_vectors_in_redis.init_redis") as mock_init_redis,
+            patch("run_update_keyword_vectors_in_redis.init_neo4j") as mock_init_neo4j,
+        ):
             # Настраиваем мок-конфиг
             mock_get_config.return_value = {
                 "redis_url": "redis://localhost:6379",
@@ -53,23 +51,23 @@ async def test_vector_updater_initialization():
             mock_init_neo4j.assert_called_once()
 
             # Проверяем, что атрибуты настроены правильно
-            assert hasattr(
-                updater, "config"
-            ), "У объекта VectorUpdater должен быть атрибут config"
+            assert hasattr(updater, "config"), (
+                "У объекта VectorUpdater должен быть атрибут config"
+            )
     else:
         # Для функции main
 
         # Мокируем функции инициализации
-        with patch(
-            "run_update_keyword_vectors_in_redis.setup_logging"
-        ) as mock_setup_logging, patch(
-            "run_update_keyword_vectors_in_redis.load_config"
-        ) as mock_load_config, patch(
-            "run_update_keyword_vectors_in_redis.init_redis"
-        ) as mock_init_redis, patch(
-            "run_update_keyword_vectors_in_redis.init_neo4j"
-        ) as mock_init_neo4j:
-
+        with (
+            patch(
+                "run_update_keyword_vectors_in_redis.setup_logging"
+            ) as mock_setup_logging,
+            patch(
+                "run_update_keyword_vectors_in_redis.load_config"
+            ) as mock_load_config,
+            patch("run_update_keyword_vectors_in_redis.init_redis") as mock_init_redis,
+            patch("run_update_keyword_vectors_in_redis.init_neo4j") as mock_init_neo4j,
+        ):
             # Настраиваем мок-функции
             mock_load_config.return_value = {
                 "redis_url": "redis://localhost:6379",
@@ -127,14 +125,16 @@ async def test_vector_updater_fetches_keywords_from_neo4j():
             {"keyword": "keyword1", "vector": [0.1, 0.2, 0.3]},
             {"keyword": "keyword2", "vector": [0.4, 0.5, 0.6]},
         ]
-        with patch(
-            "run_update_keyword_vectors_in_redis.fetch_keywords_from_neo4j",
-            new_callable=AsyncMock,
-        ) as mock_fetch, patch(
-            "run_update_keyword_vectors_in_redis.update_vectors_in_redis",
-            new_callable=AsyncMock,
-        ) as mock_update:
-
+        with (
+            patch(
+                "run_update_keyword_vectors_in_redis.fetch_keywords_from_neo4j",
+                new_callable=AsyncMock,
+            ) as mock_fetch,
+            patch(
+                "run_update_keyword_vectors_in_redis.update_vectors_in_redis",
+                new_callable=AsyncMock,
+            ) as mock_update,
+        ):
             # Настраиваем мок-функции
             mock_fetch.return_value = test_keywords
 
@@ -173,9 +173,9 @@ async def test_vector_updater_updates_redis():
         await updater.update_vectors_in_redis(test_keywords)
 
         # Проверяем, что метод set Redis был вызван для каждого ключевого слова
-        assert (
-            redis_mock.set.call_count == 2
-        ), "Метод set Redis должен быть вызван для каждого ключевого слова"
+        assert redis_mock.set.call_count == 2, (
+            "Метод set Redis должен быть вызван для каждого ключевого слова"
+        )
     else:
         # Для функции main
 
@@ -198,9 +198,9 @@ async def test_vector_updater_updates_redis():
             await update_vectors_in_redis(test_keywords)
 
             # Проверяем, что метод set Redis был вызван для каждого ключевого слова
-            assert (
-                redis_mock.set.call_count == 2
-            ), "Метод set Redis должен быть вызван для каждого ключевого слова"
+            assert redis_mock.set.call_count == 2, (
+                "Метод set Redis должен быть вызван для каждого ключевого слова"
+            )
 
 
 @pytest.mark.asyncio
@@ -234,16 +234,19 @@ async def test_vector_updater_handles_empty_keywords():
         # Для функции main
 
         # Мокируем функции
-        with patch(
-            "run_update_keyword_vectors_in_redis.fetch_keywords_from_neo4j",
-            new_callable=AsyncMock,
-        ) as mock_fetch, patch(
-            "run_update_keyword_vectors_in_redis.update_vectors_in_redis",
-            new_callable=AsyncMock,
-        ) as mock_update, patch(
-            "run_update_keyword_vectors_in_redis.log_warning"
-        ) as mock_log_warning:
-
+        with (
+            patch(
+                "run_update_keyword_vectors_in_redis.fetch_keywords_from_neo4j",
+                new_callable=AsyncMock,
+            ) as mock_fetch,
+            patch(
+                "run_update_keyword_vectors_in_redis.update_vectors_in_redis",
+                new_callable=AsyncMock,
+            ) as mock_update,
+            patch(
+                "run_update_keyword_vectors_in_redis.log_warning"
+            ) as mock_log_warning,
+        ):
             # Настраиваем мок-функции
             mock_fetch.return_value = []
 

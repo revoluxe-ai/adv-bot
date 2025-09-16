@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -23,14 +23,12 @@ async def test_keyword_sender_initialization():
         # Для класса KeywordSender
 
         # Мокируем зависимости
-        with patch("keyword_sending_to_neo4j.get_config") as mock_get_config, patch(
-            "keyword_sending_to_neo4j.setup_logging"
-        ) as mock_setup_logging, patch(
-            "keyword_sending_to_neo4j.init_neo4j"
-        ) as mock_init_neo4j, patch(
-            "keyword_sending_to_neo4j.init_db_connection"
-        ) as mock_init_db:
-
+        with (
+            patch("keyword_sending_to_neo4j.get_config") as mock_get_config,
+            patch("keyword_sending_to_neo4j.setup_logging") as mock_setup_logging,
+            patch("keyword_sending_to_neo4j.init_neo4j") as mock_init_neo4j,
+            patch("keyword_sending_to_neo4j.init_db_connection") as mock_init_db,
+        ):
             # Настраиваем мок-конфиг
             mock_get_config.return_value = {
                 "db_connection": "test_connection_string",
@@ -50,23 +48,19 @@ async def test_keyword_sender_initialization():
             mock_init_db.assert_called_once()
 
             # Проверяем, что атрибуты настроены правильно
-            assert hasattr(
-                sender, "config"
-            ), "У объекта KeywordSender должен быть атрибут config"
+            assert hasattr(sender, "config"), (
+                "У объекта KeywordSender должен быть атрибут config"
+            )
     else:
         # Для функции main
 
         # Мокируем функции инициализации
-        with patch(
-            "keyword_sending_to_neo4j.setup_logging"
-        ) as mock_setup_logging, patch(
-            "keyword_sending_to_neo4j.load_config"
-        ) as mock_load_config, patch(
-            "keyword_sending_to_neo4j.init_neo4j"
-        ) as mock_init_neo4j, patch(
-            "keyword_sending_to_neo4j.init_db"
-        ) as mock_init_db:
-
+        with (
+            patch("keyword_sending_to_neo4j.setup_logging") as mock_setup_logging,
+            patch("keyword_sending_to_neo4j.load_config") as mock_load_config,
+            patch("keyword_sending_to_neo4j.init_neo4j") as mock_init_neo4j,
+            patch("keyword_sending_to_neo4j.init_db") as mock_init_db,
+        ):
             # Настраиваем мок-функции
             mock_load_config.return_value = {
                 "db_connection": "test_connection_string",
@@ -124,12 +118,16 @@ async def test_keyword_sender_fetches_keywords():
             {"keyword": "keyword1", "frequency": 100},
             {"keyword": "keyword2", "frequency": 200},
         ]
-        with patch(
-            "keyword_sending_to_neo4j.fetch_keywords_from_db", new_callable=AsyncMock
-        ) as mock_fetch, patch(
-            "keyword_sending_to_neo4j.send_keywords_to_neo4j", new_callable=AsyncMock
-        ) as mock_send:
-
+        with (
+            patch(
+                "keyword_sending_to_neo4j.fetch_keywords_from_db",
+                new_callable=AsyncMock,
+            ) as mock_fetch,
+            patch(
+                "keyword_sending_to_neo4j.send_keywords_to_neo4j",
+                new_callable=AsyncMock,
+            ) as mock_send,
+        ):
             # Настраиваем мок-функции
             mock_fetch.return_value = test_keywords
 
@@ -169,9 +167,9 @@ async def test_keyword_sender_sends_to_neo4j():
         await sender.send_keywords_to_neo4j(test_keywords)
 
         # Проверяем, что метод run_query Neo4j был вызван для каждого ключевого слова
-        assert (
-            neo4j_mock.run_query.call_count == 2
-        ), "Метод run_query Neo4j должен быть вызван для каждого ключевого слова"
+        assert neo4j_mock.run_query.call_count == 2, (
+            "Метод run_query Neo4j должен быть вызван для каждого ключевого слова"
+        )
     else:
         # Для функции main
 
@@ -195,9 +193,9 @@ async def test_keyword_sender_sends_to_neo4j():
             await send_keywords_to_neo4j(test_keywords)
 
             # Проверяем, что метод run_query Neo4j был вызван для каждого ключевого слова
-            assert (
-                neo4j_mock.run_query.call_count == 2
-            ), "Метод run_query Neo4j должен быть вызван для каждого ключевого слова"
+            assert neo4j_mock.run_query.call_count == 2, (
+                "Метод run_query Neo4j должен быть вызван для каждого ключевого слова"
+            )
 
 
 @pytest.mark.asyncio
@@ -231,14 +229,17 @@ async def test_keyword_sender_handles_empty_keywords():
         # Для функции main
 
         # Мокируем функции
-        with patch(
-            "keyword_sending_to_neo4j.fetch_keywords_from_db", new_callable=AsyncMock
-        ) as mock_fetch, patch(
-            "keyword_sending_to_neo4j.send_keywords_to_neo4j", new_callable=AsyncMock
-        ) as mock_send, patch(
-            "keyword_sending_to_neo4j.log_warning"
-        ) as mock_log_warning:
-
+        with (
+            patch(
+                "keyword_sending_to_neo4j.fetch_keywords_from_db",
+                new_callable=AsyncMock,
+            ) as mock_fetch,
+            patch(
+                "keyword_sending_to_neo4j.send_keywords_to_neo4j",
+                new_callable=AsyncMock,
+            ) as mock_send,
+            patch("keyword_sending_to_neo4j.log_warning") as mock_log_warning,
+        ):
             # Настраиваем мок-функции
             mock_fetch.return_value = []
 

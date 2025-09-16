@@ -1,16 +1,16 @@
-﻿import asyncio
+import asyncio
 import logging
 from asyncio import Task
 
 from aiohttp import ClientSession
 
-from .excs import ShopNotFoundInRedisQueueError
-from ..redis_manager import RedisShopManager
 from ...run_process_func import run_shop_task
+from ..redis_manager import RedisShopManager
+from .excs import ShopNotFoundInRedisQueueError
 
 logger = logging.getLogger(__name__)
 
-from typing import Callable
+from collections.abc import Callable
 
 
 class ShopWorker:
@@ -37,10 +37,12 @@ class ShopWorker:
         await redis_manager.remove_shops([shop_id])
         logger.debug(f"Магазин {shop_id} удалён из активных после завершения задачи")
 
-    async def _update_active_shop_update_tasks_update(self, tasks: dict[str, Task], redis_manager: RedisShopManager) -> None:
+    async def _update_active_shop_update_tasks_update(
+        self, tasks: dict[str, Task], redis_manager: RedisShopManager
+    ) -> None:
         new_free_shop_id: str | None = await redis_manager.get_next_free_shop_id()
         if not new_free_shop_id:
-            raise ShopNotFoundInRedisQueueError('Нет магазина')
+            raise ShopNotFoundInRedisQueueError("Нет магазина")
         assert new_free_shop_id is not None
         if new_free_shop_id not in tasks:
             task: asyncio.Task[None] = asyncio.create_task(
@@ -61,7 +63,6 @@ class ShopWorker:
                     )
                 del tasks[shop_id]
 
-
     async def update_active_shop_update_tasks_run(self) -> None:
         tasks: dict[str, Task[None]] = self._tasks
         redis_manager = RedisShopManager()
@@ -70,9 +71,11 @@ class ShopWorker:
             try:
                 await self._update_active_shop_update_tasks_update(tasks, redis_manager)
             except ShopNotFoundInRedisQueueError:
-                logger.info('Нет новых магазинов')
+                logger.info("Нет новых магазинов")
                 await asyncio.sleep(15)
             except Exception as e:
-                logger.error(f"Ошибка при получении свободного магазина: {e}", exc_info=True)
+                logger.error(
+                    f"Ошибка при получении свободного магазина: {e}", exc_info=True
+                )
             finally:
                 await asyncio.sleep(1)

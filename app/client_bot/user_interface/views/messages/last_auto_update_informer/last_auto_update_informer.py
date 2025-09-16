@@ -1,11 +1,11 @@
-﻿import datetime
+import datetime
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager import (
-    last_auto_update_phrases_to_white_list,
     LastSetDownTargetPlace,
     LastSetUpTargetPlace,
     LastUpdateFirstPhrase,
+    last_auto_update_phrases_to_white_list,
 )
 
 

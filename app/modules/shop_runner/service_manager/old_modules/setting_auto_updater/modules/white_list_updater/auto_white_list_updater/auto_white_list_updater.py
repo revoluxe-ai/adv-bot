@@ -1,4 +1,4 @@
-﻿from typing import TypeVar
+from typing import TypeVar
 
 from sqlalchemy import update
 
@@ -8,6 +8,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .redis_cache.redis_cache import AdvSettingRedisCache
 
 T = TypeVar("T")
@@ -117,16 +118,10 @@ class WhiteListUpdateManager:
                 else:
                     return False
             else:
-                if (
-                    keyword.hard_status == 1
-                    and keyword.status == KeywordStatus.BAD
-                ):
+                if keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD:
                     return True
                 else:
                     return False
-
-
-
 
         keywords_for_adding = list(filter(candidate_for_white_list_filter, keywords))
         if not keywords_for_adding:

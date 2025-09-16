@@ -5,7 +5,7 @@ from aiogram import Router, types
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 
-from app.client_bot.user_interface.views import messages, callbacks
+from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
     KeywordGraphicPart_1,
     KeywordGraphicPart_2,

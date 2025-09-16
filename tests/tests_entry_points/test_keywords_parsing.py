@@ -44,14 +44,17 @@ async def test_keywords_parsing_run_calls_all_functions():
 
         # Создаем моки для всех функций, которые должны вызываться из main
         # Замените эти функции на реальные функции
-        with patch(
-            "run_keywords_parsing.fetch_keywords", new_callable=AsyncMock
-        ) as mock_fetch, patch(
-            "run_keywords_parsing.process_keywords", new_callable=AsyncMock
-        ) as mock_process, patch(
-            "run_keywords_parsing.store_keywords", new_callable=AsyncMock
-        ) as mock_store:
-
+        with (
+            patch(
+                "run_keywords_parsing.fetch_keywords", new_callable=AsyncMock
+            ) as mock_fetch,
+            patch(
+                "run_keywords_parsing.process_keywords", new_callable=AsyncMock
+            ) as mock_process,
+            patch(
+                "run_keywords_parsing.store_keywords", new_callable=AsyncMock
+            ) as mock_store,
+        ):
             # Вызываем тестируемую функцию
             await main()
 
@@ -92,18 +95,22 @@ async def test_keywords_parsing_handles_exceptions():
         # Для функции main
 
         # Создаем моки для функций, с одной функцией, вызывающей исключение
-        with patch(
-            "run_keywords_parsing.fetch_keywords",
-            new_callable=AsyncMock,
-            side_effect=Exception("Test exception"),
-        ) as mock_fetch, patch(
-            "run_keywords_parsing.process_keywords", new_callable=AsyncMock
-        ) as mock_process, patch(
-            "run_keywords_parsing.store_keywords", new_callable=AsyncMock
-        ) as mock_store, patch(
-            "run_keywords_parsing.handle_error", new_callable=AsyncMock
-        ) as mock_handle_error:
-
+        with (
+            patch(
+                "run_keywords_parsing.fetch_keywords",
+                new_callable=AsyncMock,
+                side_effect=Exception("Test exception"),
+            ) as mock_fetch,
+            patch(
+                "run_keywords_parsing.process_keywords", new_callable=AsyncMock
+            ) as mock_process,
+            patch(
+                "run_keywords_parsing.store_keywords", new_callable=AsyncMock
+            ) as mock_store,
+            patch(
+                "run_keywords_parsing.handle_error", new_callable=AsyncMock
+            ) as mock_handle_error,
+        ):
             # Вызываем тестируемую функцию
             try:
                 await main()
@@ -148,24 +155,27 @@ async def test_keywords_parsing_performance():
         # Для функции main
 
         # Создаем быстрые моки для всех функций
-        with patch(
-            "run_keywords_parsing.fetch_keywords",
-            new_callable=AsyncMock,
-            return_value=["keyword1", "keyword2", "keyword3"],
-        ) as mock_fetch, patch(
-            "run_keywords_parsing.process_keywords",
-            new_callable=AsyncMock,
-            return_value=["processed1", "processed2", "processed3"],
-        ) as mock_process, patch(
-            "run_keywords_parsing.store_keywords", new_callable=AsyncMock
-        ) as mock_store:
-
+        with (
+            patch(
+                "run_keywords_parsing.fetch_keywords",
+                new_callable=AsyncMock,
+                return_value=["keyword1", "keyword2", "keyword3"],
+            ) as mock_fetch,
+            patch(
+                "run_keywords_parsing.process_keywords",
+                new_callable=AsyncMock,
+                return_value=["processed1", "processed2", "processed3"],
+            ) as mock_process,
+            patch(
+                "run_keywords_parsing.store_keywords", new_callable=AsyncMock
+            ) as mock_store,
+        ):
             # Замеряем время выполнения
             start_time = asyncio.get_event_loop().time()
             await main()
             end_time = asyncio.get_event_loop().time()
 
             # Проверяем, что выполнение заняло не более 1 секунды
-            assert (
-                end_time - start_time < 1.0
-            ), "Выполнение заняло слишком много времени"
+            assert end_time - start_time < 1.0, (
+                "Выполнение заняло слишком много времени"
+            )

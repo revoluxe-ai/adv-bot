@@ -1,4 +1,4 @@
-﻿from app.client_bot.user_interface.message_templates import (
+from app.client_bot.user_interface.message_templates import (
     TextWithImage,
     TextWithKeyboardAndImage,
 )
@@ -6,7 +6,6 @@ from app.client_bot.user_interface.views import keyboards
 
 
 class KeywordGraphicPart_1(TextWithImage):
-
     def __init__(self, bot, chat_id, image, adv_original_id):
         self._image = image
         self._adv_original_id = adv_original_id
