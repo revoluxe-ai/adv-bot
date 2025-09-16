@@ -162,14 +162,14 @@ async def test_ctr_predictor_saves_predictions():
 
         # Мокируем функции
         with (
-            patch("run_update_predict_ctr.load_model") as mock_load_model,
+            patch("run_update_predict_ctr.load_model"),
             patch(
                 "run_update_predict_ctr.load_data",
                 return_value={"ids": test_ids, "features": np.random.rand(10, 5)},
-            ) as mock_load_data,
+            ),
             patch(
                 "run_update_predict_ctr.predict", return_value=test_predictions
-            ) as mock_predict,
+            ),
             patch(
                 "run_update_predict_ctr.save_predictions", new_callable=AsyncMock
             ) as mock_save,
@@ -213,11 +213,11 @@ async def test_ctr_predictor_handles_empty_data():
 
         # Мокируем функции, чтобы load_data возвращал пустые данные
         with (
-            patch("run_update_predict_ctr.load_model") as mock_load_model,
+            patch("run_update_predict_ctr.load_model"),
             patch(
                 "run_update_predict_ctr.load_data",
                 return_value={"ids": [], "features": np.array([]).reshape(0, 0)},
-            ) as mock_load_data,
+            ),
             patch("run_update_predict_ctr.predict") as mock_predict,
             patch("run_update_predict_ctr.save_predictions") as mock_save,
         ):
