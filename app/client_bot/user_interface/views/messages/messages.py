@@ -38,7 +38,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBItemPosition,
     WBUserCabinet,
 )
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import (

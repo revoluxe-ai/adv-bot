@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.common_slaves.wildberries.wb_api import WBApi
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import DayStats
 from app.utils.db.session_maker import get_async_session_maker as sm
 

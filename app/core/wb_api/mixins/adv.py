@@ -7,7 +7,7 @@ from typing import Any, TypeVar
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
 from app.modules.common_slaves.wildberries.data_classes.adv import Balances
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 
 from ..data_classes.advs import adv_fabric
 from ..exceptions import BadRequestError, MinAdvBidWBApiError
