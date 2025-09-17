@@ -1,19 +1,22 @@
+"""Модуль для расчета стоимости тарифов."""
+
 from sqlalchemy import func, select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
-
-from ...settings import settings
 from .tariffs import tariffs
 from .tariffs_text import text
 
 
 class Pricer:
+    """Класс для расчета стоимости тарифов."""
+
     @property
     def text(self):
         return text
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._tariffs = tariffs
 
     @staticmethod
@@ -25,7 +28,8 @@ class Pricer:
                 .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active == True)
             )
             result = await session.execute(stmt)
-            count_active_advs: int = result.scalar()
+            count_active_advs: int | None = result.scalar()
+            count_active_advs = count_active_advs or 0
             return count_active_advs
 
     async def get_month_tariff_for_count_advs(self, shop_id: str) -> int:
@@ -62,12 +66,8 @@ class Pricer:
         return sum_payment / count_advs
 
     async def get_automactic_tariff(self, shop_id: str) -> int:
-        month_tariff_for_white_list_auto_updater = (
-            await self._get_month_tariff_for_white_list_updater(shop_id)
-        )
-        month_tariff_for_autoupdate_target_place = (
-            await self._get_month_tariff_for_autoupdate_target_place(shop_id)
-        )
+        month_tariff_for_white_list_auto_updater = await self._get_month_tariff_for_white_list_updater(shop_id)
+        month_tariff_for_autoupdate_target_place = await self._get_month_tariff_for_autoupdate_target_place(shop_id)
         return month_tariff_for_white_list_auto_updater + month_tariff_for_autoupdate_target_place
 
     async def _get_month_tariff_for_white_list_updater(self, shop_id: str) -> int:
