@@ -1,3 +1,5 @@
+"""Модуль для работы с Redis через DI."""
+
 __all__ = ("_RedisLifecycle", "create_redis_client")
 
 from dependency_injector import resources
@@ -7,10 +9,11 @@ from app.configs.infrastructure_config.redis_config import RedisConfig
 
 
 def create_redis_client(redis_config: RedisConfig) -> Redis:
-    """Синхронно создаёт Redis asyncio-клиент. Проверка доступности и закрытие
-    выполняются в приватном lifecycle-ресурсе.
+    """Синхронно создаёт Redis asyncio-клиент.
+
+    Проверка доступности и закрытие выполняются в приватном lifecycle-ресурсе.
     """
-    client = Redis[str, str](
+    client = Redis(
         host=redis_config.host,
         port=redis_config.port,
         db=redis_config.db,
