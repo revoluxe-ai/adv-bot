@@ -3,7 +3,6 @@
 import logging
 from collections.abc import AsyncGenerator, Awaitable
 from datetime import datetime, timedelta
-from typing import Tuple
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
