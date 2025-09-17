@@ -1,12 +1,12 @@
 ﻿import logging
 from typing import Dict, Optional
 
+from app.core.di.wb_api.wb_api_container import WBApiDIContainer
 from app.core.mp.wb.api_client.clients.promotion.generated.v1.marketing_i_prodvizhenie.models import (
     PostAdvV0BidsMinBodyPlacementTypesItem,
 )
 
 from app.core.di import inject, Provide
-from app.core.di.wb_api_clients.wb_api_container import WBApiDIContainer
 from app.core.mp.wb.protocols.promotion_protocol import PromotionAdapterProtocol
 
 logger = logging.getLogger(__name__)
@@ -35,10 +35,9 @@ class MinBidMixin:
         try:
             # Используем адаптер, переданный через DI
             adapter = promotion_adapter
-
             # Вызываем адаптер с именованными аргументами
             response = await adapter.get_min_bids(
-                adv_id=adv_id,
+                advert_id=adv_id,
                 nmids=nmids,
                 payment_type="cpm",
                 placement_type="search",
