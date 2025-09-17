@@ -1,3 +1,5 @@
+"""Модуль для работы с Neo4j через DI."""
+
 __all__ = ("Neo4jLifecycle", "create_neo4j_driver")
 
 from dependency_injector import resources
@@ -29,9 +31,11 @@ class Neo4jLifecycle(resources.AsyncResource[None]):
     """
 
     async def init(self, driver: AsyncDriver) -> None:
+        """Инициализирует ресурс, проверяя подключение к Neo4j."""
         # Провайдер передаёт driver как аргумент
         await driver.verify_connectivity()
 
     async def shutdown(self, driver: AsyncDriver | None = None) -> None:
+        """Завершает работу ресурса, закрывая подключение к Neo4j."""
         if driver:
             await driver.close()

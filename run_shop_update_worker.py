@@ -1,17 +1,19 @@
-import dotenv
+"""Воркер для обновления магазинов."""
 
-dotenv.load_dotenv()
 import asyncio
 
+import dotenv
 from aiohttp import ClientSession
 
 from app.modules.shop_runner.shop_run_worker.worker.worker import ShopWorker
 from python_modules.logger import setup_logging
 
+dotenv.load_dotenv()
 setup_logging()
 
 
 async def run_shop_update_worker() -> None:
+    """Запускает воркер для обновления магазинов."""
     from app.core.di import AppContainer
 
     container = AppContainer()
