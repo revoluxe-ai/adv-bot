@@ -12,8 +12,12 @@ class BaseRedisManager:
 
     @inject
     def __init__(self, redis_client: Redis = Provide[AppContainer.redis_client]):
-        self._client = redis_client
+        self.__client = redis_client
+
+    @abstractmethod
+    def _get_key(self, *args: Any, **kwargs: Any) -> str: ...
 
     @property
-    @abstractmethod
-    def key(self, *args: Any, **kwargs: Any) -> str: ...
+    def _client(self) -> Redis:
+        """Геттер для доступа к клиенту Redis"""
+        return self.__client
