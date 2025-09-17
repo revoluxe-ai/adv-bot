@@ -1,9 +1,9 @@
 import logging
 
-from aiogram import Bot, Router, F
+from aiogram import Bot, F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import update
 
 from app.client_bot.user_interface.handlers.start import start_registration
@@ -22,7 +22,6 @@ router = Router()
 async def change_cpm_step(
     callback: CallbackQuery, callback_data: callbacks.CPMSettingMenu, state: FSMContext
 ):
-
     adv_original_id = callback_data.adv_original_id
     await state.update_data(adv_original_id=adv_original_id)
     await state.set_state("waiting_for_new_step")
@@ -48,9 +47,7 @@ async def set_new_step(message: Message, state: FSMContext, bot: Bot):
         return
     async with sm(read_only=False) as session:
         query = (
-            update(AdvSetting)
-            .filter(AdvSetting.id == adv_original_id)
-            .values(bidder_step=new_step)
+            update(AdvSetting).filter(AdvSetting.id == adv_original_id).values(bidder_step=new_step)
         )
         await session.execute(query)
         await session.commit()

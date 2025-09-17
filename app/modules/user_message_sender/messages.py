@@ -1,11 +1,11 @@
 from aiogram.types import InlineKeyboardButton
-from aiogram.utils.keyboard import  InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 
 
 class NotAnyUsesAndNotMoneyOnBalance(TextWithKeyboard):
-
     text = """
 Почти потерялись😳
 
@@ -26,16 +26,13 @@ Seller's Pub - уникальный сервис для ВБ✅
 Твой список магазинов:👇
     """
 
-
     @property
     def keyboard(self):
         builder = InlineKeyboardBuilder()
         button = InlineKeyboardButton(
-            text='Перейти в главное меню',
-            callback_data= \
-                callbacks.Start().pack(),
+            text="Перейти в главное меню",
+            callback_data=callbacks.Start().pack(),
         )
 
         builder.row(button)
         return builder.as_markup()
-

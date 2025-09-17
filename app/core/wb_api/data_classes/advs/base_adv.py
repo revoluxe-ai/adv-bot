@@ -2,11 +2,6 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
-
-
-
-
 
 
 class Adv(BaseModel, ABC):
@@ -22,7 +17,6 @@ class Adv(BaseModel, ABC):
     endTime: datetime
     startTime: datetime
 
-
     @property
     @abstractmethod
     def cpm(self) -> int:
@@ -32,7 +26,6 @@ class Adv(BaseModel, ABC):
     @abstractmethod
     def nmids(self) -> list[int]:
         pass
-
 
     @property
     def category_name(self) -> str:

@@ -1,7 +1,8 @@
-﻿import asyncio
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import ParamSpec, TypeVar, Callable, Awaitable
+from typing import ParamSpec, TypeVar
 
 from sqlalchemy.exc import InterfaceError
 
@@ -22,9 +23,7 @@ F_Spec = ParamSpec("F_Spec")
 
 def while_coroutine_decorator(
     pause_on_success: int, pause_on_error: int = 5
-) -> Callable[
-    [Callable[F_Spec, Awaitable[T_Result]]], Callable[F_Spec, Awaitable[T_Result]]
-]:
+) -> Callable[[Callable[F_Spec, Awaitable[T_Result]]], Callable[F_Spec, Awaitable[T_Result]]]:
     def decorator(
         func: Callable[F_Spec, Awaitable[T_Result]],
     ) -> Callable[F_Spec, Awaitable[T_Result]]:
@@ -42,8 +41,7 @@ def while_coroutine_decorator(
                     raise StopShopUpdateException from exc
                 except MaxAttemptsError as exc:
                     logger.error(
-                        f"Максимальное количество попыток для {func.__name__} "
-                        f"достигнуто: {exc}",
+                        f"Максимальное количество попыток для {func.__name__} достигнуто: {exc}",
                         exc_info=True,
                     )
                     await asyncio.sleep(pause_on_error)

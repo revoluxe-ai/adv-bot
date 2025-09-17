@@ -1,4 +1,4 @@
-﻿class ShopRunnerCriticalError(Exception):
+class ShopRunnerCriticalError(Exception):
     """Base class for all ShopRunner exceptions."""
 
     pass

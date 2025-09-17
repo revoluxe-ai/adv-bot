@@ -1,1 +1,1 @@
-﻿from .handlers import router as auto_updater_target_place_setting_router
+from .handlers import router as auto_updater_target_place_setting_router

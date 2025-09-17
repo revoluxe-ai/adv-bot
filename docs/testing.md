@@ -4,7 +4,7 @@
 
 Для запуска тестов используйте команду:
 
-```powershell
+```bash
 pytest -x
 ```
 
@@ -16,17 +16,17 @@ pytest -x
 ### Дополнительные опции запуска
 
 1. Запуск с подробным выводом:
-```powershell
+```bash
 pytest -x -v
 ```
 
 2. Запуск конкретного теста:
-```powershell
+```bash
 pytest tests/test_file.py::test_function_name -x
 ```
 
 3. Запуск с выводом print-сообщений:
-```powershell
+```bash
 pytest -x -s
 ```
 

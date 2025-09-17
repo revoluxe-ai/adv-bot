@@ -1,10 +1,10 @@
 import dotenv
+
 dotenv.load_dotenv()
 import os
 
 
 class Settings:
-
     @property
     def PARSING_KEYWORDS_DELAY_BETWEEN_TASKS(self) -> int:
         value = os.environ.get("PARSING_KEYWORDS_DELAY_BETWEEN_TASKS")
@@ -338,38 +338,31 @@ class Settings:
         else:
             return int(value)
 
-
-
     @property
     def DEFAULT_CTR_EXPONENTA(self):
-        value = os.getenv('MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS')
+        value = os.getenv("MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS")
         if not value:
             return 20
         return int(value)
 
-
     @property
     def DEFAULT_MIN_CTR(self) -> float:
-        value = os.getenv('DEFAULT_MIN_CTR')
+        value = os.getenv("DEFAULT_MIN_CTR")
         if not value:
             return 0.1
         return float(value)
 
-
     @property
     def START_AUCTION_ON_CREATING_ADV(self) -> bool:
-        value = os.environ.get('START_AUCTION_ON_CREATING_ADV')
+        value = os.environ.get("START_AUCTION_ON_CREATING_ADV")
         if value is None:
             return False
         value = value.lower()
-        if value == 'false':
+        if value == "false":
             return False
-        elif value == 'true':
+        elif value == "true":
             return True
-        raise ValueError('Не верное значение')
-
-
-
+        raise ValueError("Не верное значение")
 
 
 settings = Settings()

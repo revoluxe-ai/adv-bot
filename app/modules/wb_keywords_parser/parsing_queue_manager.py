@@ -6,4 +6,4 @@
 from .wb_parser.parsing_page_queue_manager import ParsingQueueManager
 
 # Для обратной совместимости
-__all__ = ['ParsingQueueManager']
+__all__ = ["ParsingQueueManager"]

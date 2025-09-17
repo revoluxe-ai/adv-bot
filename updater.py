@@ -1,19 +1,19 @@
-import dotenv
+import asyncio
+import logging
+import time
+from functools import partial
+from multiprocessing import Process
 
-dotenv.load_dotenv()
+import dotenv
+import psutil
 
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     run_update_all_keywords_on_wb,
 )
 from python_modules.logger import setup_logging
-import logging
-import asyncio
-from multiprocessing import Process
-from functools import partial
-import time
-import psutil
 
+dotenv.load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ async def update_keywords_ctr_by_similary_run():
     while True:
         try:
             await hard_data_manager.update_keywords_ctr_by_similary()
-        except:
+        except Exception:
             logger.error("Ошибка обновления по похожему CTR процессов", exc_info=True)
         await asyncio.sleep(60)
 
@@ -41,7 +41,7 @@ run_own_process_list = [
 def process_controller(process_pids: list[int], process_names: list[str]):
     time.sleep(10)
     while True:
-        for pid, name in zip(process_pids, process_names):
+        for pid, name in zip(process_pids, process_names, strict=False):
             logger.debug(f"Проверка процесса: {name}")
             try:
                 proc = psutil.Process(pid)
@@ -76,7 +76,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-
     level = logging.INFO
     setup_logging()
     while True:

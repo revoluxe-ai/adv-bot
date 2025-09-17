@@ -52,9 +52,7 @@ class ParserWorker:
                         await self._process_task(task)
                         logger.debug(f"Finished task: {task}")
                     except Exception as e:
-                        logger.error(
-                            f"Error processing task {task}: {e}", exc_info=True
-                        )
+                        logger.error(f"Error processing task {task}: {e}", exc_info=True)
 
                 else:
                     # Если задач нет, ждем немного

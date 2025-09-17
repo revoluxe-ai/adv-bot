@@ -1,9 +1,10 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .not_relevante_template import NotRelevantTemplate
 from .redis_manager import RedisManager
 

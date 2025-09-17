@@ -1,6 +1,6 @@
 from sqlalchemy import Integer
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import declared_attr, mapped_column, Mapped
+from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 Base = declarative_base()
 

@@ -1,11 +1,13 @@
 import logging
 import typing
 from collections import defaultdict
-from typing import Generator, TypeVar
+from collections.abc import Generator
+from typing import TypeVar
 
 from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .exceptions import ApiForbiddenError
 
 if typing.TYPE_CHECKING:
@@ -29,9 +31,7 @@ T = TypeVar("T")
 class BaseAPI:
     HOST = "wildberries.ru"
 
-    def __init__(
-        self, wb_access: WBCabinetAccess, client_session: ClientSession
-    ) -> None:
+    def __init__(self, wb_access: WBCabinetAccess, client_session: ClientSession) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
         tokens: list[WBToken] = wb_access.tokens
@@ -75,14 +75,10 @@ class BaseAPI:
         current_token_original_id = self._current_token.id
         self._bad_tokens_original_ids[method_name].add(current_token_original_id)
 
-        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[
-            method_name
-        ]
+        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[method_name]
 
         free_tokens = [
-            token
-            for token in self._free_tokens
-            if token.id not in all_bad_token_original_ids
+            token for token in self._free_tokens if token.id not in all_bad_token_original_ids
         ]
 
         if free_tokens:

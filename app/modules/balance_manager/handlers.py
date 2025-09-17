@@ -8,7 +8,7 @@ from aiogram import Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import LabeledPrice
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from app.client_bot import const
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
@@ -24,6 +24,7 @@ from app.payments.db.models import Payment
 from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
 from . import messages
 
 logger = logging.getLogger(__name__)
@@ -43,9 +44,7 @@ async def add_balance(
     state: FSMContext,
 ) -> None:
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
-    await state.update_data(
-        wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id
-    )
+    await state.update_data(wb_cabinet_original_id_for_add_balance=wb_cabinet_original_id)
 
     keyboard = types.InlineKeyboardMarkup(
         inline_keyboard=[
@@ -69,9 +68,7 @@ async def add_balance(
         "(https://docs.google.com/document/d/1fxmcwfZUwoHqDUQenHq31eHjcg641vef1ZYx3Mxqg40/)"
     )
 
-    await bot.send_message(
-        chat_id, text, reply_markup=keyboard, parse_mode="MarkdownV2"
-    )
+    await bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode="MarkdownV2")
 
     return
 
@@ -92,9 +89,7 @@ async def confirm_add_balance(
     time_from = "2024-07-01 00:00:00"
     time_from_datetime = datetime.datetime.strptime(time_from, "%Y-%m-%d %H:%M:%S")
     async with sm() as session:
-        stmt = select(func.max(Payment.amount)).where(
-            Payment.timestamp > time_from_datetime
-        )
+        stmt = select(func.max(Payment.amount)).where(Payment.timestamp > time_from_datetime)
         result_max_amount = await session.execute(stmt)
         max_amount = result_max_amount.scalar()
         if not max_amount:
@@ -114,9 +109,7 @@ async def confirm_add_balance(
 
 
 @router.message(StateFilter(states.AddBalance.awaiting_amount))
-async def waiting_for_amount(
-    message: types.Message, state: FSMContext, bot: aiogram.Bot
-) -> None:
+async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aiogram.Bot) -> None:
     assert message.text is not None
     amount: str = message.text
     min_sum = const.min_sum
@@ -155,11 +148,11 @@ async def waiting_for_amount(
 
     user_telegram_id = message.chat.id
     sum_for_adding = int(amount) * 100
-    prices = [LabeledPrice(label=f"Пополнение баланса", amount=str(sum_for_adding))]
+    prices = [LabeledPrice(label="Пополнение баланса", amount=str(sum_for_adding))]
     await bot.send_invoice(
         user_telegram_id,
         title="Подписка на бота",
-        description=f"Пополнение баланса магазина \n" f" на {amount} рублей. \n",
+        description=f"Пополнение баланса магазина \n на {amount} рублей. \n",
         provider_data=provider_data,
         payload=payload,
         provider_token=provider_token,
@@ -193,20 +186,21 @@ async def successful_payment_handler(
 
         if not user_id:
             logger.error(f"Пользователь с telegram_id {message.chat.id} не найден")
-            await message.answer(
-                "Произошла ошибка при обработке платежа. Обратитесь в поддержку."
-            )
+            await message.answer("Произошла ошибка при обработке платежа. Обратитесь в поддержку.")
             return
 
     # Используем новый сервис для обработки платежа
-    balance_payment, bonus_payment, amount, bonus_amount = (
-        await process_payment_with_bonus(
-            user_id=user_id,
-            cabinet_id=wb_cabinet_original_id,
-            amount=float(cost),
-            bonus_percent=0,  # Пока без бонусов
-            description=f"Пополнение баланса через Telegram",
-        )
+    (
+        balance_payment,
+        bonus_payment,
+        amount,
+        bonus_amount,
+    ) = await process_payment_with_bonus(
+        user_id=user_id,
+        cabinet_id=wb_cabinet_original_id,
+        amount=float(cost),
+        bonus_percent=0,  # Пока без бонусов
+        description="Пополнение баланса через Telegram",
     )
 
     await messages.BalanceUpdated(bot, message.chat.id, amount, bonus_amount)()

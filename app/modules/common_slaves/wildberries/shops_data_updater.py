@@ -5,8 +5,8 @@ import typing
 from sqlalchemy import select
 
 from app.utils.db.session_maker import get_async_session_maker
-from . import models
-from . import wb_db_manager
+
+from . import models, wb_db_manager
 from .data_classes.adv import Adv
 from .models import WBCabinet
 
@@ -27,9 +27,7 @@ async def consumer():
         logger.info("Consumer waiting for task")
         if _coroutine_parallel_run_queue.empty() and active_tasks:
             logger.info("Consumer waiting for task")
-            done, _ = await asyncio.wait(
-                active_tasks, return_when=asyncio.FIRST_COMPLETED
-            )
+            done, _ = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
             # Удалять задачи из списка active_tasks здесь не нужно, так как мы используем колбэки для их удаления
         else:
             coroutine: asyncio.Future = await _coroutine_parallel_run_queue.get()
@@ -40,7 +38,6 @@ async def consumer():
 
 
 class ShopDataUpdater:
-
     def __repr__(self):
         return f"{self.wb_cabinet.shop_id}"
 
@@ -59,9 +56,7 @@ class ShopDataUpdater:
         advert_api = wb_api
         adv_ids: list[int] = await advert_api.get_advertIds()
         async with sm() as session:
-            stmt = select(models.AdvSetting).where(
-                models.AdvSetting.adv_id.in_(adv_ids)
-            )
+            stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             exist_advs_result = (await session.execute(stmt)).unique()
             existing_advs: list[models.AdvSetting] = exist_advs_result.scalars().all()
             existind_advs_ids: set[int] = {adv.adv_id for adv in existing_advs}
@@ -93,11 +88,11 @@ class ShopDataUpdater:
         logger.debug(f"Получены adv_ids: {len(adv_ids)} штук")
         advs: list[Adv] = await advert_api.get_advs()
         await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
-        logger.debug(f"Обновление в базе advs завершено")
+        logger.debug("Обновление в базе advs завершено")
         return advs
 
     async def update_cards_data(self) -> None:
         wb_api = self.wb_api
         cards = await wb_api.get_all_cards()
         await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
-        logger.debug(f"Обновление карточек в базе завершено")
+        logger.debug("Обновление карточек в базе завершено")

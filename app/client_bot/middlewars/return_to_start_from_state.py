@@ -1,21 +1,25 @@
-from typing import Any, Awaitable, Callable, Dict
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from app.client_bot.user_interface.handlers.start_registration_func import start_registration
+from app.client_bot.user_interface.handlers.start_registration_func import (
+    start_registration,
+)
 
 
 class ReturnToStart(BaseMiddleware):
     async def __call__(
-            self,
-            handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
-            event: Message,
-            data: Dict[str, Any],
+        self,
+        handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
+        event: Message,
+        data: dict[str, Any],
     ) -> Any:
         text = event.text
-        if '/start' in text:
-            bot = data['bot']
+        if "/start" in text:
+            bot = data["bot"]
             state: FSMContext = data["state"]
             await state.clear()
             message = event

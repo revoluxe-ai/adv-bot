@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 from app.modules.wb_adv_updater import data_manager
 

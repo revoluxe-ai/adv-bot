@@ -1,10 +1,7 @@
-﻿from aiogram import Router, Bot
+from aiogram import Bot, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from app.client_bot.user_interface.views.messages.adv_keyword_messages import (
-    AdvKeywordsSetting,
-)
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
     KeywordStatus,
@@ -13,6 +10,7 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .buttons import UpdatePositionsForActivePhrase
 
 router = Router()
@@ -25,7 +23,6 @@ async def update_positions_for_active_phrase(
     bot: Bot,
     state: FSMContext,
 ) -> None:
-
     adv_setting_original_id = callback_data.adv_setting_original_id
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
 
@@ -68,16 +65,18 @@ async def update_positions_for_active_phrase(
     adv_id = adv_setting.adv_id
     await bot.send_message(
         chat_id,
-        (
-            f"Перепроверка позиций для РК с adv id {adv_id} завершена. "
-            "Отправляю эту РК..."
-        ),
+        (f"Перепроверка позиций для РК с adv id {adv_id} завершена. Отправляю эту РК..."),
     )
     nmid = adv_setting.nmids[0]
     main_photos = await data_manager.get_main_photos([nmid])
     adv_choice_last_page = 1
     page = 1
 
+    from importlib import import_module
+
+    AdvKeywordsSetting = import_module(
+        "app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages"
+    ).AdvKeywordsSetting
     await AdvKeywordsSetting(
         bot,
         chat_id,

@@ -1,4 +1,4 @@
-﻿from app.core.redis_cache import RedisCacheBase
+from app.core.redis_cache import RedisCacheBase
 from app.core.redis_cache.mixins.data_types.pass_time_redis_cache_base import (
     PassTimeRedisCacheBase,
 )

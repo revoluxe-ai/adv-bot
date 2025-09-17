@@ -1,4 +1,4 @@
-from aiogram import Router, Bot
+from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -6,10 +6,8 @@ from aiogram.types import CallbackQuery, Message
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.wb_adv_updater import data_manager
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.utils.db.session_maker import get_async_session_maker as sm
-
 
 router = Router()
 
@@ -21,7 +19,6 @@ async def add_white_phrases(
     callback_data: callbacks.AddWhitePhrases,
     state: FSMContext,
 ) -> None:
-
     adv_setting_id = callback_data.adv_setting_id
     await state.update_data(last_adv_setting_id=adv_setting_id)
     await state.set_state(states.AddBlackPhrasesTemplates.waiting_for_black_phrases)
@@ -32,9 +29,7 @@ async def add_white_phrases(
 
 
 @router.message(StateFilter(states.AddBlackPhrasesTemplates.waiting_for_black_phrases))
-async def waiting_for_black_phrases(
-    message: Message, bot: Bot, state: FSMContext
-) -> None:
+async def waiting_for_black_phrases(message: Message, bot: Bot, state: FSMContext) -> None:
     text = message.text
     if not text:
         return None
@@ -57,7 +52,6 @@ async def waiting_for_black_phrases(
 async def reset_black_phrases(
     callback: CallbackQuery, bot: Bot, callback_data: callbacks.ResetBlackPhrases
 ) -> None:
-
     adv_setting_original_id = callback_data.adv_setting_id
     async with sm(read_only=True) as session:
         adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_original_id)
@@ -65,6 +59,4 @@ async def reset_black_phrases(
             raise
     manager = RelevantPhraseManager(adv)
     await manager.update_black_phrases([])
-    await messages.WaitingForBlackPhrases(bot, callback.from_user.id)(
-        callback_data.adv_setting_id
-    )
+    await messages.WaitingForBlackPhrases(bot, callback.from_user.id)(callback_data.adv_setting_id)

@@ -1,4 +1,4 @@
-﻿from sqlalchemy import select
+from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, WBCategory
 from app.utils import redis_manager
@@ -10,9 +10,7 @@ class AdvParameterManager:
         nmid = adv.nmids[0]
 
         stmt = (
-            select(WBCategory.wb_category_name)
-            .join(WBCategory.wb_cards)
-            .where(WBCard.nmid == nmid)
+            select(WBCategory.wb_category_name).join(WBCategory.wb_cards).where(WBCard.nmid == nmid)
         )
         async with sm() as session:
             result = await session.execute(stmt)

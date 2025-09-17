@@ -9,8 +9,8 @@ from app.admin_bot.sender import redis_manager
 from app.client_bot import single_messages
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.models.models import (
-    WBUserCabinet,
     AdvSetting,
+    WBUserCabinet,
 )
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -42,9 +42,7 @@ async def get_users():
                 total_balance += wb_cabinet.balance or 0
                 total_bonus += wb_cabinet.bonus or 0
 
-                stmt = select(AdvSetting.adv_id).where(
-                    AdvSetting.wb_cabinet_id == wb_cabinet.id
-                )
+                stmt = select(AdvSetting.adv_id).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
 
                 adv_ids = await session.execute(stmt)
                 adv_ids = adv_ids.scalars().all()
@@ -63,10 +61,7 @@ async def get_users():
                 total_advs += len(advs)
                 active_advs_with_bot += len([adv for adv in advs if adv.bot_active])
             shop_ids = "; ".join(
-                [
-                    wb_user_cabinet.wb_cabinet.shop_id
-                    for wb_user_cabinet in wb_user_cabinets
-                ]
+                [wb_user_cabinet.wb_cabinet.shop_id for wb_user_cabinet in wb_user_cabinets]
             )
             total_money = total_bonus + total_balance
             # if  not  wb_user_cabinets:
@@ -78,11 +73,7 @@ async def get_test_user():
     async with sm() as session:
         stmt = (
             select(User)
-            .options(
-                selectinload(User.wb_user_cabinets).selectinload(
-                    WBUserCabinet.wb_cabinet
-                )
-            )
+            .options(selectinload(User.wb_user_cabinets).selectinload(WBUserCabinet.wb_cabinet))
             .where(User.user_telegram_id.in_(test_users_ids))
         )
         user = await session.execute(stmt)
@@ -125,5 +116,4 @@ async def send_message_to_users():
 
 
 if __name__ == "__main__":
-
     asyncio.run(send_message_to_users())

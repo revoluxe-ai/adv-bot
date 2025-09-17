@@ -1,8 +1,9 @@
-﻿import asyncio
+import asyncio
 import logging
 from collections import Counter
+from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Callable, Awaitable, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -11,13 +12,10 @@ def make_key(func_name: str, args: tuple[Any, ...], kwargs: dict[Any, Any]) -> s
     return f"{func_name}:{args}:{frozenset(kwargs.items())}"
 
 
-def single_run() -> (
-    Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]
-):
+def single_run() -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         @wraps(func)
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-
             if not hasattr(self, "_single_run_events"):
                 self._single_run_events = {}
             if not hasattr(self, "_single_run_results"):
@@ -58,9 +56,7 @@ def single_run() -> (
                 results[key] = result
                 return result
             except Exception:
-                logger.error(
-                    f"Ошибка обернутой функции: {func.__name__}", exc_info=True
-                )
+                logger.error(f"Ошибка обернутой функции: {func.__name__}", exc_info=True)
                 raise
             finally:
                 event.set()

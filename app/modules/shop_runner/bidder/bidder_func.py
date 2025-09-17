@@ -1,6 +1,5 @@
 import logging
 
-from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import wb_db_manager
@@ -11,17 +10,20 @@ from app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_m
 )
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.wb_parser import parser
+from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
-from ..bidder.wb_api import WBApi as BidderAPI
-from ..modules.wb_api import WBApi
+
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
+from ..bidder.wb_api import WBApi as BidderAPI
+from ..modules.wb_api import WBApi
 
 logger = logging.getLogger(__name__)
 
 # TODO: включить проверку РК: обновлять только если РК активна и не приостановлена
+
 
 async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: BidderAPI) -> set[int] | None:
     adv_ids = []
@@ -65,7 +67,7 @@ async def run_bidder_process_for_adv(
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не задана!")
         return
 
-    step = adv_setting.bidder_step or DEFAULT_BIDDER_STEP
+    step = adv_setting.bidder_step or settings.BIDDER_STEP
     max_position = adv_setting.max_place
     if max_position is None:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная позиция не задана!")
@@ -85,9 +87,7 @@ async def run_bidder_process_for_adv(
         logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
         await parser.add_wb_positions(text, {nmid}, delay=0.1)
     except Exception:
-        logger.error(
-            f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
-        )
+        logger.error(f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True)
         return
 
     try:
@@ -105,19 +105,13 @@ async def run_bidder_process_for_adv(
 
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
-        wb_position: WBItemPosition = await redis_manager.get_keyword_position(
-            text, nmid
-        )
+        wb_position: WBItemPosition = await redis_manager.get_keyword_position(text, nmid)
     except Exception:
-        logger.error(
-            f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
-        )
+        logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True)
         return
 
     if not wb_position or wb_position.position is None:
-        logger.error(
-            f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции"
-        )
+        logger.error(f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции")
         return
 
     promo_position = wb_position.position

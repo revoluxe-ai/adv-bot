@@ -1,2 +1,2 @@
-﻿class AutoUpdateWhiteListFatalError(Exception):
+class AutoUpdateWhiteListFatalError(Exception):
     pass

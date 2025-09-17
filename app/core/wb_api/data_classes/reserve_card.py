@@ -1,8 +1,4 @@
-
-
 class ReserveCard:
-
-
     @property
     def wb_barcode(self):
         return self._wb_barcode
@@ -23,9 +19,6 @@ class ReserveCard:
     def unique_name(self):
         return self._unique_name
 
-
     @unique_name.setter
     def unique_name(self, value):
         self._unique_name = value
-
-

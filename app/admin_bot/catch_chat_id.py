@@ -8,4 +8,3 @@ router = Router()
 async def catch_bot_adding_to_channel(event: chat_member_updated.ChatMemberUpdated):
     chat_id = event.chat.id
     print(chat_id)
-

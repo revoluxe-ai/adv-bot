@@ -1,9 +1,10 @@
 import hashlib
 import json
+from collections.abc import Awaitable
 from datetime import datetime
-from typing import Optional, Set, List, Awaitable, Union
 
 from app.core.redis_manager.base_redis_manager import BaseRedis
+
 from .parsing_task import ParsingTask
 
 
@@ -29,7 +30,7 @@ class TaskQueueManager(BaseRedis):
         """Генерирует уникальный ID задачи на основе текста"""
         return hashlib.sha1(text.encode()).hexdigest()[:12]
 
-    async def add_or_update_task(self, text: str, nmids: Set[int]) -> str:
+    async def add_or_update_task(self, text: str, nmids: set[int]) -> str:
         """
         Добавляет новую задачу или обновляет существующую
 
@@ -65,16 +66,14 @@ class TaskQueueManager(BaseRedis):
             # Добавляем в очередь с приоритетом по времени добавления
             await pipe.zadd(self.queue_key, {task_id: timestamp})
             # Индексируем по тексту
-            result: Union[Awaitable[int], int] = pipe.sadd(
-                f"{self.text_index_prefix}{text}", task_id
-            )
+            result: Awaitable[int] | int = pipe.sadd(f"{self.text_index_prefix}{text}", task_id)
             if isinstance(result, Awaitable):
                 await result
             await pipe.execute()
 
         return task_id
 
-    async def get_next_task(self) -> Optional[ParsingTask]:
+    async def get_next_task(self) -> ParsingTask | None:
         """
         Получает следующую задачу из очереди по приоритету
 
@@ -120,9 +119,7 @@ class TaskQueueManager(BaseRedis):
         async with self.client.pipeline() as pipe:
             await pipe.zrem(self.queue_key, task_id)
             await pipe.delete(f"{self.task_data_prefix}{task_id}")
-            result: Union[Awaitable[int], int] = pipe.srem(
-                f"{self.text_index_prefix}{text}", task_id
-            )
+            result: Awaitable[int] | int = pipe.srem(f"{self.text_index_prefix}{text}", task_id)
             if isinstance(result, Awaitable):
                 await result
             await pipe.execute()
@@ -135,7 +132,7 @@ class TaskQueueManager(BaseRedis):
         """
         return await self.client.zcard(self.queue_key)
 
-    async def get_all_tasks(self) -> List[ParsingTask]:
+    async def get_all_tasks(self) -> list[ParsingTask]:
         """
         Возвращает все задачи из очереди
         """
@@ -154,7 +151,7 @@ class TaskQueueManager(BaseRedis):
                 )
         return tasks
 
-    async def get_task_by_text(self, text: str) -> Optional[ParsingTask]:
+    async def get_task_by_text(self, text: str) -> ParsingTask | None:
         """
         Ищет задачу по тексту
 

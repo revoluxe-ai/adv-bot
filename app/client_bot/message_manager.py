@@ -1,14 +1,13 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-import aiogram
 from aiogram import types as tp
 
 logger = logging.getLogger(__name__)
 
+
 class LastMessage(tp.Message):
     message_type: str
-
 
     def __get_parent_class_name(self):
         # Получаем первый родительский класс из кортежа __bases__
@@ -23,16 +22,12 @@ class LastMessage(tp.Message):
         if isinstance(message_date, str):
             message_date = datetime.fromisoformat(message_date)
         # Определяем текущее время
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Рассчитываем разницу времени
         time_diff = now - message_date
         # Сообщение можно редактировать в течение 48 часов
         return time_diff < timedelta(hours=48)
 
 
-def __check_message_copy(last_message: LastMessage,
-                         text: str,
-                         keyboard: tp.InlineKeyboardMarkup):
+def __check_message_copy(last_message: LastMessage, text: str, keyboard: tp.InlineKeyboardMarkup):
     return last_message.text == text and last_message.reply_markup == keyboard
-
-

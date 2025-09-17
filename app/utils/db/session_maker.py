@@ -1,9 +1,10 @@
 import asyncio
 import logging
 import traceback
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from time import time
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from sqlalchemy import Result
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -37,11 +38,7 @@ class AnalyticAsyncSession(AsyncSession):
             # Анализ стека для поиска вызывающего кода
             stack = traceback.extract_stack()
             caller = next(
-                (
-                    frame
-                    for frame in reversed(stack[:-1])
-                    if "sqlalchemy" not in frame.filename
-                ),
+                (frame for frame in reversed(stack[:-1]) if "sqlalchemy" not in frame.filename),
                 None,
             )
 
@@ -55,7 +52,7 @@ class AnalyticAsyncSession(AsyncSession):
                 )
             return result
         except Exception as e:
-            logger.exception(f"Query error during execution:")
+            logger.exception("Query error during execution:")
             raise e
 
 
@@ -84,7 +81,9 @@ def get_alchemy_row(read_only):
     else:
         host = settings.postgres_replica_host
     # Для asyncpg используем ssl вместо sslmode
-    row_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
+    row_connector = (
+        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
+    )
     # if ssl_mode:
     #     row_connector += f'?sslmode={ssl_mode}'
     # row_connector += f'&target_session_attrs={target_session}'
@@ -100,7 +99,9 @@ def get_alchemy_row_for_migration():
     postgres_user = settings.postgres_user
     host = settings.postgres_master_host
     # Для asyncpg используем ssl вместо sslmode
-    db_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
+    db_connector = (
+        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
+    )
     return db_connector
 
 

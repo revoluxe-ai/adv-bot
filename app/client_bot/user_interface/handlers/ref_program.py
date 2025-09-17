@@ -12,21 +12,22 @@ from ..views import callbacks
 
 router = Router()
 
-@router.callback_query(callbacks.RefProgram.filter(F.action == 'return'))
-async def ref_program_return(callback: types.CallbackQuery, bot: aiogram.Bot):
 
+@router.callback_query(callbacks.RefProgram.filter(F.action == "return"))
+async def ref_program_return(callback: types.CallbackQuery, bot: aiogram.Bot):
     await messages.RefProgram(bot, callback.message.chat.id)()
     return
 
-@router.message(Command('ref_program'))
+
+@router.message(Command("ref_program"))
 async def ref_program(message: types.Message, bot: aiogram.Bot):
     await messages.RefProgram(bot, message.chat.id)()
     return
 
 
-@router.callback_query(callbacks.RefProgram.filter(F.action == 'new'))
-async def ref_program_new(callback: types.CallbackQuery, bot: aiogram.Bot,state: FSMContext):
-    await  callback.answer()
+@router.callback_query(callbacks.RefProgram.filter(F.action == "new"))
+async def ref_program_new(callback: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext):
+    await callback.answer()
     await state.set_state(states.RefProgram.getting_name)
     message = callback.message
     await messages.RefLinkGetName(bot, message.chat.id)()
@@ -49,22 +50,7 @@ async def ref_program_getting_name(message: types.Message, bot: aiogram.Bot, sta
     await messages.RefLinkCreated(bot, message.chat.id, ref_link)()
 
 
-
-@router.callback_query(callbacks.RefProgram.filter(F.action == 'select'))
+@router.callback_query(callbacks.RefProgram.filter(F.action == "select"))
 async def ref_program_select(callback: types.CallbackQuery, bot: aiogram.Bot):
     await messages.RefProgramSelect(bot, callback.message.chat.id)()
     return
-
-
-
-
-
-
-
-
-
-
-
-
-
-

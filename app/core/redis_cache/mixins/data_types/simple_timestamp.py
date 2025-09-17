@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 from abc import ABC
 
 from app.core.redis_cache.mixins.mixins_protocol import RedisCacheMixinsProtocol

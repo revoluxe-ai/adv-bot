@@ -2,27 +2,33 @@
 Сцены для модуля управления бонусами кабинетов.
 Обеспечивает изоляцию интерфейса управления бонусами от основной части приложения.
 """
+
 import logging
-from aiogram import F, Router, Bot
-from aiogram.types import Message, CallbackQuery
+
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.scene import Scene, SceneRegistry, on, SceneWizard
+from aiogram.fsm.scene import Scene, SceneRegistry, SceneWizard, on
+from aiogram.types import CallbackQuery, Message
+
 from app.client_bot.const import ADMINS
 from app.modules.cabinet_bonus_manager.bonus_service import (
-    add_bonus, subtract_bonus, reset_bonus, get_wb_cabinet_by_shop_id, get_cabinet_by_id
+    add_bonus,
+    get_cabinet_by_id,
+    get_wb_cabinet_by_shop_id,
+    reset_bonus,
+    subtract_bonus,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
-from app.modules.cabinet_bonus_manager.keyboards import (get_confirm_keyboard, get_shop_bonus_keyboard)
+from app.modules.cabinet_bonus_manager.keyboards import (
+    get_confirm_keyboard,
+    get_shop_bonus_keyboard,
+)
 
 logger = logging.getLogger(__name__)
 
 # Словарь для хранения операций, обрабатываемых менеджером состояний
-OPERATIONS = {
-    "add": "добавление",
-    "subtract": "снятие",
-    "reset": "обнуление"
-}
+OPERATIONS = {"add": "добавление", "subtract": "снятие", "reset": "обнуление"}
 
 
 class BonusScene(Scene, state="bonus_scene"):
@@ -43,21 +49,22 @@ class BonusScene(Scene, state="bonus_scene"):
         """Вход в сцену управления бонусами"""
         logger.info("Вход в сцену управления бонусами")
         self.state_context: FSMContext = state  # Сохраняем контекст состояния
-        
+
         await message.answer("Введите shop_id кабинета для управления бонусами:")
         await state.update_data(action="menu")
 
     @on.callback_query.enter(AdminBonus.filter(F.action == "menu"))
-    async def enter_scene_from_callback(self,
-                                        callback: CallbackQuery,
-                                        bot: Bot,
-                                        state: FSMContext) -> None:
+    async def enter_scene_from_callback(
+        self, callback: CallbackQuery, bot: Bot, state: FSMContext
+    ) -> None:
         """Вход в сцену управления бонусами через callback"""
         logger.info("Вход в сцену управления бонусами через callback")
         self.state_context = state  # Сохраняем контекст состояния
-        
+
         await state.update_data(action="menu")
-        await bot.send_message(callback.from_user.id, "Введите shop_id кабинета для управления бонусами:")
+        await bot.send_message(
+            callback.from_user.id, "Введите shop_id кабинета для управления бонусами:"
+        )
         return
 
     async def wizard_exit(self, with_data=True) -> None:
@@ -109,9 +116,11 @@ class BonusScene(Scene, state="bonus_scene"):
 
         # ВАЖНО: НЕ используем return, чтобы позволить глобальному обработчику показать список магазинов
         # НЕ отправляем сообщения, чтобы избежать дублирования с глобальным обработчиком
-        logger.info(f"Пользователь {message.from_user.id}"
-                    f" успешно вышел из сцены бонусов,"
-                    f" управление передано глобальному обработчику")
+        logger.info(
+            f"Пользователь {message.from_user.id}"
+            f" успешно вышел из сцены бонусов,"
+            f" управление передано глобальному обработчику"
+        )
 
     @on.message(F.text)
     async def process_shop_id(self, message: Message, state: FSMContext):
@@ -130,17 +139,21 @@ class BonusScene(Scene, state="bonus_scene"):
             if cabinet is None:
                 await message.answer(f"Кабинет с shop_id {shop_id} не найден. Попробуйте еще раз:")
                 return
-                
+
             wb_cabinet_original_id = cabinet.id
             await state.update_data(wb_cabinet_original_id=wb_cabinet_original_id)
 
             # Безопасно получаем значения баланса и бонусов
             current_bonus = 0
             current_balance = 0
-            if hasattr(cabinet, 'calculated_bonus'):
-                current_bonus = cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
-            if hasattr(cabinet, 'calculated_balance'):
-                current_balance = cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
+            if hasattr(cabinet, "calculated_bonus"):
+                current_bonus = (
+                    cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
+                )
+            if hasattr(cabinet, "calculated_balance"):
+                current_balance = (
+                    cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
+                )
 
             # Сохраняем информацию о кабинете
             await state.update_data(
@@ -148,7 +161,7 @@ class BonusScene(Scene, state="bonus_scene"):
                 cabinet_id=cabinet.id,
                 wb_cabinet_original_id=cabinet.id,
                 current_bonus=current_bonus,
-                current_balance=current_balance
+                current_balance=current_balance,
             )
 
             # Отображаем информацию и кнопки для управления бонусами данного магазина
@@ -157,7 +170,7 @@ class BonusScene(Scene, state="bonus_scene"):
                 f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
                 f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
                 f"Выберите операцию:",
-                reply_markup=get_shop_bonus_keyboard(cabinet.id)
+                reply_markup=get_shop_bonus_keyboard(cabinet.id),
             )
         elif action == "amount":
             # Обработка ввода суммы
@@ -193,7 +206,7 @@ class BonusScene(Scene, state="bonus_scene"):
                 f"🏪 Магазин: {shop_id}\n"
                 f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
                 f"🎁 Текущие бонусы: {current_bonus} руб.\n\n"
-                f'Указанная сумма: {amount:.0f} руб.\n'
+                f"Указанная сумма: {amount:.0f} руб.\n"
                 f"Введите комментарий для операции:"
             )
         elif action == "description":
@@ -243,8 +256,8 @@ class BonusScene(Scene, state="bonus_scene"):
                 reply_markup=get_confirm_keyboard(
                     wb_cabinet_original_id=wb_cabinet_original_id,
                     operation=operation,
-                    amount=amount
-                )
+                    amount=amount,
+                ),
             )
 
         elif action == "check_bonus":
@@ -262,10 +275,14 @@ class BonusScene(Scene, state="bonus_scene"):
             # Безопасно получаем значения баланса и бонусов
             current_bonus = 0
             current_balance = 0
-            if hasattr(cabinet, 'calculated_bonus'):
-                current_bonus = cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
-            if hasattr(cabinet, 'calculated_balance'):
-                current_balance = cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
+            if hasattr(cabinet, "calculated_bonus"):
+                current_bonus = (
+                    cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
+                )
+            if hasattr(cabinet, "calculated_balance"):
+                current_balance = (
+                    cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
+                )
 
             # Обновляем данные о кабинете в хранилище
             await state.update_data(
@@ -274,7 +291,7 @@ class BonusScene(Scene, state="bonus_scene"):
                 wb_cabinet_original_id=cabinet.id,  # Сохраняем оригинальный id кабинета
                 current_bonus=current_bonus,
                 current_balance=current_balance,
-                action="menu"  # Переходим в меню операций
+                action="menu",  # Переходим в меню операций
             )
 
             # Отображаем информацию о бонусах и балансе кабинета с кнопками управления
@@ -283,16 +300,16 @@ class BonusScene(Scene, state="bonus_scene"):
                 f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
                 f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
                 f"Выберите операцию:",
-                reply_markup=get_shop_bonus_keyboard(cabinet.id)  # Используем cabinet.id
+                reply_markup=get_shop_bonus_keyboard(cabinet.id),  # Используем cabinet.id
             )
 
     @on.callback_query(AdminBonus.filter(F.action.in_(["add", "subtract", "reset"])))
-    async def process_shop_bonus_callback(self, callback: CallbackQuery,
-                                          callback_data: AdminBonus,
-                                          state: FSMContext):
+    async def process_shop_bonus_callback(
+        self, callback: CallbackQuery, callback_data: AdminBonus, state: FSMContext
+    ):
         """Обработчик действий с бонусами конкретного магазина"""
         logger.info(f"Обработка callback бонусов: {callback_data.action}")
-        
+
         data = await state.get_data()
         current_bonus = data.get("current_bonus", 0)
         current_balance = data.get("current_balance", 0)
@@ -329,7 +346,9 @@ class BonusScene(Scene, state="bonus_scene"):
         await callback.message.edit_text("Введите shop_id кабинета для управления бонусами:")
 
     @on.callback_query(AdminBonus.filter(F.action == "confirm"))
-    async def process_confirm_callback(self, callback: CallbackQuery, callback_data: AdminBonus, state: FSMContext):
+    async def process_confirm_callback(
+        self, callback: CallbackQuery, callback_data: AdminBonus, state: FSMContext
+    ):
         """Обработчик подтверждения операции с бонусами"""
         data = await state.get_data()
         shop_id = data.get("shop_id")
@@ -341,21 +360,31 @@ class BonusScene(Scene, state="bonus_scene"):
         try:
             operation = callback_data.operation
             if operation == "add":
-                result = await add_bonus(wb_cabinet_original_id,
-                                         callback_data.amount,
-                                         callback.from_user.id,
-                                         description)
-                operation_text = (f"✅ Бонусы успешно добавлены в кабинет {shop_id}"
-                                  f" \nСумма: {callback_data.amount} руб.")
+                result = await add_bonus(
+                    wb_cabinet_original_id,
+                    callback_data.amount,
+                    callback.from_user.id,
+                    description,
+                )
+                operation_text = (
+                    f"✅ Бонусы успешно добавлены в кабинет {shop_id}"
+                    f" \nСумма: {callback_data.amount} руб."
+                )
             elif operation == "subtract":
-                result = await subtract_bonus(wb_cabinet_original_id,
-                                              callback_data.amount,
-                                              callback.from_user.id,
-                                              description)
-                operation_text = (f"✅ Бонусы успешно списаны с кабинета {shop_id}!\n"
-                                  f"Сумма: {callback_data.amount} руб.")
+                result = await subtract_bonus(
+                    wb_cabinet_original_id,
+                    callback_data.amount,
+                    callback.from_user.id,
+                    description,
+                )
+                operation_text = (
+                    f"✅ Бонусы успешно списаны с кабинета {shop_id}!\n"
+                    f"Сумма: {callback_data.amount} руб."
+                )
             elif operation == "reset":
-                result = await reset_bonus(wb_cabinet_original_id, callback.from_user.id, description)
+                result = await reset_bonus(
+                    wb_cabinet_original_id, callback.from_user.id, description
+                )
                 operation_text = f"✅ Бонусы кабинета {shop_id} успешно обнулены!"
             else:
                 raise ValueError(f"Неизвестная операция: {operation}")
@@ -366,15 +395,15 @@ class BonusScene(Scene, state="bonus_scene"):
                 new_balance = cabinet.calculated_balance if cabinet else 0
 
                 self.state_context = state
-                
+
                 await state.update_data(
                     action="menu",
                     shop_id=shop_id,
                     wb_cabinet_original_id=wb_cabinet_original_id,
                     current_bonus=new_bonus,
-                    current_balance=new_balance
+                    current_balance=new_balance,
                 )
-                
+
                 logger.info(f"Обновляем состояние после операции {operation}")
 
                 await callback.message.edit_text(
@@ -382,12 +411,12 @@ class BonusScene(Scene, state="bonus_scene"):
                     f"💰 Текущий баланс: {new_balance:.0f} руб.\n"
                     f"🎁 Текущие бонусы: {new_bonus:.0f} руб.\n\n"
                     f"Для продолжения работы с этим кабинетом используйте кнопки ниже:",
-                    reply_markup=get_shop_bonus_keyboard(wb_cabinet_original_id)
+                    reply_markup=get_shop_bonus_keyboard(wb_cabinet_original_id),
                 )
             else:
                 await callback.message.edit_text(
                     "❌ Не удалось выполнить операцию. Попробуйте еще раз.",
-                    reply_markup=get_shop_bonus_keyboard(wb_cabinet_original_id)
+                    reply_markup=get_shop_bonus_keyboard(wb_cabinet_original_id),
                 )
 
         except Exception as e:
@@ -397,10 +426,10 @@ class BonusScene(Scene, state="bonus_scene"):
     @on.callback_query(AdminBonus.filter(F.action == "cancel"))
     async def process_cancel_callback(self, callback: CallbackQuery, state: FSMContext):
         """Обработчик отмены операции"""
-        logger.info(f"Отмена операции")
-        
+        logger.info("Отмена операции")
+
         self.state_context = state
-            
+
         data = await state.get_data()
         shop_id = data.get("shop_id")
         current_bonus = data.get("current_bonus")
@@ -414,7 +443,7 @@ class BonusScene(Scene, state="bonus_scene"):
             f"💰 Текущий баланс: {current_balance:.0f} руб.\n"
             f"🎁 Текущие бонусы: {current_bonus:.0f} руб.\n\n"
             f"Операция отменена. Выберите действие:",
-            reply_markup=get_shop_bonus_keyboard(wb_cabinet_original_id)
+            reply_markup=get_shop_bonus_keyboard(wb_cabinet_original_id),
         )
 
     @on.callback_query(AdminBonus.filter(F.action == "back"))
@@ -428,7 +457,7 @@ class BonusScene(Scene, state="bonus_scene"):
 
         await callback.message.edit_text(
             "Вы вернулись в главное меню администратора",
-            reply_markup=get_admin_keyboard()
+            reply_markup=get_admin_keyboard(),
         )
 
         await self.wizard.exit()
@@ -445,11 +474,18 @@ def register_bonus_scene(router: Router):
     scene_registry = SceneRegistry(router)
     scene_registry.add(BonusScene)
 
-    router.message.register(BonusScene.as_handler(), Command("bonus_menu"), F.from_user.id.in_(ADMINS))
-    router.message.register(BonusScene.as_handler(), Command("check_bonus"), F.from_user.id.in_(ADMINS))
-    
+    router.message.register(
+        BonusScene.as_handler(), Command("bonus_menu"), F.from_user.id.in_(ADMINS)
+    )
+    router.message.register(
+        BonusScene.as_handler(), Command("check_bonus"), F.from_user.id.in_(ADMINS)
+    )
+
     # Регистрируем только один обработчик для входа через callback
-    router.callback_query.register(BonusScene.as_handler(),
-                                   AdminBonus.filter(F.action == "menu"), F.from_user.id.in_(ADMINS))
-    
+    router.callback_query.register(
+        BonusScene.as_handler(),
+        AdminBonus.filter(F.action == "menu"),
+        F.from_user.id.in_(ADMINS),
+    )
+
     logger.info("Сцена управления бонусами успешно зарегистрирована")

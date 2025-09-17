@@ -1,3 +1,2 @@
-
 class DataNotFoundError(Exception):
     pass

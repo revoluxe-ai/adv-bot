@@ -5,7 +5,7 @@ from aiogram import Router, types
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 
-from app.client_bot.user_interface.views import messages, callbacks
+from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
     KeywordGraphicPart_1,
     KeywordGraphicPart_2,
@@ -48,13 +48,7 @@ async def keyword_position_history(
         return
     graphic, legend = result
     if legend:
-        await KeywordGraphicPart_1(
-            bot, callback.message.chat.id, graphic, adv_original_id
-        )()
-        await KeywordGraphicPart_2(
-            bot, callback.message.chat.id, legend, adv_original_id
-        )()
+        await KeywordGraphicPart_1(bot, callback.message.chat.id, graphic, adv_original_id)()
+        await KeywordGraphicPart_2(bot, callback.message.chat.id, legend, adv_original_id)()
     else:
-        await KeywordGraphicPart_2(
-            bot, callback.message.chat.id, graphic, adv_original_id
-        )()
+        await KeywordGraphicPart_2(bot, callback.message.chat.id, graphic, adv_original_id)()

@@ -2,16 +2,15 @@ import csv
 import logging
 from dataclasses import dataclass
 from io import StringIO
-from typing import Union
 
 from sqlalchemy import and_, select
 
-from app.client_bot.const import BLACK_LIST, TURN_OFF, WHITE_LIST, AUTO_MODE
+from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
     KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
@@ -30,13 +29,11 @@ class KeywordForKeyboard:
     keyword_settings: KeywordSetting
     adv_setting: AdvSetting
     turn_on: bool
-    bad_reason: Union[str, None] = None
+    bad_reason: str | None = None
 
 
 async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-    all_phrases: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(
-        adv_setting
-    )
+    all_phrases: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
     return all_phrases
 
 
@@ -101,14 +98,16 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
         turn_on = "✅Включен" if keyword.status == KeywordStatus.GOOD else "❌Выключен"
 
         # Определение позиции (единое поле)
-        first_position: Union[str, int] = ""
+        first_position: str | int = ""
         if adv_setting.parsing_active:
             if keyword.position:
                 first_position = keyword.position
             elif keyword.position == 0:
                 first_position = ">i"
             else:
-                first_position = "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
+                first_position = (
+                    "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
+                )
         rows.append(
             [
                 keyword.text,
@@ -146,9 +145,7 @@ async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink 
         ref_link = result_ref_link.scalar_one_or_none()
         if ref_link:
             return None
-        stmt_for_user_id = select(User.id).where(
-            User.user_telegram_id == user_telegram_id
-        )
+        stmt_for_user_id = select(User.id).where(User.user_telegram_id == user_telegram_id)
         result = await session.execute(stmt_for_user_id)
         user_id: int = result.scalar_one()
         ref_link = RefLink(name=ref_link_name, referrer_id=user_id)

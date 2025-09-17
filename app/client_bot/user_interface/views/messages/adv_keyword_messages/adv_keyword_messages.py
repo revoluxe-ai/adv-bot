@@ -1,11 +1,11 @@
-﻿import logging
+import logging
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 
 from app.client_bot.user_interface.message_templates import (
-    TextWithKeyboardAndImage,
     LastMessage,
+    TextWithKeyboardAndImage,
 )
 from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
@@ -14,7 +14,7 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.c
 from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
     KeywordGraphicPart_1,
 )
-from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
+from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -51,9 +51,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
         self.image_mode = image_mode
 
-    async def __call__(
-        self, state: FSMContext, sort_mode="by_adv"
-    ) -> (LastMessage, str):
+    async def __call__(self, state: FSMContext, sort_mode="by_adv") -> (LastMessage, str):
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
@@ -65,9 +63,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 for keyword_filter in keywords_filter:
                     if '"' in keyword_filter or "'" in keyword_filter:
                         # Проверка на полное совпадение, если в фразе есть кавычки
-                        keyword_filter = keyword_filter.replace('"', "").replace(
-                            "'", ""
-                        )
+                        keyword_filter = keyword_filter.replace('"', "").replace("'", "")
                         if keyword_filter == keyword.text:
                             if keyword not in clear_keywords:
                                 clear_keywords.append(keyword)
@@ -95,10 +91,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if filter_by_query:
             clear_keywords = []
             for keyword in self._keywords:
-                if (
-                    not isinstance(keyword.query, str)
-                    and keyword.query >= filter_by_query
-                ):
+                if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
 
@@ -130,9 +123,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if self.image_mode == "graphic":
             graphic = await self._graphic_injection()
             if not graphic:
-                graphic = (
-                    "app/core/telegram/static_images/not_keywords_position_graphic.jpg"
-                )
+                graphic = "app/core/telegram/static_images/not_keywords_position_graphic.jpg"
             self._image = graphic
 
         common_days_stat_manager = CommonStatDataManager()
@@ -156,7 +147,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text = (
             "Название кампании: " + str(self._adv_setting.name) + "\n"
             f"Статус: {self._adv_setting.active_status}\n"
-            f"""Бот {'Включен' if self._adv_setting.bot_active else 'Выключен'}\n"""
+            f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
             "ID кампании: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аукциона: {self._adv_setting.search_adv_id}\n"
             f"Общая статистика за 2 дня:\n"
@@ -170,25 +161,24 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Общее число заказов: {self._all_orders_for_last_days}\n"
             f"Заказов из Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
             f"Заказов из Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
-            f"""Заказов из Органики: {self._all_orders_for_last_days
-                                                                  - self.full_adv_stat_for_last_days_for_auction.orders
-                                                                  - self.full_adv_stat_for_last_days_for_auto_adv.orders
-                                        if self._all_orders_for_last_days else 0}"""
+            f"""Заказов из Органики: {
+                self._all_orders_for_last_days
+                - self.full_adv_stat_for_last_days_for_auction.orders
+                - self.full_adv_stat_for_last_days_for_auto_adv.orders
+                if self._all_orders_for_last_days
+                else 0
+            }"""
         )
 
         # Получаем целевые значения из настроек
         plan_for_sales_for_day = self._adv_setting.plan_for_sales_for_day
         plan_for_sales_for_day_str = (
-            str(round(plan_for_sales_for_day))
-            if plan_for_sales_for_day
-            else "Не задано"
+            str(round(plan_for_sales_for_day)) if plan_for_sales_for_day else "Не задано"
         )
 
         target_price_for_order = self._adv_setting.target_price_for_order
         target_price_for_order_str = (
-            str(round(target_price_for_order))
-            if target_price_for_order
-            else "Не задано"
+            str(round(target_price_for_order)) if target_price_for_order else "Не задано"
         )
 
         max_price_for_order = self._adv_setting.max_price_for_order
@@ -214,7 +204,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += "\n"
 
         text += f"\nСтавка из Авто: {self.auto_cpm} р. "
-        text += f"""(Биддер для Авто: {' Включен' if self._adv_setting.bidder_for_auto else ' Выключен'})\n"""
+        text += f"""(Биддер для Авто: {" Включен" if self._adv_setting.bidder_for_auto else " Выключен"})\n"""
         text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
         text += f"Максимальная ставка: {self._adv_setting.max_cpm}\n"
@@ -239,9 +229,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         else:
             graphic, legend = result
         if legend:
-            await KeywordGraphicPart_1(
-                bot, user_telegram_id, graphic, adv_original_id
-            )()
+            await KeywordGraphicPart_1(bot, user_telegram_id, graphic, adv_original_id)()
             return legend
         return graphic
 

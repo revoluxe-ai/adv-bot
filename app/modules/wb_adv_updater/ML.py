@@ -16,11 +16,12 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.utils.db.session_maker import get_async_session_maker
+
+from ...core.redis_manager.base_redis_manager import BaseRedis
+from ...utils import redis_manager, text_cleaner
 from . import fitter
 from .data_getter import DataGetter
 from .ml_common_funcs import load_model
-from ...core.redis_manager.base_redis_manager import BaseRedis
-from ...utils import redis_manager, text_cleaner
 
 sm = get_async_session_maker
 
@@ -28,7 +29,7 @@ sm = get_async_session_maker
 logger = logging.getLogger(__name__)
 
 
-global_model: typing.Union[xgboost.XGBModel, None] = None
+global_model: xgboost.XGBModel | None = None
 
 
 update_predict_ctr_process_semaphore = asyncio.Semaphore(10)
@@ -37,7 +38,6 @@ data_getter = DataGetter()
 
 
 class Fitter(AbcManager):
-
     @staticmethod
     def __get_average_vector(nmids: str, df_vectors):
         nmids = literal_eval(nmids)
@@ -57,9 +57,7 @@ class Fitter(AbcManager):
         )
 
         # Находим первый не None вектор для определения длины вектора
-        first_valid_vector = next(
-            (vec for vec in averaged_vectors if vec is not None), None
-        )
+        first_valid_vector = next((vec for vec in averaged_vectors if vec is not None), None)
         vector_length = len(first_valid_vector) if first_valid_vector is not None else 0
 
         # Обрабатываем случаи с None, заменяя их на список None соответствующей длины
@@ -86,8 +84,7 @@ class Fitter(AbcManager):
 
 
 class Predictor:
-
-    def _predict(self, df: pd.DataFrame) -> typing.Union[pd.DataFrame, None]:
+    def _predict(self, df: pd.DataFrame) -> pd.DataFrame | None:
         logger.debug("начинаю _predict")
         model = load_model()
         logger.debug("Модель загружена")
@@ -123,15 +120,11 @@ class Predictor:
             df_for_predict = await self._get_df_for_predict(all_adv_settings)
             logger.debug("Получили DF для предсказаний")
         except Exception as exc:
-            logger.error(
-                f"Ошибка при получении данных для предсказания: {exc}", exc_info=True
-            )
+            logger.error(f"Ошибка при получении данных для предсказания: {exc}", exc_info=True)
             raise exc
         try:
             logger.debug("Начинаю предсказание")
-            predict_df: pd.DataFrame = await asyncio.to_thread(
-                self._predict, df_for_predict
-            )
+            predict_df: pd.DataFrame = await asyncio.to_thread(self._predict, df_for_predict)
             logger.debug("Предсказания получены")
         except Exception as exc:
             logger.error(f"Ошибка при предсказании: {exc}", exc_info=True)
@@ -179,8 +172,7 @@ class Predictor:
                 item_features = [row[1] for row in item_features.items()]
                 avg_item_features = pd.DataFrame(item_features).mean().to_dict()
                 avg_item_features = {
-                    f"item_feature_{i}": avg_item_features[i]
-                    for i in avg_item_features.keys()
+                    f"item_feature_{i}": avg_item_features[i] for i in avg_item_features.keys()
                 }
 
                 if not avg_item_features:
@@ -190,12 +182,8 @@ class Predictor:
                     text_cleaner.clear(keyword.text) for keyword in adv.keyword_settings
                 ]
                 # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
-                keyword_features_result = await self.get_keyword_features(
-                    clear_keywords
-                )
-                keyword_features_result = {
-                    row[0]: row[1] for row in keyword_features_result
-                }
+                keyword_features_result = await self.get_keyword_features(clear_keywords)
+                keyword_features_result = {row[0]: row[1] for row in keyword_features_result}
                 for keyword in adv.keyword_settings:
                     text = keyword.text.replace("_", " ")
                     keyword_features = keyword_features_result.get(text, [])
@@ -215,7 +203,7 @@ class Predictor:
                         },
                     }
                     data_rows.append(row)
-            except Exception as e:
+            except Exception:
                 logger.error("Ошибка обработки РК", exc_info=True)
         logger.debug("Формирование df")
         df = pd.DataFrame(data_rows)
@@ -236,16 +224,13 @@ class Predictor:
         keyword_setting: KeywordSetting,
         predict_df: pd.DataFrame,
     ) -> None:
-
         adv_id = keyword_setting.adv_setting.adv_id
         keyword = keyword_setting.text
         if not keyword:
             return
 
         # Получаем строку с прогнозом для текущего ключевого слова
-        row = predict_df[
-            (predict_df["adv_id"] == adv_id) & (predict_df["keyword"] == keyword)
-        ]
+        row = predict_df[(predict_df["adv_id"] == adv_id) & (predict_df["keyword"] == keyword)]
         if row.empty:
             return
 

@@ -1,4 +1,4 @@
-﻿__all__ = ["FirstKeyUpdaterError", "LastUpdateFirstPhrase", "FirstKeyUpdater"]
+__all__ = ["FirstKeyUpdaterError", "LastUpdateFirstPhrase", "FirstKeyUpdater"]
 
 
 from .exc import FirstKeyUpdaterError
