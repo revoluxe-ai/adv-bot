@@ -38,7 +38,9 @@ async def test_wb_shop_run_calls_all_coroutines():
 
     # Применяем наш мок-метод
     with patch("asyncio.gather", side_effect=mock_gather):
-        with patch("app.modules.shop_runner.wb_shop.CoroutinesManager") as mock_coroutines_manager:
+        with patch(
+            "app.modules.shop_runner.wb_shop.CoroutinesManager"
+        ) as mock_coroutines_manager:
             # Настраиваем мок CoroutinesManager
             mock_manager_instance = mock_coroutines_manager.return_value
             mock_manager_instance.parsing_keywords_run = AsyncMock()
@@ -90,7 +92,9 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
 
     # Мокируем asyncio.gather для проверки количества аргументов
     with patch("asyncio.gather") as mock_gather:
-        with patch("app.modules.shop_runner.wb_shop.CoroutinesManager") as mock_coroutines_manager:
+        with patch(
+            "app.modules.shop_runner.wb_shop.CoroutinesManager"
+        ) as mock_coroutines_manager:
             # Настраиваем mock_gather, чтобы он возвращал корутину
             mock_gather.return_value = asyncio.create_task(asyncio.sleep(0))
 
@@ -115,9 +119,9 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             call_args = mock_gather.call_args[0]
 
             # Проверяем, что gather был вызван с 9 аргументами (1 _alive_worker_run + 8 методов CoroutinesManager)
-            assert (
-                len(call_args) == 9
-            ), f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
+            assert len(call_args) == 9, (
+                f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
+            )
 
 
 @pytest.mark.asyncio

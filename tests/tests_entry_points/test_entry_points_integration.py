@@ -60,8 +60,7 @@ def test_entry_points_command_line_args():
                 cmd,
                 timeout=5,
                 check=False,  # Не генерировать исключение, если код возврата не 0
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
             )
             # Тест считается успешным, если команда не вызвала исключение
         except subprocess.TimeoutExpired:
@@ -106,7 +105,9 @@ async def test_all_entry_points_can_start():
 
         # Проверяем Keywords Parsing
         try:
-            with patch("run_keywords_parsing.main", new_callable=AsyncMock) as mock_main:
+            with patch(
+                "run_keywords_parsing.main", new_callable=AsyncMock
+            ) as mock_main:
                 from run_keywords_parsing import cli as keywords_cli
 
                 keywords_cli()

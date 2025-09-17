@@ -24,7 +24,7 @@ class AutoUpdaterTargetPlace:
         fact: FactData,
     ):
         try:
-            self._update_target_place(keywords, plan, fact)
+            await self._update_target_place(keywords, plan, fact)
         except Exception as exc:
             raise AutoUpdateTargetPlaceError from exc
 
