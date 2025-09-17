@@ -1,3 +1,5 @@
+"""Tests for AutoUpdaterTargetPlace target place updating logic."""
+
 import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,6 +24,7 @@ now = datetime.datetime.now()
 
 @pytest.fixture
 def result_mock():
+    """Return a mock Result object for tests."""
     result_mock = MagicMock(spec=Result)
     return result_mock
 
@@ -144,6 +147,7 @@ async def test_update_target_place(
     get_async_session_mock,
     session_mock,
 ) -> None:
+    """Verify target place update logic across scenarios."""
     adv_setting_mock.max_price_for_order = max_price_for_order
     adv_setting_mock.target_price_for_order = target_price_for_order
     adv_setting_mock.plan_for_sales_for_day = plan_for_sales_for_day
@@ -165,7 +169,7 @@ async def test_update_target_place(
         original_orders=fact_mean_orders_for_last_two_days,
     )
 
-        with (
+    with (
         patch(
             "app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place."
             "auto_updater_target_place.LastTargetPlaceUpdateRedisManager",
