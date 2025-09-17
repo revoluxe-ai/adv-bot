@@ -23,7 +23,6 @@ async def test_updater_run_calls_all_coroutines():
     updater.update_method4 = AsyncMock()
 
     # Подменяем asyncio.gather, чтобы проверить, какие корутины были переданы
-    original_gather = asyncio.gather
 
     async def mock_gather(*args, **kwargs):
         # Создаем задачи для каждой корутины, но не запускаем их
@@ -73,9 +72,9 @@ async def test_updater_run_gathers_correct_number_of_coroutines():
         # Проверяем, что gather был вызван с ожидаемым количеством аргументов
         # Замените число 4 на реальное количество методов в updater.run
         expected_count = 4
-        assert (
-            len(call_args) == expected_count
-        ), f"asyncio.gather должен быть вызван с {expected_count} аргументами, получено {len(call_args)}"
+        assert len(call_args) == expected_count, (
+            f"asyncio.gather должен быть вызван с {expected_count} аргументами, получено {len(call_args)}"
+        )
 
         # Проверяем, что все методы были вызваны по одному разу
         updater.update_method1.assert_called_once()

@@ -10,6 +10,10 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.auto_updater_target_place import (
     AutoUpdaterTargetPlace,
 )
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactData,
+    PlanData,
+)
 
 from .auto_updater_target_place import LastTargetPlaceUpdateRedisManager
 
@@ -148,25 +152,37 @@ async def test_update_target_place(
     redis_manager_mock = LastTargetPlaceUpdateRedisManager
     redis_manager_mock.get_last_target_place_update = AsyncMock(return_value=result)
     redis_manager_mock.set_last_target_place_update = AsyncMock()
-    with (
+
+    plan_data = PlanData(
+        orders=plan_for_sales_for_day,
+        target_pay_for_order=target_price_for_order,
+        max_pay_for_order=max_price_for_order,
+    )
+
+    fact_data = FactData(
+        predict_orders=fact_mean_orders_for_last_two_days,
+        pay_for_order=fact_mean_price_for_order_for_last_two_days,
+        original_orders=fact_mean_orders_for_last_two_days,
+    )
+
+        with (
         patch(
-            "app.modules.shop_runner.modules.auto_updater_target_place."
+            "app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place."
             "auto_updater_target_place.LastTargetPlaceUpdateRedisManager",
             new=redis_manager_mock,
         ),
         patch(
-            "app.modules.shop_runner.modules.auto_updater_target_place."
+            "app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place."
             "auto_updater_target_place.sm",
             new=get_async_session_mock,
         ),
     ):
-        updater = AutoUpdaterTargetPlace()
+        updater = AutoUpdaterTargetPlace(adv_setting_mock)
 
         await updater.update(
-            adv_setting_mock,
-            fact_mean_price_for_order_for_last_two_days,
-            fact_mean_orders_for_last_two_days,
             keywords_mocks,
+            plan_data,
+            fact_data,
         )
         if current_target_place != new_target_place:
             called_stmt = session_mock.execute.call_args[0][0]

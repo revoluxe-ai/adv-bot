@@ -2,11 +2,11 @@
 asyncio_mode = "auto"
 
 [tool.black]
-line-length = 88
+line-length = 120
 target-version = ["py311"]
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py311"
 exclude = [
     ".git",
@@ -20,7 +20,7 @@ exclude = [
 
 [tool.ruff.lint]
 # База: pycodestyle/pyflakes + расширения: bugbear, isort, pyupgrade
-select = ["E", "F", "W", "B", "I", "UP"]
+select = ["E", "F", "W", "B", "I", "UP", 'D']
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

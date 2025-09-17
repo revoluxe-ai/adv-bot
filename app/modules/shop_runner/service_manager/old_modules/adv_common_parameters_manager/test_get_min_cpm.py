@@ -25,11 +25,11 @@ async def test_get_min_cpm_from_redis(adv_setting_mock):
 
     with (
         patch(
-            "app.modules.shop_runner.modules.adv_common_parameters_manager.adv_parameter_manager.sm",
+            "app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_manager.adv_parameter_manager.sm",
             new=get_session_maker_mock,
         ),
         patch(
-            "app.modules.shop_runner.modules.adv_common_parameters_manager.adv_parameter_manager.redis_manager",
+            "app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_manager.adv_parameter_manager.redis_manager",
             new=redis_manager_mock,
         ),
     ):
