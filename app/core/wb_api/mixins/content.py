@@ -1,3 +1,5 @@
+"""Миксин для работы с карточками товаров через Content API Wildberries. Legacy, в разработке новый модуль"""
+
 import json
 import logging
 
@@ -12,9 +14,12 @@ logger = logging
 PREFIX = "https://content-api"
 
 
-class ContentMixin(WBAPIProtocol):
+class ContentMixin:
+    """Миксин для работы с карточками товаров через Content API Wildberries."""
+
     @try_except_decorator(1, 2)
     async def get_card_by_text(self: WBAPIProtocol, text: str | int) -> CardFromWB:
+        """Ищет карточку по тексту в названии или артикулу."""
         url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
         text = str(text)
         data_for_req = {
@@ -33,21 +38,28 @@ class ContentMixin(WBAPIProtocol):
             headers=self.headers.standart,
         )
         if response is None:
-            raise CardNotFoundInWB(f"Карточка с текстом {text} не найдена на Wildberries")
+            raise CardNotFoundInWB(
+                f"Карточка с текстом {text} не найдена на Wildberries"
+            )
         answer = json.loads(response)
         cards = answer["cards"]
         if not cards:
-            raise CardNotFoundInWB(f"Карточка с текстом {text} не найдена на Wildberries")
+            raise CardNotFoundInWB(
+                f"Карточка с текстом {text} не найдена на Wildberries"
+            )
         card_json = answer["cards"][0]
         card: CardFromWB = CardFromWB(card_json)
         return card
 
     @try_except_decorator(1, 2)
     async def get_all_cards(self: WBAPIProtocol) -> list[CardFromWB]:
+        """Получает все карточки товаров из магазина."""
         url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
 
         # Начальные параметры для запроса
-        data_for_req = {"settings": {"cursor": {"limit": 100}, "filter": {"withPhoto": -1}}}
+        data_for_req = {
+            "settings": {"cursor": {"limit": 100}, "filter": {"withPhoto": -1}}
+        }
 
         all_cards = []  # Список для хранения всех карточек
         while True:
