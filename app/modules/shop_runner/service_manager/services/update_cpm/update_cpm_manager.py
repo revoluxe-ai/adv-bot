@@ -123,7 +123,6 @@ class UpdateCPMManager:
         tg: TaskGroup,
         update_bids_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO],
     ) -> UpdateBidsSearchAdvInShopBatch:
-
         update_batch = UpdateBidsSearchAdvInShopBatch(self._shop_id)
         for dto in update_bids_in_search_adv_dtos:
             keywords_coro = dto.calculated_keywords_coro

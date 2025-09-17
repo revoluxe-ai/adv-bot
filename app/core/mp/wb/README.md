@@ -172,24 +172,26 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class MyCustomMixin:
     """Пример создания собственного миксина."""
-    
+
     async def my_custom_method(self: 'BaseWBApi', param: str) -> List[dict]:
         """Пример метода миксина."""
         try:
             # Получаем адаптер для нужного домена
             adapter = self._get_adapter("promotion")
-            
+
             # Вызываем метод адаптера
             result = await adapter.some_method(param=param)
-            
+
             logger.info(f"[{self.shop_id}] Выполнен custom метод")
             return result
-            
+
         except Exception as e:
             logger.error(f"[{self.shop_id}] Ошибка custom метода: {e}")
             raise
+
 
 # Использование в клиенте
 class MyWBApi(MyCustomMixin, mixins.CPMUpdateMixin, BaseWBApi):
@@ -254,8 +256,10 @@ async def test_wb_api_client():
 Пример подмены адаптера в pytest:
 
 ```python
-from app.core.di.wb_api_clients.wb_api_container import WBApiDIContainer
+from app.core.di.wb_api.wb_api_container import WBApiDIContainer
 from app.core.mp.wb.adapters.promotion.v1_adapter import PromotionV1Adapter
+
+changes
 
 
 def test_with_mock_adapter(monkeypatch):
