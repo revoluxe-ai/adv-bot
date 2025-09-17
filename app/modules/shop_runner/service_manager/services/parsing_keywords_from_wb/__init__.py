@@ -1,4 +1,6 @@
-﻿import logging
+﻿"""Парсинг ключевых слов для рекламных кампаний Wildberries."""
+
+import logging
 from datetime import datetime, timedelta
 from typing import AsyncGenerator, Tuple, Awaitable
 
@@ -15,6 +17,15 @@ logger = logging.getLogger(__name__)
 async def parsing_keywords_for_adv_generator(
     adv: AdvSetting, keywords: Awaitable[list[CalculatedKeyword]]
 ) -> AsyncGenerator[Tuple[str, int], None]:
+    """
+    Генератор для получения ключевых слов, которые нужно парсить для рекламной кампании.
+    Args:
+        adv:
+        keywords:
+
+    Returns:
+
+    """
     keywords_result = await keywords
     if not keywords:
         logger.error(f"Нет ключевых для кампании {adv.adv_id}")
@@ -42,6 +53,7 @@ async def parsing_keywords_for_adv_generator(
     now = datetime.now()
 
     def get_parsing_limit() -> int:
+        """Лимит на количество ключевых слов для парсинга за один заход."""
         positions_in_index = []
         for ps in keywords_with_positions:
             base = ps.position
@@ -69,7 +81,7 @@ async def parsing_keywords_for_adv_generator(
             continue
         elif views_now - last_views > settings.MIN_DIFF_VIEWS_FOR_PARSING_KEYWORDS:
             should_parse = True
-        elif last_position.base_position == 0 and (views_now != last_views):
+        elif last_position.position == 0 and (views_now != last_views):
             should_parse = True
         elif last_position.timestamp < now - timedelta(hours=max_hours_period):
             should_parse = True
