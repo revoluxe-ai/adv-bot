@@ -1,14 +1,14 @@
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
+
+from ...settings import settings
 from .tariffs import tariffs
 from .tariffs_text import text
-from ...settings import settings
 
 
 class Pricer:
-
     @property
     def text(self):
         return text
@@ -36,9 +36,9 @@ class Pricer:
         count = await self.get_advs_count(shop_id)
         base_tariff: int = self.get_price_for_count_advs_in_cabinet_for_month(count)
 
-        # automatic_tariff: int = await self.get_automactic_tariff(shop_id)
+        automatic_tariff: int = await self.get_automactic_tariff(shop_id)
 
-        return base_tariff
+        return base_tariff + automatic_tariff
 
     @staticmethod
     def get_tariff_for_day(tariff_for_month) -> float:
@@ -68,10 +68,7 @@ class Pricer:
         month_tariff_for_autoupdate_target_place = (
             await self._get_month_tariff_for_autoupdate_target_place(shop_id)
         )
-        return (
-            month_tariff_for_white_list_auto_updater
-            + month_tariff_for_autoupdate_target_place
-        )
+        return month_tariff_for_white_list_auto_updater + month_tariff_for_autoupdate_target_place
 
     async def _get_month_tariff_for_white_list_updater(self, shop_id: str) -> int:
         async with sm(read_only=True) as session:
