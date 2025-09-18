@@ -7,10 +7,12 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
-
-from ..setting_auto_updater.data_classes import FactData, PlanData
 from . import LastTargetPlaceUpdateRedisManager
 from .exc import AutoUpdateTargetPlaceError
+from ..setting_auto_updater.data_classes import FactData, PlanData
+
+
+# Legacy code, нигде не используется
 
 
 class AutoUpdaterTargetPlace:
@@ -57,9 +59,7 @@ class AutoUpdaterTargetPlace:
         redis_manager = LastTargetPlaceUpdateRedisManager(adv)
         last_target_place_update_timestamp: datetime.datetime | None = None
         last_spend: float | None = None
-        result: tuple[datetime.datetime, float] | None = (
-            await redis_manager.get_last_target_place_update()
-        )
+        result: tuple[datetime.datetime, float] | None = await redis_manager.get_last_target_place_update()
         if result:
             last_target_place_update_timestamp, last_spend = result
 
@@ -93,7 +93,5 @@ class AutoUpdaterTargetPlace:
         async with sm(read_only=False) as session:
             await session.execute(stmt)
             await session.commit()
-        await redis_manager.set_last_target_place_update(
-            adv, timestamp, spend_sum_from_keywords_now
-        )
+        await redis_manager.set_last_target_place_update(adv, timestamp, spend_sum_from_keywords_now)
         return None
