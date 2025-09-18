@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
+from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -27,7 +28,6 @@ from app.utils.NeoDataScience.driver import DataScience
 
 from ...core.wb_api.exceptions import ApiForbiddenError
 from ...core.wb_api.mixins.adv import MinCPMData
-from ...utils.pricer.pricer import Pricer
 from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..relevant_phrase_manager import RelevantPhraseManager

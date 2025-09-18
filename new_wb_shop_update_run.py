@@ -25,26 +25,34 @@ if system == "Linux":
 
 logger = logging.getLogger(__name__)
 
-container = AppContainer()
-
 
 async def run_process() -> None:
     """Запуск общего процесса на все магазины, legacy, нуждается в рефакторинге.
 
     TODO: Выпилить магазинные функции из общего процесса и перенести их в shop_runner. Тут оставить только общие.
     """
+    container = AppContainer()
+    # TODO: Обновлять список пакетов/модулей в wire(), если появляются новые инъекции (@inject/Provide[...]).
+    # Проверка/тест идеи
+    # Быстрая проверка на запуск: этого достаточно.
+    # Для системной проверки (позже): написать скрипт, который ищет Provide[...]/@inject и сверяет,
+    # что соответствующие файлы входят в списки packages/modules переданные в wire().
+    # Либо держать единый модуль app/core/di/wiring.py со списком пакетов, и дергать его из всех раннеров.
+    container.wire(
+        packages=["app.core.redis_manager_v2"],
+    )
+    # Запуск процесса без явного lifecycle-менеджмента, ресурсы не требуются
+    # TODO: При необходимости добавить точечную инициализацию ресурсов (например, Redis)
     try:
-        result = container.init_resources()
-        if result is None:
-            await run_process_func.run()
+        await run_process_func.run()
     except ShopRunnerCriticalError as exc:
         logger.critical(f"Критическая ошибка в процессе: {exc}", exc_info=True)
         raise exc
-
+    except Exception as exc:
+        logger.error(f"Ошибка в процессе: {exc}", exc_info=True)
+        raise exc
     finally:
-        result = container.shutdown_resources()
-        if result is not None:
-            await result
+        pass
 
 
 if __name__ == "__main__":

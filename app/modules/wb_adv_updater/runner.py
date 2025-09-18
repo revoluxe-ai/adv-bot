@@ -101,6 +101,21 @@ async def main_loop(client_session):
 
 
 async def run_main_coroutines():
+    from app.core.di.app_container import AppContainer
+
+    container = AppContainer()
+    try:
+        result = container.init_resources()
+        if result is not None:
+            await result
+        await __run_main_coroutines()
+    finally:
+        result = container.shutdown_resources()
+        if result is not None:
+            await result
+
+
+async def __run_main_coroutines():
     async with ClientSession() as client_session:
         while True:
             try:
