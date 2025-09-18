@@ -33,6 +33,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 from ..views import callbacks, messages
+from ..helpers.wb_user_cabinet import get_wb_user_cabinet_id_or_none
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,13 @@ async def setting_keywords_active_keywords(
     nmids = adv_setting.nmids
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
+    if wb_user_cabinet_original_id is None:
+        wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
+            callback.from_user.id, adv_setting.wb_cabinet_id
+        )
+        if wb_user_cabinet_original_id is None:
+            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            return
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     except:
@@ -128,6 +136,13 @@ async def setting_keywords_sort_by_ctr_desc(
     assert callback.message is not None
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
+    if wb_user_cabinet_original_id is None:
+        wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
+            callback.from_user.id, adv_setting.wb_cabinet_id
+        )
+        if wb_user_cabinet_original_id is None:
+            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            return
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     except:
@@ -174,6 +189,13 @@ async def setting_keywords_show_keywords_is_hard(
     nmids = adv_setting.nmids
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
+    if wb_user_cabinet_original_id is None:
+        wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
+            callback.from_user.id, adv_setting.wb_cabinet_id
+        )
+        if wb_user_cabinet_original_id is None:
+            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            return
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     except:
@@ -232,6 +254,13 @@ async def setting_keywords_white_list(
     nmids = adv_setting.nmids
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
+    if wb_user_cabinet_original_id is None:
+        wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
+            callback.from_user.id, adv_setting.wb_cabinet_id
+        )
+        if wb_user_cabinet_original_id is None:
+            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            return
 
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
@@ -284,6 +313,13 @@ async def setting_keywords_white_list(
     nmids = adv_setting.nmids
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
+    if wb_user_cabinet_original_id is None:
+        wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
+            callback.from_user.id, adv_setting.wb_cabinet_id
+        )
+        if wb_user_cabinet_original_id is None:
+            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            return
 
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
@@ -415,6 +451,13 @@ async def setting_keywords_hide_keywords_is_hard(
     nmids = adv_setting.nmids
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
+    if wb_user_cabinet_original_id is None:
+        wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
+            callback.from_user.id, adv_setting.wb_cabinet_id
+        )
+        if wb_user_cabinet_original_id is None:
+            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            return
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     except:
