@@ -14,6 +14,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
 )
 
 
+# TODO: Legacy code, нигде не используется, удалить после проверки
 async def update_adv_setting(
     adv: AdvSetting,
     keywords: list[CalculatedKeyword],
