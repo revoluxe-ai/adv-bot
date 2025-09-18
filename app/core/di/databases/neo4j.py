@@ -31,9 +31,12 @@ class Neo4jLifecycle(resources.AsyncResource[None]):
     """
 
     async def init(self, driver: AsyncDriver) -> None:
-        """Инициализирует ресурс, проверяя подключение к Neo4j."""
+        """Инициализирует ресурс.
+        TODO: LEGACY: проверка подключения к Neo4j отключена, так как раннеры без Neo4j падали.
+        Вернуть verify_connectivity() или сделать проверку условной по флагу конфигурации.
+        """
         # Провайдер передаёт driver как аргумент
-        await driver.verify_connectivity()
+        # await driver.verify_connectivity()
 
     async def shutdown(self, driver: AsyncDriver | None = None) -> None:
         """Завершает работу ресурса, закрывая подключение к Neo4j."""

@@ -9,6 +9,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.modules import balance_manager
+from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -18,7 +19,6 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-from app.utils.pricer.pricer import Pricer
 
 from .. import states
 from ..views import callbacks, messages
@@ -91,9 +91,7 @@ async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, stat
     page = 1
     check_data = await state.get_data()
     logger.debug(f"check_data: {check_data}")
-    await messages.AdvCompanyChoicing(
-        bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page
-    )()
+    await messages.AdvCompanyChoicing(bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page)()
     return
 
 
@@ -120,9 +118,7 @@ async def choice_adv_paginator(
     async with sm() as session:
         adv_settings = await session.execute(stmt)
         adv_settings = adv_settings.scalars().all()
-    await messages.AdvCompanyChoicing(
-        bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page
-    )()
+    await messages.AdvCompanyChoicing(bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page)()
     return
 
 
@@ -149,8 +145,7 @@ async def adv_handler(
                 .join(WBUserCabinet.wb_cabinet)
                 .join(WBCabinet.adv_settings)
                 .filter(
-                    User.user_telegram_id
-                    == callback.from_user.id,  # Фильтрация по user_telegram_id
+                    User.user_telegram_id == callback.from_user.id,  # Фильтрация по user_telegram_id
                     AdvSetting.id == adv_original_id,  # Фильтрация по нужному AdvSetting
                 )
             )
@@ -219,11 +214,7 @@ async def turn_adv_on(
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
         assert wb_user_cabinet
-        stmt = (
-            select(AdvSetting)
-            .options(selectinload(AdvSetting.payments))
-            .where(AdvSetting.id == adv_original_id)
-        )
+        stmt = select(AdvSetting).options(selectinload(AdvSetting.payments)).where(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
         adv: AdvSetting = result.scalar()
         assert adv
@@ -277,24 +268,18 @@ async def turn_adv_off_all(
 
 
 @router.callback_query(callbacks.TurnBot.filter(F.action == "off"))
-async def turn_adv_off(
-    call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot
-):
+async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot):
     # data = await state.get_data()
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         stmt = (
-            select(WBUserCabinet)
-            .join(WBUserCabinet.wb_cabinet)
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+            select(WBUserCabinet).join(WBUserCabinet.wb_cabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
 
     async with sm(read_only=False) as session:
-        result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
-        )
+        result = await session.execute(select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id))
         adv_setting: AdvSetting = result.scalars().first()
         adv_setting.bot_active = False
         await session.commit()
@@ -308,9 +293,7 @@ async def turn_adv_off(
 
 
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == "turn_on_auto_min_ctr"))
-async def turn_on_auto_min_ctr(
-    callback: types.CallbackQuery, bot: Bot, callback_data: callbacks.ChangeAutoMinCTR
-):
+async def turn_on_auto_min_ctr(callback: types.CallbackQuery, bot: Bot, callback_data: callbacks.ChangeAutoMinCTR):
     adv_setting_original_id = callback_data.adv_setting_original_id
     stmt = (
         update(AdvSetting)

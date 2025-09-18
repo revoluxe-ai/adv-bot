@@ -28,7 +28,6 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
-from app.utils.pricer.pricer import Pricer
 from app.utils.suffixes import get_day_suffix
 
 logger = logging.getLogger(__name__)
@@ -47,26 +46,22 @@ class ShopMenu(TextWithKeyboard):
         self._user_telegram_id = chat_id
         self._state = state
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-        self._pricer = Pricer()
         super().__init__(bot, chat_id)
 
     async def _is_active_adv(self):
         """Метод оставлен для обратной совместимости, но больше не используется
-        так как данные получаем сразу при основной загрузке"""
+        так как данные получаем сразу при основной загрузке
+        """
         logger.debug("_is_active_adv больше не используется, и будет удален в будущих версиях")
         return self.is_active_adv
 
     async def _load_all_data(self):
         """Оптимизированная загрузка всех данных в одной транзакции"""
         start_time = datetime.now()
-        logger.debug(
-            f"Начало оптимизированной загрузки данных для кабинета {self._wb_user_cabinet_original_id}"
-        )
+        logger.debug(f"Начало оптимизированной загрузки данных для кабинета {self._wb_user_cabinet_original_id}")
 
         # Сохраняем ID в состояние
-        await self._state.update_data(
-            last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id
-        )
+        await self._state.update_data(last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id)
 
         try:
             async with sm(read_only=True) as session:
@@ -77,12 +72,8 @@ class ShopMenu(TextWithKeyboard):
                     .options(
                         # Загружаем WBCabinet со всеми необходимыми связями
                         selectinload(WBUserCabinet.wb_cabinet),
-                        selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                            WBCabinet.bonus_payments
-                        ),
-                        selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                            WBCabinet.balance_payments
-                        ),
+                        selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.bonus_payments),
+                        selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.balance_payments),
                         # Загружаем пользователя
                         selectinload(WBUserCabinet.user),
                         # Предзагружаем активные рекламные кампании
@@ -116,12 +107,8 @@ class ShopMenu(TextWithKeyboard):
                 # 5. Расчет метрик для тарификации
                 if self.is_active_adv:
                     shop_id = self._wb_cabinet.shop_id
-                    self.price_for_month_for_shop = (
-                        await self._pricer.get_month_tariff_for_count_advs(shop_id)
-                    )
-                    self.total_amount_for_day = await self._pricer.get_price_for_day_for_shop(
-                        shop_id
-                    )
+                    self.price_for_month_for_shop = await self._pricer.get_month_tariff_for_count_advs(shop_id)
+                    self.total_amount_for_day = await self._pricer.get_price_for_day_for_shop(shop_id)
                 else:
                     self.price_for_month_for_shop = 0
                     self.total_amount_for_day = 0
@@ -129,9 +116,7 @@ class ShopMenu(TextWithKeyboard):
                 # 6. Сохраняем данные в состояние
                 await self._state.update_data(last_wb_cabinet_original_id=self._wb_cabinet.id)
 
-                logger.debug(
-                    f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек"
-                )
+                logger.debug(f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек")
                 return True
         except Exception as e:
             logger.error(f"Ошибка при оптимизированной загрузке данных: {e}", exc_info=True)
@@ -146,9 +131,7 @@ class ShopMenu(TextWithKeyboard):
         # Получаем пользователя до обработки токенов для корректной проверки админа
         user: User = self._wb_user_cabinet.user
         shop_id = self._wb_cabinet.shop_id
-        logger.debug(
-            f"Обработка токенов для пользователя {user.user_telegram_id}, магазин {shop_id}"
-        )
+        logger.debug(f"Обработка токенов для пользователя {user.user_telegram_id}, магазин {shop_id}")
 
         # Оптимизированная загрузка токенов - фильтруем сразу на уровне SQL
         try:
@@ -186,9 +169,7 @@ class ShopMenu(TextWithKeyboard):
         sort_start_time = datetime.now()
         shops_tokens = work_tokens
         shops_tokens.sort(key=lambda token: token.expires, reverse=True)
-        logger.debug(
-            f"Сортировка токенов выполнена за {(datetime.now() - sort_start_time).total_seconds():.2f} сек"
-        )
+        logger.debug(f"Сортировка токенов выполнена за {(datetime.now() - sort_start_time).total_seconds():.2f} сек")
 
         # Определение срока действия
         if user.user_telegram_id in const.ADMINS:
@@ -222,9 +203,7 @@ class ShopMenu(TextWithKeyboard):
             self.expiration_time = expiration_time
             self.last_days_for_token = (expiration_time - datetime.now()).days
 
-        logger.debug(
-            f"Обработка токенов успешно завершена, установлен срок действия {self.last_days_for_token} дней"
-        )
+        logger.debug(f"Обработка токенов успешно завершена, установлен срок действия {self.last_days_for_token} дней")
         return True
 
     async def __call__(self):
@@ -255,9 +234,7 @@ class ShopMenu(TextWithKeyboard):
         # Вызываем родительский метод __call__, который отвечает за отправку сообщения
         await super().__call__()
 
-        logger.debug(
-            f"Меню магазина отображено за {(datetime.now() - display_start_time).total_seconds():.2f} сек"
-        )
+        logger.debug(f"Меню магазина отображено за {(datetime.now() - display_start_time).total_seconds():.2f} сек")
         total_time = (datetime.now() - start_time).total_seconds()
         logger.debug(f"Общее время выполнения метода ShopMenu.__call__: {total_time:.2f} сек")
 
@@ -323,9 +300,7 @@ class ShopMenu(TextWithKeyboard):
         builder = InlineKeyboardBuilder()
         button = InlineKeyboardButton(
             text="Автоматические рекламные кампании",
-            callback_data=ChoiceAdvPaginator(
-                wb_user_cabinet_original_id=wb_user_cabinet.id, page=1
-            ).pack(),
+            callback_data=ChoiceAdvPaginator(wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
         builder.row(button)
 
@@ -347,9 +322,7 @@ class ShopMenu(TextWithKeyboard):
         if user_telegram_id in const.ADMINS:
             button = InlineKeyboardButton(
                 text="Удалить личный кабинет магазина",
-                callback_data=DeleteWbUserCabinet(
-                    wb_user_cabinet_original_id=self._wb_user_cabinet.id
-                ).pack(),
+                callback_data=DeleteWbUserCabinet(wb_user_cabinet_original_id=self._wb_user_cabinet.id).pack(),
             )
 
             builder.row(button)
@@ -357,31 +330,23 @@ class ShopMenu(TextWithKeyboard):
         if is_active_adv:
             button = InlineKeyboardButton(
                 text="Отключить все кампании",
-                callback_data=TurnBot(
-                    action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
-                ).pack(),
+                callback_data=TurnBot(action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id).pack(),
             )
             builder.row(button)
 
         if self._wb_cabinet.white_list_update_active:
             button = InlineKeyboardButton(
                 text="Выключить авто-обновление белого списка",
-                callback_data=TurnWhiteListUpdate(
-                    wb_cabinet_original_id=self._wb_cabinet.id, action="off"
-                ).pack(),
+                callback_data=TurnWhiteListUpdate(wb_cabinet_original_id=self._wb_cabinet.id, action="off").pack(),
             )
         else:
             button = InlineKeyboardButton(
                 text="Включить авто-обновление белого списка",
-                callback_data=TurnWhiteListUpdate(
-                    wb_cabinet_original_id=self._wb_cabinet.id, action="on"
-                ).pack(),
+                callback_data=TurnWhiteListUpdate(wb_cabinet_original_id=self._wb_cabinet.id, action="on").pack(),
             )
 
         builder.row(button)
 
-        button = InlineKeyboardButton(
-            text="Вернуться к списку магазинов", callback_data=Start().pack()
-        )
+        button = InlineKeyboardButton(text="Вернуться к списку магазинов", callback_data=Start().pack())
         builder.row(button)
         return builder.as_markup()

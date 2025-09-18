@@ -4,14 +4,13 @@ __all__ = ("AppContainer",)
 from dependency_injector import containers, providers
 from neo4j import AsyncDriver
 
-from . import databases
 from ...configs import AppConfig
+from . import databases
 
 
 class AppContainer(containers.DeclarativeContainer):
     """Главный DI-контейнер приложения. Содержит все основные сервисы и конфигурации."""
 
-    wiring_config = containers.WiringConfiguration(packages=["app"])
     settings = providers.Singleton(AppConfig.create)
 
     # Синхронный провайдер драйвера, чтобы инъекции получали готовый объект

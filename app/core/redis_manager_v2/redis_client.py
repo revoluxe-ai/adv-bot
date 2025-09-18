@@ -13,7 +13,7 @@ except Exception:
 
 from dependency_injector.wiring import Provide, inject
 
-from app import AppContainer
+from app.core.di import AppContainer
 
 
 class RedisClient(ABC):
