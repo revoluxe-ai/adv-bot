@@ -46,6 +46,10 @@ class ShopMenu(TextWithKeyboard):
         self._user_telegram_id = chat_id
         self._state = state
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+        from app.modules.billing.pricer import Pricer
+
+        self._pricer = Pricer()
+
         super().__init__(bot, chat_id)
 
     async def _is_active_adv(self):
