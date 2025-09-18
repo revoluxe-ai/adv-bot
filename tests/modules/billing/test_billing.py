@@ -1,5 +1,6 @@
-import asyncio
 """Tests for billing per-cabinet daily charge logic."""
+
+import asyncio
 import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.billing.billing import (
     get_active_cabinets_with_data,
     get_count_advs_for_wb_cabinet,
-    process_payment_ for_advs,
+    process_payment_for_advs,
 )
 from app.modules.billing.pricer import Pricer
 from app.modules.billing.redis_manager import RedisManager
