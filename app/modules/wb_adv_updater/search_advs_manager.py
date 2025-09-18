@@ -5,12 +5,12 @@ from collections.abc import Iterable
 from aiohttp import ClientSession
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
+from app.modules.common_slaves.wildberries.api.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 
@@ -48,9 +48,7 @@ logger = logging.getLogger(__name__)
 #             )
 
 
-async def set_fix_keywords_phrases_for_search_adv(
-    adv_setting, keywords, client_session: ClientSession
-):
+async def set_fix_keywords_phrases_for_search_adv(adv_setting, keywords, client_session: ClientSession):
     search_adv_id = adv_setting.search_adv_id
     adv_update_state_manager = AdvActiveKeywordUpdateStateManager()
     wb_cabinet_id = adv_setting.wb_cabinet_id
@@ -115,9 +113,7 @@ async def _set_keyword_phrases_for_search_advs(adv_settinds, client_session) -> 
     tasks = []
     for adv_setting in adv_settinds:
         keywords = await data_manager.get_good_bad_phrases(adv_setting)
-        task = asyncio.create_task(
-            update_keyword_phrases_for_search_adv(adv_setting, keywords, client_session)
-        )
+        task = asyncio.create_task(update_keyword_phrases_for_search_adv(adv_setting, keywords, client_session))
         tasks.append(task)
     for task in tasks:
         try:
@@ -147,6 +143,9 @@ async def _set_keyword_phrases_for_search_advs(adv_settinds, client_session) -> 
 #         except Exception as e:
 #              logger.error(f'Ошибка установки CPM для {adv.name}: {e}', exc_info=True)
 #              return
+
+
+# TODO: Легаси, на удаление
 
 
 async def update_search_advs_module_run():
