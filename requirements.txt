@@ -143,7 +143,7 @@ threadpoolctl==3.3.0
 toolz==0.12.1
 tqdm==4.66.2
 traitlets==5.14.3
-types-python-dateutil==2.9.0
+types-python-dateutil==2.9.0.20250822
 typing_extensions==4.10.0
 tzdata==2024.1
 uritemplate==3.0.1
