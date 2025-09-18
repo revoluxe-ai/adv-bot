@@ -46,6 +46,10 @@ class ShopMenu(TextWithKeyboard):
         self._user_telegram_id = chat_id
         self._state = state
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
+        from app.modules.billing.pricer import Pricer
+
+        self._pricer = Pricer()
+
         super().__init__(bot, chat_id)
 
     async def _is_active_adv(self):
@@ -119,6 +123,7 @@ class ShopMenu(TextWithKeyboard):
                 logger.debug(f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек")
                 return True
         except Exception as e:
+            # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
             logger.error(f"Ошибка при оптимизированной загрузке данных: {e}", exc_info=True)
             await self.bot.send_message(
                 self.chat_id,
