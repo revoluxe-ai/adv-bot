@@ -1,4 +1,4 @@
-﻿from typing import TypeVar
+from typing import TypeVar
 
 from sqlalchemy import update
 
@@ -8,6 +8,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .redis_cache.redis_cache import AdvSettingRedisCache
 
 T = TypeVar("T")
@@ -101,9 +102,7 @@ class WhiteListUpdateManager:
     ) -> tuple[bool, bool]:
         redis_cache = self.redis_cache
         pass_time = 60 * 15
-        if not await redis_cache.last_auto_adding_phrase_to_white_list.check_pass_time(
-            pass_time
-        ):
+        if not await redis_cache.last_auto_adding_phrase_to_white_list.check_pass_time(pass_time):
             return False, False
 
         def candidate_for_white_list_filter(keyword: CalculatedKeyword) -> bool:
@@ -117,16 +116,10 @@ class WhiteListUpdateManager:
                 else:
                     return False
             else:
-                if (
-                    keyword.hard_status == 1
-                    and keyword.status == KeywordStatus.BAD
-                ):
+                if keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD:
                     return True
                 else:
                     return False
-
-
-
 
         keywords_for_adding = list(filter(candidate_for_white_list_filter, keywords))
         if not keywords_for_adding:
@@ -138,9 +131,7 @@ class WhiteListUpdateManager:
         async with sm() as session:
             stmt = (
                 update(KeywordSetting)
-                .where(
-                    KeywordSetting.id == keyword_for_adding.keyword_setting_original_id
-                )
+                .where(KeywordSetting.id == keyword_for_adding.keyword_setting_original_id)
                 .values({"hard_status": 2})
             )
             await session.execute(stmt)

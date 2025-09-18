@@ -1,11 +1,12 @@
-﻿from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
-from .auto_white_list_updater import WhiteListUpdateManager
 from app.modules.shop_runner.wb_shop import WBShop
+
+from .auto_white_list_updater import WhiteListUpdateManager
 
 auto_adv_id = 25031215
 
@@ -62,39 +63,24 @@ async def test_update_white_list_threshold_triggered(
 
     get_daily_stats_by_last_days_mock = AsyncMock(return_value=[stat_mock])
 
-    redis_manager_mock = MagicMock()
-    redis_manager_mock.get_last_spend_sum = AsyncMock(return_value=redis_sum)
-    redis_manager_mock.set_last_spend_sum = AsyncMock()
-
-    click_house_manager_mock = MagicMock()
-    click_house_manager_mock.get_sum_spend_for_complex_adv = AsyncMock(
-        return_value=clickhouse_sum
-    )
+    redis_cache_mock = MagicMock()
+    redis_cache_mock.last_auto_delete_white_list = MagicMock()
+    redis_cache_mock.last_auto_delete_white_list.check_pass_time = AsyncMock(return_value=True)
+    redis_cache_mock.last_auto_delete_white_list.set = AsyncMock()
 
     with (
         patch(
-            "app.modules.shop_runner.modules.auto_white_list_updater.auto_white_list_updater.sm",
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.auto_white_list_updater.sm",
             new=get_session_maker_mock,
         ),
         patch(
-            "app.modules.shop_runner.modules.auto_white_list_updater."
-            "auto_white_list_updater.WhiteListDeleteManager.redis_manager",
-            new=redis_manager_mock,
-        ),
-        patch(
-            "app.modules.shop_runner.modules.auto_white_list_updater.auto_white_list_updater.click_house_manager",
-            new=click_house_manager_mock,
-        ),
-        patch(
-            "app.modules.shop_runner.modules."
-            "auto_white_list_updater.auto_white_list_updater.get_daily_stats_by_last_days",
-            new=get_daily_stats_by_last_days_mock,
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater."
+            "auto_white_list_updater.AdvSettingRedisCache",
+            return_value=redis_cache_mock,
         ),
     ):
-        manager = WhiteListUpdateManager()
-        await manager.auto_update_phrases_in_white_list(
-            adv_setting_mock, keywords_mocks
-        )
+        manager = WhiteListUpdateManager(adv_setting_mock)
+        await manager.delete_last_white_phrase(keywords_mocks)
 
         if expected_change:
             assert session_mock.add.call_count == 1
@@ -117,9 +103,39 @@ async def test_update_white_list_threshold_triggered(
 async def test_WBShop_delete_phrase_from_white_list_run(
     adv_setting_mock, keywords_mocks
 ):
+    wb_api_mock = MagicMock()
+    wb_api_mock.shop_id = "test_shop_id"
+    redis_manager_mock = MagicMock()
+    redis_manager_mock.DEFAULT_TTL = 60
+    redis_manager_mock.renew_shop_ttl = AsyncMock()
 
-    wb_shop = WBShop("тест shop_id", 123456)
+    wb_shop = WBShop(wb_api_mock, redis_manager_mock)
     wb_shop._update_advs_models = AsyncMock()
     wb_shop._adv_settings = [adv_setting_mock]
-    wb_shop._update_phrases_in_white_list_run()
     wb_shop.get_calculated_keywords = AsyncMock(return_value=keywords_mocks)
+
+    coroutines_manager_mock = MagicMock()
+    coroutines_manager_mock.parsing_keywords_run = AsyncMock()
+    coroutines_manager_mock.update_advs_data_from_wb_to_pg = AsyncMock()
+    coroutines_manager_mock.update_cards_data_from_wb_to_pg = AsyncMock()
+    coroutines_manager_mock.update_cpm_bid = AsyncMock()
+    coroutines_manager_mock.update_common_sale_stat = AsyncMock()
+    coroutines_manager_mock.update_full_adv_stat = AsyncMock()
+    coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
+    coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
+
+    with patch(
+        "app.modules.shop_runner.wb_shop.CoroutinesManager",
+        return_value=coroutines_manager_mock,
+    ):
+        await wb_shop.run()
+
+        # Проверяем, что все методы были вызваны
+        coroutines_manager_mock.parsing_keywords_run.assert_called_once()
+        coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
+        coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
+        coroutines_manager_mock.update_cpm_bid.assert_called_once()
+        coroutines_manager_mock.update_common_sale_stat.assert_called_once()
+        coroutines_manager_mock.update_full_adv_stat.assert_called_once()
+        coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
+        coroutines_manager_mock.update_top_key_in_advs.assert_called_once()

@@ -1,8 +1,7 @@
-﻿from app.core.redis_manager.base_redis_manager import KeywordBaseRedis
+from app.core.redis_manager.base_redis_manager import KeywordBaseRedis
 
 
 class LastViewsKeywordsForParser(KeywordBaseRedis):
-
     @property
     def _key(self) -> str:
         return f"LastViewsKeywordsForParser:{self._adv.adv_id}"

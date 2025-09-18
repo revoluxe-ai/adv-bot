@@ -41,9 +41,6 @@ ordersCount":12,
 """
 
 
-
-
-
 @dataclass
 class CommonStat:
     nmid: int
@@ -53,6 +50,3 @@ class CommonStat:
     orders: int
     orders_sum: float
     buy_outs: int
-
-
-

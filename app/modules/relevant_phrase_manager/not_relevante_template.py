@@ -1,12 +1,9 @@
-from typing import List, Set
-
-
 class NotRelevantTemplate:
-    def __init__(self, row_template: List[str]):
+    def __init__(self, row_template: list[str]):
         self._row_template = row_template
 
     @property
-    def _negative_contains(self) -> Set[str]:
+    def _negative_contains(self) -> set[str]:
         phrases = set()
         for row in self._row_template:
             row = row.strip()
@@ -20,7 +17,7 @@ class NotRelevantTemplate:
         return phrases
 
     @property
-    def _negative_exact(self) -> Set[str]:
+    def _negative_exact(self) -> set[str]:
         phrases = set()
         for row in self._row_template:
             row = row.strip()
@@ -30,7 +27,7 @@ class NotRelevantTemplate:
             row = self._strip_not_prefix(row)
 
             if self._is_quoted(row):
-                phrases.add(row.strip('"\''))  # убираем кавычки
+                phrases.add(row.strip("\"'"))  # убираем кавычки
         return phrases
 
     @property
@@ -46,9 +43,8 @@ class NotRelevantTemplate:
         return groups
 
     def _is_quoted(self, text: str) -> bool:
-        return (
-            (text.startswith('"') or text.endswith('"')) or
-            (text.startswith("'") or text.endswith("'"))
+        return (text.startswith('"') or text.endswith('"')) or (
+            text.startswith("'") or text.endswith("'")
         )
 
     def _strip_not_prefix(self, text: str) -> str:
@@ -60,8 +56,7 @@ class NotRelevantTemplate:
         phrase_lower = phrase.lower()
 
         # 1. Исключаем по точному совпадению
-        if phrase_lower in (p.lower()
-                            for p in self._negative_exact):
+        if phrase_lower in (p.lower() for p in self._negative_exact):
             return False
 
         # 2. Исключаем по вхождению
@@ -76,6 +71,3 @@ class NotRelevantTemplate:
 
         # Если ни одно правило не нарушено — релевантна
         return True
-
-
-

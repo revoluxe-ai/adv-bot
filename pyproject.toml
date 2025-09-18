@@ -2,30 +2,66 @@
 asyncio_mode = "auto"
 
 [tool.black]
-line-length = 100
+line-length = 120
+target-version = ["py311"]
 
 [tool.ruff]
-line-length = 100
-target-version = "py311"  # выставить под свою версию Python [3.10/3.11/3.12]
+line-length = 120
+target-version = "py311"
 exclude = [
     ".git",
     ".venv",
     "build",
     "dist",
     "migrations",
+    "__pycache__",
+    ".pytest_cache",
 ]
 
 [tool.ruff.lint]
 # База: pycodestyle/pyflakes + расширения: bugbear, isort, pyupgrade
-select = ["E", "F", "W", "B", "I", "UP"]
-ignore = ["E501"]  # длина строки отдает Black [10]
+select = ["E", "F", "W", "B", "I", "UP", 'D']
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
-# поменяй на имя своего пакета(ов) для корректной группировки импортов
-known-first-party = ["your_package"]
+# Скорректировано под вашу структуру проекта
+known-first-party = ["app"]
+split-on-trailing-comma = true
 
-# Пример пер-файловых послаблений (опционально)
+# Пер-файловые послабления
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # пример: разрешить assert в тестах
-"**/__init__.py" = ["E402"]  # импорты не вверху файла
+"tests/**" = ["S101"]  # разрешить assert в тестах
+"**/__init__.py" = ["E402", "F401"]  # импорты не вверху файла + неиспользуемые импорты
+"alembic/**" = ["F403", "F401"]  # star imports и неиспользуемые импорты для миграций
+"migrations/**" = ["F403", "F401"]  # аналогично для папки migrations
+
+# Mypy configuration
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+# Игнорирование для специфичных папок
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "migrations.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "alembic.*"
+ignore_errors = true
+
+# Import Linter configuration

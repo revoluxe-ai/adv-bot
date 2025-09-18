@@ -1,10 +1,10 @@
-﻿import datetime
+import datetime
 import logging
-from typing import Awaitable
+from collections.abc import Awaitable
 
 from sqlalchemy import update
 
-from app.modules.common_advs_stat import CommonAdvsStatDataManager, CommonAdvsStatData
+from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -15,6 +15,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .plan_fact_change_redis_caches import ChangePlanFact
 from .update_adv_setting import update_adv_setting
 
@@ -22,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class AdvSettingAutoUpdater:
-
     def __init__(self, adv: AdvSetting, max_last_period: int):
         self._adv = adv
         auto_adv_id = self._adv.adv_id
@@ -45,11 +45,7 @@ class AdvSettingAutoUpdater:
         fact = self.get_fact_data_from_stat(stat)
         return fact
 
-
-    async def update(
-        self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]
-    ) -> None:
-
+    async def update(self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]) -> None:
         keywords = await keywords_coroutine
         plan = self.get_plan_data(self._adv)
         if not plan:
@@ -70,12 +66,8 @@ class AdvSettingAutoUpdater:
         assert common_stat_data.mean_orders_for_last_days is not None
         assert common_stat_data.mean_price_for_order is not None
         assert common_stat_data.all_orders_for_last_days is not None
-        mean_orders = round(
-            common_stat_data.mean_orders_for_last_days, self._max_last_period
-        )
-        mean_pay_for_order = round(
-            common_stat_data.mean_price_for_order, self._max_last_period
-        )
+        mean_orders = round(common_stat_data.mean_orders_for_last_days, self._max_last_period)
+        mean_pay_for_order = round(common_stat_data.mean_price_for_order, self._max_last_period)
         fact_data = FactData(
             predict_orders=mean_orders,
             pay_for_order=mean_pay_for_order,
@@ -100,9 +92,7 @@ class AdvSettingAutoUpdater:
 
         return plan
 
-    async def add_top_keyword_to_white_list(
-        self, keywords: list[CalculatedKeyword]
-    ) -> None:
+    async def add_top_keyword_to_white_list(self, keywords: list[CalculatedKeyword]) -> None:
         if not keywords:
             return None
         assert keywords

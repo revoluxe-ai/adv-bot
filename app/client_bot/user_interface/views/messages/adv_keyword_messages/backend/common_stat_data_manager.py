@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
@@ -10,10 +10,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat
 
 
 class CommonStatDataManager:
-
-    async def get_days_static_text(
-        self, adv_setting: AdvSetting, last_days: int
-    ) -> str:
+    async def get_days_static_text(self, adv_setting: AdvSetting, last_days: int) -> str:
         concatenate_stat = await self.get_concatinated_stats(adv_setting, last_days)
         nmid = adv_setting.nmids[0]
         common_card_stat = await common_stat_manager.get_stats_by_days(nmid, last_days)
@@ -46,9 +43,7 @@ class CommonStatDataManager:
             [auction_adv_id], start_date, end_date
         )
 
-        concatenated_result = full_wb_adv_stat.concatenate_stats(
-            auto_adv_stat, auction_adv_stat
-        )
+        concatenated_result = full_wb_adv_stat.concatenate_stats(auto_adv_stat, auction_adv_stat)
 
         concatenated_result.sort(key=lambda x: x.date)
         return concatenated_result

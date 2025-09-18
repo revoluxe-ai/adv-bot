@@ -1,5 +1,3 @@
-
-
 class CardNotFoundInDB(Exception):
     pass
 

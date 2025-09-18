@@ -6,8 +6,6 @@ class ErrorHandler:
         self._access = access
         self._keywords_more_than_1000 = KeywordsMoreThan1000()
 
-
-
     @abstractmethod
     async def register_error(self, error: Exception):
         pass
@@ -15,14 +13,3 @@ class ErrorHandler:
     @abstractmethod
     async def reset_error(self):
         pass
-
-
-
-
-
-
-
-
-
-
-

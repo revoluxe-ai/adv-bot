@@ -1,15 +1,15 @@
 import json
 from datetime import datetime, timedelta
 
-from app.core.wb_api.http_request import try_except_decorator, requests
-from .wb_statistic_obj import CommonStat
+from app.core.wb_api.http_request import requests, try_except_decorator
+
 from ...protocols import WBAPIProtocol
+from .wb_statistic_obj import CommonStat
 
 PREFIX = "https://seller-analytics-api"
 
 
 class CommonStatMinix(WBAPIProtocol):
-
     HOST = "wildberries.ru"
 
     @try_except_decorator(1, 60)
@@ -65,9 +65,7 @@ class CommonStatMinix(WBAPIProtocol):
                 stats.append(stat)
         return stats
 
-    async def get_cards_stats_by_days(
-        self, nmIDs: list[int], pass_days: int
-    ) -> list[CommonStat]:
+    async def get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int) -> list[CommonStat]:
         """
         Разбивает запрос на несколько частей, если nmIDs больше 20, и вызывает _get_cards_stats_by_days.
 

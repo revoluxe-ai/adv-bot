@@ -75,5 +75,6 @@ logs
 .env
 venv_linux/
 .qoder
+!.qoder/rules/
 ./.vscode/
-
+cursor-chat-export/

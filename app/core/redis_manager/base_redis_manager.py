@@ -1,4 +1,3 @@
-from abc import ABC
 from asyncio import Protocol
 
 import redis
@@ -19,6 +18,3 @@ class BaseRedisProtocol(Protocol):
     _key: str
     prefix: str
     client: redis.asyncio.Redis
-
-
-

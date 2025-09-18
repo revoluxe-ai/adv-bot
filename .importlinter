@@ -1,0 +1,59 @@
+[importlinter]
+root_package = app
+include_external_packages = true
+
+[contract:ui_messages_independence_manual_phrase_positions_update]
+name = "UI messages independent from manual_phrase_positions_update"
+type = "independence"
+modules =
+    app.client_bot.user_interface.views.messages
+    app.modules.manual_phrase_positions_update
+
+[contract:ui_messages_independence_wb_adv_updater]
+name = "UI messages independent from wb_adv_updater"
+type = "independence"
+modules =
+    app.client_bot.user_interface.views.messages
+    app.modules.wb_adv_updater
+
+[contract:ui_keyboards_independence_manual_phrase_positions_update]
+name = "UI keyboards independent from manual_phrase_positions_update"
+type = "independence"
+modules =
+    app.client_bot.user_interface.views.keyboards
+    app.modules.manual_phrase_positions_update
+
+[contract:ui_keyboards_independence_wb_adv_updater]
+name = "UI keyboards independent from wb_adv_updater"
+type = "independence"
+modules =
+    app.client_bot.user_interface.views.keyboards
+    app.modules.wb_adv_updater
+
+[contract:features_handlers_must_not_import_ui]
+name = "Feature handlers must not import UI"
+type = "forbidden"
+source_modules =
+    app.modules.manual_phrase_positions_update.backend.frontend.telegram
+    app.modules.wb_adv_updater.modules.bidder.tg_bot_handlers
+    app.modules.white_list_updater.telegram
+    app.modules.predict_ctr_exponent_settings.telegram
+    app.modules.bidder_auto_mode
+    app.modules.balance_manager
+    app.modules.bidder_step_setting
+    app.modules.adv_creator.telegram
+    app.modules.user_message_sender
+    app.modules.sales_plan_settings.telegram
+    app.modules.shop_menu
+forbidden_modules =
+    app.client_bot.user_interface.views
+
+[contract:application_layers]
+name = "Application layering: core <- modules <- ui"
+type = "layers"
+layers =
+    app.core
+    app.modules
+    app.client_bot.user_interface
+
+

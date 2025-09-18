@@ -9,35 +9,31 @@ import json
 import logging
 import re
 import time
+from collections.abc import Awaitable, Callable
 from typing import (
-    Callable,
-    Awaitable,
-    Optional,
-    Union,
     Any,
     TypeVar,
-    Dict,
     cast,
 )
 
 import aiohttp
 from aiohttp import (
-    ClientOSError,
-    ServerDisconnectedError,
-    ClientResponseError,
     ClientConnectionError,
+    ClientOSError,
+    ClientResponseError,
+    ServerDisconnectedError,
 )
 
 from .exceptions import (
+    ApiErrorWithCode,
     ApiForbiddenError,
+    BadRequestError,
+    MaxAttemptsError,
+    MinAdvBidWBApiError,
+    NotMatchWBApiError,
+    NotValidDataError,
     TooManyRequests,
     UnknownApiRequestError,
-    BadRequestError,
-    NotValidDataError,
-    ApiErrorWithCode,
-    NotMatchWBApiError,
-    MinAdvBidWBApiError,
-    MaxAttemptsError,
 )
 from .protocols import WBAPIProtocol
 
@@ -53,7 +49,7 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 def try_except_decorator(
     requests_per_interval: int,
-    interval_seconds: Union[int, float],
+    interval_seconds: int | float,
     max_attempts: int = 50,
     max_delay: int = 120,
 ) -> Callable[[F], F]:
@@ -66,9 +62,7 @@ def try_except_decorator(
         Декоратор для обработки ошибок API запросов с повторными попытками и адаптивным ожиданием.
         """
 
-        async def wrapper(
-            instance: TypeWBAPIProtocol, *args: Any, **kwargs: Any
-        ) -> Any:
+        async def wrapper(instance: TypeWBAPIProtocol, *args: Any, **kwargs: Any) -> Any:
             """Обертка для декоратора, которая добавляет обработку ошибок и адаптивное ожидание."""
             if not hasattr(instance, "api_call_state"):
                 instance.api_call_state = {}
@@ -84,13 +78,11 @@ def try_except_decorator(
             state = instance.api_call_state[method_name]
             shop_id = instance.shop_id
             while state["_attempts"] < max_attempts:
-                last_query_time: Optional[float] = state["_last_query_time"]
+                last_query_time: float | None = state["_last_query_time"]
                 if last_query_time:
                     current_time = time.time()
                     time_since_last_query = current_time - last_query_time
-                    time_to_wait = max(
-                        state["_current_pause"] - time_since_last_query, 0
-                    )
+                    time_to_wait = max(state["_current_pause"] - time_since_last_query, 0)
                     await asyncio.sleep(time_to_wait)
 
                 try:
@@ -98,8 +90,7 @@ def try_except_decorator(
                     result = await func(instance, *args, **kwargs)
                     logger.debug(f"Запрос {method_name} выполнен успешно для {shop_id}")
                     next_pause = (
-                        interval_seconds / requests_per_interval
-                        + state["_current_pause"]
+                        interval_seconds / requests_per_interval + state["_current_pause"]
                     ) / 2
                     state["_current_pause"] = next_pause
                     state["_attempts"] = 0
@@ -123,11 +114,9 @@ def try_except_decorator(
                             f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
                         ) from e
                     state["_attempts"] += 1
-                    state["_current_pause"] = min(
-                        max(state["_current_pause"], 1) * 2, max_delay
-                    )
+                    state["_current_pause"] = min(max(state["_current_pause"], 1) * 2, max_delay)
                     logger.debug(
-                        f'Следующая пауза между запросами: {state["_current_pause"]} секунд для shop_id: {shop_id}'
+                        f"Следующая пауза между запросами: {state['_current_pause']} секунд для shop_id: {shop_id}"
                     )
                 except Exception as e:
                     raise e
@@ -141,14 +130,12 @@ async def requests(
     session: aiohttp.ClientSession,
     method: str,
     url: str,
-    data: Optional[Any] = None,
-    json_data: Optional[Any] = None,
-    headers: Optional[Dict[str, str]] = None,
+    data: Any | None = None,
+    json_data: Any | None = None,
+    headers: dict[str, str] | None = None,
 ) -> str:
     """Обертка для выполнения HTTP-запросов с обработкой ошибок и логированием."""
-    async with session.request(
-        method, url, data=data, headers=headers, json=json_data
-    ) as response:
+    async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
         try:
             response_text = await response.text()
             logger.debug(
@@ -207,11 +194,7 @@ def get_error_from_response(response_text: str) -> Exception:
                         exc = MinAdvBidWBApiError()
                         exc.new_min_bid = new_min_ctr
                         return exc
-                return ApiErrorWithCode(
-                    status, title, f"Поле: {field}, Ошибка: {detail}"
-                )
+                return ApiErrorWithCode(status, title, f"Поле: {field}, Ошибка: {detail}")
             else:
-                return ApiErrorWithCode(
-                    status, title, f"Поле: {field}, Ошибка: {detail}"
-                )
+                return ApiErrorWithCode(status, title, f"Поле: {field}, Ошибка: {detail}")
     return NotMatchWBApiError("Неизвестная ошибка", response_text)

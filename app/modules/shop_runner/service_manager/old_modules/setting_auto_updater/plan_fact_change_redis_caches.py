@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 
 from pydantic import ValidationError
@@ -8,15 +8,14 @@ from app.core.redis_cache.mixins.main_objects_mixins.adv_setting_redis_cache imp
 )
 from app.core.redis_cache.redis_cache_base import RedisCacheBase
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
-    PlanData,
     FactData,
+    PlanData,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class ChangePlanFact(AdvSettingRedisCache, RedisCacheBase, prefix="ChangePlanFact"):
-
     async def check_equal_in_cache(self, plan: PlanData, fact: FactData) -> bool:
         value_bytes: bytes = await self._client.get(self._key)
         if not value_bytes:

@@ -1,6 +1,4 @@
 from app import settings
-import os
-
 
 redis_master_host = settings.REDIS_MASTER_HOST
 
@@ -28,10 +26,10 @@ worker_concurrency = 0
 
 # Лимиты на число задач в одном процессе (None — без ограничений)
 worker_max_tasks_per_child = None
-task_reject_on_worker_lost=True
-broker_transport_options = {'global_keyprefix': f'{settings.CELERY_PREFIX}'}
+task_reject_on_worker_lost = True
+broker_transport_options = {"global_keyprefix": f"{settings.CELERY_PREFIX}"}
 
 
-task_acks_late=True,  # Задачи подтверждаются только после их успешного выполнения
-task_retries=5,  # Количество повторных попыток выполнения задачи
-task_retry_delay=30,  # Задержка между повторными попытками
+task_acks_late = (True,)  # Задачи подтверждаются только после их успешного выполнения
+task_retries = (5,)  # Количество повторных попыток выполнения задачи
+task_retry_delay = (30,)  # Задержка между повторными попытками

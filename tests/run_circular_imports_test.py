@@ -2,9 +2,9 @@
 """
 Скрипт для запуска тестов проверки циклических импортов в точках входа
 """
-import os
-import sys
+
 import subprocess
+import sys
 from pathlib import Path
 
 # Добавляем корневую директорию проекта в PYTHONPATH
@@ -16,7 +16,7 @@ sys.path.insert(0, str(project_root))
 def activate_venv():
     """Активирует виртуальное окружение для Windows/Linux"""
     venv_path = project_root / ".venv"
-    
+
     if sys.platform == "win32":
         activate_script = venv_path / "Scripts" / "activate"
         return f"call {activate_script}"
@@ -28,30 +28,30 @@ def activate_venv():
 def run_circular_imports_tests():
     """Запускает тесты проверки циклических импортов"""
     print("🔍 Проверка циклических импортов в точках входа...")
-    
+
     # Определение команды для запуска pytest
     # Встраиваем активацию окружения в команду
     cmd = []
-    
+
     if sys.platform == "win32":
-        # Для Windows используем powershell
+        # Для Windows используем Git Bash
         cmd = [
-            "powershell",
-            "-Command",
-            f".\\.\\.venv\\Scripts\\activate; python -m pytest tests/test_circular_imports.py -xvs"
+            "bash",
+            "-lc",
+            "source ./.venv/Scripts/activate && python -m pytest tests/test_circular_imports.py -xvs",
         ]
     else:
         # Для Linux/MacOS
         cmd = [
-            "/bin/bash", 
-            "-c", 
-            f"source ./.venv/bin/activate && python -m pytest tests/test_circular_imports.py -xvs"
+            "/bin/bash",
+            "-c",
+            "source ./.venv/bin/activate && python -m pytest tests/test_circular_imports.py -xvs",
         ]
-        
+
     # Запускаем команду
     return subprocess.run(cmd, cwd=project_root)
 
 
 if __name__ == "__main__":
     result = run_circular_imports_tests()
-    sys.exit(result.returncode) 
+    sys.exit(result.returncode)

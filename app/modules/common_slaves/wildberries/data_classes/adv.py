@@ -1,6 +1,5 @@
 import re
 from abc import abstractmethod
-from typing import Optional, List, Dict
 
 from pydantic import BaseModel
 
@@ -20,13 +19,11 @@ class UnitedParams(BaseModel):
     searchCPM: int
     subject: Subject
     # menus: List[Menu]
-    nms: List[int]
+    nms: list[int]
 
 
 class AutoParams(BaseModel):
-    active: Dict[
-        str, bool
-    ]  # Предполагается, что 'active' это словарь с булевыми значениями
+    active: dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
     # Добавьте другие поля, которые ожидаются в `autoParams`
 
 
@@ -36,12 +33,12 @@ class AdvData(BaseModel):
     changeTime: str
     startTime: str
     name: str
-    unitedParams: Optional[List[UnitedParams]] = None
+    unitedParams: list[UnitedParams] | None = None
     dailyBudget: int
     advertId: int
     status: int
     type: int
-    autoParams: Optional[AutoParams] = None
+    autoParams: AutoParams | None = None
 
 
 class Balances:

@@ -1,28 +1,28 @@
 import logging
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, Message
 from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import select, Result
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy import Result, select
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.client_bot import const
 from app.client_bot.const import DEFAULT_BIDDER_STEP
 from app.client_bot.message_manager import LastMessage
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.message_templates.templates import (
-    TextWithKeyboard,
     Text,
     TextWithImage,
-    TextWithKeyboardPagination,
+    TextWithKeyboard,
     TextWithKeyboardAndImage,
+    TextWithKeyboardPagination,
 )
-from app.client_bot.user_interface.views import keyboards, callbacks
+from app.client_bot.user_interface.views import callbacks, keyboards
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
     RedisCalculatedKeywordsCacheManager,
 )
@@ -31,21 +31,19 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import (
-    WBItemPosition,
-    WBBalancePayment,
-)
-from app.modules.common_slaves.wildberries.models import (
-    WBUserCabinet,
     AdvSetting,
     KeywordSetting,
+    WBBalancePayment,
     WBCabinet,
+    WBItemPosition,
+    WBUserCabinet,
 )
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import (
-    KeywordStatUpdateState,
     AdvActiveKeywordUpdateStateManager,
+    KeywordStatUpdateState,
 )
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
@@ -68,16 +66,13 @@ class ShopNameGet(Text):
 
 
 class ShopAddedSuccess(Text):
-
     def __init__(self, bot: Bot, chat_id, cabinet_name: str) -> None:
         super().__init__(bot, chat_id)
         self.__cabinet_name = cabinet_name
 
     @property
     def text(self) -> str:
-        return (
-            f"Магазин {self.__cabinet_name} успешно добавлен, идет обновление данных..."
-        )
+        return f"Магазин {self.__cabinet_name} успешно добавлен, идет обновление данных..."
 
 
 class GetApiForrbidenError(Text):
@@ -120,9 +115,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             return wb_cabinet
 
     async def __call__(self) -> tuple[LastMessage, str]:
-        await self._state.set_state(
-            states.AdvCompanyCatalog.waiting_for_keywords_for_filter
-        )
+        await self._state.set_state(states.AdvCompanyCatalog.waiting_for_keywords_for_filter)
         # Сортируем кампании на активные и неактивные
         active_advs = []
         inactive_advs = []
@@ -203,18 +196,15 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
 
 
 class ShopUpdateInfo(Text):
-
     @property
     def text(self):
-        return f"Обновление данных для магазина, немного подождите..."
+        return "Обновление данных для магазина, немного подождите..."
 
 
 class AdvSettingMenu(TextWithKeyboardAndImage):
     # parse_mode = ParseMode.HTML
 
-    def __init__(
-        self, bot: Bot, chat_id: int, wb_user_cabinet: WBUserCabinet, adv: AdvSetting
-    ):
+    def __init__(self, bot: Bot, chat_id: int, wb_user_cabinet: WBUserCabinet, adv: AdvSetting):
         super().__init__(bot, chat_id)
         self._bot = bot
         self._chat_id = chat_id
@@ -237,9 +227,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         if not full_stat_update_time:
             full_stat_update_time_str = "Нет данных"
         else:
-            full_stat_update_time_str = full_stat_update_time.strftime(
-                "%d.%m.%Y %H:%M:%S"
-            )
+            full_stat_update_time_str = full_stat_update_time.strftime("%d.%m.%Y %H:%M:%S")
 
         self.full_stat_update_time = full_stat_update_time_str
 
@@ -252,8 +240,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             await NoMainPhotos(self._bot, self._chat_id)(self.adv)
             return
 
-        last_update_keyword_stat: datetime | None = (
-            await self._get_last_update_keyword_stat(self.adv.adv_id)
+        last_update_keyword_stat: datetime | None = await self._get_last_update_keyword_stat(
+            self.adv.adv_id
         )
         if last_update_keyword_stat:
             self.last_update_keyword_stat_str = last_update_keyword_stat.strftime(
@@ -278,10 +266,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self.keywords_status_last_update_search_adv = "Аукцион не подключен к РК"
 
-        adv_stat: FullAdvStat = (
-            await data_manager.get_full_adv_stat_for_adv_id_from_redis(
-                adv_id=self.adv.adv_id
-            )
+        adv_stat: FullAdvStat = await data_manager.get_full_adv_stat_for_adv_id_from_redis(
+            adv_id=self.adv.adv_id
         )
 
         self.adv_stat = adv_stat
@@ -329,7 +315,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         adv_stat = self.adv_stat
 
         if adv_stat:
-
             days_stat = adv_stat.days
 
             days_stat = sorted(days_stat, key=lambda x: x.date)
@@ -343,9 +328,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 if len(parts) == 3:
                     return "-".join(reversed(parts))
                 else:
-                    raise ValueError(
-                        "Неправильный формат даты. Ожидается 'дата-месяц-год'."
-                    )
+                    raise ValueError("Неправильный формат даты. Ожидается 'дата-месяц-год'.")
 
             for day_stat in days_stat[-5:]:
                 date = day_stat.date
@@ -373,8 +356,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @staticmethod
     async def _get_last_update_keyword_stat(adv_id: int) -> datetime | None:
         last_update_keyword_stat_manager = KeywordStatUpdateState()
-        last_update_keyword_stat_for_complex_adv = (
-            await last_update_keyword_stat_manager.get_one(adv_id)
+        last_update_keyword_stat_for_complex_adv = await last_update_keyword_stat_manager.get_one(
+            adv_id
         )
         return last_update_keyword_stat_for_complex_adv
 
@@ -416,7 +399,6 @@ class ApiForrbidenError(Text):
 
 class AddNewTokenGet(TextWithImage):
     def __init__(self, bot: Bot, chat_id, cabinet_name: str):
-
         self.__cabinet_name = cabinet_name
         super().__init__(bot, chat_id)
 
@@ -445,18 +427,14 @@ class GetMinCtr(Text):
 
     @property
     def text(self):
-        return (
-            f"Введите новое значение минимального CTR для кампании {self.__adv.name}:"
-        )
+        return f"Введите новое значение минимального CTR для кампании {self.__adv.name}:"
 
 
 class CabinetExistsInSystem(Text):
-
     text = "Этот кабинет уже существует в системе, мы его добавим вам..."
 
 
 class WrongMinCTR(Text):
-
     text = "Минимальный CTR должен быть числом от 0 до 100. Попробуйте снова:"
 
 
@@ -518,11 +496,11 @@ class KeywordSettingMessage(TextWithKeyboard):
             adv_ids.add(search_adv_id)
 
         async with get_clickhouse_client() as client:
-            total_clicks, total_views, total_spend = (
-                await data_manager.get_keyword_statistic_clickhouse(
-                    client, text, adv_ids
-                )
-            )
+            (
+                total_clicks,
+                total_views,
+                total_spend,
+            ) = await data_manager.get_keyword_statistic_clickhouse(client, text, adv_ids)
         self.clicks = total_clicks
         self.views = total_views
         self.fact_ctr = total_clicks / total_views if total_views else 0
@@ -560,8 +538,8 @@ class KeywordSettingMessage(TextWithKeyboard):
             f"🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n"
             f"📈 *Показы:* {self.views}\n"
             f"🖱 *Клики:* {self.clicks}\n"
-            f'Прогнозируемый CTR: {self.original_predict_ctr*100 if self.original_predict_ctr else "Не просчитан"}%\n'
-            f"📊 *Фактический CTR:* {self.fact_ctr*100}%\n"
+            f"Прогнозируемый CTR: {self.original_predict_ctr * 100 if self.original_predict_ctr else 'Не просчитан'}%\n"
+            f"📊 *Фактический CTR:* {self.fact_ctr * 100}%\n"
             f"💰 *Расход:* {round(self.spend, 2)} руб.\n"
         )
         if self.position:
@@ -611,7 +589,7 @@ class NotFoundNmidOfNewAdvCompany(Text):
 
     @property
     def text(self):
-        return f'Товары с идентификаторами {", ".join(self.__not_found_items)} не найдены. Попробуйте снова:'
+        return f"Товары с идентификаторами {', '.join(self.__not_found_items)} не найдены. Попробуйте снова:"
 
 
 class LongTimeOperation(Text):
@@ -619,9 +597,7 @@ class LongTimeOperation(Text):
 
 
 class NeedSubscribe(TextWithKeyboard):
-    text = (
-        "Для использования функций вы должны быть подписаны на канал службы поддержки"
-    )
+    text = "Для использования функций вы должны быть подписаны на канал службы поддержки"
 
     @property
     def keyboard(self):
@@ -629,7 +605,6 @@ class NeedSubscribe(TextWithKeyboard):
 
 
 class RefProgram(TextWithKeyboard):
-
     def __init__(self, bot: Bot, chat_id: int):
         self._user_telegram_id = chat_id
         super().__init__(bot, chat_id)
@@ -674,16 +649,13 @@ class RefLinkNameAlreadyExists(Text):
 
 
 class RefLinkCreated(TextWithKeyboard):
-
     def __init__(self, bot: Bot, chat_id: int, ref_link: RefLink):
         self._ref_link = ref_link
         self._bot = bot
         super().__init__(bot, chat_id)
 
     async def __call__(self):
-        self._link = await deep_linking.create_start_link(
-            self._bot, str(self._ref_link.id)
-        )
+        self._link = await deep_linking.create_start_link(self._bot, str(self._ref_link.id))
         await super().__call__()
 
     @property
@@ -698,15 +670,12 @@ class RefLinkCreated(TextWithKeyboard):
 
 
 class RefProgramSelect(TextWithKeyboard):
-
     def __init__(self, bot: Bot, chat_id: int):
         self._user_telegram_id = chat_id
         super().__init__(bot, chat_id)
 
     async def __call__(self):
-        ref_links = await data_manager.get_ref_names_and_links(
-            self._user_telegram_id, self.bot
-        )
+        ref_links = await data_manager.get_ref_names_and_links(self._user_telegram_id, self.bot)
         self._ref_links = ref_links
         await super().__call__()
 
@@ -721,7 +690,6 @@ class RefProgramSelect(TextWithKeyboard):
 
 
 class OrderSubscribe(Text):
-
     text = f"В случае проблем с оплатой свяжитесь по этому контакту -> {const.SUPPORT_LINK}"
 
 
@@ -759,7 +727,6 @@ class NoMainPhotos(TextWithKeyboard):
 
 
 class ExpiredSubscription(TextWithKeyboard):
-
     def __init__(self, bot: Bot, chat_id: int, wb_cabinet_original_id: int):
         self._wb_cabinet_original_id = wb_cabinet_original_id
         super().__init__(bot, chat_id)
@@ -793,9 +760,7 @@ class SettingMinCTR(TextWithKeyboard):
 
     async def __call__(self, adv_original_id):
         async with sm() as session:
-            adv = await session.execute(
-                select(AdvSetting).where(AdvSetting.id == adv_original_id)
-            )
+            adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv: AdvSetting = adv.scalar()
         self._adv: AdvSetting = adv
         self._min_ctr: float = await data_manager.get_min_ctr(adv)
@@ -808,9 +773,7 @@ class SettingMinCTR(TextWithKeyboard):
 
         keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
         keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
-        keywords_without_rating = [
-            kw for kw in keywords if kw.rating_by_predict_ctr == 0
-        ]
+        keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
         keywords_with_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
         keywords = keywords_with_rating + keywords_without_rating
 
@@ -836,9 +799,12 @@ class SettingMinCTR(TextWithKeyboard):
     def text(self):
         text = (
             f"Минимальный CTR для кампании {self._adv.name}"
-            f" равен {round(self._min_ctr*100, 1)} %,"
-            f"""тип минимального CTR: {"Задан в ручную"  if not self._adv.new_auto_min_ctr_mode
-                    else "Определен автоматически"}\n"""
+            f" равен {round(self._min_ctr * 100, 1)} %,"
+            f"""тип минимального CTR: {
+                "Задан в ручную"
+                if not self._adv.new_auto_min_ctr_mode
+                else "Определен автоматически"
+            }\n"""
         )
 
         # keywords = self._goods + self._bads
@@ -853,12 +819,12 @@ class SettingMinCTR(TextWithKeyboard):
             assert predict_ctr is not None
             ctr = max(predict_ctr, baes_ctr)
             text += f"{good.text} - {round(ctr * 100, 1)}  % ✅\n"
-        text += f"================== {round(self._min_ctr*100, 1)}\n"
+        text += f"================== {round(self._min_ctr * 100, 1)}\n"
         for bad in self._bads:
             predict_ctr = bad.predict_ctr
             baes_ctr = bad.baes_ctr
             ctr = max(predict_ctr, baes_ctr)
-            text += f"{bad.text} - {round(ctr*100, 1)}  % ❌\n"
+            text += f"{bad.text} - {round(ctr * 100, 1)}  % ❌\n"
 
         text += "\n\n"
         text += "Введите новый CTR:"
@@ -870,12 +836,9 @@ class SettingMinCTR(TextWithKeyboard):
 
 
 class MaxCPCSetting(TextWithKeyboard):
-
     async def __call__(self, adv_original_id):
         async with sm() as session:
-            adv = await session.execute(
-                select(AdvSetting).where(AdvSetting.id == adv_original_id)
-            )
+            adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
         self._adv = adv
 
@@ -883,8 +846,7 @@ class MaxCPCSetting(TextWithKeyboard):
         keywords = [
             kw
             for kw in keywords
-            if str(kw.status) == KeywordStatus.GOOD
-            or kw.reason == KeywordStatus.MAX_CPC
+            if str(kw.status) == KeywordStatus.GOOD or kw.reason == KeywordStatus.MAX_CPC
         ]
         keywords.sort(key=lambda x: x.cpc, reverse=True)
         if not self._adv.max_cpc:
@@ -904,11 +866,11 @@ class MaxCPCSetting(TextWithKeyboard):
 
     @property
     def text(self):
-        text = f"""Максимальная цена клика {'для кампании ' + self._adv.name + ' равна ' + str(round(self._adv.max_cpc, 2)) + ' р.'  if self._adv.max_cpc  else 'не задана'}\n"""
+        text = f"""Максимальная цена клика {"для кампании " + self._adv.name + " равна " + str(round(self._adv.max_cpc, 2)) + " р." if self._adv.max_cpc else "не задана"}\n"""
         for keyword in self._top_kw_list:
             text += f"""{keyword.text} - {round(keyword.cpc, 2)} р. ❌\n"""
 
-        text += f'================== {round(self._adv.max_cpc, 2) if self._adv.max_cpc else ""}\n'
+        text += f"================== {round(self._adv.max_cpc, 2) if self._adv.max_cpc else ''}\n"
         print("============")
         for keyword in self._down_kw_list:
             text += f"""{keyword.text} - {round(keyword.cpc, 2)} р. ✅\n"""
@@ -924,9 +886,7 @@ class MaxCPCSetting(TextWithKeyboard):
 class SettingMinViewsForPredictCTR(TextWithKeyboard):
     async def __call__(self, adv_original_id):
         async with sm() as session:
-            adv = await session.execute(
-                select(AdvSetting).where(AdvSetting.id == adv_original_id)
-            )
+            adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
             adv = adv.scalar()
         self._adv = adv
         await super().__call__()
@@ -944,12 +904,13 @@ class SettingMinViewsForPredictCTR(TextWithKeyboard):
 
 
 class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
-
     def __init__(self, bot: Bot, chat_id, adv: AdvSetting):
         super().__init__(bot, chat_id)
         self._adv = adv
 
-    text = "Минимальное количество показов должно быть целым числом от 0 и больше. Попробуйте снова:"
+    text = (
+        "Минимальное количество показов должно быть целым числом от 0 и больше. Попробуйте снова:"
+    )
 
     @property
     def keyboard(self):
@@ -957,13 +918,11 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
 
 
 class Top10ByViewsKeywordsGraphic(TextWithKeyboardAndImage):
-
     def __init__(self, bot, chat_id):
         self._image = None
         super().__init__(bot, chat_id)
 
     async def __call__(self, adv_original_id: int):
-
         await super().__call__()
 
     @property
@@ -983,12 +942,13 @@ class NotKeywordHistoryPositions(Text):
 
 
 class NotEnoughMoneyForParsing(TextWithKeyboard):
-
     def __init__(self, bot: Bot, chat_id, wb_cabinet_original_id):
         super().__init__(bot, chat_id)
         self._wb_cabinet_original_id = wb_cabinet_original_id
 
-    text = """Не достаточный баланс для парсинга ключевых слов. Пополните баланс и попробуйте снова"""
+    text = (
+        """Не достаточный баланс для парсинга ключевых слов. Пополните баланс и попробуйте снова"""
+    )
 
     @property
     def keyboard(self):
@@ -1010,7 +970,6 @@ class CallMe1(TextWithKeyboard):
 
 
 class WaitingForWhitePhrases(TextWithKeyboard):
-
     async def __call__(self, adv_setting_id):
         self.adv_setting_id = adv_setting_id
         await super().__call__()
@@ -1058,9 +1017,9 @@ class CPMSetting(TextWithKeyboard):
     @property
     def text(self):
         text = f"""
-Режим управления ставкой: {'Ручной'  if not self.adv_setting.bidder_active else 'Автоматический'}\n\n"""
+Режим управления ставкой: {"Ручной" if not self.adv_setting.bidder_active else "Автоматический"}\n\n"""
         if self.adv_setting.bidder_active:
-            text += f"""{'Целевое место место: ' + str(self.adv_setting.max_place) }\n
+            text += f"""{"Целевое место место: " + str(self.adv_setting.max_place)}\n
 Максимальная ставка: {str(self.adv_setting.max_cpm)}\n"""
         return text
 
@@ -1069,7 +1028,6 @@ class CPMSetting(TextWithKeyboard):
         builder = InlineKeyboardBuilder()
 
         if self.adv_setting.bidder_active:
-
             bottom = InlineKeyboardButton(
                 text="Выключить автоматическое управление ставкой",
                 callback_data=callbacks.CPMSettingMenu(
@@ -1092,9 +1050,7 @@ class CPMSetting(TextWithKeyboard):
             else "Включить управление ставкой для Авто"
         )
         callback_action = (
-            "off_bidder_for_auto"
-            if self.adv_setting.bidder_for_auto
-            else "on_bidder_for_auto"
+            "off_bidder_for_auto" if self.adv_setting.bidder_for_auto else "on_bidder_for_auto"
         )
 
         bottom = InlineKeyboardButton(
@@ -1144,7 +1100,6 @@ class CPMSetting(TextWithKeyboard):
 
 
 class AutoCPMSettingGetMinPosition(Text):
-
     async def __call__(self, adv_setting_id: int):
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
@@ -1176,9 +1131,7 @@ class WaitingForBlackPhrases(TextWithKeyboard):
             adv: AdvSetting = await session.get(AdvSetting, adv_setting_id)
         rel_manager = RelevantPhraseManager(adv)
 
-        black_phrases: Optional[list[str]] = (
-            await rel_manager.get_relevant_template_data()
-        )
+        black_phrases: list[str] | None = await rel_manager.get_relevant_template_data()
         self.black_phrases = black_phrases
         await super().__call__()
 
@@ -1241,7 +1194,6 @@ class WhiteListReset(Text):
 
 
 class RelevantPhrasesAdded(TextWithKeyboard):
-
     def __init__(self, bot, user_telegram_id, adv_setting_id):
         self.adv_setting_id = adv_setting_id
         super().__init__(bot, user_telegram_id)

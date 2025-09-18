@@ -4,6 +4,7 @@ from sqlalchemy.orm import declared_attr
 
 Base = declarative_base()
 
+
 class BaseTable(Base):
     __abstract__ = True
     id = Column(Integer, primary_key=True, autoincrement=True)

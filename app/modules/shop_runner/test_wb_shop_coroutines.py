@@ -1,8 +1,9 @@
-﻿from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.modules.shop_runner.modules.wb_api import WBApi
+
 from .service_manager.manager import CoroutinesManager
 from .service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
@@ -10,35 +11,44 @@ from .service_manager.old_modules.setting_auto_updater.data_classes import (
 )
 
 
+@pytest.fixture
+def client_session_mock():
+    session = AsyncMock()
+    session.close = MagicMock()
+    return session
+
+
 @pytest.mark.asyncio
-async def test_adv_settings_auto_update(access_mock, adv_setting_mock, keywords_mocks):
-    wb_api = WBApi(access_mock)
+async def test_adv_settings_auto_update(
+    access_mock, adv_setting_mock, keywords_mocks, client_session_mock
+):
+    wb_api = WBApi(access_mock, client_session_mock)
 
     data_manager_mock = MagicMock()
     data_manager_mock.get_good_bad_phrases = AsyncMock(return_value=keywords_mocks)
     plan_data = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=250)
 
-    fact_data = FactData(predict_orders=1, pay_for_order=100)
+    fact_data = FactData(predict_orders=1, pay_for_order=100, original_orders=1)
     with (
         patch(
-            "app.modules.shop_runner.coroutine_manager.manager.data_manager",
+            "app.modules.shop_runner.service_manager.manager.data_manager",
             new=data_manager_mock,
         ),
         patch(
-            "app.modules.shop_runner.coroutine_manager.manager.AdvSettingAutoUpdater.get_fact_data",
+            "app.modules.shop_runner.service_manager.manager.AdvSettingAutoUpdater.get_fact_data",
             new=AsyncMock(return_value=fact_data),
         ),
         patch(
-            "app.modules.shop_runner.coroutine_manager.manager.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.manager.AdvSettingAutoUpdater.get_plan_data",
             new=MagicMock(return_value=plan_data),
         ),
         patch(
-            "app.modules.shop_runner.coroutine_manager.old_modules.setting_auto_updater.modules.white_list_updater."
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater."
             "auto_white_list_updater.auto_white_list_updater.WhiteListUpdateManager._delete_phrase_from_white_list",
             new_callable=AsyncMock,
-        ) as delete_phrase_from_white_list_method,
+        ),
         patch(
-            "app.modules.shop_runner.coroutine_manager.old_modules.setting_auto_updater.modules.white_list_updater."
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater."
             "auto_white_list_updater.auto_white_list_updater.WhiteListUpdateManager._delete_phrase_from_white_list"
         ),
     ):

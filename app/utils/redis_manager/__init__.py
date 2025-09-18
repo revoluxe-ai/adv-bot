@@ -10,23 +10,23 @@ from typing import Union
 from redis.asyncio.client import Pipeline
 
 from app.core.wb_api.mixins.adv import MinCPMData
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.utils import text_cleaner
 from app.utils.redis_manager.exc import DataNotFoundError
 from app.utils.text_cleaner import clear
 
 logger = logging.getLogger(__name__)
 
+from urllib.parse import quote, unquote
+
 import redis
 
-from app.modules.keywords_query import keywords_query
+from app import settings
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
-from urllib.parse import quote, unquote
-from app import settings
-
+from app.modules.keywords_query import keywords_query
 
 redis_host_master = settings.REDIS_MASTER_HOST
 assert redis_host_master
@@ -34,9 +34,7 @@ redis_master_client = redis.asyncio.StrictRedis(host=redis_host_master, port=637
 
 redis_host_replica = settings.REDIS_REPLICA_HOST
 assert redis_host_replica
-redis_replica_client = redis.asyncio.StrictRedis(
-    host=redis_host_replica, port=6379, db=0
-)
+redis_replica_client = redis.asyncio.StrictRedis(host=redis_host_replica, port=6379, db=0)
 
 
 def encode_key(raw_key):
@@ -110,9 +108,7 @@ async def set_check_last_24_hours(adv_original_id: int) -> None:
 
 
 async def check_last_24_hours(adv_original_id: int) -> typing.Any:
-    answer = await redis_replica_client.get(
-        "check_adv_last_24_hours:" + str(adv_original_id)
-    )
+    answer = await redis_replica_client.get("check_adv_last_24_hours:" + str(adv_original_id))
     return answer
 
 
@@ -125,9 +121,7 @@ async def set_auto_block_statuses(new_statuses: list[tuple[int, bool]]):
         await redis_master_client.mset(data)
 
 
-async def set_auto_block_status(
-    keywordsetting_original_id: int, auto_block_status: bool
-) -> None:
+async def set_auto_block_status(keywordsetting_original_id: int, auto_block_status: bool) -> None:
     key = "auto_block_status:" + str(keywordsetting_original_id)
     if auto_block_status is True:
         await redis_master_client.set(key, 1)
@@ -153,7 +147,7 @@ async def get_auto_block_status(keywordsetting_original_id: int) -> bool:
 async def set_keyword_statistics(
     adv_setting: AdvSetting,
     keywords: list[CalculatedKeyword],
-    pass_time: Union[int, None],
+    pass_time: int | None,
     cache_timeout: int,
 ):
     if not pass_time:
@@ -170,8 +164,8 @@ async def set_keyword_statistics(
 
 
 async def get_keyword_statistics(
-    adv_setting: AdvSetting, pass_time: Union[int, None]
-) -> Union[list[CalculatedKeyword], None]:
+    adv_setting: AdvSetting, pass_time: int | None
+) -> list[CalculatedKeyword] | None:
     if not pass_time:
         pass_time = 0
     key = "adv_keyword_statistics:" + str(adv_setting.id) + ":" + str(pass_time)
@@ -201,7 +195,7 @@ async def add_positions_to_redis(positions: list[WBItemPosition]) -> None:
         await redis_master_client.set(key, json.dumps(position_dict))
 
 
-async def get_keyword_position(keyword: str, nmid: int) -> Union[WBItemPosition, None]:
+async def get_keyword_position(keyword: str, nmid: int) -> WBItemPosition | None:
     base_key = f"adv_positions:{keyword}:{nmid}"
     json_data = await redis_replica_client.get(base_key)
     if not json_data:
@@ -225,7 +219,7 @@ async def get_keywords_positions(adv_setting, texts):
     positions = []
     missing_texts = []
 
-    for text, json_data in zip(texts, results):
+    for text, json_data in zip(texts, results, strict=False):
         if json_data:
             position = WBItemPosition.from_dict(json.loads(json_data))
             position.keyword_text = text
@@ -247,7 +241,7 @@ async def get_keywords_positions(adv_setting, texts):
         if cluster_keys:
             cluster_results = await redis_replica_client.mget(cluster_keys)
 
-            for key, json_data in zip(cluster_keys, cluster_results):
+            for key, json_data in zip(cluster_keys, cluster_results, strict=False):
                 if json_data:
                     position = WBItemPosition.from_dict(json.loads(json_data))
                     position.keyword_text = cluster_map[key]
@@ -259,22 +253,22 @@ async def get_keywords_positions(adv_setting, texts):
 async def set_position_to_out_index(position):
     position_out_index = WBItemPosition()
     position_out_index.position = 0
-    position_out_index.keyword_text = position.keyword_text if hasattr(position, "keyword_text") else None
+    position_out_index.keyword_text = (
+        position.keyword_text if hasattr(position, "keyword_text") else None
+    )
     position_out_index.adv_id = position.adv_id
     position_out_index.nmid = position.nmid
     await add_positions_to_redis([position_out_index])
 
 
 async def set_predict_ctr_with_pipeline(
-    redis_pipeline: Pipeline, adv_id: Union[int, str], keyword: str, predict_ctr: float
+    redis_pipeline: Pipeline, adv_id: int | str, keyword: str, predict_ctr: float
 ) -> None:
     key = f"predict_ctr:{adv_id}:{clear(keyword)}"
     redis_pipeline.set(key, predict_ctr)
 
 
-async def get_adv_id_to_text_predict_ctr_dict(
-    adv_id: int, texts: list[str]
-) -> dict[str, float]:
+async def get_adv_id_to_text_predict_ctr_dict(adv_id: int, texts: list[str]) -> dict[str, float]:
     # Шаблон для поиска всех ключей, связанных с данным adv_id
     keys = [f"predict_ctr:{adv_id}:{text_cleaner.clear(keyword)}" for keyword in texts]
 
@@ -283,7 +277,7 @@ async def get_adv_id_to_text_predict_ctr_dict(
 
     # Собираем результат
     result = {}
-    for keyword, value in zip(texts, values):
+    for keyword, value in zip(texts, values, strict=False):
         if value is not None:
             try:
                 result[keyword] = float(value.decode("utf-8"))
@@ -308,9 +302,7 @@ async def get_predict_ctr(adv_id: int, keyword: str):
     return predict_ctr
 
 
-async def set_predict_ctrs(
-    adv_id, keywords: list[CalculatedKeyword]
-) -> list[CalculatedKeyword]:
+async def set_predict_ctrs(adv_id, keywords: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
     """
     Получить предсказанные CTR для списка пар (adv_id, keyword).
 
@@ -319,10 +311,7 @@ async def set_predict_ctrs(
     :return: Список объектов CalculatedKeyword с обновленными предсказанными CTR.
     """
     # Формируем список ключей для запроса к Redis
-    keys = [
-        f"predict_ctr:{adv_id}:{text_cleaner.clear(keyword.text)}"
-        for keyword in keywords
-    ]
+    keys = [f"predict_ctr:{adv_id}:{text_cleaner.clear(keyword.text)}" for keyword in keywords]
 
     # Получаем данные из Redis за один запрос
     predict_ctr_bytes_list = await redis_replica_client.mget(keys)
@@ -397,7 +386,7 @@ async def get_keyword_features_from_redis(
     return result
 
 
-async def get_keyword_vector(keyword: str) -> typing.Optional[list[float]]:
+async def get_keyword_vector(keyword: str) -> list[float] | None:
     key = "keyword_vector:" + keyword
     vector_bytes = await redis_replica_client.get(key)
     if vector_bytes is None:
@@ -512,12 +501,12 @@ async def get_all_cluster_names() -> set[str]:
     return cluster_names
 
 
-async def get(key) -> typing.Optional[Union[str, int]]:
+async def get(key) -> str | int | None:
     value = await redis_replica_client.get(key)
     return value
 
 
-async def set_cluster_and_preset(text, cluster: str, preset: typing.Optional[int]):
+async def set_cluster_and_preset(text, cluster: str, preset: int | None):
     key = "cluster_and_preset:" + encode_key(text)
     if cluster is None or preset is None:
         await redis_master_client.delete(key)
@@ -530,7 +519,9 @@ async def set_cluster_and_preset(text, cluster: str, preset: typing.Optional[int
     return None
 
 
-async def get_cluster_and_preset(text) -> (
+async def get_cluster_and_preset(
+    text,
+) -> (
     str,
     int,
 ):
@@ -595,7 +586,7 @@ async def get_clusters_and_presets(texts: list[str]) -> dict[str, [tuple[str, in
 
     clusters_and_presets = {}
 
-    for text, value in zip(texts, values):
+    for text, value in zip(texts, values, strict=False):
         key = f"cluster_and_preset:{encode_key(text)}"
 
         if value is None:
@@ -607,22 +598,18 @@ async def get_clusters_and_presets(texts: list[str]) -> dict[str, [tuple[str, in
             cluster, preset = value.split(":")
             clusters_and_presets[text] = (cluster, int(preset))
         except Exception as e:
-            logger.error(
-                f"Ошибка при парсинге значения {value} из Redis с ключом {key}: {e}"
-            )
+            logger.error(f"Ошибка при парсинге значения {value} из Redis с ключом {key}: {e}")
             del e
             clusters_and_presets[text] = (None, None)
 
     return clusters_and_presets
 
 
-async def get_keywords_positions_by_nmid(
-    nmid: int, texts: list[str]
-) -> list[WBItemPosition]:
+async def get_keywords_positions_by_nmid(nmid: int, texts: list[str]) -> list[WBItemPosition]:
     keys = [f"adv_positions:{text}:{nmid}" for text in texts]
     results = await redis_replica_client.mget(keys)
     positions = []
-    for text, json_data in zip(texts, results):
+    for text, json_data in zip(texts, results, strict=False):
         if json_data:
             position = WBItemPosition.from_dict(json.loads(json_data))
             position.keyword_text = text
@@ -648,22 +635,18 @@ async def get_full_stat_adv(adv_id: int) -> str:
     key = f"full_stat_adv:{adv_id}"
     json_data = await redis_replica_client.get(key)
     if json_data is None:
-        raise DataNotFoundError(
-            f"Данные для объявления с adv_id={adv_id} не найдены в Redis"
-        )
+        raise DataNotFoundError(f"Данные для объявления с adv_id={adv_id} не найдены в Redis")
     json_data = json_data.decode("utf-8")
     return json_data
 
 
-async def set_last_full_stat_update(
-    adv_id: int, last_update: datetime.datetime
-) -> None:
+async def set_last_full_stat_update(adv_id: int, last_update: datetime.datetime) -> None:
     key = f"last_full_stat_update:{adv_id}"
     await redis_master_client.set(key, last_update.timestamp())
     return None
 
 
-async def get_last_full_stat_update(adv_id: int) -> typing.Optional[datetime.datetime]:
+async def get_last_full_stat_update(adv_id: int) -> datetime.datetime | None:
     key = f"last_full_stat_update:{adv_id}"
     value = await redis_replica_client.get(key)
     if value is None:
@@ -720,13 +703,10 @@ async def get_last_user_use_time(user_telegram_id: int):
 
 
 async def get_last_users_use_time(user_telegram_ids: list[int]) -> list[float]:
-    keys = [
-        "last_user_use_time:" + str(user_telegram_id)
-        for user_telegram_id in user_telegram_ids
-    ]
+    keys = ["last_user_use_time:" + str(user_telegram_id) for user_telegram_id in user_telegram_ids]
     values = await redis_replica_client.mget(keys)
     results = []
-    for user_telegram_id, value in zip(user_telegram_ids, values):
+    for user_telegram_id, value in zip(user_telegram_ids, values, strict=False):
         if value is None:
             results.append(None)
         else:

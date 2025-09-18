@@ -1,12 +1,12 @@
 import asyncio
 import logging
 
-from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
     KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager, search_advs_manager
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.modules.white_list_updater.backend.white_list_updater import WhiteListUpdater
@@ -39,22 +39,16 @@ class DataSetter:
                         bad_keywords.append(cluster)
 
         if len(bad_keywords) > 1000:
-            sorted_bad_keywords = sorted(
-                bad_keywords, key=lambda kw: kw.views, reverse=True
-            )
+            sorted_bad_keywords = sorted(bad_keywords, key=lambda kw: kw.views, reverse=True)
             bad_keywords = sorted_bad_keywords[:1000]
             over_words_in_company = sorted_bad_keywords[1000:]
             if over_words_in_company:
-                logger.debug(
-                    f"Не смогу заблокировать ключи {len(over_words_in_company)}"
-                )
+                logger.debug(f"Не смогу заблокировать ключи {len(over_words_in_company)}")
         bad_phrases = [kw.text for kw in bad_keywords]
         if bad_phrases:
             bad_phrases = list(set(bad_phrases))
             await self._wb_api.advert.set_minus_phrases(adv_setting, bad_phrases)
-            adv_active_keyword_update_state_manager = (
-                AdvActiveKeywordUpdateStateManager()
-            )
+            adv_active_keyword_update_state_manager = AdvActiveKeywordUpdateStateManager()
             logger.debug(f"Обновил минус слова {adv_setting.name} {bad_phrases}")
             await adv_active_keyword_update_state_manager.set_one(adv_setting.adv_id)
         else:
@@ -115,9 +109,7 @@ class DataSetter:
         logger.debug("Начинаю обновление минус слов")
         for adv_setting in adv_settings:
             logger.debug(f"Обновляю минус слова для {adv_setting.name}")
-            keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(
-                adv_setting
-            )
+            keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv_setting)
             logger.debug(f"Получил ключи для {adv_setting.name}")
             good_phrases = []
             bad_phrases = []

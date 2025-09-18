@@ -10,7 +10,7 @@ from sqlalchemy import and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.client_bot import utils, const
+from app.client_bot import const, utils
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.start_registration_func import (
     start_registration,
@@ -31,6 +31,7 @@ from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
 from ..views import callbacks, messages
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,6 @@ async def setting_keywords_active_keywords(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -110,7 +110,6 @@ async def setting_keywords_sort_by_ctr_desc(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -119,9 +118,7 @@ async def setting_keywords_sort_by_ctr_desc(
         )
         result = await session.execute(stmt)
         adv_setting: AdvSetting = result.scalar()
-    keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(
-        adv_setting
-    )
+    keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv_setting)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=1)
@@ -152,16 +149,13 @@ async def setting_keywords_sort_by_ctr_desc(
     return
 
 
-@router.callback_query(
-    callbacks.SettingKeywords.filter(F.type == "show_keywords_is_hard")
-)
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == "show_keywords_is_hard"))
 async def setting_keywords_show_keywords_is_hard(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -210,7 +204,6 @@ async def setting_keywords_white_list(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     page = callback_data.page
@@ -269,7 +262,6 @@ async def setting_keywords_white_list(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
     page = callback_data.page
@@ -315,9 +307,7 @@ async def setting_keywords_white_list(
 
 
 @router.message(StateFilter(states.AdvSetting.waiting_for_filter_keywords))
-async def setting_keywords_by_adv(
-    message: types.Message, bot: aiogram.Bot, state: FSMContext
-):
+async def setting_keywords_by_adv(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     text = message.text
     if not text:
         await bot.send_message(
@@ -331,9 +321,7 @@ async def setting_keywords_by_adv(
         await start_registration(message, bot, state)
         return
     filter_keywords = text.splitlines()
-    filter_keywords = [
-        keyword.strip().lower() for keyword in filter_keywords if keyword
-    ]
+    filter_keywords = [keyword.strip().lower() for keyword in filter_keywords if keyword]
     await state.update_data(keywords_filter=filter_keywords)
     await message.answer("Пожалуйста подождите, эта операция займет немного времени")
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
@@ -361,9 +349,7 @@ async def setting_keywords_by_adv(
             .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
             .options(
                 selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                    WBCabinet.adv_settings
-                ),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings),
             )
             .where(
                 and_(
@@ -407,16 +393,13 @@ async def setting_keywords_by_adv(
     return
 
 
-@router.callback_query(
-    callbacks.SettingKeywords.filter(F.type == "hide_keywords_is_not_relevant")
-)
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == "hide_keywords_is_not_relevant"))
 async def setting_keywords_hide_keywords_is_hard(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     await state.update_data(hide_keywords_is_not_relevant=True)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -453,16 +436,13 @@ async def setting_keywords_hide_keywords_is_hard(
     return
 
 
-@router.callback_query(
-    callbacks.SettingKeywords.filter(F.type == "show_keywords_is_not_relevant")
-)
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == "show_keywords_is_not_relevant"))
 async def setting_keywords_hide_keywords_is_hard(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     await state.update_data(hide_keywords_is_not_relevant=False)
     adv_original_id = callback_data.adv_original_id
     async with _sm() as session:
@@ -510,9 +490,7 @@ async def setting_keywords_by_adv(
         await state.update_data(keywords_filter=None)
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
     adv_original_id: int = callback_data.adv_original_id
-    await state.update_data(
-        last_adv_original_id=adv_original_id, last_adv_page=callback_data.page
-    )
+    await state.update_data(last_adv_original_id=adv_original_id, last_adv_page=callback_data.page)
 
     async with _sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
@@ -531,9 +509,7 @@ async def setting_keywords_by_adv(
             .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
             .options(
                 selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                    WBCabinet.adv_settings
-                ),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings),
             )
             .where(
                 and_(
@@ -602,16 +578,13 @@ async def setting_keyword(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-
     keyword_setting_original_id: int = callback_data.keyword_setting_original_id
 
     data = await state.get_data()
     page = data.get("last_keyword_setting_page", 1)
 
     chat_id = callback.message.chat.id
-    await messages.KeywordSettingMessage(
-        bot, chat_id, keyword_setting_original_id, page
-    )()
+    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
     return
 
 
@@ -647,10 +620,12 @@ async def change_keyword_hard_status(
             elif new_hard_status == -1:
                 min_ctr = await data_manager.get_min_ctr(adv_setting)
                 async with get_clickhouse_client() as client:
-                    clicks, views, _ = (
-                        await data_manager.get_keyword_statistic_clickhouse(
-                            client, keyword_setting.text, adv_ids
-                        )
+                    (
+                        clicks,
+                        views,
+                        _,
+                    ) = await data_manager.get_keyword_statistic_clickhouse(
+                        client, keyword_setting.text, adv_ids
                     )
                 if keyword_setting.added_clicks:
                     clicks += keyword_setting.added_clicks
@@ -670,18 +645,14 @@ async def change_keyword_hard_status(
                     keyword_setting.added_clicks = 0
                 keyword_setting.added_clicks += add_clicks
 
-                await redis_manager.set_auto_block_status(
-                    keyword_setting_original_id, False
-                )
+                await redis_manager.set_auto_block_status(keyword_setting_original_id, False)
 
             await session.commit()
         data = await state.get_data()
         page = data.get("last_keyword_setting_page", 1)
 
         chat_id = callback.message.chat.id
-        await messages.KeywordSettingMessage(
-            bot, chat_id, keyword_setting_original_id, page
-        )()
+        await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
 
         return
 
@@ -692,14 +663,11 @@ async def check_position(
     callback_data: callbacks.CheckPosition,
     bot: aiogram.Bot,
 ):
-
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     keyword_setting_original_id = callback_data.keyword_setting_original_id
     async with _sm() as session:
         result = await session.execute(
-            select(KeywordSetting.text).where(
-                KeywordSetting.id == keyword_setting_original_id
-            )
+            select(KeywordSetting.text).where(KeywordSetting.id == keyword_setting_original_id)
         )
         text: str = result.scalar()
         adv_setting_original_id = callback_data.adv_original_id
@@ -750,9 +718,7 @@ async def setting_keywords_filter_by_query(
             .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
             .options(
                 selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                    WBCabinet.adv_settings
-                ),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings),
             )
             .where(
                 and_(
@@ -795,7 +761,6 @@ async def reset_added_clicks(
     callback_data: callbacks.ResetAddedClicks,
     bot: aiogram.Bot,
 ):
-
     adv_setting_original_id = callback_data.adv_setting_original_id
     async with _sm(read_only=False) as session:
         stmt = select(KeywordSetting).where(

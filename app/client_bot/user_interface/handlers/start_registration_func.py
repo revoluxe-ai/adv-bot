@@ -2,7 +2,7 @@ from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
@@ -28,9 +28,7 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
 
         stmt = (
             select(User)
-            .options(
-                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
-            )
+            .options(joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet))
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)

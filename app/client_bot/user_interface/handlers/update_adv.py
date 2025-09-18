@@ -9,15 +9,16 @@ from sqlalchemy.orm import selectinload
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBCabinet,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import wb_manager
 from app.modules.wb_adv_updater.data_setter import DataSetter
 from app.utils.db.session_maker import get_async_session_maker
+
 from ..views import callbacks, messages
 
 sm = get_async_session_maker
@@ -35,13 +36,10 @@ async def update_minus_keywords(
     state: FSMContext,
     client_session: ClientSession,
 ):
-
     adv_original_id = callback_data.adv_setting_original_id
     async with sm() as session:
         adv = await session.execute(
-            select(AdvSetting)
-            .join(AdvSetting.wb_cabinet)
-            .where(AdvSetting.id == adv_original_id)
+            select(AdvSetting).join(AdvSetting.wb_cabinet).where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
         wb_cabinet_id: int = adv.wb_cabinet.id
@@ -81,9 +79,7 @@ async def update_keyword_stat(
     adv_original_id = callback_data.adv_setting_original_id
     async with sm() as session:
         adv: AdvSetting = await session.execute(
-            select(AdvSetting)
-            .join(AdvSetting.wb_cabinet)
-            .where(AdvSetting.id == adv_original_id)
+            select(AdvSetting).join(AdvSetting.wb_cabinet).where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
         wb_cabinet_id: int = adv.wb_cabinet.id

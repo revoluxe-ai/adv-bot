@@ -3,7 +3,6 @@ import datetime
 import random
 from collections import defaultdict
 from io import BytesIO
-from typing import Optional
 
 import matplotlib
 import pandas as pd
@@ -12,15 +11,16 @@ from sqlalchemy import select
 
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
+
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.graphic_positions_creator.classes import CommonKeyword
 
 
-async def get_common_keywords_with_positions(nmid) -> Optional[list[CommonKeyword]]:
-    positions: list[WBItemPosition] = (
-        await data_manager.get_keyword_positions_from_click_house(nmid)
+async def get_common_keywords_with_positions(nmid) -> list[CommonKeyword] | None:
+    positions: list[WBItemPosition] = await data_manager.get_keyword_positions_from_click_house(
+        nmid
     )
     common_keywords = []
     if positions:
@@ -38,30 +38,24 @@ async def get_common_keywords_with_positions(nmid) -> Optional[list[CommonKeywor
 
 async def get_keyword_history_graphic(
     adv_original_id, keywords
-) -> Optional[tuple[BytesIO, Optional[BytesIO]]]:
+) -> tuple[BytesIO, BytesIO | None] | None:
     async with sm() as session:
         stmt = select(AdvSetting.nmids).filter(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
         nmids = result.scalar()
         nmid = nmids[0]
-        common_keywords: list[CommonKeyword] = await get_common_keywords_with_positions(
-            nmid
-        )
+        common_keywords: list[CommonKeyword] = await get_common_keywords_with_positions(nmid)
 
         def sort_func(kw: CommonKeyword, order_map):
             return order_map.get(kw.text, -float("inf"))
 
         order_map = {kw.text: i for i, kw in enumerate(keywords)}
         # Сортируем common_keywords по индексу из order_map
-        sorted_common_keywords = sorted(
-            common_keywords, key=lambda kw: sort_func(kw, order_map)
-        )
+        sorted_common_keywords = sorted(common_keywords, key=lambda kw: sort_func(kw, order_map))
         common_keywords = sorted_common_keywords
         if not common_keywords:
             return
-        common_keywords.sort(
-            key=lambda x: min([pos.position for pos in x.wb_item_positions])
-        )
+        common_keywords.sort(key=lambda x: min([pos.position for pos in x.wb_item_positions]))
         common_keywords = common_keywords[:5]
         end_date = datetime.datetime.now()
         start_date = end_date - datetime.timedelta(days=7)
@@ -77,9 +71,7 @@ async def get_keyword_history_graphic(
             # Убедимся, что все timestamps в positions tz-aware
             for position in positions:
                 if position.timestamp.tzinfo is None:
-                    position.timestamp = position.timestamp.replace(
-                        tzinfo=datetime.timezone.utc
-                    )
+                    position.timestamp = position.timestamp.replace(tzinfo=datetime.UTC)
 
             # Последняя позиция по времени
             last_position: WBItemPosition = max(positions, key=lambda x: x.timestamp)
@@ -87,12 +79,10 @@ async def get_keyword_history_graphic(
             # Приведение всех дат в date_range к UTC (tz-aware)
             for date in date_range:
                 if date.tzinfo is None:
-                    date = date.replace(tzinfo=datetime.timezone.utc)
+                    date = date.replace(tzinfo=datetime.UTC)
 
                 # Поиск ближайшей позиции
-                close_position = min(
-                    positions, key=lambda x: abs(x.timestamp - date)
-                ).position
+                close_position = min(positions, key=lambda x: abs(x.timestamp - date)).position
 
                 # Заполнение данных
                 data["Ключи"].append(keyword.text + f"({last_position.position})")
@@ -113,7 +103,14 @@ async def get_keyword_history_graphic(
             def get_graphic_and_legend(plt, df, title_text):
                 import seaborn as sns
 
-                sns.lineplot(data=df, x="Дата", y="Позиция", hue="Ключи", marker="o", legend=False)
+                sns.lineplot(
+                    data=df,
+                    x="Дата",
+                    y="Позиция",
+                    hue="Ключи",
+                    marker="o",
+                    legend=False,
+                )
                 plt.xticks(rotation=45)
                 plt.title(title_text)
                 plt.tight_layout()

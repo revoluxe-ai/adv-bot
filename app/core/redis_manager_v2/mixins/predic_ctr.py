@@ -1,17 +1,18 @@
-﻿import logging
-from typing import Union
+import logging
+
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
-from ..base_protocol import BaseRedisManagerProtocol
 from app.utils.text_cleaner import clear
+
+from ..base_protocol import BaseRedisManagerProtocol
 
 logger = logging.getLogger(__name__)
 
 
 class PredictCTRRedisMixin(BaseRedisManagerProtocol):
     """Миксин для работы с ключами прогнозов CTR в Redis"""
-    
+
     _client: Redis
     prefix = "predict_ctr"
 
@@ -19,38 +20,38 @@ class PredictCTRRedisMixin(BaseRedisManagerProtocol):
     def key(self) -> str:
         """Свойство key для совместимости с базовым классом"""
         return self.prefix
-    
+
     def get_key(self, *args, **kwargs) -> str:
         """Базовый метод для формирования ключа (логика в специализированных методах)"""
         return f"{self.prefix}:{':'.join(map(str, args))}"
 
-    def _get_legacy_key(self, adv_id: Union[int, str], keyword: str) -> str:
+    def _get_legacy_key(self, adv_id: int | str, keyword: str) -> str:
         """Формирование legacy ключа"""
         return f"predict_ctr:{adv_id}:{clear(keyword)}"
 
     def _get_new_key(self, nmids: list[int], keyword: str) -> str:
         """Формирование нового ключа по nmids"""
         sorted_nmids = sorted(nmids)
-        nmids_str = ','.join(map(str, sorted_nmids))
+        nmids_str = ",".join(map(str, sorted_nmids))
         return f"predict_ctr_v2:{nmids_str}:{clear(keyword)}"
 
     async def set_predict_ctr_with_pipeline_legacy(
-        self, 
-        redis_pipeline: Pipeline, 
-        adv_id: Union[int, str], 
-        keyword: str, 
-        predict_ctr: float
+        self,
+        redis_pipeline: Pipeline,
+        adv_id: int | str,
+        keyword: str,
+        predict_ctr: float,
     ) -> None:
         """Legacy метод записи прогноза CTR в Redis"""
         key = self._get_legacy_key(adv_id, keyword)
         redis_pipeline.set(key, predict_ctr)
 
     async def set_predict_ctr_with_pipeline_by_nmids(
-        self, 
-        redis_pipeline: Pipeline, 
-        nmids: list[int], 
-        keyword: str, 
-        predict_ctr: float
+        self,
+        redis_pipeline: Pipeline,
+        nmids: list[int],
+        keyword: str,
+        predict_ctr: float,
     ) -> None:
         """Новый метод записи прогноза CTR в Redis по nmids"""
         key = self._get_new_key(nmids, keyword)

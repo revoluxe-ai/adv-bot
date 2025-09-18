@@ -1,5 +1,3 @@
-from typing import Optional
-
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
 
@@ -8,10 +6,10 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 
 class TelegramUserMixin:
-
     @staticmethod
-    async def get_telegram_user_model(user_telegram_id: int,
-                                      load_only_options: Optional[list]=None) -> User:
+    async def get_telegram_user_model(
+        user_telegram_id: int, load_only_options: list | None = None
+    ) -> User:
         stmt = select(User).filter(User.user_telegram_id == user_telegram_id)
 
         # Если load_only передан, добавляем его в запрос
@@ -24,23 +22,12 @@ class TelegramUserMixin:
 
         return user
 
-
     @staticmethod
     async def save_phone(user_telegram_id: int, phone_number: str):
         async with sm(read_only=False) as session:
-            stmt = select(User).\
-                filter(User.user_telegram_id == user_telegram_id)
+            stmt = select(User).filter(User.user_telegram_id == user_telegram_id)
             result = await session.execute(stmt)
             user: User = result.scalar_one()
             user.phone = phone_number
             await session.commit()
         return user
-
-
-
-
-
-
-
-
-

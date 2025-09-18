@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
-from app.modules.common_slaves.wildberries.api import WBApi
+from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -17,6 +17,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBBonusPayment,
     WBCabinet,
 )
+from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.my_types import KeywordStat
@@ -27,7 +28,6 @@ from app.utils.NeoDataScience.driver import DataScience
 
 from ...core.wb_api.exceptions import ApiForbiddenError
 from ...core.wb_api.mixins.adv import MinCPMData
-from ...utils.pricer.pricer import Pricer
 from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..relevant_phrase_manager import RelevantPhraseManager
@@ -48,15 +48,11 @@ keywords_hashs_in_neo = set()
 
 
 def get_count_advs_for_wb_cabinet(wb_cabinet: WBCabinet, adv_settings: list[AdvSetting]) -> int:
-    advs_for_wb_cabinet = [
-        adv_setting for adv_setting in adv_settings if adv_setting.wb_cabinet_id == wb_cabinet.id
-    ]
+    advs_for_wb_cabinet = [adv_setting for adv_setting in adv_settings if adv_setting.wb_cabinet_id == wb_cabinet.id]
     return len(advs_for_wb_cabinet)
 
 
-async def check_adv_payment(
-    session: AsyncSession, adv_setting: AdvSetting, current_date: datetime.date
-) -> bool:
+async def check_adv_payment(session: AsyncSession, adv_setting: AdvSetting, current_date: datetime.date) -> bool:
     """Проверяет наличие платежа для настройки рекламы на указанную дату."""
     adv_payment_check_stmt = select(
         exists().where(AdvPayment.adv_setting_id == adv_setting.id, AdvPayment.date == current_date)
@@ -156,12 +152,8 @@ async def insert_or_update_keywords(keyword_stats, adv_id, table_name: str):
     new_version = int(datetime.datetime.now().timestamp())
     data_to_insert = []
     for kw in keyword_stats:
-        date_time = datetime.datetime.combine(
-            kw.date, datetime.datetime.min.time()
-        )  # просто добавляем время к дате
-        data_to_insert.append(
-            [kw.text, date_time, adv_id, kw.views, kw.clicks, kw.spend, new_version]
-        )
+        date_time = datetime.datetime.combine(kw.date, datetime.datetime.min.time())  # просто добавляем время к дате
+        data_to_insert.append([kw.text, date_time, adv_id, kw.views, kw.clicks, kw.spend, new_version])
     async with get_clickhouse_client() as client:
         await client.insert(
             table=f"default_db.{table_name}",
@@ -178,9 +170,7 @@ async def insert_or_update_keywords(keyword_stats, adv_id, table_name: str):
         )
 
 
-async def update_keywords_stat_in_click_house(
-    keyword_stats: list[KeywordStat], adv_id: int, table_name: str
-) -> None:
+async def update_keywords_stat_in_click_house(keyword_stats: list[KeywordStat], adv_id: int, table_name: str) -> None:
     if keyword_stats:
         await insert_or_update_keywords(keyword_stats, adv_id, table_name)
 
@@ -226,7 +216,7 @@ async def update_all_keyword_data(
 
 
 async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
-    from app.modules.common_slaves.wildberries.api import WBApi
+    from app.modules.common_slaves.wildberries.wb_api import WBApi
 
     update_tasks: dict[int, asyncio.Task[None]] = {}
     while True:
@@ -237,25 +227,19 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
         for adv_setting in adv_settings:
             if adv_setting.id not in update_tasks:
                 wb_cabinet_id = adv_setting.wb_cabinet_id
-                access: WBCabinetAccess = await super_cabinet_manager.get_access_for_wb_cabinet(
-                    wb_cabinet_id
-                )
+                access: WBCabinetAccess = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
                 if not access:
                     logger.error(f"Нет доступа к кабинету {wb_cabinet_id}")
                     continue
                 wb_api = WBApi(access, client_session)
                 wb_cabinet = access.wb_cabinet
                 assert wb_cabinet
-                task = asyncio.create_task(
-                    update_all_keyword_data(wb_api, adv_setting, wb_cabinet=wb_cabinet)
-                )
+                task = asyncio.create_task(update_all_keyword_data(wb_api, adv_setting, wb_cabinet=wb_cabinet))
                 update_tasks[adv_setting.id] = task
             else:
                 if update_tasks[adv_setting.id].done():
                     if update_tasks[adv_setting.id].exception():
-                        logger.error(
-                            f"Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}"
-                        )
+                        logger.error(f"Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}")
                     del update_tasks[adv_setting.id]
             await asyncio.sleep(0)
 
@@ -300,14 +284,10 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             keywords_from_search_adv = []
         else:
             keywords_from_search_adv = await wb_api.advert.get_keywords_stat(auction_adv_id)
-            await update_keywords_stat_in_click_house(
-                keywords_from_search_adv, auction_adv_id, "advkeyword"
-            )
+            await update_keywords_stat_in_click_house(keywords_from_search_adv, auction_adv_id, "advkeyword")
     except Exception as exc:
         keywords_from_search_adv = []
-        logger.error(
-            f"Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}"
-        )
+        logger.error(f"Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}")
         del exc
 
     if not keywords_from_auto and not keywords_from_search_adv:
@@ -345,9 +325,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
 
     # Преобразование ключевых слов в объекты KeywordSetting
-    keyword_settings = [
-        KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords
-    ]
+    keyword_settings = [KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords]
     relevant_phrase_manager = RelevantPhraseManager(adv_setting)
     template_data = await relevant_phrase_manager.get_relevant_template_data()
 

@@ -1,9 +1,10 @@
+"""Миксин для работы с карточками товаров через Content API Wildberries. Legacy, в разработке новый модуль"""
+
 import json
 import logging
-from typing import Union
 
 from app.core.wb_api.data_classes.card_from_wb import CardFromWB
-from app.core.wb_api.http_request import try_except_decorator, requests
+from app.core.wb_api.http_request import requests, try_except_decorator
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
 from app.core.wb_api.protocols import WBAPIProtocol
 
@@ -13,12 +14,12 @@ logger = logging
 PREFIX = "https://content-api"
 
 
-class ContentMixin(WBAPIProtocol):
+class ContentMixin:
+    """Миксин для работы с карточками товаров через Content API Wildberries."""
 
     @try_except_decorator(1, 2)
-    async def get_card_by_text(
-        self: WBAPIProtocol, text: Union[str, int]
-    ) -> CardFromWB:
+    async def get_card_by_text(self: WBAPIProtocol, text: str | int) -> CardFromWB:
+        """Ищет карточку по тексту в названии или артикулу."""
         url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
         text = str(text)
         data_for_req = {
@@ -52,6 +53,7 @@ class ContentMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 2)
     async def get_all_cards(self: WBAPIProtocol) -> list[CardFromWB]:
+        """Получает все карточки товаров из магазина."""
         url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
 
         # Начальные параметры для запроса

@@ -7,6 +7,8 @@ __all__ = [
     "WBCard",
     "WBCategory",
     "WBToken",
+    "WBBalancePayment",
+    "WBBonusPayment",
 ]
 
 from .models import *

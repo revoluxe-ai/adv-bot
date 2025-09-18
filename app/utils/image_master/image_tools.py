@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image as PilImg
 
 
-def dhash(image:PilImg):
+def dhash(image: PilImg):
     hash_size = 16
     # Изменение размера изображения и преобразование в градации серого
     resized = image.resize((hash_size + 1, hash_size), PilImg.Resampling.LANCZOS)
@@ -26,7 +26,7 @@ def dhash(image:PilImg):
             hex_string.append(hex(decimal_value)[2:].rjust(2, "0"))
             decimal_value = 0
 
-    return ''.join(hex_string)
+    return "".join(hex_string)
 
 
 def _get_image_aspect_ratio(cropped_img):
@@ -35,6 +35,7 @@ def _get_image_aspect_ratio(cropped_img):
     smaller_side = min(width, height)
     aspect_ratio = larger_side / smaller_side
     return aspect_ratio
+
 
 def get_paint_size(self, image: PilImg):
     image = self.remove_white_space(image)
@@ -45,9 +46,7 @@ def get_paint_size(self, image: PilImg):
     else:
         width = 40
         height = 50
-    return  width, height
-
-
+    return width, height
 
 
 def get_standard_proportion(image: PilImg, registered_sizes):
@@ -56,25 +55,30 @@ def get_standard_proportion(image: PilImg, registered_sizes):
     return _find_closest_size(aspect_ratio, registered_sizes)
 
 
-def _find_closest_size(proportion, registered_sizes)->int:
+def _find_closest_size(proportion, registered_sizes) -> int:
     size_proportions = []
     for size in registered_sizes:
-        width, height = map(int, size.split('x'))
+        width, height = map(int, size.split("x"))
         size_proportions.append(max(width, height) / min(width, height))
     differences = [abs(proportion - size_prop) for size_prop in size_proportions]
     closest_index = differences.index(min(differences))
     size_str: str = registered_sizes[closest_index]
-    return int(size_str.replace('x', ''))
+    return int(size_str.replace("x", ""))
 
 
-
-def remove_white_space( img: PilImg):
+def remove_white_space(img: PilImg):
     np_img = np.array(img)
     non_white_pixels = np.all(np_img < 248, axis=-1)
     non_white_pixel_coords = np.where(non_white_pixels)
     if non_white_pixel_coords[0].size > 0 and non_white_pixel_coords[1].size > 0:
-        top_left = (np.min(non_white_pixel_coords[1]), np.min(non_white_pixel_coords[0]))
-        bottom_right = (np.max(non_white_pixel_coords[1]), np.max(non_white_pixel_coords[0]))
+        top_left = (
+            np.min(non_white_pixel_coords[1]),
+            np.min(non_white_pixel_coords[0]),
+        )
+        bottom_right = (
+            np.max(non_white_pixel_coords[1]),
+            np.max(non_white_pixel_coords[0]),
+        )
         cropped_img = img.crop((top_left[0], top_left[1], bottom_right[0], bottom_right[1]))
         return cropped_img
     else:
@@ -99,13 +103,12 @@ def check_image_orientation_en(image):
     width, height = image.size
     # Определение ориентации
     if width > height:
-        return 'gorizont'
+        return "gorizont"
     elif height > width:
-        return 'vertical'
+        return "vertical"
 
 
-
-def resize_image_proportionally(image, min_side_length)-> PilImg:
+def resize_image_proportionally(image, min_side_length) -> PilImg:
     # Загружаем изображение
     # Определяем текущие размеры
     width, height = image.size
@@ -134,8 +137,6 @@ def get_full_image(image, padding_left, padding_right, padding_top, padding_bott
     return new_image
 
 
-
-
 def hamming_distance(dhash1, dhash2):
     """
     Вычисляет расстояние Хэмминга между двумя dhash.
@@ -149,7 +150,7 @@ def hamming_distance(dhash1, dhash2):
     bin_dhash2 = bin(int(dhash2, 16))[2:].zfill(64)
 
     # Расчет расстояния Хэмминга
-    distance = sum(char1 != char2 for char1, char2 in zip(bin_dhash1, bin_dhash2))
+    distance = sum(char1 != char2 for char1, char2 in zip(bin_dhash1, bin_dhash2, strict=False))
 
     return distance
 

@@ -1,30 +1,36 @@
 import time
+
 import dotenv
+
 dotenv.load_dotenv()
 from app.client_bot.bot import get_bot
 from app.utils import redis_manager
 from python_modules.logger import setup_logging
-setup_logging()
-import asyncio
-from app.modules.user_message_sender import messages
-from sqlalchemy import select, or_
-from sqlalchemy.sql.functions import  func
 
 setup_logging()
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+import asyncio
+
+from sqlalchemy import or_, select
+from sqlalchemy.sql.functions import func
+
+from app.modules.user_message_sender import messages
+
+setup_logging()
+import logging
+
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
-import logging
 
 logger = logging.getLogger(__name__)
 
-delay = 60*60*24  # 1 day
+delay = 60 * 60 * 24  # 1 day
+
 
 async def send_message_to_user(bot, user_telegram_id: int):
     message = messages.NotAnyUsesAndNotMoneyOnBalance(bot, user_telegram_id)
-    logger.debug(f'Отправляю сообщение для {user_telegram_id}')
+    logger.debug(f"Отправляю сообщение для {user_telegram_id}")
     await message()
-
 
 
 async def send_messages_to_users():
@@ -38,7 +44,7 @@ async def send_messages_to_users():
         for user_telegram_id in user_telegram_ids:
             try:
                 await send_message_to_user(bot, user_telegram_id)
-                logger.debug(f'Отправил сообщение и сбрасываю использование для {user_telegram_id}')
+                logger.debug(f"Отправил сообщение и сбрасываю использование для {user_telegram_id}")
                 await redis_manager.reset_last_user_use_time(user_telegram_id)
             except Exception as e:
                 logger.error(f"Error sending message to {user_telegram_id}: {e}", exc_info=True)
@@ -51,11 +57,12 @@ async def send_messages_to_users():
     except Exception as e:
         logger.error(f"Error closing bot session: {e}")
 
+
 async def get_user_telegram_ids_for_condition(user_telegram_ids: list[int]):
     last_users_used = await redis_manager.get_last_users_use_time(user_telegram_ids)
     condition_users_ids = []
     now = time.time()
-    for user_id, last_use_time in zip(user_telegram_ids, last_users_used):
+    for user_id, last_use_time in zip(user_telegram_ids, last_users_used, strict=False):
         if last_use_time:
             pass_seconds = now - last_use_time
             if pass_seconds > delay:
@@ -72,7 +79,8 @@ async def get_all_user_telegram_ids_with_not_balance():
         .having(
             or_(
                 func.count(WBUserCabinet.id) == 0,  # Нет кабинетов
-                func.coalesce(func.sum(WBCabinet.balance + WBCabinet.bonus), 0) == 0  # Баланс всех магазинов = 0
+                func.coalesce(func.sum(WBCabinet.balance + WBCabinet.bonus), 0)
+                == 0,  # Баланс всех магазинов = 0
             )
         )
     )

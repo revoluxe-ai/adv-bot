@@ -1,5 +1,3 @@
-from typing import Optional
-
 from aiogram.filters.callback_data import CallbackData
 
 
@@ -30,13 +28,13 @@ class ShopNew(CallbackData, prefix="shop_new"):
 
 class Adv(CallbackData, prefix="adv"):
     adv_original_id: int
-    action: Optional[str] = "select"
-    wb_user_cabinet_original_id: Optional[int] = None
+    action: str | None = "select"
+    wb_user_cabinet_original_id: int | None = None
 
 
 class TurnBot(CallbackData, prefix="turn_bot"):
     action: str
-    adv_original_id: Optional[int] = None
+    adv_original_id: int | None = None
     wb_user_cabinet_original_id: int
 
 
@@ -104,9 +102,7 @@ class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     adv_original_id: int
 
 
-class ChangeMinViewsForPredictCTR(
-    CallbackData, prefix="change_min_views_for_predict_ctr"
-):
+class ChangeMinViewsForPredictCTR(CallbackData, prefix="change_min_views_for_predict_ctr"):
     adv_setting_original_id: int
 
 

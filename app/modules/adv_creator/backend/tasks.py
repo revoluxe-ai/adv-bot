@@ -7,7 +7,7 @@ from app.client_bot import const
 from app.client_bot.bot import get_bot
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
-from app.modules.adv_creator.backend import MainAdvManager, CardsNotFoundForShopError
+from app.modules.adv_creator.backend import CardsNotFoundForShopError, MainAdvManager
 from app.modules.adv_creator.backend.exc import (
     NotEnoughBalanceOnShopError,
     StartComplexAdvError,
@@ -26,8 +26,7 @@ async def create_complex_advs(
         bot = get_bot()
         await bot.send_message(
             user_telegram_id,
-            f"Нет токенов с нужными правами."
-            f" Обратитесь в поддержку {const.SUPPORT_LINK}",
+            f"Нет токенов с нужными правами. Обратитесь в поддержку {const.SUPPORT_LINK}",
         )
         return
     except Exception:
@@ -46,9 +45,7 @@ async def _create_complex_advs(
     client_session = ctx["client_session"]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
     manager = MainAdvManager(access, client_session)
-    await bot.send_message(
-        user_telegram_id, f"Создаю комплексную кампанию для артикула {nmid}"
-    )
+    await bot.send_message(user_telegram_id, f"Создаю комплексную кампанию для артикула {nmid}")
     try:
         auto_adv_id, search_adv_id = await manager.create_complex_advs(
             bot, user_telegram_id, nmid, hard_mode

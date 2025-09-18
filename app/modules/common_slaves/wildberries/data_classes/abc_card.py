@@ -1,18 +1,14 @@
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 
-Path = namedtuple('Path', ['position', 'path'])
+Path = namedtuple("Path", ["position", "path"])
 from app.utils.image_master import image_tools
 
-class WbItem(metaclass=ABCMeta):
 
+class WbItem(metaclass=ABCMeta):
     def __init__(self):
         self._brand = None
         self._image_tools = image_tools
-
-
-
-
 
     @property
     @abstractmethod
@@ -21,7 +17,6 @@ class WbItem(metaclass=ABCMeta):
 
 
 class CardGroupABC(metaclass=ABCMeta):
-
     @property
     @abstractmethod
     def targetIMT(self):

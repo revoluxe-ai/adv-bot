@@ -1,3 +1,5 @@
+"""Runner coroutines for periodic WB updater tasks."""
+
 import asyncio
 import datetime
 import logging
@@ -43,15 +45,28 @@ async def sender_message_to_not_pay_users():
 
 
 async def process_payment_for_advs() -> None:
+    from app.modules.billing import process_payment_for_advs
+
+    """Запуск один раз в сутки в 3:00"""
     while True:
+        now = datetime.datetime.now()
+
+        # Вычисляем следующие 3:00
+        next_run = now.replace(hour=3, minute=0, second=0, microsecond=0)
+        if now.hour >= 3:
+            next_run += datetime.timedelta(days=1)
+
+        # Спим до 3:00
+        sleep_seconds = (next_run - now).total_seconds()
+        logger.info(f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)")
+        await asyncio.sleep(sleep_seconds)
+
+        # Выполняем обработку
         try:
-            time_now = datetime.datetime.now()
-            if 2 < time_now.hour < 5:
-                await wb_manager.process_payment_for_advs()
+            await process_payment_for_advs()
+            logger.info("Обработка платежей завершена успешно")
         except Exception as e:
-            logger.error(f"Ошибка обработки платежей {e}", exc_info=True)
-            del e
-        await asyncio.sleep(30 * 60)
+            logger.error(f"Ошибка обработки платежей: {e}", exc_info=True)
 
 
 async def run_update_vectors_in_redis() -> None:
@@ -86,6 +101,21 @@ async def main_loop(client_session):
 
 
 async def run_main_coroutines():
+    from app.core.di.app_container import AppContainer
+
+    container = AppContainer()
+    try:
+        result = container.init_resources()
+        if result is not None:
+            await result
+        await __run_main_coroutines()
+    finally:
+        result = container.shutdown_resources()
+        if result is not None:
+            await result
+
+
+async def __run_main_coroutines():
     async with ClientSession() as client_session:
         while True:
             try:

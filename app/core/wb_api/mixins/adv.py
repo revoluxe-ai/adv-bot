@@ -2,20 +2,20 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Any, Optional
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
 from app.modules.common_slaves.wildberries.data_classes.adv import Balances
-from app.modules.full_stat_adv_updater.types import FullAdvStat
-from .excs import (
-    StartAdvError,
-    ItemCategoryNotInStockError,
-)
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
+
 from ..data_classes.advs import adv_fabric
-from ..exceptions import MinAdvBidWBApiError, BadRequestError
-from ..http_request import try_except_decorator, requests
+from ..exceptions import BadRequestError, MinAdvBidWBApiError
+from ..http_request import requests, try_except_decorator
+from .excs import (
+    ItemCategoryNotInStockError,
+    StartAdvError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +42,13 @@ class MinCPMData:
 
 
 class AdvMixin(WBAPIProtocol):
-
     PREFIX = "https://advert-api"
 
     @try_except_decorator(1, 60)
     async def get_min_cpm_adv_data(self) -> MinCPMData:
         url = f"{self.PREFIX}.{self.HOST}/adv/v0/config"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
         return MinCPMData(answer)
 
@@ -60,9 +57,7 @@ class AdvMixin(WBAPIProtocol):
         advertIds: list[int] = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/count"
 
-        response_text: str = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text: str = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer: dict[str, Any] = json.loads(response_text)
 
         adverts: list[dict[str, Any]] = answer.get("adverts", [])
@@ -83,7 +78,7 @@ class AdvMixin(WBAPIProtocol):
     @try_except_decorator(1, 2)
     async def _get_advs(self, adv_ids: list[int]) -> list[Adv]:
         advs = []
-        url = f"https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
 
         response_text = await requests(
             self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
@@ -112,7 +107,7 @@ class AdvMixin(WBAPIProtocol):
     async def create_search_adv(self, nmids: list[int], adv_name: str) -> int:
         assert len(nmids) <= 50
 
-        url = f"https://advert-api.wildberries.ru/adv/v2/seacat/save-ad"
+        url = "https://advert-api.wildberries.ru/adv/v2/seacat/save-ad"
 
         data = {"campaignName": adv_name, "nms": nmids}
 
@@ -126,7 +121,7 @@ class AdvMixin(WBAPIProtocol):
     async def create_auto_adv(
         self, name: str, SubjectID: int, balance_type: int, start_status: bool
     ) -> int:
-        url = f"https://advert-api.wildberries.ru/adv/v1/save-ad"
+        url = "https://advert-api.wildberries.ru/adv/v1/save-ad"
         data = {
             "type": 8,
             "name": name[:128],
@@ -156,9 +151,7 @@ class AdvMixin(WBAPIProtocol):
     async def check_balance(self, adv_id: int):
         url = f"https://advert-api.wildberries.ru/adv/v0/get-balance/{adv_id}"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
         return answer
 
@@ -167,23 +160,17 @@ class AdvMixin(WBAPIProtocol):
         try:
             url = f"https://advert-api.wildberries.ru/adv/v0/start?id={adv_id}"
 
-            response = await requests(
-                self.session, "GET", url, headers=self.headers.standart
-            )
+            response = await requests(self.session, "GET", url, headers=self.headers.standart)
             if response != "":
                 raise StartAdvError()
         except Exception as exc:
-            raise StartAdvError(
-                f"Не удалось запустить компанию {adv_id}. Ошибка: {exc}"
-            )
+            raise StartAdvError(f"Не удалось запустить компанию {adv_id}. Ошибка: {exc}")
 
     @try_except_decorator(1, 10)
     async def get_adv_balances(self) -> Balances:
         url = "https://advert-api.wildberries.ru/adv/v1/balance"
 
-        response = await requests(
-            self.session, "GET", url=url, headers=self.headers.standart
-        )
+        response = await requests(self.session, "GET", url=url, headers=self.headers.standart)
         response = json.loads(response)
         logger.debug(f"Ответ на получение баланса: {response}")
         balance = Balances(response)
@@ -195,9 +182,7 @@ class AdvMixin(WBAPIProtocol):
 
         data = {"advertId": adv_id, "name": new_name}
 
-        await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         return None
 
     async def update_nmids_in_adv(
@@ -206,17 +191,13 @@ class AdvMixin(WBAPIProtocol):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
-        await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
 
     @try_except_decorator(1, 2)
     async def get_nmids_to_add(self, adv_id: int) -> list[int]:
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/getnmtoadd?id={adv_id}"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
         if answer is None:
             return []
@@ -229,9 +210,7 @@ class AdvMixin(WBAPIProtocol):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
-        await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
 
     async def add_to_balance(self, adv_id: int, balance_type: int, sum_: int):
         url = f"https://advert-api.wildberries.ru/adv/v1/budget/deposit?id={adv_id}"
@@ -256,9 +235,7 @@ class AdvMixin(WBAPIProtocol):
         advertIds = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/count"
 
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
         # Используем json.loads для преобразования текста ответа в JSON
         adverts: list = answer["adverts"]
@@ -271,12 +248,8 @@ class AdvMixin(WBAPIProtocol):
 
         return advertIds
 
-    def __get_update_cpm_data(
-        self, adv_id: int, nmid: int, new_bid: int
-    ) -> dict[str, Any]:
-        data = {
-            "bids": [{"advert_id": adv_id, "nm_bids": [{"nm": nmid, "bid": new_bid}]}]
-        }
+    def __get_update_cpm_data(self, adv_id: int, nmid: int, new_bid: int) -> dict[str, Any]:
+        data = {"bids": [{"advert_id": adv_id, "nm_bids": [{"nm": nmid, "bid": new_bid}]}]}
         return data
 
     @try_except_decorator(5, 60)
@@ -298,9 +271,7 @@ class AdvMixin(WBAPIProtocol):
                 break
             except MinAdvBidWBApiError as exc:
                 if attempts >= max_attempts:
-                    logger.error(
-                        "Не удалось обновить ставку для {adv_id}, {nmid}, {new_bid}"
-                    )
+                    logger.error("Не удалось обновить ставку для {adv_id}, {nmid}, {new_bid}")
                     raise BadRequestError from exc
                 new_bid = exc.new_min_bid
                 await asyncio.sleep(1)
@@ -326,8 +297,7 @@ class AdvMixin(WBAPIProtocol):
 
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.datetime.date] | None = None
-    ) -> Optional[list[FullAdvStat]]:
-
+    ) -> list[FullAdvStat] | None:
         if not adv_ids:
             return []
 
@@ -335,18 +305,17 @@ class AdvMixin(WBAPIProtocol):
 
         # Разбиваем список adv_ids на чанки по 100
         for i in range(0, len(adv_ids), 100):
-            chunk = adv_ids[i:i + 100]
+            chunk = adv_ids[i : i + 100]
             stats_chunk = await self._get_adv_full_state(chunk, dates)
             if stats_chunk:
                 all_stats.extend(stats_chunk)
 
         return all_stats
 
-
     @try_except_decorator(1, 60)
     async def _get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.datetime.date] = None
-    ) -> Optional[list[FullAdvStat]]:
+    ) -> list[FullAdvStat] | None:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
         """Пример даты [

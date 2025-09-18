@@ -1,9 +1,9 @@
 from app import settings
 
 PRICE_PER_MONTH = 4500
-EMAIL_FOR_PAYMENT_RECEIPT = 'revoluxe@gmail.com'
+EMAIL_FOR_PAYMENT_RECEIPT = "revoluxe@gmail.com"
 
-CLIENT_BOT_LINK = 'https://t.me/wb_adv_master_bot/'
+CLIENT_BOT_LINK = "https://t.me/wb_adv_master_bot/"
 
 MAX_MESSAGE_LENGTH = 4096
 
@@ -29,15 +29,15 @@ PARSING_PRICE = 15
 AUTO_BIDDER_PRICE = 25
 
 
-MIN_CPM  = 100
+MIN_CPM = 100
 
 
-ADMINS = [373435337, #я
-         # 1603000351, #Леля
-         707068503, #Лена
-         1121102685 #Владислав
-
- ]
+ADMINS = [
+    373435337,  # я
+    # 1603000351, #Леля
+    707068503,  # Лена
+    1121102685,  # Владислав
+]
 
 
 DEFAULT_BIDDER_STEP = 2
@@ -48,4 +48,4 @@ min_sum = settings.MIN_SUM
 MIN_SUM = min_sum
 
 
-SUPPORT_LINK = 'https://t.me/Vadyanc'
+SUPPORT_LINK = "https://t.me/Vadyanc"

@@ -1,7 +1,7 @@
 import logging
 import re
 
-from aiogram import Router, types, Bot
+from aiogram import Bot, Router, types
 from aiogram.filters import BaseFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -11,8 +11,8 @@ from app.client_bot import const
 from app.client_bot.user_interface.views import messages
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    WBUserCabinet,
     WBCabinet,
+    WBUserCabinet,
 )
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
@@ -78,21 +78,15 @@ class AdminsGetAdvByIdFilter(BaseFilter):
 
 
 @router.message(AdminsGetShopFilter())
-async def getting_shop_for_admin(
-    message: types.Message, bot: Bot, state: FSMContext
-) -> None:
+async def getting_shop_for_admin(message: types.Message, bot: Bot, state: FSMContext) -> None:
     text = message.text.strip()
     async with sm() as session:
         stmt = (
-            select(WBUserCabinet.id)
-            .join(WBUserCabinet.wb_cabinet)
-            .where(WBCabinet.shop_id == text)
+            select(WBUserCabinet.id).join(WBUserCabinet.wb_cabinet).where(WBCabinet.shop_id == text)
         )
         wb_user_cabinet_original_id = await session.execute(stmt)
         wb_user_cabinet_original_id = wb_user_cabinet_original_id.scalar()
-    await state.update_data(
-        last_wb_user_cabinet_original_id=wb_user_cabinet_original_id
-    )
+    await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await ShopMenu(
         bot,
         message.chat.id,
@@ -103,7 +97,6 @@ async def getting_shop_for_admin(
 
 @router.message(AdminsGetAdvByIdFilter())
 async def getting_adv_id(message: types.Message, bot: Bot, state: FSMContext) -> None:
-
     text = message.text.strip()
     adv_id = int(text)
     chat_id = message.chat.id

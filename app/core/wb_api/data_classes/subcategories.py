@@ -2,34 +2,29 @@ from pydantic import BaseModel
 
 
 class Subcategory(BaseModel):
-
     """
-    subjectID
-integer
-Идентификатор предмета
+        subjectID
+    integer
+    Идентификатор предмета
 
-parentID
-integer
-Идентификатор родительской категории
+    parentID
+    integer
+    Идентификатор родительской категории
 
-subjectName
-string
-Название предмета
+    subjectName
+    string
+    Название предмета
 
-parentName
-string
-Название родительской категории
+    parentName
+    string
+    Название родительской категории
 
-isVisible
-boolean
-Видимость на сайте"""
+    isVisible
+    boolean
+    Видимость на сайте"""
 
     subjectID: int
     parentID: int
     subjectName: str
     parentName: str
     isVisible: bool = None
-
-
-
-

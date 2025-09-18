@@ -1,4 +1,4 @@
-from typing import Optional, Union, Any
+from typing import Any
 
 import aiogram
 from aiogram import Router
@@ -35,9 +35,7 @@ async def change_cpm(
 async def new_cpm_handler(message: aiogram.types.Message, state: FSMContext) -> None:
     """Обработчик ввода нового значения CPM."""
     data: dict[str, Any] = await state.get_data()
-    adv_setting_original_id: Optional[Union[int, str]] = data.get(
-        "last_adv_setting_original_id"
-    )
+    adv_setting_original_id: int | str | None = data.get("last_adv_setting_original_id")
     if not adv_setting_original_id:
         raise Exception("adv_setting_original_id is None")
     adv_setting_original_id = int(adv_setting_original_id)
@@ -60,7 +58,7 @@ async def new_cpm_handler(message: aiogram.types.Message, state: FSMContext) -> 
             .options(joinedload(AdvSetting.wb_cabinet))
             .where(AdvSetting.id == int(adv_setting_original_id))
         )
-        adv_setting: Optional[AdvSetting] = (await session.execute(stmt)).scalar()
+        adv_setting: AdvSetting | None = (await session.execute(stmt)).scalar()
         if not adv_setting:
             await message.answer("Настройка рекламы не найдена")
             return
@@ -76,7 +74,7 @@ async def new_cpm_handler(message: aiogram.types.Message, state: FSMContext) -> 
         await wb_api.update_cpm(adv_setting.adv_id, nmid, cpm_value)
         await message.answer(f"CPM Авто на {cpm_value}")
 
-        adv_id: Optional[int] = adv_setting.search_adv_id
+        adv_id: int | None = adv_setting.search_adv_id
         if adv_id:
             await wb_api.update_cpm(adv_id, nmid, cpm_value)
             await message.answer(f"CPM Поиск на {cpm_value}")

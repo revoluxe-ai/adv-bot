@@ -1,4 +1,4 @@
-﻿from aiogram.filters.callback_data import CallbackData
+from aiogram.filters.callback_data import CallbackData
 
 
 class AutoUpdateWhiteListSetting(CallbackData, prefix="auto_update_white_list_setting"):
@@ -6,8 +6,6 @@ class AutoUpdateWhiteListSetting(CallbackData, prefix="auto_update_white_list_se
     adv_setting_original_id: int
 
 
-class RelevantKeywordStatusSetting(
-    CallbackData, prefix="relevant_keyword_status_setting"
-):
+class RelevantKeywordStatusSetting(CallbackData, prefix="relevant_keyword_status_setting"):
     new_relevant_status: bool
     keyword_setting_original_id: int

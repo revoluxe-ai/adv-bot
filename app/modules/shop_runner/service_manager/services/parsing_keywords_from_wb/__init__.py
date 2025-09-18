@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 async def parsing_keywords_for_adv_generator(
     adv: AdvSetting, keywords: Awaitable[list[CalculatedKeyword]]
 ) -> AsyncGenerator[tuple[str, int], None]:
-    """
-    Генератор для получения ключевых слов, которые нужно парсить для рекламной кампании.
+    """Генератор для получения ключевых слов, которые нужно парсить для рекламной кампании.
+
     Args:
         adv:
         keywords:

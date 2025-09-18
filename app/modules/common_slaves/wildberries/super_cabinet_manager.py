@@ -7,8 +7,9 @@ from sqlalchemy import select
 
 from app.core.wb_api.check_righter import CheckRighter
 from app.core.wb_api.exceptions import ApiForbiddenError
-from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker
+
 from . import exceptions
 from .models import WBToken
 
@@ -35,7 +36,7 @@ class WBCabinetAccess:
 
 
 async def get_access_for_wb_cabinet(
-    wb_cabinet_id_or_shop_id: typing.Union[int, str],
+    wb_cabinet_id_or_shop_id: int | str,
 ) -> WBCabinetAccess:
     if isinstance(wb_cabinet_id_or_shop_id, str):
         shop_id: str = wb_cabinet_id_or_shop_id
@@ -67,12 +68,8 @@ async def get_access_for_wb_cabinet(
             if token.shop_id == shop_id:
                 valited_tokens.append(token)
         if not valited_tokens:
-            raise ApiForbiddenError(
-                f"Нет валидных токенов для кабинета с shop_id {shop_id}"
-            )
-        access = WBCabinetAccess(
-            tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
-        )
+            raise ApiForbiddenError(f"Нет валидных токенов для кабинета с shop_id {shop_id}")
+        access = WBCabinetAccess(tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet)
         return access
 
 
@@ -83,12 +80,8 @@ async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
             if not wb_token.check_valid():
                 logger.debug(f"Не валидный токен {wb_token.api_key}")
                 continue
-            result = await token_check_righter.check_all_rights(
-                wb_token, client_session
-            )
+            result = await token_check_righter.check_all_rights(wb_token, client_session)
             if result:
-                access = WBCabinetAccess(
-                    tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None
-                )
+                access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
                 return access
     raise ApiForbiddenError("Нет валидных токенов для доступа к API")

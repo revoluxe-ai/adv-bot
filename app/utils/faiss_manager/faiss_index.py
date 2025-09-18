@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Generator, List, Union
+from collections.abc import Generator
 
 import faiss
 import numpy as np
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class Index:
     def __init__(
         self,
-        objects: Union[Query, List],
+        objects: Query | list,
         vector_property_name,
         file_path,
         index_type,
@@ -47,15 +47,13 @@ class Index:
 
     def __create_new_index(
         self,
-        objects: Union[Query, Generator],
+        objects: Query | Generator,
         vector_property_name,
         file_path,
         index_type,
         batch_size: int,
     ):
-        index = getattr(faiss, index_type)(
-            len(getattr(objects[0], vector_property_name))
-        )
+        index = getattr(faiss, index_type)(len(getattr(objects[0], vector_property_name)))
         index = faiss.IndexIDMap(index)
 
         vectors = []

@@ -1,16 +1,12 @@
-﻿import asyncio
+import asyncio
 import logging
 from collections import defaultdict
+from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable
 from datetime import datetime
 from typing import (
-    Iterable,
-    AsyncGenerator,
-    TypeVar,
-    Tuple,
-    Awaitable,
     Any,
-    Coroutine,
     Protocol,
+    TypeVar,
 )
 
 from app.core.wb_api.ping_manager import PingManager
@@ -22,7 +18,7 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater import wb_data_getter
-from app.modules.full_stat_adv_updater.types import FullAdvStat
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
@@ -34,6 +30,7 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
+
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -51,7 +48,6 @@ class CoroutinesManagerProtocol(Protocol):
 
 
 class CoroutinesManager:
-
     def __init__(self, wb_api: WBApi):
         wb_cabinet = wb_api.wb_cabinet
         assert wb_cabinet
@@ -76,17 +72,12 @@ class CoroutinesManager:
             return None
         logger.debug(f"Обновляю ставки для магазина {self.shop_id}")
         await asyncio.gather(
-            *[
-                self.__run_bidder_process_for_adv(adv, self._wb_api)
-                for adv in adv_settings
-            ]
+            *[self.__run_bidder_process_for_adv(adv, self._wb_api) for adv in adv_settings]
         )
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
         return None
 
-    async def __run_bidder_process_for_adv(
-        self, adv_setting: AdvSetting, wb_api: WBApi
-    ) -> None:
+    async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: WBApi) -> None:
         keywords = await self._wb_shop_data_manager.get_calculated_keywords(adv_setting)
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
 
@@ -115,10 +106,8 @@ class CoroutinesManager:
             if auction_adv_id := adv.search_adv_id:
                 all_adv_ids.add(auction_adv_id)
 
-        full_stats: list[FullAdvStat] = (
-            await wb_data_getter.get_full_adv_stat_for_adv_ids(
-                wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
-            )
+        full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
+            wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
         )
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
@@ -148,7 +137,7 @@ class CoroutinesManager:
     @staticmethod
     async def _async_zip_longest(
         *async_gens, fillvalue=None
-    ) -> AsyncGenerator[Tuple[Any, ...], None]:
+    ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
 
@@ -182,10 +171,8 @@ class CoroutinesManager:
         for adv in active_advs:
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
 
-            generator: AsyncGenerator[Tuple[str, int], None] = (
-                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
-                    adv, keywords
-                )
+            generator: AsyncGenerator[tuple[str, int], None] = (
+                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(adv, keywords)
             )
             generators.append(generator)
         zipped_generators = self._async_zip_longest(*generators)
@@ -198,13 +185,10 @@ class CoroutinesManager:
                     await asyncio.sleep(
                         settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
                     )  # Добавляем небольшую задержку между задачами
-                    logger.info(
-                        f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
-                    )
+                    logger.info(f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга")
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
-
         active_advs = await self._wb_shop_data_manager.get_active_advs()
 
         update_tasks = []
@@ -232,13 +216,11 @@ class CoroutinesManager:
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:
         from .old_modules.setting_auto_updater.modules.first_key_updater import (
-            FirstKeyUpdaterError,
             FirstKeyUpdater,
+            FirstKeyUpdaterError,
         )
 
-        all_active_advs: list[AdvSetting] = (
-            await self._wb_shop_data_manager.get_active_advs()
-        )
+        all_active_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
         tasks = []
         for adv in all_active_advs:
             if not adv.auto_update_white_list:
@@ -247,9 +229,7 @@ class CoroutinesManager:
                 self._wb_shop_data_manager.get_calculated_keywords(adv)
             )
             updater = FirstKeyUpdater(adv)
-            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(
-                keywords
-            )
+            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(keywords)
             task = asyncio.create_task(update_coroutine)
             tasks.append(task)
 

@@ -6,7 +6,7 @@ from aiohttp import ClientSession
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
@@ -35,9 +35,7 @@ async def run_shop_task(
             await asyncio.sleep(1)
 
 
-async def _update_tasks(
-    active_tasks: dict[str, Task[None]], client_session: ClientSession
-) -> None:
+async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: ClientSession) -> None:
     # Получение списка магазинов с активными настройками
     stmt = (
         select(WBCabinet.shop_id)
@@ -93,9 +91,7 @@ async def run() -> None:
                 logger.warning("Редис еще не загрузилась")
                 await asyncio.sleep(15 * 60)
             except Exception as exc:
-                logger.error(
-                    f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True
-                )
+                logger.error(f"Ошибка обработки задач обновления магазинов: {exc}", exc_info=True)
                 exc.__traceback__ = None
                 del exc
                 await asyncio.sleep(1)
