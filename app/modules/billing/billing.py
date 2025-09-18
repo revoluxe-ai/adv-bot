@@ -1,14 +1,16 @@
-import logging
-from datetime import datetime, date
-from typing import Dict, List
+"""Billing per-cabinet daily charges with Redis/DB dedup and advisory locks."""
 
-from sqlalchemy import select, func, text, exists
-from sqlalchemy.orm import joinedload, selectinload
+import logging
+from datetime import date, datetime
+
+from sqlalchemy import exists, func, select, text
+from sqlalchemy.orm import selectinload
 
 from app.modules.billing.pricer import Pricer
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBBonusPayment, WBBalancePayment, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBBalancePayment, WBBonusPayment, WBCabinet
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .redis_manager import RedisManager
 
 logger = logging.getLogger(__name__)
@@ -26,11 +28,7 @@ async def get_active_cabinets_with_data(session) -> list[WBCabinet]:
             selectinload(WBCabinet.bonus_payments),
             selectinload(WBCabinet.adv_settings).selectinload(AdvSetting.payments),
         )
-        .where(
-            exists(
-                select(1).where(AdvSetting.wb_cabinet_id == WBCabinet.id, AdvSetting.bot_active == True)
-            )
-        )
+        .where(exists(select(1).where(AdvSetting.wb_cabinet_id == WBCabinet.id, AdvSetting.bot_active)))
     )
     result = await session.execute(stmt)
     cabinets = result.unique().scalars().all()
@@ -44,7 +42,6 @@ def get_count_advs_for_wb_cabinet(wb_cabinet: WBCabinet, adv_settings: list[AdvS
 
 async def process_payment_for_advs(current_date: date = None, pricer: Pricer = None) -> None:
     """Обработка платежей с группировкой по кабинетам и защитой от дублей на уровне кабинетов."""
-
     if current_date is None:
         current_date = datetime.now().date()
     if pricer is None:
@@ -65,10 +62,8 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
         for cabinet in cabinets:
             cabinet_id = cabinet.id
             # Берем только активные кампании
-            cabinet_campaigns: List[AdvSetting] = [adv for adv in cabinet.adv_settings if adv.bot_active]
-            logger.debug(
-                f"Кабинет {cabinet_id}: найдено активных кампаний: {len(cabinet_campaigns)}"
-            )
+            cabinet_campaigns: list[AdvSetting] = [adv for adv in cabinet.adv_settings if adv.bot_active]
+            logger.debug(f"Кабинет {cabinet_id}: найдено активных кампаний: {len(cabinet_campaigns)}")
             if not cabinet_campaigns:
                 logger.debug(f"Кабинет {cabinet_id}: активные кампании отсутствуют, пропуск")
                 continue
@@ -89,12 +84,16 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                     select(func.count(WBBonusPayment.id)).where(
                         WBBonusPayment.wb_cabinet_id == cabinet_id,
                         func.date(WBBonusPayment.transaction_date_time) == current_date,
+                        WBBonusPayment.operation_type == "auto_subtract",
+                        WBBonusPayment.amount < 0,
                     )
                 )
                 balance_cnt_res = await session.execute(
                     select(func.count(WBBalancePayment.id)).where(
                         WBBalancePayment.wb_cabinet_id == cabinet_id,
                         func.date(WBBalancePayment.transaction_date_time) == current_date,
+                        WBBalancePayment.operation_type == "auto_subtract",
+                        WBBalancePayment.amount < 0,
                     )
                 )
                 if (bonus_cnt_res.scalar() or 0) > 0 or (balance_cnt_res.scalar() or 0) > 0:
@@ -106,14 +105,13 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                 shop_id = str(wb_cabinet.shop_id)
                 logger.debug(f"Кабинет {cabinet_id}: расчет стоимости для магазина {shop_id}")
                 price_for_shop_for_day = await pricer.get_price_for_day_for_shop(shop_id)
-                logger.debug(
-                    f"Кабинет {cabinet_id}: price_for_shop_for_day={price_for_shop_for_day}"
-                )
+                logger.debug(f"Кабинет {cabinet_id}: price_for_shop_for_day={price_for_shop_for_day}")
 
                 calculated_bonus = float(wb_cabinet.calculated_bonus or 0)
                 calculated_balance = float(wb_cabinet.calculated_balance or 0)
                 logger.debug(
-                    f"Кабинет {cabinet_id}: calculated_bonus={calculated_bonus}, calculated_balance={calculated_balance}"
+                    f"Кабинет {cabinet_id}: calculated_bonus={calculated_bonus}, "
+                    f"calculated_balance={calculated_balance}"
                 )
 
                 if price_for_shop_for_day <= 0:
@@ -126,7 +124,7 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                         wb_cabinet_id=cabinet_id,
                         amount=-price_for_shop_for_day,
                         description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}",
-                        operation_type="subtract",
+                        operation_type="auto_subtract",
                         transaction_date_time=datetime.now(),
                     )
                     session.add(bonus_payment)
@@ -136,6 +134,7 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                         wb_cabinet_id=cabinet_id,
                         amount=-price_for_shop_for_day,
                         description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}",
+                        operation_type="auto_subtract",
                         transaction_date_time=datetime.now(),
                     )
                     session.add(balance_payment)
@@ -151,7 +150,8 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                 # История по кампаниям: делим общую сумму поровну
                 price_per_campaign = price_for_shop_for_day / len(cabinet_campaigns) if cabinet_campaigns else 0
                 logger.debug(
-                    f"Кабинет {cabinet_id}: распределение по {len(cabinet_campaigns)} кампаниям, цена за кампанию={price_per_campaign}"
+                    f"Кабинет {cabinet_id}: распределение по {len(cabinet_campaigns)} кампаниям, "
+                    f"цена за кампанию={price_per_campaign}"
                 )
                 for campaign in cabinet_campaigns:
                     existing = await session.execute(
@@ -168,7 +168,8 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                         )
                         session.add(payment)
                         logger.debug(
-                            f"Кабинет {cabinet_id}: создан AdvPayment для adv_setting={campaign.id} на сумму {price_per_campaign}"
+                            f"Кабинет {cabinet_id}: создан AdvPayment для adv_setting={campaign.id} "
+                            f"на сумму {price_per_campaign}"
                         )
                     else:
                         logger.debug(
