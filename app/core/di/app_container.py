@@ -2,10 +2,12 @@
 
 __all__ = ("AppContainer",)
 from dependency_injector import containers, providers
-from neo4j import AsyncDriver
 
-from ...configs import AppConfig
 from . import databases
+from ...configs import AppConfig
+
+
+# from neo4j import AsyncDriver
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -13,17 +15,17 @@ class AppContainer(containers.DeclarativeContainer):
 
     settings = providers.Singleton(AppConfig.create)
 
-    # Синхронный провайдер драйвера, чтобы инъекции получали готовый объект
-    neo4j_driver: providers.Singleton[AsyncDriver] = providers.Singleton(
-        databases.create_neo4j_driver,
-        neo4j_config=settings.provided.infrastructure.neo4j,
-    )
-
-    # Асинхронный ресурс для управления жизненным циклом драйвера
-    _neo4j_lifecycle = providers.Resource(
-        databases.Neo4jLifecycle,
-        driver=neo4j_driver,
-    )
+    # # Синхронный провайдер драйвера, чтобы инъекции получали готовый объект
+    # neo4j_driver: providers.Singleton[AsyncDriver] = providers.Singleton(
+    #     databases.create_neo4j_driver,
+    #     neo4j_config=settings.provided.infrastructure.neo4j,
+    # )
+    #
+    # # Асинхронный ресурс для управления жизненным циклом драйвера
+    # _neo4j_lifecycle = providers.Resource(
+    #     databases.Neo4jLifecycle,
+    #     driver=neo4j_driver,
+    # )
     # Redis: синхронный клиент + приватный lifecycle-ресурс
     redis_client = providers.Singleton(
         databases.create_redis_client,
