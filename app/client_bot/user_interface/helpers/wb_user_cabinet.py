@@ -26,5 +26,3 @@ async def get_wb_user_cabinet_id_or_none(user_telegram_id: int, wb_cabinet_id: i
         result = await session.execute(stmt)
         wb_user_cabinet = result.scalar_one_or_none()
         return wb_user_cabinet.id if wb_user_cabinet else None
-
-

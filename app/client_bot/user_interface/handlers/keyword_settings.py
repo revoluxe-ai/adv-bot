@@ -32,8 +32,8 @@ from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
-from ..views import callbacks, messages
 from ..helpers.wb_user_cabinet import get_wb_user_cabinet_id_or_none
+from ..views import callbacks, messages
 
 logger = logging.getLogger(__name__)
 
@@ -217,9 +217,7 @@ async def setting_keywords_show_keywords_is_hard(
     return
 
 
-@router.callback_query(
-    callbacks.SettingKeywords.filter(F.type == "phrase_for_adding_to_white_list")
-)
+@router.callback_query(callbacks.SettingKeywords.filter(F.type == "phrase_for_adding_to_white_list"))
 async def setting_keywords_white_list(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
@@ -241,9 +239,7 @@ async def setting_keywords_white_list(
     keywords = [
         keyword
         for keyword in keywords
-        if keyword.hard_status == 1
-        and keyword.status == KeywordStatus.BAD
-        and keyword.reason != "max_position"
+        if keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD and keyword.reason != "max_position"
     ]
     keywords.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
@@ -667,9 +663,7 @@ async def change_keyword_hard_status(
                         clicks,
                         views,
                         _,
-                    ) = await data_manager.get_keyword_statistic_clickhouse(
-                        client, keyword_setting.text, adv_ids
-                    )
+                    ) = await data_manager.get_keyword_statistic_clickhouse(client, keyword_setting.text, adv_ids)
                 if keyword_setting.added_clicks:
                     clicks += keyword_setting.added_clicks
                 if keyword_setting.added_views:
@@ -719,15 +713,11 @@ async def check_position(
         nmids: AdvSetting = result.scalar()
         nmid = nmids[0]
     await parser.add_wb_positions(text, {nmid}, delay=1)
-    await messages.KeywordSettingMessage(
-        bot, callback.message.chat.id, keyword_setting_original_id, 1
-    )()
+    await messages.KeywordSettingMessage(bot, callback.message.chat.id, keyword_setting_original_id, 1)()
 
 
 @router.message(StateFilter(states.AdvSetting.waiting_for_filter_by_query))
-async def setting_keywords_filter_by_query(
-    message: types.Message, bot: aiogram.Bot, state: FSMContext
-):
+async def setting_keywords_filter_by_query(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     text = message.text
     if "/start" in text:
         await state.clear()
@@ -806,9 +796,7 @@ async def reset_added_clicks(
 ):
     adv_setting_original_id = callback_data.adv_setting_original_id
     async with _sm(read_only=False) as session:
-        stmt = select(KeywordSetting).where(
-            KeywordSetting.adv_setting_id == adv_setting_original_id
-        )
+        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)
         result = await session.execute(stmt)
         keyword_settings = result.scalars().all()
         for keyword_setting in keyword_settings:
