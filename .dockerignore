@@ -56,3 +56,4 @@ app/utils/text_master/w2v_cc_300d_ru/*
 app/keword_async_ml_updater/model/*
 *.index
 logs
+linux_venv/
