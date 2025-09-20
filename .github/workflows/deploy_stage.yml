@@ -2,7 +2,7 @@ name: GitHub Container Registry Deploy
 
 on:
   push:
-    branches: [stage]
+    branches: [ stage ]
 
 jobs:
   deploy:
