@@ -78,3 +78,4 @@ venv_linux/
 !.qoder/rules/
 ./.vscode/
 cursor-chat-export/
+.cursor/
