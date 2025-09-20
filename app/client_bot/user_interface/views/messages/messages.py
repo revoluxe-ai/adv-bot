@@ -128,9 +128,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         adv_settings_filtred: list[AdvSetting] = await self._filter_advs(adv_settings)
         self._adv_settings = adv_settings_filtred
         stmt = select(WBCabinet.id).where(
-            WBCabinet.wb_user_cabinets.any(
-                WBUserCabinet.id == int(self._wb_user_cabinet_original_id)
-            )
+            WBCabinet.wb_user_cabinets.any(WBUserCabinet.id == int(self._wb_user_cabinet_original_id))
         )
         async with sm() as session:
             result = await session.execute(stmt)
@@ -219,9 +217,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             self._min_ctr = str(round(self._min_ctr, 2) * 100) + "%"
 
-        self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(
-            self.adv.id, self.wb_user_cabinet.user_id
-        )
+        self.in_favorites_user: bool = await data_manager.is_adv_in_favorites(self.adv.id, self.wb_user_cabinet.user_id)
 
         full_stat_update_time = await self._get_last_full_stat_update(self.adv.adv_id)
         if not full_stat_update_time:
@@ -240,35 +236,29 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             await NoMainPhotos(self._bot, self._chat_id)(self.adv)
             return
 
-        last_update_keyword_stat: datetime | None = await self._get_last_update_keyword_stat(
-            self.adv.adv_id
-        )
+        last_update_keyword_stat: datetime | None = await self._get_last_update_keyword_stat(self.adv.adv_id)
         if last_update_keyword_stat:
-            self.last_update_keyword_stat_str = last_update_keyword_stat.strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+            self.last_update_keyword_stat_str = last_update_keyword_stat.strftime("%Y-%m-%d %H:%M:%S")
         else:
             self.last_update_keyword_stat_str = "Нет данных"
 
-        self.keywords_status_last_update_auto_adv = (
-            await self._get_last_keywords_status_update_timestamp(self.adv.adv_id)
+        self.keywords_status_last_update_auto_adv = await self._get_last_keywords_status_update_timestamp(
+            self.adv.adv_id
         )
 
         if not self.keywords_status_last_update_auto_adv:
             self.keywords_status_last_update_auto_adv = "Нет данных"
 
         if search_adv_id := self.adv.search_adv_id:
-            self.keywords_status_last_update_search_adv = (
-                await self._get_last_keywords_status_update_timestamp(search_adv_id)
+            self.keywords_status_last_update_search_adv = await self._get_last_keywords_status_update_timestamp(
+                search_adv_id
             )
             if self.keywords_status_last_update_search_adv is None:
                 self.keywords_status_last_update_search_adv = "Нет данных"
         else:
             self.keywords_status_last_update_search_adv = "Аукцион не подключен к РК"
 
-        adv_stat: FullAdvStat = await data_manager.get_full_adv_stat_for_adv_id_from_redis(
-            adv_id=self.adv.adv_id
-        )
+        adv_stat: FullAdvStat = await data_manager.get_full_adv_stat_for_adv_id_from_redis(adv_id=self.adv.adv_id)
 
         self.adv_stat = adv_stat
 
@@ -349,16 +339,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
     @property
     def keyboard(self):
-        return keyboards.get_adv_setting_keyboard(
-            self._chat_id, self.wb_user_cabinet, self.adv, self.in_favorites_user
-        )
+        return keyboards.get_adv_setting_keyboard(self._chat_id, self.wb_user_cabinet, self.adv, self.in_favorites_user)
 
     @staticmethod
     async def _get_last_update_keyword_stat(adv_id: int) -> datetime | None:
         last_update_keyword_stat_manager = KeywordStatUpdateState()
-        last_update_keyword_stat_for_complex_adv = await last_update_keyword_stat_manager.get_one(
-            adv_id
-        )
+        last_update_keyword_stat_for_complex_adv = await last_update_keyword_stat_manager.get_one(adv_id)
         return last_update_keyword_stat_for_complex_adv
 
     @staticmethod
@@ -408,7 +394,7 @@ class AddNewTokenGet(TextWithImage):
     def text(self):
         return (
             f"Пришлите новый Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n"
-            "Для работы бота нужны права Контент,  Продвижение и Аналитика"
+            "Для работы бота нужны права Контент, Статистика,  Аналитика, Продвижение"
         )
 
     @property
@@ -480,9 +466,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         nmid = int(adv_setting.nmids[0])
         adv_id = int(self._adv_setting.adv_id)
         text = str(self._keyword_setting.text)
-        position: WBItemPosition = await redis_manager.get_keyword_position(
-            str(keyword_setting.text), nmid
-        )
+        position: WBItemPosition = await redis_manager.get_keyword_position(str(keyword_setting.text), nmid)
         self.position = position
         if position:
             self.last_full_update = position.timestamp.strftime("%d-%m-%Y %H:%M")
@@ -702,9 +686,7 @@ class NoMainPhotos(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        button = InlineKeyboardButton(
-            text="Вернуться к списку магазинов", callback_data=callbacks.Start().pack()
-        )
+        button = InlineKeyboardButton(text="Вернуться к списку магазинов", callback_data=callbacks.Start().pack())
         builder = InlineKeyboardBuilder()
         builder.row(button)
         return builder.as_markup()
@@ -801,9 +783,7 @@ class SettingMinCTR(TextWithKeyboard):
             f"Минимальный CTR для кампании {self._adv.name}"
             f" равен {round(self._min_ctr * 100, 1)} %,"
             f"""тип минимального CTR: {
-                "Задан в ручную"
-                if not self._adv.new_auto_min_ctr_mode
-                else "Определен автоматически"
+                "Задан в ручную" if not self._adv.new_auto_min_ctr_mode else "Определен автоматически"
             }\n"""
         )
 
@@ -843,11 +823,7 @@ class MaxCPCSetting(TextWithKeyboard):
         self._adv = adv
 
         keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
-        keywords = [
-            kw
-            for kw in keywords
-            if str(kw.status) == KeywordStatus.GOOD or kw.reason == KeywordStatus.MAX_CPC
-        ]
+        keywords = [kw for kw in keywords if str(kw.status) == KeywordStatus.GOOD or kw.reason == KeywordStatus.MAX_CPC]
         keywords.sort(key=lambda x: x.cpc, reverse=True)
         if not self._adv.max_cpc:
             top_kw_list = []
@@ -908,9 +884,7 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
         super().__init__(bot, chat_id)
         self._adv = adv
 
-    text = (
-        "Минимальное количество показов должно быть целым числом от 0 и больше. Попробуйте снова:"
-    )
+    text = "Минимальное количество показов должно быть целым числом от 0 и больше. Попробуйте снова:"
 
     @property
     def keyboard(self):
@@ -946,9 +920,7 @@ class NotEnoughMoneyForParsing(TextWithKeyboard):
         super().__init__(bot, chat_id)
         self._wb_cabinet_original_id = wb_cabinet_original_id
 
-    text = (
-        """Не достаточный баланс для парсинга ключевых слов. Пополните баланс и попробуйте снова"""
-    )
+    text = """Не достаточный баланс для парсинга ключевых слов. Пополните баланс и попробуйте снова"""
 
     @property
     def keyboard(self):
@@ -1049,24 +1021,18 @@ class CPMSetting(TextWithKeyboard):
             if self.adv_setting.bidder_for_auto
             else "Включить управление ставкой для Авто"
         )
-        callback_action = (
-            "off_bidder_for_auto" if self.adv_setting.bidder_for_auto else "on_bidder_for_auto"
-        )
+        callback_action = "off_bidder_for_auto" if self.adv_setting.bidder_for_auto else "on_bidder_for_auto"
 
         bottom = InlineKeyboardButton(
             text=button_text,
-            callback_data=callbacks.CPMSettingMenu(
-                action=callback_action, adv_original_id=self.adv_setting.id
-            ).pack(),
+            callback_data=callbacks.CPMSettingMenu(action=callback_action, adv_original_id=self.adv_setting.id).pack(),
         )
 
         builder.row(bottom)
 
         bottom = InlineKeyboardButton(
             text="Изменить ставку (Максимальную ставку)",
-            callback_data=callbacks.CPMSettingMenu(
-                action="set_manual_cpm", adv_original_id=self.adv_setting.id
-            ).pack(),
+            callback_data=callbacks.CPMSettingMenu(action="set_manual_cpm", adv_original_id=self.adv_setting.id).pack(),
         )
 
         builder.row(bottom)
@@ -1160,9 +1126,7 @@ class WaitingForBlackPhrases(TextWithKeyboard):
             builder.row(
                 InlineKeyboardButton(
                     text="Сбросить черный список",
-                    callback_data=callbacks.ResetBlackPhrases(
-                        adv_setting_id=self.adv_setting_id
-                    ).pack(),
+                    callback_data=callbacks.ResetBlackPhrases(adv_setting_id=self.adv_setting_id).pack(),
                 )
             )
 
