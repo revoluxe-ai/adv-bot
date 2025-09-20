@@ -79,3 +79,4 @@ venv_linux/
 ./.vscode/
 cursor-chat-export/
 .cursor/
+linux_venv/
