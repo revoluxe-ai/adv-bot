@@ -1,0 +1,17 @@
+extends: default
+
+rules:
+  # Disable line length checks to avoid conflicts with other tools
+  line-length: disable
+
+  # Configure indentation rules
+  indentation:
+    spaces: 2
+    indent-sequences: true
+
+  # Allow document start marker to be optional
+  document-start: disable
+
+  # Configure truthy values to be more permissive
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
