@@ -93,7 +93,7 @@ async def update_wb_config_data(client_session) -> None:
 
 async def main_loop(client_session):
     await asyncio.gather(
-        # process_payment_for_advs(),
+        process_payment_for_advs(),
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),
         update_wb_config_data(client_session),
