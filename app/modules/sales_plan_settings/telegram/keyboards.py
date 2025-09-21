@@ -43,9 +43,7 @@ class KeyboardsGetter:
             else f"Изменить план продаж в день ({self._plan_for_sales_for_day})"
         )
 
-        callback = callbacks.ChangePlanSetting(
-            target_point="change-plan-for-sales-for-day", adv_id=self._adv_id
-        ).pack()
+        callback = callbacks.ChangePlanSetting(target_point="change-plan-for-sales-for-day", adv_id=self._adv_id).pack()
 
         button = InlineKeyboardButton(text=text, callback_data=callback)
 
@@ -58,9 +56,7 @@ class KeyboardsGetter:
             else f"Изменить Цел.Себес. Заказа ({self._target_price_for_order})"
         )
 
-        callback = callbacks.ChangePlanSetting(
-            target_point="change-target-price-for-order", adv_id=self._adv_id
-        ).pack()
+        callback = callbacks.ChangePlanSetting(target_point="change-target-price-for-order", adv_id=self._adv_id).pack()
 
         button = InlineKeyboardButton(text=text, callback_data=callback)
 
@@ -73,9 +69,7 @@ class KeyboardsGetter:
             else f"Изменить Макс.Себес. Заказа ({self._max_price_for_order})"
         )
 
-        callback = callbacks.ChangePlanSetting(
-            target_point="change-max-price-for-order", adv_id=self._adv_id
-        ).pack()
+        callback = callbacks.ChangePlanSetting(target_point="change-max-price-for-order", adv_id=self._adv_id).pack()
 
         button = InlineKeyboardButton(text=text, callback_data=callback)
 

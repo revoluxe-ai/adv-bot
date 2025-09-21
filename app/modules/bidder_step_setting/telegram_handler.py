@@ -19,9 +19,7 @@ router = Router()
 
 
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "change_cpm_step"))
-async def change_cpm_step(
-    callback: CallbackQuery, callback_data: callbacks.CPMSettingMenu, state: FSMContext
-):
+async def change_cpm_step(callback: CallbackQuery, callback_data: callbacks.CPMSettingMenu, state: FSMContext):
     adv_original_id = callback_data.adv_original_id
     await state.update_data(adv_original_id=adv_original_id)
     await state.set_state("waiting_for_new_step")
@@ -46,9 +44,7 @@ async def set_new_step(message: Message, state: FSMContext, bot: Bot):
         await message.answer(f"Введите целое положительное число от 1 до {MAX_STEP}")
         return
     async with sm(read_only=False) as session:
-        query = (
-            update(AdvSetting).filter(AdvSetting.id == adv_original_id).values(bidder_step=new_step)
-        )
+        query = update(AdvSetting).filter(AdvSetting.id == adv_original_id).values(bidder_step=new_step)
         await session.execute(query)
         await session.commit()
     await message.answer(f"Шаг ставки для изменен на {new_step}")

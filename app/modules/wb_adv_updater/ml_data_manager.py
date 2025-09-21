@@ -6,14 +6,11 @@ from io import BytesIO
 import aiohttp
 import faiss
 import numpy as np
-from PIL import Image as PilImage, UnidentifiedImageError
+from PIL import Image as PilImage
+from PIL import UnidentifiedImageError
 from sqlalchemy import Row, Sequence, select
 
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
-    WBCard,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBCard
 from app.modules.wb_adv_updater.ML import Predictor
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.image_master import image_tools
@@ -77,15 +74,11 @@ async def process_product_data(wbcard: WBCard):
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
             continue
-        characteristics_words[char_name]: tuple[str, list[float]] = await get_words_from_char_value(
-            char_value
-        )
-    characteristics_words["name"]: tuple[str, list[float]] = await get_words_from_char_value(
-        wbcard.name
-    )
+        characteristics_words[char_name]: tuple[str, list[float]] = await get_words_from_char_value(char_value)
+    characteristics_words["name"]: tuple[str, list[float]] = await get_words_from_char_value(wbcard.name)
     if "description" in characteristics_words:
-        characteristics_words["description"]: tuple[str, list[float]] = (
-            await get_words_from_char_value(wbcard.description)
+        characteristics_words["description"]: tuple[str, list[float]] = await get_words_from_char_value(
+            wbcard.description
         )
     return characteristics_words
 
@@ -132,9 +125,7 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                 logger.error(f"Ошибка обновления карточки:  {wbcard.nmid}")
         except KeyError as exc:
             if exc.args[0] == "photos":
-                logger.debug(
-                    f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует"
-                )
+                logger.debug(f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует")
             else:
                 logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
         except UnidentifiedImageError as exc:
@@ -156,7 +147,7 @@ async def update_cards_in_graph_for_shops_big_cycle():
 async def update_cards_in_graph_small_cycle():
     async with sm() as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.bot_active == True,
+            AdvSetting.bot_active is True,
         )
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
@@ -185,7 +176,7 @@ async def update_wb_adv_phrase_in_neo4j() -> None:
     while True:
         try:
             await update_wb_adv_phrase_in_neo_small_cycle()
-        except:
+        except Exception:
             logger.error("Ошибка обновления фраз в neo", exc_info=True)
         await asyncio.sleep(0)
 
@@ -200,7 +191,7 @@ async def update_keywords_ctr_by_similary():
         stmt = (
             select(KeywordSetting.text, AdvSetting.adv_id)
             .join(AdvSetting, KeywordSetting.adv_setting_id == AdvSetting.id)
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active is True)
         )
         result = await session.execute(stmt)
         keyword_texts_adv_ids: Sequence[Row[tuple[str, int]]] = result.all()
@@ -262,7 +253,7 @@ async def update_keywords_ctr_by_similary():
             continue
         vector = np.array(vector, dtype=np.float32)
         vector = vector.reshape(1, -1)  # Преобразование в форму (1, d) для поиска
-
+        assert index is not None
         # Поиск ближайших векторов
         D, I = index.search(vector, index.ntotal)
         redis_base_manager = BaseRedis()
@@ -282,8 +273,6 @@ async def update_keywords_ctr_by_similary():
                         f"Обновление CTR для ключевого слова {target_text} и объявления {adv_id} "
                         f"на значение {predict_ctr}"
                     )
-                    await redis_manager.set_predict_ctr_with_pipeline(
-                        redis_pipeline, adv_id, target_text, predict_ctr
-                    )
+                    await redis_manager.set_predict_ctr_with_pipeline(redis_pipeline, adv_id, target_text, predict_ctr)
                     break
             await redis_pipeline.execute()

@@ -18,9 +18,7 @@ class ApiErrorWithCode(Exception):
         self.message = message
         self.rejection = rejection
         m = "Типовая ошибка Api Wildberries"
-        super().__init__(
-            f"{m} code: {self.code}, message: {self.message}, rejection: {self.rejection}"
-        )
+        super().__init__(f"{m} code: {self.code}, message: {self.message}, rejection: {self.rejection}")
 
 
 class NotValidTokenError(Exception):

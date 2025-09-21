@@ -52,8 +52,8 @@ async with sm() as session:
     result = await session.execute(query)
     cabinets = result.scalars().all()
     # Фильтрация по гибридным свойствам после загрузки
-    filtered_cabinets = [cab for cab in cabinets 
-                        if cab.calculated_balance > 0 
+    filtered_cabinets = [cab for cab in cabinets
+                        if cab.calculated_balance > 0
                         or cab.calculated_bonus > 0]
 
 # Правильно - обработка больших наборов данных
@@ -123,4 +123,4 @@ async with sm() as session:
     users = await session.scalars(select(User))
     for user in users:
         posts = await session.scalars(select(Post).where(Post.user_id == user.id))
-``` 
+```

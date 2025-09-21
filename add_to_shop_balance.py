@@ -1,11 +1,7 @@
 import dotenv
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.models import (
-    WBBalancePayment,
-    WBBonusPayment,
-    WBCabinet,
-)
+from app.modules.common_slaves.wildberries.models import WBBalancePayment, WBBonusPayment, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 dotenv.load_dotenv()
@@ -47,12 +43,8 @@ async def add_balance_and_bonus():
         calculated_balance = wb_cabinet.calculated_balance
         calculated_bonus = wb_cabinet.calculated_bonus
 
-        print(
-            f"Баланс кабинета {shop_id} увеличен: {add_balance} (новый расчетный баланс: {calculated_balance})"
-        )
-        print(
-            f"Бонусы кабинета {shop_id} увеличены: {add_bonus} (новый расчетный бонус: {calculated_bonus})"
-        )
+        print(f"Баланс кабинета {shop_id} увеличен: {add_balance} (новый расчетный баланс: {calculated_balance})")
+        print(f"Бонусы кабинета {shop_id} увеличены: {add_bonus} (новый расчетный бонус: {calculated_bonus})")
 
 
 if __name__ == "__main__":

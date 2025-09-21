@@ -49,9 +49,7 @@ async def waiting_for_black_phrases(message: Message, bot: Bot, state: FSMContex
 
 
 @router.callback_query(callbacks.ResetBlackPhrases.filter())
-async def reset_black_phrases(
-    callback: CallbackQuery, bot: Bot, callback_data: callbacks.ResetBlackPhrases
-) -> None:
+async def reset_black_phrases(callback: CallbackQuery, bot: Bot, callback_data: callbacks.ResetBlackPhrases) -> None:
     adv_setting_original_id = callback_data.adv_setting_id
     async with sm(read_only=True) as session:
         adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_original_id)

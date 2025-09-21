@@ -2,19 +2,11 @@
 Простой тест для проверки моделей с использованием SQLAlchemy.
 """
 
+import contextlib
 import os
 
 import pytest
-from sqlalchemy import (
-    Boolean,
-    Column,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    create_engine,
-    text,
-)
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String, create_engine, text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 # Создаем базу тестов
@@ -30,12 +22,8 @@ class WBCabinet(Base):
     bonus = Column(Float, default=0, server_default=text("0"), nullable=False)
     active = Column(Boolean, default=True)
     shop_id = Column(String, nullable=False, unique=True)
-    balance_payments = relationship(
-        "WBBalancePayment", back_populates="wb_cabinet", uselist=True
-    )
-    bonus_payments = relationship(
-        "WBBonusPayment", back_populates="wb_cabinet", uselist=True
-    )
+    balance_payments = relationship("WBBalancePayment", back_populates="wb_cabinet", uselist=True)
+    bonus_payments = relationship("WBBonusPayment", back_populates="wb_cabinet", uselist=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -103,10 +91,8 @@ def db_session():
 
     # Удаляем файл базы данных
     if os.path.exists(DB_PATH):
-        try:
+        with contextlib.suppress(Exception):
             os.remove(DB_PATH)
-        except:
-            pass
 
 
 def test_wb_cabinet_calculated_balance(db_session):
@@ -122,9 +108,7 @@ def test_wb_cabinet_calculated_balance(db_session):
     assert cabinet.calculated_balance == 100.0
 
     # Добавляем платеж
-    payment1 = WBBalancePayment(
-        wb_cabinet_id=cabinet.id, amount=50.0, description="Test payment 1"
-    )
+    payment1 = WBBalancePayment(wb_cabinet_id=cabinet.id, amount=50.0, description="Test payment 1")
     db_session.add(payment1)
     db_session.commit()
     db_session.refresh(cabinet)
@@ -133,9 +117,7 @@ def test_wb_cabinet_calculated_balance(db_session):
     assert cabinet.calculated_balance == 150.0
 
     # Добавляем еще один платеж
-    payment2 = WBBalancePayment(
-        wb_cabinet_id=cabinet.id, amount=25.0, description="Test payment 2"
-    )
+    payment2 = WBBalancePayment(wb_cabinet_id=cabinet.id, amount=25.0, description="Test payment 2")
     db_session.add(payment2)
     db_session.commit()
     db_session.refresh(cabinet)
@@ -144,9 +126,7 @@ def test_wb_cabinet_calculated_balance(db_session):
     assert cabinet.calculated_balance == 175.0
 
     # Добавляем отрицательный платеж (списание)
-    payment3 = WBBalancePayment(
-        wb_cabinet_id=cabinet.id, amount=-30.0, description="Test payment 3 (negative)"
-    )
+    payment3 = WBBalancePayment(wb_cabinet_id=cabinet.id, amount=-30.0, description="Test payment 3 (negative)")
     db_session.add(payment3)
     db_session.commit()
     db_session.refresh(cabinet)
@@ -168,9 +148,7 @@ def test_wb_cabinet_calculated_bonus(db_session):
     assert cabinet.calculated_bonus == 50.0
 
     # Добавляем бонусную транзакцию
-    bonus1 = WBBonusPayment(
-        wb_cabinet_id=cabinet.id, amount=25.0, description="Test bonus 1"
-    )
+    bonus1 = WBBonusPayment(wb_cabinet_id=cabinet.id, amount=25.0, description="Test bonus 1")
     db_session.add(bonus1)
     db_session.commit()
     db_session.refresh(cabinet)
@@ -179,9 +157,7 @@ def test_wb_cabinet_calculated_bonus(db_session):
     assert cabinet.calculated_bonus == 75.0
 
     # Добавляем еще одну бонусную транзакцию
-    bonus2 = WBBonusPayment(
-        wb_cabinet_id=cabinet.id, amount=10.0, description="Test bonus 2"
-    )
+    bonus2 = WBBonusPayment(wb_cabinet_id=cabinet.id, amount=10.0, description="Test bonus 2")
     db_session.add(bonus2)
     db_session.commit()
     db_session.refresh(cabinet)
@@ -190,9 +166,7 @@ def test_wb_cabinet_calculated_bonus(db_session):
     assert cabinet.calculated_bonus == 85.0
 
     # Добавляем отрицательную бонусную транзакцию (списание)
-    bonus3 = WBBonusPayment(
-        wb_cabinet_id=cabinet.id, amount=-15.0, description="Test bonus 3 (negative)"
-    )
+    bonus3 = WBBonusPayment(wb_cabinet_id=cabinet.id, amount=-15.0, description="Test bonus 3 (negative)")
     db_session.add(bonus3)
     db_session.commit()
     db_session.refresh(cabinet)

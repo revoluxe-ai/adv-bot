@@ -6,11 +6,7 @@ from sqlalchemy import select
 
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks, messages
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBUserCabinet
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -98,7 +94,5 @@ async def reset_white_list(
         stmt = select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_id)
         wb_user_cabinet = (await session.execute(stmt)).scalar()
     assert wb_user_cabinet
-    await bot.send_message(
-        callback.from_user.id, "Белый список сброшен, возвращаю меню кампании..."
-    )
+    await bot.send_message(callback.from_user.id, "Белый список сброшен, возвращаю меню кампании...")
     await messages.AdvSettingMenu(bot, callback.from_user.id, wb_user_cabinet, adv)()

@@ -3,10 +3,7 @@ import logging
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 
-from app.client_bot.user_interface.message_templates import (
-    LastMessage,
-    TextWithKeyboardAndImage,
-)
+from app.client_bot.user_interface.message_templates import LastMessage, TextWithKeyboardAndImage
 from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
@@ -15,13 +12,9 @@ from app.client_bot.user_interface.views.messages.positions_graphic_messanges.po
     KeywordGraphicPart_1,
 )
 from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
-    AdvSettingAutoUpdater,
-)
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import AdvSettingAutoUpdater
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
 
 logger = logging.getLogger(__name__)
@@ -97,9 +90,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         # Получаем данные через CommonAdvsStatDataManager
         common_stat_data_manager = CommonAdvsStatDataManager()
-        stat_data: CommonAdvsStatData = await common_stat_data_manager.get_data(
-            self._adv_setting, self._keywords, 2
-        )
+        stat_data: CommonAdvsStatData = await common_stat_data_manager.get_data(self._adv_setting, self._keywords, 2)
 
         # Устанавливаем полученные данные
         self.min_ctr = stat_data.min_ctr
@@ -111,12 +102,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._mean_orders_for_days = stat_data.mean_orders_for_last_days
         self._mean_price_for_order = stat_data.mean_price_for_order
         self._spend_for_inner_adv_for_3_days = stat_data.spend_for_inner_advs
-        self.full_adv_stat_for_last_days_for_auto_adv = (
-            stat_data.full_adv_stat_for_last_days_for_auto_adv
-        )
-        self.full_adv_stat_for_last_days_for_auction = (
-            stat_data.full_adv_stat_for_last_days_for_auction
-        )
+        self.full_adv_stat_for_last_days_for_auto_adv = stat_data.full_adv_stat_for_last_days_for_auto_adv
+        self.full_adv_stat_for_last_days_for_auction = stat_data.full_adv_stat_for_last_days_for_auction
         self.common_stat = stat_data.common_stat
         if self._all_orders_for_last_days is not None:
             self._sum_spend = self._spend_for_inner_adv_for_3_days
@@ -128,9 +115,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         common_days_stat_manager = CommonStatDataManager()
 
-        self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(
-            self._adv_setting, 2
-        )
+        self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(self._adv_setting, 2)
 
         auto_update_manager = AdvSettingAutoUpdater(self._adv_setting, 2)
 
@@ -172,21 +157,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         # Получаем целевые значения из настроек
         plan_for_sales_for_day = self._adv_setting.plan_for_sales_for_day
-        plan_for_sales_for_day_str = (
-            str(round(plan_for_sales_for_day)) if plan_for_sales_for_day else "Не задано"
-        )
+        plan_for_sales_for_day_str = str(round(plan_for_sales_for_day)) if plan_for_sales_for_day else "Не задано"
 
         target_price_for_order = self._adv_setting.target_price_for_order
-        target_price_for_order_str = (
-            str(round(target_price_for_order)) if target_price_for_order else "Не задано"
-        )
+        target_price_for_order_str = str(round(target_price_for_order)) if target_price_for_order else "Не задано"
 
         max_price_for_order = self._adv_setting.max_price_for_order
-        max_price_for_order_str = (
-            str(round(max_price_for_order)) if max_price_for_order else "Не задано"
-        )
+        max_price_for_order_str = str(round(max_price_for_order)) if max_price_for_order else "Не задано"
 
-        order_cost = (
+        (
             self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_days
             if self._all_orders_for_last_days
             else self._spend_for_inner_adv_for_3_days

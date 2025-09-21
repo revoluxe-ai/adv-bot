@@ -80,9 +80,7 @@ class CommonStatMinix(WBAPIProtocol):
         # Разделение nmIDs на части по 20 товаров
         for i in range(0, len(nmIDs), part):
             part_nmids = nmIDs[i : i + part]
-            result: list[CommonStat] | None = await self._get_cards_stats_by_days(
-                part_nmids, pass_days
-            )
+            result: list[CommonStat] | None = await self._get_cards_stats_by_days(part_nmids, pass_days)
             if result:
                 results.extend(result)
 

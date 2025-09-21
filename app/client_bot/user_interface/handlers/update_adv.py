@@ -9,11 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    WBCabinet,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
 from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import wb_manager
 from app.modules.wb_adv_updater.data_setter import DataSetter
@@ -43,11 +39,7 @@ async def update_minus_keywords(
         )
         adv = adv.scalar()
         wb_cabinet_id: int = adv.wb_cabinet.id
-        stmt = (
-            select(WBUserCabinet)
-            .join(WBUserCabinet.wb_cabinet)
-            .where(WBCabinet.id == wb_cabinet_id)
-        )
+        stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet).where(WBCabinet.id == wb_cabinet_id)
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar()
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)

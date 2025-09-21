@@ -2,9 +2,7 @@ import asyncio
 import logging
 from asyncio import Task
 
-from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
-    GlobalParsingQueueManager,
-)
+from app.modules.wb_keywords_parser.global_parsing_queue_manager import GlobalParsingQueueManager
 from app.modules.wb_keywords_parser.parsing_task import ParsingTask
 from app.modules.wb_keywords_parser.wb_parser import parser
 from app.settings import settings

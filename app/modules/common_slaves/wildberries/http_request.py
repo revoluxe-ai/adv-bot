@@ -5,13 +5,7 @@ import aiohttp
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 
-from .exceptions import (
-    ApiErrorWithCode,
-    BadRequestError,
-    NotValidDataError,
-    TooManyRequests,
-    UnknownApiRequestError,
-)
+from .exceptions import ApiErrorWithCode, BadRequestError, NotValidDataError, TooManyRequests, UnknownApiRequestError
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +37,6 @@ async def requests(session, method, url, data=None, json_data=None, headers=None
             json_answer = json.loads(text)
             if isinstance(json_answer, dict):
                 if code := json_answer.get("code"):
-                    raise ApiErrorWithCode(
-                        code, json_answer.get("message"), json_answer.get("rejection")
-                    )
+                    raise ApiErrorWithCode(code, json_answer.get("message"), json_answer.get("rejection"))
 
         return text

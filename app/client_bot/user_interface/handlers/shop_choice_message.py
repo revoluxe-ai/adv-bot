@@ -56,9 +56,7 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> Inlin
             ).pack(),
         )
         # Добавляем кнопку в список строк кнопок
-        keyboard_buttons.append(
-            [button]
-        )  # Каждая кнопка в своем списке, т.е. каждая в новой строке
+        keyboard_buttons.append([button])  # Каждая кнопка в своем списке, т.е. каждая в новой строке
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     return keyboard

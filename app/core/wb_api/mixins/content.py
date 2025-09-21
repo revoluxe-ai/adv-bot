@@ -38,15 +38,11 @@ class ContentMixin:
             headers=self.headers.standart,
         )
         if response is None:
-            raise CardNotFoundInWB(
-                f"Карточка с текстом {text} не найдена на Wildberries"
-            )
+            raise CardNotFoundInWB(f"Карточка с текстом {text} не найдена на Wildberries")
         answer = json.loads(response)
         cards = answer["cards"]
         if not cards:
-            raise CardNotFoundInWB(
-                f"Карточка с текстом {text} не найдена на Wildberries"
-            )
+            raise CardNotFoundInWB(f"Карточка с текстом {text} не найдена на Wildberries")
         card_json = answer["cards"][0]
         card: CardFromWB = CardFromWB(card_json)
         return card
@@ -57,9 +53,7 @@ class ContentMixin:
         url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
 
         # Начальные параметры для запроса
-        data_for_req = {
-            "settings": {"cursor": {"limit": 100}, "filter": {"withPhoto": -1}}
-        }
+        data_for_req = {"settings": {"cursor": {"limit": 100}, "filter": {"withPhoto": -1}}}
 
         all_cards = []  # Список для хранения всех карточек
         while True:

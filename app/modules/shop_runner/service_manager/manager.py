@@ -3,37 +3,23 @@ import logging
 from collections import defaultdict
 from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable
 from datetime import datetime
-from typing import (
-    Any,
-    Protocol,
-    TypeVar,
-)
+from typing import Any, Protocol, TypeVar
 
 from app.core.wb_api.ping_manager import PingManager
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import (
-    WBCommonStatManager,
-)
+from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import WBCommonStatManager
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
-    GlobalParsingQueueManager,
-)
+from app.modules.wb_keywords_parser.global_parsing_queue_manager import GlobalParsingQueueManager
 from app.settings import settings
 
-from .old_modules.setting_auto_updater import (
-    AdvSettingAutoUpdater,
-)
+from .old_modules.setting_auto_updater import AdvSettingAutoUpdater
 from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
 
@@ -55,9 +41,7 @@ class CoroutinesManager:
 
         self._wb_api = wb_api
         self.shop_id = wb_api.shop_id
-        self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
-            list[CalculatedKeyword]
-        )
+        self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(list[CalculatedKeyword])
         self._adv_settings_dict: dict[int, AdvSetting] | None = None
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
@@ -71,9 +55,7 @@ class CoroutinesManager:
         if not adv_settings:
             return None
         logger.debug(f"Обновляю ставки для магазина {self.shop_id}")
-        await asyncio.gather(
-            *[self.__run_bidder_process_for_adv(adv, self._wb_api) for adv in adv_settings]
-        )
+        await asyncio.gather(*[self.__run_bidder_process_for_adv(adv, self._wb_api) for adv in adv_settings])
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
         return None
 
@@ -135,9 +117,7 @@ class CoroutinesManager:
         await shop_data_updater.update_advs_data()
 
     @staticmethod
-    async def _async_zip_longest(
-        *async_gens, fillvalue=None
-    ) -> AsyncGenerator[tuple[Any, ...], None]:
+    async def _async_zip_longest(*async_gens, fillvalue=None) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
 
@@ -215,19 +195,14 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:
-        from .old_modules.setting_auto_updater.modules.first_key_updater import (
-            FirstKeyUpdater,
-            FirstKeyUpdaterError,
-        )
+        from .old_modules.setting_auto_updater.modules.first_key_updater import FirstKeyUpdater, FirstKeyUpdaterError
 
         all_active_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
         tasks = []
         for adv in all_active_advs:
             if not adv.auto_update_white_list:
                 continue
-            keywords: Awaitable[list[CalculatedKeyword]] = (
-                self._wb_shop_data_manager.get_calculated_keywords(adv)
-            )
+            keywords: Awaitable[list[CalculatedKeyword]] = self._wb_shop_data_manager.get_calculated_keywords(adv)
             updater = FirstKeyUpdater(adv)
             update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(keywords)
             task = asyncio.create_task(update_coroutine)

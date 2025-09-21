@@ -5,9 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 

@@ -12,10 +12,7 @@ from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from ..data_classes.advs import adv_fabric
 from ..exceptions import BadRequestError, MinAdvBidWBApiError
 from ..http_request import requests, try_except_decorator
-from .excs import (
-    ItemCategoryNotInStockError,
-    StartAdvError,
-)
+from .excs import ItemCategoryNotInStockError, StartAdvError
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +77,7 @@ class AdvMixin(WBAPIProtocol):
         advs = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
 
-        response_text = await requests(
-            self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart)
         answer = json.loads(response_text)
         for advert in answer:
             adv: Adv | None = adv_fabric.get_adv_data_class(advert)
@@ -111,16 +106,12 @@ class AdvMixin(WBAPIProtocol):
 
         data = {"campaignName": adv_name, "nms": nmids}
 
-        response_text = await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         answer = json.loads(response_text)
         return int(answer)
 
     @try_except_decorator(1, 60)
-    async def create_auto_adv(
-        self, name: str, SubjectID: int, balance_type: int, start_status: bool
-    ) -> int:
+    async def create_auto_adv(self, name: str, SubjectID: int, balance_type: int, start_status: bool) -> int:
         url = "https://advert-api.wildberries.ru/adv/v1/save-ad"
         data = {
             "type": 8,
@@ -128,12 +119,10 @@ class AdvMixin(WBAPIProtocol):
             "subjectId": SubjectID,
             "sum": 1000,
             "btype": balance_type,
-            "on_pause": False if start_status else True,
+            "on_pause": not start_status,
         }
 
-        response_text = await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         answer = json.loads(response_text)
         if isinstance(answer, int):
             return answer
@@ -185,9 +174,7 @@ class AdvMixin(WBAPIProtocol):
         await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         return None
 
-    async def update_nmids_in_adv(
-        self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
-    ):
+    async def update_nmids_in_adv(self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
@@ -204,9 +191,7 @@ class AdvMixin(WBAPIProtocol):
         return answer
 
     @try_except_decorator(1, 2)
-    async def update_nmids_in_auto_adv(
-        self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
-    ):
+    async def update_nmids_in_auto_adv(self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
@@ -217,9 +202,7 @@ class AdvMixin(WBAPIProtocol):
 
         data = {"sum": sum_, "type": balance_type, "return": True}
 
-        response_text = await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         answer = json.loads(response_text)
         new_balance = answer["total"]
         return new_balance
@@ -284,16 +267,12 @@ class AdvMixin(WBAPIProtocol):
         url = "https://advert-api.wildberries.ru/adv/v0/cpm"
         data = {"advertId": search_adv_id, "type": 9, "cpm": cpm}
 
-        response = await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        response = await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         if response == "":
             logger.debug(f"CPM для поисковой кампании {search_adv_id} установлен")
             return
         else:
-            logger.error(
-                f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}"
-            )
+            logger.error(f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}")
 
     async def get_adv_full_state(
         self, adv_ids: list[int], dates: list[datetime.datetime.date] | None = None

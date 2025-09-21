@@ -10,10 +10,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -50,27 +47,19 @@ class Fitter(AbcManager):
 
     def fill_average_vector(self, df_stat: pd.DataFrame, df_vectors: pd.DataFrame):
         # Вычисляем средние векторы, исключая None
-        averaged_vectors = (
-            df_stat["nmids"]
-            .apply(lambda nmids: self.__get_average_vector(nmids, df_vectors))
-            .dropna()
-        )
+        averaged_vectors = df_stat["nmids"].apply(lambda nmids: self.__get_average_vector(nmids, df_vectors)).dropna()
 
         # Находим первый не None вектор для определения длины вектора
         first_valid_vector = next((vec for vec in averaged_vectors if vec is not None), None)
         vector_length = len(first_valid_vector) if first_valid_vector is not None else 0
 
         # Обрабатываем случаи с None, заменяя их на список None соответствующей длины
-        averaged_vectors = averaged_vectors.apply(
-            lambda x: x if x is not None else [None] * vector_length
-        )
+        averaged_vectors = averaged_vectors.apply(lambda x: x if x is not None else [None] * vector_length)
 
         # Создаем DataFrame для новых столбцов, учитывая возможные None значения
         new_columns_data = {}
         for i in range(vector_length):
-            new_columns_data[f"item_f_{i}"] = averaged_vectors.apply(
-                lambda x: x[i] if x is not None else None
-            )
+            new_columns_data[f"item_f_{i}"] = averaged_vectors.apply(lambda x: x[i] if x is not None else None)
 
         new_columns_df = pd.DataFrame(new_columns_data)
 
@@ -108,15 +97,13 @@ class Predictor:
                     selectinload(AdvSetting.adv_keywords),
                     selectinload(AdvSetting.keyword_settings),
                 )
-                .where(AdvSetting.bot_active == True)
+                .where(AdvSetting.bot_active is True)
             )
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
         try:
             logger.debug("Начинаю получать DF  для предсказаний")
-            all_adv_settings: list[AdvSetting] = list(
-                all_adv_settings
-            )  # Приводим к списку для обработки
+            all_adv_settings: list[AdvSetting] = list(all_adv_settings)  # Приводим к списку для обработки
             df_for_predict = await self._get_df_for_predict(all_adv_settings)
             logger.debug("Получили DF для предсказаний")
         except Exception as exc:
@@ -130,9 +117,7 @@ class Predictor:
             logger.error(f"Ошибка при предсказании: {exc}", exc_info=True)
             raise exc
 
-        predict_df["predicted_ctr"] = predict_df["predicted_ctr"].apply(
-            lambda ctr: ctr if ctr >= 0 else 0
-        )
+        predict_df["predicted_ctr"] = predict_df["predicted_ctr"].apply(lambda ctr: ctr if ctr >= 0 else 0)
         await asyncio.to_thread(predict_df.to_csv, "work_folder/предсказания.csv")
         # predict_df = pd.read_csv('work_folder/предсказания.csv')
         async with sm() as session:
@@ -141,7 +126,7 @@ class Predictor:
                 .join(KeywordSetting.adv_setting)
                 .options(selectinload(KeywordSetting.adv_setting))
                 .where(
-                    AdvSetting.bot_active == True,
+                    AdvSetting.bot_active is True,
                 )
             )
             result = await session.execute(stmt)
@@ -171,16 +156,12 @@ class Predictor:
 
                 item_features = [row[1] for row in item_features.items()]
                 avg_item_features = pd.DataFrame(item_features).mean().to_dict()
-                avg_item_features = {
-                    f"item_feature_{i}": avg_item_features[i] for i in avg_item_features.keys()
-                }
+                avg_item_features = {f"item_feature_{i}": avg_item_features[i] for i in avg_item_features}
 
                 if not avg_item_features:
                     logger.debug("Нет item_features: %s", adv.name)
                     continue
-                clear_keywords = [
-                    text_cleaner.clear(keyword.text) for keyword in adv.keyword_settings
-                ]
+                clear_keywords = [text_cleaner.clear(keyword.text) for keyword in adv.keyword_settings]
                 # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
                 keyword_features_result = await self.get_keyword_features(clear_keywords)
                 keyword_features_result = {row[0]: row[1] for row in keyword_features_result}
@@ -197,10 +178,7 @@ class Predictor:
                         "adv_type": adv.type if adv.type else 0,
                         "keyword": keyword.text,
                         **avg_item_features,  # Убедитесь, что avg_item_features определен и актуален
-                        **{
-                            f"keyword_feature_{i}": keyword_features[i]
-                            for i in range(len(keyword_features))
-                        },
+                        **{f"keyword_feature_{i}": keyword_features[i] for i in range(len(keyword_features))},
                     }
                     data_rows.append(row)
             except Exception:
@@ -236,6 +214,4 @@ class Predictor:
 
         # Извлекаем предсказанный CTR
         predicted_ctr = float(row["predicted_ctr"].values[0])
-        await redis_manager.set_predict_ctr_with_pipeline(
-            redis_pipeline, adv_id, keyword, predicted_ctr
-        )
+        await redis_manager.set_predict_ctr_with_pipeline(redis_pipeline, adv_id, keyword, predicted_ctr)

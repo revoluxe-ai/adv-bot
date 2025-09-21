@@ -8,8 +8,7 @@ from sqlalchemy.orm import joinedload
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.common_slaves.wildberries.wb_api import WBApi
-from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
-from app.modules.full_stat_adv_updater.types.full_adv_stat import DayStats
+from app.modules.full_stat_adv_updater.types.full_adv_stat import DayStats, FullAdvStat
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 
@@ -17,9 +16,7 @@ async def upload_full_adv_stat(wb_cabinet_id: int, client_session):
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
     wb_api = WBApi(access, client_session)
 
-    stmt = select(AdvSetting.adv_id).where(
-        AdvSetting.wb_cabinet_id == wb_cabinet_id, AdvSetting.bidder_active == True
-    )
+    stmt = select(AdvSetting.adv_id).where(AdvSetting.wb_cabinet_id == wb_cabinet_id, AdvSetting.bidder_active is True)
     async with sm() as session:
         result = await session.execute(stmt)
         adv_ids = result.scalars().all()
@@ -33,11 +30,7 @@ async def upload_full_adv_stat(wb_cabinet_id: int, client_session):
 
 
 async def get_adv_setting(adv_id: int):
-    stmt = (
-        select(AdvSetting)
-        .options(joinedload(AdvSetting.wb_cabinet))
-        .where(AdvSetting.adv_id == adv_id)
-    )
+    stmt = select(AdvSetting).options(joinedload(AdvSetting.wb_cabinet)).where(AdvSetting.adv_id == adv_id)
     async with sm() as session:
         result = await session.execute(stmt)
         adv_setting = result.scalar()

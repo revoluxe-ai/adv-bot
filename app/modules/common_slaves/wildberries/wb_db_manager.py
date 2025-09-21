@@ -6,12 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.core.wb_api.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    WBCabinet,
-    WBCard,
-    WBCategory,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBCard, WBCategory
 from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
@@ -89,9 +84,7 @@ async def _update_cards_in_db(cards: Sequence[CardFromWB], wb_cabinet: WBCabinet
         # Получаем уже существующие категории
         stmt = select(WBCategory).where(WBCategory.wb_category_name.in_(category_names))
         result = await session.execute(stmt)
-        existing_categories = {
-            category.wb_category_name: category for category in result.scalars().all()
-        }
+        existing_categories = {category.wb_category_name: category for category in result.scalars().all()}
 
         # Добавляем недостающие категории
         for name in category_names - existing_categories.keys():

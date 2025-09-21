@@ -6,28 +6,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.client_bot import const
 from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.client_bot.user_interface.views import callbacks
-from app.client_bot.user_interface.views.callbacks import (
-    Action,
-    TurnBot,
-)
+from app.client_bot.user_interface.views.callbacks import Action, TurnBot
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
-    WBCabinet,
-    WBUserCabinet,
-)
-from app.modules.predict_ctr_exponent_settings import (
-    ChangeExponentSettinginAdvSettingCallback,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBCabinet, WBUserCabinet
+from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingCallback
 from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
-from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import (
-    SettingAuctionBoostMode,
-)
+from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import SettingAuctionBoostMode
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
     AutoUpdateTargetPlaceSettingCallBack,
 )
@@ -76,16 +61,12 @@ sm = get_async_session_maker
 #     return keyboard
 
 
-def get_adv_setting_keyboard(
-    chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
-):
+def get_adv_setting_keyboard(chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool):
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
             text="Контроль ключевых слов по кампании",
-            callback_data=callbacks.SettingKeywords(
-                adv_original_id=adv_setting.id, type="by_adv"
-            ).pack(),
+            callback_data=callbacks.SettingKeywords(adv_original_id=adv_setting.id, type="by_adv").pack(),
         )
     )
 
@@ -96,9 +77,7 @@ def get_adv_setting_keyboard(
         text = "Включить автообновление белого списка"
         new_status = True
 
-    callback = AutoUpdateWhiteListSetting(
-        new_status=new_status, adv_setting_original_id=adv_setting.id
-    ).pack()
+    callback = AutoUpdateWhiteListSetting(new_status=new_status, adv_setting_original_id=adv_setting.id).pack()
     button = InlineKeyboardButton(text=text, callback_data=callback)
     builder.row(button)
 
@@ -148,9 +127,7 @@ def get_adv_setting_keyboard(
 
     button = InlineKeyboardButton(
         text="Управление ставкой",
-        callback_data=callbacks.CPMSettingMenu(
-            action="to_cpm_setting_page", adv_original_id=adv_setting.id
-        ).pack(),
+        callback_data=callbacks.CPMSettingMenu(action="to_cpm_setting_page", adv_original_id=adv_setting.id).pack(),
     )
     builder.row(button)
 
@@ -204,9 +181,7 @@ def get_adv_setting_keyboard(
         builder.row(
             InlineKeyboardButton(
                 text="Изменить минимальный CTR",
-                callback_data=callbacks.ChangeMinCTR(
-                    action="change_min_ctr", adv_original_id=adv_setting.id
-                ).pack(),
+                callback_data=callbacks.ChangeMinCTR(action="change_min_ctr", adv_original_id=adv_setting.id).pack(),
             )
         )
 
@@ -214,26 +189,20 @@ def get_adv_setting_keyboard(
         builder.row(
             InlineKeyboardButton(
                 text="Режим управления CTR",
-                callback_data=callbacks.ChangeMinCTR(
-                    action="change_min_ctr", adv_original_id=adv_setting.id
-                ).pack(),
+                callback_data=callbacks.ChangeMinCTR(action="change_min_ctr", adv_original_id=adv_setting.id).pack(),
             )
         )
 
     button = InlineKeyboardButton(
         text="Задать/Изменить максимальную стоимость клика",
-        callback_data=callbacks.ChangeMaxCPC(
-            action="to_max_cpc_change_page", adv_original_id=adv_setting.id
-        ).pack(),
+        callback_data=callbacks.ChangeMaxCPC(action="to_max_cpc_change_page", adv_original_id=adv_setting.id).pack(),
     )
 
     builder.row(button)
 
     button = InlineKeyboardButton(
         text="Изменить мин. кол-во просмотров для ИИ-прогноза CTR",
-        callback_data=callbacks.ChangeMinViewsForPredictCTR(
-            adv_setting_original_id=adv_setting.id
-        ).pack(),
+        callback_data=callbacks.ChangeMinViewsForPredictCTR(adv_setting_original_id=adv_setting.id).pack(),
     )
 
     builder.row(button)
@@ -241,16 +210,12 @@ def get_adv_setting_keyboard(
     if adv_setting.reset_place:
         button = InlineKeyboardButton(
             text="Выключить сброс позиций",
-            callback_data=callbacks.ResetPlace(
-                action="off", adv_setting_original_id=adv_setting.id
-            ).pack(),
+            callback_data=callbacks.ResetPlace(action="off", adv_setting_original_id=adv_setting.id).pack(),
         )
     else:
         button = InlineKeyboardButton(
             text="Включить сброс позиций",
-            callback_data=callbacks.ResetPlace(
-                action="on", adv_setting_original_id=adv_setting.id
-            ).pack(),
+            callback_data=callbacks.ResetPlace(action="on", adv_setting_original_id=adv_setting.id).pack(),
         )
 
     builder.row(button)
@@ -258,32 +223,24 @@ def get_adv_setting_keyboard(
     if not adv_setting.clusters_mode:
         button = InlineKeyboardButton(
             text="Включить поддержку кластеров",
-            callback_data=callbacks.TurnClusters(
-                action="on", adv_original_id=adv_setting.id
-            ).pack(),
+            callback_data=callbacks.TurnClusters(action="on", adv_original_id=adv_setting.id).pack(),
         )
     else:
         button = InlineKeyboardButton(
             text="Отключить поддержку кластеров",
-            callback_data=callbacks.TurnClusters(
-                action="off", adv_original_id=adv_setting.id
-            ).pack(),
+            callback_data=callbacks.TurnClusters(action="off", adv_original_id=adv_setting.id).pack(),
         )
     builder.row(button)
 
     button = InlineKeyboardButton(
         text="Загрузить статистику из WB",
-        callback_data=callbacks.WBUpdate(
-            action="update_keyword_stat", adv_setting_original_id=adv_setting.id
-        ).pack(),
+        callback_data=callbacks.WBUpdate(action="update_keyword_stat", adv_setting_original_id=adv_setting.id).pack(),
     )
     builder.row(button)
 
     button = InlineKeyboardButton(
         text="Обновить минус-слова",
-        callback_data=callbacks.WBUpdate(
-            action="update_minus_keywords", adv_setting_original_id=adv_setting.id
-        ).pack(),
+        callback_data=callbacks.WBUpdate(action="update_minus_keywords", adv_setting_original_id=adv_setting.id).pack(),
     )
 
     builder.row(button)
@@ -302,9 +259,7 @@ def get_adv_setting_keyboard(
     else:
         button = InlineKeyboardButton(
             text="Удалить из избранного",
-            callback_data=callbacks.RemoveFromFavorites(
-                adv_setting_original_id=adv_setting.id
-            ).pack(),
+            callback_data=callbacks.RemoveFromFavorites(adv_setting_original_id=adv_setting.id).pack(),
         )
 
     builder.row(button)
@@ -330,9 +285,7 @@ def get_advs_keyboard_with_paginator(
     keyword_filter,
 ):
     active_part_advs = list(filter(lambda adv_local: adv_local.bot_active is True, adv_settings))
-    not_active_part_advs = list(
-        filter(lambda adv_locale: adv_locale.bot_active is not True, adv_settings)
-    )
+    not_active_part_advs = list(filter(lambda adv_locale: adv_locale.bot_active is not True, adv_settings))
     adv_settings = active_part_advs + not_active_part_advs
     assert page > 0
     keyboard_buttons = []
@@ -358,9 +311,7 @@ def get_advs_keyboard_with_paginator(
             adv_original_id=adv.id,
             wb_user_cabinet_original_id=wb_user_cabinet_original_id,
         ).pack()
-        keyboard_buttons.append(
-            [InlineKeyboardButton(text=button_text, callback_data=callback_data)]
-        )
+        keyboard_buttons.append([InlineKeyboardButton(text=button_text, callback_data=callback_data)])
 
     # Добавляем кнопки навигации
     if page > 1:
@@ -416,9 +367,7 @@ def get_advs_keyboard_with_paginator(
     keyboard_buttons.append([button])
     button = InlineKeyboardButton(
         text="Полностью обновить мета-данные от WB",
-        callback_data=callbacks.UpdateCompanyFromWB(
-            wb_user_cabinet_original_id=wb_user_cabinet_original_id
-        ).pack(),
+        callback_data=callbacks.UpdateCompanyFromWB(wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack(),
     )
 
     keyboard_buttons.append([button])
@@ -432,9 +381,7 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
         [
             InlineKeyboardButton(
                 text="Добавить новый токен",
-                callback_data=callbacks.AddNewToken(
-                    wb_user_cabinet_original_id=wb_user_cabinet_original_id
-                ).pack(),
+                callback_data=callbacks.AddNewToken(wb_user_cabinet_original_id=wb_user_cabinet_original_id).pack(),
             )
         ],
         [
@@ -494,8 +441,7 @@ def get_keywords_setting_keyboard(
         keywords = [
             keyword
             for keyword in keywords
-            if isinstance(keyword.query, int)
-            and keyword.query >= adv_setting.hide_small_query_keywords
+            if isinstance(keyword.query, int) and keyword.query >= adv_setting.hide_small_query_keywords
         ]
 
     bottoms = []
@@ -772,10 +718,7 @@ def get_keyword_setting_keyboard(
     assert keyword_setting_original_id
     assert adv_setting_original_id
     buttons = []
-    if hasattr(keyword, "reason"):
-        reason = keyword.reason
-    else:
-        reason = None
+    reason = keyword.reason if hasattr(keyword, "reason") else None
 
     if (
         calculated_keyword.hard_status == 1
@@ -838,10 +781,7 @@ def get_keyword_setting_keyboard(
     ]
     buttons.append(buttons_row)
 
-    if (
-        keyword.hard_status in [AUTO_MODE, WHITE_LIST]
-        or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH
-    ):
+    if keyword.hard_status in [AUTO_MODE, WHITE_LIST] or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
         bottom = [
             InlineKeyboardButton(
                 text="Отключить (релевантная фраза)",
@@ -880,9 +820,7 @@ def get_keyword_setting_keyboard(
     button = [
         InlineKeyboardButton(
             text="Изменить ставку",
-            callback_data=callbacks.ChangeCPM(
-                adv_setting_original_id=adv_setting_original_id
-            ).pack(),
+            callback_data=callbacks.ChangeCPM(adv_setting_original_id=adv_setting_original_id).pack(),
         )
     ]
 
@@ -928,17 +866,13 @@ def get_ref_program_keyboard():
 
 def get_return_for_your_ref_links():
     builder = InlineKeyboardBuilder()
-    button = InlineKeyboardButton(
-        text="Назад", callback_data=callbacks.RefProgram(action="return").pack()
-    )
+    button = InlineKeyboardButton(text="Назад", callback_data=callbacks.RefProgram(action="return").pack())
 
     builder.row(button)
     return builder.as_markup()
 
 
-def get_shop_menu_keyboard(
-    wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True
-):
+def get_shop_menu_keyboard(wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True):
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     expiration_time: datetime.datetime = wb_cabinet.expiration_time
     now = datetime.datetime.now()
@@ -951,9 +885,7 @@ def get_shop_menu_keyboard(
     if any([expiration_time > now, balance > 0, bonus > 0]):
         button = InlineKeyboardButton(
             text="Автоматические рекламные кампании",
-            callback_data=callbacks.ChoiceAdvPaginator(
-                wb_user_cabinet_original_id=wb_user_cabinet.id, page=1
-            ).pack(),
+            callback_data=callbacks.ChoiceAdvPaginator(wb_user_cabinet_original_id=wb_user_cabinet.id, page=1).pack(),
         )
         builder.row(button)
 
@@ -967,14 +899,10 @@ def get_shop_menu_keyboard(
     if is_active_adv:
         button = InlineKeyboardButton(
             text="Отключить все кампании",
-            callback_data=callbacks.TurnBot(
-                action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
+            callback_data=callbacks.TurnBot(action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id).pack(),
         )
         builder.row(button)
-    button = InlineKeyboardButton(
-        text="Вернуться к списку магазинов", callback_data=callbacks.Start().pack()
-    )
+    button = InlineKeyboardButton(text="Вернуться к списку магазинов", callback_data=callbacks.Start().pack())
     builder.row(button)
     return builder.as_markup()
 
@@ -996,11 +924,7 @@ def get_payment_keyboard(wb_cabinet_original_id):
 
 def get_setting_min_ctr_keyboard(adv: AdvSetting):
     builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(
-            text="Назад", callback_data=callbacks.Adv(adv_original_id=adv.id).pack()
-        )
-    )
+    builder.row(InlineKeyboardButton(text="Назад", callback_data=callbacks.Adv(adv_original_id=adv.id).pack()))
     if adv.new_auto_min_ctr_mode:
         button = InlineKeyboardButton(
             text="Выключить управление CTR по белому списку",
@@ -1034,9 +958,7 @@ def get_setting_max_cpc_keyboard(adv: AdvSetting):
     builder.row(
         InlineKeyboardButton(
             text="Отключить максимальную стоимость клика",
-            callback_data=callbacks.ChangeMaxCPC(
-                action="turn_off_max_cpc", adv_original_id=adv_original_id
-            ).pack(),
+            callback_data=callbacks.ChangeMaxCPC(action="turn_off_max_cpc", adv_original_id=adv_original_id).pack(),
         )
     )
     return builder.as_markup()
@@ -1067,18 +989,14 @@ def get_return_to_adv_setting_keyboard(adv_original_id):
 
 def get_call_me_keyboard():
     builder = InlineKeyboardBuilder()
-    button = InlineKeyboardButton(
-        text="Получить консультацию и тест-драйв бота", url=f"{const.SUPPORT_LINK}"
-    )
+    button = InlineKeyboardButton(text="Получить консультацию и тест-драйв бота", url=f"{const.SUPPORT_LINK}")
     builder.row(button)
     return builder.as_markup()
 
 
 def get_call_me_keyboard0():
     builder = InlineKeyboardBuilder()
-    button = InlineKeyboardButton(
-        text="Связаться с разработчиком бота для консультации", url=const.SUPPORT_LINK
-    )
+    button = InlineKeyboardButton(text="Связаться с разработчиком бота для консультации", url=const.SUPPORT_LINK)
     builder.row(button)
     return builder.as_markup()
 
@@ -1095,9 +1013,7 @@ def get_ozon_keyword_setting_keyboard(keyword_setting_id: int, page: int = 1):
     builder.row(
         InlineKeyboardButton(
             text="Назад к списку ключевых слов",
-            callback_data=callbacks.SettingKeywords(
-                adv_original_id=keyword_setting_id, page=page
-            ).pack(),
+            callback_data=callbacks.SettingKeywords(adv_original_id=keyword_setting_id, page=page).pack(),
         )
     )
     return builder.as_markup()
@@ -1124,9 +1040,7 @@ def get_advs_list(advs: list[AdvSetting]):
     for adv in advs:
         name = "(" + str(adv.worst_promo_position) + ")" if adv.worst_promo_position else ""
         name += adv.name
-        button = InlineKeyboardButton(
-            text=name, callback_data=callbacks.Adv(adv_original_id=adv.id).pack()
-        )
+        button = InlineKeyboardButton(text=name, callback_data=callbacks.Adv(adv_original_id=adv.id).pack())
         builder.row(button)
     return builder.as_markup()
 

@@ -19,13 +19,8 @@ class PriorityManager:
         self.check_interval = 0.5  # Интервал проверки активности
 
     def calculate_cpu_usage(self, stats):
-        cpu_delta = (
-            stats["cpu_stats"]["cpu_usage"]["total_usage"]
-            - stats["precpu_stats"]["cpu_usage"]["total_usage"]
-        )
-        system_delta = (
-            stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
-        )
+        cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+        system_delta = stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
         num_cores = len(stats["cpu_stats"]["cpu_usage"]["percpu_usage"])
 
         if system_delta > 0 and num_cores > 0:

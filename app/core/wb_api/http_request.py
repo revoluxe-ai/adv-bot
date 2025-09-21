@@ -10,19 +10,10 @@ import logging
 import re
 import time
 from collections.abc import Awaitable, Callable
-from typing import (
-    Any,
-    TypeVar,
-    cast,
-)
+from typing import Any, TypeVar, cast
 
 import aiohttp
-from aiohttp import (
-    ClientConnectionError,
-    ClientOSError,
-    ClientResponseError,
-    ServerDisconnectedError,
-)
+from aiohttp import ClientConnectionError, ClientOSError, ClientResponseError, ServerDisconnectedError
 
 from .exceptions import (
     ApiErrorWithCode,
@@ -89,9 +80,7 @@ def try_except_decorator(
                     state["_last_query_time"] = time.time()
                     result = await func(instance, *args, **kwargs)
                     logger.debug(f"Запрос {method_name} выполнен успешно для {shop_id}")
-                    next_pause = (
-                        interval_seconds / requests_per_interval + state["_current_pause"]
-                    ) / 2
+                    next_pause = (interval_seconds / requests_per_interval + state["_current_pause"]) / 2
                     state["_current_pause"] = next_pause
                     state["_attempts"] = 0
                     return result
@@ -138,9 +127,7 @@ async def requests(
     async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
         try:
             response_text = await response.text()
-            logger.debug(
-                f"Запрос к {url} выполнен. Статус: {response.status}, ответ: {response_text[:500]}"
-            )
+            logger.debug(f"Запрос к {url} выполнен. Статус: {response.status}, ответ: {response_text[:500]}")
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
@@ -162,12 +149,11 @@ async def requests(
 
         # Если код не в блоке except, значит ответ был успешным (статус 200-299)
 
-        if response_text:
-            if isinstance(response_text, dict):
-                if code := response_text.get("code"):
-                    message = response_text.get("message", "")
-                    rejection = response_text.get("rejection", "")
-                    raise ApiErrorWithCode(code, message, rejection)
+        if response_text and isinstance(response_text, dict):
+            if code := response_text.get("code"):
+                message = response_text.get("message", "")
+                rejection = response_text.get("rejection", "")
+                raise ApiErrorWithCode(code, message, rejection)
         return response_text
 
 

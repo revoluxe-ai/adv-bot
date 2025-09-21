@@ -5,9 +5,7 @@ from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from app.client_bot.user_interface.handlers.start_registration_func import (
-    start_registration,
-)
+from app.client_bot.user_interface.handlers.start_registration_func import start_registration
 
 
 class ReturnToStart(BaseMiddleware):

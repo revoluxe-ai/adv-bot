@@ -30,9 +30,7 @@ async def relevant_keyword_status_setting(
     chat_id = callback_query.message.chat.id
 
     new_text_status_str: str = (
-        "Ключ добавлен в релевантные фразы"
-        if new_relevant_status
-        else "Ключ убрал из релевантных фраз"
+        "Ключ добавлен в релевантные фразы" if new_relevant_status else "Ключ убрал из релевантных фраз"
     )
 
     await bot.send_message(chat_id, new_text_status_str)

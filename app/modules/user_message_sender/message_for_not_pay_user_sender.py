@@ -79,8 +79,7 @@ async def get_all_user_telegram_ids_with_not_balance():
         .having(
             or_(
                 func.count(WBUserCabinet.id) == 0,  # Нет кабинетов
-                func.coalesce(func.sum(WBCabinet.balance + WBCabinet.bonus), 0)
-                == 0,  # Баланс всех магазинов = 0
+                func.coalesce(func.sum(WBCabinet.balance + WBCabinet.bonus), 0) == 0,  # Баланс всех магазинов = 0
             )
         )
     )

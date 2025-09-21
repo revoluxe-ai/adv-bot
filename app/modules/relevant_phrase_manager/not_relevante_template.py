@@ -43,9 +43,7 @@ class NotRelevantTemplate:
         return groups
 
     def _is_quoted(self, text: str) -> bool:
-        return (text.startswith('"') or text.endswith('"')) or (
-            text.startswith("'") or text.endswith("'")
-        )
+        return (text.startswith('"') or text.endswith('"')) or (text.startswith("'") or text.endswith("'"))
 
     def _strip_not_prefix(self, text: str) -> str:
         if text.lower().startswith("not:"):

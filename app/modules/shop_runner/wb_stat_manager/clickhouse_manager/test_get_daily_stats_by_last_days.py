@@ -5,9 +5,7 @@ import pytest
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat import (
-    get_daily_stats_by_last_days,
-)
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat import get_daily_stats_by_last_days
 
 
 @pytest.mark.asyncio

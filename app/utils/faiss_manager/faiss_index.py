@@ -20,9 +20,7 @@ class Index:
         batch_size,
     ):
         if not os.path.exists(file_path):
-            index = self.__create_new_index(
-                objects, vector_property_name, file_path, index_type, batch_size
-            )
+            index = self.__create_new_index(objects, vector_property_name, file_path, index_type, batch_size)
         else:
             try:
                 index: faiss.IndexIDMap = faiss.read_index(file_path)
@@ -33,15 +31,11 @@ class Index:
                 else:
                     total = len(objects)
                 if ntotal != total:
-                    index = self.__create_new_index(
-                        objects, vector_property_name, file_path, index_type, batch_size
-                    )
+                    index = self.__create_new_index(objects, vector_property_name, file_path, index_type, batch_size)
             except RuntimeError as exc:
                 logger.error(exc)
-                del e
-                index = self.__create_new_index(
-                    objects, vector_property_name, file_path, index_type, batch_size
-                )
+                del exc
+                index = self.__create_new_index(objects, vector_property_name, file_path, index_type, batch_size)
         self.index = index
         self._file_path = file_path
 

@@ -20,10 +20,7 @@ from app.modules.cabinet_bonus_manager.bonus_service import (
     subtract_bonus,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
-from app.modules.cabinet_bonus_manager.keyboards import (
-    get_confirm_keyboard,
-    get_shop_bonus_keyboard,
-)
+from app.modules.cabinet_bonus_manager.keyboards import get_confirm_keyboard, get_shop_bonus_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -54,17 +51,13 @@ class BonusScene(Scene, state="bonus_scene"):
         await state.update_data(action="menu")
 
     @on.callback_query.enter(AdminBonus.filter(F.action == "menu"))
-    async def enter_scene_from_callback(
-        self, callback: CallbackQuery, bot: Bot, state: FSMContext
-    ) -> None:
+    async def enter_scene_from_callback(self, callback: CallbackQuery, bot: Bot, state: FSMContext) -> None:
         """Вход в сцену управления бонусами через callback"""
         logger.info("Вход в сцену управления бонусами через callback")
         self.state_context = state  # Сохраняем контекст состояния
 
         await state.update_data(action="menu")
-        await bot.send_message(
-            callback.from_user.id, "Введите shop_id кабинета для управления бонусами:"
-        )
+        await bot.send_message(callback.from_user.id, "Введите shop_id кабинета для управления бонусами:")
         return
 
     async def wizard_exit(self, with_data=True) -> None:
@@ -147,13 +140,9 @@ class BonusScene(Scene, state="bonus_scene"):
             current_bonus = 0
             current_balance = 0
             if hasattr(cabinet, "calculated_bonus"):
-                current_bonus = (
-                    cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
-                )
+                current_bonus = cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
             if hasattr(cabinet, "calculated_balance"):
-                current_balance = (
-                    cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
-                )
+                current_balance = cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
 
             # Сохраняем информацию о кабинете
             await state.update_data(
@@ -276,13 +265,9 @@ class BonusScene(Scene, state="bonus_scene"):
             current_bonus = 0
             current_balance = 0
             if hasattr(cabinet, "calculated_bonus"):
-                current_bonus = (
-                    cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
-                )
+                current_bonus = cabinet.calculated_bonus if cabinet.calculated_bonus is not None else 0
             if hasattr(cabinet, "calculated_balance"):
-                current_balance = (
-                    cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
-                )
+                current_balance = cabinet.calculated_balance if cabinet.calculated_balance is not None else 0
 
             # Обновляем данные о кабинете в хранилище
             await state.update_data(
@@ -304,9 +289,7 @@ class BonusScene(Scene, state="bonus_scene"):
             )
 
     @on.callback_query(AdminBonus.filter(F.action.in_(["add", "subtract", "reset"])))
-    async def process_shop_bonus_callback(
-        self, callback: CallbackQuery, callback_data: AdminBonus, state: FSMContext
-    ):
+    async def process_shop_bonus_callback(self, callback: CallbackQuery, callback_data: AdminBonus, state: FSMContext):
         """Обработчик действий с бонусами конкретного магазина"""
         logger.info(f"Обработка callback бонусов: {callback_data.action}")
 
@@ -346,9 +329,7 @@ class BonusScene(Scene, state="bonus_scene"):
         await callback.message.edit_text("Введите shop_id кабинета для управления бонусами:")
 
     @on.callback_query(AdminBonus.filter(F.action == "confirm"))
-    async def process_confirm_callback(
-        self, callback: CallbackQuery, callback_data: AdminBonus, state: FSMContext
-    ):
+    async def process_confirm_callback(self, callback: CallbackQuery, callback_data: AdminBonus, state: FSMContext):
         """Обработчик подтверждения операции с бонусами"""
         data = await state.get_data()
         shop_id = data.get("shop_id")
@@ -366,10 +347,7 @@ class BonusScene(Scene, state="bonus_scene"):
                     callback.from_user.id,
                     description,
                 )
-                operation_text = (
-                    f"✅ Бонусы успешно добавлены в кабинет {shop_id}"
-                    f" \nСумма: {callback_data.amount} руб."
-                )
+                operation_text = f"✅ Бонусы успешно добавлены в кабинет {shop_id} \nСумма: {callback_data.amount} руб."
             elif operation == "subtract":
                 result = await subtract_bonus(
                     wb_cabinet_original_id,
@@ -377,14 +355,9 @@ class BonusScene(Scene, state="bonus_scene"):
                     callback.from_user.id,
                     description,
                 )
-                operation_text = (
-                    f"✅ Бонусы успешно списаны с кабинета {shop_id}!\n"
-                    f"Сумма: {callback_data.amount} руб."
-                )
+                operation_text = f"✅ Бонусы успешно списаны с кабинета {shop_id}!\nСумма: {callback_data.amount} руб."
             elif operation == "reset":
-                result = await reset_bonus(
-                    wb_cabinet_original_id, callback.from_user.id, description
-                )
+                result = await reset_bonus(wb_cabinet_original_id, callback.from_user.id, description)
                 operation_text = f"✅ Бонусы кабинета {shop_id} успешно обнулены!"
             else:
                 raise ValueError(f"Неизвестная операция: {operation}")
@@ -474,12 +447,8 @@ def register_bonus_scene(router: Router):
     scene_registry = SceneRegistry(router)
     scene_registry.add(BonusScene)
 
-    router.message.register(
-        BonusScene.as_handler(), Command("bonus_menu"), F.from_user.id.in_(ADMINS)
-    )
-    router.message.register(
-        BonusScene.as_handler(), Command("check_bonus"), F.from_user.id.in_(ADMINS)
-    )
+    router.message.register(BonusScene.as_handler(), Command("bonus_menu"), F.from_user.id.in_(ADMINS))
+    router.message.register(BonusScene.as_handler(), Command("check_bonus"), F.from_user.id.in_(ADMINS))
 
     # Регистрируем только один обработчик для входа через callback
     router.callback_query.register(

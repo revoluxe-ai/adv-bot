@@ -49,9 +49,7 @@ def get_minimal_bet(keyword, adv_id):
     Returns:
         float: минимальная ставка
     """
-    logger.info(
-        f"Получение минимальной ставки для ключевого слова {keyword} в рекламной кампании {adv_id}"
-    )
+    logger.info(f"Получение минимальной ставки для ключевого слова {keyword} в рекламной кампании {adv_id}")
     # Мок функции, возвращает случайное значение от 50 до 150
     return np.random.randint(50, 150)
 
@@ -68,9 +66,7 @@ def get_adv_costs(adv_setting, start_date, end_date):
     Returns:
         pd.DataFrame: DataFrame с затратами по дням
     """
-    logger.info(
-        f"Получение затрат на рекламу для кампании {adv_setting.adv_id} с {start_date} по {end_date}"
-    )
+    logger.info(f"Получение затрат на рекламу для кампании {adv_setting.adv_id} с {start_date} по {end_date}")
 
     # Создаем диапазон дат
     date_range = pd.date_range(start=start_date, end=end_date)
@@ -80,12 +76,7 @@ def get_adv_costs(adv_setting, start_date, end_date):
     for date in date_range:
         day_date = date.date()
         # Для каждого дня рассчитываем сумму затрат
-        day_sum = sum(
-            [
-                keyword.bid * np.random.randint(5, 20) / 100
-                for keyword in adv_setting.keyword_settings
-            ]
-        )
+        day_sum = sum([keyword.bid * np.random.randint(5, 20) / 100 for keyword in adv_setting.keyword_settings])
         data.append({"date": day_date, "sum": day_sum})
 
     # Создаем DataFrame

@@ -38,9 +38,7 @@ if system_name == "Linux":
     # Используем Manager для создания разделяемых между процессами словарей
     manager = Manager()
     function_connection_count = manager.dict()  # Словарь для отслеживания соединений по функциям
-    caller_function_connection_count = (
-        manager.dict()
-    )  # Словарь для отслеживания соединений по вызывающим функциям
+    caller_function_connection_count = manager.dict()  # Словарь для отслеживания соединений по вызывающим функциям
     grand_caller_function_connection_count = manager.dict()  # Словарь для отслеживания соединений
     # по функциям 3-го уровня
 
@@ -82,12 +80,8 @@ class get_clickhouse_client:
             stack = inspect.stack()
             assert stack is not None
             self.func_name = stack[1].function  # Имя текущей функции
-            self.caller_func_name = (
-                stack[2].function if len(stack) > 2 else None
-            )  # Имя вызывающей функции
-            self.grand_caller_func_name = (
-                stack[3].function if len(stack) > 3 else None
-            )  # Имя функции 3-го уровня
+            self.caller_func_name = stack[2].function if len(stack) > 2 else None  # Имя вызывающей функции
+            self.grand_caller_func_name = stack[3].function if len(stack) > 3 else None  # Имя функции 3-го уровня
 
             with connection_lock:
                 connection_count.value += 1
@@ -169,10 +163,7 @@ class get_clickhouse_client:
 
                 # Вызывающая функция
                 caller_func_name = self.caller_func_name
-                if (
-                    caller_func_name is not None
-                    and caller_func_name in caller_function_connection_count
-                ):
+                if caller_func_name is not None and caller_func_name in caller_function_connection_count:
                     caller_function_connection_count[caller_func_name] -= 1
                     logger.debug(
                         f"Caller function '{caller_func_name}'"

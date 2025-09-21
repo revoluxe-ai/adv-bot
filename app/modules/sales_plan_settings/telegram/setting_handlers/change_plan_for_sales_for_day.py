@@ -12,9 +12,7 @@ from .. import callbacks, main_callback, main_message
 router = Router()
 
 
-@router.callback_query(
-    callbacks.ChangePlanSetting.filter(F.target_point == "change-plan-for-sales-for-day")
-)
+@router.callback_query(callbacks.ChangePlanSetting.filter(F.target_point == "change-plan-for-sales-for-day"))
 async def change_plan_for_sales_for_day_handler(
     callback: CallbackQuery,
     callback_data: main_callback.SalesPlanSettingsMenu,
@@ -42,11 +40,7 @@ async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, 
     data = await state.get_data()
     adv_id: int = data["adv_id"]
 
-    stmt = (
-        update(AdvSetting)
-        .filter(AdvSetting.adv_id == adv_id)
-        .values({AdvSetting.plan_for_sales_for_day: new_value})
-    )
+    stmt = update(AdvSetting).filter(AdvSetting.adv_id == adv_id).values({AdvSetting.plan_for_sales_for_day: new_value})
     async with sm() as session:
         await session.execute(stmt)
         await session.commit()

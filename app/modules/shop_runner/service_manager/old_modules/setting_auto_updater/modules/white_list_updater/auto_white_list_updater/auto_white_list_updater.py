@@ -102,24 +102,22 @@ class WhiteListUpdateManager:
     ) -> tuple[bool, bool]:
         redis_cache = self.redis_cache
         pass_time = 60 * 15
-        if not await redis_cache.last_auto_adding_phrase_to_white_list.check_pass_time(pass_time):
+        if not await redis_cache.last_auto_adding_phrase_to_white_list.check_pass_time(
+            pass_time
+        ):
             return False, False
 
         def candidate_for_white_list_filter(keyword: CalculatedKeyword) -> bool:
             if self._adv.auto_add_only_relevant_phrase:
-                if (
+                return bool(
                     keyword.relevant
                     and keyword.hard_status == 1
                     and keyword.status == KeywordStatus.BAD
-                ):
-                    return True
-                else:
-                    return False
+                )
             else:
-                if keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD:
-                    return True
-                else:
-                    return False
+                return bool(
+                    keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD
+                )
 
         keywords_for_adding = list(filter(candidate_for_white_list_filter, keywords))
         if not keywords_for_adding:
@@ -131,7 +129,9 @@ class WhiteListUpdateManager:
         async with sm() as session:
             stmt = (
                 update(KeywordSetting)
-                .where(KeywordSetting.id == keyword_for_adding.keyword_setting_original_id)
+                .where(
+                    KeywordSetting.id == keyword_for_adding.keyword_setting_original_id
+                )
                 .values({"hard_status": 2})
             )
             await session.execute(stmt)

@@ -67,4 +67,4 @@ config_path = get_project_path('app/config/settings.json')
 
 ```bash
 python scripts/test_path.py
-``` 
+```

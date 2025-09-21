@@ -11,11 +11,9 @@ if typing.TYPE_CHECKING:
         WBToken,
         WBUserCabinet,
     )
+
 from app.payments.db.models import Payment
-from app.utils.db.assoc_tables import (
-    favorite_advs_association,
-    user_reflink_association,
-)
+from app.utils.db.assoc_tables import favorite_advs_association, user_reflink_association
 from app.utils.db.base import BaseTable
 
 
@@ -30,12 +28,8 @@ class User(BaseTable):
         "RefLink", back_populates="referrer", cascade="all, delete-orphan"
     )
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="user")
-    wb_tokens: Mapped[list["WBToken"]] = relationship(
-        "WBToken", back_populates="user", cascade="all, delete-orphan"
-    )
-    favorites_advs: Mapped[list["AdvSetting"]] = relationship(
-        "AdvSetting", secondary=favorite_advs_association
-    )
+    wb_tokens: Mapped[list["WBToken"]] = relationship("WBToken", back_populates="user", cascade="all, delete-orphan")
+    favorites_advs: Mapped[list["AdvSetting"]] = relationship("AdvSetting", secondary=favorite_advs_association)
     __table_args__ = (Index("user_telegram_id_index", user_telegram_id),)
 
 

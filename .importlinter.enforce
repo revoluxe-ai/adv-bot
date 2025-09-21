@@ -55,5 +55,3 @@ layers =
     app.core
     app.modules
     app.client_bot.user_interface
-
-

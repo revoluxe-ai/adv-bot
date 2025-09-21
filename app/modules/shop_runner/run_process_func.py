@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 import asyncio
 
 
-async def run_shop_task(
-    shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
-) -> None:
+async def run_shop_task(shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager) -> None:
     while True:
         try:
             access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
@@ -42,7 +40,7 @@ async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: Cli
         .distinct()
         .join(WBCabinet.adv_settings)
         .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active == True),
+            WBCabinet.adv_settings.any(AdvSetting.bot_active is True),
         )
     )
 
@@ -64,14 +62,12 @@ async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: Cli
                 task = active_tasks[shop_id]
                 if task.done():
                     if exc := task.exception():
-                        logger.exception(
-                            f"Не обработанная ошибка выполнения задачи магазина: {exc}"
-                        )
+                        logger.exception(f"Не обработанная ошибка выполнения задачи магазина: {exc}")
                     del active_tasks[shop_id]
 
             await asyncio.sleep(0.1)
 
-    all_shop_ids = tuple(list(active_tasks.keys()))
+    all_shop_ids = tuple(active_tasks.keys())
     for shop_id in all_shop_ids:
         if shop_id not in all_needs_for_run_shop_ids:
             task = active_tasks.pop(shop_id)

@@ -8,10 +8,7 @@ from app.client_bot.bot import get_bot
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
 from app.modules.adv_creator.backend import CardsNotFoundForShopError, MainAdvManager
-from app.modules.adv_creator.backend.exc import (
-    NotEnoughBalanceOnShopError,
-    StartComplexAdvError,
-)
+from app.modules.adv_creator.backend.exc import NotEnoughBalanceOnShopError, StartComplexAdvError
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 
 logger = logging.getLogger(__name__)
@@ -47,9 +44,7 @@ async def _create_complex_advs(
     manager = MainAdvManager(access, client_session)
     await bot.send_message(user_telegram_id, f"Создаю комплексную кампанию для артикула {nmid}")
     try:
-        auto_adv_id, search_adv_id = await manager.create_complex_advs(
-            bot, user_telegram_id, nmid, hard_mode
-        )
+        auto_adv_id, search_adv_id = await manager.create_complex_advs(bot, user_telegram_id, nmid, hard_mode)
 
         await bot.send_message(
             user_telegram_id,
@@ -66,8 +61,7 @@ async def _create_complex_advs(
     except CardsNotFoundForShopError:
         await bot.send_message(
             user_telegram_id,
-            f"Карточка с артикулом {nmid} не найдена на Wildberries,"
-            f"проверьте правильность артикула!",
+            f"Карточка с артикулом {nmid} не найдена на Wildberries,проверьте правильность артикула!",
         )
 
     except NotEnoughBalanceOnShopError as exc:

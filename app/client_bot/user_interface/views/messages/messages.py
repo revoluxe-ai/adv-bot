@@ -23,13 +23,8 @@ from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardPagination,
 )
 from app.client_bot.user_interface.views import callbacks, keyboards
-from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-    RedisCalculatedKeywordsCacheManager,
-)
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import RedisCalculatedKeywordsCacheManager
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
@@ -41,10 +36,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_update_state_manager import (
-    AdvActiveKeywordUpdateStateManager,
-    KeywordStatUpdateState,
-)
+from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager, KeywordStatUpdateState
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import RefLink, User
@@ -326,10 +318,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 date = date.replace("T03:00:00+03:00", "")
                 spend = day_stat.sum
                 orders = day_stat.orders
-                if orders:
-                    cost_per_order = spend / orders
-                else:
-                    cost_per_order = 0
+                cost_per_order = spend / orders if orders else 0
                 stat_text += f"{date} | {orders} | {round(cost_per_order, 0)} р.\n"
 
             text += stat_text
@@ -934,7 +923,7 @@ class CallMe1(TextWithKeyboard):
 Чтобы полноценно рассказать про использование бота для максимально эффективного продвижения на WB и ответить на ваши вопросы нужно в среднем 40-50 минут, поэтому обещанные 10 консультаций я смогу провести только в течении 2-3 дней.
 Прошу набраться терпения - оно того стоит!
 Если успели написать до момента отправки этого сообщения - то вы точно успели и не переживайте: дойду и до вас!
-Если не успели: осталась буквально пара мест, так что скорее напишите мне,чтобы занять место и получить тест-драйв бота!    
+Если не успели: осталась буквально пара мест, так что скорее напишите мне,чтобы занять место и получить тест-драйв бота!
 
 """
 
@@ -949,7 +938,7 @@ class WaitingForWhitePhrases(TextWithKeyboard):
     @property
     def text(self):
         return """
-Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список (фразы для продвижения).  
+Отправьте мне список фраз (через перенос) которые вы хотите добавить в белый список (фразы для продвижения).
 Например:
 
 платье женское
@@ -1141,7 +1130,7 @@ class WaitingForBlackPhrases(TextWithKeyboard):
 
 class FilterByQuery(Text):
     text = """
-    Введите минимальное число прогнозируемых показов для показа (0 - без фильтрации): 
+    Введите минимальное число прогнозируемых показов для показа (0 - без фильтрации):
     """
 
 
@@ -1192,7 +1181,7 @@ class ShowFavoriteAdvs(TextWithKeyboard):
             user = result.scalars().first()
             self.user = user
             try:
-                advs: list[AdvSetting] = user.favorites_advs
+                pass
             except:
                 await self.bot.send_message(
                     self.user_telegram_id,

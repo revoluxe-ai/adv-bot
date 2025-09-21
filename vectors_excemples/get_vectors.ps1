@@ -31,4 +31,4 @@ foreach ($key in $keywordKeys) {
     }
 }
 
-Write-Host "Done! Vectors saved to $itemVectorsFile and $keywordVectorsFile" 
+Write-Host "Done! Vectors saved to $itemVectorsFile and $keywordVectorsFile"

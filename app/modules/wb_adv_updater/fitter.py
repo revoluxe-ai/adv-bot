@@ -13,15 +13,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
 
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
 
 from ... import settings
-from ..common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from ..common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from . import data_manager
 from .data_getter import DataGetter
 from .ml_common_funcs import save_model
@@ -94,28 +90,22 @@ async def _get_df_for_fit() -> pd.DataFrame:
     logger.info("Начало получения данных для обучения")
 
     async with sm() as session:
-        stmt = select(AdvSetting).filter(AdvSetting.bot_active == True)
+        stmt = select(AdvSetting).filter(AdvSetting.bot_active is True)
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
-        nmids_in_active_adv = set([nmid for adv in adv_settings for nmid in adv.nmids])
+        nmids_in_active_adv = {nmid for adv in adv_settings for nmid in adv.nmids}
         logger.debug("Формирование подзапроса для WBCabinet")
 
         # Основной запрос
         logger.debug("Выполнение основного запроса для получения AdvSetting")
-        stmt = (
-            select(AdvSetting)
-            .options(selectinload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.bot_active == True)
-        )
+        stmt = select(AdvSetting).options(selectinload(AdvSetting.wb_cabinet)).where(AdvSetting.bot_active is True)
         result = await session.execute(stmt)
         adv_settings = result.scalars()
 
-    for n, adv in enumerate(adv_settings):
+    for _n, adv in enumerate(adv_settings):
         nmids = adv.nmids
         if len(nmids) > 1:
-            logger.debug(
-                f"Кампания {adv.adv_id} содержит более одного артикула, происходит пропуск"
-            )
+            logger.debug(f"Кампания {adv.adv_id} содержит более одного артикула, происходит пропуск")
             continue
         if len(nmids) == 0:
             logger.debug(f"Кампания {adv.adv_id} не содержит артикулов, происходит пропуск")
@@ -132,27 +122,19 @@ async def _get_df_for_fit() -> pd.DataFrame:
             logger.debug(f"Расчет средних features для кампании {adv.adv_id}")
             item_features_list = list(nmid_to_item_features.values())
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
-            avg_item_features = {
-                f"item_feature_{i}": avg_item_features[i] for i in avg_item_features.keys()
-            }
+            avg_item_features = {f"item_feature_{i}": avg_item_features[i] for i in avg_item_features}
 
-            logger.debug(
-                f"Получение статистики ключевых слов из ClickHouse для кампании {adv.adv_id}"
-            )
+            logger.debug(f"Получение статистики ключевых слов из ClickHouse для кампании {adv.adv_id}")
             try:
-                keyword_stats: list[CalculatedKeyword] = (
-                    await data_manager.get_keywords_statistic_clickhouse(adv, last_views=500)
+                keyword_stats: list[CalculatedKeyword] = await data_manager.get_keywords_statistic_clickhouse(
+                    adv, last_views=500
                 )
-                logger.debug(
-                    f"Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}"
-                )
-            except:
+                logger.debug(f"Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}")
+            except Exception:
                 logger.error("Ошибка получения ключей из Клик-хаус", exc_info=True)
                 continue
             logger.debug("Конвертация статистики ключевых слов в кластеры")
-            keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(
-                keyword_stats
-            )
+            keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
             logger.debug(f"Получено {len(keywords_stats_by_clusters)} кластеров")
 
             in_clusters = {kw.text for kw in keyword_stats}
@@ -169,9 +151,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
             logger.debug(f"Получение features для {len(keyword_stats)} ключевых слов из Redis")
             processed_keywords = 0
             for keyword_stat in keyword_stats:
-                keyword_features = await data_getter.get_keyword_features_from_redis(
-                    [keyword_stat.text]
-                )
+                keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
                 if keyword_features:
                     keyword_feature = keyword_features[0][1]
                     row = {
@@ -183,42 +163,33 @@ async def _get_df_for_fit() -> pd.DataFrame:
                         "spend": keyword_stat.spend,
                         "nmids": adv.nmids,
                         **avg_item_features,
-                        **{
-                            f"keyword_feature_{i}": keyword_feature[i]
-                            for i in range(len(keyword_feature))
-                        },
+                        **{f"keyword_feature_{i}": keyword_feature[i] for i in range(len(keyword_feature))},
                     }
                     data_rows.append(row)
                     processed_keywords += 1
 
                     if processed_keywords % 100 == 0:
-                        logger.debug(
-                            f"Обработано {processed_keywords} ключевых слов из {len(keyword_stats)}"
-                        )
+                        logger.debug(f"Обработано {processed_keywords} ключевых слов из {len(keyword_stats)}")
 
     # Преобразуем данные в DataFrame
     df = pd.DataFrame(data_rows)
     execution_time = time.time() - start_time
-    logger.info(
-        f"Завершено получение данных. Собрано {len(data_rows)} строк за {execution_time:.2f} секунд"
-    )
+    logger.info(f"Завершено получение данных. Собрано {len(data_rows)} строк за {execution_time:.2f} секунд")
     return df
 
 
 async def __fetch_keyword_features(
     keywords: list[str],
 ) -> list[tuple[str, list[float]]]:
-    result: list[tuple[str, list[float]]] = await data_getter.get_keyword_features_from_redis(
-        keywords
-    )
+    result: list[tuple[str, list[float]]] = await data_getter.get_keyword_features_from_redis(keywords)
     return result
 
 
 async def _bayesian_apply(df: pd.DataFrame):
     adv_ids = df["adv_id"].unique()
     adv_ids = adv_ids.tolist()
-    adv_id_keyword_text_to_status: dict[tuple[int, str], int] = (
-        await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
+    adv_id_keyword_text_to_status: dict[tuple[int, str], int] = await data_manager.get_adv_id_keyword_text_to_status(
+        adv_ids
     )
 
     adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(adv_ids)

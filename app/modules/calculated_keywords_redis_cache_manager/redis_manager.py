@@ -2,9 +2,7 @@ import logging
 from collections.abc import Awaitable
 
 from app.core.redis_manager import RedisManager
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +33,7 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
             result = await result
         return CalculatedKeyword.from_json(result) if result is not None else None
 
-    async def get_calculated_keywords(
-        self, keywords: list[CalculatedKeyword]
-    ) -> list[CalculatedKeyword]:
+    async def get_calculated_keywords(self, keywords: list[CalculatedKeyword]) -> list[CalculatedKeyword]:
         """
         Получение списка ключевых слов из Redis.
         """

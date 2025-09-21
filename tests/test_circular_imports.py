@@ -63,9 +63,7 @@ def run_pycycle_on_module(module_path, verbose=True):
     print(f"Выполняем: {cmd}")
 
     # Запускаем команду и перехватываем вывод
-    process = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     stdout, stderr = process.communicate()
     return process.returncode, stdout, stderr
 
@@ -115,6 +113,4 @@ def test_all_entry_points_exist():
 
     for entry_point in ENTRY_POINTS:
         file_path = project_root / entry_point
-        assert file_path.exists(), (
-            f"Точка входа '{entry_point}' не найдена по пути {file_path}"
-        )
+        assert file_path.exists(), f"Точка входа '{entry_point}' не найдена по пути {file_path}"

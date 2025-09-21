@@ -6,25 +6,18 @@ from aiohttp import ClientSession
 from sqlalchemy import and_, or_, select
 
 from app.core.wb_api.data_classes.adv import Balances
-from app.core.wb_api.mixins.excs import (
-    AdvNotFoundInWBError,
-    CardNotFoundInWB,
-    NotChangeError,
-)
+from app.core.wb_api.mixins.excs import AdvNotFoundInWBError, CardNotFoundInWB, NotChangeError
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
-from .exc import (
-    CardsNotFoundForShopError,
-    NotEnoughBalanceOnShopError,
-    StartComplexAdvError,
-)
+from .exc import CardsNotFoundForShopError, NotEnoughBalanceOnShopError, StartComplexAdvError
 from .wb_api import WBApi
 
 if TYPE_CHECKING:
     from ...common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -42,18 +35,14 @@ class MainAdvManager:
 
         return adv_adv
 
-    async def _create_auto_adv(
-        self, name: str, SubjectID: int, balance_type: int, start_status: bool
-    ) -> int:
+    async def _create_auto_adv(self, name: str, SubjectID: int, balance_type: int, start_status: bool) -> int:
         return await self.wb_api.create_auto_adv(name, SubjectID, balance_type, start_status)
 
     async def upcast_auto_adv(self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot):
-        await bot.send_message(
-            user_telegram_id, f"Пытаюсь найти и настроить Авто-РК для артикула {nmid}"
-        )
+        await bot.send_message(user_telegram_id, f"Пытаюсь найти и настроить Авто-РК для артикула {nmid}")
         start_delay = 10 * 60
         global_max_attempts = 10
-        for attempt in range(global_max_attempts):
+        for _attempt in range(global_max_attempts):
             max_attempts = 3
             for _ in range(max_attempts):
                 try:
@@ -108,18 +97,14 @@ class MainAdvManager:
                 )
                 break
 
-    async def create_complex_advs(
-        self, bot: Bot, user_telegram_id, nmid: int, hard_mode
-    ) -> tuple[int, int]:
+    async def create_complex_advs(self, bot: Bot, user_telegram_id, nmid: int, hard_mode) -> tuple[int, int]:
         exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
         if not exist_adv or hard_mode is True or exist_adv.active_status in ["refused", "done"]:
             balances = await self.wb_api.get_adv_balances()
             try:
                 target_card = await self.wb_api.get_card_by_text(nmid)
             except CardNotFoundInWB:
-                raise CardsNotFoundForShopError(
-                    f"Карточка с артикулом {nmid} не найдена на Wildberries"
-                )
+                raise CardsNotFoundForShopError(f"Карточка с артикулом {nmid} не найдена на Wildberries")
             wb_cabinet = self.access.wb_cabinet
             assert wb_cabinet is not None
             async with sm() as session:
@@ -248,17 +233,13 @@ class MainAdvManager:
                     AdvSetting.active_status.not_in(["refused", "done"]),
                     or_(
                         and_(
-                            AdvSetting.name.regexp_match(
-                                r".*<!-\[\d+]-!>.*"
-                            ),  # Проверяем первый паттерн
-                            AdvSetting.name.regexp_match(
-                                rf".*{nmid}.*"
-                            ),  # Проверяем второй паттерн
+                            AdvSetting.name.regexp_match(r".*<!-\[\d+]-!>.*"),  # Проверяем первый паттерн
+                            AdvSetting.name.regexp_match(rf".*{nmid}.*"),  # Проверяем второй паттерн
                         ),
                         # Дополнительно можно вернуть этот блок, если нужно
                         and_(
                             AdvSetting.nmids == [nmid],
-                            AdvSetting._search_adv_id != None,
+                            AdvSetting._search_adv_id is not None,
                         ),
                     ),
                 )
@@ -276,9 +257,7 @@ class MainAdvManager:
         bonus = balances.bonus
         full_balance: list[int] = [balance, net, bonus]
         logger.debug(f"Балансы: {full_balance}")
-        if sum(full_balance) >= 2000 or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2:
-            return True
-        return False
+        return bool(sum(full_balance) >= 2000 or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2)
 
     def _get_balance_type(self, balances: Balances) -> (int, str):
         is_balance_enough: bool = self._check_enough_balance(balances)

@@ -60,7 +60,7 @@ class GraphUpdater:
                             fastrp_status = await self._data_getter.get_list_progress("fastrp")
                             logger.info(f"Выполнено на {fastrp_status[0]}")
                             await asyncio.sleep(60)  # Подождите немного перед повторной попыткой
-                        except:
+                        except Exception:
                             break
                     break
                 else:
@@ -81,7 +81,7 @@ class GraphUpdater:
                     .values(nmid=nmid, vector=vector)
                     .on_conflict_do_update(
                         index_elements=["nmid"],  # Specify the column(s) that trigger a conflict
-                        set_=dict(vector=vector),  # Specify which columns to update
+                        set_={"vector": vector},  # Specify which columns to update
                     )
                 )
                 await session.execute(stmt)
@@ -109,8 +109,6 @@ class GraphUpdater:
                     await session.commit()  # Выполняем коммит
                     logger.debug("Промежуточный коммит выполнен")
 
-            if (
-                count % BATCH_SIZE != 0
-            ):  # Если после последнего коммита остались несохраненные записи
+            if count % BATCH_SIZE != 0:  # Если после последнего коммита остались несохраненные записи
                 await session.commit()  # Выполняем окончательный коммит
                 logger.debug("Вектора для ключей обновлены")

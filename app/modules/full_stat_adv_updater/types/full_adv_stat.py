@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from dataclasses import dataclass
 from datetime import date, datetime
 
 from pydantic import BaseModel, Field
@@ -98,7 +97,5 @@ class FullAdvStat(BaseModel):
     shks: int = Field(..., description="Количество заказанных товаров, шт. за все дни")
     sum_price: float = Field(..., description="Сумма заказов, ₽ за все дни")
     days: list[DayStats] = Field(..., description="Статистика по дням")
-    boosterStats: list[BoosterStats] | None = Field(
-        None, description="Информация о позициях товаров"
-    )
+    boosterStats: list[BoosterStats] | None = Field(None, description="Информация о позициях товаров")
     advertId: int = Field(..., description="ID рекламного объявления")

@@ -1,6 +1,4 @@
-from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
-    UpdateBidsInSearchAdvDTO,
-)
+from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import UpdateBidsInSearchAdvDTO
 from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
     UpdateBidForNmidTask,
     UpdateBidsSearchAdvInShopBatch,
@@ -22,7 +20,7 @@ async def dummy_keywords():
 
 def main():
     adv = DummyAdvSetting()
-    dto = UpdateBidsInSearchAdvDTO(adv, dummy_keywords())
+    UpdateBidsInSearchAdvDTO(adv, dummy_keywords())
     batch = UpdateBidsSearchAdvInShopBatch("shop1")
 
     async def dummy_bid():

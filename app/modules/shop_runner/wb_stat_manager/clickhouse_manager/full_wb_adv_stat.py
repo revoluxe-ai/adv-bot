@@ -4,11 +4,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import TypedDict
 
-from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
-from app.modules.full_stat_adv_updater.types.full_adv_stat import (
-    SmallFullAdvStat,
-    SmallFullAdvStatPerDay,
-)
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat, SmallFullAdvStat, SmallFullAdvStatPerDay
 from app.utils.click_house.client import get_clickhouse_client
 
 
@@ -79,19 +75,19 @@ async def get_daily_stats_by_last_days(
     async with get_clickhouse_client() as client:
         query = """
         WITH max_versions AS (
-            SELECT *, 
+            SELECT *,
                    ROW_NUMBER() OVER (PARTITION BY adv_id, date ORDER BY version DESC) AS row_num
             FROM default_db.full_adv_wb_stat
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
             AND adv_id IN %(adv_ids)s
         )
-        SELECT 
+        SELECT
             date,
-            SUM(views) AS views, 
-            SUM(clicks) AS clicks, 
-            SUM(spend) AS spend, 
-            SUM(added_to_cart) AS added_to_cart, 
-            SUM(orders) AS orders, 
+            SUM(views) AS views,
+            SUM(clicks) AS clicks,
+            SUM(spend) AS spend,
+            SUM(added_to_cart) AS added_to_cart,
+            SUM(orders) AS orders,
             SUM(sum_price_orders) AS sum_price_orders
         FROM max_versions
         WHERE row_num = 1
@@ -131,26 +127,24 @@ async def get_daily_stats_by_last_days(
             raise
 
 
-async def get_stats_by_last_days(
-    adv_ids: list[int], start_date: datetime, end_date: datetime
-) -> SmallFullAdvStat:
+async def get_stats_by_last_days(adv_ids: list[int], start_date: datetime, end_date: datetime) -> SmallFullAdvStat:
     end_date_str = end_date.strftime("%Y-%m-%d")
     start_date_str = start_date.strftime("%Y-%m-%d")
     async with get_clickhouse_client() as client:
         query = """
         WITH max_versions AS (
-            SELECT *, 
+            SELECT *,
                    ROW_NUMBER() OVER (PARTITION BY adv_id, date ORDER BY version DESC) AS row_num
             FROM default_db.full_adv_wb_stat
-            WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s) 
+            WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
             AND adv_id IN %(adv_ids)s
         )
-        SELECT 
-            SUM(views) AS views, 
-            SUM(clicks) AS clicks, 
-            SUM(spend) AS spend, 
-            SUM(added_to_cart) AS added_to_cart, 
-            SUM(orders) AS orders, 
+        SELECT
+            SUM(views) AS views,
+            SUM(clicks) AS clicks,
+            SUM(spend) AS spend,
+            SUM(added_to_cart) AS added_to_cart,
+            SUM(orders) AS orders,
             SUM(sum_price_orders) AS sum_price_orders
         FROM max_versions
         WHERE row_num = 1
@@ -189,9 +183,7 @@ async def get_stats_by_last_days(
                 )
             else:
                 # Если нет данных
-                return SmallFullAdvStat(
-                    views=0, clicks=0, spend=0, added_to_cart=0, orders=0, sum_price=0
-                )
+                return SmallFullAdvStat(views=0, clicks=0, spend=0, added_to_cart=0, orders=0, sum_price=0)
         except Exception:
             logger.error("Ошибка получения статистики из ClickHouse", exc_info=True)
             raise
@@ -248,16 +240,14 @@ async def insert(stats: Iterable[FullAdvStat]) -> None:
             logger.error("Ошибка вставки в кликхаус", exc_info=True)
 
 
-async def get_keywords_spend(
-    adv_ids: list[int], start_date: datetime, end_date: datetime, table_name: str
-) -> float:
+async def get_keywords_spend(adv_ids: list[int], start_date: datetime, end_date: datetime, table_name: str) -> float:
     end_date_str = end_date.strftime("%Y-%m-%d")
     start_date_str = start_date.strftime("%Y-%m-%d")
 
     async with get_clickhouse_client() as client:
         query = f"""
         WITH max_versions AS (
-            SELECT *, 
+            SELECT *,
                    ROW_NUMBER() OVER (PARTITION BY adv_id, date, text ORDER BY version DESC) AS row_num
             FROM default_db.{table_name}
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
@@ -305,16 +295,16 @@ async def get_keyword_stats_by_last_days(
     async with get_clickhouse_client() as client:
         query = """
         WITH max_versions AS (
-            SELECT *, 
+            SELECT *,
                    ROW_NUMBER() OVER (PARTITION BY adv_id, date, text ORDER BY version DESC) AS row_num
             FROM default_db.advkeyword
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
             AND adv_id IN %(adv_ids)s
         )
-        SELECT 
+        SELECT
             text as keyword,
-            SUM(views) AS views, 
-            SUM(clicks) AS clicks, 
+            SUM(views) AS views,
+            SUM(clicks) AS clicks,
             SUM(spend) AS spend
         FROM max_versions
         WHERE row_num = 1

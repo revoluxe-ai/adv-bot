@@ -21,18 +21,14 @@ def client_session_mock():
 
 
 @pytest.mark.asyncio
-async def test_create_complex_advs(
-    access_mock, adv_setting_mock, bot_mock, client_session_mock
-):
+async def test_create_complex_advs(access_mock, adv_setting_mock, bot_mock, client_session_mock):
     user_telegram_id = 122334
     nmid = 112333
 
     with (
         patch("app.modules.adv_creator.backend.main_manager.WBApi") as WBAPI_mock,
     ):
-        MainAdvManager.get_adv_setting_by_nmid = AsyncMock(
-            return_value=adv_setting_mock
-        )
+        MainAdvManager.get_adv_setting_by_nmid = AsyncMock(return_value=adv_setting_mock)
         MainAdvManager.start_complex_advs = AsyncMock()
         manager = MainAdvManager(access_mock, client_session_mock)
 
@@ -42,8 +38,6 @@ async def test_create_complex_advs(
         adv_from_wb_mock_1 = MagicMock(spec=Adv)
         adv_from_wb_mock_2 = MagicMock(spec=Adv)
 
-        WBAPI_mock.get_advs = AsyncMock(
-            return_value=[adv_from_wb_mock_1, adv_from_wb_mock_2]
-        )
+        WBAPI_mock.get_advs = AsyncMock(return_value=[adv_from_wb_mock_1, adv_from_wb_mock_2])
         manager.get_adv_setting_by_nmid = AsyncMock(return_value=adv_setting_mock)
         await manager.create_complex_advs(bot_mock, user_telegram_id, nmid, None)

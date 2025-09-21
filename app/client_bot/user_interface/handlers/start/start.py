@@ -15,22 +15,13 @@ from app.client_bot import const
 from app.client_bot.redis_manager import RedisManager
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.shop_choice_message import ShopChoice
-from app.client_bot.user_interface.handlers.start_registration_func import (
-    start_registration,
-)
+from app.client_bot.user_interface.handlers.start_registration_func import start_registration
 from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.callbacks import Action
 from app.core.wb_api.exceptions import ApiForbiddenError, NotValidTokenError
-from app.modules.common_slaves.wildberries import (
-    models as wb_models,
-    super_cabinet_manager,
-)
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    WBCabinet,
-    WBToken,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries import models as wb_models
+from app.modules.common_slaves.wildberries import super_cabinet_manager
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBToken, WBUserCabinet
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.shop_menu.message import ShopMenu
@@ -48,9 +39,7 @@ router = Router()
 redis_manager = RedisManager()
 
 
-async def callback_start_registration(
-    callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
-) -> None:
+async def callback_start_registration(callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext) -> None:
     await state.clear()
     async with sm() as session:
         user_id = callback.from_user.id
@@ -70,9 +59,7 @@ async def callback_start_registration(
 
 
 @router.callback_query(callbacks.ShopNew.filter())
-async def add_shop(
-    callback_query: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext
-) -> None:
+async def add_shop(callback_query: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext) -> None:
     await bot.send_message(callback_query.message.chat.id, "Добавление нового магазина (кабинета)")
     await state.set_state(states.CabinetRegistration.cabinet_name)
     chat_id: int = callback_query.message.chat.id
@@ -159,9 +146,7 @@ async def process_cabinet_api(
         return
     async with sm() as session:
         # Получаем ID пользователя
-        stmt_for_select_user_id: Select = select(User.id).where(
-            User.user_telegram_id == user_telegram_id
-        )
+        stmt_for_select_user_id: Select = select(User.id).where(User.user_telegram_id == user_telegram_id)
         result = await session.execute(stmt_for_select_user_id)
         user_id = result.scalar()
         if user_id is None:
@@ -210,24 +195,18 @@ async def process_cabinet_api(
             )
             result = await session.execute(stmt_for_select_user_id)
             wb_user_cabinet: WBUserCabinet | None = result.scalar_one_or_none()
-            stmt_for_adv_setting = select(AdvSetting).where(
-                AdvSetting.wb_cabinet_id == wb_cabinet.id
-            )
+            stmt_for_adv_setting = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
             result = await session.execute(stmt_for_adv_setting)
             adv_settings = result.scalars().all()
             if not wb_user_cabinet:
-                wb_user_cabinet = WBUserCabinet(
-                    name=cabinet_name, user_id=user_id, wb_cabinet=wb_cabinet
-                )
+                wb_user_cabinet = WBUserCabinet(name=cabinet_name, user_id=user_id, wb_cabinet=wb_cabinet)
                 session.add(wb_user_cabinet)
                 await session.flush()
                 await session.commit()
             wb_user_cabinet_original_id = wb_user_cabinet.id
             adv_settings = list(adv_settings)
             await session.commit()
-            await messages.AdvCompanyChoicing(
-                bot, chat_id, wb_user_cabinet_original_id, adv_settings, state
-            )()
+            await messages.AdvCompanyChoicing(bot, chat_id, wb_user_cabinet_original_id, adv_settings, state)()
             return
         else:
             # Если нет вб - кабинета, то Создаем новый кабинет и привязку к пользователю
@@ -256,9 +235,7 @@ async def process_cabinet_api(
         # Показываем список кабинетов пользователя
         async with sm() as session:
             stmt_for_wb_user_cabinet = (
-                select(WBUserCabinet)
-                .join(WBUserCabinet.user)
-                .where(User.user_telegram_id == user_telegram_id)
+                select(WBUserCabinet).join(WBUserCabinet.user).where(User.user_telegram_id == user_telegram_id)
             )
             result = await session.execute(stmt_for_wb_user_cabinet)
             wb_user_cabinets: list[WBUserCabinet] = result.scalars().all()
@@ -314,9 +291,7 @@ async def select_shop(
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
 
-    await messages.AdvCompanyChoicing(
-        bot, chat_id, wb_user_cabinet_original_id, adv_settings, state
-    )()
+    await messages.AdvCompanyChoicing(bot, chat_id, wb_user_cabinet_original_id, adv_settings, state)()
     return
 
 
@@ -327,9 +302,7 @@ async def shop_menu_process(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-    await state.update_data(
-        last_wb_user_cabinet_original_id=callback_data.wb_user_cabinet_original_id
-    )
+    await state.update_data(last_wb_user_cabinet_original_id=callback_data.wb_user_cabinet_original_id)
     logger.debug("Текущее состояние: %s", await state.get_data())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await ShopMenu(bot, callback.message.chat.id, state, wb_user_cabinet_original_id)()
@@ -365,16 +338,13 @@ async def update_company_from_wb(
     timeout_min = settings.SHOP_UPDATE_TIMEOUT_MINUTES
     timeout_sec = timeout_min * 60
     try:
-        await bot.send_message(
-            chat_id, "Начинаю обновление РК, процесс может занять длительное время."
-        )
+        await bot.send_message(chat_id, "Начинаю обновление РК, процесс может занять длительное время.")
         try:
             await asyncio.wait_for(shop_updater.update_advs_data(), timeout=timeout_sec)
         except ApiForbiddenError:
             await bot.send_message(
                 chat_id,
-                "Нет прав для доступа в РК, обновите токен,"
-                " в случае проблем обратитесь в поддержку -> ",
+                "Нет прав для доступа в РК, обновите токен, в случае проблем обратитесь в поддержку -> ",
             )
             return
         except TimeoutError:
@@ -386,18 +356,14 @@ async def update_company_from_wb(
 
         await bot.send_message(
             chat_id,
-            "Загрузка кампаний завершена."
-            " Начинаю обновление карточек,"
-            " процесс может занять длительное время.",
+            "Загрузка кампаний завершена. Начинаю обновление карточек, процесс может занять длительное время.",
         )
         try:
             await asyncio.wait_for(shop_updater.update_cards_data(), timeout=timeout_sec)
         except ApiForbiddenError:
             await bot.send_message(
                 chat_id,
-                "Нет прав для доступа в РК,"
-                " обновите токен,"
-                " в случае проблем обратитесь в поддержку -> ",
+                "Нет прав для доступа в РК, обновите токен, в случае проблем обратитесь в поддержку -> ",
             )
             return
         except TimeoutError:

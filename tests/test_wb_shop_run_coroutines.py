@@ -41,7 +41,7 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
         # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
         async def mock_gather(*args, **kwargs):
             # Создаем задачи для каждой корутины, но не запускаем их
-            return [arg for arg in args]
+            return list(args)
 
         # Применяем наш мок-метод
         with patch("asyncio.gather", side_effect=mock_gather):
@@ -106,9 +106,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
             call_args = mock_gather.call_args[0]
 
             # Проверяем, что gather был вызван с 9 аргументами (8 корутин + _alive_worker_run)
-            assert len(call_args) == 9, (
-                f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
-            )
+            assert len(call_args) == 9, f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
 
             # Проверяем, что все методы были вызваны по одному разу
             coroutines_manager_mock.parsing_keywords_run.assert_called_once()

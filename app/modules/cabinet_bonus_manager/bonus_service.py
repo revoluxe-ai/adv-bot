@@ -33,9 +33,7 @@ async def get_cabinet_by_id(cabinet_id: int) -> WBCabinet:
         return result.scalar_one_or_none()
 
 
-async def add_bonus(
-    wb_cabinet_original_id: int, amount: float, admin_user_id: int, description: str
-) -> bool:
+async def add_bonus(wb_cabinet_original_id: int, amount: float, admin_user_id: int, description: str) -> bool:
     """
     Пополнить бонусы кабинета по ID
 
@@ -74,9 +72,7 @@ async def add_bonus(
             raise
 
 
-async def subtract_bonus(
-    cabinet_id: int, amount: float, admin_user_id: int, description: str | None = None
-) -> bool:
+async def subtract_bonus(cabinet_id: int, amount: float, admin_user_id: int, description: str | None = None) -> bool:
     """
     Снять бонусы с кабинета по ID
 

@@ -49,9 +49,7 @@ async def create_new_adv(
     balance, bonus = await balance_service.get_cabinet_balance(wb_cabinet_id)
     sum_bot_balance = balance + bonus
     if sum_bot_balance <= 0:
-        await messages.NotEnoughMoneyMessage(bot, callback.from_user.id)(
-            wb_user_cabinet_original_id
-        )
+        await messages.NotEnoughMoneyMessage(bot, callback.from_user.id)(wb_user_cabinet_original_id)
         return
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(states.waiting_for_get_nmid)
@@ -96,13 +94,9 @@ async def get_nmid(message: Message, state: FSMContext, bot: Bot):
     redis_task_pool = await create_pool(arq_redis_settings)
     for nmid in nmid_list:
         try:
-            await redis_task_pool.enqueue_job(
-                "create_complex_advs", nmid, shop_id, False, message.from_user.id
-            )
+            await redis_task_pool.enqueue_job("create_complex_advs", nmid, shop_id, False, message.from_user.id)
             logger.debug(f"Задача для артикула {nmid} успешно поставлена")
         except Exception as e:
             logger.error(f"Ошибка постановки задачи для артикула {nmid}: {e}")
             raise e
-    await bot.send_message(
-        message.from_user.id, "Задачи на создание рекламы добавлены в очередь. Ждите."
-    )
+    await bot.send_message(message.from_user.id, "Задачи на создание рекламы добавлены в очередь. Ждите.")

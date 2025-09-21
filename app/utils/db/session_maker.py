@@ -81,9 +81,7 @@ def get_alchemy_row(read_only):
     else:
         host = settings.postgres_replica_host
     # Для asyncpg используем ssl вместо sslmode
-    row_connector = (
-        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
-    )
+    row_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     # if ssl_mode:
     #     row_connector += f'?sslmode={ssl_mode}'
     # row_connector += f'&target_session_attrs={target_session}'
@@ -99,18 +97,12 @@ def get_alchemy_row_for_migration():
     postgres_user = settings.postgres_user
     host = settings.postgres_master_host
     # Для asyncpg используем ssl вместо sslmode
-    db_connector = (
-        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
-    )
+    db_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     return db_connector
 
 
-read_only_db_connector = get_alchemy_row(read_only=True).replace(
-    "postgresql://", "postgresql+asyncpg://"
-)
-read_write_db_connector = get_alchemy_row(read_only=False).replace(
-    "postgresql://", "postgresql+asyncpg://"
-)
+read_only_db_connector = get_alchemy_row(read_only=True).replace("postgresql://", "postgresql+asyncpg://")
+read_write_db_connector = get_alchemy_row(read_only=False).replace("postgresql://", "postgresql+asyncpg://")
 
 read_only_engine = create_async_engine(
     read_only_db_connector,
@@ -163,14 +155,10 @@ async def get_async_session_maker(
                 finally:
                     hold_time = time() - session_start
                     if hold_time > 1.0:
-                        logger.warning(
-                            f"Session held for too long: {hold_time:.2f}s by task {current_task.get_name()}"
-                        )
+                        logger.warning(f"Session held for too long: {hold_time:.2f}s by task {current_task.get_name()}")
     except Exception as e:
         logger.error(
-            f"Session error after {time() - session_start:.3f}s:\n"
-            f"Task: {current_task.get_name()}\n"
-            f"Error: {str(e)}",
+            f"Session error after {time() - session_start:.3f}s:\nTask: {current_task.get_name()}\nError: {str(e)}",
             exc_info=True,
         )
         raise

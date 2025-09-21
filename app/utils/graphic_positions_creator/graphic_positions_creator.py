@@ -19,9 +19,7 @@ from app.utils.graphic_positions_creator.classes import CommonKeyword
 
 
 async def get_common_keywords_with_positions(nmid) -> list[CommonKeyword] | None:
-    positions: list[WBItemPosition] = await data_manager.get_keyword_positions_from_click_house(
-        nmid
-    )
+    positions: list[WBItemPosition] = await data_manager.get_keyword_positions_from_click_house(nmid)
     common_keywords = []
     if positions:
         text_to_positions = defaultdict(list)
@@ -36,9 +34,7 @@ async def get_common_keywords_with_positions(nmid) -> list[CommonKeyword] | None
     return common_keywords
 
 
-async def get_keyword_history_graphic(
-    adv_original_id, keywords
-) -> tuple[BytesIO, BytesIO | None] | None:
+async def get_keyword_history_graphic(adv_original_id, keywords) -> tuple[BytesIO, BytesIO | None] | None:
     async with sm() as session:
         stmt = select(AdvSetting.nmids).filter(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
@@ -123,7 +119,7 @@ async def get_keyword_history_graphic(
                 plt.close()
                 # Создание отдельной легенды
                 plt.figure(figsize=(10, 6))
-                for name, group in df.groupby("Ключи"):
+                for name, _group in df.groupby("Ключи"):
                     plt.plot([], [], label=name)
                 plt.legend()
                 plt.axis("off")
@@ -134,9 +130,7 @@ async def get_keyword_history_graphic(
                 return image_stream, legend_stream
 
             loop = asyncio.get_event_loop()
-            image_stream, legend_stream = await loop.run_in_executor(
-                None, get_graphic_and_legend, plt, df, title_text
-            )
+            image_stream, legend_stream = await loop.run_in_executor(None, get_graphic_and_legend, plt, df, title_text)
             return image_stream, legend_stream
         else:
 

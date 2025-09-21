@@ -48,7 +48,7 @@ class UserHandlersWithRetry:
     @with_db_retry(max_retries=3, retry_delay=0.5)
     async def start_registration(message, bot, state):
         return await start_registration(message, bot, state)
-    
+
     # Другие обработчики с ретраями
 ```
 
@@ -122,4 +122,4 @@ async def handle_user_request(user_id: int):
    - Сбор метрик о повторных попытках
 
 3. **Предупреждение пользователей:**
-   - При большом количестве повторных попыток информировать пользователя о возможных задержках 
+   - При большом количестве повторных попыток информировать пользователя о возможных задержках

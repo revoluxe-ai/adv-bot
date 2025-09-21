@@ -26,11 +26,7 @@ async def add_to_favorites(
     adv_original_id = callback_data.adv_setting_original_id
     user_telegram_id = callback.from_user.id
     async with sm(read_only=False) as session:
-        stmt = (
-            select(User)
-            .options(joinedload(User.favorites_advs))
-            .where(User.user_telegram_id == user_telegram_id)
-        )
+        stmt = select(User).options(joinedload(User.favorites_advs)).where(User.user_telegram_id == user_telegram_id)
         user = await session.execute(stmt)
         user = user.scalar()
         adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
@@ -50,11 +46,7 @@ async def remove_from_favorites(
     adv_original_id = callback_data.adv_setting_original_id
     user_telegram_id = callback.from_user.id
     async with sm(read_only=False) as session:
-        stmt = (
-            select(User)
-            .options(joinedload(User.favorites_advs))
-            .where(User.user_telegram_id == user_telegram_id)
-        )
+        stmt = select(User).options(joinedload(User.favorites_advs)).where(User.user_telegram_id == user_telegram_id)
         user = await session.execute(stmt)
         user = user.scalar()
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)

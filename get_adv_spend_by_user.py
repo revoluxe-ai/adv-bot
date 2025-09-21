@@ -3,13 +3,7 @@ from collections import defaultdict
 
 from sqlalchemy import and_, select
 
-from app.modules.common_slaves.wildberries.models import (
-    AdvKeyword,
-    AdvSetting,
-    WBCabinet,
-    WBToken,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models import AdvKeyword, AdvSetting, WBCabinet, WBToken, WBUserCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker, get_session_maker
 
@@ -33,8 +27,8 @@ def get_adv_spend_by_user():
             .where(
                 and_(
                     # User.wb_tokens.any(WBToken.active == True),
-                    AdvSetting.bot_active == True,
-                    WBCabinet.active == True,
+                    AdvSetting.bot_active is True,
+                    WBCabinet.active is True,
                     AdvSetting.active_status == "started",
                     AdvKeyword.date == datetime.datetime.now().date(),
                 )
@@ -45,18 +39,12 @@ def get_adv_spend_by_user():
         result = session.execute(stmt)  # Используйте execute для выполнения запроса
         counter = 0
         for row in result:
-            stmt = (
-                select(WBToken)
-                .join(WBToken.user)
-                .where(and_(User.username == row.username, WBToken.active == True))
-            )
+            stmt = select(WBToken).join(WBToken.user).where(and_(User.username == row.username, WBToken.active is True))
             result = session.execute(stmt)
             tokens = result.scalar()
             if tokens:
                 counter += 1
-                print(
-                    f" {counter} Username: https://t.me/{row.username}, Total Spend: {row.total_spend}"
-                )
+                print(f" {counter} Username: https://t.me/{row.username}, Total Spend: {row.total_spend}")
 
 
 if __name__ == "__main__":

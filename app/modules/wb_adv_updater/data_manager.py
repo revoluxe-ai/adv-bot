@@ -10,24 +10,17 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import aiogram
-from PIL import Image
 from aiogram.utils import deep_linking
+from PIL import Image
 from sqlalchemy import Float, and_, case, cast, distinct, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import aliased, load_only, selectinload, subqueryload
 from sqlalchemy.sql.functions import coalesce
 
-from app.exc import (
-    CardNotFoundInDB,
-)
-from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
-    RedisCalculatedKeywordsCacheManager,
-)
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
+from app.exc import CardNotFoundInDB
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import RedisCalculatedKeywordsCacheManager
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
     AdvKeyword,
@@ -513,10 +506,7 @@ def __set_predict_ctr(
         if not original_predict_ctr:
             original_predict_ctr = keyword_stat.predict_ctr
         logger.debug(f"Обрабатываю ключевое слово {keyword_stat.text}")
-        if min_ctr == 0:
-            enough_views = 100
-        else:
-            enough_views = int(1 / min_ctr)
+        enough_views = 100 if min_ctr == 0 else int(1 / min_ctr)
         keyword_stat.enough_views = enough_views
         views = keyword_stat.views
         clicks = keyword_stat.clicks
@@ -640,7 +630,6 @@ async def get_good_bad_phrases_for_min_ctr(
     except Exception as e:
         logger.error(f"Ошибка при получении cpm {e}", exc_info=True)
         cpm_now = None
-    new_statuses = []
 
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
@@ -656,7 +645,7 @@ async def get_good_bad_phrases_for_min_ctr(
             continue
         original_hard_status: int = int(keyword_setting.hard_status)
         keyword_stat.hard_status = original_hard_status
-        original_predict_ctr = text_to_predict_ctr.get(text, None)
+        original_predict_ctr = text_to_predict_ctr.get(text)
         keyword_stat.original_predict_ctr = original_predict_ctr
 
     keyword_stats: list[CalculatedKeyword] = __set_predict_ctr(keyword_stats, min_ctr, adv_setting)
@@ -782,8 +771,8 @@ async def get_good_bad_phrases_for_min_ctr(
 async def get_wb_category(adv_setting: AdvSetting) -> WBCategory | None:
     try:
         nmid = adv_setting.nmids[0]
-    except:
-        raise NotItemsInAdvSetting("У кампании в базе нет товаров")
+    except Exception as e:
+        raise NotItemsInAdvSetting("У кампании в базе нет товаров") from e
     async with _sm() as session:
         smtp = select(WBCard).where(WBCard.nmid == int(nmid)).options(selectinload(WBCard.wb_category))
         result = await session.execute(smtp)
@@ -1210,7 +1199,7 @@ async def clear_cards_in_db(nmids: list[int]):
 async def get_keywords_from_clickhouse(adv_id: int) -> list[str]:
     query = f"""
 SELECT DISTINCT text
-FROM default_db.advkeyword 
+FROM default_db.advkeyword
 WHERE adv_id = {adv_id}
 """
     async with get_clickhouse_client() as client:
@@ -1222,14 +1211,14 @@ WHERE adv_id = {adv_id}
 async def get_nmids_for_keyword_text(text: str) -> set[int]:
     query = """
     SELECT DISTINCT adv_id
-    FROM default_db.advkeyword 
+    FROM default_db.advkeyword
     WHERE text = %(text)s
     """
     params = {"text": text}
     async with get_clickhouse_client() as client:
         result = await client.query(query, parameters=params)
         nmids = result.result_rows
-    return set([nmid[0] for nmid in nmids if nmid])
+    return {nmid[0] for nmid in nmids if nmid}
 
 
 async def get_need_nmids_for_parsing(text, adv_id, adv_ids):
@@ -1413,7 +1402,7 @@ async def get_active_search_advs() -> list[AdvSetting]:
     stmt = select(AdvSetting).where(
         # Проверяем, что name содержит паттерн <!-[цифры]-!>
         AdvSetting.name.op("~")(pattern),
-        AdvSetting.bot_active == True,
+        AdvSetting.bot_active is True,
         AdvSetting.active_status == "started",
     )
     async with _sm() as session:
@@ -1443,7 +1432,7 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
         select(AdvSetting)
         .distinct()
         .join(AdvSetting.wb_cabinet)
-        .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active == True)
+        .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active is True)
         .options(load_only(AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id))
     )
     async with _sm() as session:
@@ -1491,7 +1480,7 @@ async def _get_down_scale_white_list_bust_wb_item_position(adv) -> int | None:
         white_phrases = result.scalars().all()
     positions: dict[str, WBItemPosition] = await get_keywords_positions_dict_by_text(adv, white_phrases)
     if positions:
-        positions = [position for position in positions.values()]
+        positions = list(positions.values())
         positions = [position for position in positions if position.position]
         if positions:
             position: WBItemPosition = sorted(positions, key=lambda x: x.position, reverse=True)[0]
@@ -1514,7 +1503,7 @@ async def is_adv_in_favorites(adv_setting_original_id: int, user_original_id: in
 
 async def set_worst_promo_position(adv_settings: list[AdvSetting]):
     for adv in adv_settings:
-        if not adv.bot_active or not adv.active_status == "started":
+        if not adv.bot_active or adv.active_status != "started":
             adv.worst_promo_position = None
             continue
         position: int = await _get_down_scale_white_list_bust_wb_item_position(adv)
@@ -1535,11 +1524,11 @@ from datetime import datetime
 
 async def get_avg_base_positions(nmid: int, start_date: str, end_date: str):
     query = """
-    SELECT toDate(timestamp) as date, 
+    SELECT toDate(timestamp) as date,
        text,
        AVG(base_position) as avg_base_position
 FROM default_db.wbitemposition
-WHERE nmid = %(nmid)s 
+WHERE nmid = %(nmid)s
   AND timestamp >= toDateTime(%(start_date)s)
   AND timestamp <= toDateTime(%(end_date)s)
 GROUP BY date, text
@@ -1637,14 +1626,14 @@ async def get_last_full_stat_update(adv_id: int):
 
 async def get_all_keywords_from_ch(last_days=7) -> set[str]:
     ch_query = """
-    SELECT DISTINCT text FROM default_db.advkeyword 
+    SELECT DISTINCT text FROM default_db.advkeyword
     WHERE date >= today() - %(last_days)s
     """
 
     async with get_clickhouse_client() as client:
         result = await client.query(ch_query, parameters={"last_days": last_days})
         keywords = result.result_rows
-    return set([keyword[0] for keyword in keywords if keyword])
+    return {keyword[0] for keyword in keywords if keyword}
 
 
 async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(shop_id: str):
@@ -1657,8 +1646,8 @@ async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(shop_id: str):
 
 
 async def get_cpm(auto_adv: AdvSetting, keywords):
-    nmid = auto_adv.nmids[0]
-    texts = [kw.text for kw in keywords]
+    auto_adv.nmids[0]
+    [kw.text for kw in keywords]
 
     # CPM из парсинга больше недоступен, используем только настройки кампаний
     # Проверяем, есть ли CPM из аукциона

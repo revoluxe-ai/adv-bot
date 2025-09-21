@@ -184,10 +184,7 @@ class WBToken(BaseTable):
         try:
             assert self.api_key
             result = jwt.decode(self.api_key, options={"verify_signature": False})
-            if result:
-                return True
-            else:
-                return False
+            return bool(result)
         except (ValueError, DecodeError):
             return False
 

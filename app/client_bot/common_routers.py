@@ -1,22 +1,12 @@
 from aiogram import Router
 
-from app.modules.adv_creator.telegram.handlers.main_handler import (
-    router as adv_creator_router,
-)
+from app.modules.adv_creator.telegram.handlers.main_handler import router as adv_creator_router
 from app.modules.bidder_auto_mode import router as BidderAutoModeRouter
-from app.modules.bidder_step_setting.telegram_handler import (
-    router as bidder_step_setting_router,
-)
-from app.modules.manual_phrase_positions_update import (
-    manual_update_phrase_position_router,
-)
-from app.modules.predict_ctr_exponent_settings import (
-    ChangeExponentSettinginAdvSettingRouter,
-)
+from app.modules.bidder_step_setting.telegram_handler import router as bidder_step_setting_router
+from app.modules.manual_phrase_positions_update import manual_update_phrase_position_router
+from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingRouter
 from app.modules.sales_plan_settings import SalesPlanSettingsMenuRouter
-from app.modules.shop_runner.auction_boost_mode_settings import (
-    AuctionBoostModeSettingsRouter,
-)
+from app.modules.shop_runner.auction_boost_mode_settings import AuctionBoostModeSettingsRouter
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
     auto_updater_target_place_setting_router,
 )

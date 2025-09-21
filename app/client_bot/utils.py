@@ -6,10 +6,7 @@ from io import StringIO
 from sqlalchemy import and_, select
 
 from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import RefLink, User
@@ -105,9 +102,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             elif keyword.position == 0:
                 first_position = ">i"
             else:
-                first_position = (
-                    "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
-                )
+                first_position = "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
         rows.append(
             [
                 keyword.text,
@@ -137,9 +132,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
 
 
 async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink | None:
-    stmt = select(RefLink).where(
-        and_(RefLink.name == ref_link_name, RefLink.referrer_id == user_telegram_id)
-    )
+    stmt = select(RefLink).where(and_(RefLink.name == ref_link_name, RefLink.referrer_id == user_telegram_id))
     async with _sm(read_only=False) as session:
         result_ref_link = await session.execute(stmt)
         ref_link = result_ref_link.scalar_one_or_none()

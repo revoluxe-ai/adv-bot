@@ -105,16 +105,12 @@ class AdvertApi(ABC_WB_API):
         url = "https://advert-api.wildberries.ru/adv/v0/cpm"
         data = {"advertId": search_adv_id, "type": 9, "cpm": cpm}
 
-        response = await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
+        response = await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         if response == "":
             logger.debug(f"CPM для поисковой кампании {search_adv_id} установлен")
             return
         else:
-            logger.error(
-                f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}"
-            )
+            logger.error(f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}")
 
     @try_except_decorator(1, 1)
     async def set_search_keywords(self, search_adv_id, texts):
@@ -182,9 +178,7 @@ class AdvertApi(ABC_WB_API):
                 full_stats.extend(part_stats)
         return full_stats
 
-    async def get_full_adv_stat_for_date(
-        self, adv_ids: list[int], date: datetime.date
-    ) -> list[FullAdvStat]:
+    async def get_full_adv_stat_for_date(self, adv_ids: list[int], date: datetime.date) -> list[FullAdvStat]:
         full_stats = await self.get_adv_full_state(adv_ids, [date])
         return full_stats
 
@@ -196,7 +190,9 @@ class AdvertApi(ABC_WB_API):
         date_now_msk = datetime.datetime.now(moscow_tz)
         date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
-        url = f"https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}"
+        url = (
+            f"https://advert-api.wildberries.ru/adv/v0/stats/keywords?advert_id={adv_id}&from={date_from}&to={date_to}"
+        )
 
         response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
@@ -273,9 +269,7 @@ class AdvertApi(ABC_WB_API):
         advs = []
         url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
 
-        response_text = await requests(
-            self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
-        )
+        response_text = await requests(self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart)
         answer = json.loads(response_text)
         for advert in answer:
             adv: Adv | None = adv_fabric.get_adv_data_class(advert)
@@ -430,9 +424,7 @@ class ContentApi(BaseAPI, ContentMixin):
             }
         )
 
-        response = await requests(
-            self.session, "POST", url=url, data=data, headers=self.headers.standart
-        )
+        response = await requests(self.session, "POST", url=url, data=data, headers=self.headers.standart)
         return json.loads(response)
 
 

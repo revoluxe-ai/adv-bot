@@ -35,9 +35,7 @@ def find_project_root(marker_filename="project_root.marker"):
             return current_path
         new_path = os.path.abspath(os.path.join(current_path, ".."))
         if new_path == current_path:
-            raise FileNotFoundError(
-                f"Marker file '{marker_filename}' not found in any parent directory"
-            )
+            raise FileNotFoundError(f"Marker file '{marker_filename}' not found in any parent directory")
         current_path = new_path
 
 

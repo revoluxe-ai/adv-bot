@@ -10,9 +10,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 class NotEnoughMoneyMessage(TextWithKeyboard):
     async def __call__(self, wb_user_cabinet_original_id: int, *args, **kwargs):
-        stmt = select(WBUserCabinet.wb_cabinet_id).where(
-            WBUserCabinet.id == wb_user_cabinet_original_id
-        )
+        stmt = select(WBUserCabinet.wb_cabinet_id).where(WBUserCabinet.id == wb_user_cabinet_original_id)
         async with sm() as session:
             wb_cabinet_original_id = await session.execute(stmt)
             wb_cabinet_original_id = wb_cabinet_original_id.scalar()
@@ -28,9 +26,7 @@ class NotEnoughMoneyMessage(TextWithKeyboard):
         builder = InlineKeyboardBuilder()
         button = InlineKeyboardButton(
             text="Пополнить баланс",
-            callback_data=callbacks.AddBalance(
-                wb_cabinet_original_id=self.__wb_cabinet_original_id
-            ).pack(),
+            callback_data=callbacks.AddBalance(wb_cabinet_original_id=self.__wb_cabinet_original_id).pack(),
         )
 
         builder.row(button)

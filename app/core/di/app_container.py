@@ -3,9 +3,8 @@
 __all__ = ("AppContainer",)
 from dependency_injector import containers, providers
 
-from . import databases
 from ...configs import AppConfig
-
+from . import databases
 
 # from neo4j import AsyncDriver
 

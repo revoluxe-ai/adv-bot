@@ -20,9 +20,7 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
             if len(text) > 1 and text[1].isdigit():
                 referral_link_id = int(text[1])
                 stmt = (
-                    select(RefLink)
-                    .options(selectinload(RefLink.referred_users))
-                    .where(RefLink.id == referral_link_id)
+                    select(RefLink).options(selectinload(RefLink.referred_users)).where(RefLink.id == referral_link_id)
                 )
                 referral_link = (await session.execute(stmt)).scalar()
 

@@ -17,9 +17,7 @@ class RedisManager(BaseRedis):
     @staticmethod
     def _is_legacy_format(data: str) -> bool:
         """Проверяет, является ли строка старым CSV-форматом."""
-        return not data.startswith("[") and not data.startswith(
-            "{"
-        )  # не JSON-массив и не JSON-объект
+        return not data.startswith("[") and not data.startswith("{")  # не JSON-массив и не JSON-объект
 
     async def set_black_phrases(self, black_phrases: list[str]) -> None:
         """Сохраняет фразы в новом JSON-формате."""

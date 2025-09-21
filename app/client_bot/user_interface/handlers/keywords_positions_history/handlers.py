@@ -10,9 +10,7 @@ from app.client_bot.user_interface.views.messages.positions_graphic_messanges.po
     KeywordGraphicPart_1,
     KeywordGraphicPart_2,
 )
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.graphic_positions_creator import get_keyword_history_graphic

@@ -148,9 +148,7 @@ class CalculatedKeyword(BaseModel):
     @classmethod
     def from_json(cls, json_str: str) -> "CalculatedKeyword":
         data = json.loads(json_str)
-        data["position_update"] = (
-            validate_datetime(data["position_update"]) if data["position_update"] else None
-        )
+        data["position_update"] = validate_datetime(data["position_update"]) if data["position_update"] else None
         # Backward compatibility
         # 1) Map real_position -> position if no position
         if "position" not in data and "real_position" in data:

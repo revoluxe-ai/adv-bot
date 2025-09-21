@@ -8,11 +8,7 @@ from app.modules.balance_manager.exceptions import (
     PaymentNotFoundError,
     UserNotFoundError,
 )
-from app.modules.common_slaves.wildberries.models import (
-    WBBalancePayment,
-    WBBonusPayment,
-    WBCabinet,
-)
+from app.modules.common_slaves.wildberries.models import WBBalancePayment, WBBonusPayment, WBCabinet
 from app.utils.db.models import Payment, User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -20,9 +16,7 @@ from app.utils.db.session_maker import get_async_session_maker
 sm = get_async_session_maker
 
 
-async def add_balance(
-    user_id: int, cabinet_id: int, amount: float, description: str | None = None
-) -> WBBalancePayment:
+async def add_balance(user_id: int, cabinet_id: int, amount: float, description: str | None = None) -> WBBalancePayment:
     """
     Создает запись о пополнении баланса
 
@@ -73,9 +67,7 @@ async def add_balance(
         return payment
 
 
-async def add_bonus(
-    user_id: int, cabinet_id: int, amount: float, description: str | None = None
-) -> WBBonusPayment:
+async def add_bonus(user_id: int, cabinet_id: int, amount: float, description: str | None = None) -> WBBonusPayment:
     """
     Создает запись о начислении бонусов
 

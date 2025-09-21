@@ -4,9 +4,7 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
-from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
-    CommonCardStat,
-)
+from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import CommonCardStat
 
 
 class CommonStatDataManager:
@@ -15,14 +13,10 @@ class CommonStatDataManager:
         nmid = adv_setting.nmids[0]
         common_card_stat = await common_stat_manager.get_stats_by_days(nmid, last_days)
         text_stat = "\n\nСтатистика по дням:\n"
-        text_stat += await self._get_days_static_text(
-            adv_setting, concatenate_stat, common_card_stat
-        )
+        text_stat += await self._get_days_static_text(adv_setting, concatenate_stat, common_card_stat)
         return text_stat
 
-    async def get_concatinated_stats(
-        self, adv_setting: AdvSetting, last_days: int
-    ) -> list[SmallFullAdvStatPerDay]:
+    async def get_concatinated_stats(self, adv_setting: AdvSetting, last_days: int) -> list[SmallFullAdvStatPerDay]:
         """
         Получает статистику по РК и объединяет их в один список
         :param adv_setting: Настройки РК
@@ -35,13 +29,9 @@ class CommonStatDataManager:
         end_date = datetime.datetime.now()
         start_date = end_date - datetime.timedelta(days=last_days)
 
-        auto_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            [auto_adv_id], start_date, end_date
-        )
+        auto_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days([auto_adv_id], start_date, end_date)
 
-        auction_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            [auction_adv_id], start_date, end_date
-        )
+        auction_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days([auction_adv_id], start_date, end_date)
 
         concatenated_result = full_wb_adv_stat.concatenate_stats(auto_adv_stat, auction_adv_stat)
 
@@ -63,9 +53,7 @@ class CommonStatDataManager:
             str: Текст статистики по дням
         """
 
-        date_to_common_stat: dict[datetime.date, CommonCardStat] = {
-            cs.date: cs for cs in common_card_stats
-        }
+        date_to_common_stat: dict[datetime.date, CommonCardStat] = {cs.date: cs for cs in common_card_stats}
 
         text = ""
         today_date = datetime.datetime.now().date()

@@ -56,9 +56,7 @@ def get_parse_url(text: str, page: int) -> str:
 
 
 class ParserService:
-    async def parse_keywords_from_wb(
-        self, text: str, page: int, total_pages: TotalPages
-    ) -> list[WBItemPosition]:
+    async def parse_keywords_from_wb(self, text: str, page: int, total_pages: TotalPages) -> list[WBItemPosition]:
         first_place = page * 100 - 99
         try:
             data = await self.__parse_keywords_from_wb(text, page)
@@ -127,7 +125,9 @@ class ParserService:
         return positions
 
     @staticmethod
-    async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
+    async def __parse_keywords_from_wb(
+        text: str, page: int
+    ) -> tuple[
         list[dict] | None,
         str | None,
         int | None,
@@ -271,9 +271,7 @@ async def _add_wb_positions(text: str, need_nmids: set[int], delay, page_limit=6
     stop_event = asyncio.Event()
     catch_any_position = asyncio.Event()
     checked_pages: set[int] = set()
-    parsing_pages_queue: list[int] = await parsing_queue_manager.get_parsing_queue(
-        text, need_nmids, 60
-    )
+    parsing_pages_queue: list[int] = await parsing_queue_manager.get_parsing_queue(text, need_nmids, 60)
     for page in parsing_pages_queue:
         if page not in total_pages.all_pages_list:
             continue

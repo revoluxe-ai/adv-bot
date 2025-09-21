@@ -1,7 +1,4 @@
-from app.client_bot.user_interface.message_templates import (
-    TextWithImage,
-    TextWithKeyboardAndImage,
-)
+from app.client_bot.user_interface.message_templates import TextWithImage, TextWithKeyboardAndImage
 from app.client_bot.user_interface.views import keyboards
 
 

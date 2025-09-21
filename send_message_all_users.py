@@ -8,10 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.admin_bot.sender import redis_manager
 from app.client_bot import single_messages
 from app.client_bot.bot import bot
-from app.modules.common_slaves.wildberries.models.models import (
-    AdvSetting,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models.models import AdvSetting, WBUserCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from get_clients_to_file import get_total_spend
@@ -25,9 +22,7 @@ test_users_ids = [373435337, 707068503]
 
 
 async def get_users():
-    stmt = select(User).options(
-        selectinload(User.wb_user_cabinets).selectinload(WBUserCabinet.wb_cabinet)
-    )
+    stmt = select(User).options(selectinload(User.wb_user_cabinets).selectinload(WBUserCabinet.wb_cabinet))
     async with sm() as session:
         users = await session.stream(stmt)
         async for user in users.scalars().yield_per(10):
@@ -60,10 +55,8 @@ async def get_users():
 
                 total_advs += len(advs)
                 active_advs_with_bot += len([adv for adv in advs if adv.bot_active])
-            shop_ids = "; ".join(
-                [wb_user_cabinet.wb_cabinet.shop_id for wb_user_cabinet in wb_user_cabinets]
-            )
-            total_money = total_bonus + total_balance
+            "; ".join([wb_user_cabinet.wb_cabinet.shop_id for wb_user_cabinet in wb_user_cabinets])
+            total_bonus + total_balance
             # if  not  wb_user_cabinets:
             yield user
             # continue
@@ -103,7 +96,6 @@ async def send_message_to_users():
                 continue
 
         try:
-            wb_user_cabinets = user.wb_user_cabinets
             await message(bot, user_id)()
             await redis_manager.set_message_send(hash, user_id)
             send_count += 1

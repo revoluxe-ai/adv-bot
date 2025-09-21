@@ -6,10 +6,7 @@ from aiohttp import ClientSession
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.api.api import WBApi
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
@@ -118,7 +115,7 @@ async def _set_keyword_phrases_for_search_advs(adv_settinds, client_session) -> 
     for task in tasks:
         try:
             await task
-        except:
+        except Exception:
             logger.error("Ошибка установки фраз для поисковых РК", exc_info=True)
 
 
@@ -148,14 +145,14 @@ async def _set_keyword_phrases_for_search_advs(adv_settinds, client_session) -> 
 # TODO: Легаси, на удаление
 
 
-async def update_search_advs_module_run():
-    while True:
-        try:
-            adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
-            await asyncio.gather(
-                _set_keyword_phrases_for_search_advs(adv_settinds, client_session),
-            )
-        except:
-            logger.error("Ошибка обновления статистики по ключам для поисковых РК", exc_info=True)
-        finally:
-            await asyncio.sleep(0)
+# async def update_search_advs_module_run():
+#     while True:
+#         try:
+#             adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
+#             await asyncio.gather(
+#                 _set_keyword_phrases_for_search_advs(adv_settinds, client_session),
+#             )
+#         except:
+#             logger.error("Ошибка обновления статистики по ключам для поисковых РК", exc_info=True)
+#         finally:
+#             await asyncio.sleep(0)

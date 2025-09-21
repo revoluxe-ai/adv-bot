@@ -17,23 +17,17 @@ def get_shop_bonus_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup
         [
             InlineKeyboardButton(
                 text="➕ Добавить",
-                callback_data=AdminBonus(
-                    action="add", wb_cabinet_original_id=wb_cabinet_original_id
-                ).pack(),
+                callback_data=AdminBonus(action="add", wb_cabinet_original_id=wb_cabinet_original_id).pack(),
             ),
             InlineKeyboardButton(
                 text="➖ Снять",
-                callback_data=AdminBonus(
-                    action="subtract", wb_cabinet_original_id=wb_cabinet_original_id
-                ).pack(),
+                callback_data=AdminBonus(action="subtract", wb_cabinet_original_id=wb_cabinet_original_id).pack(),
             ),
         ],
         [
             InlineKeyboardButton(
                 text="🔄 Обнулить",
-                callback_data=AdminBonus(
-                    action="reset", wb_cabinet_original_id=wb_cabinet_original_id
-                ).pack(),
+                callback_data=AdminBonus(action="reset", wb_cabinet_original_id=wb_cabinet_original_id).pack(),
             )
         ],
         [InlineKeyboardButton(text="🔙 Назад", callback_data=AdminBonus(action="menu").pack())],
@@ -66,9 +60,7 @@ def get_confirm_keyboard(
                     operation=operation,
                 ).pack(),
             ),
-            InlineKeyboardButton(
-                text="❌ Отмена", callback_data=AdminBonus(action="cancel").pack()
-            ),
+            InlineKeyboardButton(text="❌ Отмена", callback_data=AdminBonus(action="cancel").pack()),
         ]
     ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)

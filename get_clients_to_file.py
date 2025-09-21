@@ -7,12 +7,7 @@ import aiofiles
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    User,
-    WBCabinet,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, User, WBCabinet, WBUserCabinet
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -52,9 +47,7 @@ async def get_clients_to_file():
 
         file = "users.csv"
         async with aiofiles.open(file, "w") as f:
-            await f.write(
-                "id, username, shop_ids, total_spend,total_advs,active_advs_with_bot,total_balance\n"
-            )
+            await f.write("id, username, shop_ids, total_spend,total_advs,active_advs_with_bot,total_balance\n")
 
             for user in users:
                 total_spend = 0
@@ -80,9 +73,7 @@ async def get_clients_to_file():
                         total_balance += wb_cabinet.balance or 0
                         total_bonus += wb_cabinet.bonus or 0
 
-                        stmt = select(AdvSetting.adv_id).where(
-                            AdvSetting.wb_cabinet_id == wb_cabinet.id
-                        )
+                        stmt = select(AdvSetting.adv_id).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
 
                         adv_ids = await session.execute(stmt)
                         adv_ids = adv_ids.scalars().all()
@@ -101,9 +92,7 @@ async def get_clients_to_file():
 
                         total_advs += len(advs)
                         active_advs_with_bot += len([adv for adv in advs if adv.bot_active])
-                    shop_ids = "; ".join(
-                        [wb_user_cabinet.wb_cabinet.shop_id for wb_user_cabinet in wb_user_cabinets]
-                    )
+                    shop_ids = "; ".join([wb_user_cabinet.wb_cabinet.shop_id for wb_user_cabinet in wb_user_cabinets])
                     row = (
                         f"{user.id},"
                         f"@{username},"

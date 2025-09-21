@@ -7,9 +7,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 class TelegramUserMixin:
     @staticmethod
-    async def get_telegram_user_model(
-        user_telegram_id: int, load_only_options: list | None = None
-    ) -> User:
+    async def get_telegram_user_model(user_telegram_id: int, load_only_options: list | None = None) -> User:
         stmt = select(User).filter(User.user_telegram_id == user_telegram_id)
 
         # Если load_only передан, добавляем его в запрос

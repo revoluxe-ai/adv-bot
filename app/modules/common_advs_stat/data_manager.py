@@ -3,16 +3,12 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
-from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
-    CommonCardStat,
-)
+from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import CommonCardStat
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -75,8 +71,7 @@ class CommonAdvsStatDataManager:
 
         # Общий расход
         full_spend_for_all_advs = (
-            full_adv_stat_for_last_days_for_auto_adv.spend
-            + full_adv_stat_for_last_days_for_auction.spend
+            full_adv_stat_for_last_days_for_auto_adv.spend + full_adv_stat_for_last_days_for_auction.spend
         )
 
         # Общая статистика
@@ -87,8 +82,7 @@ class CommonAdvsStatDataManager:
         # Рассчитываем дополнительные метрики
         base_common_orders = None
         all_orders_from_advs = (
-            full_adv_stat_for_last_days_for_auto_adv.orders
-            + full_adv_stat_for_last_days_for_auction.orders
+            full_adv_stat_for_last_days_for_auto_adv.orders + full_adv_stat_for_last_days_for_auction.orders
         )
         mean_orders_for_days = None
         mean_price_for_order = None
@@ -114,9 +108,7 @@ class CommonAdvsStatDataManager:
             [adv_setting.adv_id], start_date, end_date, "advkeyword"
         )
 
-        addition_spend_in_adv = (
-            full_adv_stat_for_last_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
-        )
+        addition_spend_in_adv = full_adv_stat_for_last_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
 
         return CommonAdvsStatData(
             adv_setting=adv_setting,

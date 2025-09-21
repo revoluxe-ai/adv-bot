@@ -1,10 +1,7 @@
 import asyncio
 import logging
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager, search_advs_manager
@@ -25,9 +22,7 @@ class DataSetter:
         self._wb_api = wb_api
         self._client_session = wb_api.client_session
 
-    async def _update_minus_keywords_in_adv(
-        self, adv_setting: AdvSetting, keywords: list[CalculatedKeyword]
-    ) -> None:
+    async def _update_minus_keywords_in_adv(self, adv_setting: AdvSetting, keywords: list[CalculatedKeyword]) -> None:
         logger.debug(f"Обновляю минус слова для {adv_setting.name}")
         logger.debug(f"Получил ключи для {adv_setting.name}")
         bad_keywords = []

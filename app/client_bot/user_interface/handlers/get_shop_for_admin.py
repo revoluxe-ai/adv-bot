@@ -9,11 +9,7 @@ from sqlalchemy.future import select
 
 from app.client_bot import const
 from app.client_bot.user_interface.views import messages
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    WBCabinet,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
 from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -22,9 +18,7 @@ router = Router()
 
 logger = logging.getLogger(__name__)
 
-UUID_REGEX = re.compile(
-    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-)
+UUID_REGEX = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
 class AdminsGetShopFilter(BaseFilter):
@@ -81,9 +75,7 @@ class AdminsGetAdvByIdFilter(BaseFilter):
 async def getting_shop_for_admin(message: types.Message, bot: Bot, state: FSMContext) -> None:
     text = message.text.strip()
     async with sm() as session:
-        stmt = (
-            select(WBUserCabinet.id).join(WBUserCabinet.wb_cabinet).where(WBCabinet.shop_id == text)
-        )
+        stmt = select(WBUserCabinet.id).join(WBUserCabinet.wb_cabinet).where(WBCabinet.shop_id == text)
         wb_user_cabinet_original_id = await session.execute(stmt)
         wb_user_cabinet_original_id = wb_user_cabinet_original_id.scalar()
     await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)

@@ -5,10 +5,7 @@ import pytest
 from app.modules.shop_runner.modules.wb_api import WBApi
 
 from .service_manager.manager import CoroutinesManager
-from .service_manager.old_modules.setting_auto_updater.data_classes import (
-    FactData,
-    PlanData,
-)
+from .service_manager.old_modules.setting_auto_updater.data_classes import FactData, PlanData
 
 
 @pytest.fixture
@@ -19,9 +16,7 @@ def client_session_mock():
 
 
 @pytest.mark.asyncio
-async def test_adv_settings_auto_update(
-    access_mock, adv_setting_mock, keywords_mocks, client_session_mock
-):
+async def test_adv_settings_auto_update(access_mock, adv_setting_mock, keywords_mocks, client_session_mock):
     wb_api = WBApi(access_mock, client_session_mock)
 
     data_manager_mock = MagicMock()

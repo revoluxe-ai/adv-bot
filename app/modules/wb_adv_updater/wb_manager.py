@@ -73,7 +73,7 @@ async def process_payment_for_advs() -> None:
                 joinedload(AdvSetting.wb_cabinet).selectinload(WBCabinet.bonus_payments),
             )
             .where(
-                AdvSetting.bot_active == True,
+                AdvSetting.bot_active is True,
             )
         )
         result = await session.execute(stmt)
@@ -311,11 +311,12 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     texts_for_adv_setting = {keyword.text for keyword in full_stat_keywords}
     clusters = set()
     for text_for_adv in texts_for_adv_setting:
-        try:
-            cluster_name, _ = await redis_manager.get_cluster_and_preset(text_for_adv)
-        except:
+        result = await redis_manager.get_cluster_and_preset(text_for_adv)
+        if not result:
             logger.error("Не удалось получить кластер")
             cluster_name = None
+        else:
+            cluster_name, _ = result
 
         if cluster_name:
             clusters.add(cluster_name)

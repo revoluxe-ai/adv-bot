@@ -1,14 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import (
-    Column,
-    Date,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    UniqueConstraint,
-)
+from sqlalchemy import Column, Date, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -48,6 +40,4 @@ class AdvPayment(BaseTable):
     adv_setting: Mapped[list["AdvSetting"]] = relationship("AdvSetting", back_populates="payments")
     type = mapped_column(String, nullable=True)
     amount: Mapped[float] = mapped_column(Float, nullable=True, default=None)
-    __table_args__ = (
-        UniqueConstraint("date", "adv_setting_id", "type", name="uix_date_adv_setting_id_type"),
-    )
+    __table_args__ = (UniqueConstraint("date", "adv_setting_id", "type", name="uix_date_adv_setting_id_type"),)

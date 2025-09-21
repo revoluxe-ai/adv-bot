@@ -55,15 +55,11 @@ class WbShop(interfaces.ShopInterface):
 
     @property
     def min_ctr(self):
-        return round(
-            float(self._load_settings().get("min_ctr", 100)), 2
-        )  # Указан 0 в качестве значения по умолчанию
+        return round(float(self._load_settings().get("min_ctr", 100)), 2)  # Указан 0 в качестве значения по умолчанию
 
     @property
     def kn_for_ml(self):
-        return int(
-            self._load_settings().get("kn_for_ml", 1)
-        )  # Указан 0 в качестве значения по умолчанию
+        return int(self._load_settings().get("kn_for_ml", 1))  # Указан 0 в качестве значения по умолчанию
 
     def __repr__(self):
         return self.name

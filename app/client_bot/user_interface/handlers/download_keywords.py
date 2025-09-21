@@ -8,9 +8,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery
 from sqlalchemy.future import select
 
 from app.client_bot import utils
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
 
 from ..views import callbacks
@@ -41,9 +39,7 @@ async def setting_keywords_active_keywords(
     csv_string: str = await utils.get_csv_file(adv_setting)
 
     # Создание временного файла для CSV
-    with tempfile.NamedTemporaryFile(
-        mode="w+", delete=False, suffix=".csv", encoding="utf-8"
-    ) as temp_file:
+    with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".csv", encoding="utf-8") as temp_file:
         temp_file.write(csv_string)
         temp_file.flush()  # Сбрасываем буфер на диск
         temp_file.seek(0)  # Перемещаем указатель в начало файла

@@ -14,10 +14,7 @@ from app.client_bot import const
 from app.client_bot.const import EMAIL_FOR_PAYMENT_RECEIPT
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks
-from app.modules.balance_manager.balance_service import (
-    get_cabinet_balance,
-    process_payment_with_bonus,
-)
+from app.modules.balance_manager.balance_service import get_cabinet_balance, process_payment_with_bonus
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.modules.shop_menu.message import ShopMenu
 from app.payments.db.models import Payment
@@ -51,9 +48,7 @@ async def add_balance(
             [
                 types.InlineKeyboardButton(
                     text="Подтвердить✅",
-                    callback_data=callbacks.ConfirmAddBalance(
-                        wb_cabinet_original_id=wb_cabinet_original_id
-                    ).pack(),
+                    callback_data=callbacks.ConfirmAddBalance(wb_cabinet_original_id=wb_cabinet_original_id).pack(),
                 )
             ]
         ]
@@ -163,16 +158,12 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
 
 
 @router.pre_checkout_query()
-async def pre_checkout_query_handler(
-    pre_checkout_query: types.PreCheckoutQuery, bot: aiogram.Bot
-) -> None:
+async def pre_checkout_query_handler(pre_checkout_query: types.PreCheckoutQuery, bot: aiogram.Bot) -> None:
     await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
 
 @router.message(aiogram.F.successful_payment)
-async def successful_payment_handler(
-    message: types.Message, state: FSMContext, bot: aiogram.Bot
-) -> None:
+async def successful_payment_handler(message: types.Message, state: FSMContext, bot: aiogram.Bot) -> None:
     successful_payment = message.successful_payment
     assert successful_payment is not None
     cost = successful_payment.total_amount / 100
@@ -207,11 +198,7 @@ async def successful_payment_handler(
 
     # Переходим к меню магазина
     async with sm() as session:
-        stmt = (
-            select(WBUserCabinet.id)
-            .join(WBUserCabinet.wb_cabinet)
-            .where(WBCabinet.id == wb_cabinet_original_id)
-        )
+        stmt = select(WBUserCabinet.id).join(WBUserCabinet.wb_cabinet).where(WBCabinet.id == wb_cabinet_original_id)
         wb_user_cabinet_id_result = await session.execute(stmt)
         wb_user_cabinet_id = wb_user_cabinet_id_result.scalars.first()
 

@@ -30,9 +30,7 @@ class CheckRighter:
         from app.modules.common_slaves.wildberries.ABC_WB_API import Headers
 
         self.headers = Headers(token)
-        check_tasks = [
-            self.ping_rights(entry_point, session) for entry_point in self.check_entry_points
-        ]
+        check_tasks = [self.ping_rights(entry_point, session) for entry_point in self.check_entry_points]
         try:
             await asyncio.gather(*check_tasks)
         except ApiForbiddenError as e:

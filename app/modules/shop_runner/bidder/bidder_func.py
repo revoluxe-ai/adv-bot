@@ -14,9 +14,7 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from ...common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from ..bidder.wb_api import WBApi as BidderAPI
 from ..modules.wb_api import WBApi
 
@@ -45,9 +43,7 @@ async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: BidderAPI) -> set[int] 
     return {adv.cpm for adv in advs}
 
 
-async def run_bidder_process_for_adv(
-    adv_setting: AdvSetting, wb_api: WBApi, keywords: list[CalculatedKeyword]
-) -> None:
+async def run_bidder_process_for_adv(adv_setting: AdvSetting, wb_api: WBApi, keywords: list[CalculatedKeyword]) -> None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
     try:
@@ -126,9 +122,7 @@ async def run_bidder_process_for_adv(
     if new_cpm >= max_cpm and adv_setting.reset_place:
         async with sm(read_only=False) as session:
             assert adv_setting
-            adv_setting_for_update: AdvSetting | None = await session.get(
-                AdvSetting, adv_setting.id
-            )
+            adv_setting_for_update: AdvSetting | None = await session.get(AdvSetting, adv_setting.id)
             if adv_setting_for_update is None:
                 logger.error(f"[{shop_id}] [{adv_id}] Настройки РК не найдены")
                 raise Exception("Настройки РК не найдены")

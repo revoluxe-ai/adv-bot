@@ -10,7 +10,7 @@
 
 ### 2. Признаки проблемного кода:
 - Много закомментированного кода
-- Импорты несуществующих модулей/функций  
+- Импорты несуществующих модулей/функций
 - Неиспользуемые переменные (F841 в ruff)
 - Функции без типов (mypy warnings)
 - Циклические импорты (import-linter violations)
@@ -54,7 +54,7 @@ grep_code "NonExistentClass"  # если не найдено - удалить т
 
 ### Неиспользуемые переменные:
 ```python
-# Проблема: 
+# Проблема:
 with patch("func") as mock_func:  # F841: assigned but never used
     result = call_function()
 
@@ -69,7 +69,7 @@ with patch("func"):
 # module_a.py
 from module_b import function_b
 
-# module_b.py  
+# module_b.py
 from module_a import function_a
 
 # Решение: вынести общие части в отдельный модуль
@@ -79,7 +79,7 @@ from module_a import function_a
 
 ### Pre-commit хуки:
 - black (форматирование)
-- ruff (линтинг) 
+- ruff (линтинг)
 - mypy (типы)
 - import-linter (архитектура)
 

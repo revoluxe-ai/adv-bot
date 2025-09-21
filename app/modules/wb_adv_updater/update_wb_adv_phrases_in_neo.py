@@ -45,7 +45,7 @@ async def update_wb_adv_phrases_in_neo():
         stmt = (
             select(AdvSetting)
             .options(load_only(AdvSetting.name, AdvSetting._search_adv_id, AdvSetting.adv_id))
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active is True)
         )
         result_for_advs = await session.execute(stmt)
         advs: Sequence[AdvSetting] = result_for_advs.scalars().all()
@@ -57,9 +57,7 @@ async def update_wb_adv_phrases_in_neo():
                 all_adv_ids.add(search_adv_id)
 
     async with get_clickhouse_client() as ch_client:
-        query = (
-            f"SELECT DISTINCT text FROM default_db.advkeyword WHERE adv_id IN {list(all_adv_ids)}"
-        )
+        query = f"SELECT DISTINCT text FROM default_db.advkeyword WHERE adv_id IN {list(all_adv_ids)}"
         result = await ch_client.query(query)
         texts = [text[0] for text in result.result_rows]
         clear_texts = set()

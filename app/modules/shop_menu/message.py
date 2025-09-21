@@ -20,12 +20,7 @@ from app.client_bot.user_interface.views.callbacks import (
     TurnWhiteListUpdate,
 )
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    WBCabinet,
-    WBToken,
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBToken, WBUserCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
@@ -82,7 +77,7 @@ class ShopMenu(TextWithKeyboard):
                         selectinload(WBUserCabinet.user),
                         # Предзагружаем активные рекламные кампании
                         selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                            WBCabinet.adv_settings.and_(AdvSetting.bot_active == True)
+                            WBCabinet.adv_settings.and_(AdvSetting.bot_active is True)
                         ),
                     )
                     .where(WBUserCabinet.id == self._wb_user_cabinet_original_id)

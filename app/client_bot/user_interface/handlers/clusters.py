@@ -29,9 +29,7 @@ async def turn_clusters_on(
     data = await state.get_data()
 
     async with sm(read_only=False) as session:
-        adv_setting = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-        )
+        adv_setting = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_setting_id))
         adv_setting: AdvSetting = adv_setting.scalar()
         adv_setting.clusters_mode = True
         await session.commit()
@@ -56,9 +54,7 @@ async def turn_clusters_off(
     data = await state.get_data()
 
     async with sm(read_only=False) as session:
-        adv_setting = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-        )
+        adv_setting = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_setting_id))
         adv_setting: AdvSetting = adv_setting.scalar()
         adv_setting.clusters_mode = False
         await session.commit()

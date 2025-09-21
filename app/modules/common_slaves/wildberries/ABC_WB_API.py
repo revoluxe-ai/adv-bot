@@ -91,9 +91,7 @@ class ABC_WB_API(WbRequestApiMixin):
 
         all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[method_name]
 
-        free_tokens = [
-            token for token in self._free_tokens if token.id not in all_bad_token_original_ids
-        ]
+        free_tokens = [token for token in self._free_tokens if token.id not in all_bad_token_original_ids]
 
         if free_tokens:
             self._current_token = free_tokens[0]
@@ -101,9 +99,7 @@ class ABC_WB_API(WbRequestApiMixin):
         else:
             wb_cabinet: WBCabinet | None = self.access.wb_cabinet
             if wb_cabinet is None:
-                raise ApiForbiddenError(
-                    "Нет WBCabinet для деактивации, метод set_next_token не может быть использован"
-                )
+                raise ApiForbiddenError("Нет WBCabinet для деактивации, метод set_next_token не может быть использован")
 
             try:
                 async with sm(read_only=False) as session:
@@ -117,6 +113,4 @@ class ABC_WB_API(WbRequestApiMixin):
                     exc_info=True,
                 )
                 raise e
-            raise ApiForbiddenError(
-                "Нет свободных токенов", wb_user_cabinet=self.access.wb_user_cabinet
-            )
+            raise ApiForbiddenError("Нет свободных токенов", wb_user_cabinet=self.access.wb_user_cabinet)

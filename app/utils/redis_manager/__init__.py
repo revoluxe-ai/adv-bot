@@ -22,9 +22,7 @@ from urllib.parse import quote, unquote
 import redis
 
 from app import settings
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
 from app.modules.keywords_query import keywords_query
 
@@ -102,9 +100,7 @@ async def get_token_rights(hash_token):
 
 
 async def set_check_last_24_hours(adv_original_id: int) -> None:
-    await redis_master_client.set(
-        "check_adv_last_24_hours:" + str(adv_original_id), "True", ex=60 * 60 * 24
-    )
+    await redis_master_client.set("check_adv_last_24_hours:" + str(adv_original_id), "True", ex=60 * 60 * 24)
 
 
 async def check_last_24_hours(adv_original_id: int) -> typing.Any:
@@ -137,10 +133,7 @@ async def get_auto_block_status(keywordsetting_original_id: int) -> bool:
         return False
     else:
         answer = int(answer)
-    if answer == 0:
-        auto_block_status = False
-    else:
-        auto_block_status = True
+    auto_block_status = answer != 0
     return auto_block_status
 
 
@@ -163,9 +156,7 @@ async def set_keyword_statistics(
     await redis_master_client.set(key, json_data, ex=cache_timeout)
 
 
-async def get_keyword_statistics(
-    adv_setting: AdvSetting, pass_time: int | None
-) -> list[CalculatedKeyword] | None:
+async def get_keyword_statistics(adv_setting: AdvSetting, pass_time: int | None) -> list[CalculatedKeyword] | None:
     if not pass_time:
         pass_time = 0
     key = "adv_keyword_statistics:" + str(adv_setting.id) + ":" + str(pass_time)
@@ -253,9 +244,7 @@ async def get_keywords_positions(adv_setting, texts):
 async def set_position_to_out_index(position):
     position_out_index = WBItemPosition()
     position_out_index.position = 0
-    position_out_index.keyword_text = (
-        position.keyword_text if hasattr(position, "keyword_text") else None
-    )
+    position_out_index.keyword_text = position.keyword_text if hasattr(position, "keyword_text") else None
     position_out_index.adv_id = position.adv_id
     position_out_index.nmid = position.nmid
     await add_positions_to_redis([position_out_index])
@@ -373,7 +362,7 @@ async def get_keyword_features_from_redis(
     keys = [f"keyword_vector:{keyword}" for keyword in keywords]
 
     # Получаем все вектора сразу с помощью MGET
-    vectors_bytes = await redis_replica_client.mget(*keys)
+    await redis_replica_client.mget(*keys)
     result = []
     for keyword in keywords:
         key = f"keyword_vector:{keyword}"
@@ -413,9 +402,7 @@ async def get_nmid_vectors(nmids_batch: list[int]) -> list[tuple[int, list[float
 async def check_phrase_in_neo(hash_text):
     key = "phrase_in_neo:" + str(hash_text)
     answer = await redis_replica_client.get(key)
-    if answer is None:
-        return False
-    return True
+    return answer is not None
 
 
 async def add_phrase_hash_like_is_in_neo(hash_text):
@@ -534,7 +521,7 @@ async def get_cluster_and_preset(
     data = value.split(":")
     try:
         cluster, preset = data
-    except:
+    except ValueError:
         logger.error("Ошибка распаковки данных о кластере и пресете")
         return None, None
     return cluster, preset
@@ -706,7 +693,7 @@ async def get_last_users_use_time(user_telegram_ids: list[int]) -> list[float]:
     keys = ["last_user_use_time:" + str(user_telegram_id) for user_telegram_id in user_telegram_ids]
     values = await redis_replica_client.mget(keys)
     results = []
-    for user_telegram_id, value in zip(user_telegram_ids, values, strict=False):
+    for _user_telegram_id, value in zip(user_telegram_ids, values, strict=False):
         if value is None:
             results.append(None)
         else:

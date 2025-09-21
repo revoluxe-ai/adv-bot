@@ -19,7 +19,7 @@ class ApiException(Exception):
         self._server_code = server_response_code
 
     def __str__(self):
-        return f"""Код ответа: {self._server_code}, тело ответа: {self._message}, 
+        return f"""Код ответа: {self._server_code}, тело ответа: {self._message},
                метод: {self._method}
                 """
 
@@ -68,9 +68,7 @@ class CachedRequests:
         cache_path = self._get_cache_path(method, url, serialized_data)
         timestamp_path = self._get_timestamp_path(url)
 
-        if self._is_cache_valid(cache_path, expire_after) and self._is_time_sleep_valid(
-            timestamp_path, time_sleep
-        ):
+        if self._is_cache_valid(cache_path, expire_after) and self._is_time_sleep_valid(timestamp_path, time_sleep):
             with open(cache_path, "rb") as cache_file:
                 response_data = pickle.load(cache_file)
         else:
@@ -84,14 +82,14 @@ class CachedRequests:
                     return None
                 try:
                     response_data = response.json()
-                except JSONDecodeError:
+                except JSONDecodeError as e:
                     raise ApiException(
                         f"Ошибка парсинга json. "
                         f"text ответа: {response.text},"
                         f"пауза между запросами: {round(time_sleep, 2)} сек.",
                         url.split("?")[0],
                         response.status_code,
-                    )
+                    ) from e
                 if isinstance(response_data, dict):
                     if response_data.get("code") == 429:
                         logger.error(f"Много запросов, пауза, {time_sleep}")

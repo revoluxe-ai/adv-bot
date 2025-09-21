@@ -12,19 +12,9 @@ from sqlalchemy.orm import selectinload
 
 from app.client_bot import const, utils
 from app.client_bot.user_interface import states
-from app.client_bot.user_interface.handlers.start_registration_func import (
-    start_registration,
-)
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
-    WBCabinet,
-    WBUserCabinet,
-)
+from app.client_bot.user_interface.handlers.start_registration_func import start_registration
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBCabinet, WBUserCabinet
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils import redis_manager

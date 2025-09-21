@@ -10,10 +10,7 @@ class PassTimeRedisCacheBase(ABC, RedisCacheMixinsProtocol):
         if not timestamp:
             return True
         now = datetime.datetime.now()
-        if timestamp + datetime.timedelta(seconds=pass_time_sec) <= now:
-            return True
-        else:
-            return False
+        return timestamp + datetime.timedelta(seconds=pass_time_sec) <= now
 
     async def set(self) -> None:
         now = datetime.datetime.now()

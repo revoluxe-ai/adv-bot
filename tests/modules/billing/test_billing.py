@@ -176,7 +176,8 @@ async def test_process_payment_for_advs_success_bonus(
 
     # Мокируем get_active_cabinets_with_data
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -238,7 +239,8 @@ async def test_process_payment_for_advs_success_balance(
 
     # Мокируем get_active_cabinets_with_data
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -299,7 +301,8 @@ async def test_process_payment_for_advs_insufficient_funds(
 
     # Мокируем get_active_cabinets_with_data
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -345,7 +348,8 @@ async def test_process_payment_for_advs_no_active_cabinets(mock_sm, mock_pricer,
     mock_sm.return_value.__aexit__.return_value = False
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = []  # Нет активных кабинетов
 
@@ -377,7 +381,8 @@ async def test_process_payment_for_advs_cabinet_already_processed_redis(
     mock_wb_cabinet.adv_settings = [mock_adv_setting]
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -414,7 +419,8 @@ async def test_process_payment_for_advs_cabinet_already_processed_db(
     mock_wb_cabinet.adv_settings = [mock_adv_setting]
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -457,7 +463,8 @@ async def test_process_payment_for_advs_zero_daily_price(
     mock_pricer.get_price_for_day_for_shop.return_value = 0.0  # Нулевая цена
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -496,7 +503,8 @@ async def test_process_payment_for_advs_exception_during_processing(
     mock_pricer.get_price_for_day_for_shop.return_value = 75.0
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -533,7 +541,8 @@ async def test_process_payment_for_advs_no_active_campaigns_in_cabinet(
     mock_wb_cabinet.adv_settings = [mock_adv_setting_inactive]  # Только неактивная кампания
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -586,9 +595,13 @@ async def test_process_payment_for_advs_multiple_cabinets(
 
     # Мокируем get_active_cabinets_with_data
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
-        mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet, mock_wb_cabinet_2]
+        mock_get_active_cabinets_with_data.return_value = [
+            mock_wb_cabinet,
+            mock_wb_cabinet_2,
+        ]
 
         # Мокируем RedisManager
         with patch("app.modules.billing.billing.redis_manager", new=mock_redis_manager):

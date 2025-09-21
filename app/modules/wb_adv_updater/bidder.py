@@ -12,9 +12,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 from ...settings import settings
 from ..common_slaves.wildberries import super_cabinet_manager
-from ..common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from ..common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ async def _run_bidder_process():
                 .join(AdvSetting.wb_cabinet)
                 .options(selectinload(AdvSetting.wb_cabinet))
                 .where(
-                    AdvSetting.bidder_active == True,
+                    AdvSetting.bidder_active is True,
                     or_(
                         AdvSetting.wb_cabinet.has(WBCabinet.balance > 0),
                         AdvSetting.wb_cabinet.has(WBCabinet.bonus > 0),
@@ -44,9 +42,7 @@ async def _run_bidder_process():
                     adv_tasks[adv_setting.id] = task
                 else:
                     if adv_tasks[adv_setting.id].done():
-                        logger.debug(
-                            f"Задача обновления ставок завершена для кабинета {wb_cabinet_id}"
-                        )
+                        logger.debug(f"Задача обновления ставок завершена для кабинета {wb_cabinet_id}")
                         if adv_tasks[adv_setting.id].exception():
                             logger.error(
                                 f"Ошибка обновления ставок: "
@@ -84,18 +80,13 @@ async def _run_bidder_process_for_adv(adv_setting: AdvSetting):
     fact_cpm = await data_manager.get_cpm(adv_setting, keywords)
     if not fact_cpm:
         logger.error(
-            "Не удалось получить ставку из парсинга"
-            f"Shop ID: {access.wb_cabinet.shop_id}"
-            f"Adv ID: {adv_id}",
+            f"Не удалось получить ставку из парсингаShop ID: {access.wb_cabinet.shop_id}Adv ID: {adv_id}",
             exc_info=True,
         )
         return
     white_keywords: list[CalculatedKeyword] = [kw for kw in keywords if kw.hard_status == 2]
     best_white_keyword = data_manager.get_best_keyword(white_keywords)
-    if best_white_keyword:
-        promo_position = best_white_keyword.position
-    else:
-        promo_position = None
+    promo_position = best_white_keyword.position if best_white_keyword else None
     if promo_position:
         if promo_position < max_position_for_adv:
             new_cpm = fact_cpm - step

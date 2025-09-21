@@ -46,10 +46,12 @@ class async_WBApi(ABC_WB_API):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/active?id={adv.advertId}"
         data = {"recom": False, "booster": True, "carousel": False}
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=data, headers=self.headers.standart) as response:
-                response_text = await response.text()
-                logger.debug(response_text)
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(url, json=data, headers=self.headers.standart) as response,
+        ):
+            response_text = await response.text()
+            logger.debug(response_text)
 
     async def create_adv_company(self, nmids: list, budget_type: int, budget: int) -> Adv | str:
         """
@@ -83,12 +85,14 @@ class async_WBApi(ABC_WB_API):
             "on_pause": True,
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=data_json, headers=self.headers.standart) as response:
-                answer = await response.text()
-                if "error" in answer:
-                    error = json.loads(answer)["error"]
-                    return error
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(url, json=data_json, headers=self.headers.standart) as response,
+        ):
+            answer = await response.text()
+            if "error" in answer:
+                error = json.loads(answer)["error"]
+                return error
         adv_id = int(answer)  # Это предполагает, что ответ содержит ID рекламной кампании
         company = (await self.get_adv_companies([adv_id]))[0]
         await asyncio.sleep(60)  # Замена sleep на асинхронный asyncio.sleep
@@ -132,16 +136,16 @@ class async_WBApi(ABC_WB_API):
         nmids_for_add = list(set(need_nmids) - set(nmids_in_adv))
         await self.update_nmids_in_adv(adv, nmids_for_add, nmids_for_del)
 
-    async def update_nmids_in_adv(
-        self, adv: Adv, nmids_for_add: list[int], nmids_for_del: list[int]
-    ):
+    async def update_nmids_in_adv(self, adv: Adv, nmids_for_add: list[int], nmids_for_del: list[int]):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv.advertId}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=data, headers=self.headers.standart) as response:
-                response_text = await response.text()
-                logger.debug(response_text)
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(url, json=data, headers=self.headers.standart) as response,
+        ):
+            response_text = await response.text()
+            logger.debug(response_text)
 
     async def _requests(
         self,
@@ -153,9 +157,7 @@ class async_WBApi(ABC_WB_API):
         headers=None,
     ):
         # Передача JSON данных, если они предоставлены
-        async with session.request(
-            method, url, data=data, headers=headers, json=json_data
-        ) as response:
+        async with session.request(method, url, data=data, headers=headers, json=json_data) as response:
             return await response.text()
 
     # @async_cache_ttl(60*30)
@@ -220,9 +222,7 @@ class async_WBApi(ABC_WB_API):
         while True:
             try:
                 async with aiohttp.ClientSession() as session:
-                    response_text = await self._requests(
-                        session, "GET", url, headers=self.headers.standart
-                    )
+                    response_text = await self._requests(session, "GET", url, headers=self.headers.standart)
                     answer = json.loads(response_text)
                     if isinstance(answer, list):
                         return answer
@@ -230,9 +230,7 @@ class async_WBApi(ABC_WB_API):
                         return []
                     else:
                         logger.error("Ошибка получения статистики ключей: %s", answer)
-                        await asyncio.sleep(
-                            timer
-                        )  # Используйте asyncio.sleep для асинхронного ожидания
+                        await asyncio.sleep(timer)  # Используйте asyncio.sleep для асинхронного ожидания
                         timer *= 2
             except Exception as exc:
                 logger.error("Ошибка получения статистики ключей: %s", exc)
@@ -261,9 +259,7 @@ class async_WBApi(ABC_WB_API):
             while total >= limit:
                 response = None  # Инициализация переменной перед блоком try
                 try:
-                    response = await session.post(
-                        url, json=data_for_req, headers=self.headers.standart
-                    )
+                    response = await session.post(url, json=data_for_req, headers=self.headers.standart)
                     response.raise_for_status()
                     answer = await response.json()
                     logger.debug(f"Карточки получены, всего {len(answer['cards'])}")
@@ -274,9 +270,7 @@ class async_WBApi(ABC_WB_API):
                         error_event.set()
                         logger.error(f"Ошибка авторизации: {exc}, {self.shop.name}")
                         return []
-                    if (
-                        response is None or response.status == 500
-                    ):  # Теперь это условие безопасно для проверки
+                    if response is None or response.status == 500:  # Теперь это условие безопасно для проверки
                         logger.error("Временно возврат только полученных карт! Переделать!")
                         return cards
                     await asyncio.sleep(10)
@@ -294,7 +288,7 @@ class async_WBApi(ABC_WB_API):
                 data_for_req["settings"]["cursor"] = cursor
                 data_for_req["settings"]["cursor"]["limit"] = limit
 
-                nmids = list(set([card.nmid for card in cards]))
+                nmids = list({card.nmid for card in cards})
                 logger.debug(f"Всего уникальных карточек: {len(nmids)}")
         return cards
 

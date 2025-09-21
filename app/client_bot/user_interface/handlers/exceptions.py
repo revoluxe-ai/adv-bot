@@ -43,9 +43,7 @@ admin_router = Router()
 
 
 @admin_router.errors(ExceptionTypeFilter(aiogram.exceptions.TelegramNetworkError))
-async def network_error_handler(
-    error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
-) -> None:
+async def network_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot) -> None:
     await state.set_state()
     message = error_event.update.message
     if message is None:
@@ -101,9 +99,7 @@ async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bo
 
 
 @admin_router.errors(ExceptionTypeFilter(ErrorParsingPositions))
-async def error_parsing_positions_handler(
-    error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
-):
+async def error_parsing_positions_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
     message = error_event.update.message
     exception = error_event.exception
 
@@ -131,7 +127,6 @@ async def error_parsing_positions_handler(
 @admin_router.errors(ExceptionTypeFilter(ApiForbiddenError))
 async def api_forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
     message = error_event.update.message
-    exception = error_event.exception
 
     if message is None:
         chat_id = error_event.update.callback_query.message.chat.id
@@ -149,9 +144,7 @@ async def api_forbidden_error_handler(error_event: ErrorEvent, state: FSMContext
 
 
 @admin_router.errors(ExceptionTypeFilter(CardNotFoundInDB))
-async def not_found_wb_card_error_handler(
-    error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
-):
+async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
     message = error_event.update.message
     exception = error_event.exception
     exception = typing.cast(CardNotFoundInDB, exception)
@@ -212,8 +205,6 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
             part_of_brief_trace = part_of_brief_trace[tb.const.MAX_MESSAGE_LENGTH :]
     else:
         # Если в трейсе нет упоминания пакета, информируем об этом
-        await bot.send_message(
-            admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены."
-        )
+        await bot.send_message(admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены.")
 
-    await bot.send_message(admin_telegram_id, "Ник пользователя: %s" % user_name)
+    await bot.send_message(admin_telegram_id, f"Ник пользователя: {user_name}")
