@@ -9,9 +9,9 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 
-def try_except_decorator(func: Callable[..., Coroutine[Any, Any, Any]] | None = None):
-    def decorator(f: Callable[..., Coroutine[Any, Any, Any]]):
-        async def wrapper(*args: Any, **kwargs: Any):
+def try_except_decorator(func: Callable[..., Coroutine[Any, Any, Any]] | None = None) -> Callable[..., Any]:
+    def decorator(f: Callable[..., Coroutine[Any, Any, Any]]) -> Callable[..., Coroutine[Any, Any, Any]]:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await f(*args, **kwargs)
 
         return wrapper

@@ -1,11 +1,13 @@
 import datetime
+from typing import Optional
 
 
 class WBTokenMock:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, shop_id: int = 123456):
         self.api_key = api_key
         self.user_id = 12345
         self.active = True
+        self.shop_id = shop_id
 
         # Создаем mock payload с датой истечения через месяц
         self._mock_payload = {
@@ -15,11 +17,11 @@ class WBTokenMock:
             "uid": 987654321,
         }
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"user_id: {self.user_id}"
 
     @property
-    def _WBTokenMock__payload(self):
+    def _WBTokenMock__payload(self) -> dict[str, int]:
         """Приватное свойство для payload"""
         return self._mock_payload
 
@@ -32,18 +34,22 @@ class WBTokenMock:
         return self._mock_payload.get(key)
 
     @property
-    def __expires(self):
+    def __expires(self) -> datetime.datetime:
         """Приватное свойство для даты истечения"""
-        return datetime.datetime.fromtimestamp(self._mock_payload.get("exp"))
+        exp_timestamp = self._mock_payload.get("exp")
+        if exp_timestamp is None:
+            raise ValueError("No expiration timestamp in payload")
+        return datetime.datetime.fromtimestamp(exp_timestamp)
 
     @property
-    def expires(self):
+    def expires(self) -> datetime.datetime:
         """Публичное свойство для даты истечения"""
         return self.__expires
 
-    def get_shop_id_from_token(self) -> str:
+    def get_shop_id_from_token(self) -> Optional[str]:
         """Возвращает shop_id из токена"""
-        return self.get_payload("sid")
+        sid = self.get_payload("sid")
+        return str(sid) if sid is not None else None
 
     @property
     def read_only(self) -> bool:
@@ -65,6 +71,8 @@ class WBTokenMock:
             30: "Токен только на чтение",
         }
         s = self.get_payload("s")
+        if not isinstance(s, int):
+            return set()
         categories = set()
         for bit_position, category_name in categories_map.items():
             if s & (1 << bit_position):

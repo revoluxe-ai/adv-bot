@@ -1,7 +1,7 @@
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
-    import new
+    pass  # Remove the import of 'new' module since it's not available
 
 
 class MaxAttemptsError(Exception):
@@ -26,20 +26,20 @@ class NotValidTokenError(Exception):
 
 
 class TokenExpiredError(Exception):
-    def __init__(self, text):
+    def __init__(self, text: Any) -> None:
         self.text = text
         m = "Срок действия токена истек"
         super().__init__(f"{m} text: {self.text}")
 
 
 class TokensFromDifferentShopsError(BaseException):
-    def __init__(self):
+    def __init__(self) -> None:
         m = "Токены принадлежат разным магазинам"
         super().__init__(f"{m}")
 
 
 class ApiForbiddenError(Exception):
-    def __init__(self, text, wb_user_cabinet: Union["new.types.WBUserCabinet", None] = None):
+    def __init__(self, text: Any, wb_user_cabinet: Any = None) -> None:
         self.text = text
         self.wb_user_cabinet = wb_user_cabinet
         m = "API доступ запрещен"

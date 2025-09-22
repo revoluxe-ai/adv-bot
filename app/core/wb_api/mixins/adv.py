@@ -88,11 +88,13 @@ class AdvMixin(WBAPIProtocol):
     @try_except_decorator(1, 1)
     async def get_advs(self, adv_ids: list[int] | None = None) -> list[Adv]:
         if not adv_ids:
-            adv_ids: list[int] = await self.get_advertIds()
+            adv_ids_from_wb: list[int] = await self.get_advertIds()
+        else:
+            adv_ids_from_wb = adv_ids
         all_advs = []
         part = 50
-        for i in range(0, len(adv_ids), part):
-            part_of_advs = adv_ids[i : i + part]
+        for i in range(0, len(adv_ids_from_wb), part):
+            part_of_advs = adv_ids_from_wb[i : i + part]
             advs = await self._get_advs(part_of_advs)
             if advs:
                 all_advs.extend(advs)
