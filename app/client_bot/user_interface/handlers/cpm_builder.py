@@ -2,6 +2,7 @@ import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import Result
 from sqlalchemy.future import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -78,7 +79,7 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
 
 
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_manual_cpm"))
-async def set_manual_cpm(
+async def start_set_manual_cpm(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
@@ -120,7 +121,7 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
 
 
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_max_position"))
-async def set_max_position(
+async def start_set_max_position(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
@@ -150,8 +151,10 @@ async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMC
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv = adv.scalar()
+        result = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv = result.scalar()
+        if not adv:
+            raise Exception("adv not found")
         adv.max_place = max_position
         await session.commit()
         await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
