@@ -1,5 +1,4 @@
 absl-py==2.2.0
-aiocache==0.12.3
 aiofiles==23.2.1
 aiogram==3.4.1
 aiogram-tests==1.0.3

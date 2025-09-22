@@ -7,13 +7,10 @@ import logging
 from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker
-from app.utils.redis_func_cache import set_config
 
 from ..user_message_sender import message_for_not_pay_user_sender
 from . import wb_manager
 from .ml_data_manager import update_model
-
-set_config()
 
 sm = get_async_session_maker
 
