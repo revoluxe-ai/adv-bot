@@ -76,4 +76,5 @@ venv_linux/
 cursor-chat-export/
 .cursor/
 linux_venv/
-.vscode/
+app/modules/predict_ctr_service/model/model/model.json
+
