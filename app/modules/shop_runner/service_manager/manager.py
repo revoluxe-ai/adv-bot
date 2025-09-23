@@ -77,7 +77,7 @@ class CoroutinesManager:
             update_bid_in_search_adv_dto = UpdateBidsInSearchAdvDTO(adv, keywords_coro)
             update_bid_in_search_adv_dtos.append(update_bid_in_search_adv_dto)
 
-        update_cpm_manager = UpdateCPMManager(self._access)
+        update_cpm_manager = UpdateCPMManager(self.shop_id)
         await update_cpm_manager.update_cpms_in_search_advs(
             update_bid_in_search_adv_dtos
         )
@@ -123,7 +123,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-        shop_data_updater: ShopDataUpdater,
+            shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -135,7 +135,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _async_zip_longest(
-        *async_gens, fillvalue=None
+            *async_gens, fillvalue=None
     ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)

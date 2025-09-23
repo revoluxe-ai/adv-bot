@@ -1,14 +1,11 @@
+import asyncio
 import logging
-from asyncio import Task, TaskGroup
-from typing import Awaitable
+from asyncio import TaskGroup
+from typing import Awaitable, Dict, List, Optional
 
-from app.client_bot.user_interface.views.messages import ApiForrbidenError
-from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_keywords_parser import parser
 from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
@@ -18,8 +15,9 @@ from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_b
     UpdateBidsSearchAdvInShopBatch,
     UpdateBidForNmidTask,
 )
+from .bid_calculator import BidCalculator, BidCalculationParams
 from .bid_orchestrator import BidUpdateOrchestrator
-from .redis_manager import RedisManager
+from .wb_api_managers import WBApiDataGetter, WBApiCpmUpdater
 
 logger = logging.getLogger(__name__)
 
@@ -27,125 +25,207 @@ logger = logging.getLogger(__name__)
 class UpdateCPMManager:
     _DEFAULT_BIDDER_STEP = 2
 
-    def __init__(self, access: WBCabinetAccess) -> None:
-
-        self._shop_id = access.shop_id
-        self._redis_manager = RedisManager()
-        self._access = access
+    def __init__(self, shop_id: str, promotion_adapter=None) -> None:
+        self._shop_id = shop_id
+        # Внедряем адаптер (через DI или напрямую), затем оборачиваем тонкими менеджерами
+        if promotion_adapter is None:
+            # Отложенная инициализация потребует внешней передачи адаптера в реальном рантайме
+            raise RuntimeError("Promotion adapter must be provided to UpdateCPMManager")
+        self._data_getter = WBApiDataGetter(promotion_adapter)
+        self._cpm_updater = WBApiCpmUpdater(promotion_adapter)
 
     async def update_cpms_in_search_advs(
-        self,
-        update_bids_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO],
+            self, update_bids_in_search_adv_dtos: List[UpdateBidsInSearchAdvDTO]
     ) -> None:
         if not update_bids_in_search_adv_dtos:
             return None
+        update_batch = self.__get_update_batch(update_bids_in_search_adv_dtos)
+        # Запускаем сеттеры и оркестратор в одном TaskGroup для централизованной отмены
         async with TaskGroup() as tg:
-            update_batch = self.__get_update_batch(tg, update_bids_in_search_adv_dtos)
-            orchestrator = BidUpdateOrchestrator(self._access)
-            # Запускаем в асинхронном контексте доступа к WB
-            await orchestrator.process_updates(update_batch)
+            # Планировщик корутин-сеттеров
+            for fut, setter_coro in update_batch.futures_to_coros:
+                tg.create_task(setter_coro)
+            # Оркестратор
+            orchestrator = BidUpdateOrchestrator(self._shop_id, self._cpm_updater)
+            tg.create_task(orchestrator.process_updates(update_batch))
 
     async def __get_best_keyword(
-        self, keywords_coro: Awaitable[list[CalculatedKeyword]]
-    ) -> CalculatedKeyword | None:
-        keywords: list[CalculatedKeyword] = await keywords_coro
+            self, keywords_coro: Awaitable[List[CalculatedKeyword]]
+    ) -> Optional[CalculatedKeyword]:
+        keywords: List[CalculatedKeyword] = await keywords_coro
         best_keyword = data_manager.get_best_keyword(keywords)
         if not best_keyword:
+            logger.debug("skip: no best keyword")
             return None
-        else:
-            return best_keyword
-
-    async def __get_min_cpms_from_wb(
-        self, adv_id: int, nmids: list[int]
-    ) -> dict[int, int]:
-        min_cpms: dict[int, int] = await self._wb_api.get_min_cpms_for_adv_setting(
-            adv_id, nmids
-        )
-        return min_cpms
+        return best_keyword
 
     async def _get_new_bid(
-        self,
-        *,
-        search_adv_id: int,
-        max_bid: int,
-        best_keyword: Task[CalculatedKeyword | None],
-        bidder_step: int | None = None,
-        max_position: int | None = None,
-        min_bid_in_adv: Task[dict[int, int]],
-    ) -> int | None:
-        best_keyword: CalculatedKeyword | None = await best_keyword_task
+            self,
+            *,
+            adv_id: int,
+            nmid: int,
+            max_bid: int,
+            best_keyword_task: asyncio.Future[Optional[CalculatedKeyword]],
+            bidder_step: Optional[int],
+            target_position: Optional[int],
+            min_bids_map_task: asyncio.Future[Dict[int, int]],
+            current_bids_map_task: asyncio.Future[Dict[int, int]],
+    ) -> Optional[int]:
+        from app.utils.redis_manager import get_keyword_position
+
+        # 1) Лучший ключ
+        best_keyword = await best_keyword_task
         if not best_keyword:
+            logger.debug("skip: no best keyword (None)", extra={"adv_id": adv_id, "nmid": nmid})
             return None
-        max_cpm: int = max_bid
-        step = bidder_step or self._DEFAULT_BIDDER_STEP
-        if not best_keyword:
-            return None
-        text = best_keyword.text
-        try:
-            current_bids_map: dict[int, int] = (
-                await self.__get_current_cpm_bids_from_wb_api(adv_id)
+
+        # 2) Карты ставок
+        min_map = await min_bids_map_task
+        curr_map = await current_bids_map_task
+
+        # 3) Текущая/минимальная ставка
+        min_bid = int(min_map.get(nmid, 0))
+        current_bid = int(curr_map.get(nmid, 0))
+        if current_bid == 0:
+            logger.debug(
+                "current bid not found, using 0",
+                extra={"adv_id": adv_id, "nmid": nmid},
             )
-        except ApiForrbidenError as e:
-            raise e
-        await parser.add_wb_positions(text, {nmid}, delay=0.1)
-        wb_position = await self._redis_manager.get_keyword_position(text, nmid)
 
-        if not wb_position or not wb_position.promo_position:
-            logger.error("Позиция ключа не найдена или нет промопозиции")
+        # 4) Позиция из Redis
+        # Перед чтением позиции инициируем парсер для обновления позиции в Redis
+        try:
+            await parser.add_wb_positions(best_keyword.text, {nmid}, delay=0.1)
+        except Exception as e:
+            logger.debug(
+                "parser add_wb_positions failed or skipped",
+                extra={"adv_id": adv_id, "nmid": nmid, "error": str(e)},
+            )
+        pos = await get_keyword_position(best_keyword.text, int(nmid))
+        if not pos or pos.position in (None, 0):
+            logger.debug(
+                "skip: no applicable position",
+                extra={"adv_id": adv_id, "nmid": nmid},
+            )
             return None
-        max_current_bid = max(current_cpm_from_wb_api, max_cpm)
-        promo_position = wb_position.promo_position
-        if promo_position <= max_position or promo_position == 1:
-            new_cpm: int = max_current_bid - step
-        else:
-            new_cpm = max_current_bid + step
 
-        await min_bid_in_adv
-        new_cpm = max(min(new_cpm, max_cpm), 0)
-        if new_cpm == current_cpm_from_wb_api:
+        # 5) Расчет
+        params = BidCalculationParams(
+            current_bid=int(current_bid),
+            min_bid=int(min_bid),
+            max_bid=int(max_bid),
+            current_position=int(pos.position),
+            target_position=int(target_position or 5),
+            bidder_step=int(bidder_step or self._DEFAULT_BIDDER_STEP),
+        )
+        try:
+            new_bid = BidCalculator().calculate_new_bid(params)
+        except Exception as e:
+            logger.critical(f"logic error: {e}")
+            raise
+
+        if new_bid is None or int(new_bid) == int(current_bid):
+            logger.debug(
+                "skip: new bid is None or unchanged",
+                extra={"adv_id": adv_id, "nmid": nmid},
+            )
             return None
-        return new_cpm
-
-    async def __get_current_cpm_bid_from_wb_api(self, adv_id: int) -> int:
-        adv: list[Adv] = await self._wb_api.get_advs([adv_id])
-        bid = adv[0].cpm
-        return bid
-
-    def _get_cpm_update_data(self, adv_setting: AdvSetting, new_cpm: int) -> dict:
-        """Подготовить данные для обновления ставок."""
-        return {
-            "adv_setting": adv_setting,
-            "new_cpm": new_cpm,
-        }
+        return int(new_bid)
 
     def __get_update_batch(
-        self,
-        tg: TaskGroup,
-        update_bids_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO],
+            self, update_bids_in_search_adv_dtos: List[UpdateBidsInSearchAdvDTO]
     ) -> UpdateBidsSearchAdvInShopBatch:
         update_batch = UpdateBidsSearchAdvInShopBatch(self._shop_id)
+        futures_to_coros = []  # list[(future, coro)]
+
         for dto in update_bids_in_search_adv_dtos:
-            keywords_coro = dto.calculated_keywords_coro
-            best_keyword_task: Task[CalculatedKeyword | None] = tg.create_task(
-                self.__get_best_keyword(keywords_coro)
-            )
-            adv_id = dto.adv_id
-            nmids = dto.nmids
-            min_bid_in_adv_task: Task[dict[int, int]] = tg.create_task(
-                self.__get_min_cpms_from_wb(adv_id, nmids)
-            )
-            max_bid = dto.max_cpm_bid
+            adv_id = int(dto.adv_id)
+            nmids = [int(x) for x in dto.nmids]
+            max_bid = int(dto.max_cpm_bid)
+            bidder_step = dto.bidder_step
+            target_position = getattr(dto, "target_place", None)
+
+            # Best keyword future
+            best_keyword_future: asyncio.Future[Optional[CalculatedKeyword]] = asyncio.Future()
+
+            async def best_keyword_setter(coro=dto.calculated_keywords_coro, fut=best_keyword_future):
+                try:
+                    result = await self.__get_best_keyword(coro)
+                    if not fut.done():
+                        fut.set_result(result)
+                except Exception as e:
+                    if not fut.done():
+                        fut.set_exception(e)
+
+            futures_to_coros.append((best_keyword_future, best_keyword_setter()))
+
+            # Min bids map future
+            min_bids_future: asyncio.Future[Dict[int, int]] = asyncio.Future()
+
+            async def min_bids_setter(adv_id=adv_id, nmids=nmids, fut=min_bids_future):
+                try:
+                    result = await self._data_getter.get_min_bid_for_nmids(
+                        self._shop_id, adv_id=adv_id, nmids=nmids
+                    )
+                    if not fut.done():
+                        fut.set_result(result)
+                except Exception as e:
+                    if not fut.done():
+                        fut.set_exception(e)
+
+            futures_to_coros.append((min_bids_future, min_bids_setter()))
+
+            # Current bids map future
+            current_bids_future: asyncio.Future[Dict[int, int]] = asyncio.Future()
+
+            async def current_bids_setter(adv_id=adv_id, nmids=nmids, fut=current_bids_future):
+                try:
+                    result = await self._data_getter.get_current_bids(
+                        self._shop_id, adv_id=adv_id, nmids=nmids
+                    )
+                    if not fut.done():
+                        fut.set_result(result)
+                except Exception as e:
+                    if not fut.done():
+                        fut.set_exception(e)
+
+            futures_to_coros.append((current_bids_future, current_bids_setter()))
+
+            # Per nmid new bid futures
             for nmid in nmids:
-                new_bid_coro = self._get_new_bid(
-                    adv_id=adv_id,
-                    nmid=nmid,
-                    max_bid=max_bid,
-                    best_keyword_task=best_keyword_task,
-                    bidder_step=dto.bidder_step,
-                    max_position=dto.target_place,
-                    min_bid_in_adv=min_bid_in_adv_task,
-                )
-                # Schedule the coroutine to avoid "coroutine was never awaited" warnings
-                new_bid_coro_task = tg.create_task(new_bid_coro)  # type: ignore[arg-type]
-                update_task = UpdateBidForNmidTask(adv_id, nmid, new_bid_coro_task)
-                update_batch.add_task(update_task)
+                new_bid_future: asyncio.Future[Optional[int]] = asyncio.Future()
+
+                async def new_bid_setter(
+                        adv_id=adv_id,
+                        nmid=nmid,
+                        max_bid=max_bid,
+                        best_keyword_future=best_keyword_future,
+                        bidder_step=bidder_step,
+                        target_position=target_position,
+                        min_bids_future=min_bids_future,
+                        current_bids_future=current_bids_future,
+                        fut=new_bid_future,
+                ):
+                    try:
+                        result = await self._get_new_bid(
+                            adv_id=adv_id,
+                            nmid=nmid,
+                            max_bid=max_bid,
+                            best_keyword_task=best_keyword_future,
+                            bidder_step=bidder_step,
+                            target_position=target_position,
+                            min_bids_map_task=min_bids_future,
+                            current_bids_map_task=current_bids_future,
+                        )
+                        if not fut.done():
+                            fut.set_result(result)
+                    except Exception as e:
+                        if not fut.done():
+                            fut.set_exception(e)
+
+                futures_to_coros.append((new_bid_future, new_bid_setter()))
+                update_batch.add_task(UpdateBidForNmidTask(adv_id, nmid, new_bid_future))
+
+        # прикрепляем список сеттеров к batch для последующего запуска
+        update_batch.futures_to_coros = futures_to_coros  # type: ignore[attr-defined]
+        return update_batch

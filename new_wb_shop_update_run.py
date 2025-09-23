@@ -27,6 +27,8 @@ if system == "Linux":
 
 logger = logging.getLogger(__name__)
 
+print('SCRIPT STARTED')
+
 
 async def run_process() -> None:
     """Запуск общего процесса на все магазины, legacy, нуждается в рефакторинге.

@@ -3,8 +3,8 @@
 import httpx
 from dependency_injector import containers, providers
 
-from .adapters.promotion.v1_adapter import PromotionV1Adapter
-from .base_wb_api import BaseWBApi
+from .adapters.promotion_v1_adapter import PromotionV1Adapter
+from .base_wb_api_manager import BaseWBApiManager
 
 
 class WBApiContainer(containers.DeclarativeContainer):
@@ -29,7 +29,7 @@ class WBApiContainer(containers.DeclarativeContainer):
 
     # Фабрика для создания BaseWBApi с нужными адаптерами
     wb_api_factory = providers.Factory(
-        lambda wb_access, http_client: BaseWBApi(
+        lambda wb_access, http_client: BaseWBApiManager(
             wb_access=wb_access,
             http_client=http_client,  # Для совместимости, но адаптеры уже получили свой
             domain_versions=WBApiVersionConfig.get_versions(),

@@ -11,13 +11,10 @@ from app.core.mp.wb.exceptions import (
     ApiUnexpectedError,
     ApiTimeoutError,
 )
-from app.core.mp.wb.generated.client_proxy import (
-    AuthenticatedClientProxy as AuthenticatedClient,
-)
-from app.core.mp.wb.generated.promotion.v1.client import errors
 from app.core.mp.wb.generated.promotion.v1.client.api.sozdanie_kampanij import (
     post_adv_v0_bids_min as use_case,
 )
+from app.core.mp.wb.generated.promotion.v1.client.client import AuthenticatedClient
 from app.core.mp.wb.generated.promotion.v1.client.models import (
     PostAdvV0BidsMinBodyPaymentType,
     PostAdvV0BidsMinBodyPlacementTypesItem,
@@ -27,23 +24,21 @@ MinBidsInAdv = use_case.PostAdvV0BidsMinResponse200
 
 
 async def post_adv_v0_bids_min(
-    *,
-    client: AuthenticatedClient,
-    adv_id: int,
-    nmids: list[int],
-    payment_type: Literal[
-        PostAdvV0BidsMinBodyPaymentType.CPM.value,
-        PostAdvV0BidsMinBodyPaymentType.CPC.value,
-    ],
-    placement_types: list[
-        Literal[
-            PostAdvV0BidsMinBodyPlacementTypesItem.SEARCH,
-            PostAdvV0BidsMinBodyPlacementTypesItem.RECOMMENDATION,
-            PostAdvV0BidsMinBodyPlacementTypesItem.COMBINED,
-        ]
-    ],
+        *,
+        client: AuthenticatedClient,
+        adv_id: int,
+        nmids: list[int],
+        payment_type: Literal[
+            PostAdvV0BidsMinBodyPaymentType.CPM.value,
+            PostAdvV0BidsMinBodyPaymentType.CPC.value,
+        ],
+        placement_types: list[
+            Literal[
+                PostAdvV0BidsMinBodyPlacementTypesItem.SEARCH,
+                PostAdvV0BidsMinBodyPlacementTypesItem.RECOMMENDATION,
+            ]
+        ],
 ) -> MinBidsInAdv:
-
     payment_type = PostAdvV0BidsMinBodyPaymentType(payment_type)
     placement_types = [
         PostAdvV0BidsMinBodyPlacementTypesItem(t) for t in placement_types
