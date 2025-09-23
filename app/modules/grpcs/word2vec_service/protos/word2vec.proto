@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package word2vec_service;
+
+// Запрос на получение вектора для одного слова
+message GetWordVectorRequest {
+  string word = 1;
+}
+
+// Ответ с вектором
+message GetWordVectorResponse {
+  repeated float vector = 1;
+}
+
+// Сервис для получения векторов Word2Vec
+service Word2VecGetter {
+  rpc get_vector_from_word(GetWordVectorRequest) returns (GetWordVectorResponse);
+}

@@ -1,14 +1,9 @@
 import asyncio
 import logging
 import time
-import typing
 
 import numpy as np
 import pandas as pd
-import xgboost
-from sklearn.model_selection import KFold, cross_validate
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from xgboost import XGBRegressor
@@ -17,17 +12,13 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
 from app.utils.db.session_maker import get_async_session_maker
-
-from ... import settings
+from . import data_manager
+from .data_getter import DataGetter
 from ..common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from . import data_manager
-from .data_getter import DataGetter
-from .ml_common_funcs import save_model
 
 sm = get_async_session_maker
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,50 +30,62 @@ async def getGradientBoostingFullFitModel():
     logger.debug("Модель обучена")
 
 
+async def fit_and_get_new_model():
+    """Возвращает обученную модель XGBRegressor (без нормализации)"""
+    model = await _fit_modelGradientBoosting()
+    return model
+
+
 async def _fit_modelGradientBoosting():
+    """Обучает и возвращает модель XGBRegressor (без нормализации)"""
     logger.debug("Поток обучения запущен, получение данных")
     try:
-        df = await _get_df_for_fit()
+        base_df: pd.DataFrame = await _get_df_for_fit()
     except Exception as exc:
         logger.error(f"Ошибка при получении данных для обучения: {exc}", exc_info=True)
         raise exc
     logger.debug("Данные получены")
-    if len(df) == 0:
+    if len(base_df) == 0:
         logger.info("Нет данных для обучения")
-        return
-    df: pd.DataFrame = await _bayesian_apply(df)
+        return None
+    df: pd.DataFrame = await _bayesian_apply(base_df)
     try:
         await asyncio.to_thread(df.to_csv, "work_folder/df_for_fit.csv", index=False)
     except Exception:
         logger.error("Ошибка при сохранении данных для обучения", exc_info=True)
     try:
         y = df["ctr"]
-        X = df.drop(["keyword", "views", "ctr", "clicks", "adv_id", "spend", "nmids"], axis=1)
+        X = df.drop(
+            [
+                "keyword",
+                "views",
+                "ctr",
+                "clicks",
+                "adv_id",
+                "spend",
+                "nmids",
+                "adv_type",
+            ],
+            axis=1,
+        )
         logger.debug("Данные подготовлены")
-        # Создание модели градиентного бустинга
-        model = make_pipeline(StandardScaler(), XGBRegressor(n_jobs=-1))
-        if settings.cv:
-            logger.debug("Начало кросс-валидации")
-            cv = KFold(n_splits=5, random_state=42, shuffle=True)
-            scores = cross_validate(model, X, y, scoring="neg_mean_squared_error", cv=cv)
-            logger.debug("Кросс-валидация завершена")
-            mse_scores = -scores["test_score"]
-            # Вычисление и вывод метрик
-            mean_mse = mse_scores.mean()
-            std_dev_mse = mse_scores.std()
-            max_difference = mse_scores.max() - mse_scores.min()
-
-            logger.info(
-                f"CV MSE scores: {mse_scores}\n"
-                f"Mean CV MSE: {mean_mse}\n"
-                f"Standard Deviation of CV MSE: {std_dev_mse}\n"
-                f"Max difference between CV MSE scores: {max_difference}\n"
-            )
+        logger.debug(f"X shape: {X.shape}")
+        logger.debug(f"X columns: {list(X.columns)}")
+        logger.debug(
+            f"Item features count: {len([c for c in X.columns if c.startswith('item_feature_')])}"
+        )
+        logger.debug(
+            f"Keyword features count: {len([c for c in X.columns if c.startswith('keyword_feature_')])}"
+        )
+        # Создание модели XGBRegressor (без нормализации)
+        # Нормализация не нужна для FastRP векторов - они уже в едином векторном пространстве
+        model = XGBRegressor(n_jobs=-1)
         logger.debug("Обучение модели на полных данных")
         model.fit(X, y)
         logger.debug("Модель обучена")
-        model = typing.cast(xgboost.XGBModel, model.named_steps["xgbregressor"])
-        await asyncio.to_thread(save_model, model, time_stamp=None)
+        # Возвращаем обученную XGBRegressor модель
+        return model
+
     except Exception as exc:
         logger.error(f"Ошибка при обучении модели: {exc}", exc_info=True)
         raise exc
@@ -118,7 +121,9 @@ async def _get_df_for_fit() -> pd.DataFrame:
             )
             continue
         if len(nmids) == 0:
-            logger.debug(f"Кампания {adv.adv_id} не содержит артикулов, происходит пропуск")
+            logger.debug(
+                f"Кампания {adv.adv_id} не содержит артикулов, происходит пропуск"
+            )
             continue
 
         nmid_in_adv = nmids[0]
@@ -133,7 +138,8 @@ async def _get_df_for_fit() -> pd.DataFrame:
             item_features_list = list(nmid_to_item_features.values())
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
             avg_item_features = {
-                f"item_feature_{i}": avg_item_features[i] for i in avg_item_features.keys()
+                f"item_feature_{i}": avg_item_features[i]
+                for i in avg_item_features.keys()
             }
 
             logger.debug(
@@ -141,7 +147,9 @@ async def _get_df_for_fit() -> pd.DataFrame:
             )
             try:
                 keyword_stats: list[CalculatedKeyword] = (
-                    await data_manager.get_keywords_statistic_clickhouse(adv, last_views=500)
+                    await data_manager.get_keywords_statistic_clickhouse(
+                        adv, last_views=500
+                    )
                 )
                 logger.debug(
                     f"Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}"
@@ -150,8 +158,8 @@ async def _get_df_for_fit() -> pd.DataFrame:
                 logger.error("Ошибка получения ключей из Клик-хаус", exc_info=True)
                 continue
             logger.debug("Конвертация статистики ключевых слов в кластеры")
-            keywords_stats_by_clusters = await data_manager.convert_keyword_stats_in_clusters(
-                keyword_stats
+            keywords_stats_by_clusters = (
+                await data_manager.convert_keyword_stats_in_clusters(keyword_stats)
             )
             logger.debug(f"Получено {len(keywords_stats_by_clusters)} кластеров")
 
@@ -162,11 +170,15 @@ async def _get_df_for_fit() -> pd.DataFrame:
                 if keyword_stat.text not in in_clusters:
                     clear_keyword_stat.append(keyword_stat)
 
-            logger.debug(f"Найдено {len(clear_keyword_stat)} ключевых слов вне кластеров")
+            logger.debug(
+                f"Найдено {len(clear_keyword_stat)} ключевых слов вне кластеров"
+            )
 
             keyword_stats = keywords_stats_by_clusters + clear_keyword_stat
 
-            logger.debug(f"Получение features для {len(keyword_stats)} ключевых слов из Redis")
+            logger.debug(
+                f"Получение features для {len(keyword_stats)} ключевых слов из Redis"
+            )
             processed_keywords = 0
             for keyword_stat in keyword_stats:
                 keyword_features = await data_getter.get_keyword_features_from_redis(
@@ -208,20 +220,22 @@ async def _get_df_for_fit() -> pd.DataFrame:
 async def __fetch_keyword_features(
     keywords: list[str],
 ) -> list[tuple[str, list[float]]]:
-    result: list[tuple[str, list[float]]] = await data_getter.get_keyword_features_from_redis(
-        keywords
+    result: list[tuple[str, list[float]]] = (
+        await data_getter.get_keyword_features_from_redis(keywords)
     )
     return result
 
 
-async def _bayesian_apply(df: pd.DataFrame):
+async def _bayesian_apply(df: pd.DataFrame) -> pd.DataFrame:
     adv_ids = df["adv_id"].unique()
     adv_ids = adv_ids.tolist()
     adv_id_keyword_text_to_status: dict[tuple[int, str], int] = (
         await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
     )
 
-    adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(adv_ids)
+    adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(
+        adv_ids
+    )
 
     def calculate_ctr(row):
         clicks = row["clicks"]

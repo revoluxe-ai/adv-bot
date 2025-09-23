@@ -30,7 +30,6 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
-
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -38,7 +37,6 @@ from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
 
 logger = logging.getLogger(__name__)
-
 
 T = TypeVar("T")
 
@@ -53,7 +51,8 @@ class CoroutinesManager:
         assert wb_cabinet
         self._wb_shop_data_manager = WBShopDataManager(wb_cabinet)
 
-        self._wb_api = wb_api
+        self._wb_api = wb_api  # deprecated
+        self._access = wb_api.access
         self.shop_id = wb_api.shop_id
         self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
             list[CalculatedKeyword]
@@ -61,21 +60,6 @@ class CoroutinesManager:
         self._adv_settings_dict: dict[int, AdvSetting] | None = None
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
-
-    @while_coroutine_decorator(3, 60)
-    async def update_cpm_bid(self) -> None:
-        adv_settings = await self._wb_shop_data_manager.get_active_advs()
-        if not adv_settings:
-            return None
-        adv_settings = [adv for adv in adv_settings if adv.bidder_active]
-        if not adv_settings:
-            return None
-        logger.debug(f"Обновляю ставки для магазина {self.shop_id}")
-        await asyncio.gather(
-            *[self.__run_bidder_process_for_adv(adv, self._wb_api) for adv in adv_settings]
-        )
-        logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
-        return None
 
     async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: WBApi) -> None:
         keywords = await self._wb_shop_data_manager.get_calculated_keywords(adv_setting)
@@ -124,7 +108,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-        shop_data_updater: ShopDataUpdater,
+            shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -136,7 +120,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _async_zip_longest(
-        *async_gens, fillvalue=None
+            *async_gens, fillvalue=None
     ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
@@ -239,3 +223,94 @@ class CoroutinesManager:
             except FirstKeyUpdaterError as exc:
                 logger.error(f"Ошибка обновления верхнего ключа: {exc}", exc_info=True)
                 raise exc
+
+    @while_coroutine_decorator(60, 1)
+    async def update_features_in_redis(self):
+        from .services.redis_features_update_manager import (
+            Neo4jtoRedisFeaturesUpdateManager,
+        )
+
+        advs = await self._wb_shop_data_manager.get_active_advs()
+        redis_update_manager = Neo4jtoRedisFeaturesUpdateManager()
+        all_coroutines = []
+        for adv in advs:
+            item_features_update_coro = redis_update_manager.update_items_features(adv)
+            all_coroutines.append(item_features_update_coro)
+            keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
+            keywords_features_update_coroutines = (
+                redis_update_manager.update_keyword_features(keywords)
+            )
+            all_coroutines.append(keywords_features_update_coroutines)
+
+        await asyncio.gather(*all_coroutines)
+
+    @while_coroutine_decorator(60, 10)
+    async def update_data_in_neo4j(self) -> None:
+        from .services.neo4j_data_update_manager import Neo4jDataUpdateManager
+
+        advs = await self._wb_shop_data_manager.get_active_advs()
+        neo4j_update_manager = Neo4jDataUpdateManager()
+
+        try:
+            all_coroutines = []
+
+            # Обрабатываем товары для каждого объявления
+            for adv in advs:
+                item_update_coro = neo4j_update_manager.update_item(adv)
+                all_coroutines.append(item_update_coro)
+
+                # Получаем ключевые слова для объявления
+                keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
+                keywords_list = await keywords
+
+                # Обрабатываем каждое ключевое слово
+                for keyword in keywords_list:
+                    keyword_update_coro = neo4j_update_manager.update_keyword_phrase(
+                        keyword.text
+                    )
+                    all_coroutines.append(keyword_update_coro)
+
+            # Выполняем все задачи параллельно
+            await asyncio.gather(*all_coroutines)
+
+        finally:
+            # Закрываем gRPC каналы
+            await neo4j_update_manager.close_channels()
+
+    @while_coroutine_decorator(60, 10)
+    async def update_predict_ctr(self) -> None:
+        """Обновление прогнозов CTR для всех активных кампаний"""
+        from .services.predict_ctr_update_manager import PredictCTRUpdateManager
+
+        advs = await self._wb_shop_data_manager.get_active_advs()
+
+        if not advs:
+            logger.debug(f"Нет активных кампаний для магазина {self.shop_id}")
+            return
+
+        predict_ctr_manager = PredictCTRUpdateManager()
+
+        try:
+            all_coroutines = []
+
+            logger.info(
+                f"Начинаем обновление прогнозов CTR для {len(advs)} кампаний магазина {self.shop_id}"
+            )
+
+            # Собираем корутины для всех кампаний
+            for adv in advs:
+                # Получаем корутину для ключевых слов (не await!)
+                keywords_coro = self._wb_shop_data_manager.get_calculated_keywords(adv)
+
+                # Создаем корутину обновления прогнозов CTR
+                update_coro = predict_ctr_manager.update_predict_ctr(adv, keywords_coro)
+                all_coroutines.append(update_coro)
+
+            await asyncio.gather(*all_coroutines)
+
+        finally:
+            # Закрываем соединения
+            await predict_ctr_manager.close()
+
+    async def update_cpm_bid_in_search_advs(self):
+        ...

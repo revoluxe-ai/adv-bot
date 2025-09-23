@@ -1,0 +1,159 @@
+import asyncio
+import logging
+from asyncio import Task
+from typing import Awaitable
+
+
+from app.client_bot.user_interface.views.messages import ApiForrbidenError
+from app.modules.common_slaves.wildberries.data_classes.adv import Adv
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
+    CalculatedKeyword,
+)
+from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_keywords_parser import parser
+from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
+    UpdateBidsInSearchAdvDTO,
+)
+from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
+    UpdateBidsSearchAdvInShopBatch,
+    UpdateBidForNmidTask,
+)
+from .redis_manager import RedisManager
+from .bid_orchestrator import BidUpdateOrchestrator
+from app.core.mp.wb.token_management.token_context import WBAccessContext
+
+logger = logging.getLogger(__name__)
+
+
+class UpdateCPMManager:
+    _DEFAULT_BIDDER_STEP = 2
+
+    def __init__(self, access: WBCabinetAccess) -> None:
+        from .wb_api import WBApi
+
+        self._shop_id = access.shop_id
+        self._redis_manager = RedisManager()
+        # Создаем WB API через фабрику с DI в контексте WBAccessContext
+        from app.core.mp.wb.factory import create_wb_api_client
+
+        # Контекст гарантирует, что фабрика токен-менеджеров увидит корректный access
+        with WBAccessContext(access):
+            self._wb_api = create_wb_api_client(WBApi, access)
+        # Сохраним доступ для асинхронных вызовов
+        self._access = access
+
+    async def update_cpms_in_search_advs(
+        self,
+        update_bids_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO],
+    ) -> None:
+        if not update_bids_in_search_adv_dtos:
+            return None
+
+        update_batch = self.__get_update_batch(update_bids_in_search_adv_dtos)
+        orchestrator = BidUpdateOrchestrator(self._wb_api)
+        # Запускаем в асинхронном контексте доступа к WB
+        async with WBAccessContext(self._access):
+            await orchestrator.process_updates(update_batch)
+
+    async def __get_best_keyword(
+        self, keywords_coro: Awaitable[list[CalculatedKeyword]]
+    ) -> CalculatedKeyword | None:
+        keywords: list[CalculatedKeyword] = await keywords_coro
+        best_keyword = data_manager.get_best_keyword(keywords)
+        if not best_keyword:
+            return None
+        else:
+            return best_keyword
+
+    async def __get_min_cpm_from_wb(
+        self, adv_id: int, nmids: list[int]
+    ) -> dict[int, int]:
+        min_cpm: dict[int, int] = await self._wb_api.get_min_bid_for_nmids(
+            adv_id, nmids
+        )
+        return min_cpm
+
+    async def _get_new_bid(
+        self,
+        *,
+        search_adv_id: int,
+        max_bid: int,
+        best_keyword: Task[CalculatedKeyword | None],
+        bidder_step: int | None = None,
+        max_position: int | None = None,
+        min_bid_in_adv: Task[dict[int, int]],
+    ) -> int | None:
+        best_keyword: CalculatedKeyword | None = await best_keyword
+        if not best_keyword:
+            return None
+        max_cpm: int = max_bid
+        step = bidder_step or self._DEFAULT_BIDDER_STEP
+        if not best_keyword:
+            return None
+        text = best_keyword.text
+        nmid = search_adv_id
+        try:
+            current_cpm_from_wb_api: int = await self.__get_current_cpm_bid_from_wb_api(
+                search_adv_id
+            )
+        except ApiForrbidenError as e:
+            raise e
+        await parser.add_wb_positions(text, {nmid}, delay=0.1)
+        wb_position = await self._redis_manager.get_keyword_position(text, nmid)
+
+        if not wb_position or not wb_position.promo_position:
+            logger.error("Позиция ключа не найдена или нет промопозиции")
+            return None
+        max_current_bid = max(current_cpm_from_wb_api, max_cpm)
+        promo_position = wb_position.promo_position
+        if promo_position <= max_position or promo_position == 1:
+            new_cpm: int = max_current_bid - step
+        else:
+            new_cpm = max_current_bid + step
+
+        await min_bid_in_adv
+        new_cpm = max(min(new_cpm, max_cpm), 0)
+        if new_cpm == current_cpm_from_wb_api:
+            return None
+        return new_cpm
+
+    async def __get_current_cpm_bid_from_wb_api(self, adv_id: int) -> int:
+        adv: list[Adv] = await self._wb_api.get_advs([adv_id])
+        bid = adv[0].cpm
+        return bid
+
+    def _get_cpm_update_data(self, adv_setting: AdvSetting, new_cpm: int) -> dict:
+        """Подготовить данные для обновления ставок."""
+        return {
+            "adv_setting": adv_setting,
+            "new_cpm": new_cpm,
+        }
+
+    def __get_update_batch(
+        self, update_bids_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO]
+    ) -> UpdateBidsSearchAdvInShopBatch:
+        update_batch = UpdateBidsSearchAdvInShopBatch(self._shop_id)
+        for dto in update_bids_in_search_adv_dtos:
+            keywords_coro = dto.calculated_keywords_coro
+            best_keyword_task: Task[CalculatedKeyword | None] = asyncio.create_task(
+                self.__get_best_keyword(keywords_coro)
+            )
+            adv_id = dto.adv_id
+            nmids = dto.nmids
+            min_bid_in_adv_task: Task[dict[int, int]] = asyncio.create_task(
+                self.__get_min_cpm_from_wb(adv_id, nmids)
+            )
+            max_bid = dto.max_cpm_bid
+            for nmid in nmids:
+                new_bid_coro: Awaitable[int] = self._get_new_bid(
+                    search_adv_id=adv_id,
+                    max_bid=max_bid,
+                    best_keyword=best_keyword_task,
+                    bidder_step=None,
+                    max_position=dto.target_place,
+                    min_bid_in_adv=min_bid_in_adv_task,
+                )
+                update_task = UpdateBidForNmidTask(adv_id, nmid, new_bid_coro)
+                update_batch.add_task(update_task)

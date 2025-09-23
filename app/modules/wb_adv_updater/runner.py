@@ -8,10 +8,9 @@ from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
-
-from ..user_message_sender import message_for_not_pay_user_sender
 from . import wb_manager
 from .ml_data_manager import update_model
+from ..user_message_sender import message_for_not_pay_user_sender
 
 set_config()
 
@@ -93,10 +92,9 @@ async def update_wb_config_data(client_session) -> None:
 
 async def main_loop(client_session):
     await asyncio.gather(
-        # process_payment_for_advs(),
-        run_update_vectors_in_redis(),
-        run_vector_update_in_neo4j(),
-        update_wb_config_data(client_session),
+        process_payment_for_advs(),
+        run_vector_update_in_neo4j(),  # TODO: проверить не дублируется ли эта функция в wb_shop runner
+
     )
 
 

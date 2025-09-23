@@ -9,7 +9,6 @@ import psutil
 
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
-    run_update_all_keywords_on_wb,
 )
 from python_modules.logger import setup_logging
 
@@ -32,8 +31,8 @@ async def update_keywords_ctr_by_similary_run():
 
 
 run_own_process_list = [
-    update_keywords_ctr_by_similary_run,
-    run_update_all_keywords_on_wb,
+    # update_keywords_ctr_by_similary_run,
+    # run_update_all_keywords_on_wb,
     run_main_coroutines,
 ]
 

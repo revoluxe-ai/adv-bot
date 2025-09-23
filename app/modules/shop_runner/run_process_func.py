@@ -6,8 +6,8 @@ from aiohttp import ClientSession
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
+from app.modules.common_slaves.wildberries.api import WBApi
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
-from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
 from app.modules.shop_runner.wb_shop import WBShop
@@ -19,7 +19,7 @@ import asyncio
 
 
 async def run_shop_task(
-    shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
+        shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
 ) -> None:
     while True:
         try:

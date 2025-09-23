@@ -71,6 +71,10 @@ class Adv:
     def adv_type(self) -> int:
         return self._data["type"]
 
+    @adv_type.setter
+    def adv_type(self, value: int):
+        self._type = value
+
     @property
     def status_native(self) -> str:
         if self.status == 4:
@@ -177,10 +181,6 @@ class Adv:
             nmids = re.findall(r"(?<!\[)\d{7,9}(?!\])", self.name)
             nmids = [int(nmid) for nmid in nmids]
             return nmids if nmids else []
-
-    @adv_type.setter
-    def adv_type(self, value):
-        self._type = value
 
 
 class Statistic:

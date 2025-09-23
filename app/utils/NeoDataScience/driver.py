@@ -60,10 +60,13 @@ class DataScience(metaclass=AsyncMeta):
 
         self.MAIN_GRAPH_NAME = "main"
         name = os.environ.get("NEO4J_NAME")
+        ip_address = os.environ.get("NEO4J_IP")
+        port = os.environ.get("NEO4J_PORT")
+        uri = f"bolt://{ip_address}:{port}"
         password = os.environ.get("NEO4J_PASSWORD")
-        self.__uri: str = os.environ.get("NEO4J_URI")
+        self.__uri: str = uri
         self.__auth: tuple[str, str] = (name, password)
-        self.__driver = neo4j.GraphDatabase.driver(self.__uri, auth=self.__auth)
+        self.__driver = neo4j.GraphDatabase.driver(uri, auth=self.__auth)
 
         self.SHOP_GRAPH_NAME = "shop_graph"
 

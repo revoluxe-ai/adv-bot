@@ -23,8 +23,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.wb_api import exceptions
-
 # Добавляем правильный импорт AdvPayment
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.settings import settings
@@ -174,11 +172,12 @@ class WBToken(BaseTable):
 
     @property
     def __payload(self):
+        from .excs import NotValidTokenError
         try:
             result = jwt.decode(self.api_key, options={"verify_signature": False})
             return result
         except:
-            raise exceptions.NotValidTokenError
+            raise NotValidTokenError
 
     def check_valid(self) -> bool:
         try:
@@ -307,7 +306,10 @@ class AdvSetting(BaseTable):
         self._worst_promo_position = None
 
     def __repr__(self):
-        return f"name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}"
+        return (f"name: {self.name},"
+                f" adverdId: {self.adv_id},"
+                f"bot_active: {self.bot_active},"
+                f" active_status: {self.active_status}")
 
     favorite_users: Mapped[list[User]] = relationship(
         "User", secondary=favorite_advs_association, back_populates="favorites_advs"

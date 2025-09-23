@@ -1,0 +1,159 @@
+from typing import Dict, Set, Optional, Any
+from datetime import datetime, timedelta
+import json
+import asyncio
+from dataclasses import dataclass
+from cryptography.fernet import Fernet
+import redis.asyncio as redis
+from app.core.redis.client import get_redis_client
+
+
+@dataclass
+class TokenState:
+    is_bad: bool = False
+    last_error: Optional[str] = None
+    error_count: int = 0
+    last_used: Optional[datetime] = None
+    success_count: int = 0
+
+
+@dataclass
+class ShopTokenState:
+    shop_id: str
+    tokens: Dict[str, Dict[str, TokenState]]  # {method_name: {token_id: TokenState}}
+    last_refresh: Optional[datetime] = None
+    total_requests: int = 0
+
+
+class SecureRedisTokenStorage:
+    """Secure storage of token states in Redis."""
+
+    def __init__(self, redis_client: Optional[redis.Redis] = None, encryption_key: Optional[bytes] = None):
+        self._redis = redis_client or get_redis_client()
+
+        if encryption_key:
+            self._cipher = Fernet(encryption_key)
+        else:
+            # In prod pass key from env/vault
+            self._cipher = Fernet(Fernet.generate_key())
+
+        self._key_prefix = "wb_tokens_v2"
+
+    def _get_key(self, shop_id: str) -> str:
+        return f"{self._key_prefix}:shop:{shop_id}"
+
+    def _encrypt_data(self, data: Dict[str, Any]) -> bytes:
+        json_data = json.dumps(data, default=str)
+        return self._cipher.encrypt(json_data.encode())
+
+    def _decrypt_data(self, encrypted_data: bytes) -> Dict[str, Any]:
+        decrypted_json = self._cipher.decrypt(encrypted_data).decode()
+        return json.loads(decrypted_json)
+
+    async def store_shop_state(self, shop_state: ShopTokenState) -> None:
+        try:
+            serializable_data = {
+                'shop_id': shop_state.shop_id,
+                'tokens': {},
+                'last_refresh': shop_state.last_refresh.isoformat() if shop_state.last_refresh else None,
+                'total_requests': shop_state.total_requests,
+            }
+
+            for method_name, method_tokens in shop_state.tokens.items():
+                serializable_data['tokens'][method_name] = {}
+                for token_id, token_state in method_tokens.items():
+                    serializable_data['tokens'][method_name][token_id] = {
+                        'is_bad': token_state.is_bad,
+                        'last_error': token_state.last_error,
+                        'error_count': token_state.error_count,
+                        'last_used': token_state.last_used.isoformat() if token_state.last_used else None,
+                        'success_count': token_state.success_count,
+                    }
+
+            encrypted_data = self._encrypt_data(serializable_data)
+            await self._redis.setex(self._get_key(shop_state.shop_id), timedelta(days=7), encrypted_data)
+
+        except Exception:
+            import logging
+            logging.exception(f"Failed to store shop state for {shop_state.shop_id}")
+
+    async def get_shop_state(self, shop_id: str) -> Optional[ShopTokenState]:
+        try:
+            encrypted_data = await self._redis.get(self._get_key(shop_id))
+            if not encrypted_data:
+                return None
+
+            data = self._decrypt_data(encrypted_data)
+
+            tokens: Dict[str, Dict[str, TokenState]] = {}
+            for method_name, method_tokens in data.get('tokens', {}).items():
+                tokens[method_name] = {}
+                for token_id, token_data in method_tokens.items():
+                    tokens[method_name][token_id] = TokenState(
+                        is_bad=token_data.get('is_bad', False),
+                        last_error=token_data.get('last_error'),
+                        error_count=token_data.get('error_count', 0),
+                        last_used=datetime.fromisoformat(token_data['last_used']) if token_data.get('last_used') else None,
+                        success_count=token_data.get('success_count', 0),
+                    )
+
+            return ShopTokenState(
+                shop_id=data['shop_id'],
+                tokens=tokens,
+                last_refresh=datetime.fromisoformat(data['last_refresh']) if data.get('last_refresh') else None,
+                total_requests=data.get('total_requests', 0),
+            )
+
+        except Exception:
+            import logging
+            logging.exception(f"Failed to get shop state for {shop_id}")
+            return None
+
+    async def mark_token_bad(self, shop_id: str, method_name: str, token_id: str, error_message: str) -> None:
+        shop_state = await self.get_shop_state(shop_id)
+        if not shop_state:
+            shop_state = ShopTokenState(shop_id=shop_id, tokens={})
+
+        if method_name not in shop_state.tokens:
+            shop_state.tokens[method_name] = {}
+
+        if token_id not in shop_state.tokens[method_name]:
+            shop_state.tokens[method_name][token_id] = TokenState()
+
+        token_state = shop_state.tokens[method_name][token_id]
+        token_state.is_bad = True
+        token_state.last_error = error_message
+        token_state.error_count += 1
+        token_state.last_used = datetime.utcnow()
+
+        await self.store_shop_state(shop_state)
+
+    async def mark_token_success(self, shop_id: str, method_name: str, token_id: str) -> None:
+        shop_state = await self.get_shop_state(shop_id)
+        if not shop_state:
+            shop_state = ShopTokenState(shop_id=shop_id, tokens={})
+
+        if method_name not in shop_state.tokens:
+            shop_state.tokens[method_name] = {}
+
+        if token_id not in shop_state.tokens[method_name]:
+            shop_state.tokens[method_name][token_id] = TokenState()
+
+        token_state = shop_state.tokens[method_name][token_id]
+        token_state.success_count += 1
+        token_state.last_used = datetime.utcnow()
+
+        shop_state.total_requests += 1
+        await self.store_shop_state(shop_state)
+
+    async def get_bad_tokens(self, shop_id: str, method_name: str) -> Set[str]:
+        shop_state = await self.get_shop_state(shop_id)
+        if not shop_state or method_name not in shop_state.tokens:
+            return set()
+
+        return {token_id for token_id, token_state in shop_state.tokens[method_name].items() if token_state.is_bad}
+
+    async def clear_shop_state(self, shop_id: str) -> None:
+        await self._redis.delete(self._get_key(shop_id))
+
+

@@ -1,0 +1,7 @@
+{
+  "package_name": "promotion_v1_generated",
+  "project_name": "promotion_v1_generated",
+  "class_overrides": {},
+  "use_async": true,
+  "http_client": "aiohttp"
+}
