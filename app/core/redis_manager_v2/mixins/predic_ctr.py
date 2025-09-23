@@ -5,12 +5,10 @@ from redis.asyncio.client import Pipeline
 
 from app.utils.text_cleaner import clear
 
-from ..base_protocol import BaseRedisManagerProtocol
-
 logger = logging.getLogger(__name__)
 
 
-class PredictCTRRedisMixin(BaseRedisManagerProtocol):
+class PredictCTRRedisMixin:
     """Миксин для работы с ключами прогнозов CTR в Redis"""
 
     _client: Redis
@@ -57,7 +55,9 @@ class PredictCTRRedisMixin(BaseRedisManagerProtocol):
         key = self._get_new_key(nmids, keyword)
         redis_pipeline.set(key, predict_ctr)
 
-    async def get_predict_ctr_by_nmids(self, nmids: list[int], keyword: str) -> float | None:
+    async def get_predict_ctr_by_nmids(
+        self, nmids: list[int], keyword: str
+    ) -> float | None:
         """Чтение прогноза CTR из Redis по новому ключу"""
         key = self._get_new_key(nmids, keyword)
         return await self._get_predict_ctr_by_key(key)

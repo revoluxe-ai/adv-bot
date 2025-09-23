@@ -1,23 +1,25 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Any
 
-from dependency_injector.wiring import Provide, inject
-from redis.asyncio import Redis
-
-from app.core.di.app_container import AppContainer
+from ._redis_client import RedisClient
+from .base_redis_manager_protocol import BaseRedisManagerProtocol
 
 
-class BaseRedisManager:
-    prefix: str
-
-    @inject
-    def __init__(self, redis_client: Redis = Provide[AppContainer.redis_client]):
-        self.__client = redis_client
+class BaseRedisManager(ABC, BaseRedisManagerProtocol):
+    def __init__(self):
+        redis_client = RedisClient()
+        self.__redis_client = redis_client
 
     @abstractmethod
-    def _get_key(self, *args: Any, **kwargs: Any) -> str: ...
+    def _get_key(self, *args: Any, **kwargs: Any) -> str:
+        pass
 
     @property
-    def _client(self) -> Redis:
+    @abstractmethod
+    def _prefix(self) -> str:
+        pass
+
+    @property
+    def _client(self) -> RedisClient:
         """Геттер для доступа к клиенту Redis"""
-        return self.__client
+        return self.__redis_client
