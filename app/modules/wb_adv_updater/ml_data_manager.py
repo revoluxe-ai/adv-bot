@@ -6,7 +6,8 @@ from io import BytesIO
 import aiohttp
 import faiss
 import numpy as np
-from PIL import Image as PilImage, UnidentifiedImageError
+from PIL import Image as PilImage
+from PIL import UnidentifiedImageError
 from sqlalchemy import Row, Sequence, select
 
 from app.modules.common_slaves.wildberries.models import (
@@ -77,11 +78,11 @@ async def process_product_data(wbcard: WBCard):
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
             continue
-        characteristics_words[char_name]: tuple[str, list[float]] = await get_words_from_char_value(
-            char_value
+        characteristics_words[char_name]: tuple[str, list[float]] = (
+            await get_words_from_char_value(char_value)
         )
-    characteristics_words["name"]: tuple[str, list[float]] = await get_words_from_char_value(
-        wbcard.name
+    characteristics_words["name"]: tuple[str, list[float]] = (
+        await get_words_from_char_value(wbcard.name)
     )
     if "description" in characteristics_words:
         characteristics_words["description"]: tuple[str, list[float]] = (
@@ -136,7 +137,9 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
                     f"Карточка {wbcard.nmid} не содержит изображений, возможно, карточка не существует"
                 )
             else:
-                logger.error(f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}")
+                logger.error(
+                    f"Ошибка при добавлении карточки в neo4j {wbcard.nmid}: {exc}"
+                )
         except UnidentifiedImageError as exc:
             logger.error(
                 f"Ошибка UnidentifiedImageError при обработке изображения nmid"
@@ -156,7 +159,7 @@ async def update_cards_in_graph_for_shops_big_cycle():
 async def update_cards_in_graph_small_cycle():
     async with sm() as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.bot_active == True,
+            AdvSetting.bot_active is True,
         )
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
@@ -185,7 +188,7 @@ async def update_wb_adv_phrase_in_neo4j() -> None:
     while True:
         try:
             await update_wb_adv_phrase_in_neo_small_cycle()
-        except:
+        except Exception:
             logger.error("Ошибка обновления фраз в neo", exc_info=True)
         await asyncio.sleep(0)
 
@@ -200,7 +203,7 @@ async def update_keywords_ctr_by_similary():
         stmt = (
             select(KeywordSetting.text, AdvSetting.adv_id)
             .join(AdvSetting, KeywordSetting.adv_setting_id == AdvSetting.id)
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active is True)
         )
         result = await session.execute(stmt)
         keyword_texts_adv_ids: Sequence[Row[tuple[str, int]]] = result.all()
@@ -253,8 +256,12 @@ async def update_keywords_ctr_by_similary():
         if not target_text:
             continue
         target_adv_id = keyword_text_adv_id[1]
-        logger.debug(f"Обработка ключевого слова {target_text} для объявления {target_adv_id}")
-        original_predict_ctr = await redis_manager.get_predict_ctr(target_adv_id, target_text)
+        logger.debug(
+            f"Обработка ключевого слова {target_text} для объявления {target_adv_id}"
+        )
+        original_predict_ctr = await redis_manager.get_predict_ctr(
+            target_adv_id, target_text
+        )
         if original_predict_ctr:
             continue
         vector = await word2vec.average_vector_from_sentence(target_text)
@@ -262,7 +269,7 @@ async def update_keywords_ctr_by_similary():
             continue
         vector = np.array(vector, dtype=np.float32)
         vector = vector.reshape(1, -1)  # Преобразование в форму (1, d) для поиска
-
+        assert index is not None
         # Поиск ближайших векторов
         D, I = index.search(vector, index.ntotal)
         redis_base_manager = BaseRedis()

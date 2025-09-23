@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -34,42 +35,44 @@ async def test_wb_shop_run_calls_all_coroutines():
     # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
     async def mock_gather(*args, **kwargs) -> list:  # type: ignore[misc]
         # Создаем задачи для каждой корутины, но не запускаем их
-        return [arg for arg in args]
+        return list(args)
 
     # Применяем наш мок-метод
-    with patch("asyncio.gather", side_effect=mock_gather):
-        with patch(
+    with (
+        patch("asyncio.gather", side_effect=mock_gather),
+        patch(
             "app.modules.shop_runner.wb_shop.CoroutinesManager"
-        ) as mock_coroutines_manager:
-            # Настраиваем мок CoroutinesManager
-            mock_manager_instance = mock_coroutines_manager.return_value
-            mock_manager_instance.parsing_keywords_run = AsyncMock()
-            mock_manager_instance.update_advs_data_from_wb_to_pg = AsyncMock()
-            mock_manager_instance.update_cards_data_from_wb_to_pg = AsyncMock()
-            mock_manager_instance.update_cpm_bid = AsyncMock()
-            mock_manager_instance.update_common_sale_stat = AsyncMock()
-            mock_manager_instance.update_full_adv_stat = AsyncMock()
-            mock_manager_instance.adv_settings_auto_update = AsyncMock()
-            mock_manager_instance.update_top_key_in_advs = AsyncMock()
+        ) as mock_coroutines_manager,
+    ):
+        # Настраиваем мок CoroutinesManager
+        mock_manager_instance = mock_coroutines_manager.return_value
+        mock_manager_instance.parsing_keywords_run = AsyncMock()
+        mock_manager_instance.update_advs_data_from_wb_to_pg = AsyncMock()
+        mock_manager_instance.update_cards_data_from_wb_to_pg = AsyncMock()
+        mock_manager_instance.update_cpm_bid = AsyncMock()
+        mock_manager_instance.update_common_sale_stat = AsyncMock()
+        mock_manager_instance.update_full_adv_stat = AsyncMock()
+        mock_manager_instance.adv_settings_auto_update = AsyncMock()
+        mock_manager_instance.update_top_key_in_advs = AsyncMock()
 
-            # Вызываем тестируемый метод
-            await wb_shop.run()
+        # Вызываем тестируемый метод
+        await wb_shop.run()
 
-            # Проверяем, что CoroutinesManager был создан с правильным аргументом
-            mock_coroutines_manager.assert_called_once_with(mock_wb_api)
+        # Проверяем, что CoroutinesManager был создан с правильным аргументом
+        mock_coroutines_manager.assert_called_once_with(mock_wb_api)
 
-            # Проверяем, что _alive_worker_run был вызван
-            wb_shop._alive_worker_run.assert_called_once()
+        # Проверяем, что _alive_worker_run был вызван
+        wb_shop._alive_worker_run.assert_called_once()
 
-            # Проверяем, что все методы CoroutinesManager были вызваны
-            mock_manager_instance.parsing_keywords_run.assert_called_once()
-            mock_manager_instance.update_advs_data_from_wb_to_pg.assert_called_once()
-            mock_manager_instance.update_cards_data_from_wb_to_pg.assert_called_once()
-            mock_manager_instance.update_cpm_bid.assert_called_once()
-            mock_manager_instance.update_common_sale_stat.assert_called_once()
-            mock_manager_instance.update_full_adv_stat.assert_called_once()
-            mock_manager_instance.adv_settings_auto_update.assert_called_once()
-            mock_manager_instance.update_top_key_in_advs.assert_called_once()
+        # Проверяем, что все методы CoroutinesManager были вызваны
+        mock_manager_instance.parsing_keywords_run.assert_called_once()
+        mock_manager_instance.update_advs_data_from_wb_to_pg.assert_called_once()
+        mock_manager_instance.update_cards_data_from_wb_to_pg.assert_called_once()
+        mock_manager_instance.update_cpm_bid.assert_called_once()
+        mock_manager_instance.update_common_sale_stat.assert_called_once()
+        mock_manager_instance.update_full_adv_stat.assert_called_once()
+        mock_manager_instance.adv_settings_auto_update.assert_called_once()
+        mock_manager_instance.update_top_key_in_advs.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -119,9 +122,9 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             call_args = mock_gather.call_args[0]
 
             # Проверяем, что gather был вызван с 9 аргументами (1 _alive_worker_run + 8 методов CoroutinesManager)
-            assert len(call_args) == 9, (
-                f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
-            )
+            assert (
+                len(call_args) == 9
+            ), f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
 
 
 @pytest.mark.asyncio
@@ -149,10 +152,8 @@ async def test_wb_shop_alive_worker_run() -> None:
     task.cancel()
 
     # Ждем завершения отмены
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await task
-    except asyncio.CancelledError:
-        pass
 
     # Проверяем, что renew_shop_ttl был вызван хотя бы один раз
     mock_redis_manager.renew_shop_ttl.assert_called_with("test_shop_id")

@@ -7,12 +7,10 @@ import logging
 from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker
-from app.utils.redis_func_cache import set_config
+
+from ..user_message_sender import message_for_not_pay_user_sender
 from . import wb_manager
 from .ml_data_manager import update_model
-from ..user_message_sender import message_for_not_pay_user_sender
-
-set_config()
 
 sm = get_async_session_maker
 
@@ -57,7 +55,9 @@ async def process_payment_for_advs() -> None:
 
         # Спим до 3:00
         sleep_seconds = (next_run - now).total_seconds()
-        logger.info(f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)")
+        logger.info(
+            f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
+        )
         await asyncio.sleep(sleep_seconds)
 
         # Выполняем обработку
@@ -94,7 +94,6 @@ async def main_loop(client_session):
     await asyncio.gather(
         process_payment_for_advs(),
         run_vector_update_in_neo4j(),  # TODO: проверить не дублируется ли эта функция в wb_shop runner
-
     )
 
 

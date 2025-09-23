@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from dataclasses import dataclass
 from datetime import date, datetime
 
 from pydantic import BaseModel, Field
@@ -86,13 +85,17 @@ class SmallFullAdvStat:
 
 
 class FullAdvStat(BaseModel):
-    dates: list[str] = Field(..., description="Даты, за которые необходимо выдать информацию")
+    dates: list[str] = Field(
+        ..., description="Даты, за которые необходимо выдать информацию"
+    )
     views: int = Field(..., description="Количество просмотров за все дни")
     clicks: int = Field(..., description="Количество кликов за все дни")
     ctr: float = Field(..., description="Показатель кликабельности, % за все дни")
     cpc: float = Field(..., description="Средняя стоимость клика, ₽ за все дни")
     sum: float = Field(..., description="Затраты, ₽ за все дни")
-    atbs: int = Field(..., description="Количество добавлений товаров в корзину за все дни")
+    atbs: int = Field(
+        ..., description="Количество добавлений товаров в корзину за все дни"
+    )
     orders: int = Field(..., description="Количество заказов за все дни")
     cr: float = Field(..., description="Конверсия (CR), % за все дни")
     shks: int = Field(..., description="Количество заказанных товаров, шт. за все дни")

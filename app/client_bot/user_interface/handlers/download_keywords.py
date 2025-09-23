@@ -8,9 +8,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery
 from sqlalchemy.future import select
 
 from app.client_bot import utils
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
 
 from ..views import callbacks

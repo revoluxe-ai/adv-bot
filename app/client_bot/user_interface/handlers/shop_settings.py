@@ -3,9 +3,7 @@ from aiogram import Router, types
 from sqlalchemy import delete, select
 
 from app.client_bot.user_interface.views import callbacks, messages
-from app.modules.common_slaves.wildberries.models import (
-    WBUserCabinet,
-)
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 

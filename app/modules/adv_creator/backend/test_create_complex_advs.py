@@ -27,9 +27,7 @@ async def test_create_complex_advs(
     user_telegram_id = 122334
     nmid = 112333
 
-    with (
-        patch("app.modules.adv_creator.backend.main_manager.WBApi") as WBAPI_mock,
-    ):
+    with (patch("app.modules.adv_creator.backend.main_manager.WBApi") as WBAPI_mock,):
         MainAdvManager.get_adv_setting_by_nmid = AsyncMock(
             return_value=adv_setting_mock
         )

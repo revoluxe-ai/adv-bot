@@ -27,7 +27,9 @@ def mock_adv_setting():
     adv_setting.auto_update_white_list = True
     adv_setting.auto_update_target_place = True
     adv_setting.payments = []
-    adv_setting.wb_cabinet_id = 100  # Устанавливаем wb_cabinet_id для соответствия WBCabinet
+    adv_setting.wb_cabinet_id = (
+        100  # Устанавливаем wb_cabinet_id для соответствия WBCabinet
+    )
     return adv_setting
 
 
@@ -114,7 +116,9 @@ def test_get_count_advs_for_wb_cabinet(mock_adv_setting, mock_wb_cabinet):
     adv_setting_2.wb_cabinet_id = 101  # Другой кабинет
 
     adv_setting_3 = MagicMock(spec=AdvSetting)
-    adv_setting_3.wb_cabinet_id = mock_wb_cabinet.id  # Этот относится к тому же кабинету
+    adv_setting_3.wb_cabinet_id = (
+        mock_wb_cabinet.id
+    )  # Этот относится к тому же кабинету
 
     adv_settings = [mock_adv_setting, adv_setting_2, adv_setting_3]
     result = get_count_advs_for_wb_cabinet(mock_wb_cabinet, adv_settings)
@@ -153,7 +157,9 @@ async def test_get_active_cabinets_with_data(
     assert len(cabinets) == 1
     assert cabinets[0].id == mock_wb_cabinet.id
     # Проверяем, что AdvSetting также загружены
-    assert len(cabinets[0].adv_settings) == 2  # Должны быть оба AdvSetting, активные и неактивные
+    assert (
+        len(cabinets[0].adv_settings) == 2
+    )  # Должны быть оба AdvSetting, активные и неактивные
 
 
 @pytest.mark.asyncio
@@ -165,7 +171,9 @@ async def test_process_payment_for_advs_success_bonus(
     mock_session = AsyncMock(spec=AsyncSession)
     # Get the mocked sm instance that was patched by the decorator
     mock_sm.return_value.__aenter__.return_value = mock_session
-    mock_sm.return_value.__aexit__.return_value = False  # Убеждаемся, что aexit не вызывает исключение
+    mock_sm.return_value.__aexit__.return_value = (
+        False  # Убеждаемся, что aexit не вызывает исключение
+    )
 
     # Настраиваем кабинет и кампании
     mock_adv_setting.wb_cabinet_id = mock_wb_cabinet.id
@@ -176,7 +184,8 @@ async def test_process_payment_for_advs_success_bonus(
 
     # Мокируем get_active_cabinets_with_data
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -187,23 +196,34 @@ async def test_process_payment_for_advs_success_bonus(
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для advisory lock
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для bonus_cnt_res
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для balance_cnt_res
-                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # Для AdvPayment
+                MagicMock(
+                    scalar_one_or_none=MagicMock(return_value=None)
+                ),  # Для AdvPayment
                 MagicMock(scalar=MagicMock(return_value=None)),  # Для unlock
             ]
 
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
-            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(str(mock_wb_cabinet.shop_id))
+            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(
+                str(mock_wb_cabinet.shop_id)
+            )
 
             # Проверяем, что были добавлены правильные платежи
             # Извлекаем объект WBBonusPayment и проверяем его атрибуты
             added_bonus_payment = mock_session.add.call_args_list[0].args[0]
             assert added_bonus_payment.wb_cabinet_id == mock_wb_cabinet.id
             assert added_bonus_payment.amount == pytest.approx(-75.0, abs=1e-2)
-            assert added_bonus_payment.description == f"Ежедневное списание за 1 кампаний, дата: {current_date}"
+            assert (
+                added_bonus_payment.description
+                == f"Ежедневное списание за 1 кампаний, дата: {current_date}"
+            )
             assert added_bonus_payment.operation_type == "auto_subtract"
-            assert isinstance(added_bonus_payment.transaction_date_time, datetime.datetime)
+            assert isinstance(
+                added_bonus_payment.transaction_date_time, datetime.datetime
+            )
 
             # Проверяем AdvPayment
             added_adv_payment = mock_session.add.call_args_list[1].args[0]
@@ -214,7 +234,9 @@ async def test_process_payment_for_advs_success_bonus(
 
             mock_session.commit.assert_called_once()
             mock_session.rollback.assert_not_called()
-            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(mock_wb_cabinet.id, current_date)
+            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(
+                mock_wb_cabinet.id, current_date
+            )
 
 
 @pytest.mark.asyncio
@@ -238,7 +260,8 @@ async def test_process_payment_for_advs_success_balance(
 
     # Мокируем get_active_cabinets_with_data
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -248,23 +271,34 @@ async def test_process_payment_for_advs_success_balance(
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для advisory lock
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для bonus_cnt_res
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для balance_cnt_res
-                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # Для AdvPayment
+                MagicMock(
+                    scalar_one_or_none=MagicMock(return_value=None)
+                ),  # Для AdvPayment
                 MagicMock(scalar=MagicMock(return_value=None)),  # Для unlock
             ]
 
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
-            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(str(mock_wb_cabinet.shop_id))
+            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(
+                str(mock_wb_cabinet.shop_id)
+            )
 
             # Проверяем, что были добавлены правильные платежи
             # Извлекаем объект WBBalancePayment и проверяем его атрибуты
             added_balance_payment = mock_session.add.call_args_list[0].args[0]
             assert added_balance_payment.wb_cabinet_id == mock_wb_cabinet.id
             assert added_balance_payment.amount == pytest.approx(-75.0, abs=1e-2)
-            assert added_balance_payment.description == f"Ежедневное списание за 1 кампаний, дата: {current_date}"
+            assert (
+                added_balance_payment.description
+                == f"Ежедневное списание за 1 кампаний, дата: {current_date}"
+            )
             assert added_balance_payment.operation_type == "auto_subtract"
-            assert isinstance(added_balance_payment.transaction_date_time, datetime.datetime)
+            assert isinstance(
+                added_balance_payment.transaction_date_time, datetime.datetime
+            )
 
             # Проверяем второй вызов add (AdvPayment)
             added_adv_payment = mock_session.add.call_args_list[1].args[0]
@@ -275,7 +309,9 @@ async def test_process_payment_for_advs_success_balance(
 
             mock_session.commit.assert_called_once()
             mock_session.rollback.assert_not_called()
-            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(mock_wb_cabinet.id, current_date)
+            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(
+                mock_wb_cabinet.id, current_date
+            )
 
 
 @pytest.mark.asyncio
@@ -299,7 +335,8 @@ async def test_process_payment_for_advs_insufficient_funds(
 
     # Мокируем get_active_cabinets_with_data
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -309,14 +346,20 @@ async def test_process_payment_for_advs_insufficient_funds(
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для advisory lock
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для bonus_cnt_res
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для balance_cnt_res
-                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # Для AdvPayment
+                MagicMock(
+                    scalar_one_or_none=MagicMock(return_value=None)
+                ),  # Для AdvPayment
                 MagicMock(scalar=MagicMock(return_value=None)),  # Для unlock
             ]
 
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
-            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(str(mock_wb_cabinet.shop_id))
+            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(
+                str(mock_wb_cabinet.shop_id)
+            )
 
             # Проверяем, что кампании были деактивированы
             assert mock_adv_setting.bot_active is False
@@ -332,12 +375,16 @@ async def test_process_payment_for_advs_insufficient_funds(
 
             mock_session.commit.assert_called_once()
             mock_session.rollback.assert_not_called()
-            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(mock_wb_cabinet.id, current_date)
+            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(
+                mock_wb_cabinet.id, current_date
+            )
 
 
 @pytest.mark.asyncio
 @patch("app.modules.billing.billing.sm", new_callable=MagicMock)
-async def test_process_payment_for_advs_no_active_cabinets(mock_sm, mock_pricer, mock_redis_manager):
+async def test_process_payment_for_advs_no_active_cabinets(
+    mock_sm, mock_pricer, mock_redis_manager
+):
     current_date = datetime.date(2023, 1, 1)
     mock_session = AsyncMock(spec=AsyncSession)
     # Get the mocked sm instance that was patched by the decorator
@@ -345,12 +392,15 @@ async def test_process_payment_for_advs_no_active_cabinets(mock_sm, mock_pricer,
     mock_sm.return_value.__aexit__.return_value = False
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = []  # Нет активных кабинетов
 
         with patch("app.modules.billing.billing.redis_manager", new=mock_redis_manager):
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
             mock_pricer.get_price_for_day_for_shop.assert_not_called()  # Не должен вызываться
@@ -377,20 +427,29 @@ async def test_process_payment_for_advs_cabinet_already_processed_redis(
     mock_wb_cabinet.adv_settings = [mock_adv_setting]
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
         with patch("app.modules.billing.billing.redis_manager", new=mock_redis_manager):
-            mock_redis_manager.get_billing_process_for_day.return_value = True  # Уже обработан
+            mock_redis_manager.get_billing_process_for_day.return_value = (
+                True  # Уже обработан
+            )
 
             # Для advisory lock, который все равно будет вызван
-            mock_session.execute.return_value = MagicMock(scalar=MagicMock(return_value=0))
+            mock_session.execute.return_value = MagicMock(
+                scalar=MagicMock(return_value=0)
+            )
 
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
-            mock_redis_manager.get_billing_process_for_day.assert_called_once_with(mock_wb_cabinet.id, current_date)
+            mock_redis_manager.get_billing_process_for_day.assert_called_once_with(
+                mock_wb_cabinet.id, current_date
+            )
             mock_pricer.get_price_for_day_for_shop.assert_not_called()
             mock_session.add.assert_not_called()
             mock_session.commit.assert_called_once()  # commit все равно будет вызван в конце process_payment_for_advs
@@ -414,25 +473,34 @@ async def test_process_payment_for_advs_cabinet_already_processed_db(
     mock_wb_cabinet.adv_settings = [mock_adv_setting]
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
         with patch("app.modules.billing.billing.redis_manager", new=mock_redis_manager):
-            mock_redis_manager.get_billing_process_for_day.return_value = False  # Не обработан в Redis
+            mock_redis_manager.get_billing_process_for_day.return_value = (
+                False  # Не обработан в Redis
+            )
 
             # Имитируем, что платеж уже есть в БД
             mock_session.execute.side_effect = [
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для advisory lock
-                MagicMock(scalar=MagicMock(return_value=1)),  # Для bonus_cnt_res (уже есть платеж)
+                MagicMock(
+                    scalar=MagicMock(return_value=1)
+                ),  # Для bonus_cnt_res (уже есть платеж)
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для balance_cnt_res
                 MagicMock(scalar=MagicMock(return_value=None)),  # Для unlock
             ]
 
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
-            mock_redis_manager.get_billing_process_for_day.assert_called_once_with(mock_wb_cabinet.id, current_date)
+            mock_redis_manager.get_billing_process_for_day.assert_called_once_with(
+                mock_wb_cabinet.id, current_date
+            )
             mock_pricer.get_price_for_day_for_shop.assert_not_called()
             mock_session.add.assert_not_called()
             mock_session.commit.assert_called_once()  # commit все равно будет вызван в конце process_payment_for_advs
@@ -457,7 +525,8 @@ async def test_process_payment_for_advs_zero_daily_price(
     mock_pricer.get_price_for_day_for_shop.return_value = 0.0  # Нулевая цена
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
@@ -469,10 +538,14 @@ async def test_process_payment_for_advs_zero_daily_price(
                 MagicMock(scalar=MagicMock(return_value=None)),  # Для unlock
             ]
 
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
-            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(str(mock_wb_cabinet.shop_id))
+            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(
+                str(mock_wb_cabinet.shop_id)
+            )
             mock_session.add.assert_not_called()
             mock_session.commit.assert_called_once()  # commit все равно будет вызван в конце process_payment_for_advs
             mock_session.rollback.assert_not_called()
@@ -496,23 +569,30 @@ async def test_process_payment_for_advs_exception_during_processing(
     mock_pricer.get_price_for_day_for_shop.return_value = 75.0
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
         with patch("app.modules.billing.billing.redis_manager", new=mock_redis_manager):
             # Мокируем, что get_price_for_day_for_shop вызывает исключение
-            mock_pricer.get_price_for_day_for_shop.side_effect = Exception("Pricer Error")
+            mock_pricer.get_price_for_day_for_shop.side_effect = Exception(
+                "Pricer Error"
+            )
 
             mock_session.execute.side_effect = [
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для advisory lock
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для bonus_cnt_res
                 MagicMock(scalar=MagicMock(return_value=0)),  # Для balance_cnt_res
-                MagicMock(scalar=MagicMock(return_value=None)),  # Для unlock (вызывается в finally)
+                MagicMock(
+                    scalar=MagicMock(return_value=None)
+                ),  # Для unlock (вызывается в finally)
             ]
 
             with pytest.raises(Exception, match="Pricer Error"):
-                await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+                await process_payment_for_advs(
+                    current_date=current_date, pricer=mock_pricer
+                )
 
             mock_session.rollback.assert_called_once()
             mock_session.commit.assert_not_called()
@@ -530,18 +610,25 @@ async def test_process_payment_for_advs_no_active_campaigns_in_cabinet(
     mock_sm.return_value.__aenter__.return_value = mock_session
     mock_sm.return_value.__aexit__.return_value = False
 
-    mock_wb_cabinet.adv_settings = [mock_adv_setting_inactive]  # Только неактивная кампания
+    mock_wb_cabinet.adv_settings = [
+        mock_adv_setting_inactive
+    ]  # Только неактивная кампания
 
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
         mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
 
         with patch("app.modules.billing.billing.redis_manager", new=mock_redis_manager):
             # Только advisory lock, остальное не должно вызываться
-            mock_session.execute.return_value = MagicMock(scalar=MagicMock(return_value=0))  # Для advisory lock
+            mock_session.execute.return_value = MagicMock(
+                scalar=MagicMock(return_value=0)
+            )  # Для advisory lock
 
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
             mock_redis_manager.get_billing_process_for_day.assert_not_called()
@@ -586,9 +673,13 @@ async def test_process_payment_for_advs_multiple_cabinets(
 
     # Мокируем get_active_cabinets_with_data
     with patch(
-        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+        "app.modules.billing.billing.get_active_cabinets_with_data",
+        new_callable=AsyncMock,
     ) as mock_get_active_cabinets_with_data:
-        mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet, mock_wb_cabinet_2]
+        mock_get_active_cabinets_with_data.return_value = [
+            mock_wb_cabinet,
+            mock_wb_cabinet_2,
+        ]
 
         # Мокируем RedisManager
         with patch("app.modules.billing.billing.redis_manager", new=mock_redis_manager):
@@ -598,33 +689,48 @@ async def test_process_payment_for_advs_multiple_cabinets(
                 MagicMock(scalar=MagicMock(return_value=0)),  # lock 1
                 MagicMock(scalar=MagicMock(return_value=0)),  # bonus_cnt 1
                 MagicMock(scalar=MagicMock(return_value=0)),  # balance_cnt 1
-                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # AdvPayment 1
+                MagicMock(
+                    scalar_one_or_none=MagicMock(return_value=None)
+                ),  # AdvPayment 1
                 MagicMock(scalar=MagicMock(return_value=None)),  # unlock 1
                 # Для второго кабинета
                 MagicMock(scalar=MagicMock(return_value=0)),  # lock 2
                 MagicMock(scalar=MagicMock(return_value=0)),  # bonus_cnt 2
                 MagicMock(scalar=MagicMock(return_value=0)),  # balance_cnt 2
-                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # AdvPayment 2
+                MagicMock(
+                    scalar_one_or_none=MagicMock(return_value=None)
+                ),  # AdvPayment 2
                 MagicMock(scalar=MagicMock(return_value=None)),  # unlock 2
             ]
 
             # Настраиваем pricer для каждого кабинета
             mock_pricer.get_price_for_day_for_shop.side_effect = [75.0, 80.0]
 
-            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+            await process_payment_for_advs(
+                current_date=current_date, pricer=mock_pricer
+            )
 
             mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
             assert mock_pricer.get_price_for_day_for_shop.call_count == 2
-            mock_pricer.get_price_for_day_for_shop.assert_any_call(str(mock_wb_cabinet.shop_id))
-            mock_pricer.get_price_for_day_for_shop.assert_any_call(str(mock_wb_cabinet_2.shop_id))
+            mock_pricer.get_price_for_day_for_shop.assert_any_call(
+                str(mock_wb_cabinet.shop_id)
+            )
+            mock_pricer.get_price_for_day_for_shop.assert_any_call(
+                str(mock_wb_cabinet_2.shop_id)
+            )
 
             # Проверяем добавления для первого кабинета (бонусы)
             added_bonus_payment = mock_session.add.call_args_list[0].args[0]
             assert added_bonus_payment.wb_cabinet_id == mock_wb_cabinet.id
             assert added_bonus_payment.amount == pytest.approx(-75.0, abs=1e-2)
-            assert added_bonus_payment.description == f"Ежедневное списание за 1 кампаний, дата: {current_date}"
+            assert (
+                added_bonus_payment.description
+                == f"Ежедневное списание за 1 кампаний, дата: {current_date}"
+            )
             assert added_bonus_payment.operation_type == "auto_subtract"
-            assert isinstance(added_bonus_payment.transaction_date_time, datetime.datetime)
+            assert isinstance(
+                added_bonus_payment.transaction_date_time, datetime.datetime
+            )
 
             # Проверяем AdvPayment для первого кабинета
             added_adv_payment_1 = mock_session.add.call_args_list[1].args[0]
@@ -636,8 +742,13 @@ async def test_process_payment_for_advs_multiple_cabinets(
             added_balance_payment = mock_session.add.call_args_list[2].args[0]
             assert added_balance_payment.wb_cabinet_id == mock_wb_cabinet_2.id
             assert added_balance_payment.amount == pytest.approx(-80.0, abs=1e-2)
-            assert added_balance_payment.description == f"Ежедневное списание за 1 кампаний, дата: {current_date}"
-            assert isinstance(added_balance_payment.transaction_date_time, datetime.datetime)
+            assert (
+                added_balance_payment.description
+                == f"Ежедневное списание за 1 кампаний, дата: {current_date}"
+            )
+            assert isinstance(
+                added_balance_payment.transaction_date_time, datetime.datetime
+            )
 
             # Проверяем AdvPayment для второго кабинета
             added_adv_payment_2 = mock_session.add.call_args_list[3].args[0]
@@ -649,8 +760,12 @@ async def test_process_payment_for_advs_multiple_cabinets(
             mock_session.commit.assert_called_once()
             mock_session.rollback.assert_not_called()
             assert mock_redis_manager.set_billing_process_for_day.call_count == 2
-            mock_redis_manager.set_billing_process_for_day.assert_any_call(mock_wb_cabinet.id, current_date)
-            mock_redis_manager.set_billing_process_for_day.assert_any_call(mock_wb_cabinet_2.id, current_date)
+            mock_redis_manager.set_billing_process_for_day.assert_any_call(
+                mock_wb_cabinet.id, current_date
+            )
+            mock_redis_manager.set_billing_process_for_day.assert_any_call(
+                mock_wb_cabinet_2.id, current_date
+            )
 
 
 @pytest.mark.asyncio
@@ -687,7 +802,9 @@ async def test_process_payment_for_advs_race_condition(
                 MagicMock(scalar=MagicMock(return_value=0)),  # lock 1
                 MagicMock(scalar=MagicMock(return_value=0)),  # bonus_cnt 1
                 MagicMock(scalar=MagicMock(return_value=0)),  # balance_cnt 1
-                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # AdvPayment 1
+                MagicMock(
+                    scalar_one_or_none=MagicMock(return_value=None)
+                ),  # AdvPayment 1
                 MagicMock(scalar=MagicMock(return_value=None)),  # unlock 1
                 MagicMock(scalar=MagicMock(return_value=0)),  # lock 2
                 MagicMock(scalar=MagicMock(return_value=None)),  # unlock 2
@@ -710,10 +827,14 @@ async def test_process_payment_for_advs_race_condition(
 
             # Проверяем, что RedisManager.get_billing_process_for_day был вызван дважды
             assert mock_redis_manager.get_billing_process_for_day.call_count == 2
-            mock_redis_manager.get_billing_process_for_day.assert_any_call(mock_wb_cabinet.id, current_date)
+            mock_redis_manager.get_billing_process_for_day.assert_any_call(
+                mock_wb_cabinet.id, current_date
+            )
 
             # Проверяем, что Pricer был вызван только один раз (первым успешным вызовом)
-            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(str(mock_wb_cabinet.shop_id))
+            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(
+                str(mock_wb_cabinet.shop_id)
+            )
 
             # Проверяем, что добавление платежей произошло только один раз
             assert mock_session.add.call_count == 2  # WBBonusPayment + AdvPayment
@@ -723,4 +844,6 @@ async def test_process_payment_for_advs_race_condition(
             mock_session.rollback.assert_not_called()
 
             # Проверяем, что set_billing_process_for_day был вызван только один раз (первым успешным вызовом)
-            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(mock_wb_cabinet.id, current_date)
+            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(
+                mock_wb_cabinet.id, current_date
+            )

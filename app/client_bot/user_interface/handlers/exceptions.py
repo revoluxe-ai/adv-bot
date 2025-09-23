@@ -82,7 +82,9 @@ async def error_handler_for_telegram_bad_request_exception(
 
 
 @admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
-async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+async def forbidden_error_handler(
+    error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
+):
     logger.error("Юзер заблокировал бота")
     return
 
@@ -123,15 +125,18 @@ async def error_parsing_positions_handler(
         user_name = await session.execute(stmt)
         user_name = user_name.scalar_one_or_none()
 
-    await bot.send_message(admin_telegram_id, f"Ошибка парсинга у пользователя {user_name}")
+    await bot.send_message(
+        admin_telegram_id, f"Ошибка парсинга у пользователя {user_name}"
+    )
 
     return
 
 
 @admin_router.errors(ExceptionTypeFilter(ApiForbiddenError))
-async def api_forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+async def api_forbidden_error_handler(
+    error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
+):
     message = error_event.update.message
-    exception = error_event.exception
 
     if message is None:
         chat_id = error_event.update.callback_query.message.chat.id
@@ -201,7 +206,9 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
         part_of_trace = part_of_trace[tb.const.MAX_MESSAGE_LENGTH :]
 
     # Фильтруем и отправляем строки с упоминанием пакета 'app' из уже полученного трейса
-    lines_with_package_name = [line for line in trace_error.splitlines() if "app" in line]
+    lines_with_package_name = [
+        line for line in trace_error.splitlines() if "app" in line
+    ]
     if lines_with_package_name:
         brief_trace = "\n".join(lines_with_package_name)
         # Отправляем краткий трейс администратору частями, если он слишком длинный
@@ -216,4 +223,4 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
             admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены."
         )
 
-    await bot.send_message(admin_telegram_id, "Ник пользователя: %s" % user_name)
+    await bot.send_message(admin_telegram_id, f"Ник пользователя: {user_name}")

@@ -8,16 +8,14 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import cast as typing_cast
 
 import aiogram
-from PIL import Image
 from aiogram.utils import deep_linking
-from sqlalchemy import and_, func, select, case, Float, distinct, cast
+from PIL import Image
+from sqlalchemy import Float, and_, case, cast, distinct, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, load_only
+from sqlalchemy.orm import aliased, load_only, selectinload, subqueryload
 from sqlalchemy.sql.functions import coalesce
 
 from app.exc import (
@@ -49,12 +47,12 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.assoc_tables import favorite_advs_association
-from app.utils.db.models import RefLink, User
+from app.utils.db.models import Payment, RefLink, User, user_reflink_association
 from app.utils.db.session_maker import get_async_session_maker
-from app.utils.image_normalizer import safe_image_to_bytes
 from app.utils.redis_manager.exc import DataNotFoundError
 
 logger = logging.getLogger(__name__)
+
 
 _sm = get_async_session_maker
 
@@ -328,7 +326,7 @@ def __sort_by_update_keyword(keyword: WBItemPosition):
 
 async def set_positions(
     keyword_stats: list[CalculatedKeyword], adv_setting: AdvSetting
-) -> list[CalculatedKeyword]:
+) -> list[CalculatedKeyword] | None:
     texts = [keyword.text for keyword in keyword_stats]
     try:
         positions = await redis_manager.get_keywords_positions(adv_setting, texts)
@@ -464,35 +462,6 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> FullAdvStat | 
         return full_stat
     except DataNotFoundError:
         return None
-
-
-# async def get_max_cpc(adv: AdvSetting)-> Optional[int]:
-#     max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
-#     if max_cpc and adv.max_cpc:
-#         return min(max_cpc, adv.max_cpc)
-#     if not max_cpc:
-#         return adv.max_cpc
-#     if not adv.max_cpc:
-#         return max_cpc
-
-#
-# async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
-#     max_pay_for_order: Optional[int]  = adv.max_pay_for_order
-#     if not max_pay_for_order:
-#         return None
-#     all_keywords = await data_manager
-#     cpm_now = await get_cpm_by_nmid(adv.nmids[0])
-#     if not cpm_now:
-#         return None
-#     full_stat: FullAdvStat = await get_full_adv_stat_for_adv_id_from_redis(adv.adv_id)
-#     if not full_stat:
-#         return None
-#     else:
-#         clicks = full_stat.clicks + 1
-#         orders = full_stat.orders + 1
-#         need_clicks_for_order = clicks/orders
-#         max_cpc = max_pay_for_order / need_clicks_for_order
-#         return max_cpc
 
 
 # @profile
@@ -672,14 +641,13 @@ async def get_good_bad_phrases_for_min_ctr(
     text_to_predict_ctr: dict[str, float] = (
         await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
     )
-    # keyword_positions = await redis_manager.get_keywords_positions(adv_setting, texts)
-    # text_to_keyword_position: dict[str, WBItemPosition]\
-    #     = {position.keyword_text: position for position in keyword_positions}
+
     try:
         cpm_now = await get_cpm(adv_setting)
     except Exception as e:
         logger.error(f"Ошибка при получении cpm {e}", exc_info=True)
         cpm_now = None
+    new_statuses = []
 
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
@@ -695,7 +663,7 @@ async def get_good_bad_phrases_for_min_ctr(
             continue
         original_hard_status: int = int(keyword_setting.hard_status)
         keyword_stat.hard_status = original_hard_status
-        original_predict_ctr = text_to_predict_ctr.get(text, None)
+        original_predict_ctr = text_to_predict_ctr.get(text)
         keyword_stat.original_predict_ctr = original_predict_ctr
 
     keyword_stats: list[CalculatedKeyword] = __set_predict_ctr(
@@ -827,8 +795,8 @@ async def get_good_bad_phrases_for_min_ctr(
 async def get_wb_category(adv_setting: AdvSetting) -> WBCategory | None:
     try:
         nmid = adv_setting.nmids[0]
-    except:
-        raise NotItemsInAdvSetting("У кампании в базе нет товаров")
+    except Exception as e:
+        raise NotItemsInAdvSetting("У кампании в базе нет товаров") from e
     async with _sm() as session:
         smtp = (
             select(WBCard)
@@ -976,41 +944,44 @@ class ReferralStatistic:
 async def get_ref_statistic(user_telegram_id: int) -> list[ReferralStatistic] | None:
     """TODO:  НУЖНО ЧИНИТЬ,ПОКА НЕ РАБОТАЕТ ПАРТНЕРКА"""
     async with _sm() as session:
-        # # Сначала найдем пользователя по telegram_id
-        # user_query = select(User.id).where(User.user_telegram_id == user_telegram_id)
-        # result = await session.execute(user_query)
-        # user_id = result.scalar()
-        #
-        # if user_id is None:
-        #     return None
-        #
-        # # Теперь получим статистику по реферальным ссылкам
-        # statistics_query = (
-        #     select(
-        #         RefLink.name,
-        #         func.count(user_reflink_association.c.user_id).label("referrals_count"),
-        #         func.coalesce(func.sum(Payment.amount), 0).label("total_payments"),
-        #     )
-        #     .select_from(RefLink)
-        #     .outerjoin(
-        #         user_reflink_association,
-        #         RefLink.id == int(user_reflink_association.c.reflink_id),
-        #     )
-        #     .outerjoin(WBUserCabinet, WBUserCabinet.user_id == User.id)
-        #     .outerjoin(WBCabinet, WBCabinet.id == int(WBUserCabinet.wbcabinet_id))
-        #     .outerjoin(Payment, Payment. == WBCabinet.id) # mytyp
-        #     .where(RefLink.referrer_id == user_id)
-        #     .group_by(RefLink.name)
-        # )
-        #
-        # result = await session.execute(statistics_query)
-        # stats = result.fetchall()
-        #
-        # # Возвращаем результаты в удобном для использования виде
-        # return [
-        #     ReferralStatistic(name=row[0], referrals_count=row[1], total_payments=min(row[2], 500)) for row in stats
-        # ]
-        pass
+        # Сначала найдем пользователя по telegram_id
+        user_query = select(User.id).where(User.user_telegram_id == user_telegram_id)
+        result = await session.execute(user_query)
+        user_id = result.scalar()
+
+        if user_id is None:
+            return None
+
+        # Теперь получим статистику по реферальным ссылкам
+        statistics_query = (
+            select(
+                RefLink.name,
+                func.count(user_reflink_association.c.user_id).label("referrals_count"),
+                func.coalesce(func.sum(Payment.amount), 0).label("total_payments"),
+            )
+            .select_from(RefLink)
+            .outerjoin(
+                user_reflink_association,
+                RefLink.id == int(user_reflink_association.c.reflink_id),
+            )
+            .outerjoin(User, user_reflink_association.c.user_id == int(User.id))
+            .outerjoin(WBUserCabinet, WBUserCabinet.user_id == User.id)
+            .outerjoin(WBCabinet, WBCabinet.id == int(WBUserCabinet.wbcabinet_id))
+            .outerjoin(Payment, Payment == WBCabinet.id)
+            .where(RefLink.referrer_id == user_id)
+            .group_by(RefLink.name)
+        )
+
+        result = await session.execute(statistics_query)
+        stats = result.fetchall()
+
+        # Возвращаем результаты в удобном для использования виде
+        return [
+            ReferralStatistic(
+                name=row[0], referrals_count=row[1], total_payments=min(row[2], 500)
+            )
+            for row in stats
+        ]
 
 
 @dataclass
@@ -1280,7 +1251,7 @@ async def clear_cards_in_db(nmids: list[int]):
 async def get_keywords_from_clickhouse(adv_id: int) -> list[str]:
     query = f"""
 SELECT DISTINCT text
-FROM default_db.advkeyword 
+FROM default_db.advkeyword
 WHERE adv_id = {adv_id}
 """
     async with get_clickhouse_client() as client:
@@ -1292,14 +1263,14 @@ WHERE adv_id = {adv_id}
 async def get_nmids_for_keyword_text(text: str) -> set[int]:
     query = """
     SELECT DISTINCT adv_id
-    FROM default_db.advkeyword 
+    FROM default_db.advkeyword
     WHERE text = %(text)s
     """
     params = {"text": text}
     async with get_clickhouse_client() as client:
         result = await client.query(query, parameters=params)
         nmids = result.result_rows
-    return set([nmid[0] for nmid in nmids if nmid])
+    return {nmid[0] for nmid in nmids if nmid}
 
 
 async def get_need_nmids_for_parsing(text, adv_id, adv_ids):
@@ -1461,7 +1432,7 @@ async def get_active_search_advs() -> list[AdvSetting]:
     stmt = select(AdvSetting).where(
         # Проверяем, что name содержит паттерн <!-[цифры]-!>
         AdvSetting.name.op("~")(pattern),
-        AdvSetting.bot_active == True,
+        AdvSetting.bot_active is True,
         AdvSetting.active_status == "started",
     )
     async with _sm() as session:
@@ -1495,7 +1466,7 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
         select(AdvSetting)
         .distinct()
         .join(AdvSetting.wb_cabinet)
-        .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active == True)
+        .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active is True)
         .options(
             load_only(AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id)
         )
@@ -1566,11 +1537,11 @@ from datetime import datetime
 
 async def get_avg_base_positions(nmid: int, start_date: str, end_date: str):
     query = """
-    SELECT toDate(timestamp) as date, 
+    SELECT toDate(timestamp) as date,
        text,
        AVG(base_position) as avg_base_position
 FROM default_db.wbitemposition
-WHERE nmid = %(nmid)s 
+WHERE nmid = %(nmid)s
   AND timestamp >= toDateTime(%(start_date)s)
   AND timestamp <= toDateTime(%(end_date)s)
 GROUP BY date, text
@@ -1671,14 +1642,14 @@ async def get_last_full_stat_update(adv_id: int):
 
 async def get_all_keywords_from_ch(last_days=7) -> set[str]:
     ch_query = """
-    SELECT DISTINCT text FROM default_db.advkeyword 
+    SELECT DISTINCT text FROM default_db.advkeyword
     WHERE date >= today() - %(last_days)s
     """
 
     async with get_clickhouse_client() as client:
         result = await client.query(ch_query, parameters={"last_days": last_days})
         keywords = result.result_rows
-    return set([keyword[0] for keyword in keywords if keyword])
+    return {keyword[0] for keyword in keywords if keyword}
 
 
 async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(shop_id: str):

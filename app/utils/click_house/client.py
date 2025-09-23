@@ -37,15 +37,21 @@ function_count_lock: LockType | None = None
 if system_name == "Linux":
     # Используем Manager для создания разделяемых между процессами словарей
     manager = Manager()
-    function_connection_count = manager.dict()  # Словарь для отслеживания соединений по функциям
+    function_connection_count = (
+        manager.dict()
+    )  # Словарь для отслеживания соединений по функциям
     caller_function_connection_count = (
         manager.dict()
     )  # Словарь для отслеживания соединений по вызывающим функциям
-    grand_caller_function_connection_count = manager.dict()  # Словарь для отслеживания соединений
+    grand_caller_function_connection_count = (
+        manager.dict()
+    )  # Словарь для отслеживания соединений
     # по функциям 3-го уровня
 
     # Глобальные переменные для счётчика и блокировок
-    connection_count = cast(ValueProtocol, manager.Value("i", 0))  # Счётчик открытых соединений
+    connection_count = cast(
+        ValueProtocol, manager.Value("i", 0)
+    )  # Счётчик открытых соединений
     connection_lock = Lock()  # Блокировка для синхронизации доступа к общему счётчику
     function_count_lock = Lock()  # Блокировка для синхронизации доступа к словарям
 
@@ -117,9 +123,16 @@ class get_clickhouse_client:
 
                 # Функция 3-го уровня
                 if self.grand_caller_func_name:
-                    if self.grand_caller_func_name not in grand_caller_function_connection_count:
-                        grand_caller_function_connection_count[self.grand_caller_func_name] = 0
-                    grand_caller_function_connection_count[self.grand_caller_func_name] += 1
+                    if (
+                        self.grand_caller_func_name
+                        not in grand_caller_function_connection_count
+                    ):
+                        grand_caller_function_connection_count[
+                            self.grand_caller_func_name
+                        ] = 0
+                    grand_caller_function_connection_count[
+                        self.grand_caller_func_name
+                    ] += 1
                     logger.debug(
                         f"Grand caller function '{self.grand_caller_func_name}' open connections count:"
                         f" {grand_caller_function_connection_count[self.grand_caller_func_name]}"

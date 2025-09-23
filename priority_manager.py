@@ -15,7 +15,9 @@ class PriorityManager:
         self.client = docker.from_env()
         self.bot = self.client.containers.get("wb_bot")
         self.backend = self.client.containers.get("adv_wb_bot_backend")
-        self.activity_threshold = 30  # Процент нагрузки на CPU, при котором бот считается активным
+        self.activity_threshold = (
+            30  # Процент нагрузки на CPU, при котором бот считается активным
+        )
         self.check_interval = 0.5  # Интервал проверки активности
 
     def calculate_cpu_usage(self, stats):
@@ -24,7 +26,8 @@ class PriorityManager:
             - stats["precpu_stats"]["cpu_usage"]["total_usage"]
         )
         system_delta = (
-            stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
+            stats["cpu_stats"]["system_cpu_usage"]
+            - stats["precpu_stats"]["system_cpu_usage"]
         )
         num_cores = len(stats["cpu_stats"]["cpu_usage"]["percpu_usage"])
 

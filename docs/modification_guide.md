@@ -28,10 +28,10 @@ class NewFeatureCallback(CallbackData, prefix="new_feature"):
 ```python
 def get_some_keyboard(param_id: int):
     builder = InlineKeyboardBuilder()
-    
+
     # Добавление существующих кнопок
     # ...
-    
+
     # Добавление новой кнопки
     button = InlineKeyboardButton(
         text="Новая функция",
@@ -41,7 +41,7 @@ def get_some_keyboard(param_id: int):
         ).pack()
     )
     builder.row(button)
-    
+
     return builder.as_markup()
 ```
 
@@ -59,7 +59,7 @@ async def process_new_feature(
     # Ваш код для обработки нажатия на кнопку
     param_id = callback_data.param_id
     chat_id = callback.message.chat.id
-    
+
     # Например, отправляем сообщение
     await bot.send_message(chat_id, f"Вы выбрали новую функцию с параметром {param_id}")
 ```
@@ -111,19 +111,19 @@ class NewFeatureMessage:
         self.bot = bot
         self.chat_id = chat_id
         self.data = data or {}
-    
+
     async def __call__(self):
         text = (
             f"✅ Новая функция активирована!\n\n"
             f"Параметр: {self.data.get('param', 'не указан')}\n"
             f"Статус: {self.data.get('status', 'активный')}"
         )
-        
+
         # Создаем клавиатуру с кнопками для этого сообщения
         keyboard = keyboards.get_new_feature_keyboard(
             param_id=self.data.get('param_id')
         )
-        
+
         await self.bot.send_message(
             chat_id=self.chat_id,
             text=text,
@@ -146,7 +146,7 @@ async def some_handler(
         "status": "активный",
         "param_id": callback_data.id
     }
-    
+
     await messages.NewFeatureMessage(bot, chat_id, data)()
 ```
 
@@ -171,13 +171,13 @@ async def start_new_feature_process(
     state: FSMContext
 ):
     chat_id = callback.message.chat.id
-    
+
     # Устанавливаем состояние
     await state.set_state(states.NewFeatureState.waiting_for_input)
-    
+
     # Сохраняем данные в состоянии
     await state.update_data(param_id=callback_data.param_id)
-    
+
     # Отправляем сообщение с инструкциями
     await bot.send_message(chat_id, "Введите значение для новой функции:")
 
@@ -189,18 +189,18 @@ async def process_new_feature_input(
 ):
     user_input = message.text
     chat_id = message.chat.id
-    
+
     # Получаем данные из состояния
     state_data = await state.get_data()
     param_id = state_data.get("param_id")
-    
+
     # Обрабатываем ввод пользователя
     # ...
-    
+
     # Переходим к следующему состоянию
     await state.set_state(states.NewFeatureState.waiting_for_confirmation)
     await state.update_data(user_input=user_input)
-    
+
     # Отправляем сообщение для подтверждения
     await bot.send_message(
         chat_id,
@@ -215,11 +215,11 @@ async def process_new_feature_input(
 ```python
 def get_new_feature_keyboard(items: list, page: int = 1, items_per_page: int = 5):
     builder = InlineKeyboardBuilder()
-    
+
     # Вычисляем границы текущей страницы
     start_idx = (page - 1) * items_per_page
     end_idx = min(start_idx + items_per_page, len(items))
-    
+
     # Добавляем кнопки для элементов на текущей странице
     for i in range(start_idx, end_idx):
         item = items[i]
@@ -231,10 +231,10 @@ def get_new_feature_keyboard(items: list, page: int = 1, items_per_page: int = 5
             ).pack()
         )
         builder.row(button)
-    
+
     # Добавляем кнопки навигации, если есть больше страниц
     nav_buttons = []
-    
+
     if page > 1:
         # Кнопка "Назад"
         nav_buttons.append(
@@ -246,7 +246,7 @@ def get_new_feature_keyboard(items: list, page: int = 1, items_per_page: int = 5
                 ).pack()
             )
         )
-    
+
     # Номер текущей страницы
     nav_buttons.append(
         InlineKeyboardButton(
@@ -254,7 +254,7 @@ def get_new_feature_keyboard(items: list, page: int = 1, items_per_page: int = 5
             callback_data="ignore"
         )
     )
-    
+
     if end_idx < len(items):
         # Кнопка "Вперед"
         nav_buttons.append(
@@ -266,10 +266,10 @@ def get_new_feature_keyboard(items: list, page: int = 1, items_per_page: int = 5
                 ).pack()
             )
         )
-    
+
     # Добавляем строку с кнопками навигации
     builder.row(*nav_buttons)
-    
+
     # Добавляем кнопку "Назад в меню"
     builder.row(
         InlineKeyboardButton(
@@ -279,7 +279,7 @@ def get_new_feature_keyboard(items: list, page: int = 1, items_per_page: int = 5
             ).pack()
         )
     )
-    
+
     return builder.as_markup()
 ```
 
@@ -296,7 +296,7 @@ class NewMenuCallback(CallbackData, prefix="new_menu"):
 ```python
 def get_new_menu_keyboard():
     builder = InlineKeyboardBuilder()
-    
+
     # Добавляем пункты меню
     builder.row(
         InlineKeyboardButton(
@@ -322,7 +322,7 @@ def get_new_menu_keyboard():
             callback_data=callbacks.Navigation(action="back").pack()
         )
     )
-    
+
     return builder.as_markup()
 ```
 
@@ -332,15 +332,15 @@ class NewMenuMessage:
     def __init__(self, bot: Bot, chat_id: int):
         self.bot = bot
         self.chat_id = chat_id
-    
+
     async def __call__(self):
         text = (
             "🔹 Новое меню\n\n"
             "Выберите одну из доступных опций:"
         )
-        
+
         keyboard = keyboards.get_new_menu_keyboard()
-        
+
         await self.bot.send_message(
             chat_id=self.chat_id,
             text=text,
@@ -359,7 +359,7 @@ async def process_menu_option_1(
 ):
     chat_id = callback.message.chat.id
     await bot.send_message(chat_id, "Вы выбрали пункт 1")
-    
+
 @router.callback_query(NewMenuCallback.filter(F.action == "option_2"))
 async def process_menu_option_2(
     callback: types.CallbackQuery,
@@ -369,7 +369,7 @@ async def process_menu_option_2(
 ):
     chat_id = callback.message.chat.id
     await bot.send_message(chat_id, "Вы выбрали пункт 2")
-    
+
 @router.callback_query(NewMenuCallback.filter(F.action == "option_3"))
 async def process_menu_option_3(
     callback: types.CallbackQuery,
@@ -419,7 +419,7 @@ class MyNewFeatureSettings(BaseTable):
     name = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     adv_setting_id = Column(Integer, ForeignKey('adv_settings.id'))
-    
+
     adv_setting = relationship("AdvSetting", back_populates="my_new_feature_settings")
 ```
 
@@ -435,12 +435,12 @@ from .models import MyNewFeatureSettings
 class MyNewFeatureService:
     def __init__(self, session: AsyncSession):
         self.session = session
-    
+
     async def get_settings_by_adv_id(self, adv_id: int) -> Optional[MyNewFeatureSettings]:
         stmt = select(MyNewFeatureSettings).where(MyNewFeatureSettings.adv_setting_id == adv_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
-    
+
     async def create_settings(self, name: str, adv_id: int) -> MyNewFeatureSettings:
         settings = MyNewFeatureSettings(
             name=name,
@@ -450,17 +450,17 @@ class MyNewFeatureService:
         await self.session.commit()
         await self.session.refresh(settings)
         return settings
-    
+
     async def update_settings(self, settings_id: int, is_active: bool) -> Optional[MyNewFeatureSettings]:
         stmt = select(MyNewFeatureSettings).where(MyNewFeatureSettings.id == settings_id)
         result = await self.session.execute(stmt)
         settings = result.scalar_one_or_none()
-        
+
         if settings:
             settings.is_active = is_active
             await self.session.commit()
             await self.session.refresh(settings)
-        
+
         return settings
 ```
 
@@ -499,11 +499,11 @@ async def view_settings(
 ):
     chat_id = callback.message.chat.id
     adv_id = callback_data.adv_id
-    
+
     async with sm() as session:
         service_obj = service.MyNewFeatureService(session)
         settings = await service_obj.get_settings_by_adv_id(adv_id)
-        
+
         if settings:
             status = "активно" if settings.is_active else "не активно"
             await bot.send_message(
@@ -527,11 +527,11 @@ async def toggle_settings(
 ):
     chat_id = callback.message.chat.id
     settings_id = callback_data.settings_id
-    
+
     async with sm() as session:
         service_obj = service.MyNewFeatureService(session)
         settings = await service_obj.get_settings_by_id(settings_id)
-        
+
         if settings:
             settings = await service_obj.update_settings(settings_id, not settings.is_active)
             status = "активно" if settings.is_active else "не активно"
@@ -580,10 +580,10 @@ from app.modules.my_new_feature.telegram.callbacks import MyNewFeatureCallback
 
 def get_adv_setting_keyboard(adv_setting: AdvSetting):
     builder = InlineKeyboardBuilder()
-    
+
     # Существующие кнопки
     # ...
-    
+
     # Кнопка для новой функции
     builder.row(
         InlineKeyboardButton(
@@ -594,7 +594,7 @@ def get_adv_setting_keyboard(adv_setting: AdvSetting):
             ).pack()
         )
     )
-    
+
     return builder.as_markup()
 ```
 
@@ -615,4 +615,4 @@ alembic upgrade head
 3. **Колбэки Telegram** - для обработки взаимодействия с пользователем
 4. **Обработчики** - для выполнения конкретных действий в ответ на действия пользователя
 5. **Роутеры** - для регистрации обработчиков и их соединения с основным ботом
-6. **UI интеграция** - добавление кнопок и сообщений в пользовательский интерфейс 
+6. **UI интеграция** - добавление кнопок и сообщений в пользовательский интерфейс

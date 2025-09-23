@@ -33,6 +33,7 @@ from app.settings import settings
 from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
     UpdateBidsInSearchAdvDTO,
 )
+
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -40,6 +41,7 @@ from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
 
 logger = logging.getLogger(__name__)
+
 
 T = TypeVar("T")
 
@@ -54,8 +56,7 @@ class CoroutinesManager:
         assert wb_cabinet
         self._wb_shop_data_manager = WBShopDataManager(wb_cabinet)
 
-        self._wb_api = wb_api  # deprecated
-        self._access = wb_api.access
+        self._wb_api = wb_api
         self.shop_id = wb_api.shop_id
         self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
             list[CalculatedKeyword]
@@ -86,7 +87,6 @@ class CoroutinesManager:
 
         return None
 
-
     @while_coroutine_decorator(5 * 60)
     async def update_common_sale_stat(self) -> None:
         wb_api = self._wb_api
@@ -112,8 +112,10 @@ class CoroutinesManager:
             if auction_adv_id := adv.search_adv_id:
                 all_adv_ids.add(auction_adv_id)
 
-        full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
-            wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
+        full_stats: list[FullAdvStat] = (
+            await wb_data_getter.get_full_adv_stat_for_adv_ids(
+                wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
+            )
         )
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
@@ -122,15 +124,8 @@ class CoroutinesManager:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
         return None
 
-    # @staticmethod
-    # async def _update_adv_data_from_wb_to_pg(
-    #     shop_data_updater: ShopDataUpdater,
-    # ) -> None:
-    #     await shop_data_updater.update_advs_data()
-
-    @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-            shop_data_updater: ShopDataUpdater,
+        shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -142,7 +137,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _async_zip_longest(
-            *async_gens, fillvalue=None
+        *async_gens, fillvalue=None
     ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
@@ -178,7 +173,9 @@ class CoroutinesManager:
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
 
             generator: AsyncGenerator[tuple[str, int], None] = (
-                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(adv, keywords)
+                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
+                    adv, keywords
+                )
             )
             generators.append(generator)
         zipped_generators = self._async_zip_longest(*generators)
@@ -191,7 +188,9 @@ class CoroutinesManager:
                     await asyncio.sleep(
                         settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
                     )  # Добавляем небольшую задержку между задачами
-                    logger.info(f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга")
+                    logger.info(
+                        f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
+                    )
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
@@ -222,11 +221,13 @@ class CoroutinesManager:
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:
         from .old_modules.setting_auto_updater.modules.first_key_updater import (
-            FirstKeyUpdaterError,
             FirstKeyUpdater,
+            FirstKeyUpdaterError,
         )
 
-        all_active_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
+        all_active_advs: list[AdvSetting] = (
+            await self._wb_shop_data_manager.get_active_advs()
+        )
         tasks = []
         for adv in all_active_advs:
             if not adv.auto_update_white_list:
@@ -235,7 +236,9 @@ class CoroutinesManager:
                 self._wb_shop_data_manager.get_calculated_keywords(adv)
             )
             updater = FirstKeyUpdater(adv)
-            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(keywords)
+            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(
+                keywords
+            )
             task = asyncio.create_task(update_coroutine)
             tasks.append(task)
 

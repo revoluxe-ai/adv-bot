@@ -74,7 +74,7 @@ class FaissManager:
     def _get_all_images_index(self) -> faiss.IndexFlatL2:
         file_name = "all_images.index"
         file_path = self.__get_file_path(file_name)
-        criteria = Image.is_background != True
+        criteria = Image.is_background is not True
         index = self.__get_index_by_criteria(file_path, criteria)
         self._index_save_list.append([file_path, index])
         faiss.write_index(index, file_path)
@@ -100,7 +100,7 @@ class FaissManager:
     def _get_background_images_index(self):
         file_name = "background_images.index"
         file_path = self.__get_file_path(file_name)
-        criteria = Image.is_background == True
+        criteria = Image.is_background is True
         index = self.__get_index_by_criteria(file_path, criteria)
         self._index_save_list.append([file_path, index])
         return index
@@ -117,7 +117,7 @@ class FaissManager:
         return index
 
     def save_indexes(self):
-        for path, index in self._index_save_list:
+        for _path, index in self._index_save_list:
             index.save_index()
 
     @staticmethod
@@ -140,18 +140,23 @@ class FaissManager:
                         return images
                     else:
                         return images
-            except:
+            except Exception:
                 images = self.__get_new_objects(objects, pickle_file_path)
                 return images
 
-    def _get_images_in_items_index(self, index_type):
-        index_name = "images_in_items"
-        index_file_name = index_name + ".index"
-        # object_pickle_name = index_name + '.pickle'
-        index_file_path = self.__get_file_path(index_file_name)
-        # pickle_file_path = self.__get_file_path(object_pickle_name)
-        s = self._session_maker()
-        images = s.query(Image).join(Image.items).filter(Image.items.any()).distinct(Image.id)
+        # def _get_images_in_items_index(self, index_type):
+        #     index_name = "images_in_items"
+        #     index_file_name = index_name + ".index"
+        #     # object_pickle_name = index_name + '.pickle'
+        #     index_file_path = self.__get_file_path(index_file_name)
+        #     # pickle_file_path = self.__get_file_path(object_pickle_name)
+        #     s = self._session_maker()
+        images = (
+            s.query(Image)
+            .join(Image.items)
+            .filter(Image.items.any())
+            .distinct(Image.id)
+        )
         # images = self._get_objects(images, pickle_file_path)
         index = Index(
             images,
@@ -168,7 +173,9 @@ class FaissManager:
         file_name = "keyword.index"
         file_path = self.__get_file_path(file_name)
         s = self._session_maker()
-        keywords = s.query(Keyword).filter(getattr(Keyword, vector_property) != None)
+        keywords = s.query(Keyword).filter(
+            getattr(Keyword, vector_property) is not None
+        )
         index = Index(
             keywords,
             vector_property,

@@ -69,7 +69,9 @@ async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet) -> 
         await _update_cards_in_db(cards_part, wb_cabinet)
 
 
-async def _update_cards_in_db(cards: Sequence[CardFromWB], wb_cabinet: WBCabinet) -> None:
+async def _update_cards_in_db(
+    cards: Sequence[CardFromWB], wb_cabinet: WBCabinet
+) -> None:
     if not cards:
         return
 

@@ -18,7 +18,9 @@ class KeyboardsGetter:
         self.__set_data(adv)
         builder = InlineKeyboardBuilder()
 
-        setting_plan_for_sales_for_day_button = self.get_setting_plan_for_sales_for_day_button()
+        setting_plan_for_sales_for_day_button = (
+            self.get_setting_plan_for_sales_for_day_button()
+        )
         builder.row(setting_plan_for_sales_for_day_button)
 
         target_price_for_order_button = self.get_setting_target_price_for_order_button()

@@ -45,7 +45,9 @@ async def _create_complex_advs(
     client_session = ctx["client_session"]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
     manager = MainAdvManager(access, client_session)
-    await bot.send_message(user_telegram_id, f"Создаю комплексную кампанию для артикула {nmid}")
+    await bot.send_message(
+        user_telegram_id, f"Создаю комплексную кампанию для артикула {nmid}"
+    )
     try:
         auto_adv_id, search_adv_id = await manager.create_complex_advs(
             bot, user_telegram_id, nmid, hard_mode
@@ -66,8 +68,7 @@ async def _create_complex_advs(
     except CardsNotFoundForShopError:
         await bot.send_message(
             user_telegram_id,
-            f"Карточка с артикулом {nmid} не найдена на Wildberries,"
-            f"проверьте правильность артикула!",
+            f"Карточка с артикулом {nmid} не найдена на Wildberries,проверьте правильность артикула!",
         )
 
     except NotEnoughBalanceOnShopError as exc:

@@ -1,8 +1,6 @@
 import asyncio
 import logging
-from typing import (
-    TypeVar,
-)
+from typing import TypeVar
 
 from .modules.wb_api import WBApi
 from .shop_run_worker.redis_manager import RedisShopManager

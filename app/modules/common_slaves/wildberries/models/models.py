@@ -35,8 +35,12 @@ _sm = get_async_session_maker
 
 
 class WBUserCabinet(BaseTable):
-    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="wb_user_cabinets")
+    wb_cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="wb_user_cabinets"
+    )
     user_id: Mapped[int] = Column(Integer, ForeignKey("user.id"), nullable=False)
     user: Mapped[User] = relationship("User", back_populates="wb_user_cabinets")
     name = Column(String(255), nullable=False)
@@ -53,12 +57,18 @@ class WBBalancePayment(BaseTable):
     __tablename__ = "wbbalancepayment"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="balance_payments")
+    wb_cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="balance_payments"
+    )
 
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=True)
-    transaction_date_time = Column(DateTime, nullable=False, server_default=text("now()"))
+    transaction_date_time = Column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
     # Тип операции для унификации с бонусами: 'add', 'subtract', 'auto_subtract', 'reset' (если понадобится)
     operation_type = Column(String, nullable=False, server_default=text("'subtract'"))
     __table_args__ = (
@@ -81,12 +91,18 @@ class WBBonusPayment(BaseTable):
     __tablename__ = "wbbonuspayment"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    wb_cabinet_id: Mapped[int] = Column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="bonus_payments")
+    wb_cabinet_id: Mapped[int] = Column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="bonus_payments"
+    )
 
     amount = Column(Float, nullable=False)
     description = Column(String, nullable=True)
-    transaction_date_time = Column(DateTime, nullable=False, server_default=text("now()"))
+    transaction_date_time = Column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
 
     # Новые поля для поддержки операций администраторов
     operation_type = Column(
@@ -107,14 +123,18 @@ class WBBonusPayment(BaseTable):
             "wb_cabinet_id",
             text("DATE(transaction_date_time)"),
             unique=True,
-            postgresql_where=text("operation_type = 'auto_subtract' AND amount < 0 AND admin_user_id IS NULL"),
+            postgresql_where=text(
+                "operation_type = 'auto_subtract' AND amount < 0 AND admin_user_id IS NULL"
+            ),
         ),
     )
 
 
 class WBCabinet(BaseTable):
     shop_id: Mapped[str] = Column(String, nullable=False, unique=True)
-    wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_cabinet", uselist=True)
+    wb_cards: Mapped[list["WBCard"]] = relationship(
+        "WBCard", back_populates="wb_cabinet", uselist=True
+    )
     wb_categories = relationship("WBCategory", uselist=True)
     adv_settings = relationship("AdvSetting", back_populates="wb_cabinet", uselist=True)
     wb_user_cabinets: Mapped[list[WBUserCabinet]] = relationship(
@@ -122,14 +142,22 @@ class WBCabinet(BaseTable):
         back_populates="wb_cabinet",
     )
     active = Column(Boolean, default=True)
-    expiration_time = Column(DateTime, nullable=False, server_default=text('datetime("now", "+7 days")'))
+    expiration_time = Column(
+        DateTime, nullable=False, server_default=text('datetime("now", "+7 days")')
+    )
     expiration_alarm_days_pass = Column(Integer, default=None)
     demo: Mapped[bool] = Column(Boolean, default=True)
     balance = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
-    bonus: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
+    bonus: Mapped[float] = mapped_column(
+        Float, default=0, server_default=text("0"), nullable=False
+    )
     white_list_update_active = Column(Boolean, default=False)
-    balance_payments = relationship("WBBalancePayment", back_populates="wb_cabinet", uselist=True)
-    bonus_payments = relationship("WBBonusPayment", back_populates="wb_cabinet", uselist=True)
+    balance_payments = relationship(
+        "WBBalancePayment", back_populates="wb_cabinet", uselist=True
+    )
+    bonus_payments = relationship(
+        "WBBonusPayment", back_populates="wb_cabinet", uselist=True
+    )
     __table_args__ = (
         Index("idx_balance_bonus", "balance", "bonus"),
         Index("idx_balance", "balance"),
@@ -177,6 +205,7 @@ class WBToken(BaseTable):
     @property
     def __payload(self):
         from .excs import NotValidTokenError
+
         try:
             result = jwt.decode(self.api_key, options={"verify_signature": False})
             return result
@@ -187,10 +216,7 @@ class WBToken(BaseTable):
         try:
             assert self.api_key
             result = jwt.decode(self.api_key, options={"verify_signature": False})
-            if result:
-                return True
-            else:
-                return False
+            return bool(result)
         except (ValueError, DecodeError):
             return False
 
@@ -257,9 +283,15 @@ class AdvKeyword(BaseTable):
     clicks = Column(Integer, default=0)
     spend = Column(Float, default=0)
     add_to_db = Column(Boolean, default=False)
-    keyword_setting_id = Column(Integer, ForeignKey("keywordsetting.id"), nullable=False)
+    keyword_setting_id = Column(
+        Integer, ForeignKey("keywordsetting.id"), nullable=False
+    )
     keyword_setting = relationship("KeywordSetting", back_populates="adv_keywords")
-    __table_args__ = (UniqueConstraint("text", "date", "adv_setting_id", name="_text_date_adv_setting_id_uc"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "text", "date", "adv_setting_id", name="_text_date_adv_setting_id_uc"
+        ),
+    )
 
 
 class WBCategory(BaseTable):
@@ -270,7 +302,9 @@ class WBCategory(BaseTable):
         "WBCabinet", back_populates="wb_categories"
     )  # Добавляем связь обратно к WbCabinet
     wb_category_name: Mapped[str] = mapped_column(String, nullable=False)
-    wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_category", uselist=True)
+    wb_cards: Mapped[list["WBCard"]] = relationship(
+        "WBCard", back_populates="wb_category", uselist=True
+    )
     Index("ix_wb_category_name", "wb_category_name")
 
 
@@ -279,12 +313,20 @@ class WBCard(BaseTable):  # Изменено название таблицы
     offer_id = Column(String)
     name = Column(String)
     wb_category_id = Column(Integer, ForeignKey("wbcategory.id"))
-    wb_category: Mapped[WBCategory] = relationship("WBCategory", back_populates="wb_cards", lazy="joined")
+    wb_category: Mapped[WBCategory] = relationship(
+        "WBCategory", back_populates="wb_cards", lazy="joined"
+    )
     json: Mapped[str] = Column(JSONB)
-    wb_cabinet_id = Column(Integer, ForeignKey("wbcabinet.id"))  # Добавляем внешний ключ к WbCabinet
+    wb_cabinet_id = Column(
+        Integer, ForeignKey("wbcabinet.id")
+    )  # Добавляем внешний ключ к WbCabinet
     wb_cabinet: Mapped[WBCabinet] = relationship("WBCabinet", back_populates="wb_cards")
-    adv_setting_id = Column(Integer, ForeignKey("advsetting.id"))  # Добавлен внешний ключ
-    adv_setting: Mapped["AdvSetting"] = relationship("AdvSetting", back_populates="wb_cards")
+    adv_setting_id = Column(
+        Integer, ForeignKey("advsetting.id")
+    )  # Добавлен внешний ключ
+    adv_setting: Mapped["AdvSetting"] = relationship(
+        "AdvSetting", back_populates="wb_cards"
+    )
     updated = Column(Boolean, default=False)
     add_to_db = Column(Boolean, default=False)
 
@@ -320,10 +362,12 @@ class AdvSetting(BaseTable):
         self._worst_promo_position = None
 
     def __repr__(self):
-        return (f"name: {self.name},"
-                f" adverdId: {self.adv_id},"
-                f"bot_active: {self.bot_active},"
-                f" active_status: {self.active_status}")
+        return (
+            f"name: {self.name},"
+            f" adverdId: {self.adv_id},"
+            f"bot_active: {self.bot_active},"
+            f" active_status: {self.active_status}"
+        )
 
     favorite_users: Mapped[list[User]] = relationship(
         "User", secondary=favorite_advs_association, back_populates="favorites_advs"
@@ -334,8 +378,12 @@ class AdvSetting(BaseTable):
         nullable=True,
     )  # Автоматическая рекламная кампания
     name = mapped_column(String, nullable=False)
-    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped[WBCabinet] = relationship("WBCabinet", back_populates="adv_settings", lazy="joined")
+    wb_cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped[WBCabinet] = relationship(
+        "WBCabinet", back_populates="adv_settings", lazy="joined"
+    )
     wb_cards: Mapped[list[WBCard]] = relationship(
         "WBCard",
         back_populates="adv_setting",
@@ -368,19 +416,29 @@ class AdvSetting(BaseTable):
     )
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
-    payments: Mapped[list[AdvPayment]] = relationship("AdvPayment", back_populates="adv_setting", uselist=True)
+    payments: Mapped[list[AdvPayment]] = relationship(
+        "AdvPayment", back_populates="adv_setting", uselist=True
+    )
     parsing_active = mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
-    bidder_active: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
+    bidder_active: Mapped[bool | None] = mapped_column(
+        Boolean, default=False, nullable=True
+    )
     max_cpm = mapped_column(Integer, nullable=True)
     max_place = mapped_column(Integer, nullable=True)
     min_block_position = mapped_column(Integer, nullable=True, default=0)
     clusters_mode = mapped_column(Boolean, nullable=True, default=True)
     target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
     hide_small_query_keywords = mapped_column(Integer, nullable=True, default=0)
-    target_ctr_mode_strategy = mapped_column(String, nullable=True, default="forward")  # forward, keep
-    new_auto_min_ctr_mode = mapped_column(Boolean, nullable=False, default=True, server_default="true")
-    reset_place = mapped_column(Boolean, nullable=True, default=True, server_default=text("true"))
+    target_ctr_mode_strategy = mapped_column(
+        String, nullable=True, default="forward"
+    )  # forward, keep
+    new_auto_min_ctr_mode = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    reset_place = mapped_column(
+        Boolean, nullable=True, default=True, server_default=text("true")
+    )
     _search_adv_id = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=settings.BIDDER_STEP)
     exponent_predict_ctr = mapped_column(
@@ -390,20 +448,28 @@ class AdvSetting(BaseTable):
         server_default=text(str(settings.DEFAULT_CTR_EXPONENTA)),
     )
 
-    auction_boost_all_phrase_mode = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    auction_boost_all_phrase_mode = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     plan_for_sales_for_day = mapped_column(Integer, nullable=True, default=None)
     target_price_for_order = mapped_column(Float, nullable=True, default=None)
 
     max_price_for_order = mapped_column(Float, nullable=True, default=None)
     cpm = mapped_column(Integer, nullable=True, default=None)
-    bidder_for_auto = mapped_column(Boolean, nullable=True, default=True, server_default="true")
+    bidder_for_auto = mapped_column(
+        Boolean, nullable=True, default=True, server_default="true"
+    )
 
-    auto_update_white_list: Mapped[bool] = mapped_column(Boolean, nullable=True, default=False, server_default="false")
+    auto_update_white_list: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=False, server_default="false"
+    )
 
     auto_update_target_place: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
-    max_balance_adding_for_day: Mapped[int] = mapped_column(Integer, nullable=True, default=0, server_default="0")
+    max_balance_adding_for_day: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=0, server_default="0"
+    )
 
     auto_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
     auction_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
@@ -468,7 +534,9 @@ class AdvSetting(BaseTable):
 
     @property
     def max_pay_for_order(self) -> int | None:
-        pattern = re.compile(r"<MAX_PAY>(\d+)!?</MAX_PAY>")  # Добавили !? для необязательного символа "!"
+        pattern = re.compile(
+            r"<MAX_PAY>(\d+)!?</MAX_PAY>"
+        )  # Добавили !? для необязательного символа "!"
         match = re.search(pattern, self.name)
         if match:
             return int(match.group(1))
@@ -476,7 +544,9 @@ class AdvSetting(BaseTable):
 
     @property
     def auto_max_bid(self) -> bool:
-        pattern = re.compile(r"<MAX_PAY>(\d+)!?</MAX_PAY>")  # Используем тот же паттерн, чтобы найти!
+        pattern = re.compile(
+            r"<MAX_PAY>(\d+)!?</MAX_PAY>"
+        )  # Используем тот же паттерн, чтобы найти!
         match = re.search(pattern, self.name)
         if match and "!" in match.group(0):  # Проверяем, есть ли "!" в найденной строке
             return True
@@ -504,7 +574,9 @@ class KeywordSetting(BaseTable):
 
     text = Column(String, nullable=False)
     adv_setting_id: Mapped[int] = mapped_column(ForeignKey("advsetting.id"))
-    adv_setting: Mapped[AdvSetting] = relationship("AdvSetting", back_populates="keyword_settings", uselist=False)
+    adv_setting: Mapped[AdvSetting] = relationship(
+        "AdvSetting", back_populates="keyword_settings", uselist=False
+    )
     predict_ctr = Column(Float, nullable=True)
     adv_keywords = relationship(
         "AdvKeyword",
@@ -516,7 +588,9 @@ class KeywordSetting(BaseTable):
     added_clicks = Column(Integer, default=0)
     added_views = Column(Integer, default=0)
     auto_block = Column(Boolean)
-    relevant: Mapped[bool] = mapped_column(Boolean, nullable=True, default=False, server_default="false")
+    relevant: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=False, server_default="false"
+    )
     __table_args__ = (
         UniqueConstraint("text", "adv_setting_id"),
         Index("ix_text_adv_setting_id", "text", "adv_setting_id"),

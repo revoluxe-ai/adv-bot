@@ -1,7 +1,6 @@
 import datetime
 import json
-from typing import Annotated
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, PlainValidator
 

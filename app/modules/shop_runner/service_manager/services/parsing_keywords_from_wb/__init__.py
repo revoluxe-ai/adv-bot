@@ -79,11 +79,12 @@ async def parsing_keywords_for_adv_generator(
             should_parse = True
         elif views_now == 0:
             continue
-        elif views_now - last_views > settings.MIN_DIFF_VIEWS_FOR_PARSING_KEYWORDS:
-            should_parse = True
-        elif last_position.position == 0 and (views_now != last_views):
-            should_parse = True
-        elif last_position.timestamp < now - timedelta(hours=max_hours_period):
+        elif (
+            views_now - last_views > settings.MIN_DIFF_VIEWS_FOR_PARSING_KEYWORDS
+            or last_position.position == 0
+            and (views_now != last_views)
+            or last_position.timestamp < now - timedelta(hours=max_hours_period)
+        ):
             should_parse = True
 
         if should_parse:

@@ -6,7 +6,7 @@ from aiohttp import ClientSession
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries import super_cabinet_manager
-from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.shop_run_worker.redis_manager import RedisShopManager
@@ -34,14 +34,16 @@ async def run_shop_task(
             raise exc
 
 
-async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: ClientSession) -> None:
+async def _update_tasks(
+    active_tasks: dict[str, Task[None]], client_session: ClientSession
+) -> None:
     # Получение списка магазинов с активными настройками
     stmt = (
         select(WBCabinet.shop_id)
         .distinct()
         .join(WBCabinet.adv_settings)
         .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active == True),
+            WBCabinet.adv_settings.any(AdvSetting.bot_active is True),
         )
     )
 
@@ -56,7 +58,9 @@ async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: Cli
         for shop_id in all_needs_for_run_shop_ids:
             if shop_id not in active_tasks:
                 # Создание асинхронной задачи
-                task = asyncio.create_task(run_shop_task(shop_id, client_session, redis_manager))
+                task = asyncio.create_task(
+                    run_shop_task(shop_id, client_session, redis_manager)
+                )
                 active_tasks[shop_id] = task
                 logger.debug(f"Процесс обновления магазина {shop_id} запущен")
             else:
@@ -71,7 +75,7 @@ async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: Cli
 
             await asyncio.sleep(0.1)
 
-    all_shop_ids = tuple(list(active_tasks.keys()))
+    all_shop_ids = tuple(active_tasks.keys())
     for shop_id in all_shop_ids:
         if shop_id not in all_needs_for_run_shop_ids:
             task = active_tasks.pop(shop_id)

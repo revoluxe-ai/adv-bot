@@ -1,6 +1,6 @@
 ---
 description: Создание и редактирование правил
-globs: 
+globs:
 alwaysApply: false
 ---
 ---
@@ -63,4 +63,4 @@ tags: ["rules", "management", "documentation", "meta"]
 - v2 (YYYY-MM-DD): [Описание изменений]
 
 ## Связанные правила
-- [Ссылки на связанные правила] 
+- [Ссылки на связанные правила]

@@ -151,4 +151,4 @@ query = select(WBCabinet).where(WBCabinet.calculated_balance > 1000)
 
 # Агрегация по расчетным бонусам
 query = select(func.sum(WBCabinet.calculated_bonus))
-``` 
+```

@@ -1,18 +1,11 @@
 """Контейнер для DI-зависимостей приложения."""
 
 __all__ = ("AppContainer",)
-
-
-import httpx
 from dependency_injector import containers, providers
 from neo4j import AsyncDriver
 
-from . import databases
-from .http_sessions.wb_api_httpx_session import (
-    create_httpx_session,
-    ApiHttpxSessionLifecycle,
-)
 from ...configs import AppConfig
+from . import databases
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -39,14 +32,4 @@ class AppContainer(containers.DeclarativeContainer):
     _redis_lifecycle = providers.Resource(
         databases._RedisLifecycle,
         client=redis_client,
-    )
-
-    # WB API HTTP Session
-    wb_api_httpx_session: providers.Singleton[httpx.AsyncClient] = providers.Singleton(
-        create_httpx_session
-    )
-
-    _wb_api_httpx_session_lifecycle = providers.Resource(
-        ApiHttpxSessionLifecycle,
-        session=wb_api_httpx_session,
     )

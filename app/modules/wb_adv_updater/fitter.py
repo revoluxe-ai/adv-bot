@@ -12,11 +12,12 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
 from app.utils.db.session_maker import get_async_session_maker
-from . import data_manager
-from .data_getter import DataGetter
+
 from ..common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
+from . import data_manager
+from .data_getter import DataGetter
 
 sm = get_async_session_maker
 
@@ -97,10 +98,10 @@ async def _get_df_for_fit() -> pd.DataFrame:
     logger.info("Начало получения данных для обучения")
 
     async with sm() as session:
-        stmt = select(AdvSetting).filter(AdvSetting.bot_active == True)
+        stmt = select(AdvSetting).filter(AdvSetting.bot_active is True)
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
-        nmids_in_active_adv = set([nmid for adv in adv_settings for nmid in adv.nmids])
+        nmids_in_active_adv = {nmid for adv in adv_settings for nmid in adv.nmids}
         logger.debug("Формирование подзапроса для WBCabinet")
 
         # Основной запрос
@@ -108,12 +109,12 @@ async def _get_df_for_fit() -> pd.DataFrame:
         stmt = (
             select(AdvSetting)
             .options(selectinload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active is True)
         )
         result = await session.execute(stmt)
         adv_settings = result.scalars()
 
-    for n, adv in enumerate(adv_settings):
+    for _n, adv in enumerate(adv_settings):
         nmids = adv.nmids
         if len(nmids) > 1:
             logger.debug(
@@ -138,8 +139,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
             item_features_list = list(nmid_to_item_features.values())
             avg_item_features = pd.DataFrame(item_features_list).mean().to_dict()
             avg_item_features = {
-                f"item_feature_{i}": avg_item_features[i]
-                for i in avg_item_features.keys()
+                f"item_feature_{i}": avg_item_features[i] for i in avg_item_features
             }
 
             logger.debug(
@@ -154,7 +154,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
                 logger.debug(
                     f"Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}"
                 )
-            except:
+            except Exception:
                 logger.error("Ошибка получения ключей из Клик-хаус", exc_info=True)
                 continue
             logger.debug("Конвертация статистики ключевых слов в кластеры")

@@ -47,7 +47,7 @@ python -m pytest tests/test_circular_imports.py -v
    ```python
    # Вместо:
    from module_b import function_b
-   
+
    # Используйте:
    def function_a():
        from module_b import function_b
@@ -62,4 +62,4 @@ python -m pytest tests/test_circular_imports.py -v
 
 ## Интеграция с CI
 
-Тесты циклических импортов автоматически запускаются в CI для обеспечения качества кода. 
+Тесты циклических импортов автоматически запускаются в CI для обеспечения качества кода.

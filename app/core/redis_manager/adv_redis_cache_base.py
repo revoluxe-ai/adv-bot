@@ -1,6 +1,4 @@
-from app.core.redis_manager.base_redis_manager import (
-    BaseRedisProtocol,
-)
+from app.core.redis_manager.base_redis_manager import BaseRedisProtocol
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )

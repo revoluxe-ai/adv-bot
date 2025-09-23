@@ -1,3 +1,5 @@
+from typing import Any
+
 # class Size:
 #     def __init__(self, data):
 #         self._size = data['dimensions']
@@ -24,40 +26,40 @@ class CardFromWB:
     def shop_name(self, value: str) -> None:
         self._shop_name = value
 
-    def __str__(self):
+    def __str__(self) -> str:
         name = []
         name.append("<" * 5 + ">" * 5)
         name.append(str(self.nmid))
         name.append("<" * 5 + ">" * 5)
         return "\n".join(name)
 
-    def __init__(self, data) -> None:
+    def __init__(self, data: Any) -> None:
         super().__init__()
         self._data = data
 
     @property
-    def data(self):
+    def data(self) -> Any:
         return self._data
 
     @property
-    def name(self):
+    def name(self) -> Any:
         return self.data["title"]
 
     @property
-    def techSize(self):
+    def techSize(self) -> Any:
         return self.data["sizes"][0]["techSize"]
 
     @property
-    def wb_mediaFiles(self):
+    def wb_mediaFiles(self) -> list[Any]:
         media = [image["big"] for image in self.data.get("photos", [])]
         return media
 
     @property
-    def subjectID(self):
+    def subjectID(self) -> Any:
         return self.data["subjectID"]
 
     @property
-    def wb_barcode(self):
+    def wb_barcode(self) -> Any:
         return self.data["sizes"][0]["skus"][0]
 
     @property
@@ -65,7 +67,7 @@ class CardFromWB:
         return self.data["vendorCode"]
 
     @property
-    def brand(self):
+    def brand(self) -> Any:
         return self.data["brand"]
 
     # def item_size(self):
@@ -73,17 +75,17 @@ class CardFromWB:
     #     return size
 
     @property
-    def characterisics(self):
+    def characterisics(self) -> Any:
         return self.data["characteristics"]
 
-    def createdAt(self):
+    def createdAt(self) -> Any:
         return self.data["createdAt"]
 
-    def updatedAt(self):
+    def updatedAt(self) -> Any:
         return self.data["updatedAt"]
 
     @property
-    def wb_category_name(self):
+    def wb_category_name(self) -> Any:
         return self.data["subjectName"]
 
     @property
@@ -91,23 +93,23 @@ class CardFromWB:
         return int(self.data["nmID"])
 
     @property
-    def _id(self):
+    def _id(self) -> int:
         return self.nmid
 
     @property
-    def imtID(self):
+    def imtID(self) -> Any:
         return self.data["imtID"]
 
 
 class CardFromError:
-    def __init__(self, dict_):
+    def __init__(self, dict_: Any) -> None:
         self._nmid = dict_["nmid"]
         self._offer_id = dict_["offer_id"]
 
     @property
-    def nmid(self):
+    def nmid(self) -> Any:
         return self._nmid
 
     @property
-    def offer_id(self):
+    def offer_id(self) -> Any:
         return self._offer_id

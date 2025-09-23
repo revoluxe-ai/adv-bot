@@ -10,10 +10,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    KeywordSetting,
-)
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.wb_adv_updater.ABC_manager import AbcManager
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -57,7 +54,9 @@ class Fitter(AbcManager):
         )
 
         # Находим первый не None вектор для определения длины вектора
-        first_valid_vector = next((vec for vec in averaged_vectors if vec is not None), None)
+        first_valid_vector = next(
+            (vec for vec in averaged_vectors if vec is not None), None
+        )
         vector_length = len(first_valid_vector) if first_valid_vector is not None else 0
 
         # Обрабатываем случаи с None, заменяя их на список None соответствующей длины
@@ -108,7 +107,7 @@ class Predictor:
                     selectinload(AdvSetting.adv_keywords),
                     selectinload(AdvSetting.keyword_settings),
                 )
-                .where(AdvSetting.bot_active == True)
+                .where(AdvSetting.bot_active is True)
             )
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
@@ -120,11 +119,15 @@ class Predictor:
             df_for_predict = await self._get_df_for_predict(all_adv_settings)
             logger.debug("Получили DF для предсказаний")
         except Exception as exc:
-            logger.error(f"Ошибка при получении данных для предсказания: {exc}", exc_info=True)
+            logger.error(
+                f"Ошибка при получении данных для предсказания: {exc}", exc_info=True
+            )
             raise exc
         try:
             logger.debug("Начинаю предсказание")
-            predict_df: pd.DataFrame = await asyncio.to_thread(self._predict, df_for_predict)
+            predict_df: pd.DataFrame = await asyncio.to_thread(
+                self._predict, df_for_predict
+            )
             logger.debug("Предсказания получены")
         except Exception as exc:
             logger.error(f"Ошибка при предсказании: {exc}", exc_info=True)
@@ -141,7 +144,7 @@ class Predictor:
                 .join(KeywordSetting.adv_setting)
                 .options(selectinload(KeywordSetting.adv_setting))
                 .where(
-                    AdvSetting.bot_active == True,
+                    AdvSetting.bot_active is True,
                 )
             )
             result = await session.execute(stmt)
@@ -172,7 +175,7 @@ class Predictor:
                 item_features = [row[1] for row in item_features.items()]
                 avg_item_features = pd.DataFrame(item_features).mean().to_dict()
                 avg_item_features = {
-                    f"item_feature_{i}": avg_item_features[i] for i in avg_item_features.keys()
+                    f"item_feature_{i}": avg_item_features[i] for i in avg_item_features
                 }
 
                 if not avg_item_features:
@@ -182,8 +185,12 @@ class Predictor:
                     text_cleaner.clear(keyword.text) for keyword in adv.keyword_settings
                 ]
                 # Выполняем один запрос, чтобы получить все KeywordFeature объекты для этих ключевых слов
-                keyword_features_result = await self.get_keyword_features(clear_keywords)
-                keyword_features_result = {row[0]: row[1] for row in keyword_features_result}
+                keyword_features_result = await self.get_keyword_features(
+                    clear_keywords
+                )
+                keyword_features_result = {
+                    row[0]: row[1] for row in keyword_features_result
+                }
                 for keyword in adv.keyword_settings:
                     text = keyword.text.replace("_", " ")
                     keyword_features = keyword_features_result.get(text, [])
@@ -230,7 +237,9 @@ class Predictor:
             return
 
         # Получаем строку с прогнозом для текущего ключевого слова
-        row = predict_df[(predict_df["adv_id"] == adv_id) & (predict_df["keyword"] == keyword)]
+        row = predict_df[
+            (predict_df["adv_id"] == adv_id) & (predict_df["keyword"] == keyword)
+        ]
         if row.empty:
             return
 

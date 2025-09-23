@@ -28,4 +28,4 @@ spec:
   tls:
   - hosts:
     - skyline360.ru
-    secretName: skyline360-tls 
+    secretName: skyline360-tls

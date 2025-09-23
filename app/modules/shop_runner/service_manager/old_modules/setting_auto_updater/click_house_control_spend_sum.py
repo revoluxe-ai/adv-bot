@@ -5,14 +5,14 @@ __all__ = ["get_sum_spend_for_complex_adv"]
 
 query = """
 WITH max_versions AS (
-    SELECT 
-        spend, 
+    SELECT
+        spend,
         date,  -- добавляем сюда
         ROW_NUMBER() OVER (PARTITION BY adv_id, date ORDER BY version DESC) AS row_num
     FROM default_db.full_adv_wb_stat
     WHERE adv_id IN %(adv_ids)s
 )
-SELECT  
+SELECT
     SUM(spend) AS spend
 FROM max_versions
 WHERE row_num = 1

@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .tariffs import tariffs
 from .tariffs_text import text
 
@@ -25,7 +26,7 @@ class Pricer:
             stmt = (
                 select(func.count(AdvSetting.id))
                 .join(AdvSetting.wb_cabinet)
-                .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active == True)
+                .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active is True)
             )
             result = await session.execute(stmt)
             count_active_advs: int | None = result.scalar()
@@ -66,9 +67,16 @@ class Pricer:
         return sum_payment / count_advs
 
     async def get_automactic_tariff(self, shop_id: str) -> int:
-        month_tariff_for_white_list_auto_updater = await self._get_month_tariff_for_white_list_updater(shop_id)
-        month_tariff_for_autoupdate_target_place = await self._get_month_tariff_for_autoupdate_target_place(shop_id)
-        return month_tariff_for_white_list_auto_updater + month_tariff_for_autoupdate_target_place
+        month_tariff_for_white_list_auto_updater = (
+            await self._get_month_tariff_for_white_list_updater(shop_id)
+        )
+        month_tariff_for_autoupdate_target_place = (
+            await self._get_month_tariff_for_autoupdate_target_place(shop_id)
+        )
+        return (
+            month_tariff_for_white_list_auto_updater
+            + month_tariff_for_autoupdate_target_place
+        )
 
     async def _get_month_tariff_for_white_list_updater(self, shop_id: str) -> int:
         async with sm(read_only=True) as session:
@@ -77,7 +85,7 @@ class Pricer:
                 .join(WBCabinet)
                 .where(
                     WBCabinet.shop_id == shop_id,
-                    AdvSetting.auto_update_white_list == True,
+                    AdvSetting.auto_update_white_list is True,
                 )
             )
             result = await session.execute(stmt)
@@ -93,7 +101,7 @@ class Pricer:
                 .join(WBCabinet)
                 .where(
                     WBCabinet.shop_id == shop_id,
-                    AdvSetting.auto_update_target_place == True,
+                    AdvSetting.auto_update_target_place is True,
                 )
             )
             result = await session.execute(stmt)

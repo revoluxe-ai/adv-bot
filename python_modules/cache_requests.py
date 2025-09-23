@@ -19,7 +19,7 @@ class ApiException(Exception):
         self._server_code = server_response_code
 
     def __str__(self):
-        return f"""Код ответа: {self._server_code}, тело ответа: {self._message}, 
+        return f"""Код ответа: {self._server_code}, тело ответа: {self._message},
                метод: {self._method}
                 """
 
@@ -79,19 +79,21 @@ class CachedRequests:
                 sleep(time_sleep)
 
             while True:
-                response = requests.request(method, url, json=json_data, headers=headers)
+                response = requests.request(
+                    method, url, json=json_data, headers=headers
+                )
                 if response.text == "":
                     return None
                 try:
                     response_data = response.json()
-                except JSONDecodeError:
+                except JSONDecodeError as e:
                     raise ApiException(
                         f"Ошибка парсинга json. "
                         f"text ответа: {response.text},"
                         f"пауза между запросами: {round(time_sleep, 2)} сек.",
                         url.split("?")[0],
                         response.status_code,
-                    )
+                    ) from e
                 if isinstance(response_data, dict):
                     if response_data.get("code") == 429:
                         logger.error(f"Много запросов, пауза, {time_sleep}")

@@ -1,5 +1,5 @@
-!app/core/mp/wb/keyword_async_ml_updater/bot/images/*
-!app/core/mp/wb/keyword_async_ml_updater/bot/images
+!wb/keyword_async_ml_updater/bot/images/*
+!wb/keyword_async_ml_updater/bot/images
 setting.yaml
 *.yaml
 redis-data/
@@ -19,7 +19,7 @@ node_modules/
 dist/
 .idea/
 __pycache__
-app/core/mp/wb/keyword_async_ml_updater/data/*
+wb/keyword_async_ml_updater/data/*
 app/utils/faiss_manager/indexes/*
 *.pickle
 *.zip
@@ -81,3 +81,4 @@ cursor-chat-export/
 .cursor/
 linux_venv/
 app/modules/predict_ctr_service/model/model/model.json
+!.pre-commit-config.yaml

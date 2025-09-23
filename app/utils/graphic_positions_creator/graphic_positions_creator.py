@@ -19,8 +19,8 @@ from app.utils.graphic_positions_creator.classes import CommonKeyword
 
 
 async def get_common_keywords_with_positions(nmid) -> list[CommonKeyword] | None:
-    positions: list[WBItemPosition] = await data_manager.get_keyword_positions_from_click_house(
-        nmid
+    positions: list[WBItemPosition] = (
+        await data_manager.get_keyword_positions_from_click_house(nmid)
     )
     common_keywords = []
     if positions:
@@ -44,18 +44,24 @@ async def get_keyword_history_graphic(
         result = await session.execute(stmt)
         nmids = result.scalar()
         nmid = nmids[0]
-        common_keywords: list[CommonKeyword] = await get_common_keywords_with_positions(nmid)
+        common_keywords: list[CommonKeyword] = await get_common_keywords_with_positions(
+            nmid
+        )
 
         def sort_func(kw: CommonKeyword, order_map):
             return order_map.get(kw.text, -float("inf"))
 
         order_map = {kw.text: i for i, kw in enumerate(keywords)}
         # Сортируем common_keywords по индексу из order_map
-        sorted_common_keywords = sorted(common_keywords, key=lambda kw: sort_func(kw, order_map))
+        sorted_common_keywords = sorted(
+            common_keywords, key=lambda kw: sort_func(kw, order_map)
+        )
         common_keywords = sorted_common_keywords
         if not common_keywords:
             return
-        common_keywords.sort(key=lambda x: min([pos.position for pos in x.wb_item_positions]))
+        common_keywords.sort(
+            key=lambda x: min([pos.position for pos in x.wb_item_positions])
+        )
         common_keywords = common_keywords[:5]
         end_date = datetime.datetime.now()
         start_date = end_date - datetime.timedelta(days=7)
@@ -82,7 +88,9 @@ async def get_keyword_history_graphic(
                     date = date.replace(tzinfo=datetime.UTC)
 
                 # Поиск ближайшей позиции
-                close_position = min(positions, key=lambda x: abs(x.timestamp - date)).position
+                close_position = min(
+                    positions, key=lambda x: abs(x.timestamp - date)
+                ).position
 
                 # Заполнение данных
                 data["Ключи"].append(keyword.text + f"({last_position.position})")
@@ -123,7 +131,7 @@ async def get_keyword_history_graphic(
                 plt.close()
                 # Создание отдельной легенды
                 plt.figure(figsize=(10, 6))
-                for name, group in df.groupby("Ключи"):
+                for name, _group in df.groupby("Ключи"):
                     plt.plot([], [], label=name)
                 plt.legend()
                 plt.axis("off")
@@ -143,7 +151,9 @@ async def get_keyword_history_graphic(
             def get_graphic(plt, df, title_text):
                 import seaborn as sns
 
-                sns.lineplot(data=df, x="Дата", y="Позиция", hue="Ключи", marker="o", legend=True)
+                sns.lineplot(
+                    data=df, x="Дата", y="Позиция", hue="Ключи", marker="o", legend=True
+                )
                 plt.xticks(rotation=45)
                 plt.title(title_text)
                 plt.tight_layout()

@@ -1,0 +1,31 @@
+repos:
+  # 1. ruff - линтинг, форматирование, сортировка импортов
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: ["--fix", "--unsafe-fixes"]  # Добавили --unsafe-fixes
+        exclude: ^(alembic/|migrations/|generated/|build/|dist/|__pycache__/|.venv/|venv/|.git/|.mypy_cache/|.pytest_cache/|.tox/|.eggs/|node_modules/|app/modules/shop_runner/service_manager/old_modules/|app/utils/image_master/)
+      - id: ruff-format
+        exclude: ^(alembic/|migrations/|generated/|build/|dist/|__pycache__/|.venv/|venv/|.git/|.mypy_cache/|.pytest_cache/|.tox/|.eggs/|node_modules/|app/modules/shop_runner/service_manager/old_modules/|app/utils/image_master/)
+
+  # 2. mypy через Poetry
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: poetry run mypy
+        language: system
+        types: [python]
+        args: ["--show-error-codes"]
+        exclude: ^(alembic/|migrations/|generated/|build/|dist/|__pycache__/|.venv/|venv/|.git/|.mypy_cache/|.pytest_cache/|.tox/|.eggs/|node_modules/|app/modules/shop_runner/service_manager/old_modules/|app/utils/image_master/)
+
+  # 3. Базовые проверки файлов
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+        exclude: ^(.*\.mdc|.*\.ps1|.*\.json|app/utils/image_master/)$
+      - id: trailing-whitespace
+        exclude: ^(.*\.mdc|.*\.ps1|app/utils/image_master/)$
+      - id: check-merge-conflict

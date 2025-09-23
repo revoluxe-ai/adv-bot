@@ -32,7 +32,9 @@ async def change_exponent_setting(
 
 
 @router.message(StateFilter("waiting_for_new_exponent"))
-async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, bot: Bot):
+async def set_new_exponent_for_predict_ctr(
+    message: Message, state: FSMContext, bot: Bot
+):
     data = await state.get_data()
     adv_id: int = data["adv_id"]
     text = message.text
@@ -43,7 +45,9 @@ async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, 
     # Заменяем запятую на точку, если есть
     text = text.replace(",", ".")
     if not text.replace(".", "", 1).isdigit() or text.count(".") > 1:
-        await message.answer("Введите число в правильном формате (например, 1.23 или 1,23)")
+        await message.answer(
+            "Введите число в правильном формате (например, 1.23 или 1,23)"
+        )
         return
     exponent_predict_ctr = float(text)
     async with sm(read_only=False) as session:
@@ -52,7 +56,9 @@ async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, 
         adv_setting: AdvSetting = result.scalar_one()
         adv_setting.exponent_predict_ctr = exponent_predict_ctr
         await session.commit()
-    await message.answer(f"Экспонента прогнозируемого CTR изменена на {exponent_predict_ctr}")
+    await message.answer(
+        f"Экспонента прогнозируемого CTR изменена на {exponent_predict_ctr}"
+    )
     await state.set_state(None)
 
     keywords = await utils.get_keywords_for_keyboard(adv_setting)

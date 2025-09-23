@@ -42,7 +42,9 @@ async def get_users():
                 total_balance += wb_cabinet.balance or 0
                 total_bonus += wb_cabinet.bonus or 0
 
-                stmt = select(AdvSetting.adv_id).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
+                stmt = select(AdvSetting.adv_id).where(
+                    AdvSetting.wb_cabinet_id == wb_cabinet.id
+                )
 
                 adv_ids = await session.execute(stmt)
                 adv_ids = adv_ids.scalars().all()
@@ -60,10 +62,13 @@ async def get_users():
 
                 total_advs += len(advs)
                 active_advs_with_bot += len([adv for adv in advs if adv.bot_active])
-            shop_ids = "; ".join(
-                [wb_user_cabinet.wb_cabinet.shop_id for wb_user_cabinet in wb_user_cabinets]
+            "; ".join(
+                [
+                    wb_user_cabinet.wb_cabinet.shop_id
+                    for wb_user_cabinet in wb_user_cabinets
+                ]
             )
-            total_money = total_bonus + total_balance
+            total_bonus + total_balance
             # if  not  wb_user_cabinets:
             yield user
             # continue
@@ -73,7 +78,11 @@ async def get_test_user():
     async with sm() as session:
         stmt = (
             select(User)
-            .options(selectinload(User.wb_user_cabinets).selectinload(WBUserCabinet.wb_cabinet))
+            .options(
+                selectinload(User.wb_user_cabinets).selectinload(
+                    WBUserCabinet.wb_cabinet
+                )
+            )
             .where(User.user_telegram_id.in_(test_users_ids))
         )
         user = await session.execute(stmt)
@@ -103,7 +112,6 @@ async def send_message_to_users():
                 continue
 
         try:
-            wb_user_cabinets = user.wb_user_cabinets
             await message(bot, user_id)()
             await redis_manager.set_message_send(hash, user_id)
             send_count += 1

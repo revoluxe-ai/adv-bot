@@ -7,7 +7,7 @@ from time import time
 from typing import Any
 
 from sqlalchemy import Result
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.settings import settings
 
@@ -21,14 +21,13 @@ max_overflow = settings.PG_MAX_OVERFLOW
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
 global_semaphore = asyncio.Semaphore(count_sem)
 
-
 #
 # ssl_context = ssl.create_default_context(cafile=RDS_CERT_PATH)
 # ssl_context.verify_mode = ssl.CERT_REQUIRED
 
 
 class AnalyticAsyncSession(AsyncSession):
-    async def execute(self, statement: Any, *args, **kwargs) -> Result[Any]:
+    async def execute(self, statement, *args, **kwargs) -> Result[Any]:
         query_start = time()
         try:
             # Определяем тип операции
@@ -37,7 +36,11 @@ class AnalyticAsyncSession(AsyncSession):
             # Анализ стека для поиска вызывающего кода
             stack = traceback.extract_stack()
             caller = next(
-                (frame for frame in reversed(stack[:-1]) if "sqlalchemy" not in frame.filename),
+                (
+                    frame
+                    for frame in reversed(stack[:-1])
+                    if "sqlalchemy" not in frame.filename
+                ),
                 None,
             )
 
@@ -55,21 +58,6 @@ class AnalyticAsyncSession(AsyncSession):
             raise e
 
 
-# def log_checkout(dbapi_con, con_record, con_proxy):
-#     logger.debug("Соединение взято из пула")
-#     global conn_counter
-#     with lock_counter:
-#         conn_counter += 1
-#     logger.debug(f"Количество соединений: {conn_counter}")
-#
-# def log_checkin(dbapi_con, con_record):
-#     logger.debug("Соединение возвращено в пул")
-#     global conn_counter
-#     with lock_counter:
-#         conn_counter -= 1
-#     logger.debug(f"Количество соединений: {conn_counter}")
-
-
 def get_alchemy_row(read_only):
     port = settings.postgres_port
     postgres_dbname = settings.postgres_dbname
@@ -80,13 +68,7 @@ def get_alchemy_row(read_only):
     else:
         host = settings.postgres_replica_host
     # Для asyncpg используем ssl вместо sslmode
-    row_connector = (
-        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
-    )
-    # if ssl_mode:
-    #     row_connector += f'?sslmode={ssl_mode}'
-    # row_connector += f'&target_session_attrs={target_session}'
-
+    row_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     db_connector = row_connector
     return db_connector
 
@@ -98,9 +80,7 @@ def get_alchemy_row_for_migration():
     postgres_user = settings.postgres_user
     host = settings.postgres_master_host
     # Для asyncpg используем ssl вместо sslmode
-    db_connector = (
-        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
-    )
+    db_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     return db_connector
 
 
@@ -143,7 +123,7 @@ read_write_session_maker = async_sessionmaker(
 
 @asynccontextmanager
 async def get_async_session_maker(
-        read_only=False,
+    read_only=False,
 ) -> AsyncGenerator[AsyncSession, None]:
     session_start = time()
     current_task = asyncio.current_task()

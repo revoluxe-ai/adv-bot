@@ -87,7 +87,9 @@ async def run_bidder_process_for_adv(
         logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
         await parser.add_wb_positions(text, {nmid}, delay=0.1)
     except Exception:
-        logger.error(f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True)
+        logger.error(
+            f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
+        )
         return
 
     try:
@@ -105,13 +107,19 @@ async def run_bidder_process_for_adv(
 
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
-        wb_position: WBItemPosition = await redis_manager.get_keyword_position(text, nmid)
+        wb_position: WBItemPosition = await redis_manager.get_keyword_position(
+            text, nmid
+        )
     except Exception:
-        logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True)
+        logger.error(
+            f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
+        )
         return
 
     if not wb_position or wb_position.position is None:
-        logger.error(f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции")
+        logger.error(
+            f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции"
+        )
         return
 
     promo_position = wb_position.position

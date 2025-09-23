@@ -11,6 +11,7 @@ if typing.TYPE_CHECKING:
         WBToken,
         WBUserCabinet,
     )
+
 from app.payments.db.models import Payment
 from app.utils.db.assoc_tables import (
     favorite_advs_association,

@@ -2,6 +2,7 @@
 Простой тест для проверки моделей с использованием SQLAlchemy.
 """
 
+import contextlib
 import os
 
 import pytest
@@ -103,10 +104,8 @@ def db_session():
 
     # Удаляем файл базы данных
     if os.path.exists(DB_PATH):
-        try:
+        with contextlib.suppress(Exception):
             os.remove(DB_PATH)
-        except:
-            pass
 
 
 def test_wb_cabinet_calculated_balance(db_session):

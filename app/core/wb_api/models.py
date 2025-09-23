@@ -6,8 +6,6 @@ continue to work without requiring deeper architectural changes.
 """
 
 from app.modules.common_slaves.wildberries.models import WBToken
-from app.modules.common_slaves.wildberries.super_cabinet_manager import (
-    WBCabinetAccess,
-)
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 __all__ = ["WBToken", "WBCabinetAccess"]

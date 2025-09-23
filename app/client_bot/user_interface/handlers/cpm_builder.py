@@ -2,6 +2,7 @@ import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import Result
 from sqlalchemy.future import select
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -16,13 +17,17 @@ sm = get_async_session_maker
 router = Router()
 
 
-@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page"))
+@router.callback_query(
+    callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page")
+)
 async def to_page_for_cpm_setting(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
 ):
     adv_original_id = callback_data.adv_original_id
+    if callback.message is None:
+        return
     await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
     return
 
@@ -30,6 +35,9 @@ async def to_page_for_cpm_setting(
 @router.message(StateFilter(states.CPMSetting.waiting_for_min_position))
 async def get_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     text = message.text
+    if text is None:
+        await message.answer("Введите целое положительное число")
+        return
     if "/start" in text:
         await state.set_state(state=None)
         await start.start_registration(message, bot, state)
@@ -51,6 +59,9 @@ async def get_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
 async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     data = await state.get_data()
     text = message.text
+    if text is None:
+        await message.answer("Введите целое положительное число")
+        return
     if "/start" in text:
         await state.set_state(state=None)
         await start.start_registration(message, bot, state)
@@ -66,8 +77,13 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv = adv.scalar()
+        result = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
+        adv = result.scalar()
+        if not adv:
+            await message.answer("Настройка рекламы не найдена")
+            return
         adv.max_place = data["min_position"]
         adv.max_cpm = max_cpm
         adv.bidder_active = True
@@ -78,7 +94,7 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
 
 
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_manual_cpm"))
-async def set_manual_cpm(
+async def start_set_manual_cpm(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
@@ -87,6 +103,8 @@ async def set_manual_cpm(
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_manual_cpm)
+    if callback.message is None:
+        return
     await messages.ManualCPMSetting(bot, callback.message.chat.id)()
     return
 
@@ -94,6 +112,9 @@ async def set_manual_cpm(
 @router.message(StateFilter(states.CPMSetting.waiting_for_manual_cpm))
 async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     text = message.text
+    if text is None:
+        await message.answer("Введите целое положительное число")
+        return
     if "/start" in text:
         await state.set_state(state=None)
         await start.start_registration(message, bot, state)
@@ -109,8 +130,13 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
     adv_original_id = state_data["last_adv_original_id"]
 
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv = adv.scalar()
+        result = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
+        adv = result.scalar()
+        if not adv:
+            await message.answer("Настройка рекламы не найдена")
+            return
         adv.max_cpm = manual_cpm
         await session.commit()
     await bot.send_message(message.chat.id, f"CPM успешно установлен ({manual_cpm}) р.")
@@ -120,7 +146,7 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
 
 
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_max_position"))
-async def set_max_position(
+async def start_set_max_position(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
@@ -129,13 +155,20 @@ async def set_max_position(
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_max_position)
-    await messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(adv_original_id)
+    if callback.message is None:
+        return
+    await messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(
+        adv_original_id
+    )
     return
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_max_position))
 async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMContext):
     text = message.text
+    if text is None:
+        await message.answer("Ввежите целое положительное число")
+        return
     if "/start" in text:
         await state.set_state(state=None)
         await start.start_registration(message, bot, state)
@@ -150,8 +183,12 @@ async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMC
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv = adv.scalar()
+        result = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
+        adv = result.scalar()
+        if not adv:
+            raise Exception("adv not found")
         adv.max_place = max_position
         await session.commit()
         await messages.CPMSetting(bot, message.chat.id)(adv_original_id)

@@ -16,13 +16,14 @@ from app.utils.text_cleaner import clear
 
 logger = logging.getLogger(__name__)
 
+from urllib.parse import quote, unquote
+
 import redis
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
-from urllib.parse import quote, unquote
 from app.settings import settings
 
 redis_host_master = settings.REDIS_MASTER_HOST
@@ -143,10 +144,7 @@ async def get_auto_block_status(keywordsetting_original_id: int) -> bool:
         return False
     else:
         answer = int(answer)
-    if answer == 0:
-        auto_block_status = False
-    else:
-        auto_block_status = True
+    auto_block_status = answer != 0
     return auto_block_status
 
 
@@ -343,10 +341,13 @@ async def get_keyword_features_from_redis(
     if not keywords:
         return []
 
+    keys = [f"keyword_vector:{keyword}" for keyword in keywords]
+
+    # Получаем сразу все вектора одним запросом MGET
+    vector_bytes_list = await redis_replica_client.mget(*keys)
+
     result = []
-    for keyword in keywords:
-        key = f"keyword_vector:{keyword}"
-        vector_bytes = await redis_replica_client.get(key)
+    for keyword, vector_bytes in zip(keywords, vector_bytes_list):
         if vector_bytes:
             vector_str = vector_bytes.decode("utf-8")
             vector = json.loads(vector_str)
@@ -382,9 +383,7 @@ async def get_nmid_vectors(nmids_batch: list[int]) -> list[tuple[int, list[float
 async def check_phrase_in_neo(hash_text):
     key = "phrase_in_neo:" + str(hash_text)
     answer = await redis_replica_client.get(key)
-    if answer is None:
-        return False
-    return True
+    return answer is not None
 
 
 async def add_phrase_hash_like_is_in_neo(hash_text):
@@ -407,52 +406,6 @@ async def get_cluster_name(text):
     if answer is None:
         return None
     return answer.decode("utf-8")
-
-
-# функция не работает и не используется
-# async def get_all_keywords_positions(text) -> list[WBItemPosition]:
-#     key_pattern = f'adv_positions:{text}:*'
-#     cursor = 0
-#     positions = []
-#
-#     while True:
-#         # Используем scan для поиска ключей
-#         cursor, keys = await redis_replica_client.scan(cursor=cursor, match=key_pattern)
-#
-#         # Получаем данные по всем ключам за один запрос с использованием mget
-#         if keys:
-#             json_data_list = await redis_replica_client.mget(*keys)
-#
-#             for json_data in json_data_list:
-#                 if json_data:
-#                     position = WBItemPosition.from_dict(json.loads(json_data))
-#                     positions.append(position)
-#
-#         # Если курсор вернулся в 0, значит, все ключи обработаны
-#         if cursor == 0:
-#             break
-#
-#     return positions
-
-
-async def get_keyword_position(
-    keyword: str, nmid: int
-) -> WBItemPosition | None:  # deprecated
-    base_key = f"adv_positions:{keyword}:{nmid}"
-    json_data = await redis_replica_client.get(base_key)
-    if not json_data:
-        cluster, _ = await get_cluster_and_preset(keyword)
-        if not cluster:
-            return None
-        base_key = f"adv_positions:{cluster}:{nmid}"
-        json_data = await redis_replica_client.get(base_key)
-        if not json_data:
-            return None
-        else:
-            position = WBItemPosition.from_dict(json.loads(json_data))
-            return position
-    position = WBItemPosition.from_dict(json.loads(json_data))
-    return position
 
 
 async def get_all_cluster_names() -> set[str]:
@@ -512,7 +465,7 @@ async def get_cluster_and_preset(
     data = value.split(":")
     try:
         cluster, preset = data
-    except:
+    except ValueError:
         logger.error("Ошибка распаковки данных о кластере и пресете")
         return None, None
     return cluster, preset
@@ -657,6 +610,13 @@ async def set_last_bid_update(adv_id: str):
     await redis_master_client.set(key, now)
 
 
+async def get_last_bid_update(adv_id) -> datetime:
+    key = f"last_bid_update:{adv_id}"
+    value = await redis_replica_client.get(key)
+    value = datetime.datetime.fromtimestamp(value)
+    return value
+
+
 async def set_last_user_use_time(user_telegram_id: int):
     key = "last_user_use_time:" + str(user_telegram_id)
     now = datetime.datetime.now()
@@ -682,7 +642,7 @@ async def get_last_users_use_time(user_telegram_ids: list[int]) -> list[float]:
     ]
     values = await redis_replica_client.mget(keys)
     results = []
-    for user_telegram_id, value in zip(user_telegram_ids, values, strict=False):
+    for _user_telegram_id, value in zip(user_telegram_ids, values, strict=False):
         if value is None:
             results.append(None)
         else:

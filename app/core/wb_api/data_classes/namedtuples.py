@@ -15,7 +15,7 @@ class KeywordPhrase(NamedTuple):
     word2vec: list[float]
 
     @property
-    def dist_to_word(self):
+    def dist_to_word(self) -> float:
         count_words = len(self.words)
         if count_words:
             logger.error("Нет слов в keywordphrase")
