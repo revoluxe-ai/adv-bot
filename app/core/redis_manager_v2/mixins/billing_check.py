@@ -8,10 +8,11 @@ from ..base_redis_manager_protocol import BaseRedisManagerProtocol
 class BillingCheckMixin:
     """Mixin for billing check operations in Redis."""
 
-    @staticmethod
-    def _get_key(wb_cabinet_id: int, day: datetime) -> str:
+    _prefix = "billing_processed:"
+
+    def _get_key(self, wb_cabinet_id: int, day: datetime) -> str:
         """Generate a Redis key for billing processing check."""
-        return f"billing_processed:{wb_cabinet_id}:{day.strftime('%Y-%m-%d')}"
+        return f"{self._prefix}:{wb_cabinet_id}:{day.strftime('%Y-%m-%d')}"
 
     async def set_billing_process_for_day(
         self: BaseRedisManagerProtocol, wb_cabinet_id: int, day: datetime

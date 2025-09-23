@@ -32,9 +32,9 @@ def get_adv_spend_by_user():
             .join(AdvSetting.adv_keywords)
             .where(
                 and_(
-                    # User.wb_tokens.any(WBToken.active == True),
-                    AdvSetting.bot_active is True,
-                    WBCabinet.active is True,
+                    # User.wb_tokens.any(WBToken.active.is_(True)),
+                    AdvSetting.bot_active.is_(True),
+                    WBCabinet.active.is_(True),
                     AdvSetting.active_status == "started",
                     AdvKeyword.date == datetime.datetime.now().date(),
                 )

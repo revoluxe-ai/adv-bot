@@ -6,7 +6,7 @@
 #             joinedload(WBCabinet.adv_settings),
 #             joinedload(WBCabinet.wb_user_cabinets)
 #             .joinedload(WBUserCabinet.user)
-#         ).filter(WBCabinet.adv_settings.any(AdvSetting.bot_active == True))
+#         ).filter(WBCabinet.adv_settings.any(AdvSetting.bot_active.is_(True)))
 #
 #         result = await session.execute(stmt)
 #         cabinets: list[WBCabinet] = result.scalars().all()

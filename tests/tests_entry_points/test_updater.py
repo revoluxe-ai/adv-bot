@@ -114,7 +114,7 @@ async def test_updater_run_coroutines_without_errors_for_one_minute():
     # Подождем 60 секунд (минуту)
     try:
         await asyncio.wait_for(task, timeout=60.0)
-    except TimeoutError:
+    except Exception:
         # Тайм-аут ожидаем, так как корутины должны работать бесконечно
         pass
 

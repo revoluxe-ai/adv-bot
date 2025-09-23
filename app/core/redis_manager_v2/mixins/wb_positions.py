@@ -1,14 +1,11 @@
 __all__ = ("WBPositionsMixin",)
 
 import json
-import typing
 from datetime import datetime
 
 from app.modules.common_slaves.wildberries.models import WBItemPosition
 from .wb_clusters import WBClustersMixin
-
-if typing.TYPE_CHECKING:
-    from ..base_redis_manager import BaseRedisManager
+from ..base_redis_manager import BaseRedisManager
 
 
 class WBPositionsMixin(WBClustersMixin):

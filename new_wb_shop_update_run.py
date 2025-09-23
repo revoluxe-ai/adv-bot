@@ -34,6 +34,7 @@ async def run_process() -> None:
     TODO: Выпилить магазинные функции из общего процесса и перенести их в shop_runner. Тут оставить только общие.
     """
     container = AppContainer()
+    container.wire(packages=["app.modules.shop_runner"])
     # TODO: Обновлять список пакетов/модулей в wire(), если появляются новые инъекции (@inject/Provide[...]).
     # Проверка/тест идеи
     # Быстрая проверка на запуск: этого достаточно.
@@ -42,6 +43,7 @@ async def run_process() -> None:
     # Либо держать единый модуль app/core/di/wiring.py со списком пакетов, и дергать его из всех раннеров.
     container.wire(
         packages=["app.core.redis_manager_v2"],
+        modules=["app.modules.common_slaves.wildberries.super_cabinet_manager"],
     )
     # Запуск процесса без явного lifecycle-менеджмента, ресурсы не требуются
     # TODO: При необходимости добавить точечную инициализацию ресурсов (например, Redis)

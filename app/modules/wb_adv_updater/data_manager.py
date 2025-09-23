@@ -10,12 +10,12 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import aiogram
-from aiogram.utils import deep_linking
 from PIL import Image
+from aiogram.utils import deep_linking
 from sqlalchemy import Float, and_, case, cast, distinct, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.orm import aliased, load_only, selectinload, subqueryload
+from sqlalchemy.orm import load_only, selectinload
 from sqlalchemy.sql.functions import coalesce
 
 from app.exc import (
@@ -52,7 +52,6 @@ from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
 
 logger = logging.getLogger(__name__)
-
 
 _sm = get_async_session_maker
 
@@ -273,7 +272,7 @@ async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
 #         selectinload(AdvSetting.adv_keywords),
 #         selectinload(AdvSetting.keyword_settings),
 #         selectinload(AdvSetting.wb_cards)
-#     ).where(and_(AdvSetting.bot_active == True, AdvSetting.active_status == 'started'))
+#     ).where(and_(AdvSetting.bot_active.is_(True), AdvSetting.active_status == 'started'))
 #
 #     async with _sm() as session:
 #         result = await session.execute(stmt)

@@ -92,7 +92,7 @@ async def set_minus_keywords_for_search_adv(
     ]
     texts = texts[:1000]
     if texts:
-        texts = [text.replace('"', "") for text in texts]
+        texts: list | set = [text.replace('"', "") for text in texts]
         texts = set(texts)
         try:
             await api.advert.set_pluse_status_in_search_adv(search_adv_id, False)

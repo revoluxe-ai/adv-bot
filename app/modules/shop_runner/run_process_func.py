@@ -43,7 +43,9 @@ async def _update_tasks(
         .distinct()
         .join(WBCabinet.adv_settings)
         .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active is True),
+            WBCabinet.adv_settings.any(
+                AdvSetting.bot_active.is_(True)
+            ),  # Используем is_(True) для корректного SQL
         )
     )
 
@@ -53,8 +55,11 @@ async def _update_tasks(
         stmt = stmt.filter(WBCabinet.shop_id.in_(shop_filter_list))
     redis_manager = RedisShopManager()
     async with sm() as session:
+        logger.debug(f"Перед выполнением запроса к БД: {stmt}")
         result = await session.execute(stmt)
+        logger.debug("Запрос к БД выполнен успешно")
         all_needs_for_run_shop_ids = result.scalars().all()
+        logger.debug(f"Получено shop_ids: {all_needs_for_run_shop_ids}")
         for shop_id in all_needs_for_run_shop_ids:
             if shop_id not in active_tasks:
                 # Создание асинхронной задачи

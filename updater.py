@@ -87,6 +87,5 @@ if __name__ == "__main__":
         except InterruptedError:
             raise  # Перевыбрасывание исключения
         except Exception as e:
-            logging.error("Произошла ошибка:", exc_info=True)
-            del e
-            continue  # Продолжение работы программы после других исключений
+            logging.critical("Произошла ошибка:", exc_info=True)
+            raise e

@@ -3,10 +3,10 @@ from pydantic_settings import BaseSettings
 
 
 class Neo4jConfig(BaseSettings):
-    uri: str = Field(..., description="Neo4j URI")
-    name: str = Field(..., description="Neo4j user")
-    password: str = Field(..., description="Neo4j password")
-    port: int = Field(..., description="Neo4j port")
+    uri: str = Field(default=..., description="Neo4j URI")
+    name: str = Field(default=..., description="Neo4j user")
+    password: str = Field(default=..., description="Neo4j password")
+    port: int = Field(default=..., description="Neo4j port")
 
     model_config = {
         "env_prefix": "NEO4J_",

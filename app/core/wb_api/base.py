@@ -7,13 +7,12 @@ from typing import TypeVar
 from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker as sm
-
 from .exceptions import ApiForbiddenError
 
 if typing.TYPE_CHECKING:
     from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
-from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+from ...modules.common_slaves.wildberries.wb_access_types import WBCabinetAccess
 
 logger = logging.getLogger(__name__)
 

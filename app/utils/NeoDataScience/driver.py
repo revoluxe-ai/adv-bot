@@ -59,10 +59,14 @@ class DataScience(metaclass=AsyncMeta):
 
         self.MAIN_GRAPH_NAME = "main"
         name = os.environ.get("NEO4J_NAME")
+        if not name:
+            raise ValueError("NEO4J_NAME environment variable is not set")
         ip_address = os.environ.get("NEO4J_IP")
         port = os.environ.get("NEO4J_PORT")
         uri = f"bolt://{ip_address}:{port}"
         password = os.environ.get("NEO4J_PASSWORD")
+        if not password:
+            raise ValueError("NEO4J_PASSWORD environment variable is not set")
         self.__uri: str = uri
         self.__auth: tuple[str, str] = (name, password)
         self.__driver = neo4j.GraphDatabase.driver(uri, auth=self.__auth)
@@ -1161,7 +1165,7 @@ UNWIND phrase.words AS word
     #             # Получаем количество уникальных текстов один раз
     #             count_stmt = select(func.count()).select_from(
     #                 select(KeywordSetting.text).distinct().join(KeywordSetting.adv_setting).where(
-    #                     AdvSetting.bot_active == True
+    #                     AdvSetting.bot_active.is_(True)
     #                 ).subquery()
     #             )
     #             total_count_result = await session.execute(count_stmt)

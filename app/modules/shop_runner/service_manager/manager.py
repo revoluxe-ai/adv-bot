@@ -19,7 +19,6 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
-from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import (
@@ -33,7 +32,6 @@ from app.settings import settings
 from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
     UpdateBidsInSearchAdvDTO,
 )
-
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -41,7 +39,6 @@ from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
 
 logger = logging.getLogger(__name__)
-
 
 T = TypeVar("T")
 
@@ -124,6 +121,7 @@ class CoroutinesManager:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
         return None
 
+    @staticmethod
     async def _update_cards_data_from_wb_to_pg(
         shop_data_updater: ShopDataUpdater,
     ) -> None:

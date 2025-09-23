@@ -7,10 +7,9 @@ import logging
 from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker
-
-from ..user_message_sender import message_for_not_pay_user_sender
 from . import wb_manager
 from .ml_data_manager import update_model
+from ..user_message_sender import message_for_not_pay_user_sender
 
 sm = get_async_session_maker
 
@@ -26,8 +25,9 @@ async def run_update_all_keywords_on_wb():
         while True:
             try:
                 await wb_manager.update_all_keywords_on_wb(client_session)
-            except Exception:
-                logger.error("Ошибка обновления фраз", exc_info=True)
+            except Exception as exc:
+                logger.critical("Ошибка обновления фраз", exc_info=True)
+                raise exc
             await asyncio.sleep(5)
 
 
@@ -98,6 +98,16 @@ async def main_loop(client_session):
 
 
 async def run_main_coroutines():
+    while True:
+        try:
+            await _run_main_coroutines()
+        except Exception as e:
+            logger.critical(f"Критическая ошибка в главном цикле {e}", exc_info=True)
+            del e
+        await asyncio.sleep(5)
+
+
+async def _run_main_coroutines():
     from app.core.di.app_container import AppContainer
 
     container = AppContainer()

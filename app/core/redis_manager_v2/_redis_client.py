@@ -1,15 +1,17 @@
 __all__ = ("RedisClient",)
 
-from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Union, Any
+
+from typing import List, Optional, Dict, Any
 from typing import cast
-from aioredis import Redis
+from redis.asyncio import Redis
 from app.core.di import Provide, AppContainer, inject
 
 
-class RedisClient(ABC):
+class RedisClient:
     @inject
-    def __init__(self, redis_client: Redis = Provide[AppContainer.redis_client]) -> None:
+    def __init__(
+        self, redis_client: Redis = Provide[AppContainer.redis_client]
+    ) -> None:
         self._replica_read_client = redis_client
         self._replica_write_client = redis_client
 
@@ -33,7 +35,9 @@ class RedisClient(ABC):
         return cast(Dict[str, str], await self._replica_read_client.hgetall(name))
 
     async def hmget(self, name: str, keys: List[str]) -> List[Optional[bytes]]:
-        return cast(List[Optional[bytes]], await self._replica_read_client.hmget(name, keys))
+        return cast(
+            List[Optional[bytes]], await self._replica_read_client.hmget(name, keys)
+        )
 
     async def hexists(self, name: str, key: str) -> bool:
         return await self._replica_read_client.hexists(name, key)
@@ -51,13 +55,17 @@ class RedisClient(ABC):
         return cast(int, await self._replica_read_client.llen(name))
 
     async def lindex(self, name: str, index: int) -> bytes | None:
-        return cast(Optional[bytes], await self._replica_read_client.lindex(name, index))
+        return cast(
+            Optional[bytes], await self._replica_read_client.lindex(name, index)
+        )
 
     async def lrange(self, name: str, start: int, end: int) -> List[bytes]:
-        return cast(List[bytes], await self._replica_read_client.lrange(name, start, end))
+        return cast(
+            List[bytes], await self._replica_read_client.lrange(name, start, end)
+        )
 
-    async def smembers(self, name: str) -> Set[Any]:
-        return cast(Set[Any], await self._replica_read_client.smembers(name))
+    async def smembers(self, name: str) -> set[Any]:
+        return cast(set[Any], await self._replica_read_client.smembers(name))
 
     async def scard(self, name: str) -> int:
         return cast(int, await self._replica_read_client.scard(name))
@@ -141,9 +149,9 @@ class RedisClient(ABC):
         return results
 
     async def execute_pipeline_batch(
-            self,
-            read_commands: list[list[Any]] | None = None,
-            write_commands: list[list[Any]] | None = None,
+        self,
+        read_commands: list[list[Any]] | None = None,
+        write_commands: list[list[Any]] | None = None,
     ) -> dict[str, list[Any]]:
         """Выполняет пакет команд чтения и записи"""
         results = {}

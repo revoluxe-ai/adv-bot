@@ -41,7 +41,7 @@ class UpdateCPMManager:
             return None
         async with TaskGroup() as tg:
             update_batch = self.__get_update_batch(tg, update_bids_in_search_adv_dtos)
-            orchestrator = BidUpdateOrchestrator(self._wb_api)
+            orchestrator = BidUpdateOrchestrator(self._access)
             # Запускаем в асинхронном контексте доступа к WB
             await orchestrator.process_updates(update_batch)
 

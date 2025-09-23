@@ -1,6 +1,6 @@
 import json
 
-from app.core.redis_manager_v2.redis_client import RedisClient as BaseRedisManager
+from app.core.redis_manager_v2._redis_client import RedisClient as BaseRedisManager
 
 
 class RedisManager(BaseRedisManager):
