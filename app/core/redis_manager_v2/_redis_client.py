@@ -1,15 +1,13 @@
 __all__ = ("RedisClient",)
 
-import asyncio
 from abc import ABC
-from typing import Any, cast, Optional
+from typing import cast, Optional, List, Dict, Set, Any, cast, Optional
 from typing import Awaitable, TypeVar
 
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
 T = TypeVar('T')
-
 
 def ensure_awaitable(obj: Awaitable[T] | T) -> Awaitable[T]:
     if hasattr(obj, '__await__'):
@@ -70,6 +68,12 @@ class RedisClient(ABC):
 
     async def srem(self, name: str, *values: str | bytes) -> int:
         return cast(int, await ensure_awaitable(self._replica_write_client.srem(name, *values)))
+
+    async def scard(self, name: str) -> int:
+        return cast(int, await  ensure_awaitable( self._replica_read_client.scard(name)))
+
+    async def sismember(self, name: str, value: str) -> bool:
+        return cast(bool, await  ensure_awaitable(self._replica_read_client.sismember(name, value)))
 
     # Методы для записи (через мастер)
     async def set(self, key: str, value: str | bytes, ex: int | None = None) -> bool:
@@ -152,8 +156,8 @@ class RedisClient(ABC):
 
     async def execute_pipeline_batch(
             self,
-            read_commands: Optional[list[list[Any]]] = None,
-            write_commands: Optional[list[list[Any]]] = None,
+            read_commands: list[list[Any]] | None = None,
+            write_commands: list[list[Any]] | None = None,
     ) -> dict[str, list[Any]]:
         results: dict[str, list[Any]] = {}
 
