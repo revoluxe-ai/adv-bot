@@ -29,9 +29,7 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
-from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
-    UpdateBidsInSearchAdvDTO,
-)
+
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -69,18 +67,14 @@ class CoroutinesManager:
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
             return None
-
-        update_bid_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO] = []
-
+        adv_keywords_coro: list[
+            tuple[AdvSetting, Awaitable[list[CalculatedKeyword]]]
+        ] = []
         for adv in adv_settings:
             keywords_coro = self._wb_shop_data_manager.get_calculated_keywords(adv)
-            update_bid_in_search_adv_dto = UpdateBidsInSearchAdvDTO(adv, keywords_coro)
-            update_bid_in_search_adv_dtos.append(update_bid_in_search_adv_dto)
-
-        update_cpm_manager = UpdateCPMManager(self._access)
-        await update_cpm_manager.update_cpms_in_search_advs(
-            update_bid_in_search_adv_dtos
-        )
+            adv_keywords_coro.append((adv, keywords_coro))
+        update_cpm_manager = UpdateCPMManager(self.shop_id)
+        await update_cpm_manager.update_cpms_in_search_advs(adv_keywords_coro)
 
         return None
 
