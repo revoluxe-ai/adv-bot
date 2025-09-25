@@ -1,11 +1,14 @@
-"""DI контейнер для WB API компонентов."""
+# app/core/mp/wb/containers.py
+from __future__ import annotations
 
 import httpx
 from dependency_injector import containers, providers
 
 from .adapters.promotion_v1_adapter import PromotionV1Adapter
 from .base_wb_api_manager import BaseWBApiManager
-from __future__ import annotations
+from .rate_limit.storage import RateLimitStorage
+from .tokens.token_manager import TokenManagerFactory
+from .factories.adapter_factory import WbApiAdapterFactory
 
 
 class WBApiContainer(containers.DeclarativeContainer):
@@ -13,11 +16,35 @@ class WBApiContainer(containers.DeclarativeContainer):
 
     config = providers.Configuration()
 
-    # Singleton http clients per section (to be wired in application)
-    http_clients = providers.Dict()
+    # Singleton HTTP клиент с настройкой base_url из конфигурации
+    http_client = providers.Singleton(
+        httpx.AsyncClient,
+        base_url=config.promotion.base_url,
+        timeout=30.0,
+        headers={"User-Agent": "WB-Bot/1.0"},
+        limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
+    )
 
-    rate_limit_storage = providers.Singleton(object)  # replace with RateLimitStorage
+    # Singleton для хранилища лимитов запросов (Rate Limiting)
+    rate_limit_storage = providers.Singleton(RateLimitStorage)
 
-    token_manager_factory = providers.Singleton(object)  # replace with TokenManagerFactory
+    # Singleton фабрика для менеджеров токенов
+    token_manager_factory = providers.Singleton(TokenManagerFactory)
 
-    adapter_factory = providers.Singleton(object)  # replace with WbApiAdapterFactory
+    # Singleton фабрика адаптеров WB API
+    wb_api_adapter_factory = providers.Singleton(WbApiAdapterFactory)
+
+    # Singleton адаптеры для каждой версии
+    promotion_adapter_v1 = providers.Singleton(
+        PromotionV1Adapter,
+        http_client=http_client,  # ← инжекция HTTP клиента
+        wb_access=providers.Dependency(),  # Передается при создании
+    )
+
+    # Фабрика для создания BaseWBApi с нужными адаптерами
+    wb_api_factory = providers.Factory(
+        BaseWBApiManager,
+        wb_access=providers.Dependency(),
+        http_client=http_client,
+    )
+

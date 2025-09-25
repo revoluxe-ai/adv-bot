@@ -9,10 +9,11 @@ from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_b
     UpdateBidForNmidCommand,
 )
 from app.core.di import inject
+from app.core.mp.wb.base_adapters.base_adapter import WBBaseAdapters
 
 logger = logging.getLogger(__name__)
 
 
-class CPMUpdateMixin:
+class CPMUpdateMixin(WBBaseAdapters):
     """Миксин для управления ставками CPM."""
-   pass
+    pass

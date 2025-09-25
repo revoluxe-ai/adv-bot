@@ -10,5 +10,5 @@ class BestKeywordFromFutureGetter(FutureGetterBase):
         keywords = await keywords_coro
         return get_best_keyword(keywords)
 
-    def _get_future(self, keywords_coro: Awaitable[list[Any]]):
+    def get_future(self, keywords_coro: Awaitable[list[Any]]):
         return super()._get_future(keywords_coro)

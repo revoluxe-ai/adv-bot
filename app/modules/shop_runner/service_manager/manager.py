@@ -29,7 +29,6 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
-
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -60,6 +59,9 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1 * 60, 60)
     async def update_cpm_bid_in_search_advs(self) -> None:
+        from app.core.mp.wb.adapters.promotion_v1_adapter import PromotionV1Adapter
+        from app.core.mp.wb.generated.promotion.v1.client.client import AuthenticatedClient
+
         from .services.update_cpm import UpdateCPMManager
 
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
@@ -111,7 +113,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-            shop_data_updater: ShopDataUpdater,
+        shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -122,9 +124,7 @@ class CoroutinesManager:
         await shop_data_updater.update_advs_data()
 
     @staticmethod
-    async def _async_zip_longest(
-            *async_gens, fillvalue=None
-    ) -> AsyncGenerator[tuple[Any, ...], None]:
+    async def _async_zip_longest(*async_gens, fillvalue=None) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
 
@@ -243,36 +243,37 @@ class CoroutinesManager:
 
         await asyncio.gather(*all_coroutines)
 
-    @while_coroutine_decorator(60, 10)
-    async def update_data_in_neo4j(self) -> None:
-        from .services.neo4j_data_update_manager import Neo4jDataUpdateManager
-
-        advs = await self._wb_shop_data_manager.get_active_advs()
-        neo4j_update_manager = Neo4jDataUpdateManager()
-
-        try:
-            all_coroutines = []
-
-            # Обрабатываем товары для каждого объявления
-            for adv in advs:
-                item_update_coro = neo4j_update_manager.update_item(adv)
-                all_coroutines.append(item_update_coro)
-
-                # Получаем ключевые слова для объявления
-                keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
-                keywords_list = await keywords
-
-                # Обрабатываем каждое ключевое слово
-                for keyword in keywords_list:
-                    keyword_update_coro = neo4j_update_manager.update_keyword_phrase(keyword.text)
-                    all_coroutines.append(keyword_update_coro)
-
-            # Выполняем все задачи параллельно
-            await asyncio.gather(*all_coroutines)
-
-        finally:
-            # Закрываем gRPC каналы
-            await neo4j_update_manager.close_channels()
+    # TODO: временно отключено, чтобы не было конфликтов
+    # @while_coroutine_decorator(60, 10)
+    # async def update_data_in_neo4j(self) -> None:
+    #     from .services.neo4j_data_update_manager import Neo4jDataUpdateManager
+    #
+    #     advs = await self._wb_shop_data_manager.get_active_advs()
+    #     neo4j_update_manager = Neo4jDataUpdateManager()
+    #
+    #     try:
+    #         all_coroutines = []
+    #
+    #         # Обрабатываем товары для каждого объявления
+    #         for adv in advs:
+    #             item_update_coro = neo4j_update_manager.update_item(adv)
+    #             all_coroutines.append(item_update_coro)
+    #
+    #             # Получаем ключевые слова для объявления
+    #             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
+    #             keywords_list = await keywords
+    #
+    #             # Обрабатываем каждое ключевое слово
+    #             for keyword in keywords_list:
+    #                 keyword_update_coro = neo4j_update_manager.update_keyword_phrase(keyword.text)
+    #                 all_coroutines.append(keyword_update_coro)
+    #
+    #         # Выполняем все задачи параллельно
+    #         await asyncio.gather(*all_coroutines)
+    #
+    #     finally:
+    #         # Закрываем gRPC каналы
+    #         await neo4j_update_manager.close_channels()
 
     @while_coroutine_decorator(60, 10)
     async def update_predict_ctr(self) -> None:

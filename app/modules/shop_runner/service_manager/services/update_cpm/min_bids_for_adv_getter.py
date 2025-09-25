@@ -9,5 +9,5 @@ class MinBidsForAdvGetter(FutureGetterBase):
         await asyncio.sleep(0)  # имитируем асинхронность
         return {nmid: 100 for nmid in nmids}
 
-    def _get_future(self, adv_id: int, nmids: list[int]) -> asyncio.Future:
+    def get_future(self, adv_id: int, nmids: list[int]) -> asyncio.Future:
         return super()._get_future(adv_id, nmids)
