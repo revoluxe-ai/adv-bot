@@ -12,7 +12,7 @@ class SendToQueueForUpdateNmidBidCommand:
     max_cpm_bid: int
     target_position: int
     bidder_step: int
-    best_keyword_future: Future[list[CalculatedKeyword]]
+    best_keyword_future: Future[CalculatedKeyword]
     min_bids_future: Future[dict[int, int]]
     current_positions_future: Future[dict[int, int]]
     current_bids_future: Future[dict[int, int]]

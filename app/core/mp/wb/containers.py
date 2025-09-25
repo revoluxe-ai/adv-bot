@@ -6,6 +6,7 @@ from dependency_injector import containers, providers
 
 from .adapters.promotion_v1_adapter import PromotionV1Adapter
 from .base_wb_api_manager import BaseWBApiManager
+from .promotion_manager import PromotionManager
 from .rate_limit.storage import RateLimitStorage
 from .tokens.token_manager import TokenManagerFactory
 from .factories.adapter_factory import WbApiAdapterFactory
@@ -33,6 +34,12 @@ class WBApiContainer(containers.DeclarativeContainer):
 
     # Singleton фабрика адаптеров WB API
     wb_api_adapter_factory = providers.Singleton(WbApiAdapterFactory)
+
+    # PromotionManager with injected adapter factory
+    promotion_manager = providers.Factory(
+        PromotionManager,
+        adapter_factory=wb_api_adapter_factory,
+    )
 
     # Singleton адаптеры для каждой версии
     promotion_adapter_v1 = providers.Singleton(

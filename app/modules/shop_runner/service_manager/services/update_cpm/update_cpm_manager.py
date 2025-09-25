@@ -1,25 +1,28 @@
 import asyncio
 import logging
-from asyncio import Task, TaskGroup
-from collections.abc import Awaitable
+from asyncio import Future
+from typing import Coroutine, Any, Awaitable
+from asyncio import TaskGroup
+from typing import Awaitable, Dict, List, Optional
 
-from app.client_bot.user_interface.views.messages import ApiForrbidenError
-from app.modules.common_slaves.wildberries.data_classes.adv import Adv
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.shared.application.commands.search_adv_bid_update.send_to_queue_for_update_nmid_bid_command import \
+    SendToQueueForUpdateNmidBidCommand
+from app.shared.application.commands.search_adv_bid_update.update_bid_command import BidUpdateForNmidCommand
+from .best_keyword_from_future_getter import BestKeywordFromFutureGetter
+from .current_positions_for_adv_getter import CurrentPositionsForAdvGetter
+from .min_bids_for_adv_getter import MinBidsForAdvGetter
+from .update_bid_orchestrator import UpdateBidOrchestrator
+from .wb_api_managers import WBApiDataGetter, WBApiCpmUpdater
+from .сurrent_bids_for_adv_getter import CurrentBidsForAdvGetter
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser import parser
-from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
-    UpdateBidsInSearchAdvDTO,
-)
-from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
-    UpdateBidForNmidTask,
-    UpdateBidsSearchAdvInShopBatch,
-)
 
-from .bid_orchestrator import BidUpdateOrchestrator
-from .redis_manager import RedisManager
+
+from .wb_api_managers import WBApiDataGetter, WBApiCpmUpdater
 
 logger = logging.getLogger(__name__)
 
@@ -45,15 +48,6 @@ class UpdateCPMManager:
         self._current_positions_for_adv_from_future_getter = CurrentPositionsForAdvGetter(loop)
         self._current_bids_for_adv_from_future_getter = CurrentBidsForAdvGetter(loop)
 
-    async def __get_best_keyword(
-        self, keywords_coro: Awaitable[List[CalculatedKeyword]]
-    ) -> Optional[CalculatedKeyword]:
-        keywords: List[CalculatedKeyword] = await keywords_coro
-        best_keyword = data_manager.get_best_keyword(keywords)
-        if not best_keyword:
-            logger.debug("skip: no best keyword")
-            return None
-        return best_keyword
 
     async def update_cpms_in_search_advs(
         self, adv_settings_and_keywords_coro: list[tuple[AdvSetting, Awaitable[list[CalculatedKeyword]]]]
@@ -70,15 +64,12 @@ class UpdateCPMManager:
             if not any([search_adv_id, nmids, max_bid, target_place]):
                 logger.debug("skip: empty adv params", extra={"adv_id": adv.adv_id})
                 continue
-            best_keyword_future: asyncio.Future[list[CalculatedKeyword]] = (
-                self._best_keyword_from_future_getter._get_future(keywords_coro)
-            )
-            min_bids_future: Future[dict[int, int]] = self._min_bids_for_adv_from_future_getter._get_future(
-                search_adv_id, nmids
-            )
-            current_positions_future: Future[dict[int, int]] = (
-                self._current_positions_for_adv_from_future_getter.get_future(adv, best_keyword_future)
-            )
+            best_keyword_future: asyncio.Future[CalculatedKeyword] \
+                = self._best_keyword_from_future_getter._get_future(keywords_coro)
+            min_bids_future: Future[dict[int, int]] = self._min_bids_for_adv_from_future_getter. \
+                _get_future(search_adv_id, nmids)
+            current_positions_future: Future[dict[int, int]] \
+                = self._current_positions_for_adv_from_future_getter.get_future(adv, best_keyword_future)
             max_bid = adv.max_cpm
 
             current_bids_future: Future[dict[int, int]] = self._current_bids_for_adv_from_future_getter._get_future(
@@ -99,7 +90,9 @@ class UpdateCPMManager:
                     current_positions_future=current_positions_future,
                     current_bids_future=current_bids_future,
                 )
-                send_update_commands_coros.append(self._update_bid_orchestrator.send_update_command_to_queue(cmd))
+                send_update_commands_coros.append(
+                    self._update_bid_orchestrator.send_update_command_to_queue(cmd)
+                )
 
         update_batch_task = asyncio.create_task(self._update_bid_orchestrator.update_batch())
         update_bids_by_batch_task = asyncio.create_task(self._update_bid_orchestrator.update_bids_for_batch())
