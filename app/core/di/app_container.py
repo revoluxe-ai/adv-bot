@@ -14,7 +14,7 @@ class AppContainer(containers.DeclarativeContainer):
 
     wiring_config = containers.WiringConfiguration(
         packages=[
-            "app",
+            "app.core",
         ],
     )
     settings = providers.Singleton(AppConfig.create)

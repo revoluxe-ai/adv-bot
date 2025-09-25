@@ -6,7 +6,7 @@ from typing import List, Dict, Optional
 
 from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
     UpdateBidsSearchAdvInShopBatch,
-    UpdateBidForNmidTask,
+    UpdateBidForNmidCommand,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,10 +38,10 @@ class BidUpdateOrchestrator:
     """Оркестратор обновления ставок с Producer-Consumer логикой"""
 
     def __init__(
-        self,
-        api_adapter,
-        max_batch_size: int = 50,
-        queue_size: int = 200,
+            self,
+            api_adapter,
+            max_batch_size: int = 50,
+            queue_size: int = 200,
     ):
         self.api_adapter = api_adapter
         self.max_batch_size = max_batch_size
@@ -49,7 +49,7 @@ class BidUpdateOrchestrator:
         self.stats = ProcessingStats()
         self.logger = logging.getLogger(__name__)
 
-    async def _process_bid_task(self, task: UpdateBidForNmidTask) -> BidUpdateResult:
+    async def _process_bid_task(self, task: UpdateBidForNmidCommand) -> BidUpdateResult:
         """Обрабатывает одну задачу на обновление ставки"""
         try:
             new_bid = await task.new_bid_coro
@@ -146,7 +146,7 @@ class BidUpdateOrchestrator:
                 batch = []
 
     async def process_updates(
-        self, update_batch: UpdateBidsSearchAdvInShopBatch
+            self, update_batch: UpdateBidsSearchAdvInShopBatch
     ) -> ProcessingStats:
         """Запускает процесс обновления ставок"""
         try:

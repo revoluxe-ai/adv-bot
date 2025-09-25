@@ -29,9 +29,7 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
-from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
-    UpdateBidsInSearchAdvDTO,
-)
+
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -55,54 +53,27 @@ class CoroutinesManager:
 
         self._wb_api = wb_api
         self.shop_id = wb_api.shop_id
-        self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
-            list[CalculatedKeyword]
-        )
+        self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(list[CalculatedKeyword])
         self._adv_settings_dict: dict[int, AdvSetting] | None = None
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
 
     @while_coroutine_decorator(1 * 60, 60)
     async def update_cpm_bid_in_search_advs(self) -> None:
-        from .services.update_cpm import UpdateCPMManager
         from app.core.mp.wb.adapters.promotion_v1_adapter import PromotionV1Adapter
         from app.core.mp.wb.generated.promotion.v1.client.client import AuthenticatedClient
+
+        from .services.update_cpm import UpdateCPMManager
 
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
             return None
-
-        update_bid_in_search_adv_dtos: list[UpdateBidsInSearchAdvDTO] = []
-
+        adv_keywords_coro: list[tuple[AdvSetting, Awaitable[list[CalculatedKeyword]]]] = []
         for adv in adv_settings:
             keywords_coro = self._wb_shop_data_manager.get_calculated_keywords(adv)
-            update_bid_in_search_adv_dto = UpdateBidsInSearchAdvDTO(adv, keywords_coro)
-            update_bid_in_search_adv_dtos.append(update_bid_in_search_adv_dto)
-
-        # Create a simple client factory that uses the existing WB API infrastructure
-        class SimpleClientFactory:
-            def __init__(self, wb_api):
-                self._wb_api = wb_api
-                
-            async def get_client(self, shop_id: str):
-                # Create an AuthenticatedClient with the current token
-                token = self._wb_api._current_token.api_key
-                client = AuthenticatedClient(
-                    base_url="https://advert-api.wildberries.ru",
-                    token=token,
-                    timeout=30.0
-                )
-                # Don't set session - let it create its own httpx client
-                return client
-        
-        # Create PromotionV1Adapter with simple client factory
-        client_factory = SimpleClientFactory(self._wb_api)
-        promotion_adapter = PromotionV1Adapter(client_factory)
-        
-        update_cpm_manager = UpdateCPMManager(self.shop_id, promotion_adapter=promotion_adapter)
-        await update_cpm_manager.update_cpms_in_search_advs(
-            update_bid_in_search_adv_dtos
-        )
+            adv_keywords_coro.append((adv, keywords_coro))
+        update_cpm_manager = UpdateCPMManager(self.shop_id)
+        await update_cpm_manager.update_cpms_in_search_advs(adv_keywords_coro)
 
         return None
 
@@ -131,10 +102,8 @@ class CoroutinesManager:
             if auction_adv_id := adv.search_adv_id:
                 all_adv_ids.add(auction_adv_id)
 
-        full_stats: list[FullAdvStat] = (
-            await wb_data_getter.get_full_adv_stat_for_adv_ids(
-                wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
-            )
+        full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
+            wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
         )
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
@@ -145,7 +114,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-            shop_data_updater: ShopDataUpdater,
+        shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -156,9 +125,7 @@ class CoroutinesManager:
         await shop_data_updater.update_advs_data()
 
     @staticmethod
-    async def _async_zip_longest(
-            *async_gens, fillvalue=None
-    ) -> AsyncGenerator[tuple[Any, ...], None]:
+    async def _async_zip_longest(*async_gens, fillvalue=None) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
 
@@ -193,9 +160,7 @@ class CoroutinesManager:
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
 
             generator: AsyncGenerator[tuple[str, int], None] = (
-                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
-                    adv, keywords
-                )
+                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(adv, keywords)
             )
             generators.append(generator)
         zipped_generators = self._async_zip_longest(*generators)
@@ -208,9 +173,7 @@ class CoroutinesManager:
                     await asyncio.sleep(
                         settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
                     )  # Добавляем небольшую задержку между задачами
-                    logger.info(
-                        f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
-                    )
+                    logger.info(f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга")
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
@@ -245,20 +208,14 @@ class CoroutinesManager:
             FirstKeyUpdaterError,
         )
 
-        all_active_advs: list[AdvSetting] = (
-            await self._wb_shop_data_manager.get_active_advs()
-        )
+        all_active_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
         tasks = []
         for adv in all_active_advs:
             if not adv.auto_update_white_list:
                 continue
-            keywords: Awaitable[list[CalculatedKeyword]] = (
-                self._wb_shop_data_manager.get_calculated_keywords(adv)
-            )
+            keywords: Awaitable[list[CalculatedKeyword]] = self._wb_shop_data_manager.get_calculated_keywords(adv)
             updater = FirstKeyUpdater(adv)
-            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(
-                keywords
-            )
+            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(keywords)
             task = asyncio.create_task(update_coroutine)
             tasks.append(task)
 
@@ -282,9 +239,7 @@ class CoroutinesManager:
             item_features_update_coro = redis_update_manager.update_items_features(adv)
             all_coroutines.append(item_features_update_coro)
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
-            keywords_features_update_coroutines = (
-                redis_update_manager.update_keyword_features(keywords)
-            )
+            keywords_features_update_coroutines = redis_update_manager.update_keyword_features(keywords)
             all_coroutines.append(keywords_features_update_coroutines)
 
         await asyncio.gather(*all_coroutines)
@@ -310,9 +265,7 @@ class CoroutinesManager:
 
                 # Обрабатываем каждое ключевое слово
                 for keyword in keywords_list:
-                    keyword_update_coro = neo4j_update_manager.update_keyword_phrase(
-                        keyword.text
-                    )
+                    keyword_update_coro = neo4j_update_manager.update_keyword_phrase(keyword.text)
                     all_coroutines.append(keyword_update_coro)
 
             # Выполняем все задачи параллельно
@@ -338,9 +291,7 @@ class CoroutinesManager:
         try:
             all_coroutines = []
 
-            logger.info(
-                f"Начинаем обновление прогнозов CTR для {len(advs)} кампаний магазина {self.shop_id}"
-            )
+            logger.info(f"Начинаем обновление прогнозов CTR для {len(advs)} кампаний магазина {self.shop_id}")
 
             # Собираем корутины для всех кампаний
             for adv in advs:

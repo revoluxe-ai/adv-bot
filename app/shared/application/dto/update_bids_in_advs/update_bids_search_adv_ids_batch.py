@@ -1,26 +1,25 @@
-from collections.abc import Awaitable
 from dataclasses import dataclass
 
 
 @dataclass
-class UpdateBidForNmidTask:
+class UpdateBidForNmidCommand:
     adv_id: int
     nmid: int
-    new_bid_coro: Awaitable[int]
+    new_bid: int
 
 
 @dataclass
 class UpdateBidsSearchAdvInShopBatch:
     shop_id: str
-    __tasks: list[UpdateBidForNmidTask] | None = None
+    __tasks: list[UpdateBidForNmidCommand] | None = None
 
-    def add_task(self, task: UpdateBidForNmidTask) -> None:
+    def add_task(self, task: UpdateBidForNmidCommand) -> None:
         if self.__tasks is None:
             self.__tasks = []
         self.__tasks.append(task)
 
     @property
-    def tasks(self) -> list[UpdateBidForNmidTask]:
+    def tasks(self) -> list[UpdateBidForNmidCommand]:
         if self.__tasks is None:
             return []
         return self.__tasks
