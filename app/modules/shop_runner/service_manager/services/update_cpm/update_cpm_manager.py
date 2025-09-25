@@ -1,12 +1,14 @@
 import asyncio
 import logging
 from asyncio import Future
-from typing import Coroutine, Any, Awaitable
-from asyncio import TaskGroup
-from typing import Awaitable, Dict, List, Optional
+from typing import Awaitable
+from typing import Coroutine, Any
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
+    CalculatedKeyword,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.wb_adv_updater import data_manager
 from app.shared.application.commands.search_adv_bid_update.send_to_queue_for_update_nmid_bid_command import \
     SendToQueueForUpdateNmidBidCommand
 from app.shared.application.commands.search_adv_bid_update.update_bid_command import BidUpdateForNmidCommand
@@ -15,14 +17,7 @@ from .current_positions_for_adv_getter import CurrentPositionsForAdvGetter
 from .min_bids_for_adv_getter import MinBidsForAdvGetter
 from .update_bid_orchestrator import UpdateBidOrchestrator
 from .wb_api_managers import WBApiDataGetter, WBApiCpmUpdater
-from .сurrent_bids_for_adv_getter import CurrentBidsForAdvGetter
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
-from app.modules.wb_adv_updater import data_manager
-
-
-from .wb_api_managers import WBApiDataGetter, WBApiCpmUpdater
+from .сurrent_bids_for_adv_getter.сurrent_bids_for_adv_getter import CurrentBidsForAdvGetter
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +43,8 @@ class UpdateCPMManager:
         self._current_positions_for_adv_from_future_getter = CurrentPositionsForAdvGetter(loop)
         self._current_bids_for_adv_from_future_getter = CurrentBidsForAdvGetter(loop)
 
-
     async def __get_best_keyword(
-        self, keywords_coro: Awaitable[list[CalculatedKeyword]]
+            self, keywords_coro: Awaitable[list[CalculatedKeyword]]
     ) -> CalculatedKeyword | None:
         keywords: list[CalculatedKeyword] = await keywords_coro
         best_keyword = data_manager.get_best_keyword(keywords)
@@ -74,7 +68,7 @@ class UpdateCPMManager:
             if not any([search_adv_id, nmids, max_bid, target_place]):
                 logger.debug("skip: empty adv params", extra={"adv_id": adv.adv_id})
                 continue
-            best_keyword_future: asyncio.Future[list[CalculatedKeyword]] \
+            best_keyword_future: asyncio.Future[CalculatedKeyword] \
                 = self._best_keyword_from_future_getter._get_future(keywords_coro)
             min_bids_future: Future[dict[int, int]] = self._min_bids_for_adv_from_future_getter. \
                 _get_future(search_adv_id, nmids)
