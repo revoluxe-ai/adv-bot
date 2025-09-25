@@ -4,33 +4,21 @@ from __future__ import annotations
 import httpx
 from dependency_injector import containers, providers
 
-from .rate_limit.storage import RateLimitStorage
-from .tokens.token_manager import TokenManagerFactory
-from .factories.adapter_factory import WbApiAdapterFactory
+from .adapters.promotion_v1_adapter import PromotionV1Adapter
+from .base_wb_api_manager import BaseWBApiManager
 
 
 class WBApiContainer(containers.DeclarativeContainer):
-    """DI контейнер WB API по ТЗ."""
+    """Dependency injection container for WB API components."""
 
     config = providers.Configuration()
 
-    # Один AsyncClient на раздел API (сейчас только promotion)
-    promotion_http_client = providers.Singleton(
-        httpx.AsyncClient,
-        base_url=config.promotion.base_url,   # пример: "https://advert-api.wildberries.ru/"
-        timeout=30.0,
-    )
+    # Singleton http clients per section (to be wired in application)
+    http_clients = providers.Dict()
 
-    # Централизованное хранилище RL
-    rate_limit_storage = providers.Singleton(RateLimitStorage)
+    rate_limit_storage = providers.Singleton(object)  # replace with RateLimitStorage
 
-    # Фабрика токен-менеджеров (per shop_id)
-    token_manager_factory = providers.Singleton(TokenManagerFactory)
+    token_manager_factory = providers.Singleton(object)  # replace with TokenManagerFactory
 
-    # Фабрика адаптеров с кэшом по (shop_id, section, version)
-    adapter_factory = providers.Singleton(
-        WbApiAdapterFactory,
-        promotion_http_client=promotion_http_client,
-        token_manager_factory=token_manager_factory,
-        rate_limit_storage=rate_limit_storage,  # передадим для декоратора/адаптера
-    )
+    adapter_factory = providers.Singleton(object)  # replace with WbApiAdapterFactory
+
