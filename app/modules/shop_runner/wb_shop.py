@@ -20,18 +20,18 @@ class WBShop:
         wb_api = self._wb_api
         coroutines_manager = CoroutinesManager(wb_api)
         await asyncio.gather(
-            # self._alive_worker_run(),
-            # coroutines_manager.parsing_keywords_run(),
-            # coroutines_manager.update_advs_data_from_wb_to_pg(),
-            # coroutines_manager.update_cards_data_from_wb_to_pg(),
+            self._alive_worker_run(),
+            coroutines_manager.parsing_keywords_run(),
+            coroutines_manager.update_advs_data_from_wb_to_pg(),
+            coroutines_manager.update_cards_data_from_wb_to_pg(),
             coroutines_manager.update_cpm_bid_in_search_advs(),
-            # coroutines_manager.update_common_sale_stat(),
-            # coroutines_manager.update_full_adv_stat(),
-            # coroutines_manager.adv_settings_auto_update(),
-            # coroutines_manager.update_top_key_in_advs(),
-            # coroutines_manager.update_features_in_redis(),
-            # coroutines_manager.update_data_in_neo4j(),
-            # coroutines_manager.update_predict_ctr(),
+            coroutines_manager.update_common_sale_stat(),
+            coroutines_manager.update_full_adv_stat(),
+            coroutines_manager.adv_settings_auto_update(),
+            coroutines_manager.update_top_key_in_advs(),
+            coroutines_manager.update_features_in_redis(),
+            coroutines_manager.update_data_in_neo4j(),
+            coroutines_manager.update_predict_ctr(),
         )
 
     async def _alive_worker_run(self):
