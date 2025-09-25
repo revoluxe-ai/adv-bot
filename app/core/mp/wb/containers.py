@@ -6,10 +6,11 @@ from dependency_injector import containers, providers
 
 from .adapters.promotion_v1_adapter import PromotionV1Adapter
 from .base_wb_api_manager import BaseWBApiManager
+from .factories.adapter_factory import WbApiAdapterFactory
 from .promotion_manager import PromotionManager
 from .rate_limit.storage import RateLimitStorage
+from .services.promotion_bids_service import PromotionBidsService
 from .tokens.token_manager import TokenManagerFactory
-from .factories.adapter_factory import WbApiAdapterFactory
 
 
 class WBApiContainer(containers.DeclarativeContainer):
@@ -41,6 +42,12 @@ class WBApiContainer(containers.DeclarativeContainer):
         adapter_factory=wb_api_adapter_factory,
     )
 
+    # PromotionBidsService as Singleton using PromotionManager
+    promotion_bids_service = providers.Singleton(
+        PromotionBidsService,
+        promotion_manager=promotion_manager,
+    )
+
     # Singleton адаптеры для каждой версии
     promotion_adapter_v1 = providers.Singleton(
         PromotionV1Adapter,
@@ -54,4 +61,3 @@ class WBApiContainer(containers.DeclarativeContainer):
         wb_access=providers.Dependency(),
         http_client=http_client,
     )
-
