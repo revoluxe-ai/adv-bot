@@ -16,4 +16,4 @@ logger = logging.getLogger(__name__)
 
 class CPMUpdateMixin(WBBaseAdapters):
     """Миксин для управления ставками CPM."""
-   pass
+    pass
