@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
     UpdateBidsSearchAdvInShopBatch,

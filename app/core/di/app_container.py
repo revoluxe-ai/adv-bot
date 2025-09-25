@@ -12,11 +12,11 @@ from ...configs import AppConfig
 class AppContainer(containers.DeclarativeContainer):
     """Главный DI-контейнер приложения. Содержит все основные сервисы и конфигурации."""
 
-    # wiring_config = containers.WiringConfiguration(
-    #     packages=[
-    #         "app.core",
-    #     ],
-    # )
+    wiring_config = containers.WiringConfiguration(
+        packages=[
+            "app.core",
+        ],
+    )
     settings = providers.Singleton(AppConfig.create)
 
     # Neo4j
