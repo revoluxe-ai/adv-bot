@@ -12,7 +12,7 @@ class MinBidMixin:
 
     async def get_min_bids(self, adv_id: int, nmids: List[int]) -> Dict[int, int]:
         """Proxy to PromotionManager.get_min_bids"""
-        raise NotImplementedError
+        return await self.promotion_manager.get_min_bids(self.shop_id, adv_id, nmids)
 
 
 class CurrentBidMixin:
@@ -22,7 +22,7 @@ class CurrentBidMixin:
 
     async def get_current_bids(self, adv_id: int, nmids: List[int]) -> Dict[int, int]:
         """Proxy to PromotionManager.get_current_bids"""
-        raise NotImplementedError
+        return await self.promotion_manager.get_current_bids(self.shop_id, adv_id, nmids)
 
 
 class BidUpdateMixin:
@@ -32,4 +32,4 @@ class BidUpdateMixin:
 
     async def update_bids(self, batch: object) -> None:
         """Proxy to PromotionManager.update_bids"""
-        raise NotImplementedError
+        return await self.promotion_manager.update_bids(self.shop_id, batch)
