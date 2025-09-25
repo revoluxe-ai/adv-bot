@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
-    UpdateBidsSearchAdvInShopBatch,
     UpdateBidForNmidCommand,
+    UpdateBidsSearchAdvInShopBatch,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,16 +32,9 @@ class BidUpdateOrchestrator:
         self._queue: asyncio.Queue[BidUpdateResult] = asyncio.Queue(maxsize=queue_size)
         self._logger = logger
 
-    async def _process_bid_task(self, task: UpdateBidForNmidCommand) -> Optional[BidUpdateResult]:
-        try:
-            new_bid = await task.new_bid_coro
-        except Exception:
-            # Логические ошибки должен обработать верхний TaskGroup
-            raise
-        if new_bid is None:
-            self._logger.debug("skip: new_bid is None", extra={"adv_id": task.adv_id, "nmid": task.nmid})
-            return None
-        return BidUpdateResult(adv_id=task.adv_id, nmid=task.nmid, new_bid=int(new_bid))
+    async def _process_bid_task(self, task: UpdateBidForNmidTask) -> BidUpdateResult:
+        new_bid = await task.new_bid_coro
+        return BidUpdateResult(adv_id=task.adv_id, nmid=task.nmid, new_bid=new_bid)
 
     async def _producer(self, task: UpdateBidForNmidCommand) -> None:
         result = await self._process_bid_task(task)
@@ -50,7 +43,7 @@ class BidUpdateOrchestrator:
         await self._queue.put(result)
 
     async def _consumer(self, producers_done: asyncio.Event) -> None:
-        batch: List[BidUpdateResult] = []
+        batch: list[BidUpdateResult] = []
         try:
             while True:
                 # gather with 1s timeout
@@ -75,9 +68,9 @@ class BidUpdateOrchestrator:
             # Корректно выходим при отмене TaskGroup
             return
 
-    async def _send_batch(self, batch: List[BidUpdateResult]) -> None:
+    async def _send_batch(self, batch: list[BidUpdateResult]) -> None:
         # group by adv_id
-        grouped: Dict[int, List[Dict[str, int]]] = {}
+        grouped: dict[int, list[dict[str, int]]] = {}
         for r in batch:
             if r.new_bid is None:
                 continue
@@ -85,7 +78,7 @@ class BidUpdateOrchestrator:
         # send per adv in chunks up to max_batch_size
         for adv_id, nm_bids in grouped.items():
             for i in range(0, len(nm_bids), self._max_batch_size):
-                chunk = nm_bids[i: i + self._max_batch_size]
+                chunk = nm_bids[i : i + self._max_batch_size]
                 await self._cpm_updater.update_bids(self._shop_id, adv_id=adv_id, nm_bids=chunk)
 
     async def process_updates(self, update_batch: UpdateBidsSearchAdvInShopBatch) -> None:
