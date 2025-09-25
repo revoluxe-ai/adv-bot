@@ -65,6 +65,8 @@ class CoroutinesManager:
     @while_coroutine_decorator(1 * 60, 60)
     async def update_cpm_bid_in_search_advs(self) -> None:
         from .services.update_cpm import UpdateCPMManager
+        from app.core.mp.wb.adapters.promotion_v1_adapter import PromotionV1Adapter
+        from app.core.mp.wb.generated.promotion.v1.client.client import AuthenticatedClient
 
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
@@ -77,7 +79,27 @@ class CoroutinesManager:
             update_bid_in_search_adv_dto = UpdateBidsInSearchAdvDTO(adv, keywords_coro)
             update_bid_in_search_adv_dtos.append(update_bid_in_search_adv_dto)
 
-        update_cpm_manager = UpdateCPMManager(self.shop_id)
+        # Create a simple client factory that uses the existing WB API infrastructure
+        class SimpleClientFactory:
+            def __init__(self, wb_api):
+                self._wb_api = wb_api
+                
+            async def get_client(self, shop_id: str):
+                # Create an AuthenticatedClient with the current token
+                token = self._wb_api._current_token.api_key
+                client = AuthenticatedClient(
+                    base_url="https://advert-api.wildberries.ru",
+                    token=token,
+                    timeout=30.0
+                )
+                # Don't set session - let it create its own httpx client
+                return client
+        
+        # Create PromotionV1Adapter with simple client factory
+        client_factory = SimpleClientFactory(self._wb_api)
+        promotion_adapter = PromotionV1Adapter(client_factory)
+        
+        update_cpm_manager = UpdateCPMManager(self.shop_id, promotion_adapter=promotion_adapter)
         await update_cpm_manager.update_cpms_in_search_advs(
             update_bid_in_search_adv_dtos
         )
