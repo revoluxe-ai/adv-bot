@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 class AuthenticatedClient:
@@ -12,6 +12,10 @@ class AuthenticatedClient:
     def __init__(self, base_url: str, token: Optional[str] = None) -> None:
         self.base_url = base_url
         self.token = token
+
+    # ВАЖНО: порядок декораторов фиксирован
+    # @auth_decorator -> @rate_limit_decorator -> @retry_decorator
+    # чтобы retry учитывал обновление токена и задержки RL.
 
     async def request(self, method: str, url: str, **kwargs: Any) -> Any:
         """Perform a request using underlying httpx client. Implementation provided later."""
