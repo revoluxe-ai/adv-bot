@@ -5,8 +5,17 @@ import asyncio
 
 
 def _extract_raw_method(self: Any, kwargs: dict, func_name: str) -> str:
-    # try kwargs, then attribute, then function name
-    return (kwargs.get("raw_method") or getattr(self, "_raw_method", None) or func_name)
+    # try kwargs, then method-specific attribute, then generic _raw_method, then function name
+    if kwargs.get("raw_method"):
+        return kwargs.get("raw_method")
+    method_attr = f"_raw_method_{func_name}"
+    val = getattr(self, method_attr, None)
+    if val:
+        return val
+    val = getattr(self, "_raw_method", None)
+    if val:
+        return val
+    return func_name
 
 
 def rate_limit_decorator(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable[..., Coroutine[Any, Any, Any]]:

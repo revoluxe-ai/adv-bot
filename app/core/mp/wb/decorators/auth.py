@@ -48,11 +48,17 @@ def auth_decorator(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable[..
         if shared_client is not None and hasattr(temp_client, "attach_session"):
             temp_client.attach_session(shared_client)
 
-        # inject into kwargs as authenticated_client
-        kwargs = dict(kwargs)
-        kwargs["authenticated_client"] = temp_client
+        # attach temporary client onto self for the duration of the call
+        setattr(self, "_authenticated_client", temp_client)
 
-        resp = await func(*args, **kwargs)
+        try:
+            resp = await func(*args, **kwargs)
+        finally:
+            # cleanup attribute to avoid leaking per-request client
+            try:
+                delattr(self, "_authenticated_client")
+            except Exception:
+                pass
 
         # on auth failure, mark invalid and retry once
         if _is_auth_error(resp):
@@ -65,8 +71,14 @@ def auth_decorator(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable[..
             temp_client = client_factory(self.section, new_token)
             if shared_client is not None and hasattr(temp_client, "attach_session"):
                 temp_client.attach_session(shared_client)
-            kwargs["authenticated_client"] = temp_client
-            return await func(*args, **kwargs)
+            setattr(self, "_authenticated_client", temp_client)
+            try:
+                return await func(*args, **kwargs)
+            finally:
+                try:
+                    delattr(self, "_authenticated_client")
+                except Exception:
+                    pass
 
         return resp
 
