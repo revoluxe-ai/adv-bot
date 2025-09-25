@@ -34,7 +34,7 @@ async def run_process() -> None:
     TODO: Выпилить магазинные функции из общего процесса и перенести их в shop_runner. Тут оставить только общие.
     """
     container = AppContainer()
-    container.wire(packages=["app.modules.shop_runner"])
+    # container.wire(packages=["app.modules.shop_runner"])
     # TODO: Обновлять список пакетов/модулей в wire(), если появляются новые инъекции (@inject/Provide[...]).
     # Проверка/тест идеи
     # Быстрая проверка на запуск: этого достаточно.

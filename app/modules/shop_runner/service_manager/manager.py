@@ -53,9 +53,7 @@ class CoroutinesManager:
 
         self._wb_api = wb_api
         self.shop_id = wb_api.shop_id
-        self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
-            list[CalculatedKeyword]
-        )
+        self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(list[CalculatedKeyword])
         self._adv_settings_dict: dict[int, AdvSetting] | None = None
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
@@ -67,9 +65,7 @@ class CoroutinesManager:
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
             return None
-        adv_keywords_coro: list[
-            tuple[AdvSetting, Awaitable[list[CalculatedKeyword]]]
-        ] = []
+        adv_keywords_coro: list[tuple[AdvSetting, Awaitable[list[CalculatedKeyword]]]] = []
         for adv in adv_settings:
             keywords_coro = self._wb_shop_data_manager.get_calculated_keywords(adv)
             adv_keywords_coro.append((adv, keywords_coro))
@@ -103,10 +99,8 @@ class CoroutinesManager:
             if auction_adv_id := adv.search_adv_id:
                 all_adv_ids.add(auction_adv_id)
 
-        full_stats: list[FullAdvStat] = (
-            await wb_data_getter.get_full_adv_stat_for_adv_ids(
-                wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
-            )
+        full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
+            wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
         )
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
@@ -128,9 +122,7 @@ class CoroutinesManager:
         await shop_data_updater.update_advs_data()
 
     @staticmethod
-    async def _async_zip_longest(
-        *async_gens, fillvalue=None
-    ) -> AsyncGenerator[tuple[Any, ...], None]:
+    async def _async_zip_longest(*async_gens, fillvalue=None) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
 
@@ -165,9 +157,7 @@ class CoroutinesManager:
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
 
             generator: AsyncGenerator[tuple[str, int], None] = (
-                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
-                    adv, keywords
-                )
+                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(adv, keywords)
             )
             generators.append(generator)
         zipped_generators = self._async_zip_longest(*generators)
@@ -180,9 +170,7 @@ class CoroutinesManager:
                     await asyncio.sleep(
                         settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
                     )  # Добавляем небольшую задержку между задачами
-                    logger.info(
-                        f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
-                    )
+                    logger.info(f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга")
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
@@ -217,20 +205,14 @@ class CoroutinesManager:
             FirstKeyUpdaterError,
         )
 
-        all_active_advs: list[AdvSetting] = (
-            await self._wb_shop_data_manager.get_active_advs()
-        )
+        all_active_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
         tasks = []
         for adv in all_active_advs:
             if not adv.auto_update_white_list:
                 continue
-            keywords: Awaitable[list[CalculatedKeyword]] = (
-                self._wb_shop_data_manager.get_calculated_keywords(adv)
-            )
+            keywords: Awaitable[list[CalculatedKeyword]] = self._wb_shop_data_manager.get_calculated_keywords(adv)
             updater = FirstKeyUpdater(adv)
-            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(
-                keywords
-            )
+            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(keywords)
             task = asyncio.create_task(update_coroutine)
             tasks.append(task)
 
@@ -254,9 +236,7 @@ class CoroutinesManager:
             item_features_update_coro = redis_update_manager.update_items_features(adv)
             all_coroutines.append(item_features_update_coro)
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
-            keywords_features_update_coroutines = (
-                redis_update_manager.update_keyword_features(keywords)
-            )
+            keywords_features_update_coroutines = redis_update_manager.update_keyword_features(keywords)
             all_coroutines.append(keywords_features_update_coroutines)
 
         await asyncio.gather(*all_coroutines)
@@ -282,9 +262,7 @@ class CoroutinesManager:
 
                 # Обрабатываем каждое ключевое слово
                 for keyword in keywords_list:
-                    keyword_update_coro = neo4j_update_manager.update_keyword_phrase(
-                        keyword.text
-                    )
+                    keyword_update_coro = neo4j_update_manager.update_keyword_phrase(keyword.text)
                     all_coroutines.append(keyword_update_coro)
 
             # Выполняем все задачи параллельно
@@ -310,9 +288,7 @@ class CoroutinesManager:
         try:
             all_coroutines = []
 
-            logger.info(
-                f"Начинаем обновление прогнозов CTR для {len(advs)} кампаний магазина {self.shop_id}"
-            )
+            logger.info(f"Начинаем обновление прогнозов CTR для {len(advs)} кампаний магазина {self.shop_id}")
 
             # Собираем корутины для всех кампаний
             for adv in advs:

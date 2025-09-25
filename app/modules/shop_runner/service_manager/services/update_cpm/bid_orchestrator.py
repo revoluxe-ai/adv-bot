@@ -1,13 +1,12 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
     UpdateBidsSearchAdvInShopBatch,
-    UpdateBidForNmidTask,
+    UpdateBidForNmidCommand,
 )
-from .wb_api import WBApi
 
 logger = logging.getLogger(__name__)
 
@@ -17,110 +16,85 @@ class BidUpdateResult:
     adv_id: int
     nmid: int
     new_bid: Optional[int] = None
-    error: Optional[str] = None
 
 
 class BidUpdateOrchestrator:
-    """Producer-Consumer orchestrator for CPM bid updates.
+    """Producer-Consumer orchestrator for CPM bid updates (per TЗ).
 
-    Producers compute bids concurrently and push results to a queue.
-    Single consumer batches by size or timeout and sends to WB API.
+    - One producer per task computes new_bid and enqueues non-None results.
+    - Single consumer batches results by timeout/size and delegates PATCH to WBApiCpmUpdater.
     """
 
-    def __init__(
-        self, wb_api: WBApi, max_batch_size: int = 50, queue_size: int = 200
-    ) -> None:
-        self._wb_api = wb_api
+    def __init__(self, shop_id: str, cpm_updater, max_batch_size: int = 50, queue_size: int = 200) -> None:
+        self._shop_id = shop_id
+        self._cpm_updater = cpm_updater
         self._max_batch_size = max_batch_size
-        self._queue_size = queue_size
+        self._queue: asyncio.Queue[BidUpdateResult] = asyncio.Queue(maxsize=queue_size)
         self._logger = logger
 
-    async def _process_bid_task(self, task: UpdateBidForNmidTask) -> BidUpdateResult:
-        new_bid = await task.new_bid_coro
-        return BidUpdateResult(adv_id=task.adv_id, nmid=task.nmid, new_bid=new_bid)
+    async def _process_bid_task(self, task: UpdateBidForNmidCommand) -> Optional[BidUpdateResult]:
+        try:
+            new_bid = await task.new_bid_coro
+        except Exception:
+            # Логические ошибки должен обработать верхний TaskGroup
+            raise
+        if new_bid is None:
+            self._logger.debug("skip: new_bid is None", extra={"adv_id": task.adv_id, "nmid": task.nmid})
+            return None
+        return BidUpdateResult(adv_id=task.adv_id, nmid=task.nmid, new_bid=int(new_bid))
 
-    async def _producer(
-        self, task: UpdateBidForNmidTask, queue: asyncio.Queue[BidUpdateResult]
-    ) -> None:
+    async def _producer(self, task: UpdateBidForNmidCommand) -> None:
         result = await self._process_bid_task(task)
-        if result.error:
-            self._logger.debug(
-                "producer: skipped result with error",
-                extra={
-                    "adv_id": result.adv_id,
-                    "nmid": result.nmid,
-                    "error": result.error,
-                },
-            )
+        if result is None:
             return
-        if result.new_bid is None:
-            self._logger.debug(
-                "producer: skipped None bid",
-                extra={"adv_id": result.adv_id, "nmid": result.nmid},
-            )
-            return
-        await queue.put(result)
+        await self._queue.put(result)
 
-    async def _batch_consumer(
-        self, queue: asyncio.Queue[BidUpdateResult], producers_done: asyncio.Event
-    ) -> None:
+    async def _consumer(self, producers_done: asyncio.Event) -> None:
         batch: List[BidUpdateResult] = []
-        while True:
-            try:
-                item = await asyncio.wait_for(queue.get(), timeout=1.0)
-                batch.append(item)
-                queue.task_done()
-            except asyncio.TimeoutError:
-                if batch:
+        try:
+            while True:
+                # gather with 1s timeout
+                try:
+                    item = await asyncio.wait_for(self._queue.get(), timeout=1.0)
+                    batch.append(item)
+                    self._queue.task_done()
+                except asyncio.TimeoutError:
+                    if batch:
+                        await self._send_batch(batch)
+                        batch = []
+                # flush on full
+                if len(batch) >= self._max_batch_size:
                     await self._send_batch(batch)
                     batch = []
-            # send if full
-            if len(batch) >= self._max_batch_size:
-                await self._send_batch(batch)
-                batch = []
-            # finish condition
-            if producers_done.is_set() and queue.empty():
-                if batch:
-                    await self._send_batch(batch)
-                break
+                # finish when producer done and queue empty
+                if producers_done.is_set() and self._queue.empty():
+                    if batch:
+                        await self._send_batch(batch)
+                    break
+        except asyncio.CancelledError:
+            # Корректно выходим при отмене TaskGroup
+            return
 
     async def _send_batch(self, batch: List[BidUpdateResult]) -> None:
-        """Делегируем отправку в локальный WBApi-менеджер (миксины).
-
-        Собираем временный UpdateBidsSearchAdvInShopBatch с уже готовыми ставками,
-        оборачивая значения в корутины (ожидается new_bid_coro).
-        """
-        from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
-            UpdateBidsResolvedBatch,
-            UpdateBidResolvedTask,
-        )
-
-        resolved_batch = UpdateBidsResolvedBatch(self._wb_api.shop_id)
-
-        # Добавляем готовые задачи в батч
+        # group by adv_id
+        grouped: Dict[int, List[Dict[str, int]]] = {}
         for r in batch:
             if r.new_bid is None:
                 continue
-            resolved_batch.add_task(
-                UpdateBidResolvedTask(r.adv_id, r.nmid, int(r.new_bid))
-            )
+            grouped.setdefault(r.adv_id, []).append({"nm": int(r.nmid), "cpm": int(r.new_bid)})
+        # send per adv in chunks up to max_batch_size
+        for adv_id, nm_bids in grouped.items():
+            for i in range(0, len(nm_bids), self._max_batch_size):
+                chunk = nm_bids[i: i + self._max_batch_size]
+                await self._cpm_updater.update_bids(self._shop_id, adv_id=adv_id, nm_bids=chunk)
 
-        # Делегируем миксину. Внутри миксина реализованы правила батчинга/лимитов.
-        await self._wb_api.update_bids_in_search_advs_resolved(resolved_batch)
-
-    async def process_updates(
-        self, update_batch: UpdateBidsSearchAdvInShopBatch
-    ) -> None:
+    async def process_updates(self, update_batch: UpdateBidsSearchAdvInShopBatch) -> None:
         if not getattr(update_batch, "tasks", []):
             return
-
-        queue: asyncio.Queue[BidUpdateResult] = asyncio.Queue(maxsize=self._queue_size)
         producers_done = asyncio.Event()
-        consumer_task = asyncio.create_task(self._batch_consumer(queue, producers_done))
-
+        consumer_task = asyncio.create_task(self._consumer(producers_done))
         async with asyncio.TaskGroup() as tg:
-            for task in update_batch.tasks:
-                tg.create_task(self._producer(task, queue))
-
+            for t in update_batch.tasks:
+                tg.create_task(self._producer(t))
         producers_done.set()
         await consumer_task
