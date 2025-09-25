@@ -40,7 +40,7 @@ async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: Cli
         .distinct()
         .join(WBCabinet.adv_settings)
         .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active is True),
+            WBCabinet.adv_settings.any(AdvSetting.bot_active),
         )
     )
 

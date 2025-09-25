@@ -30,10 +30,10 @@ predictor = Predictor()
 
 image_master = ImageMaster()
 
-keywords_hashs_in_neo = set()
+keywords_hashs_in_neo: set[str] = set()
 
 
-def is_number(s):
+def is_number(s: str) -> bool:
     try:
         float(s)
         return True
@@ -41,7 +41,7 @@ def is_number(s):
         return False
 
 
-async def get_words_from_char_value(char_value) -> list[tuple[str, list[float]]]:
+async def get_words_from_char_value(char_value: str | list[str]) -> list[tuple[str, list[float]]]:
     if isinstance(char_value, list):
         char_value = " ".join(char_value)
     words = re.split(r"[ ,\.]+", char_value)
@@ -49,7 +49,8 @@ async def get_words_from_char_value(char_value) -> list[tuple[str, list[float]]]
     groups = []
     for word in words:
         word = word.lower()
-        vector: list[float] = await word2vec.average_vector_from_sentence(word)
+        vector_raw = await word2vec.average_vector_from_sentence(word)
+        vector: list[float] = list(vector_raw) if vector_raw is not None else []
         groups.append(
             (
                 word,
@@ -60,7 +61,7 @@ async def get_words_from_char_value(char_value) -> list[tuple[str, list[float]]]
     return groups
 
 
-async def process_product_data(wbcard: WBCard):
+async def process_product_data(wbcard: WBCard) -> dict[str, list[tuple[str, list[float]]]]:
     product_data = wbcard.card_json
     # Обработка характеристик
     characteristics_words = {}
@@ -74,16 +75,16 @@ async def process_product_data(wbcard: WBCard):
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
             continue
-        characteristics_words[char_name]: tuple[str, list[float]] = await get_words_from_char_value(char_value)
-    characteristics_words["name"]: tuple[str, list[float]] = await get_words_from_char_value(wbcard.name)
+        characteristics_words[char_name] = await get_words_from_char_value(char_value)
+    characteristics_words["name"] = await get_words_from_char_value(wbcard.name)
     if "description" in characteristics_words:
-        characteristics_words["description"]: tuple[str, list[float]] = await get_words_from_char_value(
-            wbcard.description
+        characteristics_words["description"] = await get_words_from_char_value(
+            wbcard.card_json.get("description", "")
         )
     return characteristics_words
 
 
-async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
+async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]) -> None:
     all_nmids = set()
     for adv in adv_settings:
         nmids = adv.nmids
@@ -103,10 +104,11 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
             async with sm() as session:
                 stmt = select(WBCard).where(WBCard.nmid == nmid)
                 result = await session.execute(stmt)
-                wbcard: WBCard = result.scalar()
-                if not wbcard:
+                wbcard_temp: WBCard | None = result.scalar()
+                if wbcard_temp is None:
                     logger.debug(f"Карточка {nmid} не найдена")
                     continue
+                wbcard: WBCard = wbcard_temp
                 logger.debug(f"Получили карточку {nmid}")
                 main_image_url: str = wbcard.photos[0]
                 async with aiohttp.ClientSession() as http_session:
@@ -140,21 +142,21 @@ async def update_cards_in_graph_for_shops_big_cycle():
     async with sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.active_status == "pause")
         result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = result.scalars().all()
+        adv_settings: list[AdvSetting] = list(result.scalars().all())
     await __update_cards_in_graph_for_shops(adv_settings)
 
 
 async def update_cards_in_graph_small_cycle():
     async with sm() as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.bot_active is True,
+            AdvSetting.bot_active,
         )
         result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = result.scalars().all()
+        adv_settings: list[AdvSetting] = list(result.scalars().all())
     await __update_cards_in_graph_for_shops(adv_settings)
 
 
-async def fit_and_save_model():
+async def fit_and_save_model() -> None:
     await fitter.getGradientBoostingFullFitModel()
 
 
@@ -164,7 +166,7 @@ async def update_model():
     logger.debug("Устанавливаю сет, разрешаю обновление ключей")
 
 
-async def update_wb_adv_phrase_in_neo_small_cycle():
+async def update_wb_adv_phrase_in_neo_small_cycle() -> None:
     try:
         await update_wb_adv_phrases_in_neo()
     except:
@@ -191,10 +193,10 @@ async def update_keywords_ctr_by_similary():
         stmt = (
             select(KeywordSetting.text, AdvSetting.adv_id)
             .join(AdvSetting, KeywordSetting.adv_setting_id == AdvSetting.id)
-            .where(AdvSetting.bot_active is True)
+            .where(AdvSetting.bot_active)
         )
         result = await session.execute(stmt)
-        keyword_texts_adv_ids: Sequence[Row[tuple[str, int]]] = result.all()
+        keyword_texts_adv_ids: list[Row[tuple[str | None, int]]] = result.all()
 
     # Получение ключей из Redis
     keys = await redis_manager.get_keys("predict_ctr*")

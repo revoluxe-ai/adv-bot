@@ -65,19 +65,24 @@ class AdminsGetAdvByIdFilter(BaseFilter):
         if text.isdigit() and user_id in const.ADMINS:
             async with sm() as session:
                 stmt = select(AdvSetting.id).where(AdvSetting.adv_id == int(text))
-                adv = await session.execute(stmt)
-                adv = adv.scalar()
-                return bool(adv)
+                adv_id_result = await session.execute(stmt)
+                adv_id: int | None = adv_id_result.scalar()
+                return bool(adv_id)
         return False
 
 
 @router.message(AdminsGetShopFilter())
 async def getting_shop_for_admin(message: types.Message, bot: Bot, state: FSMContext) -> None:
+    if message.text is None:
+        return
     text = message.text.strip()
     async with sm() as session:
         stmt = select(WBUserCabinet.id).join(WBUserCabinet.wb_cabinet).where(WBCabinet.shop_id == text)
-        wb_user_cabinet_original_id = await session.execute(stmt)
-        wb_user_cabinet_original_id = wb_user_cabinet_original_id.scalar()
+        result_wb_user_cabinet_original_id = await session.execute(stmt)
+        wb_user_cabinet_original_id: int | None = result_wb_user_cabinet_original_id.scalar()
+    if wb_user_cabinet_original_id is None:
+        await bot.send_message(message.chat.id, "Магазин не найден.")
+        return
     await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await ShopMenu(
         bot,
@@ -89,6 +94,8 @@ async def getting_shop_for_admin(message: types.Message, bot: Bot, state: FSMCon
 
 @router.message(AdminsGetAdvByIdFilter())
 async def getting_adv_id(message: types.Message, bot: Bot, state: FSMContext) -> None:
+    if message.text is None:
+        return
     text = message.text.strip()
     adv_id = int(text)
     chat_id = message.chat.id
@@ -97,22 +104,30 @@ async def getting_adv_id(message: types.Message, bot: Bot, state: FSMContext) ->
         stmt_for_get_adv = select(AdvSetting).where(
             AdvSetting.adv_id == adv_id,
         )
-        result = await session.execute(stmt_for_get_adv)
-        adv: AdvSetting = result.scalar()
+        result_adv = await session.execute(stmt_for_get_adv)
+        adv: AdvSetting | None = result_adv.scalar_one_or_none()
+        if adv is None:
+            await bot.send_message(chat_id, "Рекламная кампания не найдена.")
+            return
         wb_cabinet_id = adv.wb_cabinet_id
 
         stmt_for_user = select(User.id).where(User.user_telegram_id == chat_id)
-        result = await session.execute(stmt_for_user)
-        user_original_id: User = result.scalar()
+        result_user = await session.execute(stmt_for_user)
+        user_original_id: int | None = result_user.scalar_one_or_none()
+        if user_original_id is None:
+            await bot.send_message(chat_id, "Пользователь не найден.")
+            return
 
         stmt_for_wb_user_cabinet = select(WBUserCabinet).where(
             WBUserCabinet.wb_cabinet_id == wb_cabinet_id,
             WBUserCabinet.user_id == user_original_id,
         )
 
-        result = await session.execute(stmt_for_wb_user_cabinet)
-        wb_user_cabinet = result.scalar()
-    assert wb_user_cabinet
+        result_wb_user_cabinet = await session.execute(stmt_for_wb_user_cabinet)
+        wb_user_cabinet: WBUserCabinet | None = result_wb_user_cabinet.scalar_one_or_none()
+    if wb_user_cabinet is None:
+        await bot.send_message(chat_id, "Кабинет пользователя не найден.")
+        return
     assert adv
     await messages.AdvSettingMenu(
         bot,

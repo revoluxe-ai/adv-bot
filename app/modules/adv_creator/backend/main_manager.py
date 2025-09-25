@@ -1,11 +1,11 @@
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple, Any, cast
 
 from aiogram import Bot
 from aiohttp import ClientSession
 from sqlalchemy import and_, or_, select
 
-from app.core.wb_api.data_classes.adv import Balances
+from app.modules.common_slaves.wildberries.data_classes.adv import Balances
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError, CardNotFoundInWB, NotChangeError
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.settings import settings
@@ -14,6 +14,8 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
 from .exc import CardsNotFoundForShopError, NotEnoughBalanceOnShopError, StartComplexAdvError
 from .wb_api import WBApi
+from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
+from app.modules.common_slaves.wildberries.models.models import AdvSetting
 
 if TYPE_CHECKING:
     from ...common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -38,7 +40,7 @@ class MainAdvManager:
     async def _create_auto_adv(self, name: str, SubjectID: int, balance_type: int, start_status: bool) -> int:
         return await self.wb_api.create_auto_adv(name, SubjectID, balance_type, start_status)
 
-    async def upcast_auto_adv(self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot):
+    async def upcast_auto_adv(self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot) -> None:
         await bot.send_message(user_telegram_id, f"Пытаюсь найти и настроить Авто-РК для артикула {nmid}")
         start_delay = 10 * 60
         global_max_attempts = 10
@@ -97,12 +99,12 @@ class MainAdvManager:
                 )
                 break
 
-    async def create_complex_advs(self, bot: Bot, user_telegram_id, nmid: int, hard_mode) -> tuple[int, int]:
-        exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
+    async def create_complex_advs(self, bot: Bot, user_telegram_id: int, nmid: int, hard_mode: bool) -> Tuple[int, int]:
+        exist_adv: AdvSetting | None = await self.get_adv_setting_by_nmid(nmid)
         if not exist_adv or hard_mode is True or exist_adv.active_status in ["refused", "done"]:
-            balances = await self.wb_api.get_adv_balances()
+            balances: Balances = await self.wb_api.get_adv_balances()
             try:
-                target_card = await self.wb_api.get_card_by_text(nmid)
+                target_card: CardFromWB = await self.wb_api.get_card_by_text(nmid)
             except CardNotFoundInWB:
                 raise CardsNotFoundForShopError(f"Карточка с артикулом {nmid} не найдена на Wildberries")
             wb_cabinet = self.access.wb_cabinet
@@ -142,10 +144,7 @@ class MainAdvManager:
             )
             async with sm(read_only=False) as session:
                 assert self.access.wb_cabinet is not None
-                wb_cabinet_original_id: int = self.access.wb_cabinet.id
-                stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
-                wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
-                new_adv = AdvSetting()
+                new_adv: AdvSetting = AdvSetting()
                 new_adv.adv_id = auto_adv_id
                 new_adv.search_adv_id = search_adv_id
                 new_adv.max_place = 1
@@ -153,7 +152,6 @@ class MainAdvManager:
                 new_adv.reset_place = True
                 new_adv.name = new_adv_name
                 new_adv.bidder_active = False
-                new_adv.wb_cabinet = wb_cabinet
                 new_adv.parsing_active = False
                 new_adv.bot_active = True
                 new_adv.auto_adv_target_status = False
@@ -162,7 +160,8 @@ class MainAdvManager:
                 new_adv.active_status = "created_by_bot"
                 new_adv.type = 8
                 new_adv.nmids = [nmid]
-                new_adv.hard_min_ctr = 0.1
+                new_adv.hard_min_ctr = 0.1 # type: ignore
+                new_adv.wb_cabinet = self.access.wb_cabinet
                 session.add(new_adv)
                 await session.commit()
 
@@ -202,7 +201,7 @@ class MainAdvManager:
             raise exc
         return auto_adv_id, search_adv_id
 
-    async def start_complex_advs(self, nmid, auto_adv_id, search_adv_id):
+    async def start_complex_advs(self, nmid: int, auto_adv_id: int, search_adv_id: int) -> None:
         advs_for_start = [auto_adv_id]
         if settings.START_AUCTION_ON_CREATING_ADV:
             advs_for_start.append(search_adv_id)
@@ -221,12 +220,15 @@ class MainAdvManager:
         async with sm(read_only=False) as session:
             stmt = select(AdvSetting).where(AdvSetting.adv_id == auto_adv_id)
             result = await session.execute(stmt)
-            adv_setting: AdvSetting = result.scalar()
+            adv_setting: AdvSetting | None = result.scalar_one_or_none()
+            if adv_setting is None:
+                logger.error(f"AdvSetting с adv_id {auto_adv_id} не найден")
+                return
             adv_setting.active_status = "started"
             await session.commit()
 
     @staticmethod
-    async def get_adv_setting_by_nmid(nmid: int) -> AdvSetting:
+    async def get_adv_setting_by_nmid(nmid: int) -> AdvSetting | None:
         async with sm() as session:
             stmt = select(AdvSetting).where(
                 and_(
@@ -239,7 +241,7 @@ class MainAdvManager:
                         # Дополнительно можно вернуть этот блок, если нужно
                         and_(
                             AdvSetting.nmids == [nmid],
-                            AdvSetting._search_adv_id is not None,
+                            AdvSetting._search_adv_id.is_not(None),
                         ),
                     ),
                 )
@@ -248,18 +250,19 @@ class MainAdvManager:
             result = await session.execute(stmt)
             adv_settings = result.all()
             if adv_settings:
-                return adv_settings[0][0]
+                return cast(AdvSetting, adv_settings[0][0])
+            return None
 
     @staticmethod
     def _check_enough_balance(balances: Balances) -> bool:
         balance = balances.balance
         net = balances.net
         bonus = balances.bonus
-        full_balance: list[int] = [balance, net, bonus]
+        full_balance: list[int | float] = [balance, net, bonus]
         logger.debug(f"Балансы: {full_balance}")
         return bool(sum(full_balance) >= 2000 or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2)
 
-    def _get_balance_type(self, balances: Balances) -> (int, str):
+    def _get_balance_type(self, balances: Balances) -> Tuple[int, str]:
         is_balance_enough: bool = self._check_enough_balance(balances)
 
         if not is_balance_enough:
@@ -271,7 +274,11 @@ class MainAdvManager:
             (balances.bonus, "bonus"),
         ]
 
-        min_balance_property_name = min(list(filter(lambda row: row[0] > 1000, balance_rows)))[1]
+        # Фильтруем элементы, где баланс > 1000, и сортируем их, чтобы найти минимальный
+        eligible_balances = sorted([row for row in balance_rows if row[0] > 1000], key=lambda x: x[0])
+        if not eligible_balances:
+            raise NotEnoughBalanceOnShopError("Недостаточно средств ни на одном из балансов")
+        min_balance_property_name = eligible_balances[0][1]
 
         if min_balance_property_name == "balance":
             balance_type = 0

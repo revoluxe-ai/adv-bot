@@ -143,7 +143,7 @@ async def waiting_for_amount(message: types.Message, state: FSMContext, bot: aio
 
     user_telegram_id = message.chat.id
     sum_for_adding = int(amount) * 100
-    prices = [LabeledPrice(label="Пополнение баланса", amount=str(sum_for_adding))]
+    prices = [LabeledPrice(label="Пополнение баланса", amount=sum_for_adding)]
     await bot.send_invoice(
         user_telegram_id,
         title="Подписка на бота",
@@ -200,8 +200,9 @@ async def successful_payment_handler(message: types.Message, state: FSMContext, 
     async with sm() as session:
         stmt = select(WBUserCabinet.id).join(WBUserCabinet.wb_cabinet).where(WBCabinet.id == wb_cabinet_original_id)
         wb_user_cabinet_id_result = await session.execute(stmt)
-        wb_user_cabinet_id = wb_user_cabinet_id_result.scalars.first()
+        wb_user_cabinet_id = wb_user_cabinet_id_result.scalar_one_or_none()
 
     logger.debug(f"wb_user_cabinet_id: {wb_user_cabinet_id}")
     await asyncio.sleep(1)
+    assert wb_user_cabinet_id is not None
     await ShopMenu(bot, message.chat.id, state, wb_user_cabinet_id)()

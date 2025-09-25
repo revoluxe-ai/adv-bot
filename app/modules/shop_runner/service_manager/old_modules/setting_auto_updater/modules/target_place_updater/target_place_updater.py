@@ -16,7 +16,7 @@ class TargetPlaceUpdater:
 
     async def _refresh_adv(self):
         async with sm() as session:
-            await session.refresh(self._adv, attribute_names=[AdvSetting.max_place])
+            await session.refresh(self._adv, attribute_names=["max_place"])
 
     async def set_up(self) -> tuple[bool, bool]:
         pass_time = 15 * 60

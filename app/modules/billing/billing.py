@@ -2,10 +2,12 @@
 
 import logging
 from datetime import date, datetime
+from typing import Optional
 
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.orm import selectinload
-
+from sqlalchemy.ext.asyncio import AsyncSession
+и   
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBBalancePayment, WBBonusPayment, WBCabinet
 from app.modules.wb_adv_updater.models import AdvPayment
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 redis_manager = RedisManager()
 
 
-async def get_active_cabinets_with_data(session) -> list[WBCabinet]:
+async def get_active_cabinets_with_data(session: AsyncSession) -> list[WBCabinet]:
     """Вернуть кабинеты, у которых есть активные кампании, с подгруженными платежами и платежами кампаний."""
     stmt = (
         select(WBCabinet)
@@ -40,7 +42,7 @@ def get_count_advs_for_wb_cabinet(wb_cabinet: WBCabinet, adv_settings: list[AdvS
     return len(advs_for_wb_cabinet)
 
 
-async def process_payment_for_advs(current_date: date = None, pricer: Pricer = None) -> None:
+async def process_payment_for_advs(current_date: date | None = None, pricer: Pricer | None = None) -> None:
     """Обработка платежей с группировкой по кабинетам и защитой от дублей на уровне кабинетов."""
     if current_date is None:
         current_date = datetime.now().date()
@@ -62,7 +64,7 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
         for cabinet in cabinets:
             cabinet_id = cabinet.id
             # Берем только активные кампании
-            cabinet_campaigns: list[AdvSetting] = [adv for adv in cabinet.adv_settings if adv.bot_active]
+            cabinet_campaigns: list[AdvSetting] = [adv for adv in list(cabinet.adv_settings) if adv.bot_active]
             logger.debug(f"Кабинет {cabinet_id}: найдено активных кампаний: {len(cabinet_campaigns)}")
             if not cabinet_campaigns:
                 logger.debug(f"Кабинет {cabinet_id}: активные кампании отсутствуют, пропуск")
@@ -75,7 +77,7 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                 )
 
                 # Защита в Redis на уровне кабинета/дня
-                if await redis_manager.get_billing_process_for_day(cabinet_id, current_date):
+                if await redis_manager.get_billing_process_for_day(cabinet_id, datetime.combine(current_date, datetime.min.time())):
                     logger.debug(f"Кабинет {cabinet_id} уже обработан за {current_date} (Redis)")
                     continue
 
@@ -131,7 +133,7 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                     logger.debug(f"Кабинет {cabinet_id}: списание бонусов {price_for_shop_for_day}")
                 elif calculated_balance >= price_for_shop_for_day:
                     balance_payment = WBBalancePayment(
-                        wb_cabinet_id=cabinet_id,
+                        wb_cabinet=cabinet,
                         amount=-price_for_shop_for_day,
                         description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}",
                         operation_type="auto_subtract",
@@ -163,7 +165,6 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                     if existing.scalar_one_or_none() is None:
                         payment = AdvPayment(
                             date=current_date,
-                            amount=price_per_campaign,
                             adv_setting_id=campaign.id,
                         )
                         session.add(payment)
@@ -197,7 +198,7 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
             # Отмечаем в Redis по кабинетам после успешного коммита
             for cabinet_id in processed_cabinet_ids:
                 try:
-                    await redis_manager.set_billing_process_for_day(cabinet_id, current_date)
+                    await redis_manager.set_billing_process_for_day(cabinet_id, datetime.combine(current_date, datetime.min.time()))
                 except Exception as e:
                     logger.error(f"Не удалось отметить Redis для кабинета {cabinet_id}: {e}")
 

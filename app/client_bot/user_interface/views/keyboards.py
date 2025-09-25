@@ -1,4 +1,5 @@
 import datetime
+from typing import cast
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -10,10 +11,10 @@ from app.client_bot.user_interface.views.callbacks import Action, TurnBot
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBCabinet, WBUserCabinet
-from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingCallback
-from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
+from app.modules.predict_ctr_exponent_settings import ChangeExponentSettinginAdvSettingCallback  # type: ignore[attr-defined]
+from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback  # type: ignore[attr-defined]
 from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import SettingAuctionBoostMode
-from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
+from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (  # type: ignore[attr-defined]
     AutoUpdateTargetPlaceSettingCallBack,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
@@ -61,7 +62,12 @@ sm = get_async_session_maker
 #     return keyboard
 
 
-def get_adv_setting_keyboard(chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool):
+def get_adv_setting_keyboard(
+    chat_id: int,
+    wb_user_cabinet: WBUserCabinet,
+    adv_setting: AdvSetting,
+    in_favorites: bool,
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
@@ -282,8 +288,8 @@ def get_advs_keyboard_with_paginator(
     adv_settings: list[AdvSetting],
     page: int,
     on_page: int,
-    keyword_filter,
-):
+    keyword_filter: str | None,
+) -> InlineKeyboardMarkup:
     active_part_advs = list(filter(lambda adv_local: adv_local.bot_active is True, adv_settings))
     not_active_part_advs = list(filter(lambda adv_locale: adv_locale.bot_active is not True, adv_settings))
     adv_settings = active_part_advs + not_active_part_advs
@@ -297,7 +303,7 @@ def get_advs_keyboard_with_paginator(
             filtred_advs.append(adv)
     adv_settings = filtred_advs
     for adv in adv_settings[start_index:end_index]:
-        check_last_24_hours = adv.check_last_24_hours
+        check_last_24_hours = getattr(adv, "check_last_24_hours", False)
         check_text = "✅" if check_last_24_hours else "❓"
         button_text = (
             f"{'(' + str(adv.worst_promo_position) + ')' if adv.worst_promo_position else ''}{check_text} {adv.name} (Бот включен)"
@@ -343,7 +349,7 @@ def get_advs_keyboard_with_paginator(
         )
 
     if keyword_filter:
-        button = [
+        button_row = [
             InlineKeyboardButton(
                 text="Сбросить фильтр",
                 callback_data=callbacks.ChoiceAdvPaginator(
@@ -354,7 +360,7 @@ def get_advs_keyboard_with_paginator(
             )
         ]
 
-        keyboard_buttons.append(button)
+        keyboard_buttons.append(button_row)
 
     button = InlineKeyboardButton(
         text="Вернуться к меню магазина",
@@ -375,7 +381,7 @@ def get_advs_keyboard_with_paginator(
     return keyboard
 
 
-def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
+def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet: WBUserCabinet) -> InlineKeyboardMarkup:
     wb_user_cabinet_original_id = wb_user_cabinet.id
     buttons = [
         [
@@ -401,29 +407,29 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
 def get_keywords_setting_keyboard(
     keywords: list[CalculatedKeyword],
     adv_setting: AdvSetting,
-    adv_choice_last_page,
+    adv_choice_last_page: int | None,
     wb_user_cabinet_original_id: int,
-    page,
+    page: int,
     return_from_filter_bottom: bool,
-    on_page,
-    min_ctr,
-    hide_keywords_is_not_relevant,
-    sort_mode="default",
-    image_mode="graphic",
-):
-    def sorting_keywords(keywords, sort_mode):
+    on_page: int,
+    min_ctr: float | None,
+    hide_keywords_is_not_relevant: bool | None,
+    sort_mode: str = "default",
+    image_mode: str = "graphic",
+) -> InlineKeyboardMarkup:
+    def sorting_keywords(keywords: list[CalculatedKeyword], sort_mode: str) -> list[CalculatedKeyword]:
         if sort_mode in ["by_adv", "only_out_index"]:
             keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
             keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
             keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
-            keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+            keywords_without_rating.sort(key=lambda x: (x.predict_ctr or 0.0), reverse=True)
             keywords = keywords_with_rating + keywords_without_rating
             return keywords
 
         elif sort_mode == "white_list":
 
-            def sort_func(keyword: CalculatedKeyword):
-                return keyword.baes_ctr
+            def sort_func(keyword: CalculatedKeyword) -> float:
+                return keyword.baes_ctr or 0.0
 
             return sorted(keywords, key=sort_func, reverse=True)
 
@@ -485,15 +491,17 @@ def get_keywords_setting_keyboard(
 
         text += f"({keyword.query})"
 
-        text += f"({round(keyword.predict_ctr * 100, 2)}%)"
+        pct = keyword.predict_ctr if keyword.predict_ctr is not None else 0.0
+        text += f"({round(pct * 100, 2)}%)"
 
         text += f"""{"(" + str(keyword.added_clicks) + ")" if keyword.added_clicks else ""}"""
         text += f"""{"❗" if not cluster_name else ""}"""
+        keyword_setting_id_safe = keyword.keyword_setting_original_id or 0
         inline_keyboard = [
             InlineKeyboardButton(
                 text=text,
                 callback_data=callbacks.SettingKeyword(
-                    keyword_setting_original_id=keyword.keyword_setting_original_id,
+                    keyword_setting_original_id=keyword_setting_id_safe,
                 ).pack(),
             )
         ]
@@ -711,7 +719,7 @@ def get_keyword_setting_keyboard(
     keyword: KeywordSetting,
     calculated_keyword: CalculatedKeyword,
     adv_setting: AdvSetting,
-    page,
+    page: int,
 ) -> InlineKeyboardMarkup:
     adv_setting_original_id = adv_setting.id
     keyword_setting_original_id = keyword.id
@@ -842,14 +850,14 @@ def get_keyword_setting_keyboard(
     return keyboard
 
 
-def get_subscribe_keyboard():
+def get_subscribe_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text="Подписаться", url="https://t.me/auto_wb_master")
     builder.row(button)
     return builder.as_markup()
 
 
-def get_ref_program_keyboard():
+def get_ref_program_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(
         text="Создать новую реф.ссылку",
@@ -864,7 +872,7 @@ def get_ref_program_keyboard():
     return builder.as_markup()
 
 
-def get_return_for_your_ref_links():
+def get_return_for_your_ref_links() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text="Назад", callback_data=callbacks.RefProgram(action="return").pack())
 
@@ -872,9 +880,11 @@ def get_return_for_your_ref_links():
     return builder.as_markup()
 
 
-def get_shop_menu_keyboard(wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True):
+def get_shop_menu_keyboard(
+    wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: bool
+) -> InlineKeyboardMarkup:
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-    expiration_time: datetime.datetime = wb_cabinet.expiration_time
+    expiration_time: datetime.datetime = cast(datetime.datetime, wb_cabinet.expiration_time)
     now = datetime.datetime.now()
     if not (balance := wb_cabinet.balance):
         balance = 0
@@ -907,7 +917,7 @@ def get_shop_menu_keyboard(wb_user_cabinet: WBUserCabinet, wb_cabinet_original_i
     return builder.as_markup()
 
 
-def get_payment_keyboard(wb_cabinet_original_id):
+def get_payment_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(
         text="Пополнить баланс",
@@ -922,7 +932,7 @@ def get_payment_keyboard(wb_cabinet_original_id):
     return builder.as_markup()
 
 
-def get_setting_min_ctr_keyboard(adv: AdvSetting):
+def get_setting_min_ctr_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="Назад", callback_data=callbacks.Adv(adv_original_id=adv.id).pack()))
     if adv.new_auto_min_ctr_mode:
@@ -945,7 +955,7 @@ def get_setting_min_ctr_keyboard(adv: AdvSetting):
     return builder.as_markup()
 
 
-def get_setting_max_cpc_keyboard(adv: AdvSetting):
+def get_setting_max_cpc_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
     adv_original_id = adv.id
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -964,7 +974,7 @@ def get_setting_max_cpc_keyboard(adv: AdvSetting):
     return builder.as_markup()
 
 
-def get_setting_min_views_for_predict_ctr_keyboard(adv: AdvSetting):
+def get_setting_min_views_for_predict_ctr_keyboard(adv: AdvSetting) -> InlineKeyboardMarkup:
     adv_original_id = adv.id
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -976,7 +986,7 @@ def get_setting_min_views_for_predict_ctr_keyboard(adv: AdvSetting):
     return builder.as_markup()
 
 
-def get_return_to_adv_setting_keyboard(adv_original_id):
+def get_return_to_adv_setting_keyboard(adv_original_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
@@ -987,28 +997,28 @@ def get_return_to_adv_setting_keyboard(adv_original_id):
     return builder.as_markup()
 
 
-def get_call_me_keyboard():
+def get_call_me_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text="Получить консультацию и тест-драйв бота", url=f"{const.SUPPORT_LINK}")
     builder.row(button)
     return builder.as_markup()
 
 
-def get_call_me_keyboard0():
+def get_call_me_keyboard0() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text="Связаться с разработчиком бота для консультации", url=const.SUPPORT_LINK)
     builder.row(button)
     return builder.as_markup()
 
 
-def get_call_me_keyboard1():
+def get_call_me_keyboard1() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     button = InlineKeyboardButton(text="Заказать демо-доступ к боту", url=const.SUPPORT_LINK)
     builder.row(button)
     return builder.as_markup()
 
 
-def get_ozon_keyword_setting_keyboard(keyword_setting_id: int, page: int = 1):
+def get_ozon_keyword_setting_keyboard(keyword_setting_id: int, page: int = 1) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
@@ -1019,7 +1029,7 @@ def get_ozon_keyword_setting_keyboard(keyword_setting_id: int, page: int = 1):
     return builder.as_markup()
 
 
-def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]):
+def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for wb_user_cabinet in wb_user_cabinets[:20]:
         wb_cabinet = wb_user_cabinet.wb_cabinet
@@ -1027,15 +1037,16 @@ def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]):
         bonus = wb_cabinet.bonus or 0
         total_money = balance + bonus
 
+        safe_name = wb_user_cabinet.name or ""
         button = InlineKeyboardButton(
-            text="Пополнить " + wb_user_cabinet.name + f" Текущий общий баланс({total_money})",
+            text="Пополнить " + safe_name + f" Текущий общий баланс({total_money})",
             callback_data=callbacks.AddBalance(wb_cabinet_original_id=wb_user_cabinet.id).pack(),
         )
         builder.row(button)
     return builder.as_markup()
 
 
-def get_advs_list(advs: list[AdvSetting]):
+def get_advs_list(advs: list[AdvSetting]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for adv in advs:
         name = "(" + str(adv.worst_promo_position) + ")" if adv.worst_promo_position else ""
@@ -1045,7 +1056,7 @@ def get_advs_list(advs: list[AdvSetting]):
     return builder.as_markup()
 
 
-def get_admin_keyboard():
+def get_admin_keyboard() -> InlineKeyboardMarkup:
     """
     Создает клавиатуру администратора с доступными административными функциями
     """

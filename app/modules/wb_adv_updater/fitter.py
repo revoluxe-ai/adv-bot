@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 import typing
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -92,15 +93,15 @@ async def _get_df_for_fit() -> pd.DataFrame:
     async with sm() as session:
         stmt = select(AdvSetting).filter(AdvSetting.bot_active is True)
         result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+        adv_settings: list[AdvSetting] = list(result.scalars().all())
         nmids_in_active_adv = {nmid for adv in adv_settings for nmid in adv.nmids}
         logger.debug("Формирование подзапроса для WBCabinet")
 
         # Основной запрос
         logger.debug("Выполнение основного запроса для получения AdvSetting")
-        stmt = select(AdvSetting).options(selectinload(AdvSetting.wb_cabinet)).where(AdvSetting.bot_active is True)
+        stmt = select(AdvSetting).options(selectinload(AdvSetting.wb_cabinet)).where(AdvSetting.bot_active)
         result = await session.execute(stmt)
-        adv_settings = result.scalars()
+        adv_settings = list(result.scalars().all())
 
     for _n, adv in enumerate(adv_settings):
         nmids = adv.nmids
@@ -116,7 +117,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
             logger.debug("Артикулы данной рк не участвуют в активных кампаниях")
             continue
         logger.debug(f"Получение features для {len(nmids)} nmids кампании {adv.adv_id}")
-        nmid_to_item_features = await get_nmid_to_item_features(nmids)
+        nmid_to_item_features = await get_nmid_to_item_features(set(nmids))
 
         if nmid_to_item_features:
             logger.debug(f"Расчет средних features для кампании {adv.adv_id}")
@@ -153,7 +154,9 @@ async def _get_df_for_fit() -> pd.DataFrame:
             for keyword_stat in keyword_stats:
                 keyword_features = await data_getter.get_keyword_features_from_redis([keyword_stat.text])
                 if keyword_features:
-                    keyword_feature = keyword_features[0][1]
+                    keyword_feature = keyword_features.get(keyword_stat.text, [])
+                    if not keyword_feature:
+                        continue
                     row = {
                         "adv_id": adv.adv_id,
                         "adv_type": adv.type,
@@ -180,21 +183,21 @@ async def _get_df_for_fit() -> pd.DataFrame:
 
 async def __fetch_keyword_features(
     keywords: list[str],
-) -> list[tuple[str, list[float]]]:
-    result: list[tuple[str, list[float]]] = await data_getter.get_keyword_features_from_redis(keywords)
+) -> dict[str, list[float]]:
+    result: dict[str, list[float]] = await data_getter.get_keyword_features_from_redis(keywords)
     return result
 
 
-async def _bayesian_apply(df: pd.DataFrame):
+async def _bayesian_apply(df: pd.DataFrame) -> pd.DataFrame:
     adv_ids = df["adv_id"].unique()
-    adv_ids = adv_ids.tolist()
+    adv_ids_list: list[int] = adv_ids.tolist()
     adv_id_keyword_text_to_status: dict[tuple[int, str], int] = await data_manager.get_adv_id_keyword_text_to_status(
-        adv_ids
+        adv_ids_list
     )
 
-    adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(adv_ids)
+    adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(adv_ids_list)
 
-    def calculate_ctr(row):
+    def calculate_ctr(row: pd.Series[Any]) -> float:
         clicks = row["clicks"]
         views = row["views"]
         adv_id = row["adv_id"]
@@ -203,36 +206,36 @@ async def _bayesian_apply(df: pd.DataFrame):
         except KeyError:
             status = 1
         if status == 0:
-            return 0
+            return 0.0
         else:
             if clicks == 0:
                 min_ctr = adv_id_to_min_ctr[adv_id]
                 if min_ctr > 0:
                     enough_views = _get_enough_views(min_ctr)
                 else:
-                    return clicks / views
+                    return float(clicks / views)
 
                 clicks = clicks + 1
                 views = views + enough_views
                 ctr = clicks / views
-                return ctr
+                return float(ctr)
             else:
-                return clicks / views
+                return float(clicks / views)
 
     # Предположим, что adv_id_to_min_ctr - это ваш словарь с минимальными CTR для каждого adv_id
     df["ctr"] = df.apply(calculate_ctr, axis=1)
     return df
 
 
-def _get_enough_views(ctr):
-    return int(1 / ctr)
+def _get_enough_views(ctr: float) -> int:
+    return int(1 / ctr) if ctr != 0 else 0
 
 
-async def get_nmid_to_item_features(nmids_batch: set[int]) -> dict[int, np.ndarray]:
+async def get_nmid_to_item_features(nmids_batch: set[int]) -> dict[int, list[float]]:
     result = await data_getter.get_item_features_from_redis(nmids_batch)
     result_list = []
     for row in result:
         nmid = row[0]
         vector = row[1]
-        result_list.append((nmid, vector))
+        result_list.append((nmid, vector.tolist()))  # Convert numpy array to list
     return dict(result_list)

@@ -31,20 +31,26 @@ async def update_minus_keywords(
     bot: aiogram.Bot,
     state: FSMContext,
     client_session: ClientSession,
-):
+) -> None:
     adv_original_id = callback_data.adv_setting_original_id
     async with sm() as session:
-        adv = await session.execute(
+        result = await session.execute(
             select(AdvSetting).join(AdvSetting.wb_cabinet).where(AdvSetting.id == adv_original_id)
         )
-        adv = adv.scalar()
+        adv = result.scalar_one_or_none()
+        if adv is None:
+            return
         wb_cabinet_id: int = adv.wb_cabinet.id
         stmt = select(WBUserCabinet).join(WBUserCabinet.wb_cabinet).where(WBCabinet.id == wb_cabinet_id)
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        result_user = await session.execute(stmt)
+        wb_user_cabinet = result_user.scalar_one_or_none()
+        if wb_user_cabinet is None:
+            return
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
     if not access:
         raise ApiForbiddenError("Не удалось получить доступ к Wildberries")
+    if not isinstance(callback.message, types.Message):
+        return
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
 
     wb_api = WBApi(access, client_session)
@@ -63,17 +69,18 @@ async def update_keyword_stat(
     bot: aiogram.Bot,
     state: FSMContext,
     client_session: ClientSession,
-):
-    """ "
-    нужно обновить статистику ключевых слов из Wildberreis, а для этого нужен access
-
+) -> None:
+    """
+    Нужно обновить статистику ключевых слов из Wildberries; требуется access.
     """
     adv_original_id = callback_data.adv_setting_original_id
     async with sm() as session:
-        adv: AdvSetting = await session.execute(
+        result_adv = await session.execute(
             select(AdvSetting).join(AdvSetting.wb_cabinet).where(AdvSetting.id == adv_original_id)
         )
-        adv = adv.scalar()
+        adv = result_adv.scalar_one_or_none()
+        if adv is None:
+            return
         wb_cabinet_id: int = adv.wb_cabinet.id
         stmt = (
             select(WBUserCabinet)
@@ -81,12 +88,15 @@ async def update_keyword_stat(
             .options(selectinload(WBUserCabinet.wb_cabinet))
             .where(WBCabinet.id == wb_cabinet_id)
         )
-        result = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet | None = result.scalar()
-    assert wb_user_cabinet is not None
+        result_user = await session.execute(stmt)
+        wb_user_cabinet: WBUserCabinet | None = result_user.scalar_one_or_none()
+    if wb_user_cabinet is None:
+        return
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
     if not access:
         raise ApiForbiddenError("Не удалось получить доступ к Wildberries")
+    if not isinstance(callback.message, types.Message):
+        return
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
 
     wb_cabinet = wb_user_cabinet.wb_cabinet

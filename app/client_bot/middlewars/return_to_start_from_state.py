@@ -12,11 +12,11 @@ class ReturnToStart(BaseMiddleware):
     async def __call__(
         self,
         handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        event: Message,  # type: ignore
         data: dict[str, Any],
     ) -> Any:
         text = event.text
-        if "/start" in text:
+        if text is not None and "/start" in text:
             bot = data["bot"]
             state: FSMContext = data["state"]
             await state.clear()

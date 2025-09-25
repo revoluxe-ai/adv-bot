@@ -28,7 +28,7 @@ class ShopChoice(TextWithKeyboard):
         return get_shop_keyboard(self.__all_shops, self.user_telegram_id)
 
 
-def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> InlineKeyboardMarkup:
+def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id: int) -> InlineKeyboardMarkup:
     # Создаем список для строк кнопок
     keyboard_buttons = []
 
@@ -49,7 +49,7 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> Inlin
         shop_name = wb_user_cabinet.name
         wb_user_cabinet_original_id: int = wb_user_cabinet.id
         button = InlineKeyboardButton(
-            text=shop_name,
+            text=shop_name if shop_name is not None else "",
             callback_data=callbacks.Shop(
                 action=Action.select,
                 wb_user_cabinet_original_id=wb_user_cabinet_original_id,

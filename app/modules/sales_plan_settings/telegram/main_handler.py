@@ -13,7 +13,7 @@ async def plane_settings_menu_handler(
     callback_data: main_callback.SalesPlanSettingsMenu,
     bot: Bot,
     state: FSMContext,
-):
+) -> None:
     chat_id = callback.from_user.id
     adv_id = callback_data.adv_id
     await main_message.SalesPlanSettingsMenuMessage(bot, chat_id, adv_id, state)()

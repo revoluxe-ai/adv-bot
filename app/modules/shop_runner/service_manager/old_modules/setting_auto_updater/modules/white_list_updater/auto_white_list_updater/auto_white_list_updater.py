@@ -77,7 +77,7 @@ class WhiteListUpdateManager:
         white_keywords: list[CalculatedKeyword] = [
             kw for kw in keywords if kw.hard_status == 2 and not kw.best_keyword_status
         ]
-        white_keywords.sort(key=lambda kw: kw.baes_ctr, reverse=True)
+        white_keywords.sort(key=lambda kw: kw.baes_ctr if kw.baes_ctr is not None else 0.0, reverse=True)
         white_keywords = white_keywords[1:]
         if not white_keywords:
             return False, True

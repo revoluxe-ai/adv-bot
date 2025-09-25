@@ -8,7 +8,7 @@ from arq import create_pool
 from sqlalchemy import select
 
 from app.arq_workers.arq_redis_settings import arq_redis_settings
-from app.client_bot.user_interface.handlers.start import start_registration
+from app.client_bot.user_interface.handlers.start_registration_func import start_registration
 from app.modules.balance_manager import balance_service
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def extract_nmid_list(input_text):
+def extract_nmid_list(input_text: str) -> list[int]:
     """Извлекает список артикулов из текста."""
     return [int(nmid) for nmid in input_text.replace(",", " ").split() if nmid.isdigit()]
 
 
-def extract_nmid_from_file(file_content):
+def extract_nmid_from_file(file_content: bytes) -> list[int]:
     """Извлекает список артикулов из содержимого текстового файла."""
     return extract_nmid_list(file_content.decode("utf-8"))
 
@@ -61,7 +61,7 @@ async def create_new_adv(
 
 
 @router.message(StateFilter(states.waiting_for_get_nmid))
-async def get_nmid(message: Message, state: FSMContext, bot: Bot):
+async def get_nmid(message: Message, state: FSMContext, bot: Bot) -> None:
     data = await state.get_data()
     wb_user_cabinet_original_id: int = data["wb_user_cabinet_original_id"]
 
@@ -69,12 +69,15 @@ async def get_nmid(message: Message, state: FSMContext, bot: Bot):
         # Обработка текстового файла
         file = await bot.get_file(message.document.file_id)
         file_content = await bot.download_file(file.file_path)
+        if file_content is None:
+            await bot.send_message(message.from_user.id, "Не удалось скачать файл. Попробуйте снова.")
+            return
         nmid_list = extract_nmid_from_file(file_content.read())
     else:
         text = message.text
-        if "/start" in text:
+        if text is not None and "/start" in text:
             await start_registration(message, bot, state)
-        nmid_list = extract_nmid_list(text)
+        nmid_list = extract_nmid_list(text or "")
 
     if not nmid_list:
         await bot.send_message(

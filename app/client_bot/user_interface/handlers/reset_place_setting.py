@@ -1,5 +1,6 @@
 import aiogram
 from aiogram import Bot, F, Router, types
+from aiogram.fsm.context import FSMContext
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
@@ -17,7 +18,7 @@ async def on_reset_place(
     callback: types.CallbackQuery,
     callback_data: callbacks.ResetPlace,
     bot: Bot,
-):
+) -> None:
     adv_original_id: int = callback_data.adv_setting_original_id
 
     stmt = update(AdvSetting).filter(AdvSetting.id == adv_original_id).values(reset_place=True)
@@ -25,6 +26,8 @@ async def on_reset_place(
     async with sm(read_only=False) as session:
         await session.execute(stmt)
         await session.commit()
+    assert callback.message is not None
+    assert callback.message.chat is not None
     await bot.send_message(callback.message.chat.id, "Сброс места включен")
 
 
@@ -33,7 +36,9 @@ async def off_reset_place(
     callback: types.CallbackQuery,
     callback_data: callbacks.ResetPlace,
     bot: aiogram.Bot,
-):
+    state: FSMContext,
+) -> None:
+    if callback.message is None: return
     adv_original_id: int = callback_data.adv_setting_original_id
 
     stmt = update(AdvSetting).filter(AdvSetting.id == adv_original_id).values(reset_place=False)
@@ -41,4 +46,6 @@ async def off_reset_place(
     async with sm(read_only=False) as session:
         await session.execute(stmt)
         await session.commit()
+    assert callback.message is not None
+    assert callback.message.chat is not None
     await bot.send_message(callback.message.chat.id, "Сброс места выключен")

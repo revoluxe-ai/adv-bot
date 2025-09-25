@@ -1,8 +1,9 @@
 from abc import ABC
-from typing import Any
+from typing import Any, Union, Tuple
 
 import aiogram
 from aiogram import Bot
+from aiogram.types import Message
 
 
 class Base(ABC):
@@ -18,7 +19,7 @@ class Base(ABC):
     def chat_id(self) -> int:
         return self._chat_id
 
-    async def __call__(self: "Base", *args: Any, **kwargs: Any) -> None:
+    async def __call__(self: "Base", *args: Any, **kwargs: Any) -> Union[Message, Tuple[Message, str], None]:
         parse_mode = getattr(self, "parse_mode", None)
         self.parse_mode = parse_mode
 

@@ -25,7 +25,7 @@ class GraphUpdater:
     _data_getter = DataGetter()
 
     def __init__(self):
-        self._word2vec = None
+        self._word2vec: None = None
 
     @staticmethod
     def __calculate_file_hash(filepath):
@@ -46,7 +46,7 @@ class GraphUpdater:
         hash_now = self.__calculate_file_hash(self._hash_file_path)
         return hash_now == hash_in_file
 
-    async def update_graph_run(self, leingth: int):
+    async def update_graph_run(self, leingth: int) -> None:
         await self._gds.linking_images_and_keyword()
         while True:
             try:

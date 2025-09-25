@@ -12,6 +12,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 from ...common_slaves.wildberries.models import AdvSetting
 from ...wb_adv_updater import data_manager
 from .callbacks import ChangeExponentSettinginAdvSettingCallback
+from aiogram.types import InaccessibleMessage
 
 router = Router()
 
@@ -21,16 +22,19 @@ async def change_exponent_setting(
     callback: CallbackQuery,
     callback_data: ChangeExponentSettinginAdvSettingCallback,
     state: FSMContext,
-):
+) -> None:
     adv_id = callback_data.adv_id
     await state.update_data(adv_id=adv_id)
     await state.set_state("waiting_for_new_exponent")
     message = callback.message
-    await message.answer("Введите новое значение для экспоненты прогнозируемого CTR:")
+    if message and not isinstance(message, InaccessibleMessage):
+        await message.answer("Введите новое значение для экспоненты прогнозируемого CTR:")
+    else:
+        await bot.send_message(callback.from_user.id, "Введите новое значение для экспоненты прогнозируемого CTR:")
 
 
 @router.message(StateFilter("waiting_for_new_exponent"))
-async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, bot: Bot):
+async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, bot: Bot) -> None:
     data = await state.get_data()
     adv_id: int = data["adv_id"]
     text = message.text
@@ -39,7 +43,11 @@ async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, 
         await start_registration(message, bot, state)
         return
     # Заменяем запятую на точку, если есть
-    text = text.replace(",", ".")
+    if text is not None:
+        text = text.replace(",", ".")
+    else:
+        await message.answer("Текст сообщения отсутствует.")
+        return
     if not text.replace(".", "", 1).isdigit() or text.count(".") > 1:
         await message.answer("Введите число в правильном формате (например, 1.23 или 1,23)")
         return
@@ -58,6 +66,7 @@ async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, 
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
+    assert message.from_user
     chat_id = message.from_user.id
     adv_choice_last_page = 1
     try:

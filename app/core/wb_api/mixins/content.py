@@ -2,89 +2,84 @@
 
 import json
 import logging
+from typing import Any, cast
 
-from app.core.wb_api.data_classes.card_from_wb import CardFromWB
+from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.core.wb_api.http_request import requests, try_except_decorator
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
 from app.core.wb_api.protocols import WBAPIProtocol
 
-logger = logging
+logger = logging.getLogger(__name__)
 
 
 PREFIX = "https://content-api"
 
 
-class ContentMixin:
-    """Миксин для работы с карточками товаров через Content API Wildberries."""
+class ContentMixin(WBAPIProtocol):
+    HOST = "wildberries.ru"
 
-    @try_except_decorator(1, 2)
-    async def get_card_by_text(self: WBAPIProtocol, text: str | int) -> CardFromWB:
-        """Ищет карточку по тексту в названии или артикулу."""
+    @try_except_decorator(1, 60)
+    async def get_card_by_text(self, query_text: str | int) -> CardFromWB:
         url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
-        text = str(text)
-        data_for_req = {
+
+        data = {
             "settings": {
-                "sort": {"ascending": False},
+                "filter": {"textSearch": str(query_text)},
                 "cursor": {"limit": 1},
-                "filter": {"withPhoto": -1, "textSearch": str(text)},
             }
         }
 
-        response = await requests(
+        response_text = await requests(
             self.session,
             "POST",
-            url=url,
-            json_data=data_for_req,
+            url,
+            json_data=data,
             headers=self.headers.standart,
         )
-        if response is None:
-            raise CardNotFoundInWB(f"Карточка с текстом {text} не найдена на Wildberries")
-        answer = json.loads(response)
-        cards = answer["cards"]
-        if not cards:
-            raise CardNotFoundInWB(f"Карточка с текстом {text} не найдена на Wildberries")
-        card_json = answer["cards"][0]
-        card: CardFromWB = CardFromWB(card_json)
-        return card
+        answer = json.loads(response_text)
+        card_data = answer["cards"][0]
+        return CardFromWB(card_data)
 
-    @try_except_decorator(1, 2)
-    async def get_all_cards(self: WBAPIProtocol) -> list[CardFromWB]:
-        """Получает все карточки товаров из магазина."""
+    @try_except_decorator(1, 60)
+    async def get_card_by_nm_id(self, nm_id: int) -> CardFromWB:
         url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
 
-        # Начальные параметры для запроса
-        data_for_req = {"settings": {"cursor": {"limit": 100}, "filter": {"withPhoto": -1}}}
+        data = {
+            "settings": {
+                "filter": {"textSearch": str(nm_id)},
+                "cursor": {"limit": 1},
+            }
+        }
 
-        all_cards = []  # Список для хранения всех карточек
-        while True:
-            response = await requests(
-                self.session,
-                "POST",
-                url=url,
-                json_data=data_for_req,
-                headers=self.headers.standart,
-            )
-            answer = json.loads(response)
+        response_text = await requests(
+            self.session,
+            "POST",
+            url,
+            json_data=data,
+            headers=self.headers.standart,
+        )
+        answer = json.loads(response_text)
+        card_data = answer["cards"][0]
+        return CardFromWB(card_data)
 
-            # Проверяем наличие ключа 'cards' в ответе
-            cards_data = answer.get("cards", [])
-            if not cards_data:
-                break
+    @try_except_decorator(1, 60)
+    async def get_card_by_imt_id(self, imt_id: int) -> CardFromWB:
+        url = f"{PREFIX}.{self.HOST}/content/v2/get/cards/list"
 
-            # Добавляем карточки в общий список
-            all_cards.extend([CardFromWB(card_json) for card_json in cards_data])
+        data = {
+            "settings": {
+                "filter": {"imtID": imt_id},
+                "cursor": {"limit": 1},
+            }
+        }
 
-            # Проверяем, есть ли еще данные для пагинации
-            if len(cards_data) < data_for_req["settings"]["cursor"]["limit"]:
-                break
-
-            # Обновляем курсор для следующего запроса
-            last_card = cards_data[-1]
-            data_for_req["settings"]["cursor"].update(
-                {
-                    "updatedAt": last_card.get("updatedAt"),
-                    "nmID": last_card.get("nmID"),
-                }
-            )
-
-        return all_cards
+        response_text = await requests(
+            self.session,
+            "POST",
+            url,
+            json_data=data,
+            headers=self.headers.standart,
+        )
+        answer = json.loads(response_text)
+        card_data = answer["cards"][0]
+        return CardFromWB(card_data)

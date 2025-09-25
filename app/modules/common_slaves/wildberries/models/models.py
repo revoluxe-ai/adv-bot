@@ -3,6 +3,7 @@ import json
 import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 import jwt
 from jwt import DecodeError
@@ -298,7 +299,7 @@ class AdvSetting(BaseTable):
     class ActiveStatuses(Enum):
         DONE = "done"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._search_adv_id = None
         self._worst_promo_position = None

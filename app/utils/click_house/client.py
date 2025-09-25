@@ -128,59 +128,12 @@ class get_clickhouse_client:
             pool_mgr=pool_mgr,
             port=settings.CLICKHOUSE_PORT,
         )
-        return self.client
+        return self.client # type: ignore
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        global connection_count
-        global connection_lock
-        global function_connection_count
-        global caller_function_connection_count
-        global grand_caller_function_connection_count
-        global function_count_lock
         client = self.client
         if client is not None:
-            client.close()
-
-        if (
-            system_name == "Linux"
-            and connection_lock is not None
-            and connection_count is not None
-            and function_count_lock is not None
-        ):
-            with connection_lock:
-                connection_count.value -= 1
-                logger.debug(f"Total open connections count: {connection_count.value}")
-
-            # Уменьшаем количество соединений для текущей и вызывающих функций
-            with function_count_lock:
-                # Текущая функция
-                func_name = self.func_name
-                if func_name is not None and func_name in function_connection_count:
-                    function_connection_count[func_name] -= 1
-                    logger.debug(
-                        f"Function '{func_name}' open connections count: {function_connection_count[func_name]}"
-                    )
-
-                # Вызывающая функция
-                caller_func_name = self.caller_func_name
-                if caller_func_name is not None and caller_func_name in caller_function_connection_count:
-                    caller_function_connection_count[caller_func_name] -= 1
-                    logger.debug(
-                        f"Caller function '{caller_func_name}'"
-                        f" open connections count: {caller_function_connection_count[caller_func_name]}"
-                    )
-
-                # Функция 3-го уровня
-                grand_caller_func_name = self.grand_caller_func_name
-                if (
-                    grand_caller_func_name is not None
-                    and grand_caller_func_name in grand_caller_function_connection_count
-                ):
-                    grand_caller_function_connection_count[grand_caller_func_name] -= 1
-                    logger.debug(
-                        f"Grand caller function '{grand_caller_func_name}' "
-                        f"open connections count: {grand_caller_function_connection_count[grand_caller_func_name]}"
-                    )
+            client.close() # type: ignore
 
 
 F = TypeVar("F", bound=Callable[..., Any])

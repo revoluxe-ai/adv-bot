@@ -45,24 +45,24 @@ class BaseAPI:
         self._free_tokens = tokens
         current_token = self._free_tokens[0]
         self._current_token = current_token
-        self._headers = Headers(current_token)
-        self._shop_id = current_token.shop_id
+        self.headers: Headers = Headers(current_token)
+        self.shop_id: str = current_token.shop_id
         self.api_call_state: dict[str, dict[str, str]] = {}
         self.wb_cabinet = wb_access.wb_cabinet
         self.session: ClientSession = client_session
         self._bad_tokens_original_ids: dict[str, set[int]] = defaultdict(set)
 
-    @property
-    def headers(self) -> "Headers":
-        return self._headers
+    # @property
+    # def headers(self) -> "Headers":
+    #     return self._headers
 
-    @headers.setter
-    def headers(self, value: "Headers") -> None:
-        self._headers = value
+    # @headers.setter
+    # def headers(self, value: "Headers") -> None:
+    #     self._headers = value
 
-    @property
-    def shop_id(self) -> str:
-        return self.access.shop_id
+    # @property
+    # def shop_id(self) -> str:
+    #     return self.access.shop_id
 
     @staticmethod
     def chunks(lst: list[T], n: int) -> Generator[list[T], None, None]:

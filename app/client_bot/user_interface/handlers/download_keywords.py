@@ -28,13 +28,17 @@ async def setting_keywords_active_keywords(
     callback_data: callbacks.DownloadCSV,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_setting_original_id
     async with _sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
+        adv_setting: AdvSetting | None = result.scalar_one_or_none()
+        if adv_setting is None:
+            # Отправьте сообщение об ошибке пользователю или запишите в лог
+            await bot.send_message(callback.from_user.id, "Настройка рекламы не найдена.")
+            return
 
     csv_string: str = await utils.get_csv_file(adv_setting)
 

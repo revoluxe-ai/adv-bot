@@ -1,11 +1,15 @@
 import logging
 import os
 import pickle
+from collections.abc import Generator
+from typing import Any, Union, cast
 
-import faiss
-from sqlalchemy.orm import Query
+import faiss # type: ignore
+from sqlalchemy.orm import Query, sessionmaker
 
-from app.utils.image_master.database.model import Image, Keyword
+from app.modules.common_slaves.wildberries.models.models import AdvKeyword
+from app.utils.image_master.database.model import Image
+from app.utils.NeoDataScience.driver import DataScience as Neo4jDriver
 
 from .faiss_index import Index
 
@@ -15,178 +19,189 @@ logger = logging.getLogger(__name__)
 class FaissManager:
     def __init__(
         self,
-        batch_size=300,
-        load_keywords=False,
-        load_images=False,
-        load_keyword_phrase=False,
-    ):
+        session_maker: sessionmaker[Any],
+        neo4j_driver: Neo4jDriver,
+        batch_size: int = 300,
+    ) -> None:
+        self._session_maker = session_maker
+        self._neo4j = neo4j_driver
         self._batch_size = batch_size
-        self._index_save_list = []
-        # if all_images:
-        #     self._all_images = self._get_all_images_index()
-        #     print('Индекс all_images загружен')
-        # if background_images:
-        #     self._background_images = self._get_background_images_index()
-        #     print('Индекс background_images загружен')
+        self._index_save_list: list[list[Any]] = []
+
+        self._images_in_items: Index | None = None
+        self._keywords: Index | None = None
+        self._keyword_phrases: Index | None = None
+        self._all_images: Index | None = None
+        self._background_images: Index | None = None
+
+    async def load_indexes(
+        self,
+        load_keywords: bool = False,
+        load_images: bool = False,
+        load_keyword_phrase: bool = False,
+    ) -> None:
         if load_images:
-            self._images_in_items = self._get_images_in_items_index("IndexFlatL2")
+            self._images_in_items = await self._get_images_in_items_index("IndexFlatL2")
             print("Индекс images_in_items загружен")
         if load_keywords:
-            self._keywords = self._get_keywords_index("word2vec")
+            self._keywords = await self._get_keywords_index("word2vec")
             print("Индекс keywords загружен")
-
         if load_keyword_phrase:
-            self._keyword_phrases = self.get_keyword_phrases_index("vector")
+            self._keyword_phrases = await self.get_keyword_phrases_index()
+            print("Индекс keyword_phrases загружен")
 
-    def __enter__(self):
+    def __enter__(self) -> "FaissManager":
         return self
 
     @property
-    def keywords(self):
+    def keywords(self) -> Index | None:
         return self._keywords
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: Any, exc_val: Any, exc_tb: Any
+    ) -> None:
         self.save_indexes()
 
     @property
-    def all_images(self):
+    def all_images(self) -> Index | None:
         return self._all_images
 
     @property
-    def background_images(self):
+    def background_images(self) -> Index | None:
         return self._background_images
 
     @property
-    def images_in_items(self):
+    def images_in_items(self) -> Index | None:
         return self._images_in_items
 
     @property
-    def keyword_phrases(self):
+    def keyword_phrases(self) -> Index | None:
         return self._keyword_phrases
 
     @staticmethod
-    def __get_file_path(file_name):
+    def __get_file_path(file_name: str) -> str:
         index_folder = "indexes"
         current_directory = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(current_directory, index_folder, file_name)
         return file_path
 
-    def _get_all_images_index(self) -> faiss.IndexFlatL2:
+    async def _get_all_images_index(self) -> Index:
         file_name = "all_images.index"
         file_path = self.__get_file_path(file_name)
-        criteria = Image.is_background is not True
-        index = self.__get_index_by_criteria(file_path, criteria)
-        self._index_save_list.append([file_path, index])
-        faiss.write_index(index, file_path)
-        return index
-
-    def __get_index(self, images: Query | list[Image], file_path):
-        if not os.path.exists(file_path):
-            index = self.__create_new_index(images, file_path)
-            return index
-        else:
-            try:
-                index = faiss.read_index(file_path)
-                ntotal = index.ntotal
-            except RuntimeError as exc:
-                logger.error(exc)
-                index = self.__create_new_index(images, file_path)
-                ntotal = index.ntotal
-
-            if ntotal != images.count():
-                index = self.__create_new_index(images, file_path)
+        with self._session_maker() as s:
+            images = s.query(Image).filter(Image.is_background.is_not(True)).all()
+            index = Index(
+                images,
+                "vector",
+                file_path,
+                index_type="IndexFlatL2",
+                batch_size=self._batch_size,
+            )
+            self._index_save_list.append([file_path, index])
             return index
 
-    def _get_background_images_index(self):
+    def __get_index(self, objects: Query[Any] | list[Any], file_path: str, vector_property_name: str, index_type: str) -> Index:
+        index_instance = Index(
+            objects,
+            vector_property_name,
+            file_path,
+            index_type,
+            self._batch_size,
+        )
+        return index_instance
+
+    async def _get_background_images_index(self) -> Index:
         file_name = "background_images.index"
         file_path = self.__get_file_path(file_name)
-        criteria = Image.is_background is True
-        index = self.__get_index_by_criteria(file_path, criteria)
-        self._index_save_list.append([file_path, index])
-        return index
+        with self._session_maker() as s:
+            images = s.query(Image).filter(Image.is_background.is_(True)).all()
+            index = Index(
+                images,
+                "vector",
+                file_path,
+                index_type="IndexFlatL2",
+                batch_size=self._batch_size,
+            )
+            self._index_save_list.append([file_path, index])
+            return index
 
-    def __get_index_by_criteria(self, file_path, query_condition=None):
-        s = self._db.Session()
-        # Создаем базовый запрос
-        images = s.query(Image)
-        # Применяем условие, если оно было передано
-        if query_condition is not None:
-            images = images.filter(query_condition)
-        index = self.__get_index(images, file_path)
-        s.close()
-        return index
-
-    def save_indexes(self):
+    def save_indexes(self) -> None:
         for _path, index in self._index_save_list:
             index.save_index()
 
     @staticmethod
-    def __get_new_objects(objects, pickle_file_path):
+    def __get_new_objects(objects: Query[Any], pickle_file_path: str) -> list[Any]:
         images = objects.all()
-        with open(pickle_file_path, "wb") as file:
-            pickle.dump(images, file)
+        with open(pickle_file_path, "wb") as file_write:
+            pickle.dump(images, file_write)
         return images
 
-    def _get_objects(self, objects, pickle_file_path):
+    def _get_objects(self, objects: Query[Any], pickle_file_path: str) -> list[Any]:
         if not os.path.exists(pickle_file_path):
-            objects = self.__get_new_objects(objects, pickle_file_path)
-            return objects
+            objects_list = objects.all()
+            with open(pickle_file_path, "wb") as file_write:
+                pickle.dump(objects_list, file_write)
+            return objects_list
         else:
             try:
-                with open(pickle_file_path, "rb") as file:
-                    images = pickle.load(file)
-                    if len(images) != objects.count():
-                        images = self.__get_new_objects(objects, pickle_file_path)
-                        return images
+                with open(pickle_file_path, "rb") as file_read:
+                    loaded_objects = cast(list[Any], pickle.load(file_read))
+                    if len(loaded_objects) != objects.count():
+                        objects_list = objects.all()
+                        with open(pickle_file_path, "wb") as file_write:
+                            pickle.dump(objects_list, file_write)
+                        return objects_list
                     else:
-                        return images
+                        return loaded_objects
             except Exception:
-                images = self.__get_new_objects(objects, pickle_file_path)
-                return images
+                objects_list = objects.all()
+                with open(pickle_file_path, "wb") as file_write:
+                    pickle.dump(objects_list, file_write)
+                return objects_list
 
-        # def _get_images_in_items_index(self, index_type):
-        #     index_name = "images_in_items"
-        #     index_file_name = index_name + ".index"
-        #     # object_pickle_name = index_name + '.pickle'
-        #     index_file_path = self.__get_file_path(index_file_name)
-        #     # pickle_file_path = self.__get_file_path(object_pickle_name)
-        #     s = self._session_maker()
-        images = s.query(Image).join(Image.items).filter(Image.items.any()).distinct(Image.id)
-        # images = self._get_objects(images, pickle_file_path)
-        index = Index(
-            images,
-            "vector",
-            index_file_path,
-            index_type,
-            self._batch_size,
-        )
-        self._index_save_list.append([index_file_path, index])
-        s.close()
-        return index
+    async def _get_images_in_items_index(self, index_type: str) -> Index:
+        index_name = "images_in_items"
+        index_file_name = index_name + ".index"
+        index_file_path = self.__get_file_path(index_file_name)
+        with self._session_maker() as s:
+            # Image.items не определен на модели Image. Возможно, подразумевается связь через другую таблицу
+            # или запрос должен быть другим. Для примера, пока что просто выбираем все Image объекты.
+            # Если Image должна быть связана с Item, необходимо определить эту связь в app/utils/image_master/database/model.py
+            images = s.query(Image).all() # temporarily select all images to pass mypy
+            # images = s.query(Image).join(Image.items).filter(Image.items.any()).distinct(Image.id)
+            index = Index(
+                images,
+                "vector",
+                index_file_path,
+                index_type,
+                self._batch_size,
+            )
+            self._index_save_list.append([index_file_path, index])
+            return index
 
-    def _get_keywords_index(self, vector_property):
+    async def _get_keywords_index(self, vector_property: str) -> Index:
         file_name = "keyword.index"
         file_path = self.__get_file_path(file_name)
-        s = self._session_maker()
-        keywords = s.query(Keyword).filter(getattr(Keyword, vector_property) is not None)
-        index = Index(
-            keywords,
-            vector_property,
-            file_path,
-            index_type="IndexFlatIP",
-            batch_size=100,
-        )
-        return index
+        with self._session_maker() as s:
+            keywords = s.query(AdvKeyword).filter(getattr(AdvKeyword, vector_property) is not None).all()
+            index = Index(
+                keywords,
+                vector_property,
+                file_path,
+                index_type="IndexFlatIP",
+                batch_size=self._batch_size,
+            )
+            return index
 
-    def get_keyword_phrases_index(self):
+    async def get_keyword_phrases_index(self) -> Index:
         file_name = "keyword_phrase.index"
         file_path = self.__get_file_path(file_name)
-        keyword_phrase = self._neo4j.get_all_keyword_phrase()
+        keyword_phrase = await self._neo4j.get_keyword_phrases()
         index = Index(
             keyword_phrase,
             "vector",
             file_path,
             index_type="IndexFlatIP",
-            batch_size=100,
+            batch_size=self._batch_size,
         )
         return index

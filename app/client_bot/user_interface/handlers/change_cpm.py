@@ -6,6 +6,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
+from aiohttp import ClientSession
 
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.views import callbacks
@@ -32,7 +33,7 @@ async def change_cpm(
 
 
 @router.message(StateFilter(states.ChangeCPM.waiting_for_cpm))
-async def new_cpm_handler(message: aiogram.types.Message, state: FSMContext) -> None:
+async def new_cpm_handler(message: aiogram.types.Message, state: FSMContext, client_session: ClientSession) -> None:
     """Обработчик ввода нового значения CPM."""
     data: dict[str, Any] = await state.get_data()
     adv_setting_original_id: int | str | None = data.get("last_adv_setting_original_id")
@@ -68,7 +69,7 @@ async def new_cpm_handler(message: aiogram.types.Message, state: FSMContext) -> 
         access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
 
     # Работа с API вне контекста сессии
-    wb_api = BidderWBApi(access)
+    wb_api = BidderWBApi(access, client_session)
     try:
         nmid = adv_setting.nmids[0]
         await wb_api.update_cpm(adv_setting.adv_id, nmid, cpm_value)

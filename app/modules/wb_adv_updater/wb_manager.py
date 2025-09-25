@@ -44,7 +44,7 @@ gds = DataScience()
 
 sm = get_async_session_maker
 
-keywords_hashs_in_neo = set()
+keywords_hashs_in_neo: set[str] = set()
 
 
 def get_count_advs_for_wb_cabinet(wb_cabinet: WBCabinet, adv_settings: list[AdvSetting]) -> int:
@@ -59,7 +59,7 @@ async def check_adv_payment(session: AsyncSession, adv_setting: AdvSetting, curr
     )
 
     result = await session.execute(adv_payment_check_stmt)
-    return result.scalar()
+    return bool(result.scalar())
 
 
 async def process_payment_for_advs() -> None:
@@ -73,7 +73,7 @@ async def process_payment_for_advs() -> None:
                 joinedload(AdvSetting.wb_cabinet).selectinload(WBCabinet.bonus_payments),
             )
             .where(
-                AdvSetting.bot_active is True,
+                AdvSetting.bot_active,
             )
         )
         result = await session.execute(stmt)
@@ -95,24 +95,24 @@ async def process_payment_for_advs() -> None:
             # Сначала проверяем наличие средств
             if calculated_bonus >= PRICE_FOR_ADV_FOR_DAY:
                 # Создаем платеж и запись списания бонусов
-                payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+                payment = AdvPayment(date=current_date)
                 adv_setting.payments.append(payment)
 
                 bonus_payment = WBBonusPayment(
                     wb_cabinet_id=wb_cabinet.id,
-                    amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
+                    amount=float(-PRICE_FOR_ADV_FOR_DAY),  # Отрицательное значение для списания
                     description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
                     operation_type="subtract",
                 )
                 session.add(bonus_payment)
             elif calculated_balance >= PRICE_FOR_ADV_FOR_DAY:
                 # Создаем платеж и запись списания с баланса
-                payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+                payment = AdvPayment(date=current_date)
                 adv_setting.payments.append(payment)
 
                 balance_payment = WBBalancePayment(
-                    wb_cabinet_id=wb_cabinet.id,
-                    amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
+                    wb_cabinet=wb_cabinet,
+                    amount=float(-PRICE_FOR_ADV_FOR_DAY),  # Отрицательное значение для списания
                     description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
                 )
                 session.add(balance_payment)
@@ -147,7 +147,7 @@ async def update_vectors_in_redis() -> None:
     await gds.update_vectors_in_redis()
 
 
-async def insert_or_update_keywords(keyword_stats, adv_id, table_name: str):
+async def insert_or_update_keywords(keyword_stats: list, adv_id: int, table_name: str) -> None:
     # Подготовка данных для вставки
     new_version = int(datetime.datetime.now().timestamp())
     data_to_insert = []
@@ -175,12 +175,12 @@ async def update_keywords_stat_in_click_house(keyword_stats: list[KeywordStat], 
         await insert_or_update_keywords(keyword_stats, adv_id, table_name)
 
 
-async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
+async def get_existing_keyword_settings(adv_setting_id: int) -> set[str]:
     async with sm() as session:
         stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_id)
         result = await session.execute(stmt)
-        existing_keyword_settings: list[KeywordSetting] = result.scalars().all()
-    return {ks.text for ks in existing_keyword_settings}
+        existing_keyword_settings: list[KeywordSetting] = list(result.scalars().all())
+    return {ks.text for ks in existing_keyword_settings if ks.text is not None}
 
 
 async def update_predict_ctr() -> None:
@@ -192,9 +192,9 @@ async def update_predict_ctr() -> None:
 
 async def update_all_keyword_data(
     wb_api: WBApi,
-    adv_setting,
+    adv_setting: AdvSetting,
     wb_cabinet: WBCabinet,
-):
+) -> None:
     shop_id = wb_cabinet.shop_id
     try:
         await common_keyword_stat_update(adv_setting, wb_api)
@@ -223,7 +223,7 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.bot_active)
             result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = result.scalars().all()
+            adv_settings: list[AdvSetting] = list(result.scalars().all())
         for adv_setting in adv_settings:
             if adv_setting.id not in update_tasks:
                 wb_cabinet_id = adv_setting.wb_cabinet_id
@@ -244,7 +244,7 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
             await asyncio.sleep(0)
 
 
-async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
+async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi) -> None:
     try:
         clusters = await wb_api.advert.get_clusters_for_adv(adv)
         clusters = clusters["clusters"]
@@ -262,7 +262,7 @@ async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
         return
 
 
-async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
+async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api: WBApi) -> None:
     auto_adv_id = adv_setting.adv_id
     auction_adv_id = adv_setting.search_adv_id
     try:
@@ -326,7 +326,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
 
     # Преобразование ключевых слов в объекты KeywordSetting
-    keyword_settings = [KeywordSetting(text=keyword, adv_setting_id=adv_setting.id) for keyword in new_keywords]
+    keyword_settings = [KeywordSetting(text=keyword, adv_setting=adv_setting) for keyword in new_keywords]
     relevant_phrase_manager = RelevantPhraseManager(adv_setting)
     template_data = await relevant_phrase_manager.get_relevant_template_data()
 
@@ -337,7 +337,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             # Обработка данных порциями
             for keyword in keyword_settings:
                 text = keyword.text
-                if not not_rel_templator.is_relevant(text):
+                if text is not None and not not_rel_templator.is_relevant(text):
                     keyword.hard_status = 0
                 session.add(keyword)
             await session.commit()
@@ -378,7 +378,7 @@ async def update_wb_config_data(client_session: ClientSession) -> None:
     await redis_manager.set_min_cpm_data(min_cpm_data)
 
 
-async def update_wb_config_data_run(client_session) -> None:
+async def update_wb_config_data_run(client_session: ClientSession) -> None:
     while True:
         try:
             await update_wb_config_data(client_session)

@@ -14,7 +14,7 @@ router = Router()
 @router.callback_query(RelevantKeywordStatusSetting.filter())
 async def relevant_keyword_status_setting(
     callback_query: CallbackQuery, callback_data: RelevantKeywordStatusSetting, bot: Bot
-):
+) -> None:
     keyword_setting_original_id = callback_data.keyword_setting_original_id
     new_relevant_status = callback_data.new_relevant_status
 
@@ -27,6 +27,8 @@ async def relevant_keyword_status_setting(
         await session.execute(stmt)
         await session.commit()
 
+    if callback_query.message is None: return
+    assert callback_query.message.chat is not None
     chat_id = callback_query.message.chat.id
 
     new_text_status_str: str = (

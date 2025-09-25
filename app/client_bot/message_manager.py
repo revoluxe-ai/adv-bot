@@ -9,12 +9,12 @@ logger = logging.getLogger(__name__)
 class LastMessage(tp.Message):
     message_type: str
 
-    def __get_parent_class_name(self):
+    def __get_parent_class_name(self) -> str:
         # Получаем первый родительский класс из кортежа __bases__
         parent_class = self.__class__.__bases__[0]
         return parent_class.__name__
 
-    def get_content_type(self):
+    def get_content_type(self) -> str:
         return self.__get_parent_class_name()
 
     def can_edit_message(self) -> bool:
@@ -29,5 +29,5 @@ class LastMessage(tp.Message):
         return time_diff < timedelta(hours=48)
 
 
-def __check_message_copy(last_message: LastMessage, text: str, keyboard: tp.InlineKeyboardMarkup):
+def __check_message_copy(last_message: LastMessage, text: str, keyboard: tp.InlineKeyboardMarkup) -> bool:
     return last_message.text == text and last_message.reply_markup == keyboard

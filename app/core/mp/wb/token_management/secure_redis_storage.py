@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
+from pydantic import Field
+
 
 @dataclass
 class TokenState:
@@ -15,10 +17,7 @@ class TokenState:
 @dataclass
 class ShopState:
     # tokens -> method_name -> { token_id -> TokenState }
-    tokens: dict[str, dict[str, TokenState]]
-
-    def __init__(self):
-        self.tokens = {}
+    tokens: dict[str, dict[str, TokenState]] = Field(default_factory=dict)
 
 
 class SecureRedisTokenStorage:
@@ -27,7 +26,7 @@ class SecureRedisTokenStorage:
     Provides the minimal API used by EnhancedShopTokenManager.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._shop_states: dict[str, ShopState] = {}
         self._lock = asyncio.Lock()
 
@@ -41,7 +40,7 @@ class SecureRedisTokenStorage:
         async with self._lock:
             shop = self._shop_states.get(shop_id)
             if shop is None:
-                shop = ShopState()
+                shop = ShopState(tokens={})
                 self._shop_states[shop_id] = shop
             method_tokens = shop.tokens.setdefault(method_name, {})
             token = method_tokens.get(token_id)
@@ -53,7 +52,7 @@ class SecureRedisTokenStorage:
 
     async def mark_token_success(self, shop_id: str, method_name: str, token_id: str) -> None:
         async with self._lock:
-            shop = self._shop_states.setdefault(shop_id, ShopState())
+            shop = self._shop_states.setdefault(shop_id, ShopState(tokens={}))
             method_tokens = shop.tokens.setdefault(method_name, {})
             token = method_tokens.get(token_id)
             if token is None:
@@ -66,8 +65,8 @@ class SecureRedisTokenStorage:
     async def get_shop_state(self, shop_id: str) -> ShopState | None:
         # Return a copy-like object; for simplicity return the stored one or a fresh empty state
         async with self._lock:
-            return self._shop_states.get(shop_id, ShopState())
+            return self._shop_states.get(shop_id, ShopState(tokens={}))
 
     async def clear_shop_state(self, shop_id: str) -> None:
         async with self._lock:
-            self._shop_states[shop_id] = ShopState()
+            self._shop_states[shop_id] = ShopState(tokens={})

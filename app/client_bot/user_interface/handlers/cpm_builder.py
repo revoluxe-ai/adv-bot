@@ -10,7 +10,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 from .. import states
 from ..views import callbacks, messages
-from . import start
+from .start_registration_func import start_registration
 
 sm = get_async_session_maker
 
@@ -20,9 +20,9 @@ router = Router()
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page"))
 async def to_page_for_cpm_setting(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
-):
+) -> None:
     adv_original_id = callback_data.adv_original_id
     if callback.message is None:
         return
@@ -31,14 +31,14 @@ async def to_page_for_cpm_setting(
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_min_position))
-async def get_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def get_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext) -> None:
     text = message.text
     if text is None:
         await message.answer("Введите целое положительное число")
         return
     if "/start" in text:
         await state.set_state(state=None)
-        await start.start_registration(message, bot, state)
+        await start_registration(message, bot, state)
         return
     if not text.isdigit():
         await message.answer("Введите целое положительное число")
@@ -54,7 +54,7 @@ async def get_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_max_cpm))
-async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext) -> None:
     data = await state.get_data()
     text = message.text
     if text is None:
@@ -62,7 +62,7 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
         return
     if "/start" in text:
         await state.set_state(state=None)
-        await start.start_registration(message, bot, state)
+        await start_registration(message, bot, state)
         return
     if not text.isdigit():
         await message.answer("Введите целое положительное число")
@@ -92,10 +92,10 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_manual_cpm"))
 async def start_set_manual_cpm(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_manual_cpm)
@@ -106,14 +106,14 @@ async def start_set_manual_cpm(
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_manual_cpm))
-async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext) -> None:
     text = message.text
     if text is None:
         await message.answer("Введите целое положительное число")
         return
     if "/start" in text:
         await state.set_state(state=None)
-        await start.start_registration(message, bot, state)
+        await start_registration(message, bot, state)
         return
     if not text.isdigit():
         await message.answer("Введите целое положительное число")
@@ -142,10 +142,10 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_max_position"))
 async def start_set_max_position(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_max_position)
@@ -156,14 +156,14 @@ async def start_set_max_position(
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_max_position))
-async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMContext) -> None:
     text = message.text
     if text is None:
         await message.answer("Ввежите целое положительное число")
         return  
     if "/start" in text:
         await state.set_state(state=None)
-        await start.start_registration(message, bot, state)
+        await start_registration(message, bot, state)
         return
     if not text.isdigit():
         await message.answer("Введите целое положительное число")

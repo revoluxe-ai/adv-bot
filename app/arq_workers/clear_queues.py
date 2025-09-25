@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def clear_queues():
+async def clear_queues() -> None:
     try:
         # Создаем пул подключений к Redis с настройками проекта
         redis = await create_pool(arq_redis_settings)

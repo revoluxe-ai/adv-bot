@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 from aiogram import BaseMiddleware
 from aiogram.types import Message
@@ -12,6 +12,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 from .. import redis_manager as __redis_manager
 
+
 _redis_manager = __redis_manager.RedisManager()
 
 
@@ -22,10 +23,11 @@ class UserDataMiddleware(BaseMiddleware):
     async def __call__(
         self,
         handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        event: Message,  # type: ignore
         data: dict[str, Any],
     ) -> Any:
         async with _sm(read_only=False) as session:
+            assert event.from_user is not None
             user_telegram_id = event.from_user.id
             stmt = (
                 select(User)
@@ -33,15 +35,13 @@ class UserDataMiddleware(BaseMiddleware):
                 .where(User.user_telegram_id == user_telegram_id)
             )
             result = await session.execute(stmt)
-            user = result.scalar()
+            user = result.scalar_one_or_none()
             if not user:
-                user = User(
-                    user_telegram_id=user_telegram_id,
-                    username=event.from_user.username,
-                    wb_tokens=[],
-                )
+                user = User()
+                user.user_telegram_id = user_telegram_id
+                user.username = event.from_user.username
                 session.add(user)
                 await session.commit()
                 await session.refresh(user)
-            data["user"]: User = user
+            data["user"] = user
         return await handler(event, data)

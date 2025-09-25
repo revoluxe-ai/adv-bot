@@ -7,7 +7,7 @@ from io import BytesIO
 import aiofiles
 import aiogram
 from aiogram import Bot
-from aiogram.client.session import aiohttp
+from aiohttp import ClientSession
 from aiogram.types import BufferedInputFile, InputFile
 from PIL import Image as PilImage
 
@@ -17,7 +17,7 @@ from app.utils.image_master import image_tools
 logger = logging.getLogger(__name__)
 
 
-async def get_telegram_image(image_path: str, bot: aiogram.Bot) -> InputFile | str:
+async def get_telegram_image(image_path: str | InputFile | None, bot: aiogram.Bot) -> InputFile | str | BytesIO:
     result = await _get_telegram_file(image_path, bot)
     return result
 
@@ -30,7 +30,7 @@ def get_image_from_disc_path(image_path: str) -> str:
     return image_path
 
 
-async def get_image_from_disc(image_path: str) -> BytesIO:
+async def get_image_from_disc(image_path: str) -> BytesIO | None:
     image_path = get_image_from_disc_path(image_path)
     if os.path.exists(image_path):
         async with aiofiles.open(image_path, "rb") as f:
@@ -39,7 +39,7 @@ async def get_image_from_disc(image_path: str) -> BytesIO:
     return None
 
 
-async def save_image_to_disc(url: str, image: BytesIO):
+async def save_image_to_disc(url: str, image: BytesIO) -> None:
     image_path = get_image_from_disc_path(url)
     image_path_dir = os.path.dirname(image_path)
     if not os.path.exists(image_path_dir):
@@ -48,7 +48,7 @@ async def save_image_to_disc(url: str, image: BytesIO):
         await f.write(image.getvalue())
 
 
-async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFile:
+async def _get_telegram_file(image_path: str | InputFile | None, bot: Bot) -> str | InputFile | BytesIO:
     logger.debug(f"Начало обработки файла: {image_path}")
 
     if isinstance(image_path, BytesIO):
@@ -56,12 +56,12 @@ async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFil
         return BufferedInputFile(image_path.getvalue(), filename="wbgram.png")
 
     try:
-        if image_path.startswith("http"):
+        if isinstance(image_path, str) and image_path.startswith("http"):
             buffered_image = await get_image_from_disc(image_path)
             if buffered_image:
                 return BufferedInputFile(buffered_image.getvalue(), filename="wbgram")
             logger.debug(f"Загрузка изображения по HTTP: {image_path}")
-            async with aiohttp.ClientSession() as session:
+            async with ClientSession() as session:
                 async with session.get(image_path) as response:
                     logger.debug(f"HTTP ответ: {response.status}")
                     if response.status == 200:
@@ -71,12 +71,14 @@ async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFil
                         await save_image_to_disc(image_path, buffered_image)
                     else:
                         raise Exception(f"Ошибка загрузки изображения: HTTP {response.status}")
-        else:
+        elif isinstance(image_path, str):
             logger.debug(f"Загрузка изображения из локального файла: {image_path}")
             async with aiofiles.open(image_path, "rb") as f:
                 content = await f.read()
                 logger.debug("Изображение успешно прочитано из файла")
                 buffered_image = io.BytesIO(content)
+        else:
+            raise Exception("Неизвестный тип image_path")
 
         pil_image = PilImage.open(buffered_image)
         logger.debug(f"Изображение открыто с помощью PIL в формате: {pil_image.format}")
@@ -99,14 +101,14 @@ async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFil
 
     if file_id:
         logger.debug(f"Найден существующий файл: {file_id}")
-        return file_id
+        return file_id # type: ignore
     else:
         logger.debug("Файл не найден, создание нового BufferedInputFile")
         buffered_image.seek(0)
         return BufferedInputFile(buffered_image.getvalue(), filename="wbgram.png")
 
 
-async def save_telegram_file(image: io.BytesIO, image_telegram_id: str, bot_id: int):
+async def save_telegram_file(image: io.BytesIO, image_telegram_id: str, bot_id: int) -> None:
     pil_image = PilImage.open(image)
     dhash = image_tools.dhash(pil_image)
     await db.add_file(image_telegram_id, dhash, bot_id)

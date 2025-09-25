@@ -1,11 +1,12 @@
 from sqlalchemy import BIGINT, Column, DateTime, ForeignKey, String, func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 
 from app.utils.db.base import BaseTable
+from app.utils.db.models import User
 
 
 class Payment(BaseTable):
-    user = relationship("User", back_populates="payments")
+    user: Mapped["User"] = relationship("User", back_populates="payments")
     user_id = Column(BIGINT, ForeignKey("user.id"))
     amount = Column(BIGINT, nullable=False)
     target = Column(String, nullable=False)

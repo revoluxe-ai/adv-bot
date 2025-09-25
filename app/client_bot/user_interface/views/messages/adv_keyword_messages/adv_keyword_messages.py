@@ -2,6 +2,7 @@ import logging
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup
 
 from app.client_bot.user_interface.message_templates import LastMessage, TextWithKeyboardAndImage
 from app.client_bot.user_interface.views import keyboards
@@ -24,15 +25,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     def __init__(
         self,
         bot: Bot,
-        chat_id,
+        chat_id: int,
         keywords: list[CalculatedKeyword],
         adv_setting: AdvSetting,
-        wb_user_cabinet_original_id,
-        adv_choice_last_page,
+        wb_user_cabinet_original_id: int,
+        adv_choice_last_page: int,
         image: str,
-        page,
-        image_mode="graphic",
-    ):
+        page: int,
+        image_mode: str = "graphic",
+    ) -> None:
         super().__init__(bot, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
@@ -44,12 +45,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
         self.image_mode = image_mode
 
-    async def __call__(self, state: FSMContext, sort_mode="by_adv") -> (LastMessage, str):
+    async def __call__(self, state: FSMContext, sort_mode: str = "by_adv") -> None:
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
-        keywords_filter: list[str] = data.get("keywords_filter")
-        clear_keywords = []
+        keywords_filter: list[str] | None = data.get("keywords_filter")
+        clear_keywords: list[CalculatedKeyword] = []
         if keywords_filter:
             self._filter = True
             for keyword in self._keywords:
@@ -84,7 +85,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if filter_by_query:
             clear_keywords = []
             for keyword in self._keywords:
-                if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
+                if isinstance(keyword.query, (int, float)) and keyword.query >= filter_by_query:
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
 
@@ -124,7 +125,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._fact_data = fact_data
 
         await super().__call__()
-        return
+        return None
 
     @property
     def text(self) -> str:
@@ -165,11 +166,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         max_price_for_order = self._adv_setting.max_price_for_order
         max_price_for_order_str = str(round(max_price_for_order)) if max_price_for_order else "Не задано"
 
-        (
-            self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_days
-            if self._all_orders_for_last_days
-            else self._spend_for_inner_adv_for_3_days
-        )
+        # Защищённый расчёт среднего расхода на заказ (может не использоваться в тексте)
+        spend_for_inner_adv = float(self._spend_for_inner_adv_for_3_days or 0)
+        if self._all_orders_for_last_days:
+            _avg_spend_per_order = spend_for_inner_adv / self._all_orders_for_last_days
+        else:
+            _avg_spend_per_order = spend_for_inner_adv
 
         text += (
             f"\nВ среднем в день (срез за 2 дня):\n"
@@ -190,21 +192,21 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         return text
 
     @property
-    def image(self) -> str:
+    def image(self) -> object:
         return self._image
 
     @image.setter
-    def image(self, value):
+    def image(self, value: object) -> None:
         self._image = value
 
-    async def _graphic_injection(self):
+    async def _graphic_injection(self) -> object | None:
         bot = self.bot
         user_telegram_id = self.chat_id
         adv_original_id = self._adv_setting.id
         result = await get_keyword_history_graphic(adv_original_id, self._keywords)
         if not result:
-            graphic = None
-            legend = None
+            graphic: object | None = None
+            legend: object | None = None
         else:
             graphic, legend = result
         if legend:
@@ -213,7 +215,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         return graphic
 
     @property
-    def keyboard(self):
+    def keyboard(self) -> InlineKeyboardMarkup:
         return keyboards.get_keywords_setting_keyboard(
             self._keywords,
             self._adv_setting,

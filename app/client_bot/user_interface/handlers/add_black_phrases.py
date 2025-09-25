@@ -38,7 +38,9 @@ async def waiting_for_black_phrases(message: Message, bot: Bot, state: FSMContex
     data = await state.get_data()
     adv_setting_id = data["last_adv_setting_id"]
     async with sm(read_only=True) as session:
-        adv: AdvSetting = await session.get(AdvSetting, adv_setting_id)
+        adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
+        if not adv:
+            raise ValueError(f"AdvSetting with id {adv_setting_id} not found")
 
     rel_manager = RelevantPhraseManager(adv)
     await rel_manager.update_black_phrases(keywords)

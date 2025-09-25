@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import update
 
-from app.client_bot.user_interface.handlers.start import start_registration
+from app.client_bot.user_interface.handlers.start_registration_func import start_registration
 from app.client_bot.user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -19,7 +19,11 @@ router = Router()
 
 
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "change_cpm_step"))
-async def change_cpm_step(callback: CallbackQuery, callback_data: callbacks.CPMSettingMenu, state: FSMContext):
+async def change_cpm_step(
+    callback: CallbackQuery,
+    callback_data: callbacks.CPMSettingMenu,
+    state: FSMContext,
+) -> None:
     adv_original_id = callback_data.adv_original_id
     await state.update_data(adv_original_id=adv_original_id)
     await state.set_state("waiting_for_new_step")
@@ -28,7 +32,7 @@ async def change_cpm_step(callback: CallbackQuery, callback_data: callbacks.CPMS
 
 
 @router.message(StateFilter("waiting_for_new_step"))
-async def set_new_step(message: Message, state: FSMContext, bot: Bot):
+async def set_new_step(message: Message, state: FSMContext, bot: Bot) -> None:
     data = await state.get_data()
     adv_original_id: int = data["adv_original_id"]
     text = message.text
@@ -36,7 +40,7 @@ async def set_new_step(message: Message, state: FSMContext, bot: Bot):
         await state.set_state(None)
         await start_registration(message, bot, state)
         return
-    if not text.isdigit():
+    if text is None or not text.isdigit():
         await message.answer("Введите целое положительное число")
         return
     new_step = int(text)

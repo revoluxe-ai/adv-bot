@@ -7,9 +7,9 @@ from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from aiohttp import ClientSession
-from sqlalchemy import Select
+from typing import Any, Iterable, cast
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import joinedload
 
 from app.client_bot import const
 from app.client_bot.redis_manager import RedisManager
@@ -50,9 +50,12 @@ async def callback_start_registration(callback: CallbackQuery, bot: aiogram.Bot,
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)
-        user: User = result.scalar()
-
+        user = result.scalar_one_or_none()
+        if user is None:
+            return
         wb_user_cabinets = user.wb_user_cabinets
+        if not isinstance(callback.message, Message):
+            return
         chat_id = callback.message.chat.id
         await ShopChoice(bot, chat_id, wb_user_cabinets)()
     return
@@ -60,6 +63,8 @@ async def callback_start_registration(callback: CallbackQuery, bot: aiogram.Bot,
 
 @router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(callback_query: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext) -> None:
+    if not isinstance(callback_query.message, Message):
+        return
     await bot.send_message(callback_query.message.chat.id, "Добавление нового магазина (кабинета)")
     await state.set_state(states.CabinetRegistration.cabinet_name)
     chat_id: int = callback_query.message.chat.id
@@ -67,7 +72,7 @@ async def add_shop(callback_query: types.CallbackQuery, bot: aiogram.Bot, state:
 
 
 @router.message(StateFilter(states.CabinetRegistration.cabinet_name))
-async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMContext):
+async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMContext) -> None:
     catch_cab: WBUserCabinet | None = None
     cabinet_name = message.text
     if cabinet_name is None or not cabinet_name.strip():
@@ -85,13 +90,15 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
         stmt = (
             select(User)
             .options(joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet))
-            .where(User.user_telegram_id == message.from_user.id)
+            .where(User.user_telegram_id == (message.from_user.id if message.from_user else -1))
         )
         result = await session.execute(stmt)
-        user = result.scalar()
+        user = result.scalar_one_or_none()
+    if user is None:
+        return
     for cabinet in user.wb_user_cabinets:
         if cabinet.name == cabinet_name:
-            catch_cab: WBUserCabinet = cabinet
+            catch_cab = cabinet
             break
     if catch_cab:
         await state.set_state()
@@ -99,7 +106,7 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
         await messages.CabinetNameExists(bot, chat_id)()
 
     else:
-        cabinet_name = message.text
+        cabinet_name = message.text or ""
         await state.update_data(cabinet_name=cabinet_name)
         await state.set_state(states.CabinetRegistration.api)
         await messages.AddNewTokenGet(bot, chat_id, cabinet_name)()
@@ -133,12 +140,13 @@ async def process_cabinet_api(
         await start_registration(message, bot, state)
         return
 
+    if message.from_user is None:
+        return
     user_telegram_id = message.from_user.id
     chat_id = message.chat.id
 
-    wb_token = wb_models.WBToken(
-        api_key=text,
-    )
+    wb_token = wb_models.WBToken()
+    wb_token.api_key = text
     try:
         shop_id = wb_token.get_shop_id_from_token()
     except NotValidTokenError:
@@ -146,12 +154,14 @@ async def process_cabinet_api(
         return
     async with sm() as session:
         # Получаем ID пользователя
-        stmt_for_select_user_id: Select = select(User.id).where(User.user_telegram_id == user_telegram_id)
+        stmt_for_select_user_id = select(User.id).where(User.user_telegram_id == user_telegram_id)
         result = await session.execute(stmt_for_select_user_id)
         user_id = result.scalar()
         if user_id is None:
             await bot.send_message(chat_id, "Ошибка: пользователь не найден.")
             return
+        # Ensure mypy knows this is int
+        user_id = int(user_id)
 
     wb_token.shop_id = shop_id
     wb_token.user_id = user_id
@@ -160,72 +170,73 @@ async def process_cabinet_api(
     await messages.ShopUpdateInfo(bot, chat_id)()
 
     data_state = await state.get_data()
-    cabinet_name = data_state["cabinet_name"].strip()
+    cabinet_name = (data_state.get("cabinet_name") or "").strip()
 
     async with sm() as session:
         session.add(wb_token)
         # Проверка, что токен не используется другим пользователем
         stmt_for_wb_token = (
             select(WBToken)
-            .options(load_only(WBToken.user_id))
             .where(
                 WBToken.api_key == wb_token.api_key,
                 WBToken.shop_id == wb_token.shop_id,
             )
         )
         result = await session.execute(stmt_for_wb_token)
-        existing_token = result.scalar()
-        if existing_token:
-            if existing_token.user_id == user_id:
-                await bot.send_message(chat_id, "Этот токен уже используется вами.")
-            else:
-                await bot.send_message(chat_id, "Этот токен уже используется другим пользователем.")
-                return
+        existing_token = result.scalar_one_or_none()
+        if existing_token is not None:
+            await bot.send_message(chat_id, "Этот токен уже используется.")
+            return
 
         # Проверка существования кабинета по shop_id
         stmt_for_cabinet = select(WBCabinet).where(WBCabinet.shop_id == wb_token.shop_id)
         result = await session.execute(stmt_for_cabinet)
-        wb_cabinet: WBCabinet | None = result.scalar()
+        wb_cabinet_obj_existing = cast(WBCabinet | None, result.scalar_one_or_none())
 
-        if wb_cabinet:
+        if wb_cabinet_obj_existing is not None:
             await messages.CabinetExistsForUser(bot, chat_id)()
-            stmt_for_select_user_id = select(WBUserCabinet).where(
-                WBUserCabinet.wb_cabinet_id == wb_cabinet.id,
+            wb_cabinet_id_existing = wb_cabinet_obj_existing.id
+            stmt_for_select_uc = select(WBUserCabinet).where(
+                WBUserCabinet.wb_cabinet_id == wb_cabinet_id_existing,
                 WBUserCabinet.user_id == user_id,
             )
-            result = await session.execute(stmt_for_select_user_id)
-            wb_user_cabinet: WBUserCabinet | None = result.scalar_one_or_none()
-            stmt_for_adv_setting = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet.id)
+            result = await session.execute(stmt_for_select_uc)
+            wb_user_cabinet_obj = cast(WBUserCabinet | None, result.scalar_one_or_none())
+            stmt_for_adv_setting = select(AdvSetting).where(AdvSetting.wb_cabinet_id == wb_cabinet_id_existing)
             result = await session.execute(stmt_for_adv_setting)
-            adv_settings = result.scalars().all()
-            if not wb_user_cabinet:
-                wb_user_cabinet = WBUserCabinet(name=cabinet_name, user_id=user_id, wb_cabinet=wb_cabinet)
-                session.add(wb_user_cabinet)
+            adv_settings_seq = result.scalars().all()
+            adv_settings_list = list(cast(Iterable[AdvSetting], adv_settings_seq))
+            if not wb_user_cabinet_obj:
+                wb_user_cabinet_obj = WBUserCabinet(
+                    name=cabinet_name,
+                    user_id=int(user_id),
+                    wb_cabinet=wb_cabinet_obj_existing,
+                )
+                session.add(wb_user_cabinet_obj)
                 await session.flush()
                 await session.commit()
-            wb_user_cabinet_original_id = wb_user_cabinet.id
-            adv_settings = list(adv_settings)
+            wb_user_cabinet_original_id = wb_user_cabinet_obj.id
             await session.commit()
-            await messages.AdvCompanyChoicing(bot, chat_id, wb_user_cabinet_original_id, adv_settings, state)()
+            await messages.AdvCompanyChoicing(bot, chat_id, wb_user_cabinet_original_id, adv_settings_list, state)()
             return
         else:
             # Если нет вб - кабинета, то Создаем новый кабинет и привязку к пользователю
-            wb_cabinet: WBCabinet = WBCabinet()
-            wb_cabinet.shop_id = shop_id
-            wb_cabinet.balance = 0
-            wb_cabinet.bonus = 0
-            session.add(wb_cabinet)
+            wb_cabinet_obj = WBCabinet()
+            wb_cabinet_obj.shop_id = shop_id
+            wb_cabinet_obj.balance = 0
+            wb_cabinet_obj.bonus = 0
+            session.add(wb_cabinet_obj)
             await session.flush()  # получаем wb_cabinet.id
-            wb_user_cabinet = WBUserCabinet()
-            wb_user_cabinet.name = cabinet_name
-            wb_user_cabinet.wb_cabinet_id = wb_cabinet.id
-            wb_user_cabinet.user_id = user_id
-            session.add(wb_user_cabinet)
+            wb_user_cabinet_obj = WBUserCabinet()
+            wb_user_cabinet_obj.name = cabinet_name
+            wb_user_cabinet_obj.wb_cabinet_id = wb_cabinet_obj.id
+            wb_user_cabinet_obj.user_id = user_id
+            session.add(wb_user_cabinet_obj)
             await session.commit()
 
         await messages.ShopAddedSuccess(bot, chat_id, cabinet_name)()
-        access.wb_cabinet = wb_cabinet
-        access.wb_user_cabinet = wb_user_cabinet
+        access.wb_cabinet = wb_cabinet_obj_existing if wb_cabinet_obj_existing is not None else wb_cabinet_obj
+        access.wb_user_cabinet = wb_user_cabinet_obj
         # Обновляем данные магазина
         wb_api = WBApi(access, client_session)
 
@@ -234,13 +245,14 @@ async def process_cabinet_api(
 
         # Показываем список кабинетов пользователя
         async with sm() as session:
-            stmt_for_wb_user_cabinet = (
-                select(WBUserCabinet).join(WBUserCabinet.user).where(User.user_telegram_id == user_telegram_id)
+            stmt_for_wb_user_cabinet = select(WBUserCabinet).join(WBUserCabinet.user).where(
+                User.user_telegram_id == user_telegram_id
             )
             result = await session.execute(stmt_for_wb_user_cabinet)
-            wb_user_cabinets: list[WBUserCabinet] = result.scalars().all()
+            wb_user_cabinets_seq = result.scalars().all()
+            wb_user_cabinets_list = list(cast(Iterable[WBUserCabinet], wb_user_cabinets_seq))
 
-        await ShopChoice(bot, chat_id, wb_user_cabinets)()
+        await ShopChoice(bot, chat_id, wb_user_cabinets_list)()
 
 
 @router.callback_query(callbacks.AddNewToken.filter())
@@ -249,47 +261,52 @@ async def add_app_token(
     callback_data: callbacks.AddNewToken,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
     logger.debug("Текущее состояние: %s", await state.get_state())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         stmt = select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
         result = await session.execute(stmt)
-        wb_user_cabinet = result.scalars().first()
+        wb_user_cabinet = result.scalar_one_or_none()
+    if not isinstance(callback_query.message, Message):
+        return
+    if wb_user_cabinet is None:
+        return
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state(states.AddNewToken.token)
     chat_id = callback_query.message.chat.id
-    cabinet_name = wb_user_cabinet.name
+    cabinet_name = wb_user_cabinet.name or ""
     await messages.AddNewTokenGet(bot, chat_id, cabinet_name)()
 
 
-@router.callback_query(callbacks.ChoiceAdvPaginator.filter())
+@router.callback_query(callbacks.Shop.filter())
 async def select_shop(
     callback_query: types.CallbackQuery,
     callback_data: callbacks.Shop,
     bot: aiogram.Bot,
     state: FSMContext,
-):
-    reset_filter = callback_data.reset_filter
+) -> None:
+    reset_filter = getattr(callback_data, "reset_filter", False)
     if reset_filter:
         await state.update_data(filter_advs=None)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     message = callback_query.message
-
+    if not isinstance(message, Message):
+        return
     chat_id = message.chat.id
     # await state.update_data(chat_id = chat_id)
     # Получаем список рекламных кампаний
     async with sm() as session:
-        stmt = (
+        stmt_adv = (
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
             .join(WBCabinet.wb_user_cabinets)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
             .order_by(AdvSetting.name)
         )
-        result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+        result = await session.execute(stmt_adv)
+        adv_settings: list[AdvSetting] = list(result.scalars().all())
 
     await messages.AdvCompanyChoicing(bot, chat_id, wb_user_cabinet_original_id, adv_settings, state)()
     return
@@ -301,7 +318,9 @@ async def shop_menu_process(
     callback_data: callbacks.Shop,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
+    if not isinstance(callback.message, Message):
+        return
     await state.update_data(last_wb_user_cabinet_original_id=callback_data.wb_user_cabinet_original_id)
     logger.debug("Текущее состояние: %s", await state.get_data())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
@@ -316,7 +335,9 @@ async def update_company_from_wb(
     callback_data: callbacks.UpdateCompanyFromWB,
     state: FSMContext,
     client_session: ClientSession,
-):
+) -> None:
+    if not isinstance(callback_query.message, Message):
+        return
     await messages.LongTimeOperation(bot, callback_query.message.chat.id)()
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
@@ -329,7 +350,9 @@ async def update_company_from_wb(
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         result = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = result.scalar()
+        wb_user_cabinet = result.scalar_one_or_none()
+    if wb_user_cabinet is None:
+        return
     wb_cabinet = wb_user_cabinet.wb_cabinet
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet.id)
     wb_api = WBApi(access, client_session)
@@ -387,15 +410,15 @@ async def update_company_from_wb(
 
     # Получаем список рекламных кампаний
     async with sm() as session:
-        stmt = (
+        stmt_adv2 = (
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
             .join(WBCabinet.wb_user_cabinets)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
             .order_by(AdvSetting.name)
         )
-        result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+        res_adv = await session.execute(stmt_adv2)
+        adv_settings: list[AdvSetting] = list(res_adv.scalars().all())
 
     await messages.AdvCompanyChoicing(
         bot,

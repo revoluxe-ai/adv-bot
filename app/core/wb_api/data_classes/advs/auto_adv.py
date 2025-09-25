@@ -1,6 +1,7 @@
 import re
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import cast
 
 from .base_adv import Adv
 
@@ -19,9 +20,8 @@ class Active(BaseModel):
 class AutoParams(BaseModel):
     subject: Subject
     active: Active
-    nms: list[int]
+    nms: list[int] = Field(default_factory=list)
     cpm: int | None = None
-    nms: list[int] | None = None
 
 
 class AutoAdv(Adv):
@@ -29,11 +29,11 @@ class AutoAdv(Adv):
 
     @property
     def cpm(self) -> int:
-        cpm = self.autoParams.cpm
-        return cpm
+        cpm: int | None = self.autoParams.cpm
+        return cpm if cpm is not None else 0
 
     @property
-    def nmids(self):
+    def nmids(self) -> list[int]:
         try:
             nmids = self.autoParams.nms
             if nmids:

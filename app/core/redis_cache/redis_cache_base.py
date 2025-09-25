@@ -2,11 +2,12 @@ import os
 from abc import ABC, abstractmethod
 
 import redis
+from typing import Any, cast
 
 redis_host = os.environ.get("REDIS_HOST")
 
 
-redis_client = redis.asyncio.Redis(host=redis_host, port=6379, db=0)
+redis_client = redis.asyncio.Redis(host=cast(str, redis_host), port=6379, db=0)
 
 
 class RedisCacheBase(ABC):
@@ -18,7 +19,7 @@ class RedisCacheBase(ABC):
     def _unique_id(self) -> str:
         pass
 
-    def __init_subclass__(cls, prefix: str, **kwargs) -> None:
+    def __init_subclass__(cls, prefix: str, **kwargs: Any) -> None:
         cls._prefix = prefix
         super().__init_subclass__(**kwargs)
 

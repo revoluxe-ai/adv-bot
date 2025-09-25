@@ -2,9 +2,9 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union, cast
 
-from app.core.wb_api.data_classes.adv import Adv
+from app.core.wb_api.data_classes.advs.base_adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
 from app.modules.common_slaves.wildberries.data_classes.adv import Balances
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
@@ -139,12 +139,12 @@ class AdvMixin(WBAPIProtocol):
                 raise Exception("Неизвестная ошибка создания РК")
 
     @try_except_decorator(1, 20)
-    async def check_balance(self, adv_id: int):
+    async def check_balance(self, adv_id: int) -> dict[str, Any]:
         url = f"https://advert-api.wildberries.ru/adv/v0/get-balance/{adv_id}"
 
         response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
-        return answer
+        return cast(dict[str, Any], answer)
 
     @try_except_decorator(1, 10)
     async def start_adv(self, adv_id: int) -> None:
@@ -162,9 +162,9 @@ class AdvMixin(WBAPIProtocol):
         url = "https://advert-api.wildberries.ru/adv/v1/balance"
 
         response = await requests(self.session, "GET", url=url, headers=self.headers.standart)
-        response = json.loads(response)
-        logger.debug(f"Ответ на получение баланса: {response}")
-        balance = Balances(response)
+        response_json = json.loads(response)
+        logger.debug(f"Ответ на получение баланса: {response_json}")
+        balance = Balances(response_json)
         return balance
 
     @try_except_decorator(1, 1)
@@ -176,7 +176,7 @@ class AdvMixin(WBAPIProtocol):
         await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         return None
 
-    async def update_nmids_in_adv(self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]):
+    async def update_nmids_in_adv(self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]) -> None:
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
@@ -190,16 +190,16 @@ class AdvMixin(WBAPIProtocol):
         answer = json.loads(response_text)
         if answer is None:
             return []
-        return answer
+        return cast(list[int], answer)
 
     @try_except_decorator(1, 2)
-    async def update_nmids_in_auto_adv(self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]):
+    async def update_nmids_in_auto_adv(self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]) -> None:
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
 
         await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
 
-    async def add_to_balance(self, adv_id: int, balance_type: int, sum_: int):
+    async def add_to_balance(self, adv_id: int, balance_type: int, sum_: int) -> int:
         url = f"https://advert-api.wildberries.ru/adv/v1/budget/deposit?id={adv_id}"
 
         data = {"sum": sum_, "type": balance_type, "return": True}
@@ -207,9 +207,9 @@ class AdvMixin(WBAPIProtocol):
         response_text = await requests(self.session, "POST", url, json_data=data, headers=self.headers.standart)
         answer = json.loads(response_text)
         new_balance = answer["total"]
-        return new_balance
+        return cast(int, new_balance)
 
-    async def stop_adv(self, adv_id: int):
+    async def stop_adv(self, adv_id: int) -> None:
         url = f"https://advert-api.wildberries.ru/adv/v0/pause?id={adv_id}"
 
         await requests(self.session, "GET", url, headers=self.headers.standart)
@@ -223,7 +223,7 @@ class AdvMixin(WBAPIProtocol):
         response_text = await requests(self.session, "GET", url, headers=self.headers.standart)
         answer = json.loads(response_text)
         # Используем json.loads для преобразования текста ответа в JSON
-        adverts: list = answer["adverts"]
+        adverts: list[dict[str, Any]] = answer["adverts"]
         if not adverts:
             return []
         for advert_data in adverts:
@@ -275,9 +275,10 @@ class AdvMixin(WBAPIProtocol):
             return
         else:
             logger.error(f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}")
+            raise Exception(f"Ошибка установки CPM для поисковой кампании {search_adv_id}, ответ: {response}")
 
     async def get_adv_full_state(
-        self, adv_ids: list[int], dates: list[datetime.datetime.date] | None = None
+        self, adv_ids: list[int], dates: list[datetime.date] | None = None
     ) -> list[FullAdvStat] | None:
         if not adv_ids:
             return []
@@ -295,10 +296,12 @@ class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 60)
     async def _get_adv_full_state(
-        self, adv_ids: list[int], dates: list[datetime.datetime.date] = None
+        self, adv_ids: list[int], dates: list[datetime.date] | None = None
     ) -> list[FullAdvStat] | None:
-        assert [isinstance(dt, datetime.date) for dt in dates]
-        assert [isinstance(adv_id, int) for adv_id in adv_ids]
+        if dates is None:
+            dates = []
+        assert all(isinstance(dt, datetime.date) for dt in dates)
+        assert all(isinstance(adv_id, int) for adv_id in adv_ids)
         """Пример даты [
   {
     "id": 8960367,
@@ -315,11 +318,11 @@ class AdvMixin(WBAPIProtocol):
     ]
   }
        ]"""
-        dates = [date.isoformat() for date in dates]
+        dates_iso = [date.isoformat() for date in dates]  # Use a new variable to avoid overwriting
         url = "https://advert-api.wildberries.ru/adv/v2/fullstats"
         query_data = []
         for adv_id in adv_ids:
-            query_data.append({"id": adv_id, "dates": dates})
+            query_data.append({"id": adv_id, "dates": dates_iso})
 
         response_text = await requests(
             self.session,

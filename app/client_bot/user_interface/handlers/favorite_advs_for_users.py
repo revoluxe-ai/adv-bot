@@ -22,15 +22,24 @@ async def add_to_favorites(
     callback_data: callbacks.AddToFavorites,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
+    if callback.message is None:
+        return
+    if callback.from_user is None:
+        return
     adv_original_id = callback_data.adv_setting_original_id
     user_telegram_id = callback.from_user.id
     async with sm(read_only=False) as session:
-        stmt = select(User).options(joinedload(User.favorites_advs)).where(User.user_telegram_id == user_telegram_id)
-        user = await session.execute(stmt)
-        user = user.scalar()
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv = adv.scalar()
+        stmt_user = select(User).options(joinedload(User.favorites_advs)).where(User.user_telegram_id == user_telegram_id)
+        user: User | None = (await session.execute(stmt_user)).scalar_one_or_none()
+        if user is None:
+            await bot.send_message(callback.message.chat.id, "Пользователь не найден.")
+            return
+        stmt_adv = select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        adv: AdvSetting | None = (await session.execute(stmt_adv)).scalar_one_or_none()
+        if adv is None:
+            await bot.send_message(callback.message.chat.id, "Настройка рекламы не найдена.")
+            return
         user.favorites_advs.append(adv)
         await session.commit()
         await bot.send_message(callback.message.chat.id, "Кампания в избранное")
@@ -42,16 +51,24 @@ async def remove_from_favorites(
     callback: types.CallbackQuery,
     callback_data: callbacks.RemoveFromFavorites,
     bot: aiogram.Bot,
-):
+) -> None:
+    if callback.message is None:
+        return
+    if callback.from_user is None:
+        return
     adv_original_id = callback_data.adv_setting_original_id
     user_telegram_id = callback.from_user.id
     async with sm(read_only=False) as session:
-        stmt = select(User).options(joinedload(User.favorites_advs)).where(User.user_telegram_id == user_telegram_id)
-        user = await session.execute(stmt)
-        user = user.scalar()
-        stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        adv = await session.execute(stmt)
-        adv = adv.scalar()
+        stmt_user = select(User).options(joinedload(User.favorites_advs)).where(User.user_telegram_id == user_telegram_id)
+        user: User | None = (await session.execute(stmt_user)).scalar_one_or_none()
+        if user is None:
+            await bot.send_message(callback.message.chat.id, "Пользователь не найден.")
+            return
+        stmt_adv = select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        adv: AdvSetting | None = (await session.execute(stmt_adv)).scalar_one_or_none()
+        if adv is None:
+            await bot.send_message(callback.message.chat.id, "Настройка рекламы не найдена.")
+            return
         user.favorites_advs.remove(adv)
         await session.commit()
         await bot.send_message(callback.message.chat.id, "Кампания удалена из избранного")
@@ -64,7 +81,9 @@ async def show_favorites(
     callback_data: callbacks.ShowFavorites,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
+    if callback.from_user is None:
+        return
     user_telegram_id = callback.from_user.id
     await messages.LongTimeOperation(bot, user_telegram_id)()
     await messages.ShowFavoriteAdvs(bot, user_telegram_id)()

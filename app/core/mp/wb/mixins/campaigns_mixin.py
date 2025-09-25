@@ -3,7 +3,7 @@ from __future__ import annotations
 """Миксин для работы с рекламными кампаниями (Promotion API)."""
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.shared.application.dto.campaigns import CampaignDTO, CampaignsListDTO
 
@@ -30,10 +30,10 @@ class CampaignsMixin:
 
         """
         try:
-            from app.core.di import Provide
+            from dependency_injector.wiring import Provide
             from app.core.di.wb_api.wb_api_container import WBApiDIContainer
 
-            adapter = Provide[WBApiDIContainer.current_adapter]
+            adapter = WBApiDIContainer.current_adapter()
 
             # Если ID не переданы — получаем все ID кампаний
             if adv_ids is None:
@@ -70,16 +70,16 @@ class CampaignsMixin:
         campaign = campaigns.campaigns[0]
         return campaign.bids or {}
 
-    def _to_campaign_dto(self, data: dict) -> CampaignDTO | None:
+    def _to_campaign_dto(self, data: dict[str, Any]) -> CampaignDTO | None:
         """Преобразовать словарь кампании в CampaignDTO."""
         try:
             return CampaignDTO(
-                advert_id=int(data.get("advert_id")),
-                name=str(data.get("name") or ""),
-                status=int(data.get("status") or 0),
-                type=int(data.get("type") or 0),
-                create_time=str(data.get("create_time") or ""),
-                change_time=str(data.get("change_time") or ""),
+                advert_id=int(data.get("advert_id", 0)),
+                name=str(data.get("name", "")),
+                status=int(data.get("status", 0)),
+                type=int(data.get("type", 0)),
+                create_time=str(data.get("create_time", "")),
+                change_time=str(data.get("change_time", "")),
                 start_time=data.get("start_time"),
                 end_time=data.get("end_time"),
                 daily_budget=data.get("daily_budget"),

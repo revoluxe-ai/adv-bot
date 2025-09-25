@@ -39,6 +39,6 @@ class RelevantPhraseManager:
 
             await session.commit()
 
-    async def get_relevant_template_data(self):
+    async def get_relevant_template_data(self) -> list[str]:
         data = await self._redis_manager.get_black_phrases()
         return data

@@ -143,27 +143,27 @@ class Settings:
     @property
     def TELEGRAM_WEB_PORT(self) -> int:
         value = os.environ.get("TELEGRAM_WEB_PORT")
-        return int(value)
+        return int(value or "0")
 
     @property
     def CH_MAX_THREAD(self) -> int:
         value = os.environ.get("CH_MAX_THREAD")
-        return int(value)
+        return int(value or "0")
 
     @property
     def BIDDER_STEP(self) -> int:
         value = os.environ.get("BIDDER_STEP_RUB")
-        return int(value)
+        return int(value or "0")
 
     @property
     def CLICKHOUSE_PORT(self) -> int:
         value = os.environ.get("CLICKHOUSE_PORT")
-        return int(value)
+        return int(value or "0")
 
     @property
     def postgres_port(self) -> int:
         value = os.environ.get("POSTGRES_PORT")
-        return int(value)
+        return int(value or "0")
 
     @property
     def ssl_mode(self) -> str | None:
@@ -198,8 +198,10 @@ class Settings:
 
     @property
     def MIN_SUM(self) -> int:
-        value = int(os.getenv("MIN_SUM"))
-        return value
+        value = os.getenv("MIN_SUM")
+        if value is None:
+            return 0
+        return int(value)
 
     @property
     def SHOP_FILTER_LIST(self) -> list[str]:
@@ -242,6 +244,7 @@ class Settings:
     @property
     def TELEGRAM_BOT_TOKEN(self) -> str:
         value = os.environ.get("TELEGRAM_BOT_TOKEN")
+        if not value: raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
         return value
 
     @property
@@ -339,7 +342,7 @@ class Settings:
             return int(value)
 
     @property
-    def DEFAULT_CTR_EXPONENTA(self):
+    def DEFAULT_CTR_EXPONENTA(self) -> int:
         value = os.getenv("MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS")
         if not value:
             return 20

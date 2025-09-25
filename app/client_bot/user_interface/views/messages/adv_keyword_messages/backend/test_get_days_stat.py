@@ -39,7 +39,7 @@ async def test_get_days_stat_text(adv_setting_mock: AsyncMock) -> None:
         add_to_cart=5,
         orders=2,
         orders_sum=2000,
-        buy_outs=0.5,
+        buy_outs=0,
     )
     common_card_stat_mock.date = datetime.datetime.combine(test_date, datetime.time.min)
 

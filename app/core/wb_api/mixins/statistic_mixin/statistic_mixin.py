@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 from app.core.wb_api.http_request import requests, try_except_decorator
+from typing import cast, Any
 
 from ...protocols import WBAPIProtocol
 from .wb_statistic_obj import CommonStat
@@ -13,7 +14,7 @@ class CommonStatMinix(WBAPIProtocol):
     HOST = "wildberries.ru"
 
     @try_except_decorator(1, 60)
-    async def _get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int):
+    async def _get_cards_stats_by_days(self, nmIDs: list[int], pass_days: int) -> list[CommonStat]:
         """
         Получить статистику по карточкам товаров за указанный промежуток времени.
 
@@ -48,19 +49,19 @@ class CommonStatMinix(WBAPIProtocol):
             headers=self.headers.standart,
         )
 
-        response = json.loads(response)
+        response_data: dict[str, Any] = cast(dict[str, Any], json.loads(response))
         stats = []
-        for data in response["data"]:
+        for data in response_data["data"]:
             for history in data["history"]:
-                date = datetime.strptime(history["dt"], "%Y-%m-%d")
+                date = datetime.strptime(cast(str, history["dt"]), "%Y-%m-%d")
                 stat = CommonStat(
-                    nmid=data["nmID"],
+                    nmid=cast(int, data["nmID"]),
                     date=date,
-                    open_card=history["openCardCount"],
-                    add_to_cart=history["addToCartCount"],
-                    orders=history["ordersCount"],
-                    orders_sum=history["ordersSumRub"],
-                    buy_outs=history["buyoutsCount"],
+                    open_card=cast(int, history["openCardCount"]),
+                    add_to_cart=cast(int, history["addToCartCount"]),
+                    orders=cast(int, history["ordersCount"]),
+                    orders_sum=cast(float, history["ordersSumRub"]),
+                    buy_outs=cast(int, history["buyoutsCount"]),
                 )
                 stats.append(stat)
         return stats

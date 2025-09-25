@@ -53,7 +53,7 @@ class CommonStatDataManager:
             str: Текст статистики по дням
         """
 
-        date_to_common_stat: dict[datetime.date, CommonCardStat] = {cs.date: cs for cs in common_card_stats}
+        date_to_common_stat: dict[datetime.date, CommonCardStat] = {cs.date: cs for cs in common_card_stats if cs.date is not None}
 
         text = ""
         today_date = datetime.datetime.now().date()

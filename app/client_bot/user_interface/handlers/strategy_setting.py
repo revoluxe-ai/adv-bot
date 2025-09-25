@@ -23,14 +23,18 @@ async def turn_on_min_ctr(
     bot: aiogram.Bot,
     callback_data: callbacks.StrategySetting,
     state: FSMContext,
-):
+) -> None:
+    if callback.message is None:
+        return
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv: AdvSetting = adv.scalar()
-        adv.target_ctr_mode = False
+        result_adv_setting = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv_setting: AdvSetting | None = result_adv_setting.scalar_one_or_none()
+        if adv_setting is None: return
+        adv_setting.target_ctr_mode = False
         await session.commit()
 
+    assert callback.message.chat is not None
     await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
     return
 
@@ -41,13 +45,16 @@ async def on_target_ctr(
     bot: aiogram.Bot,
     callback_data: callbacks.StrategySetting,
     state: FSMContext,
-):
+) -> None:
+    if callback.message is None: return
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv: AdvSetting = adv.scalar()
-        adv.target_ctr_mode = True
+        result_adv_setting = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv_setting: AdvSetting | None = result_adv_setting.scalar_one_or_none()
+        if adv_setting is None: return
+        adv_setting.target_ctr_mode = True
         await session.commit()
+    assert callback.message.chat is not None
     await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
     return
 
@@ -58,13 +65,16 @@ async def turn_on_forward_mode(
     bot: aiogram.Bot,
     callback_data: callbacks.StrategySetting,
     state: FSMContext,
-):
+) -> None:
+    if callback.message is None: return
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv: AdvSetting = adv.scalar()
-        adv.target_ctr_mode_strategy = "forward"
+        result_adv_setting = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv_setting: AdvSetting | None = result_adv_setting.scalar_one_or_none()
+        if adv_setting is None: return
+        adv_setting.target_ctr_mode_strategy = "forward"
         await session.commit()
+    assert callback.message.chat is not None
     await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
     return
 
@@ -75,13 +85,16 @@ async def turn_on_keep_mode(
     bot: aiogram.Bot,
     callback_data: callbacks.StrategySetting,
     state: FSMContext,
-):
+) -> None:
+    if callback.message is None: return
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv: AdvSetting = adv.scalar()
-        adv.target_ctr_mode_strategy = "keep"
+        result_adv_setting = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv_setting: AdvSetting | None = result_adv_setting.scalar_one_or_none()
+        if adv_setting is None: return
+        adv_setting.target_ctr_mode_strategy = "keep"
         await session.commit()
+    assert callback.message.chat is not None
     await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
     return
 
@@ -92,7 +105,9 @@ async def strategy_setting(
     bot: aiogram.Bot,
     callback_data: callbacks.StrategySetting,
     state: FSMContext,
-):
+) -> None:
+    if callback.message is None: return
     adv_original_id = callback_data.adv_setting_original_id
+    assert callback.message.chat is not None
     await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
     return

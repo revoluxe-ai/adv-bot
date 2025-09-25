@@ -1,4 +1,4 @@
-from yookassa import Configuration
+from yookassa import Configuration # type: ignore
 
 from python_modules import path_setting_funcs
 

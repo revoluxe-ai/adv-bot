@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -21,7 +22,7 @@ class PredictCTRRedisMixin(BaseRedisManagerProtocol):
         """Свойство key для совместимости с базовым классом"""
         return self.prefix
 
-    def get_key(self, *args, **kwargs) -> str:
+    def get_key(self, *args: Any, **kwargs: Any) -> str:
         """Базовый метод для формирования ключа (логика в специализированных методах)"""
         return f"{self.prefix}:{':'.join(map(str, args))}"
 

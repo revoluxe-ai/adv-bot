@@ -63,8 +63,8 @@ class CardFromWB:
         return self.data["sizes"][0]["skus"][0]
 
     @property
-    def offer_id(self):
-        return self.data["vendorCode"]
+    def offer_id(self) -> str:
+        return str(self.data["vendorCode"])
 
     @property
     def brand(self) -> Any:

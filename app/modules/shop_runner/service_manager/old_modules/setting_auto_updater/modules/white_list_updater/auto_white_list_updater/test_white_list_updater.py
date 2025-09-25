@@ -29,7 +29,11 @@ def common_mocks():
     session_maker_mock = MagicMock()
     session_maker_mock.__aenter__ = AsyncMock(return_value=session_mock)
     get_session_maker_mock = MagicMock(return_value=session_maker_mock)
-    return session_mock, get_session_maker_mock
+    redis_manager_mock = MagicMock()
+    redis_manager_mock.DEFAULT_TTL = 60
+    redis_manager_mock.renew_shop_ttl = AsyncMock()
+    redis_manager_mock.set_last_spend_sum = AsyncMock()
+    return session_mock, get_session_maker_mock, redis_manager_mock
 
 
 @pytest.mark.asyncio
@@ -55,7 +59,7 @@ async def test_update_white_list_threshold_triggered(
     orders,
     adv_setting_mock,
 ):
-    session_mock, get_session_maker_mock = common_mocks
+    session_mock, get_session_maker_mock, redis_manager_mock = common_mocks
 
     stat_mock = MagicMock(spec=SmallFullAdvStatPerDay)
     stat_mock.spend = spend_in_stat
@@ -103,18 +107,18 @@ async def test_update_white_list_threshold_triggered(
 
 @pytest.mark.asyncio
 async def test_WBShop_delete_phrase_from_white_list_run(
-    adv_setting_mock, keywords_mocks
+    adv_setting_mock, keywords_mocks, redis_manager_mock
 ):
     wb_api_mock = MagicMock()
     wb_api_mock.shop_id = "test_shop_id"
-    redis_manager_mock = MagicMock()
-    redis_manager_mock.DEFAULT_TTL = 60
-    redis_manager_mock.renew_shop_ttl = AsyncMock()
+    # redis_manager_mock = MagicMock()
+    # redis_manager_mock.DEFAULT_TTL = 60
+    # redis_manager_mock.renew_shop_ttl = AsyncMock()
 
     wb_shop = WBShop(wb_api_mock, redis_manager_mock)
-    wb_shop._update_advs_models = AsyncMock()
-    wb_shop._adv_settings = [adv_setting_mock]
-    wb_shop.get_calculated_keywords = AsyncMock(return_value=keywords_mocks)
+    # wb_shop._update_advs_models = AsyncMock()
+    # wb_shop._adv_settings = [adv_setting_mock]
+    # wb_shop.get_calculated_keywords = AsyncMock(return_value=keywords_mocks)
 
     coroutines_manager_mock = MagicMock()
     coroutines_manager_mock.parsing_keywords_run = AsyncMock()

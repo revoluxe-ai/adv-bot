@@ -15,7 +15,7 @@ from collections.abc import Callable
 
 class ShopWorker:
     def __init__(self, session: ClientSession):
-        self._tasks: dict[str, Task] = {}
+        self._tasks: dict[str, Task[None]] = {}
         self._client_session = session
 
     def _on_shop_task_done(
@@ -34,7 +34,7 @@ class ShopWorker:
         logger.debug(f"Магазин {shop_id} удалён из активных после завершения задачи")
 
     async def _update_active_shop_update_tasks_update(
-        self, tasks: dict[str, Task], redis_manager: RedisShopManager
+        self, tasks: dict[str, Task[None]], redis_manager: RedisShopManager
     ) -> None:
         new_free_shop_id: str | None = await redis_manager.get_next_free_shop_id()
         if not new_free_shop_id:

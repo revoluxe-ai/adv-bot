@@ -38,7 +38,7 @@ async def get_phrase_data(text):
     return phrase_data
 
 
-async def update_wb_adv_phrases_in_neo():
+async def update_wb_adv_phrases_in_neo() -> None:
     batch_size = 5
     phrase_data_list = []
     async with sm() as session:

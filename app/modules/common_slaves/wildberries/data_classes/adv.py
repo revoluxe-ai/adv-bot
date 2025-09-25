@@ -1,5 +1,6 @@
 import re
 from abc import abstractmethod
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -42,7 +43,7 @@ class AdvData(BaseModel):
 
 
 class Balances:
-    def __init__(self, data: dict[str, int]) -> None:
+    def __init__(self, data: dict[str, Any]) -> None:
         self.balance = data.get("balance", 0)  # Счет 0
         self.net = data.get("net", 0)  # Баланс 1
         self.bonus = data.get("bonus", 0)  # Бонусы 3

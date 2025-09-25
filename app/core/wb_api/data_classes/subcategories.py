@@ -27,4 +27,4 @@ class Subcategory(BaseModel):
     parentID: int
     subjectName: str
     parentName: str
-    isVisible: bool = None
+    isVisible: bool = False

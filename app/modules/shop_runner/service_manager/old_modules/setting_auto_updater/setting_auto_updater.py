@@ -104,7 +104,7 @@ class AdvSettingAutoUpdater:
         if not keywords:
             return None
         assert keywords
-        keywords.sort(key=lambda kw: kw.predict_ctr, reverse=True)
+        keywords.sort(key=lambda kw: kw.predict_ctr if kw.predict_ctr is not None else -float('inf'), reverse=True)
 
         first_kw = keywords[0]
 
@@ -144,7 +144,7 @@ class AdvSettingAutoUpdater:
     def __get_mean_pay_for_order(
         self,
         stat_data: list[SmallFullAdvStatPerDay],
-    ):
+    ) -> float:
         stat_data.sort(key=lambda stat: stat.date, reverse=True)
         for n, stat in enumerate(stat_data):
             if stat.orders > 0:

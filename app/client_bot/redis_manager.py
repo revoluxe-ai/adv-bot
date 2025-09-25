@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from redis.asyncio import Redis
 
@@ -16,7 +17,7 @@ class RedisManager:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    async def get_connection(self):
+    async def get_connection(self) -> Redis:
         if self._redis_conn is None:
-            self._redis_conn = await Redis.from_url("redis://localhost/0")
+            self._redis_conn = cast(Redis, await Redis.from_url("redis://localhost/0"))
         return self._redis_conn

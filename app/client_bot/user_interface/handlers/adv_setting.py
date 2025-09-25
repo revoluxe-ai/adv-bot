@@ -48,11 +48,12 @@ async def reset_filter(
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+        adv_settings: list[AdvSetting] = list(result.scalars().all())
 
     page = 1
     message = callback.message
-    assert message
+    if not isinstance(message, types.Message):
+        return
     await messages.AdvCompanyChoicing(
         bot,
         message.chat.id,
@@ -66,9 +67,11 @@ async def reset_filter(
 
 
 @router.message(StateFilter(states.AdvCompanyCatalog.waiting_for_keywords_for_filter))
-async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, state: FSMContext):
+async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, state: FSMContext) -> None:
     chat_id = message.chat.id
     text = message.text
+    if text is None:
+        return
     filter_advs = text.splitlines()
     filter_advs = [keyword.strip().lower() for keyword in filter_advs if keyword]
     await state.update_data(filter_advs=filter_advs)
@@ -81,8 +84,8 @@ async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, stat
             .join(WBCabinet.wb_user_cabinets)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        adv_settings = await session.execute(stmt)
-        adv_settings = adv_settings.scalars().all()
+        result2 = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = list(result2.scalars().all())
 
     page = 1
     check_data = await state.get_data()
@@ -93,11 +96,13 @@ async def waiting_for_keywords_for_filter(message: types.Message, bot: Bot, stat
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
 async def choice_adv_paginator(
-    callback: types.CallbackQuery | types.Message,
+    callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
+    if not isinstance(callback.message, types.Message):
+        return
     chat_id = callback.message.chat.id
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
@@ -112,8 +117,8 @@ async def choice_adv_paginator(
         .where(WBUserCabinet.id == wb_user_cabinet_original_id)
     )
     async with sm() as session:
-        adv_settings = await session.execute(stmt)
-        adv_settings = adv_settings.scalars().all()
+        result3 = await session.execute(stmt)
+        adv_settings: list[AdvSetting] = list(result3.scalars().all())
     await messages.AdvCompanyChoicing(bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page)()
     return
 
@@ -124,8 +129,10 @@ async def adv_handler(
     callback_data: callbacks.Adv,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
     await state.set_state()
+    if not isinstance(callback.message, types.Message):
+        return
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
@@ -146,16 +153,18 @@ async def adv_handler(
                 )
             )
             result = await session.execute(stmt)
-            wb_user_cabinet = result.scalar()  # Извлекаем первую строку
-        wb_user_cabinet_original_id: int = wb_user_cabinet.id
+            wb_user_cabinet = result.scalar_one_or_none()
+        if wb_user_cabinet is None:
+            return
+        wb_user_cabinet_original_id = wb_user_cabinet.id
 
     async with sm() as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
-        adv = adv.scalar()
+        result_adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv = result_adv.scalar_one_or_none()
 
     if not adv:
         await bot.send_message(callback.message.chat.id, "Кампания не найдена, попробуйте еще раз")
-        stmt = (
+        advs_stmt = (
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
             .join(WBCabinet.wb_user_cabinets)
@@ -163,8 +172,8 @@ async def adv_handler(
             .order_by(AdvSetting.name)
         )
         async with sm() as session:
-            adv_settings = await session.execute(stmt)
-            adv_settings = adv_settings.scalars().all()
+            adv_settings_result = await session.execute(advs_stmt)
+            adv_settings: list[AdvSetting] = list(adv_settings_result.scalars().all())
 
         await messages.AdvCompanyChoicing(
             bot,
@@ -176,13 +185,15 @@ async def adv_handler(
         return
 
     async with sm() as session:
-        wb_user_cabinet = await session.execute(
+        result_uc = await session.execute(
             select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet = result_uc.scalar_one_or_none()
 
     chat_id = callback.message.chat.id
     try:
+        if wb_user_cabinet is None or adv is None:
+            return
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     except NotItemsInAdvSetting:
         await messages.NoMainPhotos(bot, chat_id)(adv)
@@ -197,6 +208,8 @@ async def turn_adv_on(
     callback_data: callbacks.TurnBot,
     bot: aiogram.Bot,
 ) -> None:
+    if not isinstance(callback.message, types.Message):
+        return
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     adv_original_id = callback_data.adv_original_id
     async with sm(read_only=False) as session:
@@ -207,13 +220,17 @@ async def turn_adv_on(
             .options(selectinload(WBUserCabinet.wb_cabinet))
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
-        assert wb_user_cabinet
-        stmt = select(AdvSetting).options(selectinload(AdvSetting.payments)).where(AdvSetting.id == adv_original_id)
-        result = await session.execute(stmt)
-        adv: AdvSetting = result.scalar()
-        assert adv
+        result_uc = await session.execute(stmt)
+        wb_user_cabinet = result_uc.scalar_one_or_none()
+        if wb_user_cabinet is None:
+            await bot.send_message(callback.message.chat.id, "Кабинет не найден")
+            return
+        stmt_adv = select(AdvSetting).options(selectinload(AdvSetting.payments)).where(AdvSetting.id == adv_original_id)
+        result = await session.execute(stmt_adv)
+        adv = result.scalar_one_or_none()
+        if adv is None:
+            await bot.send_message(callback.message.chat.id, "Кампания не найдена")
+            return
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
         tariff_for_month = await pricer.get_price_for_day_for_shop(wb_cabinet.shop_id)
         price_for_adv_for_day = pricer.get_tariff_for_day(tariff_for_month)
@@ -230,10 +247,12 @@ async def turn_adv_on(
         await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
         await state.update_data(adv_original_id=adv.id)
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-        stmt = select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        stmt_uc2 = select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        result2 = await session.execute(stmt_uc2)
+        wb_user_cabinet = result2.scalar_one_or_none()
         chat_id = callback.message.chat.id
+        if wb_user_cabinet is None:
+            return
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
@@ -244,7 +263,9 @@ async def turn_adv_off_all(
     state: FSMContext,
     callback_data: callbacks.TurnBot,
     bot: aiogram.Bot,
-):
+) -> None:
+    if not isinstance(callback.message, types.Message):
+        return
     await bot.send_message(callback.message.chat.id, "Отключаю бота от всех кампаний")
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm(read_only=False) as session:
@@ -254,8 +275,8 @@ async def turn_adv_off_all(
             .join(WBCabinet.wb_user_cabinets)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        advs = advs.scalars().all()
-        for adv_ in advs:
+        advs_list: list[AdvSetting] = list(advs.scalars().all())
+        for adv_ in advs_list:
             adv_.bot_active = False
         await session.commit()
     chat_id = callback.message.chat.id
@@ -264,32 +285,38 @@ async def turn_adv_off_all(
 
 
 @router.callback_query(callbacks.TurnBot.filter(F.action == "off"))
-async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot):
+async def turn_adv_off(call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot) -> None:
+    if not isinstance(call.message, types.Message):
+        return
     # data = await state.get_data()
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         stmt = (
             select(WBUserCabinet).join(WBUserCabinet.wb_cabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        result_uc = await session.execute(stmt)
+        wb_user_cabinet = result_uc.scalar_one_or_none()
 
     async with sm(read_only=False) as session:
         result = await session.execute(select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id))
-        adv_setting: AdvSetting = result.scalars().first()
+        adv_setting = result.scalar_one_or_none()
+        if adv_setting is None:
+            return
         adv_setting.bot_active = False
         await session.commit()
 
     await messages.AdvSettingMenu(
         bot,
         call.message.chat.id,
-        wb_user_cabinet,
+        wb_user_cabinet if wb_user_cabinet is not None else WBUserCabinet(),
         adv_setting,
     )()
 
 
 @router.callback_query(callbacks.ChangeAutoMinCTR.filter(F.action == "turn_on_auto_min_ctr"))
-async def turn_on_auto_min_ctr(callback: types.CallbackQuery, bot: Bot, callback_data: callbacks.ChangeAutoMinCTR):
+async def turn_on_auto_min_ctr(callback: types.CallbackQuery, bot: Bot, callback_data: callbacks.ChangeAutoMinCTR) -> None:
+    if not isinstance(callback.message, types.Message):
+        return
     adv_setting_original_id = callback_data.adv_setting_original_id
     stmt = (
         update(AdvSetting)
@@ -308,7 +335,9 @@ async def turn_off_auto_min_ctr(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChangeAutoMinCTR,
     bot: Bot,
-):
+) -> None:
+    if not isinstance(callback.message, types.Message):
+        return
     adv_setting_original_id = callback_data.adv_setting_original_id
 
     stmt = (

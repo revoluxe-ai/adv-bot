@@ -80,7 +80,7 @@ async def error_handler_for_telegram_bad_request_exception(
 
 
 @admin_router.errors(ExceptionTypeFilter(TelegramForbiddenError))
-async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot) -> None:
     logger.error("Юзер заблокировал бота")
     return
 
@@ -99,11 +99,15 @@ async def forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bo
 
 
 @admin_router.errors(ExceptionTypeFilter(ErrorParsingPositions))
-async def error_parsing_positions_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+async def error_parsing_positions_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot) -> None:
     message = error_event.update.message
     exception = error_event.exception
 
     if message is None:
+        if error_event.update.callback_query is None:
+            return
+        if error_event.update.callback_query.message is None:
+            return
         chat_id = error_event.update.callback_query.message.chat.id
     else:
         chat_id = message.chat.id
@@ -116,8 +120,8 @@ async def error_parsing_positions_handler(error_event: ErrorEvent, state: FSMCon
 
     async with sm() as session:
         stmt = select(User.username).where(User.user_telegram_id == chat_id)
-        user_name = await session.execute(stmt)
-        user_name = user_name.scalar_one_or_none()
+        user_name_result = await session.execute(stmt)
+        user_name = user_name_result.scalar_one_or_none()
 
     await bot.send_message(admin_telegram_id, f"Ошибка парсинга у пользователя {user_name}")
 
@@ -125,10 +129,14 @@ async def error_parsing_positions_handler(error_event: ErrorEvent, state: FSMCon
 
 
 @admin_router.errors(ExceptionTypeFilter(ApiForbiddenError))
-async def api_forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+async def api_forbidden_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot) -> None:
     message = error_event.update.message
 
     if message is None:
+        if error_event.update.callback_query is None:
+            return
+        if error_event.update.callback_query.message is None:
+            return
         chat_id = error_event.update.callback_query.message.chat.id
     else:
         chat_id = message.chat.id
@@ -144,13 +152,16 @@ async def api_forbidden_error_handler(error_event: ErrorEvent, state: FSMContext
 
 
 @admin_router.errors(ExceptionTypeFilter(CardNotFoundInDB))
-async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot) -> None:
     message = error_event.update.message
     exception = error_event.exception
     exception = typing.cast(CardNotFoundInDB, exception)
 
     if message is None:
-        assert error_event.update.callback_query
+        if error_event.update.callback_query is None:
+            return
+        if error_event.update.callback_query.message is None:
+            return
         chat_id = error_event.update.callback_query.message.chat.id
     else:
         chat_id = message.chat.id
@@ -163,18 +174,28 @@ async def not_found_wb_card_error_handler(error_event: ErrorEvent, state: FSMCon
 
 
 @admin_router.errors(ExceptionTypeFilter(Exception))
-async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
+async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot) -> None:
     await state.set_state()
     message = error_event.update.message
     exception = error_event.exception
     if isinstance(exception, KeyboardInterrupt):
         raise exception
     if message is None:
+        if error_event.update.callback_query is None:
+            return
+        if error_event.update.callback_query.message is None:
+            return
         chat_id = error_event.update.callback_query.message.chat.id
-        user_name = error_event.update.callback_query.from_user.username
+        if error_event.update.callback_query.from_user is None:
+            user_name = "Неизвестный пользователь"
+        else:
+            user_name = error_event.update.callback_query.from_user.username
     else:
         chat_id = message.chat.id
-        user_name = message.from_user.username
+        if message.from_user is None:
+            user_name = "Неизвестный пользователь"
+        else:
+            user_name = message.from_user.username
     await bot.send_message(
         chat_id=chat_id,
         text="Произошла ошибка, но не волнуйтесь! Бот продолжает работать "

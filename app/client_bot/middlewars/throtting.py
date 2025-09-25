@@ -3,13 +3,13 @@ from typing import Any
 
 from aiogram import BaseMiddleware
 from aiogram.dispatcher.flags import get_flag
-from aiogram.types import Message
+from aiogram.types import Message, TelegramObject
 from cachetools import TTLCache
 
 
 class ThrottlingMiddleware(BaseMiddleware):
     def __init__(self, throttle_time_spin: int = 1, throttle_time_other: int = 1):
-        self.caches = {
+        self.caches: dict[str, TTLCache[int, Any]] = {
             "spin": TTLCache(maxsize=10_000, ttl=throttle_time_spin),
             "default": TTLCache(maxsize=10_000, ttl=throttle_time_other),
         }
@@ -17,7 +17,7 @@ class ThrottlingMiddleware(BaseMiddleware):
     async def __call__(
         self,
         handler: Callable[[Message, dict[str, Any]], Awaitable[Any]],
-        event: Message,
+        event: Message,  # type: ignore
         data: dict[str, Any],
     ) -> Any:
         throttling_key = get_flag(data, "throttling_key")

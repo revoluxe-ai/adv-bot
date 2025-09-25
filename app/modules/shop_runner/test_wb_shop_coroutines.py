@@ -48,7 +48,6 @@ async def test_adv_settings_auto_update(access_mock, adv_setting_mock, keywords_
         ),
     ):
         manager = CoroutinesManager(wb_api)
-        manager._update_advs_models = AsyncMock()
         manager._adv_settings_list = [adv_setting_mock]
         manager._adv_settings_dict = {adv_setting_mock.adv_id: adv_setting_mock}
         await manager.adv_settings_auto_update()

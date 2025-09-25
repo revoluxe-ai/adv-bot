@@ -1,5 +1,5 @@
 from app.configs.infrastructure_config.wb_config import WBConfig
-from app.core.di import Provide, inject
+from dependency_injector.wiring import Provide, inject
 from app.core.di.app_container import AppContainer
 
 SERVICE_DOMAINS: dict[str, str] = {

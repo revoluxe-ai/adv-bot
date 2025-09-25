@@ -1,4 +1,4 @@
-__all__ = ["CoroutinesManager", "LastSetUpTargetPlace", "LastSetDownTargetPlace"]
+__all__ = ["CoroutinesManager", "LastSetUpTargetPlace", "LastSetDownTargetPlace", "LastUpdateFirstPhrase"]
 
 from .manager import CoroutinesManager
 from .old_modules import LastTargetPlaceUpdateRedisManager

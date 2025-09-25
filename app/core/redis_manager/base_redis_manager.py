@@ -1,4 +1,5 @@
 from asyncio import Protocol
+from abc import abstractmethod
 
 import redis
 
@@ -15,6 +16,9 @@ class BaseRedis:
 
 
 class BaseRedisProtocol(Protocol):
-    _key: str
+    @property
+    @abstractmethod
+    def _key(self) -> str:
+        pass
     prefix: str
     client: redis.asyncio.Redis

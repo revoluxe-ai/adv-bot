@@ -31,20 +31,22 @@ async def keyword_position_history(
     state: FSMContext,
 ) -> None:
     await state.set_state(state=None)
+    if callback.message is None:
+        return
     adv_original_id: int = callback_data.adv_original_id
 
     stmt = select(AdvSetting).filter(AdvSetting.id == adv_original_id)
 
     async with _sm() as session:
-        result = await session.execute(stmt)
-        adv: AdvSetting = result.scalar_one()
+        result_adv_setting = await session.execute(stmt)
+        adv: AdvSetting = result_adv_setting.scalar_one()
     keywords = await data_manager.get_good_bad_phrases(adv)
 
-    result = await get_keyword_history_graphic(adv_original_id, keywords)
-    if not result:
+    graphic_result = await get_keyword_history_graphic(adv_original_id, keywords)
+    if not graphic_result:
         await messages.NotKeywordHistoryPositions(bot, callback.message.chat.id)()
         return
-    graphic, legend = result
+    graphic, legend = graphic_result
     if legend:
         await KeywordGraphicPart_1(bot, callback.message.chat.id, graphic, adv_original_id)()
         await KeywordGraphicPart_2(bot, callback.message.chat.id, legend, adv_original_id)()

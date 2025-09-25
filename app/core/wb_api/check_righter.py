@@ -3,16 +3,18 @@ import json
 import logging
 
 from aiohttp import ClientSession
+from typing import Any, cast
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.http_request import requests
 from app.modules.common_slaves.wildberries.models import WBToken
+from app.modules.common_slaves.wildberries.ABC_WB_API import Headers
 
 __all__ = ["CheckRighter"]
 
 
 class CheckRighter:
-    headers: "Headers"
+    headers: Headers
 
     check_entry_points = [
         ["https://content-api.wildberries.ru/ping", "Контент"],
@@ -27,8 +29,6 @@ class CheckRighter:
     ]
 
     async def check_all_rights(self, token: WBToken, session: ClientSession) -> bool:
-        from app.modules.common_slaves.wildberries.ABC_WB_API import Headers
-
         self.headers = Headers(token)
         check_tasks = [self.ping_rights(entry_point, session) for entry_point in self.check_entry_points]
         try:
@@ -39,15 +39,15 @@ class CheckRighter:
             return False
         return True
 
-    async def ping_rights(self, entry_point: list[str], session) -> str:
+    async def ping_rights(self, entry_point: list[str], session: ClientSession) -> str:
         url = entry_point[0]
         name = entry_point[1]
 
-        response = await requests(session, "GET", url=url, headers=self.headers.standart)
-        response = json.loads(response)
-        status = response["Status"]
+        response_text = await requests(session, "GET", url=url, headers=self.headers.standart)
+        response_data = json.loads(response_text)
+        status = cast(str, response_data["Status"])
         if status == "OK":
             return "OK"
         else:
-            logging.error(f"Нет доступов для аналитики: {response}")
+            logging.error(f"Нет доступов для аналитики: {response_data}")
             raise ApiForbiddenError(f"Нет прав для {name}")

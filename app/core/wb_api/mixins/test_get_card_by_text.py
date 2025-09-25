@@ -2,12 +2,13 @@
 
 import json
 from unittest.mock import AsyncMock, MagicMock
-
+from typing import Any
 import pytest
 
 from app.core.wb_api.base import BaseAPI
 from app.core.wb_api.data_classes.card_from_wb import CardFromWB
 from app.core.wb_api.mixins.content import PREFIX, ContentMixin
+from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 
 @pytest.fixture
@@ -24,7 +25,7 @@ class TestWBApi(BaseAPI, ContentMixin):
 
 
 @pytest.mark.asyncio
-async def test_get_card_by_text_success(access_mock, client_session_mock) -> None:
+async def test_get_card_by_text_success(access_mock: WBCabinetAccess, client_session_mock: AsyncMock) -> None:
     wb_api = TestWBApi(access_mock, client_session_mock)
 
     url = f"{wb_api.PREFIX}.{wb_api.HOST}/content/v2/get/cards/list"
@@ -67,10 +68,10 @@ async def test_get_card_by_text_success(access_mock, client_session_mock) -> Non
 
     # Создаем async-контекстный менеджер для ответа
     class _AsyncCM:
-        async def __aenter__(self):
+        async def __aenter__(self) -> AsyncMock:
             return response_mock
 
-        async def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
             return None
 
     context_manager_mock = _AsyncCM()

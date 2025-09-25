@@ -3,11 +3,11 @@ import logging
 from abc import abstractmethod
 from collections.abc import Callable
 from functools import wraps
-from typing import TypeVar
+from typing import TypeVar, Coroutine, Any, Tuple, Union, TYPE_CHECKING
 
 import aiogram
 from aiogram import types
-from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, Message
+from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, Message, InputFile
 
 from app import file_handler
 
@@ -20,36 +20,36 @@ class LastMessage(types.Message):
     message_type: str
 
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Message)
 
 
-def manage_file_id(func) -> Callable:
+def manage_file_id(func: Callable[..., Coroutine[Any, Any, Message]]) -> Callable[..., Coroutine[Any, Any, Union[Message, None]]]:
     @wraps(func)
-    async def wrapper(self, *args, **kwargs) -> T | None:
+    async def wrapper(self: Union["TextWithImage", "TextWithKeyboardAndImage"], *args: Any, **kwargs: Any) -> Message | None:
         logger.debug("Вызов обертки manage_file_id")
         # Получение и изменение file_id перед вызовом основной функции
-        old_image = self.image
+        old_image: str | InputFile | None = self.image
+        image: io.BytesIO | str | InputFile | None = None
         if old_image:
             logger.debug("Получение изображения")
-            image: io.BytesIO | str = await file_handler.get_telegram_image(old_image, self.bot)
+            image = await file_handler.get_telegram_image(old_image, self.bot)
 
             if isinstance(image, io.BytesIO):
                 new_image = BufferedInputFile(image.getvalue(), filename="wbgram.png")
                 self.image = new_image
             else:
                 self.image = image
-        else:
-            image = None
 
         # Вызов основной функции
-        message: T = await func(self, *args, **kwargs)
+        message: Message = await func(self, *args, **kwargs)
 
         # Обработка результата выполнения основной функции для сохранения image_id
-        image_id = message.photo[-1].file_id
-        if isinstance(image, io.BytesIO):
-            bot: aiogram.Bot = self.bot
-            bot_id = bot.id
-            await file_handler.save_telegram_file(image, image_id, bot_id)
+        if message.photo:
+            image_id = message.photo[-1].file_id
+            if isinstance(image, io.BytesIO):
+                bot: aiogram.Bot = self.bot
+                bot_id = bot.id
+                await file_handler.save_telegram_file(image, image_id, bot_id)
         return message
 
     return wrapper
@@ -66,7 +66,7 @@ class TextWithKeyboard(Base):
     def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
-    async def __call__(self) -> tuple[Message, str]:
+    async def __call__(self) -> Tuple[Message, str]:
         await super().__call__()
         text = self.text
         parse_mode = getattr(self, "parse_mode", None)
@@ -88,16 +88,20 @@ class TextWithKeyboard(Base):
 class TextWithImage(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
     @property
     @abstractmethod
-    def image(self):
+    def image(self) -> str | InputFile:
         pass
 
+    @image.setter
+    def image(self, value: str | InputFile) -> None:
+        self._image = value
+
     @manage_file_id
-    async def __call__(self):
+    async def __call__(self) -> Message:
         parse_mode = getattr(self, "parse_mode", None)
 
         last_message = await self.bot.send_photo(
@@ -112,10 +116,10 @@ class TextWithImage(Base):
 class Text(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
-    async def __call__(self) -> (LastMessage, str):
+    async def __call__(self) -> Tuple[Message, str]:
         # Отправка нового сообщения без попытки редактирования существующего
         last_message = await self.bot.send_message(
             chat_id=self.chat_id,
@@ -123,26 +127,26 @@ class Text(Base):
             parse_mode=getattr(self, "parse_mode", None),
             disable_web_page_preview=getattr(self, "DISABLE_WEBPAGE_PREVIEW", None),
         )
-        return last_message
+        return last_message, self.get_content_type()
 
 
 class TextWithKeyboardPagination(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
     @property
     @abstractmethod
-    def keyboard(self):
+    def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
     @property
     @abstractmethod
-    def on_page(self):
+    def on_page(self) -> Any:
         pass
 
-    async def __call__(self) -> (LastMessage, str):
+    async def __call__(self) -> Tuple[Message, str]:
         last_message = await self.bot.send_message(
             chat_id=self.chat_id,
             text=self.text,
@@ -155,20 +159,20 @@ class TextWithKeyboardPagination(Base):
 class TextWithKeyboardAndImage(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
     @property
     @abstractmethod
-    def keyboard(self):
+    def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
     @property
-    def image(self):
+    def image(self) -> str:
         return self._image
 
     @image.setter
-    def image(self, value):
+    def image(self, value: str) -> None:
         self._image = value
 
     @manage_file_id

@@ -17,7 +17,7 @@ class NotValidTokens:
         self.wb_cabinet_original_id = wb_cabinet_id
         self.shop_id = shop_id
 
-    async def send_all_users(self):
+    async def send_all_users(self) -> None:
         async with sm() as session:
             stmt = (
                 select(User)

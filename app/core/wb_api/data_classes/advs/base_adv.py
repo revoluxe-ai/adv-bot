@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, cast
 
 
 class Adv(BaseModel, ABC):
@@ -16,6 +17,7 @@ class Adv(BaseModel, ABC):
     dailyBudget: float
     endTime: datetime
     startTime: datetime
+    autoParams: Any | None = None
 
     @property
     @abstractmethod
@@ -29,11 +31,15 @@ class Adv(BaseModel, ABC):
 
     @property
     def category_name(self) -> str:
-        return self.autoParams.subject.name
+        if self.autoParams:
+            return cast(str, self.autoParams.subject.name)
+        return ""
 
     @property
     def subject_id(self) -> int:
-        return self.autoParams.subject.id
+        if self.autoParams:
+            return cast(int, self.autoParams.subject.id)
+        return 0
 
     @property
     def status_native(self) -> str:

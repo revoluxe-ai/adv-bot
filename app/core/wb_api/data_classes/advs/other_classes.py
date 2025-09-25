@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Any, cast
 
 
 class Subject(BaseModel):
@@ -39,7 +40,7 @@ class AdvData(BaseModel):
 
 
 class Balances:
-    def __init__(self, data: dict):
+    def __init__(self, data: dict[str, Any]):
         self.balance = data.get("balance", 0)  # Счет
         self.net = data.get("net", 0)  # Баланс
         self.bonus = data.get("bonus", 0)  # Бонусы
@@ -51,62 +52,62 @@ class AdvType:
 
 
 class Statistic:
-    def __init__(self, data):
+    def __init__(self, data: list[dict[str, Any]]) -> None:
         assert isinstance(data, list)
-        self._data = data[0]
+        self._data: dict[str, Any] = data[0]
 
     @property
-    def advert_id(self):
-        return self._data["advertId"]
+    def advert_id(self) -> int:
+        return cast(int, self._data["advertId"])
 
     @property
-    def begin(self):
-        return self._data["begin"]
+    def begin(self) -> str:
+        return cast(str, self._data["begin"])
 
     @property
-    def end(self):
-        return self._data["end"]
+    def end(self) -> str:
+        return cast(str, self._data["end"])
 
     @property
-    def days(self):
-        return self._data["days"]
+    def days(self) -> list[Any]:
+        return cast(list[Any], self._data["days"])
 
     @property
-    def views(self):
-        return self._data["views"]
+    def views(self) -> int:
+        return cast(int, self._data["views"])
 
     @property
-    def clicks(self):
-        return self._data["clicks"]
+    def clicks(self) -> int:
+        return cast(int, self._data["clicks"])
 
     @property
-    def ctr(self):
-        return self._data["ctr"]
+    def ctr(self) -> float:
+        return cast(float, self._data["ctr"])
 
     @property
-    def cpc(self):
-        return self._data["cpc"]
+    def cpc(self) -> float:
+        return cast(float, self._data["cpc"])
 
     @property
-    def sum(self):
-        return self._data["sum"]
+    def sum(self) -> float:
+        return cast(float, self._data["sum"])
 
     @property
-    def atbs(self):
-        return self._data["atbs"]
+    def atbs(self) -> int:
+        return cast(int, self._data["atbs"])
 
     @property
-    def orders(self):
-        return self._data["orders"]
+    def orders(self) -> int:
+        return cast(int, self._data["orders"])
 
     @property
-    def cr(self):
-        return self._data["cr"]
+    def cr(self) -> float:
+        return cast(float, self._data["cr"])
 
     @property
-    def in_shks(self):
-        return self._data["shks"]
+    def in_shks(self) -> int:
+        return cast(int, self._data["shks"])
 
     @property
-    def sum_price(self):
-        return self._data["sum_price"]
+    def sum_price(self) -> float:
+        return cast(float, self._data["sum_price"])
