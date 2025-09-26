@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Dict, List, Tuple
 
-from ..promotion_manager import PromotionManager
+from ..managers.promotion import PromotionManager
 
 logger = logging.getLogger(__name__)
 

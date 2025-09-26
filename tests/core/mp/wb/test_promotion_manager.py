@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, Mock
 
-from app.core.mp.wb.promotion_manager import PromotionManager
-from app.core.mp.wb.factories.adapter_factory import WbApiAdapterFactory
+from app.core.mp.wb.managers.promotion import PromotionManager
+from app.core.mp.wb.adapter_factory import WbApiAdapterFactory
 
 
 class TestPromotionManager:
@@ -47,7 +47,7 @@ class TestPromotionManager:
 
         # Assert
         mock_adapter_factory.get_adapter.assert_called_once_with(
-            shop_id, section="promotion", version="v1"
+            shop_id, section="promotion", version=1
         )
         mock_adapter.get_min_bids.assert_called_once_with(shop_id, adv_id=adv_id, nmids=nmids)
         assert result == expected_result
@@ -70,7 +70,7 @@ class TestPromotionManager:
 
         # Assert
         mock_adapter_factory.get_adapter.assert_called_once_with(
-            shop_id, section="promotion", version="v1"
+            shop_id, section="promotion", version=1
         )
         mock_adapter.get_current_bids.assert_called_once_with(shop_id, adv_id=adv_id, nmids=nmids)
         assert result == expected_result
@@ -91,7 +91,7 @@ class TestPromotionManager:
 
         # Assert
         mock_adapter_factory.get_adapter.assert_called_once_with(
-            shop_id, section="promotion", version="v1"
+            shop_id, section="promotion", version=1
         )
         mock_adapter.update_bids.assert_called_once_with(shop_id, adv_id=adv_id, nm_bids=nmids_bids)
 
@@ -115,7 +115,7 @@ class TestPromotionManager:
         for call in mock_adapter_factory.get_adapter.call_args_list:
             # Check that get_adapter was called with correct parameters
             assert call[0] == (shop_id,)  # positional args
-            assert call[1] == {"section": "promotion", "version": "v1"}  # keyword args
+            assert call[1] == {"section": "promotion", "version": 1}  # keyword args
 
     def test_promotion_manager_initialization(self, mock_adapter_factory):
         """Test that PromotionManager initializes correctly with adapter factory."""

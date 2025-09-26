@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from types import SimpleNamespace
 
 from app.modules.shop_runner.service_manager.services.update_cpm.update_cpm_manager import UpdateCPMManager
-from app.core.mp.wb.promotion_manager import PromotionManager
+from app.core.mp.wb.managers.promotion import PromotionManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting
 

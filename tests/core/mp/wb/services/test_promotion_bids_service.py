@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from app.core.mp.wb.containers import WBApiContainer
-from app.core.mp.wb.promotion_manager import PromotionManager
+from app.core.mp.wb.managers.promotion import PromotionManager
 from app.core.mp.wb.services.promotion_bids_service import PromotionBidsService
 
 
