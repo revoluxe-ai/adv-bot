@@ -59,9 +59,6 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1 * 60, 60)
     async def update_cpm_bid_in_search_advs(self) -> None:
-        from app.core.mp.wb.adapters.promotion_v1_adapter import PromotionV1Adapter
-        from app.core.mp.wb.generated.promotion.v1.client.client import AuthenticatedClient
-
         from .services.update_cpm import UpdateCPMManager
 
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
@@ -113,7 +110,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-        shop_data_updater: ShopDataUpdater,
+            shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 

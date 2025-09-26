@@ -8,7 +8,7 @@ from app.shared.application.commands.search_adv_bid_update.send_to_queue_for_upd
     SendToQueueForUpdateNmidBidCommand,
 )
 from app.shared.application.commands.search_adv_bid_update.update_bid_command import BidUpdateForNmidCommand
-from .wb_api_managers import WBApiCpmUpdater
+from .wb_api_cpm_updater import WBApiCpmUpdater
 
 logger = logging.getLogger(__name__)
 
@@ -23,18 +23,14 @@ class UpdateBidOrchestrator:
             queue: asyncio.Queue[BidUpdateForNmidCommand],
             stop_event: asyncio.Event,
             shop_id: str,
-            wb_api_cpm_updater: WBApiCpmUpdater,
-            max_adv_ids_per_batch: int | None = None,
     ) -> None:
         self._queue: asyncio.Queue[BidUpdateForNmidCommand] = queue
         self._stop_event: asyncio.Event = stop_event
         self._shop_id: str = shop_id
-        if max_adv_ids_per_batch is not None:
-            self.MAX_ADV_IDS_PER_BATCH = max_adv_ids_per_batch
-
+        self.MAX_ADV_IDS_PER_BATCH = 50
         self._new_cpm_manager: NewCpmBidManager = NewCpmBidManager()
         self._update_batch: Dict[int, List[BidUpdateForNmidCommand]] = defaultdict(list)
-        self._wb_api_cpm_updater: WBApiCpmUpdater = wb_api_cpm_updater
+        self._wb_api_cpm_updater: WBApiCpmUpdater = WBApiCpmUpdater(self._shop_id)
         self._batch_lock: asyncio.Lock = asyncio.Lock()
 
     async def send_update_command_to_queue(self, command: SendToQueueForUpdateNmidBidCommand) -> None:

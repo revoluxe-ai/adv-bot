@@ -1,6 +1,6 @@
 ﻿# app/core/mp/wb/adapters/promotions/sozdanie_kampanij/post_adv_v0_bids_min/post_adv_v0_bids_min.py
 
-from typing import Literal, cast
+from typing import cast
 
 import httpx
 
@@ -20,25 +20,18 @@ from app.core.mp.wb.generated.promotion.v1.client.models import (
     PostAdvV0BidsMinBodyPlacementTypesItem,
 )
 
-MinBidsInAdv = use_case.PostAdvV0BidsMinResponse200
-
 
 async def post_adv_v0_bids_min(
         *,
         client: AuthenticatedClient,
         adv_id: int,
         nmids: list[int],
-        payment_type: Literal[
-            PostAdvV0BidsMinBodyPaymentType.CPM.value,
-            PostAdvV0BidsMinBodyPaymentType.CPC.value,
-        ],
-        placement_types: list[
-            Literal[
-                PostAdvV0BidsMinBodyPlacementTypesItem.SEARCH,
-                PostAdvV0BidsMinBodyPlacementTypesItem.RECOMMENDATION,
-            ]
-        ],
-) -> MinBidsInAdv:
+        payment_type:
+        PostAdvV0BidsMinBodyPaymentType,
+        placement_types:
+        PostAdvV0BidsMinBodyPlacementTypesItem
+        ,
+) -> PostAdvV0BidsMinResponse200:
     payment_type = PostAdvV0BidsMinBodyPaymentType(payment_type)
     placement_types = [
         PostAdvV0BidsMinBodyPlacementTypesItem(t) for t in placement_types
@@ -73,6 +66,6 @@ async def post_adv_v0_bids_min(
 
     if isinstance(response, use_case.PostAdvV0BidsMinResponse200):
         resp: use_case.PostAdvV0BidsMinResponse200 = cast(response, MinBidsInAdv)
-        return resp
+        return cast(PostAdvV0BidsMinResponse200, resp)
 
     raise ApiUnexpectedError("Unhandled response type from promotion API")
