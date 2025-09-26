@@ -1,6 +1,6 @@
 from .methods.sozdanie_kampanij.post_adv_v0_bids_min import PostAdvV0BidsMinResponse200
 from ...base_adapter import WBBaseAdapters
-fro
+from ....decorators.auth import auth_for_adapter
 
 class PromotionAdapterV1(WBBaseAdapters):
     section = "promotion"
@@ -16,7 +16,7 @@ class PromotionAdapterV1(WBBaseAdapters):
         )
 
 
-    @auth(limits...)
+    @auth_for_adapter(section = 'promotion', version = 1)
     async def get_min_bids(self,
                            client: UserAuthClient,
                            get_min_bids_command: GetMinBidsCommand) -> dict[int, int]:
