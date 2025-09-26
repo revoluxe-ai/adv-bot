@@ -13,27 +13,46 @@ from unittest.mock import AsyncMock, Mock, patch
 from types import SimpleNamespace
 
 from app.modules.shop_runner.service_manager.services.update_cpm.update_cpm_manager import UpdateCPMManager
-from app.core.mp.wb.managers.promotion import PromotionManager
+from app.modules.shop_runner.service_manager.services.update_cpm.wb_api_managers import WBApiCpmUpdater, WBApiDataGetter
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.core.mp.wb.base_wb_api import BaseWBApi
 
 
 class TestUpdateCPMManager:
     """Test cases for UpdateCPMManager with mocked PromotionManager."""
 
     @pytest.fixture
-    def mock_promotion_manager(self):
-        """Create a mock PromotionManager."""
-        manager = Mock(spec=PromotionManager)
-        manager.get_min_bids = AsyncMock(return_value={123: 10, 456: 15})
-        manager.get_current_bids = AsyncMock(return_value={123: 20, 456: 25})
-        manager.update_bids = AsyncMock()
+    def mock_adapter_factory(self):
+        mock_factory = Mock()
+        mock_adapter = Mock()
+        mock_adapter.get_min_bids = AsyncMock(return_value={123: 10, 456: 15})
+        mock_adapter.get_current_bids = AsyncMock(return_value={123: 20, 456: 25})
+        mock_adapter.update_bids = AsyncMock()
+        mock_factory.get_adapter.return_value = mock_adapter
+        return mock_factory
+
+    @pytest.fixture
+    def update_cpm_manager(self, mock_adapter_factory):
+        """Create UpdateCPMManager with mocked PromotionManager."""
+        with patch.object(BaseWBApi, 'adapter_factory', new=mock_adapter_factory):
+            manager = UpdateCPMManager("test_shop")
+            manager._wb_data_getter = WBApiDataGetter(shop_id=manager._shop_id)
+            manager._wb_cpm_updater = WBApiCpmUpdater(shop_id=manager._shop_id)
         return manager
 
     @pytest.fixture
-    def update_cpm_manager(self, mock_promotion_manager):
-        """Create UpdateCPMManager with mocked PromotionManager."""
-        return UpdateCPMManager("test_shop", mock_promotion_manager)
+    def mock_wb_data_getter(self):
+        getter = Mock(spec=WBApiDataGetter)
+        getter.get_min_bid_for_nmids = AsyncMock(return_value={123: 10, 456: 15})
+        getter.get_current_bids = AsyncMock(return_value={123: 20, 456: 25})
+        return getter
+
+    @pytest.fixture
+    def mock_wb_cpm_updater(self):
+        updater = Mock(spec=WBApiCpmUpdater)
+        updater.update_bids = AsyncMock()
+        return updater
 
     @pytest.fixture
     def sample_adv_setting(self):
@@ -55,54 +74,58 @@ class TestUpdateCPMManager:
         return [keyword]
 
     @pytest.mark.asyncio
-    async def test_update_cpm_manager_initialization(self, mock_promotion_manager):
+    async def test_update_cpm_manager_initialization(self, mock_adapter_factory):
         """Test that UpdateCPMManager initializes correctly."""
         # Act
-        manager = UpdateCPMManager("test_shop", mock_promotion_manager)
+        with patch.object(BaseWBApi, 'adapter_factory', new=mock_adapter_factory):
+            manager = UpdateCPMManager("test_shop")
+            manager._wb_data_getter = WBApiDataGetter(shop_id=manager._shop_id)
+            manager._wb_cpm_updater = WBApiCpmUpdater(shop_id=manager._shop_id)
 
         # Assert
         assert manager._shop_id == "test_shop"
-        assert manager._promotion_manager is mock_promotion_manager
+        assert manager._wb_data_getter is not None
+        assert manager._wb_cpm_updater is not None
         assert manager._DEFAULT_BIDDER_STEP == 2
 
     @pytest.mark.asyncio
-    async def test_get_min_bids_delegation(self, update_cpm_manager, mock_promotion_manager):
+    async def test_get_min_bids_delegation(self, update_cpm_manager, mock_wb_data_getter):
         """Test that get_min_bids delegates to PromotionManager."""
         # Arrange
         adv_id = 100
         nmids = [123, 456]
         expected_result = {123: 10, 456: 15}
-        mock_promotion_manager.get_min_bids.return_value = expected_result
+        mock_wb_data_getter.get_min_bid_for_nmids.return_value = expected_result
 
         # Act
         result = await update_cpm_manager.get_min_bids(adv_id, nmids)
 
         # Assert
-        mock_promotion_manager.get_min_bids.assert_called_once_with(
+        mock_wb_data_getter.get_min_bid_for_nmids.assert_called_once_with(
             "test_shop", adv_id=adv_id, nmids=nmids
         )
         assert result == expected_result
 
     @pytest.mark.asyncio
-    async def test_get_current_bids_delegation(self, update_cpm_manager, mock_promotion_manager):
+    async def test_get_current_bids_delegation(self, update_cpm_manager, mock_wb_data_getter):
         """Test that get_current_bids delegates to PromotionManager."""
         # Arrange
         adv_id = 100
         nmids = [123, 456]
         expected_result = {123: 20, 456: 25}
-        mock_promotion_manager.get_current_bids.return_value = expected_result
+        mock_wb_data_getter.get_current_bids.return_value = expected_result
 
         # Act
         result = await update_cpm_manager.get_current_bids(adv_id, nmids)
 
         # Assert
-        mock_promotion_manager.get_current_bids.assert_called_once_with(
+        mock_wb_data_getter.get_current_bids.assert_called_once_with(
             "test_shop", adv_id=adv_id, nmids=nmids
         )
         assert result == expected_result
 
     @pytest.mark.asyncio
-    async def test_update_bids_delegation(self, update_cpm_manager, mock_promotion_manager):
+    async def test_update_bids_delegation(self, update_cpm_manager, mock_wb_cpm_updater):
         """Test that update_bids delegates to PromotionManager."""
         # Arrange
         adv_id = 100
@@ -112,7 +135,7 @@ class TestUpdateCPMManager:
         await update_cpm_manager.update_bids(adv_id, nm_bids)
 
         # Assert
-        mock_promotion_manager.update_bids.assert_called_once_with(
+        mock_wb_cpm_updater.update_bids.assert_called_once_with(
             "test_shop", adv_id=adv_id, nm_bids=nm_bids
         )
 
@@ -143,14 +166,14 @@ class TestUpdateCPMManager:
         await update_cpm_manager._process_single_adv(adv, keywords_coro())
 
         # Assert - should complete without making API calls
-        assert not update_cpm_manager._promotion_manager.get_min_bids.called
+        assert not update_cpm_manager._wb_data_getter.get_min_bid_for_nmids.called
 
     @pytest.mark.asyncio
     @patch('app.modules.wb_adv_updater.data_manager.get_best_keyword')
     @patch('app.utils.redis_manager.get_keyword_position')
     async def test_process_single_adv_with_bid_updates(
         self, mock_get_position, mock_get_best_keyword, update_cpm_manager, 
-        mock_promotion_manager, sample_adv_setting, sample_keywords
+        mock_wb_data_getter, mock_wb_cpm_updater, sample_adv_setting, sample_keywords
     ):
         """Test successful processing of advertisement with bid updates."""
         # Arrange
@@ -167,14 +190,14 @@ class TestUpdateCPMManager:
         await update_cpm_manager._process_single_adv(sample_adv_setting, keywords_coro())
 
         # Assert
-        mock_promotion_manager.get_min_bids.assert_called_once_with(
+        mock_wb_data_getter.get_min_bid_for_nmids.assert_called_once_with(
             "test_shop", adv_id=100, nmids=[123, 456]
         )
-        mock_promotion_manager.get_current_bids.assert_called_once_with(
+        mock_wb_data_getter.get_current_bids.assert_called_once_with(
             "test_shop", adv_id=100, nmids=[123, 456]
         )
         # Should call update_bids if new bids were calculated
-        assert mock_promotion_manager.update_bids.call_count <= 1
+        assert mock_wb_cpm_updater.update_bids.call_count <= 1
 
     @pytest.mark.asyncio
     @patch('app.modules.wb_adv_updater.data_manager.get_best_keyword')
@@ -191,7 +214,7 @@ class TestUpdateCPMManager:
         await update_cpm_manager._process_single_adv(sample_adv_setting, keywords_coro())
 
         # Assert - should skip API calls
-        assert not update_cpm_manager._promotion_manager.get_min_bids.called
+        assert not update_cpm_manager._wb_data_getter.get_min_bid_for_nmids.called
 
     @pytest.mark.asyncio
     @patch('app.utils.redis_manager.get_keyword_position')
@@ -245,11 +268,11 @@ class TestUpdateCPMManager:
 
     @pytest.mark.asyncio
     async def test_update_cpms_error_handling(
-        self, update_cpm_manager, sample_adv_setting, mock_promotion_manager
+        self, update_cpm_manager, sample_adv_setting, mock_wb_data_getter
     ):
         """Test error handling in update_cpms_in_search_advs."""
         # Arrange
-        mock_promotion_manager.get_min_bids.side_effect = Exception("API Error")
+        mock_wb_data_getter.get_min_bid_for_nmids.side_effect = Exception("API Error")
         keywords_coro = AsyncMock(return_value=[])
 
         adv_settings_and_keywords = [(sample_adv_setting, keywords_coro())]

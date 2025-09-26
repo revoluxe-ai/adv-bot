@@ -1,73 +1,48 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+import asyncio
+from typing import Dict, Set, Optional, List
+
+# For now, we'll use a simple in-memory store for tokens.
+# In a real-world scenario, this would interact with a database or external service.
+_TOKEN_STORAGE: Dict[str, List[str]] = {
+    "test_shop": ["token_shop_1_promotion_1", "token_shop_1_promotion_2"],
+    "shop_abc": ["token_abc_promo_1", "token_abc_promo_2"],
+}
 
 
 class TokenManager:
-    """Manage tokens for a single shop. Tracks tokens and per-section invalid marks."""
+    """Manages API tokens for a specific shop_id, handling invalidation per API section."""
 
-    def __init__(self, shop_id: str, tokens: Optional[List[str]] = None) -> None:
-        self.shop_id = shop_id
-        self._tokens: List[str] = tokens or []
-        # section -> set of invalid token indices
-        self._invalid_by_section: Dict[str, set[int]] = {}
-        self._current_index: int = 0
+    def __init__(self, shop_id: str) -> None:
+        self._shop_id = shop_id
+        self._tokens: List[str] = _TOKEN_STORAGE.get(shop_id, [])
+        # Stores tokens marked as invalid for a specific section
+        self._invalid_tokens_by_section: Dict[str, Set[str]] = {}
+        self._lock = asyncio.Lock()
 
     async def get_token(self, section: str) -> str:
-        """Return a valid token for the given section, considering invalid marks.
+        """Returns a valid token for the given section, considering invalidations."""
+        async with self._lock:
+            invalid_for_section = self._invalid_tokens_by_section.get(section, set())
+            for token in self._tokens:
+                if token not in invalid_for_section:
+                    return token
+            # If all tokens are invalid for this section, clear invalidation and retry (or raise error)
+            self._invalid_tokens_by_section[section] = set()
+            if self._tokens:
+                return self._tokens[0] # Return first token after reset
+            raise ValueError(f"No valid tokens available for shop {self._shop_id} and section {section}")
 
-        Searches the token list starting from the current pointer and returns the
-        first token index that is not marked invalid for the given section. If no
-        token is available raises RuntimeError.
-        """
-        if not self._tokens:
-            raise RuntimeError("no tokens configured for shop")
+    async def mark_invalid(self, section: str, token: Optional[str] = None) -> None:
+        """Marks a token as invalid for the specified section and initiates selection of a new one."""
+        async with self._lock:
+            if section not in self._invalid_tokens_by_section:
+                self._invalid_tokens_by_section[section] = set()
 
-        invalid = self._invalid_by_section.get(section, set())
-        n = len(self._tokens)
-        # try all tokens starting from current_index
-        for offset in range(n):
-            idx = (self._current_index + offset) % n
-            if idx in invalid:
-                continue
-            # move current pointer to found index
-            self._current_index = idx
-            return self._tokens[idx]
-
-        raise RuntimeError(f"no valid token available for section {section}")
-
-    def mark_invalid(self, section: str, token: Optional[str] = None) -> None:
-        """Mark provided token (or current) as invalid for a section and advance selection.
-
-        If token is provided, mark that token instance as invalid (first matching
-        index). Otherwise mark the current token.
-        After marking, advance the current index to the next candidate (if any).
-        """
-        if not self._tokens:
-            return
-
-        # determine index to mark
-        idx_to_mark: Optional[int] = None
-        if token is not None:
-            try:
-                idx_to_mark = self._tokens.index(token)
-            except ValueError:
-                # token not found - nothing to mark
-                return
-        else:
-            idx_to_mark = self._current_index
-
-        invalid_set = self._invalid_by_section.setdefault(section, set())
-        invalid_set.add(idx_to_mark)
-
-        # advance current_index to next not-marked index (relative to current)
-        n = len(self._tokens)
-        for offset in range(1, n + 1):
-            next_idx = (idx_to_mark + offset) % n
-            if next_idx not in invalid_set:
-                self._current_index = next_idx
-                return
-        # all tokens marked invalid for this section -> keep pointer unchanged
+            if token:
+                self._invalid_tokens_by_section[section].add(token)
+            # In a real scenario, this would also trigger a token refresh/re-evaluation logic
 
 
 class TokenManagerFactory:

@@ -3,32 +3,34 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 from app.core.mp.wb.adapters.base import BaseAdapter
+from app.core.mp.wb.client_factory import ClientFactory
+from app.core.mp.wb.rate_limit.storage import RateLimitStorage
 
 
 class WbApiAdapterFactory:
     """Factory that creates and caches adapters per (shop_id, section, version)."""
 
-    def __init__(self) -> None:
-        self._adapters_cache: Dict[Tuple[str, str, str], BaseAdapter] = {}
+    def __init__(self, client_factory: ClientFactory) -> None:
+        self._client_factory = client_factory
+        self._adapters_cache: Dict[Tuple[str, str, int], BaseAdapter] = {}
 
-    def get_adapter(self, shop_id: str, section: str, version: int) -> BaseAdapter:
-        key = (shop_id, section, str(version))
+    def get_adapter(self, shop_id: str, section: str, version: int, rate_limit_storage: RateLimitStorage) -> BaseAdapter:
+        key = (shop_id, section, version)
         if key in self._adapters_cache:
             return self._adapters_cache[key]
-        # Concrete adapter creation is deferred; registry/conditional logic added later
-        adapter = self._create_adapter(shop_id, section, version)
+        
+        adapter = self._get_new_adapter(shop_id, section, version, rate_limit_storage)
         self._adapters_cache[key] = adapter
         return adapter
 
-    def _create_adapter(self, shop_id: str, section: str, version: int) -> BaseAdapter:
-        key = (shop_id, section, version)
-        if not key in self._adapters_cache:
-            self._adapters_cache[key] = self._get_new_adapter(shop_id, section, version)
-        return self._adapters_cache[key]
+    def _get_new_adapter(self, shop_id: str, section: str, version: int, rate_limit_storage: RateLimitStorage) -> BaseAdapter:
+        client = self._client_factory.get_client(shop_id, section, version)
 
-    def _get_new_adapter(self, shop_id: str, section: str, version: int ) -> BaseAdapter:
-        # Support numeric version identifiers (1) and string form ('v1')
-        if section == 'promotion' and version == 1:
-            from .adapters.promotion.v1.adapter import PromotionAdapterV1
-            return PromotionAdapterV1(shop_id)
+        if section == 'promotion':
+            if version == 0:
+                from .adapters.promotion.v0.adapter import PromotionAdapterV0
+                return PromotionAdapterV0(shop_id, client, rate_limit_storage)
+            elif version == 1:
+                from .adapters.promotion.v1.adapter import PromotionAdapterV1
+                return PromotionAdapterV1(shop_id, client, rate_limit_storage)
         raise ValueError(f"No adapter found for section '{section}' with version '{version}'")

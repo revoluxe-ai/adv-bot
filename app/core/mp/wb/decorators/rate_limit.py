@@ -1,121 +1,66 @@
 from __future__ import annotations
 
-from functools import wraps
-from typing import Any, Callable, Coroutine
 import asyncio
+import time
+from functools import wraps
+from typing import Callable, Awaitable, Any, TYPE_CHECKING
 
-from app.core.mp.wb.rate_limit.storage import RateLimitConfig
+from app.core.mp.wb.rate_limit.storage import RateLimitStorage, RateLimitConfig
 
-
-_DEF_RATE_LIMIT_WEIGHT = 1.0
-
-
-def _resolve_config(
-    instance: Any,
-    raw_method: str,
-    supplied: RateLimitConfig | None,
-    requests_per_interval: int | None,
-    interval_seconds: float | None,
-    burst: int | None,
-    weight: float,
-) -> RateLimitConfig | None:
-    if supplied is not None:
-        return supplied
-    if requests_per_interval is not None and interval_seconds is not None:
-        return RateLimitConfig(
-            requests_per_interval=requests_per_interval,
-            interval_seconds=interval_seconds,
-            burst=burst,
-            weight=weight,
-        )
-    resolver = getattr(instance, "get_rate_limit_config", None)
-    if callable(resolver):
-        resolved = resolver(raw_method)
-        if resolved is not None:
-            return resolved
-    section_default = getattr(instance, "section_rate_limit", None)
-    if isinstance(section_default, RateLimitConfig):
-        return section_default
-    return None
+if TYPE_CHECKING:
+    from app.core.mp.wb.adapters.base import BaseAdapter
 
 
 def rate_limit_decorator(
-    func: Callable[..., Coroutine[Any, Any, Any]] | None = None,
-    *,
-    config: RateLimitConfig | None = None,
-    requests_per_interval: int | None = None,
-    limits: int | None = None,
-    interval_seconds: float | None = None,
-    interval: float | None = None,
-    burst: int | None = None,
-    weight: float = _DEF_RATE_LIMIT_WEIGHT,
-) -> Callable[..., Coroutine[Any, Any, Any]]:
-    """Decorator wiring asynchronous rate-limiting around adapter calls.
+    limits: int,
+    interval: float,
+    burst: int = 1,
+) -> Callable[..., Callable[..., Awaitable[Any]]]:
+    """Decorator to apply rate limiting to adapter methods."""
 
-    Every decorated adapter method MUST have an explicit RateLimitConfig:
-    - either passed directly via config
-    - or via numeric overrides
-    - or provided by the adapter (method-specific or section default)
-    """
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+        @wraps(func)
+        async def wrapper(self: BaseAdapter, *args: Any, **kwargs: Any) -> Any:
+            if not hasattr(self, 'rate_limit_storage') or not isinstance(self.rate_limit_storage, RateLimitStorage):
+                raise RuntimeError("RateLimitStorage not configured on adapter.")
 
-    if func is None:
-        return lambda f: rate_limit_decorator(
-            f,
-            config=config,
-            requests_per_interval=requests_per_interval,
-            limits=limits,
-            interval_seconds=interval_seconds,
-            interval=interval,
-            burst=burst,
-            weight=weight,
-        )
+            storage: RateLimitStorage = self.rate_limit_storage
+            # Assuming method name can be extracted from func.__name__ or passed as arg
+            method_name = func.__name__
+            shop_id = self.shop_id
+            section = self.section
 
-    effective_requests = requests_per_interval if requests_per_interval is not None else limits
-    effective_interval = interval_seconds if interval_seconds is not None else interval
+            key = (shop_id, section, method_name)
+            lock = await storage.acquire_lock(*key)
 
-    @wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        if not args:
-            return await func(*args, **kwargs)
+            async with lock:
+                state = storage.get_state(*key)
+                config = RateLimitConfig(limits, interval, burst)
 
-        adapter = args[0]
-        storage = getattr(adapter, "rate_limit_storage", None)
-        raw_method = func.__name__
-        shop_id = adapter.shop_id
-        section = adapter.section
+                # Calculate delay based on token bucket algorithm or similar
+                now = time.time()
+                elapsed = now - state.last_call_timestamp
+                tokens = elapsed * (config.requests_per_interval / config.interval_seconds)
+                state.quota_used = max(0, state.quota_used - int(tokens))
 
-        resolved_config = _resolve_config(
-            adapter,
-            raw_method,
-            config,
-            effective_requests,
-            effective_interval,
-            burst,
-            weight,
-        )
+                delay = 0.0
+                if state.quota_used >= config.requests_per_interval:
+                    # Out of quota, calculate wait time until next token is available
+                    # This is a simplified calculation; a real token bucket might be more complex
+                    time_to_wait = (state.quota_used - config.requests_per_interval + 1) * \
+                                 (config.interval_seconds / config.requests_per_interval)
+                    delay = max(0.0, time_to_wait - elapsed)
 
-        if resolved_config is None:
-            raise RuntimeError(
-                f"Missing rate-limit configuration for {adapter.__class__.__name__}.{raw_method}"
-            )
+                if delay > 0:
+                    await asyncio.sleep(delay)
 
-        if storage is not None:
-            # Remember method-level configuration so concurrent calls share the same limits.
-            await storage.register_config(shop_id, section, raw_method, resolved_config)
+                state.last_call_timestamp = time.time()
+                state.quota_used += 1 # Consume one quota
 
-            # Respect any delay suggested by the storage (retry-after/reset windows, etc.).
-            delay = await storage.preflight_delay(shop_id, section, raw_method)
-            if delay and delay > 0:
-                await asyncio.sleep(delay)
+                # Call original function
+                return await func(self, *args, **kwargs)
 
-        resp = await func(*args, **kwargs)
+        return wrapper
 
-        if storage is not None:
-            status = getattr(resp, "status_code", None)
-            headers = getattr(resp, "headers", {}) or {}
-            await storage.update_from_response(shop_id, section, raw_method, status, headers)
-
-        return resp
-
-    return wrapper
+    return decorator
 

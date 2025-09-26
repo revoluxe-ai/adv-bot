@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 class UpdateCPMManager:
     _DEFAULT_BIDDER_STEP = 2
 
-    def __init__(self, shop_id: str) -> None:
+    def __init__(self, shop_id: str, wb_data_getter: WBApiDataGetter, wb_cpm_updater: WBApiCpmUpdater) -> None:
         self._shop_id = shop_id
-        self._wb_data_getter = WBApiDataGetter()
-        self._wb_cpm_updater = WBApiCpmUpdater()
+        self._wb_data_getter = wb_data_getter
+        self._wb_cpm_updater = wb_cpm_updater
         self._stop_event = asyncio.Event()
         queue: asyncio.Queue[BidUpdateForNmidCommand] = asyncio.Queue()
         self._update_bid_orchestrator = UpdateBidOrchestrator(

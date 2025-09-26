@@ -1,40 +1,66 @@
-import logging
+from __future__ import annotations
 
-from app.core.mp.wb.generated.promotion.v1.client.models.patch_adv_v0_bids_body import PatchAdvV0BidsBody
-from app.core.mp.wb.generated.promotion.v1.client.models.v0_advert_multi_bid_item import V0AdvertMultiBidItem
-from app.core.mp.wb.generated.promotion.v1.client.models.v0_advert_multibid import V0AdvertMultibid
+"""WB API facades for promotion section built on shared mixins."""
 
-logger = logging.getLogger(__name__)
+from typing import Iterable, Mapping, Optional, Sequence
 
-
-class WBApiDataGetter:
-    async def get_min_bid_for_nmids(self, shop_id: str, *, adv_id: int, nmids: list[int]) -> dict[int, int]:
-        return await self._promotion_adapter.get_min_bids(shop_id, adv_id=adv_id, nmids=nmids)
-
-    async def get_current_bids(self, shop_id: str, *, adv_id: int, nmids: list[int]) -> dict[int, int]:
-        return await self._promotion_adapter.get_current_bids(shop_id, adv_id=adv_id, nmids=nmids)
+from app.core.mp.wb.base_wb_api import BaseWBApi
+from app.core.mp.wb.mixins.cpm_update_mixin import CPMUpdateMixin
+from app.core.mp.wb.mixins.current_bid_mixin import CurrentBidMixin
+from app.core.mp.wb.mixins.min_bid_mixin import MinBidMixin
 
 
-class WBApiCpmUpdater:
-    async def update_bids(self, shop_id: str, *, adv_id: int, nm_bids: list[dict[str, int]]) -> None:
-        # Преобразуем {nm, cpm} -> V0AdvertMultiBidItem(nm, bid)
-        items = [V0AdvertMultiBidItem(nm=int(row["nm"]), bid=int(row["cpm"])) for row in nm_bids]
-        multibid = V0AdvertMultibid(advert_id=int(adv_id), nm_bids=items)
-        payload = PatchAdvV0BidsBody(bids=[multibid])
-        await self._promotion_adapter.update_bids(shop_id, payload=payload)
+class WBApiDataGetter(MinBidMixin, CurrentBidMixin, BaseWBApi):
+    """Expose read-only promotion helpers scoped to a single shop."""
+
+    def __init__(self, shop_id: str) -> None:
+        super().__init__(shop_id)
+
+    async def get_min_bid_for_nmids(
+        self,
+        shop_id: Optional[str] = None,
+        *,
+        adv_id: int,
+        nmids: Sequence[int] | Iterable[int],
+    ) -> dict[int, int]:
+        if shop_id is not None and shop_id != self.shop_id:
+            raise ValueError("WBApiDataGetter scoped to different shop_id")
+        return await MinBidMixin.get_min_bids(self, adv_id, list(nmids))
+
+    async def get_current_bids(
+        self,
+        shop_id: Optional[str] = None,
+        *,
+        adv_id: int,
+        nmids: Sequence[int] | Iterable[int],
+    ) -> dict[int, int]:
+        if shop_id is not None and shop_id != self.shop_id:
+            raise ValueError("WBApiDataGetter scoped to different shop_id")
+        return await CurrentBidMixin.get_current_bids(self, adv_id, list(nmids))
 
 
-import logging
+class WBApiCpmUpdater(CPMUpdateMixin, BaseWBApi):
+    """Expose write operations for promotion CPM updates."""
 
-logger = logging.getLogger(__name__)
+    def __init__(self, shop_id: str) -> None:
+        super().__init__(shop_id)
 
+    async def update_bids_for_shop(
+        self,
+        *,
+        adv_id: int,
+        nm_bids: Sequence[Mapping[str, int]] | Iterable[Mapping[str, int]],
+    ) -> None:
+        await CPMUpdateMixin.update_bids_for_shop(self, adv_id=adv_id, nm_bids=list(nm_bids))
 
-class WBApiDataGetter:
-    def __init__(self, promotion_adapter) -> None:
-        self._promotion_adapter = promotion_adapter
+    async def update_bids(
+        self,
+        shop_id: Optional[str] = None,
+        *,
+        adv_id: int,
+        nm_bids: Sequence[Mapping[str, int]] | Iterable[Mapping[str, int]],
+    ) -> None:
+        if shop_id is not None and shop_id != self.shop_id:
+            raise ValueError("WBApiCpmUpdater scoped to different shop_id")
+        await self.update_bids_for_shop(adv_id=adv_id, nm_bids=nm_bids)
 
-    async def get_min_bid_for_nmids(self, shop_id: str, *, adv_id: int, nmids: list[int]) -> dict[int, int]:
-        return await self._promotion_adapter.get_min_bids(shop_id, adv_id=adv_id, nmids=nmids)
-
-    async def get_current_bids(self, shop_id: str, *, adv_id: int, nmids: list[int]) -> dict[int, int]:
-        return await self._promotion_adapter.get_current_bids(shop_id, adv_id=adv_id, nmids=nmids)

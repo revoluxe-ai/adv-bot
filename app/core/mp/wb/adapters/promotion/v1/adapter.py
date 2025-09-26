@@ -1,58 +1,51 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Optional
+from typing import Dict, List, Optional, Sequence, Iterable, Mapping
 
-
-@dataclass
-class GetMinBidsCommand:
-    adv_id: int
-    nmids: List[int]
-    payment_type: Optional[str] = None
-    placement_types: Optional[List[str]] = None
-
-
-@dataclass
-class GetCurrentBidsCommand:
-    adv_id: int
-    nmids: List[int]
-
-
-@dataclass
-class UpdateBidsCommand:
-    adv_id: int
-    nm_bids: List[dict]
-
-
-from .methods.sozdanie_kampanij.post_adv_v0_bids_min import PostAdvV0BidsMinResponse200
-from app.core.mp.wb.adapters.base_adapter import WBBaseAdapter
-from app.core.mp.wb.decorators.auth import auth_for_adapter
-from typing import ClassVar
+from app.core.mp.wb.adapters.auth_client_mixin import AdapterAuthClient
+from app.core.mp.wb.adapters.base import BaseAdapter
 from app.core.mp.wb.decorators.rate_limit import rate_limit_decorator
-from app.core.mp.wb.rate_limit.storage import RateLimitConfig
+from app.core.mp.wb.decorators.retry import retry_decorator
+from app.core.mp.wb.rate_limit.storage import RateLimitStorage
+# Import the generated client for promotion v1
+from app.core.mp.wb.adapters.promotion.v1.client import Client as PromotionClientV1
 
 
+class PromotionAdapterV1(BaseAdapter):
+    """Adapter for Wildberries Promotion API v1."""
 
-class PromotionAdapterV1(WBBaseAdapter):
-    section: ClassVar[str] = "promotion"
-    version: ClassVar[int] = 1
+    def __init__(self, shop_id: str, client: AdapterAuthClient, rate_limit_storage: RateLimitStorage) -> None:
+        super().__init__(shop_id, rate_limit_storage)
+        # Ensure the client is an instance of the generated client mixed with AdapterAuthClient
+        # For runtime, we assume it's already properly typed by ClientFactory
+        self._client: PromotionClientV1 = client # type: ignore
+        self.section = "promotion"
+        self.version = 1
 
-    # Base throttle for the whole promotion v1 section.
-    section_rate_limit: ClassVar[RateLimitConfig] = RateLimitConfig(
-        requests_per_interval=20,
-        interval_seconds=1.0,
-        burst=20,
-    )
+    @retry_decorator()
+    @rate_limit_decorator(limits=5, interval=1.0) # Example limits, adjust as needed
+    async def get_min_bids(
+        self,
+        adv_id: int,
+        nmids: Sequence[int] | Iterable[int],
+    ) -> Dict[int, int]:
+        return await self._client.post_adv_v1_bids_min(adv_id=adv_id, nmids=list(nmids))
 
-    @rate_limit_decorator(limits=8, interval=1.0)
-    @auth_for_adapter()
-    async def get_min_bids(self, client, get_min_bids_command) -> dict[int, int]:
-        from .methods.sozdanie_kampanij import post_adv_v0_bids_min
-        response: PostAdvV0BidsMinResponse200 = await post_adv_v0_bids_min(
-            client,
-            adv_id=get_min_bids_command.adv_id,
-            nmids=get_min_bids_command.nmids,
-            payment_type=get_min_bids_command.payment_type,
-            placement_types=get_min_bids_command.placement_types,
-        )
+    @retry_decorator()
+    @rate_limit_decorator(limits=5, interval=1.0) # Example limits, adjust as needed
+    async def get_current_bids(
+        self,
+        adv_id: int,
+        nmids: Sequence[int] | Iterable[int],
+    ) -> Dict[int, int]:
+        return await self._client.get_adv_v1_auction_adverts(adv_id=adv_id, nmids=list(nmids))
+
+    @retry_decorator()
+    @rate_limit_decorator(limits=5, interval=1.0) # Example limits, adjust as needed
+    async def update_bids(
+        self,
+        adv_id: int,
+        nm_bids: Sequence[Mapping[str, int]] | Iterable[Mapping[str, int]],
+    ) -> None:
+        await self._client.patch_adv_v1_bids(adv_id=adv_id, request_body=list(nm_bids))
 
