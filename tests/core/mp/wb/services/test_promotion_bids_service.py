@@ -71,7 +71,7 @@ class TestPromotionBidsService:
     @pytest.mark.asyncio
     async def test_update_bids_success(self, promotion_bids_service, mock_promotion_manager):
         shop_id, adv_id = "test_shop", 100
-        nm_bids = [{"nm": 123, "cpm": 30}, {"nm": 456, "cpm": 35}]
+        nmid_bids = [{"nmid": 123, "cpm": 30}, {"nmid": 456, "cpm": 35}]
 
         await promotion_bids_service.update_bids(shop_id, adv_id, nm_bids)
 
@@ -80,7 +80,7 @@ class TestPromotionBidsService:
     @pytest.mark.asyncio
     async def test_update_bids_error(self, promotion_bids_service, mock_promotion_manager):
         shop_id, adv_id = "test_shop", 100
-        nm_bids = [{"nm": 123, "cpm": 30}]
+        nmids_bids = [{"nmid": 123, "cpm": 30}]
         mock_promotion_manager.update_bids.side_effect = RuntimeError("Update Error")
 
         with pytest.raises(RuntimeError, match="Update Error"):
@@ -99,9 +99,9 @@ class TestPromotionBidsService:
     @pytest.mark.asyncio
     async def test_service_delegates_correctly(self, promotion_bids_service, mock_promotion_manager):
         shop_id, adv_id, nmids = "test_shop", 100, [123, 456]
-        nm_bids = [{"nm": 123, "cpm": 30}]
+        nmis_bids = [{"nmid": 123, "cpm": 30}]
 
         mock_promotion_manager.get_min_bids.return_value = {123: 10}
         mock_promotion_manager.get_current_bids.return_value = {123: 20}
 
-        min_resul_
+      
