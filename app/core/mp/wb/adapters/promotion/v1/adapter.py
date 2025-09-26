@@ -27,3 +27,4 @@ class PromotionAdapterV1(WBBaseAdapters):
                                                                            payment_type=get_min_bids_command.payment_type,
                                                                            placement_types=get_min_bids_command.placement_types,
                                                                            )
+        return response
