@@ -1,9 +1,8 @@
 import asyncio
 import logging
 from asyncio import Future
-from typing import Coroutine, Any, Awaitable
-from asyncio import TaskGroup
-from typing import Awaitable, Dict, List, Optional
+from typing import Awaitable
+from typing import Coroutine, Any
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -16,13 +15,6 @@ from .min_bids_for_adv_getter import MinBidsForAdvGetter
 from .update_bid_orchestrator import UpdateBidOrchestrator
 from .wb_api_managers import WBApiDataGetter, WBApiCpmUpdater
 from .сurrent_bids_for_adv_getter import CurrentBidsForAdvGetter
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
-from app.modules.wb_adv_updater import data_manager
-
-
-from .wb_api_managers import WBApiDataGetter, WBApiCpmUpdater
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +40,8 @@ class UpdateCPMManager:
         self._current_positions_for_adv_from_future_getter = CurrentPositionsForAdvGetter(loop)
         self._current_bids_for_adv_from_future_getter = CurrentBidsForAdvGetter(loop)
 
-
     async def update_cpms_in_search_advs(
-        self, adv_settings_and_keywords_coro: list[tuple[AdvSetting, Awaitable[list[CalculatedKeyword]]]]
+            self, adv_settings_and_keywords_coro: list[tuple[AdvSetting, Awaitable[list[CalculatedKeyword]]]]
     ) -> None:
         if not adv_settings_and_keywords_coro:
             return None
