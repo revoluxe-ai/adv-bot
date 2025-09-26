@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from collections import defaultdict
 from typing import Dict, List, Optional
 
 from app.modules.shop_runner.service_manager.services.update_cpm.new_cpm_bid_manager import NewCpmBidManager
@@ -120,8 +119,8 @@ class UpdateBidOrchestrator:
             try:
                 # Отправляем обновления по adv_id
                 for adv_id, cmds in snapshot.items():
-                    nm_bids = self._update_batch.get_nm_bids_for_adv(adv_id)
-                    await self._wb_api_cpm_updater.update_bids_for_shop(dv_id=adv_id, nm_bids=nm_bids)
+                    nm_bids = self._update_batch.get_nmids_bids_for_adv(adv_id)
+                    await self._wb_api_cpm_updater.update_bids_for_shop(adv_id=adv_id, nm_bids=nm_bids)
 
                 # Ack всех команд при успехе
                 self._ack_commands(snapshot)
