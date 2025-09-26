@@ -9,9 +9,9 @@ from app.core.mp.wb.rate_limit.storage import RateLimitStorage
 class WBBaseAdapter:
     """Base class for WB adapters providing shared wiring and state."""
 
-    section: ClassVar[str] = ""
-    version: ClassVar[str] = ""
-
+    def __init__(self):
+        self._auth_client_factory = AuthClientFactory()
+        self._rate_limiter = RateLimiter()
     _rate_limit_storage_cache: ClassVar[dict[tuple[str, str], RateLimitStorage]] = {}
     _rate_limit_storage_lock: ClassVar[Lock] = Lock()
 
