@@ -1,22 +1,30 @@
+
 from .methods.sozdanie_kampanij.post_adv_v0_bids_min import PostAdvV0BidsMinResponse200
-from ...base_adapter import WBBaseAdapters
+from ...base_adapter import WBBaseAdapter
 from ....decorators.auth import auth_for_adapter
 
-class PromotionAdapterV1(WBBaseAdapters):
-    section = "promotion"
-    version = 1
+
+from typing import ClassVar
+
+from app.core.mp.wb.adapters.base_adapter import WBBaseAdapter
+from app.core.mp.wb.decorators.rate_limit import rate_limit_decorator
+from app.core.mp.wb.rate_limit.storage import RateLimitConfig
 
 
-    def __init__(self, ...):
-        self.rate_limit_manager = RateLimitManager(
-            requests_per_interval=20,)
-            interval_seconds=1,
-            max_delay=60,
-            max_attempts=5,
-        )
 
+class PromotionAdapterV1(WBBaseAdapter):
+    section: ClassVar[str] = "promotion"
+    version: ClassVar[int] = 1
 
-    @auth_for_adapter(section = 'promotion', version = 1)
+    # Base throttle for the whole promotion v1 section.
+    section_rate_limit: ClassVar[RateLimitConfig] = RateLimitConfig(
+        requests_per_interval=20,
+        interval_seconds=1.0,
+        burst=20,
+    )
+
+    @rate_limit_decorator(limits=8, interval=1.0)
+    @auth_for_adapter()
     async def get_min_bids(self,
                            client: UserAuthClient,
                            get_min_bids_command: GetMinBidsCommand) -> dict[int, int]:
@@ -27,4 +35,4 @@ class PromotionAdapterV1(WBBaseAdapters):
                                                                            payment_type=get_min_bids_command.payment_type,
                                                                            placement_types=get_min_bids_command.placement_types,
                                                                            )
-        return response
+

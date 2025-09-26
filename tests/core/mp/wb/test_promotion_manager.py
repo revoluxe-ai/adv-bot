@@ -84,16 +84,16 @@ class TestPromotionManager:
         mock_adapter_factory.get_adapter.return_value = mock_adapter
         shop_id = "test_shop"
         adv_id = 789
-        nm_bids = [{"nm": 555, "cpm": 100}, {"nm": 666, "cpm": 120}]
+        nmids_bids = [{"nmid": 555, "cpm": 100}, {"nmid": 666, "cpm": 120}]
 
         # Act
-        await promotion_manager.update_bids(shop_id, adv_id=adv_id, nm_bids=nm_bids)
+        await promotion_manager.update_bids(shop_id, adv_id=adv_id, nm_bids=nmids_bids)
 
         # Assert
         mock_adapter_factory.get_adapter.assert_called_once_with(
             shop_id, section="promotion", version="v1"
         )
-        mock_adapter.update_bids.assert_called_once_with(shop_id, adv_id=adv_id, nm_bids=nm_bids)
+        mock_adapter.update_bids.assert_called_once_with(shop_id, adv_id=adv_id, nm_bids=nmids_bids)
 
     @pytest.mark.asyncio
     async def test_adapter_factory_called_with_correct_parameters(

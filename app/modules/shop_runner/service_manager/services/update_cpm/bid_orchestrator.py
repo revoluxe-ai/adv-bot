@@ -74,7 +74,7 @@ class BidUpdateOrchestrator:
         for r in batch:
             if r.new_bid is None:
                 continue
-            grouped.setdefault(r.adv_id, []).append({"nm": int(r.nmid), "cpm": int(r.new_bid)})
+            grouped.setdefault(r.adv_id, []).append({"nmid": int(r.nmid), "cpm": int(r.new_bid)})
         # send per adv in chunks up to max_batch_size
         for adv_id, nm_bids in grouped.items():
             for i in range(0, len(nm_bids), self._max_batch_size):
