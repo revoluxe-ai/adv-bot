@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
-from typing import Any, Dict, List
+from typing import Dict, List, Protocol
 
 
 class PromotionAdapterProtocol(Protocol):
@@ -15,10 +14,6 @@ class PromotionAdapterProtocol(Protocol):
         """Return current bids mapping by nmid."""
         ...
 
-    async def update_bids(self, payload: Any) -> None:
-        """Send bids update batch."""
-        ...
-
-    async def update_cpms_in_search_advs(self, command: Any) -> None:
-        """Update CPM values in search advertisements."""
+    async def update_bids(self, adv_id: int, nm_bids: List[dict[str, int]]) -> None:
+        """Send bids update batch for specified advert."""
         ...
