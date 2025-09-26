@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from app.core.mp.wb.managers.promotion import PromotionManager
+from typing import TYPE_CHECKING, List, Dict, Any, cast
+
+if TYPE_CHECKING:
+    from app.core.mp.wb.base_wb_api import BaseWBApi
+    from app.core.mp.wb.adapters.promotion.promotion_adapter_protocol import PromotionAdapterProtocol
 
 
 class BidUpdateMixin:
-    def __init__(self, shop_id: str, promotion_manager: PromotionManager) -> None:
-        self.shop_id = shop_id
-        self.promotion_manager = promotion_manager
 
-    async def update_bids(self, batch: object) -> None:
-        """Delegate to PromotionManager.update_bids with stored shop_id."""
-        return await self.promotion_manager.update_bids(self.shop_id, batch)
+    async def update_bids(self: BaseWBApi, *, adv_id: int, nmids_bids: List[Dict[str, Any]]) -> None:
+        """Delegate to promotion adapter to update bids."""
+        promotion_adapter = self.get_adapter(section="promotion", version=1)
+        typed_adapter = cast(PromotionAdapterProtocol, promotion_adapter)
+        await typed_adapter.update_bids(adv_id=adv_id, nmids_bids=nmids_bids)
 
 
