@@ -84,9 +84,9 @@ class UpdateBidOrchestrator:
                 # Отправляем по adv_id: WB API ожидает adv_id и список {nm, cpm}
                 for adv_id, cmds in snapshot.items():
                     nm_bids: List[dict[str, int]] = [
-                        {"nm": int(cmd.nmid), "cpm": int(cmd.new_bid)} for cmd in cmds
+                        {"nmid": int(cmd.nmid), "bid": int(cmd.new_bid)} for cmd in cmds
                     ]
-                    await self._wb_api_cpm_updater.update_bids(self._shop_id, adv_id=adv_id, nm_bids=nm_bids)
+                    await self._wb_api_cpm_updater.update_bids_for_shop(dv_id=adv_id, nm_bids=nm_bids)
             except asyncio.CancelledError:
                 # Ack всех уже извлечённых элементов, затем пробрасываем отмену
                 for cmds in snapshot.values():

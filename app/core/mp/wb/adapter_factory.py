@@ -10,7 +10,6 @@ class AdapterFactory:
         key = (shop_id, section.value, version.value)
         adapter = self.__adapters.get(key)
         if not adapter:
-
             adapter = self.__get_new_adapter(section, version)
             self.__adapters[key] = adapter
         client = self.__client_factory.get_client(shop_id, section, version)

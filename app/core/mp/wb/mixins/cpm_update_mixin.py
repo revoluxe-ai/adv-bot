@@ -1,19 +1,21 @@
 ﻿from __future__ import annotations
 
+from ..adapters.promotion.v1 import PromotionV1Adapter
+
 """Миксин для обновления CPM ставок."""
 
 import logging
-
-from app.shared.application.dto.update_bids_in_advs.update_bids_search_adv_ids_batch import (
-    UpdateBidsSearchAdvInShopBatch,
-    UpdateBidForNmidCommand,
-)
-from app.core.di import inject
-from app.core.mp.wb.base_adapters.base_adapter import WBBaseAdapters
+from .base_wb_api_protocol import  BaseWBApiProtocol
 
 logger = logging.getLogger(__name__)
 
 
-class CPMUpdateMixin(WBBaseAdapters):
-    """Миксин для управления ставками CPM."""
-    pass
+class CPMUpdateMixin(BaseWBApiProtocol):
+
+    async def def update_bids_for_shop(self: BaseWBApiProtocol, update_cpms_for_shop_command: UpdateBIDForShopCommand ) -> None:
+        adapter: PromotionAdapterProtocol = self.adapter_manager.get_adapter(self.shop_id,
+                                                                             'promotion',
+                                                                             version=1)
+        await adapter.update_cpms_in_search_advs(update_cpms_for_shop_command)
+
+
