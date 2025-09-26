@@ -3,25 +3,49 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
 
 Key = tuple[str, str, str]  # (shop_id, section, method_raw)
 
 
+@dataclass(frozen=True, slots=True)
+class RateLimitConfig:
+    """Immutable configuration describing a token bucket style limit."""
+
+    requests_per_interval: int
+    interval_seconds: float
+    burst: int | None = None
+    weight: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.requests_per_interval <= 0:
+            raise ValueError("requests_per_interval must be positive")
+        if self.interval_seconds <= 0:
+            raise ValueError("interval_seconds must be positive")
+        if self.weight <= 0:
+            raise ValueError("weight must be positive")
+
+    @property
+    def min_interval(self) -> float:
+        """Return minimal spacing between requests for the plain weight."""
+        return self.interval_seconds / self.requests_per_interval
+
+    def interval_for_weight(self, weight: float | None = None) -> float:
+        """Return spacing adjusted for a heavier request."""
+        effective_weight = weight if weight and weight > 0 else self.weight
+        return self.min_interval * max(effective_weight, 1.0)
+
+
 @dataclass
 class RateLimitRecord:
-    # последняя отметка времени вызова (для равномерной подачи)
     last_call_ts: float = 0.0
-    # сколько запросов осталось в текущем окне burst
     remaining: int | None = None
-    # когда полностью восстановится burst (epoch seconds), если известно
     reset_at: float | None = None
-    # если получили 429 и сервер сказал подождать
     retry_after_until: float | None = None
+    config: RateLimitConfig | None = None
 
 
 class RateLimitStorage:
-    """In-memory RL-хранилище под ключ (shop_id, section, method_raw)."""
+    """In-memory rate limit storage shared across adapters."""
 
     def __init__(self) -> None:
         self._data: dict[Key, RateLimitRecord] = {}
@@ -42,22 +66,46 @@ class RateLimitStorage:
             self._data[key] = rec
         return rec
 
-    async def preflight_delay(self, shop_id: str, section: str, method: str) -> float:
-        """Верни сколько секунд подождать перед вызовом с учётом retry_after/reset."""
+    async def register_config(
+        self,
+        shop_id: str,
+        section: str,
+        method: str,
+        config: RateLimitConfig,
+    ) -> None:
+        """Bind a static configuration to the key if it is not set yet."""
         key: Key = (shop_id, section, method)
-        rec = self.get(shop_id, section, method)
-        now = time.time()
+        lock = self._lock_for(key)
+        async with lock:
+            rec = self.get(shop_id, section, method)
+            if rec.config != config:
+                rec.config = config
 
-        delay = 0.0
-        # если есть активный retry-after, ждём до него
-        if rec.retry_after_until and rec.retry_after_until > now:
-            delay = max(delay, rec.retry_after_until - now)
+    async def preflight_delay(self, shop_id: str, section: str, method: str) -> float:
+        """Return delay before issuing the next request based on known limits/state."""
+        key: Key = (shop_id, section, method)
+        lock = self._lock_for(key)
+        async with lock:
+            rec = self.get(shop_id, section, method)
+            now = time.time()
+            delay = 0.0
 
-        # если reset_at в будущем и remaining == 0, тоже подождём до reset
-        if rec.remaining == 0 and rec.reset_at and rec.reset_at > now:
-            delay = max(delay, rec.reset_at - now)
+            if rec.retry_after_until and rec.retry_after_until > now:
+                delay = max(delay, rec.retry_after_until - now)
 
-        return delay
+            if rec.remaining == 0 and rec.reset_at and rec.reset_at > now:
+                delay = max(delay, rec.reset_at - now)
+
+            config = rec.config
+            if config is not None and config.requests_per_interval > 0:
+                min_interval = config.interval_for_weight()
+                if rec.last_call_ts:
+                    elapsed = now - rec.last_call_ts
+                    if elapsed < min_interval:
+                        delay = max(delay, min_interval - elapsed)
+                rec.last_call_ts = now + delay
+
+            return delay
 
     async def update_from_response(
         self,
@@ -67,16 +115,13 @@ class RateLimitStorage:
         status_code: int,
         headers: dict[str, str],
     ) -> None:
-        """Обновить состояние по заголовкам WB.
-        Ожидаем заголовки: X-Ratelimit-Limit, X-Ratelimit-Remaining, X-Ratelimit-Reset, X-Ratelimit-Retry
-        """
+        """Update runtime rate-limit state using HTTP response headers."""
         key: Key = (shop_id, section, method)
         lock = self._lock_for(key)
         async with lock:
             rec = self.get(shop_id, section, method)
             now = time.time()
 
-            # remaining
             remaining = headers.get("X-Ratelimit-Remaining")
             if remaining is not None:
                 try:
@@ -84,7 +129,6 @@ class RateLimitStorage:
                 except ValueError:
                     pass
 
-            # reset
             reset = headers.get("X-Ratelimit-Reset")
             if reset is not None:
                 try:
@@ -93,7 +137,6 @@ class RateLimitStorage:
                 except ValueError:
                     pass
 
-            # retry-after (актуально при 429)
             retry = headers.get("X-Ratelimit-Retry")
             if retry is not None and status_code == 429:
                 try:
@@ -101,5 +144,7 @@ class RateLimitStorage:
                     rec.retry_after_until = now + secs
                 except ValueError:
                     pass
+            elif status_code != 429:
+                rec.retry_after_until = None
 
             rec.last_call_ts = now

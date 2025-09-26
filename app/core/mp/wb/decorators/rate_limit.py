@@ -4,7 +4,7 @@ from functools import wraps
 from typing import Any, Callable, Coroutine
 import asyncio
 
-from app.core.mp.wb.rate_limit.config import RateLimitConfig
+from app.core.mp.wb.rate_limit.storage import RateLimitConfig
 
 
 _DEF_RATE_LIMIT_WEIGHT = 1.0
@@ -118,3 +118,4 @@ def rate_limit_decorator(
         return resp
 
     return wrapper
+

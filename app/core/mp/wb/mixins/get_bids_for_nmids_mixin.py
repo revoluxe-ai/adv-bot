@@ -14,3 +14,4 @@ class GetBidsForNmidsMixin:
     async def get_bids_for_nmid_campaign(self, adv_id: int, nmids: List[int]) -> Dict[int, int]:
         adapter: PromotionAdapterProtocol = self.get_adapter(self.section, self.version)
         return await adapter.get_current_bids(adv_id=adv_id, nmids=nmids)
+

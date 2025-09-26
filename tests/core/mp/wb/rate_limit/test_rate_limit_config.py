@@ -4,7 +4,7 @@ import pytest
 
 from app.core.mp.wb.adapters.base_adapter import WBBaseAdapter
 from app.core.mp.wb.decorators.rate_limit import rate_limit_decorator
-from app.core.mp.wb.rate_limit.config import RateLimitConfig
+from app.core.mp.wb.rate_limit.storage import RateLimitConfig
 from app.core.mp.wb.rate_limit.storage import RateLimitStorage
 
 
@@ -94,3 +94,4 @@ async def test_rate_limit_accepts_limits_interval_aliases() -> None:
     record = adapter.rate_limit_storage.get("shop-1", "test", "call")
     expected = RateLimitConfig(requests_per_interval=3, interval_seconds=2.0)
     assert record.config == expected
+

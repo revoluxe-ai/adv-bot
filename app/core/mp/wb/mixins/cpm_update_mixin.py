@@ -12,7 +12,7 @@ class CPMUpdateMixin:
     promotion_adapter_version: str = "v1"
 
     def _promotion_adapter(self) -> PromotionAdapterProtocol:
-        adapter = self.get_promotion_adapter(self.promotion_adapter_version)
+        adapter = self.get_adapter("promotion", self.promotion_adapter_version)
         return cast(PromotionAdapterProtocol, adapter)
 
     async def update_bids_for_shop(
@@ -21,3 +21,4 @@ class CPMUpdateMixin:
     ) -> None:
         adapter = self._promotion_adapter()
         await adapter.update_cpms_in_search_advs(update_cpms_for_shop_command)
+

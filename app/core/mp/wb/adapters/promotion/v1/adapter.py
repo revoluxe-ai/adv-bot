@@ -4,7 +4,7 @@ from typing import ClassVar, Dict, List
 
 from app.core.mp.wb.adapters.base_adapter import WBBaseAdapter
 from app.core.mp.wb.decorators.rate_limit import rate_limit_decorator
-from app.core.mp.wb.rate_limit.config import RateLimitConfig
+from app.core.mp.wb.rate_limit.storage import RateLimitConfig
 from app.core.mp.wb.rate_limit.storage import RateLimitStorage
 
 
@@ -36,3 +36,4 @@ class PromotionAdapterV1(WBBaseAdapter):
     async def get_min_bids(self, adv_id: int, nmids: List[int]) -> Dict[int, int]:
         """Fetch minimal bids for a promotion campaign. Implementation TBD."""
         raise NotImplementedError
+
