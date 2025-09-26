@@ -1,7 +1,8 @@
 from .methods.sozdanie_kampanij.post_adv_v0_bids_min import PostAdvV0BidsMinResponse200
+from ...base_adapter import WBBaseAdapters
 
 
-class PromotionAdapterV1:
+class PromotionAdapterV1(WBBaseAdapters):
     async def get_min_bids(self,
                            client: UserAuthClient,
                            get_min_bids_command: GetMinBidsCommand) -> dict[int, int]:

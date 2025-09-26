@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from app.core.mp.wb.adapters.base import BaseAdapter
+from app.core.mp.wb.decorators.auth import auth_decorator
 
 
 class PromotionV1Adapter(BaseAdapter):
@@ -19,6 +20,6 @@ class PromotionV1Adapter(BaseAdapter):
         """Return current bids mapping by nmid."""
         raise NotImplementedError
 
-    async def update_bids(self, payload: Any) -> None:
-        """Send bids update batch."""
-        raise NotImplementedError
+    @auth_decorator()
+    async def update_bids(self, payload: Any, client: PromotionClient) -> None:
+

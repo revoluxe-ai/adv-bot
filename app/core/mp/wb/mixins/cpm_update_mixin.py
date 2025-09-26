@@ -1,7 +1,6 @@
 ﻿from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 
 from ._adapter_mixins.mixins.promotion_adapter_mixin import PromotionAdapterProtocol
 from .base_wb_api_protocol import BaseWBApiProtocol
