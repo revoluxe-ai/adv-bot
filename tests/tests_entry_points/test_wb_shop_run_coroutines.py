@@ -40,20 +40,11 @@ async def test_wb_shop_run_calls_all_coroutines():
     # Применяем наш мок-метод
     with (
         patch("asyncio.gather", side_effect=mock_gather),
-        patch(
-            "app.modules.shop_runner.wb_shop.CoroutinesManager"
-        ) as mock_coroutines_manager,
+        patch("app.modules.shop_runner.wb_shop.CoroutinesManager") as mock_coroutines_manager,
     ):
-        # Настраиваем мок CoroutinesManager
+        # Настраиваем мок CoroutinesManager (только активные методы)
         mock_manager_instance = mock_coroutines_manager.return_value
-        mock_manager_instance.parsing_keywords_run = AsyncMock()
-        mock_manager_instance.update_advs_data_from_wb_to_pg = AsyncMock()
-        mock_manager_instance.update_cards_data_from_wb_to_pg = AsyncMock()
-        mock_manager_instance.update_cpm_bid = AsyncMock()
-        mock_manager_instance.update_common_sale_stat = AsyncMock()
-        mock_manager_instance.update_full_adv_stat = AsyncMock()
-        mock_manager_instance.adv_settings_auto_update = AsyncMock()
-        mock_manager_instance.update_top_key_in_advs = AsyncMock()
+        mock_manager_instance.update_cpm_bid_in_search_advs = AsyncMock()
 
         # Вызываем тестируемый метод
         await wb_shop.run()
@@ -64,15 +55,8 @@ async def test_wb_shop_run_calls_all_coroutines():
         # Проверяем, что _alive_worker_run был вызван
         wb_shop._alive_worker_run.assert_called_once()
 
-        # Проверяем, что все методы CoroutinesManager были вызваны
-        mock_manager_instance.parsing_keywords_run.assert_called_once()
-        mock_manager_instance.update_advs_data_from_wb_to_pg.assert_called_once()
-        mock_manager_instance.update_cards_data_from_wb_to_pg.assert_called_once()
-        mock_manager_instance.update_cpm_bid.assert_called_once()
-        mock_manager_instance.update_common_sale_stat.assert_called_once()
-        mock_manager_instance.update_full_adv_stat.assert_called_once()
-        mock_manager_instance.adv_settings_auto_update.assert_called_once()
-        mock_manager_instance.update_top_key_in_advs.assert_called_once()
+        # Проверяем, что активный метод CoroutinesManager был вызван
+        mock_manager_instance.update_cpm_bid_in_search_advs.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -95,22 +79,13 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
 
     # Мокируем asyncio.gather для проверки количества аргументов
     with patch("asyncio.gather") as mock_gather:
-        with patch(
-            "app.modules.shop_runner.wb_shop.CoroutinesManager"
-        ) as mock_coroutines_manager:
+        with patch("app.modules.shop_runner.wb_shop.CoroutinesManager") as mock_coroutines_manager:
             # Настраиваем mock_gather, чтобы он возвращал корутину
             mock_gather.return_value = asyncio.create_task(asyncio.sleep(0))
 
-            # Настраиваем мок CoroutinesManager
+            # Настраиваем мок CoroutinesManager (только активные методы)
             mock_manager_instance = mock_coroutines_manager.return_value
-            mock_manager_instance.parsing_keywords_run = AsyncMock()
-            mock_manager_instance.update_advs_data_from_wb_to_pg = AsyncMock()
-            mock_manager_instance.update_cards_data_from_wb_to_pg = AsyncMock()
-            mock_manager_instance.update_cpm_bid = AsyncMock()
-            mock_manager_instance.update_common_sale_stat = AsyncMock()
-            mock_manager_instance.update_full_adv_stat = AsyncMock()
-            mock_manager_instance.adv_settings_auto_update = AsyncMock()
-            mock_manager_instance.update_top_key_in_advs = AsyncMock()
+            mock_manager_instance.update_cpm_bid_in_search_advs = AsyncMock()
 
             # Вызываем тестируемый метод
             await wb_shop.run()
@@ -121,10 +96,8 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             # Получаем все аргументы, с которыми был вызван gather
             call_args = mock_gather.call_args[0]
 
-            # Проверяем, что gather был вызван с 9 аргументами (1 _alive_worker_run + 8 методов CoroutinesManager)
-            assert (
-                len(call_args) == 9
-            ), f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
+            # Проверяем, что gather был вызван с 2 аргументами (1 _alive_worker_run + 1 метод CoroutinesManager)
+            assert len(call_args) == 2, f"asyncio.gather должен быть вызван с 2 аргументами, получено {len(call_args)}"
 
 
 @pytest.mark.asyncio
