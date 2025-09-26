@@ -1,25 +1,25 @@
-from .adapter_enums import AdapterSection, AdapterVersion
+from __future__ import annotations
+
+from typing import Dict, Tuple
+
+from app.core.mp.wb.adapters.base import BaseAdapter
 
 
-class AdapterFactory:
-    __adapters: dict[tuple[str, str, int], BaseAdapter] = {}
-    __client_factory = AuthenticatedClientFactory()
+class WbApiAdapterFactory:
+    """Factory that creates and caches adapters per (shop_id, section, version)."""
 
+    def __init__(self) -> None:
+        self.adapters: Dict[Tuple[str, str, str], BaseAdapter] = {}
 
-    def get_adapter(self, shop_id: str, section: AdapterSection, version: AdapterVersion) -> "BaseAdapter"":
-        key = (shop_id, section.value, version.value)
-        adapter = self.__adapters.get(key)
-        if not adapter:
-            adapter = self.__get_new_adapter(section, version)
-            self.__adapters[key] = adapter
-        client = self.__client_factory.get_client(shop_id, section, version)
-        adapter.set_client(client)
+    def get_adapter(self, shop_id: str, section: str, version: str) -> BaseAdapter:
+        key = (shop_id, section, version)
+        if key in self.adapters:
+            return self.adapters[key]
+        # Concrete adapter creation is deferred; registry/conditional logic added later
+        adapter = self._create_adapter(shop_id, section, version)
+        self.adapters[key] = adapter
         return adapter
 
-
-    def __get_new_adapter(self, section: AdapterSection, version: AdapterVersion) -> "BaseAdapter":
-        if section == AdapterSection.PROMOTION and version == AdapterVersion.V1:
-            from .adapters.promotion.v1 import PromotionV1Adapter
-            return PromotionV1Adapter()
-        else:
-            raise ValueError(f"No adapter found for section {section} and version {version}")
+    def _create_adapter(self, shop_id: str, section: str, version: str) -> BaseAdapter:
+        """Instantiate appropriate adapter class for section/version."""
+        raise NotImplementedError
