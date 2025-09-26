@@ -7,8 +7,6 @@ from .base_wb_api_protocol import BaseWBApiProtocol
 logger = logging.getLogger(__name__)
 
 
-
-
 class CPMUpdateMixin(BaseWBApiProtocol):
     async def update_bids_for_shop(
             self,
