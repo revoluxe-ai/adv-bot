@@ -37,5 +37,5 @@ async def test_promotion_manager_delegates_calls():
 
     # проверяем update_bids
     batch_payload = {"adv_id": adv_id, "bids": [{111: 30}, {222: 40}]}
-    await manager.update_bids(batch_payload)
+    await manager.update_bids(shop_id, batch_payload)
     adapter_mock.update_bids.assert_awaited_once_with(batch_payload)

@@ -1,26 +1,24 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-import json
 
-import httpx
-
-from app.core.mp.wb.adapters.base import BaseAdapter, AuthenticatedClient
-from app.core.mp.wb.decorators.auth import auth_decorator
-from app.core.mp.wb.decorators.rate_limit import rate_limit_decorator
-from app.core.mp.wb.decorators.retry import retry_decorator
+from app.core.mp.wb.adapters.base import BaseAdapter
 
 
-class PromotionV1Adapter((BaseAdapter):
-    base_url = "https://advert-api.wildberries.ru/"
+class PromotionV1Adapter(BaseAdapter):
+    """Adapter for Promotion API v1. Stateful and scoped by shop_id/section/version."""
 
-    def __init__(self):
-        self.limiter = Limiter()
+    def __init__(self, shop_id: str, version: str) -> None:
+        super().__init__(shop_id=shop_id, section="promotion", version=version)
 
-    @auth_decorator
-    @rate_limit_decorator
-    @retry_decorator
     async def get_min_bids(self, adv_id: int, nmids: List[int]) -> Dict[int, int]:
+        """Return minimal bids mapping by nmid."""
+        raise NotImplementedError
 
+    async def get_current_bids(self, adv_id: int, nmids: List[int]) -> Dict[int, int]:
+        """Return current bids mapping by nmid."""
+        raise NotImplementedError
 
-
+    async def update_bids(self, payload: Any) -> None:
+        """Send bids update batch."""
+        raise NotImplementedError

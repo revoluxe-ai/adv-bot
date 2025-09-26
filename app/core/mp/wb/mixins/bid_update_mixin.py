@@ -11,3 +11,5 @@ class BidUpdateMixin:
     async def update_bids(self, batch: object) -> None:
         """Delegate to PromotionManager.update_bids with stored shop_id."""
         return await self.promotion_manager.update_bids(self.shop_id, batch)
+
+
