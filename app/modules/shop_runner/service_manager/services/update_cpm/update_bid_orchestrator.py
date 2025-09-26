@@ -7,6 +7,7 @@ from app.shared.application.commands.search_adv_bid_update.send_to_queue_for_upd
     SendToQueueForUpdateNmidBidCommand,
 )
 from app.shared.application.commands.search_adv_bid_update.update_bid_command import BidUpdateForNmidCommand
+
 from .wb_api_cpm_updater import WBApiCpmUpdater
 
 logger = logging.getLogger(__name__)
@@ -15,29 +16,26 @@ logger = logging.getLogger(__name__)
 class UpdateBatch:
     """Класс для управления батчами обновлений ставок."""
 
-    def __init__(self, commands: Optional[Dict[int, List[BidUpdateForNmidCommand]]] = None):
+    def __init__(self, commands: Optional[dict[int, list[BidUpdateForNmidCommand]]] = None):
         self.commands = commands or {}
 
     def add_command(self, command: BidUpdateForNmidCommand) -> None:
         """Добавляет команду в батч."""
         self.commands.setdefault(command.adv_id, []).append(command)
 
-    def get_nmids_bids_for_adv(self, adv_id: int) -> List[dict[str, int]]:
+    def get_nmids_bids_for_adv(self, adv_id: int) -> list[dict[str, int]]:
         """Возвращает nmids_bids для указанного adv_id."""
-        return [
-            {"nmid": int(cmd.nmid), "bid": int(cmd.new_bid)}
-            for cmd in self.commands.get(adv_id, [])
-        ]
+        return [{"nmid": int(cmd.nmid), "bid": int(cmd.new_bid)} for cmd in self.commands.get(adv_id, [])]
 
     def is_empty(self) -> bool:
         """Проверяет, пуст ли батч."""
         return not self.commands
 
-    def get_adv_ids(self) -> List[int]:
+    def get_adv_ids(self) -> list[int]:
         """Возвращает список всех adv_id в батче."""
         return list(self.commands.keys())
 
-    def pop_adv_commands(self, adv_ids: List[int]) -> Dict[int, List[BidUpdateForNmidCommand]]:
+    def pop_adv_commands(self, adv_ids: list[int]) -> dict[int, list[BidUpdateForNmidCommand]]:
         """Извлекает команды для указанных adv_id из батча."""
         result = {}
         for adv_id in adv_ids:
@@ -56,10 +54,10 @@ class UpdateBidOrchestrator:
     BATCH_IDLE_SLEEP_SEC: float = 0.05
 
     def __init__(
-            self,
-            queue: asyncio.Queue[BidUpdateForNmidCommand],
-            stop_event: asyncio.Event,
-            shop_id: str,
+        self,
+        queue: asyncio.Queue[BidUpdateForNmidCommand],
+        stop_event: asyncio.Event,
+        shop_id: str,
     ) -> None:
         self._queue: asyncio.Queue[BidUpdateForNmidCommand] = queue
         self._stop_event: asyncio.Event = stop_event
@@ -101,7 +99,7 @@ class UpdateBidOrchestrator:
         - Локального requeue/ретраев нет.
         """
         while not self._stop_event.is_set():
-            snapshot: Dict[int, List[BidUpdateForNmidCommand]] = {}
+            snapshot: dict[int, list[BidUpdateForNmidCommand]] = {}
 
             async with self._batch_lock:
                 if self._update_batch.is_empty():
@@ -109,7 +107,7 @@ class UpdateBidOrchestrator:
                     continue
 
                 # Берем только первые MAX_ADV_IDS_PER_BATCH adv_id для обработки
-                adv_ids_to_process = self._update_batch.get_adv_ids()[:self.MAX_ADV_IDS_PER_BATCH]
+                adv_ids_to_process = self._update_batch.get_adv_ids()[: self.MAX_ADV_IDS_PER_BATCH]
                 snapshot = self._update_batch.pop_adv_commands(adv_ids_to_process)
 
             if not snapshot:
@@ -118,9 +116,9 @@ class UpdateBidOrchestrator:
 
             try:
                 # Отправляем обновления по adv_id
-                for adv_id, cmds in snapshot.items():
-                    nm_bids = self._update_batch.get_nmids_bids_for_adv(adv_id)
-                    await self._wb_api_cpm_updater.update_bids_for_shop(adv_id=adv_id, nm_bids=nm_bids)
+                for adv_id, _cmds in snapshot.items():
+                    nmids_bids = self._update_batch.get_nmids_bids_for_adv(adv_id)
+                    await self._wb_api_cpm_updater.update_bids_for_shop(adv_id=adv_id, nmids_bids=nmids_bids)
 
                 # Ack всех команд при успехе
                 self._ack_commands(snapshot)
@@ -135,7 +133,7 @@ class UpdateBidOrchestrator:
                 self._ack_commands(snapshot)
                 await asyncio.sleep(self.BATCH_IDLE_SLEEP_SEC)
 
-    def _ack_commands(self, snapshot: Dict[int, List[BidUpdateForNmidCommand]]) -> None:
+    def _ack_commands(self, snapshot: dict[int, list[BidUpdateForNmidCommand]]) -> None:
         """Выполняет ack для всех команд в snapshot."""
         for cmds in snapshot.values():
             for _ in cmds:
