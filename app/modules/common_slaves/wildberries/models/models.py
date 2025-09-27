@@ -19,12 +19,13 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.wb_api import exceptions
-
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 # Добавляем правильный импорт AdvPayment
 from app.modules.wb_adv_updater.models import AdvPayment
 from app.settings import settings
@@ -393,6 +394,13 @@ class AdvSetting(BaseTable):
     auction_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
     auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=True, server_default=text("true")
+    )
+
+    orders_source_for_auto_mode: Mapped[OrdersSourceForAutoMode] = mapped_column(
+        SAEnum(OrdersSourceForAutoMode),
+        nullable=True,
+        default=OrdersSourceForAutoMode.COMMON_STATISTIC,  # экземпляр Enum
+        server_default=OrdersSourceForAutoMode.COMMON_STATISTIC.name  # строка
     )
 
     __table_args__ = (
