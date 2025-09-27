@@ -2,6 +2,7 @@ import datetime
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.filters.callback_data import CallbackData
 
 from app.client_bot import const
 from app.client_bot.const import AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
@@ -9,6 +10,7 @@ from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
     Action,
     TurnBot,
+    OrdersSourceToggle,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -21,6 +23,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
@@ -35,6 +38,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
     AutoUpdateWhiteListSetting,
     RelevantKeywordStatusSetting,
 )
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
@@ -111,6 +115,20 @@ def get_adv_setting_keyboard(
 
     callback = AutoUpdateTargetPlaceSettingCallBack(
         new_status=new_status, adv_setting_original_id=adv_setting.id
+    ).pack()
+    button = InlineKeyboardButton(text=text, callback_data=callback)
+    builder.row(button)
+
+    # Добавляем кнопку переключения источника заказов для автоуправления
+    if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
+        text = "Переключить на общую статистику заказов"
+        new_source = OrdersSourceForAutoMode.COMMON_STATISTIC.value  # Use .value for string
+    else:
+        text = "Переключить на заказы только из рекламы"
+        new_source = OrdersSourceForAutoMode.ADV_SUM.value  # Use .value for string
+
+    callback = OrdersSourceToggle(
+        new_source=new_source, adv_setting_original_id=adv_setting.id
     ).pack()
     button = InlineKeyboardButton(text=text, callback_data=callback)
     builder.row(button)

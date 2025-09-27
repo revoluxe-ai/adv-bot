@@ -7,6 +7,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
@@ -94,7 +95,22 @@ class CommonAdvsStatDataManager:
         mean_price_for_order = None
         spend_for_inner_advs_for_days = None
 
-        if common_stat:
+        # Проверяем источник заказов для автоуправления
+        if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
+            # Используем только заказы из рекламы (Авто + Аукцион)
+            base_common_orders = all_orders_from_advs
+            if base_common_orders == 0:
+                base_common_orders = 1
+            spend_for_inner_advs_for_days = full_spend_for_all_advs
+
+            now = datetime.now()
+            hours_passed = now.hour + now.minute / 60 + now.second / 3600
+            fraction_of_day = hours_passed / 24 + pass_days
+
+            mean_orders_for_days = base_common_orders / fraction_of_day
+            mean_price_for_order = spend_for_inner_advs_for_days / base_common_orders
+        elif common_stat:
+            # Используем общую статистику (по умолчанию)
             base_common_orders = common_stat.orders
             if base_common_orders < all_orders_from_advs:
                 base_common_orders = all_orders_from_advs
