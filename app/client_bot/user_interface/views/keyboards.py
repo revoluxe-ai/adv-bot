@@ -23,7 +23,6 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBUserCabinet,
 )
-from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
@@ -120,15 +119,17 @@ def get_adv_setting_keyboard(
     builder.row(button)
 
     # Добавляем кнопку переключения источника заказов для автоуправления
-    if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
-        text = "Переключить на общую статистику заказов"
-        new_source = OrdersSourceForAutoMode.COMMON_STATISTIC.value  # Use .value for string
+    current_source = (
+        adv_setting.orders_source_for_auto_mode
+        or OrdersSourceForAutoMode.COMMON_STATISTIC
+    )
+    if current_source == OrdersSourceForAutoMode.ADV_SUM:
+        text = "Режим заказов: только реклама (нажмите, чтобы переключить)"
     else:
-        text = "Переключить на заказы только из рекламы"
-        new_source = OrdersSourceForAutoMode.ADV_SUM.value  # Use .value for string
+        text = "Режим заказов: общая статистика (нажмите, чтобы переключить)"
 
     callback = OrdersSourceToggle(
-        new_source=new_source, adv_setting_original_id=adv_setting.id
+        adv_setting_original_id=adv_setting.id
     ).pack()
     button = InlineKeyboardButton(text=text, callback_data=callback)
     builder.row(button)

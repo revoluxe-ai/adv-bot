@@ -218,5 +218,4 @@ class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
 
 
 class OrdersSourceToggle(CallbackData, prefix="orders_source_toggle"):
-    new_source: str  # OrdersSourceForAutoMode enum value as string
     adv_setting_original_id: int
