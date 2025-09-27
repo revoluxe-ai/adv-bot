@@ -1,5 +1,7 @@
 from aiogram.filters.callback_data import CallbackData
 
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+
 
 class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
     wb_user_cabinet_original_id: int
@@ -213,3 +215,8 @@ class ResetPlace(CallbackData, prefix="reset_place"):
 class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
     action: str
     wb_cabinet_original_id: int
+
+
+class OrdersSourceToggle(CallbackData, prefix="orders_source_toggle"):
+    new_source: str  # OrdersSourceForAutoMode enum value as string
+    adv_setting_original_id: int

@@ -19,6 +19,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -161,14 +162,21 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Общее число заказов: {self._all_orders_for_last_days}\n"
             f"Заказов из Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
             f"Заказов из Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
-            f"""Заказов из Органики: {
+        )
+        
+        # Показываем источник данных для заказов
+        if self._adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
+            text += "📊 Источник заказов: ТОЛЬКО рекламные заказы\n"
+            text += f"Суммарные заказы из рекламы: {self.full_adv_stat_for_last_days_for_auto_adv.orders + self.full_adv_stat_for_last_days_for_auction.orders}\n"
+        else:
+            text += "📊 Источник заказов: Общая статистика (включая органику)\n"
+            text += f"""Заказов из Органики: {
                 self._all_orders_for_last_days
                 - self.full_adv_stat_for_last_days_for_auction.orders
                 - self.full_adv_stat_for_last_days_for_auto_adv.orders
                 if self._all_orders_for_last_days
                 else 0
-            }"""
-        )
+            }\n"""
 
         # Получаем целевые значения из настроек
         plan_for_sales_for_day = self._adv_setting.plan_for_sales_for_day

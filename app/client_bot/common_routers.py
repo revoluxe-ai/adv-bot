@@ -45,6 +45,7 @@ from .user_interface.handlers import (
     keyword_settings,
     keywords_positions_history,
     min_views_for_ml_predict_ctr,
+    orders_source_toggle,
     reset_place_setting,
     setting_min_ctr,
     shop_settings,
@@ -68,6 +69,7 @@ common_router.include_routers(manual_update_phrase_position_router)
 common_router.include_router(auto_updater_target_place_setting_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
+common_router.include_routers(orders_source_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)
