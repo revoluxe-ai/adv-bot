@@ -43,17 +43,32 @@ async def test_adv_settings_auto_update(
             new=MagicMock(return_value=plan_data),
         ),
         patch(
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_active_advs",
+            new=AsyncMock(return_value=[adv_setting_mock]),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_calculated_keywords",
+            new=AsyncMock(return_value=keywords_mocks),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.update",
+            new=AsyncMock(return_value=None),
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater."
-            "auto_white_list_updater.auto_white_list_updater.WhiteListUpdateManager._delete_phrase_from_white_list",
+            "auto_white_list_updater.auto_white_list_updater.WhiteListUpdateManager.delete_last_white_phrase",
             new_callable=AsyncMock,
         ),
         patch(
             "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater."
-            "auto_white_list_updater.auto_white_list_updater.WhiteListUpdateManager._delete_phrase_from_white_list"
+            "auto_white_list_updater.auto_white_list_updater.WhiteListUpdateManager.delete_last_white_phrase"
         ),
     ):
         manager = CoroutinesManager(wb_api)
         manager._update_advs_models = AsyncMock()
         manager._adv_settings_list = [adv_setting_mock]
         manager._adv_settings_dict = {adv_setting_mock.adv_id: adv_setting_mock}
-        await manager.adv_settings_auto_update()
+        # decorator while_coroutine_decorator запускает корутину в бесконечном цикле,
+        # поэтому в тестах мы вызываем оригинальную функцию через __wrapped__,
+        # чтобы выполнить её один раз и не зависнуть.
+        await manager.adv_settings_auto_update.__wrapped__(manager)
