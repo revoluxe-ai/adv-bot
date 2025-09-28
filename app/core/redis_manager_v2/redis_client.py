@@ -3,15 +3,8 @@ __all__ = ("RedisClient",)
 from abc import ABC
 from typing import Any
 
-try:
-    from aioredis import Redis
-except Exception:
-    # Fallback stub to avoid hard dependency during progressive refactor
-    class Redis:  # type: ignore
-        pass
-
-
 from dependency_injector.wiring import Provide, inject
+from redis.asyncio import Redis
 
 from app.core.di import AppContainer
 
@@ -79,7 +72,7 @@ class RedisClient(ABC):
         return await self._replica_read_client.scard(name)
 
     async def sismember(self, name: str, value: str) -> bool:
-        return await self._replica_read_client.sismember(name, value)
+        return bool(await self._replica_read_client.sismember(name, value))
 
     # Методы для записи (через мастер)
     async def set(self, key: str, value: str | bytes, ex: int | None = None) -> bool:
@@ -157,9 +150,9 @@ class RedisClient(ABC):
         return results
 
     async def execute_pipeline_batch(
-        self,
-        read_commands: list[list[Any]] = None,
-        write_commands: list[list[Any]] = None,
+            self,
+            read_commands: list[list[Any]] = None,
+            write_commands: list[list[Any]] = None,
     ) -> dict[str, list[Any]]:
         """Выполняет пакет команд чтения и записи"""
         results = {}
