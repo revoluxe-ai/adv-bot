@@ -118,101 +118,77 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                     logger.debug(f"Кабинет {cabinet_id}: нулевая сумма списания — пропуск")
                     continue
 
-                payment_successful = False
+                # Списание для всего кабинета: сначала бонусы, затем баланс
+                bonus_to_use = min(calculated_bonus, price_for_shop_for_day)
+                remaining_after_bonus = price_for_shop_for_day - bonus_to_use
+                balance_to_use = min(calculated_balance, remaining_after_bonus)
+                total_deducted = bonus_to_use + balance_to_use
 
-                # Списание для всего кабинета
-                if calculated_bonus >= price_for_shop_for_day:
-                    bonus_payment = WBBonusPayment(
-                        wb_cabinet_id=cabinet_id,
-                        amount=-price_for_shop_for_day,
-                        description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}",
-                        operation_type="auto_subtract",
-                        transaction_date_time=datetime.now(),
-                    )
-                    session.add(bonus_payment)
-                    logger.debug(f"Кабинет {cabinet_id}: списание бонусов {price_for_shop_for_day}")
-                    payment_successful = True
-                elif calculated_balance >= price_for_shop_for_day:
-                    balance_payment = WBBalancePayment(
-                        wb_cabinet_id=cabinet_id,
-                        amount=-price_for_shop_for_day,
-                        description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}",
-                        operation_type="auto_subtract",
-                        transaction_date_time=datetime.now(),
-                    )
-                    session.add(balance_payment)
-                    logger.debug(f"Кабинет {cabinet_id}: списание баланса {price_for_shop_for_day}")
-                    payment_successful = True
-                elif calculated_bonus + calculated_balance >= price_for_shop_for_day:
-                    remaining_amount = price_for_shop_for_day
-                    if calculated_bonus > 0:
-                        bonus_to_charge = min(calculated_bonus, remaining_amount)
-                        bonus_payment = WBBonusPayment(
-                            wb_cabinet_id=cabinet_id,
-                            amount=-bonus_to_charge,
-                            description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}",
-                            operation_type="auto_subtract",
-                            transaction_date_time=datetime.now(),
-                        )
-                        session.add(bonus_payment)
-                        remaining_amount -= bonus_to_charge
-                        logger.debug(
-                            f"Кабинет {cabinet_id}: списание бонусов {bonus_to_charge}, остаток {remaining_amount}"
-                        )
-                    if remaining_amount > 0:
-                        balance_payment = WBBalancePayment(
-                            wb_cabinet_id=cabinet_id,
-                            amount=-remaining_amount,
-                            description=f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}",
-                            operation_type="auto_subtract",
-                            transaction_date_time=datetime.now(),
-                        )
-                        session.add(balance_payment)
-                        logger.debug(
-                            f"Кабинет {cabinet_id}: списание баланса {remaining_amount} для остатка платежа"
-                        )
-                    payment_successful = True
-                else:
+                if total_deducted < price_for_shop_for_day:
                     # Недостаточно средств — деактивируем все кампании кабинета
                     for campaign in cabinet_campaigns:
                         campaign.bot_active = False
                         campaign.auto_update_white_list = False
                         campaign.auto_update_target_place = False
                     logger.debug(f"Кабинет {cabinet_id}: деактивировано кампаний: {len(cabinet_campaigns)}")
+                else:
+                    payment_description = (
+                        f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}"
+                    )
+                    now_dt = datetime.now()
+                    if bonus_to_use > 0:
+                        bonus_payment = WBBonusPayment(
+                            wb_cabinet_id=cabinet_id,
+                            amount=-bonus_to_use,
+                            description=payment_description,
+                            operation_type="auto_subtract",
+                            transaction_date_time=now_dt,
+                        )
+                        session.add(bonus_payment)
+                        logger.debug(
+                            f"Кабинет {cabinet_id}: списание бонусов {bonus_to_use} из {price_for_shop_for_day}"
+                        )
+                    if balance_to_use > 0:
+                        balance_payment = WBBalancePayment(
+                            wb_cabinet_id=cabinet_id,
+                            amount=-balance_to_use,
+                            description=payment_description,
+                            operation_type="auto_subtract",
+                            transaction_date_time=now_dt,
+                        )
+                        session.add(balance_payment)
+                        logger.debug(
+                            f"Кабинет {cabinet_id}: списание баланса {balance_to_use} из {price_for_shop_for_day}"
+                        )
 
                 # История по кампаниям: делим общую сумму поровну
-                if payment_successful:
-                    price_per_campaign = price_for_shop_for_day / len(cabinet_campaigns) if cabinet_campaigns else 0
-                    logger.debug(
-                        f"Кабинет {cabinet_id}: распределение по {len(cabinet_campaigns)} кампаниям, "
-                        f"цена за кампанию={price_per_campaign}"
-                    )
-                    for campaign in cabinet_campaigns:
-                        existing = await session.execute(
-                            select(AdvPayment).where(
-                                AdvPayment.adv_setting_id == campaign.id,
-                                AdvPayment.date == current_date,
-                            )
+                price_per_campaign = price_for_shop_for_day / len(cabinet_campaigns) if cabinet_campaigns else 0
+                logger.debug(
+                    f"Кабинет {cabinet_id}: распределение по {len(cabinet_campaigns)} кампаниям, "
+                    f"цена за кампанию={price_per_campaign}"
+                )
+                for campaign in cabinet_campaigns:
+                    existing = await session.execute(
+                        select(AdvPayment).where(
+                            AdvPayment.adv_setting_id == campaign.id,
+                            AdvPayment.date == current_date,
                         )
-                        if existing.scalar_one_or_none() is None:
-                            payment = AdvPayment(
-                                date=current_date,
-                                amount=price_per_campaign,
-                                adv_setting_id=campaign.id,
-                            )
-                            session.add(payment)
-                            logger.debug(
-                                f"Кабинет {cabinet_id}: создан AdvPayment для adv_setting={campaign.id} "
-                                f"на сумму {price_per_campaign}"
-                            )
-                        else:
-                            logger.debug(
-                                f"Кабинет {cabinet_id}: AdvPayment уже существует для adv_setting={campaign.id}, пропуск"
-                            )
-                else:
-                    logger.debug(
-                        f"Кабинет {cabinet_id}: списание не выполнено, AdvPayment создаваться не будет"
                     )
+                    if existing.scalar_one_or_none() is None:
+                        payment = AdvPayment(
+                            date=current_date,
+                            amount=price_per_campaign,
+                            adv_setting_id=campaign.id,
+                        )
+                        session.add(payment)
+                        logger.debug(
+                            f"Кабинет {cabinet_id}: создан AdvPayment для adv_setting={campaign.id} "
+                            f"на сумму {price_per_campaign}"
+                        )
+                    else:
+                        logger.debug(
+                            f"Кабинет {cabinet_id}: AdvPayment уже существует для adv_setting={campaign.id}, пропуск"
+                        )
 
                 processed_cabinet_ids.append(cabinet_id)
 
