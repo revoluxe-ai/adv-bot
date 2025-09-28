@@ -299,6 +299,8 @@ class WBCard(BaseTable):  # Изменено название таблицы
 
 
 class AdvSetting(BaseTable):
+    # TODO: Модель поделена между микросервисами и требует рефакторинга!!!!
+    # Не менять поля до рефакторина! По уму: вынести всю работу с базами в один микросервис и прикрутить GRPC-DTO
     class ActiveStatuses(Enum):
         DONE = "done"
 
