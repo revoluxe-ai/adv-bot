@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 from aiogram import Dispatcher, types
@@ -11,6 +12,9 @@ from app.client_bot.bot import get_bot
 from app.client_bot.global_router import global_router
 from app.settings import settings
 from python_modules.logger import setup_logging
+
+# Import token monitoring system
+from app.modules.token_monitoring import initialize_token_monitoring, shutdown_token_monitoring
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +32,18 @@ POLLING_MODE = settings.polling_mode
 
 @asynccontextmanager
 async def lifespan(app_fast_api: FastAPI):
+    # Initialize token monitoring system
+    try:
+        await initialize_token_monitoring(
+            enable_decorator_monitoring=True,
+            enable_expiration_scheduler=True
+        )
+        logger.info("✅ Token monitoring system initialized")
+    except Exception as e:
+        logger.error("❌ Failed to initialize token monitoring: %s",
+                     e)
+        # Continue without token monitoring if it fails
+
     async with ClientSession() as client_session:
         dp = Dispatcher(client_session=client_session)
         dp.include_router(global_router)
@@ -52,6 +68,13 @@ async def lifespan(app_fast_api: FastAPI):
                 await bot.delete_webhook()
                 await bot.session.close()
                 logger.info("✅ Завершено.")
+
+    # Shutdown token monitoring system
+    try:
+        await shutdown_token_monitoring()
+        logger.info("✅ Token monitoring system shutdown completed")
+    except Exception as e:
+        logger.error(f"❌ Error during token monitoring shutdown: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
