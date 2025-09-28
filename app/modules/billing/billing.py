@@ -179,6 +179,35 @@ async def process_payment_for_advs(current_date: date = None, pricer: Pricer = N
                         campaign.auto_update_white_list = False
                         campaign.auto_update_target_place = False
                     logger.debug(f"Кабинет {cabinet_id}: деактивировано кампаний: {len(cabinet_campaigns)}")
+                else:
+                    payment_description = (
+                        f"Ежедневное списание за {len(cabinet_campaigns)} кампаний, дата: {current_date}"
+                    )
+                    now_dt = datetime.now()
+                    if bonus_to_use > 0:
+                        bonus_payment = WBBonusPayment(
+                            wb_cabinet_id=cabinet_id,
+                            amount=-bonus_to_use,
+                            description=payment_description,
+                            operation_type="auto_subtract",
+                            transaction_date_time=now_dt,
+                        )
+                        session.add(bonus_payment)
+                        logger.debug(
+                            f"Кабинет {cabinet_id}: списание бонусов {bonus_to_use} из {price_for_shop_for_day}"
+                        )
+                    if balance_to_use > 0:
+                        balance_payment = WBBalancePayment(
+                            wb_cabinet_id=cabinet_id,
+                            amount=-balance_to_use,
+                            description=payment_description,
+                            operation_type="auto_subtract",
+                            transaction_date_time=now_dt,
+                        )
+                        session.add(balance_payment)
+                        logger.debug(
+                            f"Кабинет {cabinet_id}: списание баланса {balance_to_use} из {price_for_shop_for_day}"
+                        )
 
                 # История по кампаниям: делим общую сумму поровну
                 if payment_successful:
