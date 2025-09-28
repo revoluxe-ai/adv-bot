@@ -374,12 +374,8 @@ async def test_process_payment_for_advs_insufficient_funds(
             assert mock_adv_setting.auto_update_white_list is False
             assert mock_adv_setting.auto_update_target_place is False
 
-            # Проверяем, что AdvPayment был создан (история)
-            mock_session.add.assert_called_once()
-            added_adv_payment = mock_session.add.call_args[0][0]
-            assert added_adv_payment.date == current_date
-            assert added_adv_payment.amount == 75.0
-            assert added_adv_payment.adv_setting_id == mock_adv_setting.id
+            # Проверяем, что AdvPayment не был создан при недостатке средств
+            mock_session.add.assert_not_called()
 
             mock_session.commit.assert_called_once()
             mock_session.rollback.assert_not_called()
