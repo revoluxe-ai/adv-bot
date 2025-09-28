@@ -5,8 +5,10 @@ without importing the full runner module to avoid dependency issues.
 For complete functional testing, see test_runner_token_integration_isolated.py
 """
 
+import asyncio
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 import os
 
 

@@ -52,15 +52,6 @@ class ShopMenu(TextWithKeyboard):
 
         super().__init__(bot, chat_id)
 
-    async def _is_active_adv(self):
-        """Метод оставлен для обратной совместимости, но больше не используется
-        так как данные получаем сразу при основной загрузке
-        """
-        logger.debug(
-            "_is_active_adv больше не используется, и будет удален в будущих версиях"
-        )
-        return self.is_active_adv
-
     async def _load_all_data(self):
         """Оптимизированная загрузка всех данных в одной транзакции"""
         start_time = datetime.now()
@@ -271,7 +262,7 @@ class ShopMenu(TextWithKeyboard):
         logger.debug("Отображение меню магазина (вызов родительского метода __call__)")
 
         # Вызываем родительский метод __call__, который отвечает за отправку сообщения
-        await super().__call__()
+        result = await super().__call__()
 
         logger.debug(
             f"Меню магазина отображено за {(datetime.now() - display_start_time).total_seconds():.2f} сек"
@@ -280,6 +271,7 @@ class ShopMenu(TextWithKeyboard):
         logger.debug(
             f"Общее время выполнения метода ShopMenu.__call__: {total_time:.2f} сек"
         )
+        return result
 
     @property
     def text(self):
@@ -337,9 +329,7 @@ class ShopMenu(TextWithKeyboard):
         user_telegram_id = self._user_telegram_id
         wb_user_cabinet = self._wb_user_cabinet
         wb_cabinet = self._wb_cabinet
-        is_active_adv = self.is_active_adv
         wb_cabinet_original_id = wb_cabinet.id
-        is_active_adv: True
         builder = InlineKeyboardBuilder()
         button = InlineKeyboardButton(
             text="Автоматические рекламные кампании",
@@ -378,16 +368,15 @@ class ShopMenu(TextWithKeyboard):
 
             builder.row(button)
 
-        if is_active_adv:
-            button = InlineKeyboardButton(
-                text="Отключить все кампании",
-                callback_data=TurnBot(
-                    action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
-                ).pack(),
-            )
-            builder.row(button)
+        button = InlineKeyboardButton(
+            text="Отключить все кампании",
+            callback_data=TurnBot(
+                action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+        builder.row(button)
 
-        if self._wb_cabinet.white_list_update_active:
+        if bool(self._wb_cabinet.white_list_update_active):
             button = InlineKeyboardButton(
                 text="Выключить авто-обновление белого списка",
                 callback_data=TurnWhiteListUpdate(
