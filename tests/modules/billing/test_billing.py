@@ -280,6 +280,57 @@ async def test_process_payment_for_advs_success_balance(
 
 @pytest.mark.asyncio
 @patch("app.modules.billing.billing.sm", new_callable=MagicMock)
+async def test_process_payment_for_advs_success_mixed_sources(
+    mock_sm, mock_adv_setting, mock_wb_cabinet, mock_pricer, mock_redis_manager
+):
+    current_date = datetime.date(2023, 1, 1)
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_sm.return_value.__aenter__.return_value = mock_session
+    mock_sm.return_value.__aexit__.return_value = False
+
+    mock_adv_setting.wb_cabinet_id = mock_wb_cabinet.id
+    mock_adv_setting.bot_active = True
+    mock_wb_cabinet.adv_settings = [mock_adv_setting]
+    mock_wb_cabinet.calculated_bonus = 50.0
+    mock_wb_cabinet.calculated_balance = 100.0
+    mock_pricer.get_price_for_day_for_shop.return_value = 75.0
+
+    with patch(
+        "app.modules.billing.billing.get_active_cabinets_with_data", new_callable=AsyncMock
+    ) as mock_get_active_cabinets_with_data:
+        mock_get_active_cabinets_with_data.return_value = [mock_wb_cabinet]
+
+        with patch("app.modules.billing.billing.redis_manager", new=mock_redis_manager):
+            mock_session.execute.side_effect = [
+                MagicMock(scalar=MagicMock(return_value=0)),
+                MagicMock(scalar=MagicMock(return_value=0)),
+                MagicMock(scalar=MagicMock(return_value=0)),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+                MagicMock(scalar=MagicMock(return_value=None)),
+            ]
+
+            await process_payment_for_advs(current_date=current_date, pricer=mock_pricer)
+
+            mock_get_active_cabinets_with_data.assert_called_once_with(mock_session)
+            mock_pricer.get_price_for_day_for_shop.assert_called_once_with(str(mock_wb_cabinet.shop_id))
+
+            assert mock_session.add.call_count == 3
+            added_bonus_payment = mock_session.add.call_args_list[0].args[0]
+            added_balance_payment = mock_session.add.call_args_list[1].args[0]
+            added_adv_payment = mock_session.add.call_args_list[2].args[0]
+
+            assert added_bonus_payment.amount == pytest.approx(-50.0, abs=1e-2)
+            assert added_balance_payment.amount == pytest.approx(-25.0, abs=1e-2)
+            assert added_adv_payment.amount == 75.0
+            assert added_adv_payment.adv_setting_id == mock_adv_setting.id
+
+            mock_session.commit.assert_called_once()
+            mock_session.rollback.assert_not_called()
+            mock_redis_manager.set_billing_process_for_day.assert_called_once_with(mock_wb_cabinet.id, current_date)
+
+
+@pytest.mark.asyncio
+@patch("app.modules.billing.billing.sm", new_callable=MagicMock)
 async def test_process_payment_for_advs_insufficient_funds(
     mock_sm, mock_adv_setting, mock_wb_cabinet, mock_pricer, mock_redis_manager
 ):
