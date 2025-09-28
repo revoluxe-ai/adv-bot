@@ -1,0 +1,337 @@
+"""Tests for ShopMenu token monitoring integration."""
+
+import datetime
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from app.modules.shop_menu.message import ShopMenu
+from app.modules.token_monitoring.services.token_info_service import TokenStatusReport, TokenInfo
+from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, AdvSetting
+from app.utils.db.models import User
+
+
+class TestShopMenuTokenIntegration:
+    """Test cases for ShopMenu with token monitoring integration."""
+    
+    @pytest.fixture
+    def mock_bot(self):
+        """Mock Telegram bot."""
+        return AsyncMock()
+    
+    @pytest.fixture
+    def mock_state(self):
+        """Mock FSMContext state."""
+        state = AsyncMock()
+        state.update_data = AsyncMock()
+        return state
+    
+    @pytest.fixture
+    def mock_session_maker(self):
+        """Mock session maker."""
+        session = AsyncMock()
+        session_maker = MagicMock()
+        session_maker.return_value.__aenter__.return_value = session
+        session_maker.return_value.__aexit__.return_value = None
+        return session_maker, session
+    
+    @pytest.fixture
+    def sample_wb_user_cabinet(self):
+        """Create sample WBUserCabinet with related data."""
+        # Create user
+        user = MagicMock()
+        user.user_telegram_id = 123456789
+        
+        # Create cabinet - avoid spec to prevent SQLAlchemy hybrid property issues
+        wb_cabinet = MagicMock()
+        wb_cabinet.id = 1
+        wb_cabinet.shop_id = "test_shop_123"
+        wb_cabinet.balance = 1000.0
+        wb_cabinet.bonus = 200.0
+        wb_cabinet.calculated_balance = 1000.0
+        wb_cabinet.calculated_bonus = 200.0
+        wb_cabinet.expiration_time = datetime.datetime.now() + datetime.timedelta(days=30)
+        wb_cabinet.white_list_update_active = False
+        wb_cabinet.adv_settings = []
+        wb_cabinet.bonus_payments = []
+        wb_cabinet.balance_payments = []
+        
+        # Create user cabinet
+        wb_user_cabinet = MagicMock()
+        wb_user_cabinet.id = 1
+        wb_user_cabinet.name = "Test Shop"
+        wb_user_cabinet.user = user
+        wb_user_cabinet.wb_cabinet = wb_cabinet
+        
+        return wb_user_cabinet
+    
+    @pytest.fixture
+    def sample_token_status_complete(self):
+        """Create sample complete token status."""
+        token_info = MagicMock()
+        token_info.is_valid = True
+        token_info.is_expired = False
+        token_info.is_read_only = False
+        token_info.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        
+        return TokenStatusReport(
+            shop_id="test_shop_123",
+            shop_name="Test Shop",
+            status="Complete",
+            all_tokens=[token_info],
+            valid_tokens=[token_info],
+            expired_tokens=[],
+            available_permissions={"Контент", "Статистика", "Аналитика", "Продвижение"},
+            missing_permissions=set(),
+            has_all_required_permissions=True,
+            expiring_tokens=[]
+        )
+    
+    @pytest.fixture
+    def sample_token_status_insufficient(self):
+        """Create sample insufficient token status."""
+        token_info = MagicMock()
+        token_info.is_valid = True
+        token_info.is_expired = False
+        token_info.is_read_only = False
+        token_info.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        
+        return TokenStatusReport(
+            shop_id="test_shop_123",
+            shop_name="Test Shop",
+            status="Insufficient",
+            all_tokens=[token_info],
+            valid_tokens=[token_info],
+            expired_tokens=[],
+            available_permissions={"Контент", "Статистика"},
+            missing_permissions={"Аналитика", "Продвижение"},
+            has_all_required_permissions=False,
+            expiring_tokens=[]
+        )
+    
+    @pytest.fixture
+    def sample_token_status_expiring(self):
+        """Create sample token status with expiring tokens."""
+        from app.modules.token_monitoring.services.token_info_service import ExpiringToken
+        
+        token_info = MagicMock()
+        token_info.is_valid = True
+        token_info.is_expired = False
+        token_info.is_read_only = False
+        token_info.expires = datetime.datetime.now() + datetime.timedelta(days=3)
+        
+        expiring_token = ExpiringToken(
+            token_info=token_info,
+            days_until_expiry=3,
+            shop_name="Test Shop"
+        )
+        
+        return TokenStatusReport(
+            shop_id="test_shop_123",
+            shop_name="Test Shop",
+            status="Complete",
+            all_tokens=[token_info],
+            valid_tokens=[token_info],
+            expired_tokens=[],
+            available_permissions={"Контент", "Статистика", "Аналитика", "Продвижение"},
+            missing_permissions=set(),
+            has_all_required_permissions=True,
+            expiring_tokens=[expiring_token]
+        )
+    
+    @pytest.mark.asyncio
+    async def test_shop_menu_text_with_complete_tokens(
+        self, mock_bot, mock_state, sample_wb_user_cabinet, sample_token_status_complete
+    ):
+        """Test ShopMenu text generation with complete token status."""
+        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+            with patch('app.modules.token_monitoring.services.token_info_service.get_shop_token_status') as mock_get_status:
+                # Setup mocks
+                mock_get_status.return_value = sample_token_status_complete
+                mock_sm.return_value.__aenter__.return_value.execute.return_value.scalar_one.return_value = sample_wb_user_cabinet
+                
+                shop_menu = ShopMenu(
+                    bot=mock_bot,
+                    chat_id=123456789,
+                    state=mock_state,
+                    wb_user_cabinet_original_id=1
+                )
+                
+                # Mock required attributes
+                shop_menu._wb_user_cabinet = sample_wb_user_cabinet
+                shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
+                shop_menu._balance = 1000.0
+                shop_menu._bonus = 200.0
+                shop_menu.count_active_advs = 0
+                shop_menu.total_amount_for_day = 100.0
+                shop_menu.price_for_month_for_shop = 500
+                shop_menu.is_active_adv = False
+                shop_menu._token_status = sample_token_status_complete
+                shop_menu._token_status_loaded = True
+                
+                text = shop_menu.text
+                
+                # Verify token status information is included
+                assert "🔑 <b>Состояние токенов:</b> ✅" in text
+                assert "• Всего токенов: 1" in text
+                assert "• Действующих: 1" in text
+                assert "Отсутствуют права" not in text  # Should not show missing permissions
+    
+    @pytest.mark.asyncio
+    async def test_shop_menu_text_with_insufficient_tokens(
+        self, mock_bot, mock_state, sample_wb_user_cabinet, sample_token_status_insufficient
+    ):
+        """Test ShopMenu text generation with insufficient token status."""
+        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+            with patch('app.modules.token_monitoring.services.token_info_service.get_shop_token_status') as mock_get_status:
+                mock_get_status.return_value = sample_token_status_insufficient
+                mock_sm.return_value.__aenter__.return_value.execute.return_value.scalar_one.return_value = sample_wb_user_cabinet
+                
+                shop_menu = ShopMenu(
+                    bot=mock_bot,
+                    chat_id=123456789,
+                    state=mock_state,
+                    wb_user_cabinet_original_id=1
+                )
+                
+                # Mock required attributes
+                shop_menu._wb_user_cabinet = sample_wb_user_cabinet
+                shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
+                shop_menu._balance = 1000.0
+                shop_menu._bonus = 200.0
+                shop_menu.count_active_advs = 0
+                shop_menu.total_amount_for_day = 100.0
+                shop_menu.price_for_month_for_shop = 500
+                shop_menu.is_active_adv = False
+                shop_menu._token_status = sample_token_status_insufficient
+                shop_menu._token_status_loaded = True
+                
+                text = shop_menu.text
+                
+                # Verify token status information shows problems
+                assert "🔑 <b>Состояние токенов:</b> ⚠️" in text
+                assert "❌ <b>Отсутствуют права:</b> Аналитика, Продвижение" in text
+                assert "🔧 <b>Требуется обновление токенов</b>" in text
+    
+    @pytest.mark.asyncio
+    async def test_shop_menu_text_with_expiring_tokens(
+        self, mock_bot, mock_state, sample_wb_user_cabinet, sample_token_status_expiring
+    ):
+        """Test ShopMenu text generation with expiring tokens."""
+        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+            with patch('app.modules.token_monitoring.services.token_info_service.get_shop_token_status') as mock_get_status:
+                mock_get_status.return_value = sample_token_status_expiring
+                mock_sm.return_value.__aenter__.return_value.execute.return_value.scalar_one.return_value = sample_wb_user_cabinet
+                
+                shop_menu = ShopMenu(
+                    bot=mock_bot,
+                    chat_id=123456789,
+                    state=mock_state,
+                    wb_user_cabinet_original_id=1
+                )
+                
+                # Mock required attributes
+                shop_menu._wb_user_cabinet = sample_wb_user_cabinet
+                shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
+                shop_menu._balance = 1000.0
+                shop_menu._bonus = 200.0
+                shop_menu.count_active_advs = 0
+                shop_menu.total_amount_for_day = 100.0
+                shop_menu.price_for_month_for_shop = 500
+                shop_menu.is_active_adv = False
+                shop_menu._token_status = sample_token_status_expiring
+                shop_menu._token_status_loaded = True
+                
+                text = shop_menu.text
+                
+                # Verify expiring token warning is shown
+                assert "🚨 <b>Токены истекают через 3 дн.!</b>" in text
+    
+    @pytest.mark.asyncio
+    async def test_shop_menu_text_with_token_loading_error(
+        self, mock_bot, mock_state, sample_wb_user_cabinet
+    ):
+        """Test ShopMenu text generation when token loading fails."""
+        shop_menu = ShopMenu(
+            bot=mock_bot,
+            chat_id=123456789,
+            state=mock_state,
+            wb_user_cabinet_original_id=1
+        )
+        
+        # Mock required attributes
+        shop_menu._wb_user_cabinet = sample_wb_user_cabinet
+        shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
+        shop_menu._balance = 1000.0
+        shop_menu._bonus = 200.0
+        shop_menu.count_active_advs = 0
+        shop_menu.total_amount_for_day = 100.0
+        shop_menu.price_for_month_for_shop = 500
+        shop_menu.is_active_adv = False
+        shop_menu._token_status = None
+        shop_menu._token_status_loaded = False
+        
+        text = shop_menu.text
+        
+        # Verify error message is shown
+        assert "🔑 <b>Состояние токенов:</b> ⚠️ Ошибка загрузки" in text
+    
+    @pytest.mark.asyncio
+    async def test_token_status_actually_loaded_during_data_loading(
+        self, mock_bot, mock_state, sample_wb_user_cabinet, sample_token_status_complete
+    ):
+        """
+        CRITICAL TEST: This test would have caught the original bug.
+        
+        The existing tests manually set _token_status and _token_status_loaded,
+        but this test actually calls _load_all_data() to verify token loading works.
+        """
+        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+            with patch('app.modules.shop_menu.message.get_shop_token_status') as mock_get_token_status:
+                # Setup database mocks - properly mock the async context manager
+                mock_session = AsyncMock()
+                mock_context_manager = AsyncMock()
+                mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session)
+                mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+                mock_sm.return_value = mock_context_manager
+                
+                # Mock the database query result
+                mock_result = MagicMock()  # Result object is not async
+                mock_result.scalar_one.return_value = sample_wb_user_cabinet  # scalar_one() is sync
+                mock_session.execute = AsyncMock(return_value=mock_result)  # execute() is async
+                
+                # Mock token status service
+                mock_get_token_status.return_value = sample_token_status_complete
+                
+                # Mock pricer methods - these are async methods
+                with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
+                    with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
+                        mock_month_tariff.return_value = 500
+                        mock_day_price.return_value = 100
+                        
+                        # Create ShopMenu instance
+                        shop_menu = ShopMenu(
+                            bot=mock_bot,
+                            chat_id=123456789,
+                            state=mock_state,
+                            wb_user_cabinet_original_id=1
+                        )
+                        
+                        # Initially, token status should not be loaded
+                        assert shop_menu._token_status_loaded == False, "Initially should not be loaded"
+                        assert shop_menu._token_status is None, "Initially should be None"
+                        
+                        # Call _load_all_data which should load token status
+                        await shop_menu._load_all_data()
+                        
+                        # After loading, token status should be populated
+                        assert shop_menu._token_status_loaded == True, "Token status should be marked as loaded"
+                        assert shop_menu._token_status is not None, "Token status should be populated"
+                        assert shop_menu._token_status == sample_token_status_complete, "Should have correct data"
+                        
+                        # Verify that get_shop_token_status was called
+                        mock_get_token_status.assert_called_once_with("test_shop_123")
+                        
+                        # Verify text output shows correct token status
+                        text = shop_menu.text
+                        assert "🔑 <b>Состояние токенов:</b> ✅" in text
+                        assert "⚠️ Ошибка загрузки" not in text
