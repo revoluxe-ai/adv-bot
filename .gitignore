@@ -1,3 +1,5 @@
+!wb/keyword_async_ml_updater/bot/images/*
+!wb/keyword_async_ml_updater/bot/images
 setting.yaml
 *.yaml
 redis-data/
@@ -18,6 +20,7 @@ dist/
 .idea/
 *__pycache__
 wb/keyword_async_ml_updater/data/*
+__pycache__
 app/utils/faiss_manager/indexes/*
 *.pickle
 *.zip
