@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+import logging
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
@@ -26,6 +27,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBToken,
     WBUserCabinet,
 )
+from app.modules.token_monitoring.services.token_info_service import TokenInfoService
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
@@ -49,8 +51,25 @@ class ShopMenu(TextWithKeyboard):
         from app.modules.billing.pricer import Pricer
 
         self._pricer = Pricer()
+        
+        # Initialize token status attributes
+        self._token_status = None
+        self._token_status_loaded = False
 
         super().__init__(bot, chat_id)
+
+    async def get_shop_token_status(self):
+        """Load token status for the shop."""
+        try:
+            token_service = TokenInfoService()
+            shop_id = self._wb_cabinet.shop_id
+            self._token_status = await token_service.get_shop_token_status(shop_id)
+            self._token_status_loaded = True
+            logger.debug(f"Token status loaded for shop {shop_id}: {self._token_status.status}")
+        except Exception as e:
+            logger.error(f"Failed to load token status: {e}", exc_info=True)
+            self._token_status = None
+            self._token_status_loaded = False
 
     async def _is_active_adv(self):
         """Метод оставлен для обратной совместимости, но больше не используется
@@ -117,7 +136,10 @@ class ShopMenu(TextWithKeyboard):
                     self.price_for_month_for_shop = 0
                     self.total_amount_for_day = 0
 
-                # 6. Сохраняем данные в состояние
+                # 6. Load token status
+                await self.get_shop_token_status()
+                
+                # 7. Сохраняем данные в состояние
                 await self._state.update_data(last_wb_cabinet_original_id=self._wb_cabinet.id)
 
                 logger.debug(f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек")
@@ -145,7 +167,7 @@ class ShopMenu(TextWithKeyboard):
                 # Сразу фильтруем токены для конкретного магазина
                 stmt = select(WBToken).where(WBToken.shop_id == shop_id)
                 result = await session.execute(stmt)
-                work_tokens: list[WBToken] = result.scalars().all()
+                work_tokens = list(result.scalars().all())
                 logger.debug(
                     f"Найдено токенов для магазина {shop_id}: {len(work_tokens)} (запрос выполнен за {(datetime.now() - token_start_time).total_seconds():.2f} сек)"
                 )
@@ -222,7 +244,12 @@ class ShopMenu(TextWithKeyboard):
         except Exception as e:
             logger.error(f"Критическая ошибка в ShopMenu.__call__: {e}", exc_info=True)
             del e
-            return  # Прерываем выполнение в случае ошибки
+            # Return error message instead of None
+            error_msg = await self.bot.send_message(
+                self.chat_id,
+                "Произошла ошибка при загрузке данных. Пожалуйста, попробуйте позже."
+            )
+            return error_msg, "error"
 
         # Проверка и обработка токенов только если это необходимо
         # Вызов метода _process_tokens закомментирован, так как из кода видно,
@@ -237,11 +264,12 @@ class ShopMenu(TextWithKeyboard):
         logger.debug("Отображение меню магазина (вызов родительского метода __call__)")
 
         # Вызываем родительский метод __call__, который отвечает за отправку сообщения
-        await super().__call__()
+        result = await super().__call__()
 
         logger.debug(f"Меню магазина отображено за {(datetime.now() - display_start_time).total_seconds():.2f} сек")
         total_time = (datetime.now() - start_time).total_seconds()
         logger.debug(f"Общее время выполнения метода ShopMenu.__call__: {total_time:.2f} сек")
+        return result
 
     @property
     def text(self):
@@ -254,6 +282,8 @@ class ShopMenu(TextWithKeyboard):
             last_for_days = int(total_money / self.total_amount_for_day)
         else:
             last_for_days = "∞"
+        
+        # 💰 MONEY SECTION - All financial information grouped together
         text = (
             f"📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n"
             f"""Ваш тариф в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else "Нет активных РК"}"""
@@ -261,6 +291,7 @@ class ShopMenu(TextWithKeyboard):
             f"💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n"
         )
 
+        # Money status with appropriate warnings
         if isinstance(last_for_days, int):
             if last_for_days > 7:
                 text += f"""
@@ -280,12 +311,50 @@ class ShopMenu(TextWithKeyboard):
 
 🔔 Настоятельно рекомендую пополнить счет во избежание проблем с работой кампаний"""
 
+        # Balance details
         text += (
-            "===================================\n"
-            f"🏬 Магазин: {self._wb_user_cabinet.name}\n"
-            f"🆔 Shop ID: {self._wb_cabinet.shop_id}\n"
-            f"💰 Баланс магазина: {balance:.0f} рублей\n"
-            f"🎁 Бонусы: {self._bonus:.0f} рублей\n"
+            "\n===================================\n"
+            f"💰 <b>Баланс магазина</b>: {balance:.0f} рублей\n"
+            f"🎁 <b>Бонусы</b>: {self._bonus:.0f} рублей\n"
+        )
+        
+        # 🔑 TOKEN SECTION - All token information grouped together 
+        if self._token_status_loaded and self._token_status:
+            token_status = self._token_status
+            
+            if token_status.status == "Complete":
+                # All permissions available - show success status
+                text += "\n🔑 <b>Токены:</b> ✅ <b>Все в порядке</b>\n"
+                
+                # Always show when service will expire (if we have expiration info)
+                days_until_break = token_status.days_until_service_breaks
+                if days_until_break is not None:
+                    expiration_date = token_status.service_expiration_date
+                    if expiration_date:
+                        date_str = expiration_date.strftime("%d.%m.%Y")
+                        if days_until_break <= 3:
+                            text += f"🚨 <b>Сервис перестанет работать {date_str} (через {days_until_break} дн.)!</b>\n"
+                        elif days_until_break <= 7:
+                            text += f"⚠️ <b>Внимание:</b> Сервис перестанет работать {date_str} (через {days_until_break} дн.)\n"
+                        elif days_until_break <= 30:
+                            text += f"⏰ Сервис перестанет работать {date_str} (через {days_until_break} дн.)\n"
+                        else:
+                            # Show expiration date even for distant dates
+                            text += f"📅 Токены действуют до {date_str} (через {days_until_break} дн.)\n"
+            else:
+                # Missing permissions - show critical status
+                text += "\n🔑 <b>Токены:</b> ❌ <b>Требуется обновление</b>\n"
+                text += f"❌ <b>Отсутствуют права:</b> {', '.join(sorted(token_status.missing_permissions))}\n"
+                text += "🔧 <b>Добавьте новые токены для восстановления работы</b>\n"
+                
+        elif not self._token_status_loaded:
+            text += "\n🔑 <b>Токены:</b> ⚠️ <b>Ошибка загрузки</b>\n"
+        
+        # Shop information
+        text += (
+            "\n===================================\n"
+            f"🏬 <b>Магазин</b>: {self._wb_user_cabinet.name}\n"
+            f"🆔 <b>Shop ID</b>: {self._wb_cabinet.shop_id}\n"
         )
 
         text += """
@@ -301,7 +370,7 @@ class ShopMenu(TextWithKeyboard):
         wb_cabinet = self._wb_cabinet
         is_active_adv = self.is_active_adv
         wb_cabinet_original_id = wb_cabinet.id
-        is_active_adv: True
+        is_active_adv = True
         builder = InlineKeyboardBuilder()
         button = InlineKeyboardButton(
             text="Автоматические рекламные кампании",
@@ -339,7 +408,7 @@ class ShopMenu(TextWithKeyboard):
             )
             builder.row(button)
 
-        if self._wb_cabinet.white_list_update_active:
+        if bool(self._wb_cabinet.white_list_update_active):
             button = InlineKeyboardButton(
                 text="Выключить авто-обновление белого списка",
                 callback_data=TurnWhiteListUpdate(wb_cabinet_original_id=self._wb_cabinet.id, action="off").pack(),
