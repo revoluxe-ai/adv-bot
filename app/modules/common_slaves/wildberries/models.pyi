@@ -1,0 +1,3 @@
+# Stub for models
+
+class AdvSetting: ...

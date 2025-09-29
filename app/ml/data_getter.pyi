@@ -1,0 +1,3 @@
+# Stub for data_getter
+class DataGetter: ...
+

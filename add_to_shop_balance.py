@@ -6,7 +6,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBBonusPayment,
     WBCabinet,
 )
-from app.utils.db.session_maker import get_async_session_maker as sm
+from app_old.utils.db.session_maker import get_async_session_maker as sm
 
 dotenv.load_dotenv()
 
