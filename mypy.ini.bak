@@ -1,0 +1,27 @@
+; [mypy]
+; plugins = sqlalchemy.ext.mypy.plugin
+; strict = True
+; disallow_untyped_defs = True
+;
+;
+; # Лучше убрать skip, чтобы mypy реально анализировал импорты
+; follow_imports = normal
+;
+; # Для сторонних пакетов можно ослабить проверку
+; ignore_missing_imports = True
+;
+; # Подавление ошибок в отдельных автогенерируемых файлах
+; per-file-ignores =
+;     predict_ctr_service/grpc_service/predict_ctr_service_pb2_grpc.py: no-untyped-def
+;
+;
+; [mypy-joblib.*]
+; ignore_missing_imports = True
+;
+;
+; [mypy-predict_ctr_service.dto.calculated_keyword]
+; ignore_errors = true
+;
+;
+; [mypy-predict_ctr_service.grpc_service.predict_ctr_service_pb2_grpc]
+; ignore_errors = True
