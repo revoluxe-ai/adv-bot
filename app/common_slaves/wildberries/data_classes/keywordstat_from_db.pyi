@@ -1,0 +1,3 @@
+# Stub for keywordstat_from_db
+
+class CalculatedKeyword: ...
