@@ -38,23 +38,23 @@ class Pricer:
         Цена за месяц = цена_тарифа * количество_артикулов
         """
         count = await self.get_advs_count(shop_id)
-        base_tariff: int = self.get_price_for_count_advs_in_cabinet_for_month(count)
+        base_tariff: int | float = self.get_price_for_count_advs_in_cabinet_for_month(count)
 
         automatic_tariff: int = await self.get_automactic_tariff(shop_id)
 
-        return base_tariff + automatic_tariff
+        return int(base_tariff + automatic_tariff)
 
     @staticmethod
-    def get_tariff_for_day(tariff_for_month) -> float:
+    def get_tariff_for_day(tariff_for_month: int) -> float:
         return round(tariff_for_month / 30, 2)
 
-    async def get_price_for_day_for_shop(self, shop_id: str):
+    async def get_price_for_day_for_shop(self, shop_id: str) -> int | float:
         price_for_month_for_shop = await self.get_month_tariff_for_count_advs(shop_id)
         price_for_day = self.get_tariff_for_day(price_for_month_for_shop)
         return price_for_day
 
     @staticmethod
-    def get_price_for_count_advs_in_cabinet_for_month(count_advs: int):
+    def get_price_for_count_advs_in_cabinet_for_month(count_advs: int) -> float:
         for limit, price in sorted(tariffs.items()):
             if count_advs <= limit:
                 return price * count_advs

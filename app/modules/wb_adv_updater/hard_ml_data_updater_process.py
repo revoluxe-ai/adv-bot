@@ -23,7 +23,7 @@ async def update_cards_in_graph_big_cycle():
         await asyncio.sleep(0)
 
 
-async def update_cards_in_graph_small_cycle():
+async def update_cards_in_graph_small_cycle() -> None:
     from . import ml_data_manager
 
     while True:
@@ -35,7 +35,7 @@ async def update_cards_in_graph_small_cycle():
         await asyncio.sleep(0)
 
 
-async def update_keywords_ctr_by_similary():
+async def update_keywords_ctr_by_similary() -> None:
     from . import ml_data_manager
 
     while True:

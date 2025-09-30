@@ -6,12 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from sqlalchemy.orm import configure_mappers
 
 from alembic import context
-from app.admin_bot.sender.utils.db.models import *
-from app.modules.common_slaves.wildberries.models import *
-from app.modules.wb_adv_updater.models import *
-from app.payments.db.models import *
 from app.utils.db.base import BaseTable as Base
-from app.utils.db.models import *
 from app.utils.db.session_maker import get_alchemy_row_for_migration
 
 dotenv.load_dotenv()
@@ -23,7 +18,6 @@ config = context.config
 row = get_alchemy_row_for_migration()
 
 config.set_main_option("sqlalchemy.url", row)
-
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

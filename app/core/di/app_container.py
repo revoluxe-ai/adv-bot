@@ -1,37 +1,46 @@
 """Контейнер для DI-зависимостей приложения."""
 
 __all__ = ("AppContainer",)
-from dependency_injector import containers, providers
 
+from dependency_injector import containers, providers
+from dependency_injector.resources import AsyncResource
+from redis.asyncio import Redis
+
+from app.core.redis_manager_v2.redis_client import RedisClient
 from . import databases
+from .module_resources import ModuleResources
 from ...configs import AppConfig
 
 
-# from neo4j import AsyncDriver
+def create_redis_client(redis_config: AppConfig) -> Redis:
+    redis = databases.create_redis_client(redis_config)
+    return redis
 
 
 class AppContainer(containers.DeclarativeContainer):
     """Главный DI-контейнер приложения. Содержит все основные сервисы и конфигурации."""
+    wiring_config = containers.WiringConfiguration(
+        packages=[
+            "app.core.redis_manager_v2"]
+    )
 
     settings = providers.Singleton(AppConfig.create)
-
-    # # Синхронный провайдер драйвера, чтобы инъекции получали готовый объект
-    # neo4j_driver: providers.Singleton[AsyncDriver] = providers.Singleton(
-    #     databases.create_neo4j_driver,
-    #     neo4j_config=settings.provided.infrastructure.neo4j,
-    # )
-    #
-    # # Асинхронный ресурс для управления жизненным циклом драйвера
-    # _neo4j_lifecycle = providers.Resource(
-    #     databases.Neo4jLifecycle,
-    #     driver=neo4j_driver,
-    # )
-    # Redis: синхронный клиент + приватный lifecycle-ресурс
     redis_client = providers.Singleton(
-        databases.create_redis_client,
-        redis_config=settings.provided.infrastructure.redis,
+        create_redis_client,
+        redis_config=settings,
     )
-    _redis_lifecycle = providers.Resource(
-        databases._RedisLifecycle,
+    # Обёртка над raw Redis, предоставляющая унифицированный API
+    redis_client_wrapper = providers.Singleton(
+        RedisClient,
+        redis_client=redis_client,
+    )
+
+    module_resources = providers.Container(
+        ModuleResources,
+        redis_client_wrapper=redis_client_wrapper,
+    )
+
+    _redis_lifecycle: providers.Resource[AsyncResource[Redis]] = providers.Resource(
+        databases.RedisLifecycle,
         client=redis_client,
     )

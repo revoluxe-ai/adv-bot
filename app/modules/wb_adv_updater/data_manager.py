@@ -53,7 +53,6 @@ from app.utils.redis_manager.exc import DataNotFoundError
 
 logger = logging.getLogger(__name__)
 
-
 _sm = get_async_session_maker
 
 
@@ -69,7 +68,7 @@ async def measure_time(function):
 
 
 async def get_keyword_statistic_clickhouse(
-    client, text: str, adv_ids: set[int], pass_days: int | None = 7
+        client, text: str, adv_ids: set[int], pass_days: int | None = 7
 ) -> tuple[int, int, int]:
     today = datetime.now().date()
     start_date_clause = ""
@@ -124,11 +123,11 @@ async def get_keyword_statistic_clickhouse(
 
 
 async def get_keywords_statistic_clickhouse(
-    adv_setting: AdvSetting,
-    pass_time: timedelta | None = timedelta(days=7),
-    last_views=None,
-    hard_statuses: list[int] | None = None,
-    cache_timeout: int = 60 * 15,
+        adv_setting: AdvSetting,
+        pass_time: timedelta | None = timedelta(days=7),
+        last_views=None,
+        hard_statuses: list[int] | None = None,
+        cache_timeout: int = 60 * 15,
 ) -> list[CalculatedKeyword]:
     async with get_clickhouse_client() as ch_client:
         advs: set[int] = set()
@@ -164,9 +163,9 @@ async def _get_keyword_settings(adv_setting_id: int, hard_statuses: list[int] | 
 
 
 def _build_clickhouse_query(
-    adv_ids: set[int],
-    pass_time: timedelta | None,
-    last_views: int | None = None,
+        adv_ids: set[int],
+        pass_time: timedelta | None,
+        last_views: int | None = None,
 ) -> str:
     # Преобразуем список ID в строку для SQL
     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
@@ -401,7 +400,7 @@ def profile_function(inner_func: Callable, *args, **kwargs):
 
 
 async def convert_keyword_stats_in_clusters(
-    keyword_stats: list[CalculatedKeyword],
+        keyword_stats: list[CalculatedKeyword],
 ) -> list[CalculatedKeyword]:
     preset_to_keywords = defaultdict(list)
     preset_to_cluster_name = {}
@@ -505,7 +504,7 @@ async def get_cached_keyword(adv: AdvSetting, text: str) -> CalculatedKeyword | 
 
 
 def __set_predict_ctr(
-    keyword_stats: list[CalculatedKeyword], min_ctr, adv_setting: AdvSetting
+        keyword_stats: list[CalculatedKeyword], min_ctr, adv_setting: AdvSetting
 ) -> list[CalculatedKeyword]:
     for keyword_stat in keyword_stats:
         keyword_stat.predict_ctr_exponent = adv_setting.exponent_predict_ctr
@@ -535,6 +534,7 @@ def __set_predict_ctr(
             predicted_clicks = int(predicted_views * original_predict_ctr)
             views += predicted_views
             clicks += predicted_clicks + 1
+        # TODO: тут вылетает ошибка деления  на ноль
         baes_predict_ctr = clicks / views
         keyword_stat.predict_ctr = baes_predict_ctr
         keyword_stat.baes_predict_ctr = baes_predict_ctr
@@ -545,9 +545,9 @@ def __set_predict_ctr(
 
 # @profile
 async def get_good_bad_phrases_for_min_ctr(
-    adv_setting: AdvSetting,
-    max_cpc=None,
-    pass_time=timedelta(days=7),
+        adv_setting: AdvSetting,
+        max_cpc=None,
+        pass_time=timedelta(days=7),
 ) -> list[CalculatedKeyword]:
     min_ctr = await get_min_ctr(adv_setting)
     logger.debug("Минимальный ctr получен")
@@ -691,10 +691,10 @@ async def get_good_bad_phrases_for_min_ctr(
                 await asyncio.sleep(0)
                 continue
         if (
-            not original_predict_ctr
-            and enough_views / 2 > keyword_stat.views
-            and not adv_setting.min_views_for_ml_predict
-            and keyword_stat.hard_status in [1, 2]
+                not original_predict_ctr
+                and enough_views / 2 > keyword_stat.views
+                and not adv_setting.min_views_for_ml_predict
+                and keyword_stat.hard_status in [1, 2]
         ):
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
