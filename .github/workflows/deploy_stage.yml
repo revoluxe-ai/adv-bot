@@ -58,7 +58,7 @@ jobs:
 
       # Установка зависимостей
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --no-root --without dev
 
       # Остальные шаги остаются без изменений
       - name: Log in to GitHub Container Registry

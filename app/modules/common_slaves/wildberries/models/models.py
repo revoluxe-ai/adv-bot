@@ -1,8 +1,10 @@
 import datetime
 import json
 import re
+import typing
 from dataclasses import dataclass
 from enum import Enum
+from typing import cast  # добавлено для типизации
 
 import jwt
 from jwt import DecodeError
@@ -26,13 +28,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.wb_api import exceptions
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
-# Добавляем правильный импорт AdvPayment
-from app.modules.wb_adv_updater.models import AdvPayment
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
+if typing.TYPE_CHECKING:
+    from app.modules.billing.models import AdvPayment
 
 _sm = get_async_session_maker
 
@@ -40,9 +43,9 @@ _sm = get_async_session_maker
 class WBUserCabinet(BaseTable):
     wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
     wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="wb_user_cabinets")
-    user_id: Mapped[int] = Column(Integer, ForeignKey("user.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"), nullable=False)
     user: Mapped[User] = relationship("User", back_populates="wb_user_cabinets")
-    name = Column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
     __table_args__ = (
         UniqueConstraint("wb_cabinet_id", "user_id", name="_wb_cabinet_id_user_id_uc"),
         Index("idx_wb_user_cabinet_user_id", "user_id"),
@@ -55,15 +58,17 @@ class WBBalancePayment(BaseTable):
 
     __tablename__ = "wbbalancepayment"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
     wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="balance_payments")
 
-    amount = Column(Float, nullable=False)
-    description = Column(String, nullable=True)
-    transaction_date_time = Column(DateTime, nullable=False, server_default=text("now()"))
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    transaction_date_time: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
     # Тип операции для унификации с бонусами: 'add', 'subtract', 'auto_subtract', 'reset' (если понадобится)
-    operation_type = Column(String, nullable=False, server_default=text("'subtract'"))
+    operation_type: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'subtract'"))
     __table_args__ = (
         Index("idx_wb_balance_payment_cabinet_id", "wb_cabinet_id"),
         Index("idx_wb_balance_payment_date", "transaction_date_time"),
@@ -83,22 +88,18 @@ class WBBonusPayment(BaseTable):
 
     __tablename__ = "wbbonuspayment"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    wb_cabinet_id: Mapped[int] = Column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
     wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="bonus_payments")
 
-    amount = Column(Float, nullable=False)
-    description = Column(String, nullable=True)
-    transaction_date_time = Column(DateTime, nullable=False, server_default=text("now()"))
-
-    # Новые поля для поддержки операций администраторов
-    operation_type = Column(
-        String,
-        nullable=False,
-    )  # 'add', 'subtract', 'reset'
-    admin_user_id = Column(
-        Integer, nullable=True
-    )  # ID администратора, выполнившего операцию, NULL для обычных операций
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    transaction_date_time: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
+    # 'add', 'subtract', 'reset', 'auto_subtract'
+    operation_type: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'subtract'"))
+    admin_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         Index("idx_wb_bonus_payment_cabinet_id", "wb_cabinet_id"),
@@ -110,29 +111,44 @@ class WBBonusPayment(BaseTable):
             "wb_cabinet_id",
             text("DATE(transaction_date_time)"),
             unique=True,
-            postgresql_where=text("operation_type = 'auto_subtract' AND amount < 0 AND admin_user_id IS NULL"),
+            postgresql_where=text(
+                "operation_type = 'auto_subtract' AND amount < 0 AND admin_user_id IS NULL"
+            ),
         ),
     )
 
 
+class WBCategory(BaseTable):
+    cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
+    wb_cabinet: Mapped['WBCabinet'] = relationship(
+        "WBCabinet", back_populates="wb_categories"
+    )
+    wb_category_name: Mapped[str] = mapped_column(String, nullable=False)
+    wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_category", uselist=True)
+    __table_args__ = (Index("ix_wb_category_name", "wb_category_name"),)
+
+
 class WBCabinet(BaseTable):
-    shop_id: Mapped[str] = Column(String, nullable=False, unique=True)
+    shop_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_cabinet", uselist=True)
-    wb_categories = relationship("WBCategory", uselist=True)
-    adv_settings = relationship("AdvSetting", back_populates="wb_cabinet", uselist=True)
+    wb_categories: Mapped[list[WBCategory]] = relationship("WBCategory", uselist=True)
+    adv_settings: Mapped[list['AdvSetting']] = relationship("AdvSetting", back_populates="wb_cabinet", uselist=True)
     wb_user_cabinets: Mapped[list[WBUserCabinet]] = relationship(
         "WBUserCabinet",
         back_populates="wb_cabinet",
     )
-    active = Column(Boolean, default=True)
-    expiration_time = Column(DateTime, nullable=False, server_default=text('datetime("now", "+7 days")'))
-    expiration_alarm_days_pass = Column(Integer, default=None)
-    demo: Mapped[bool] = Column(Boolean, default=True)
-    balance = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    expiration_time: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False,
+                                                               server_default=text('datetime("now", "+7 days")'))
+    expiration_alarm_days_pass: Mapped[int | None] = mapped_column(Integer, default=None)
+    demo: Mapped[bool] = mapped_column(Boolean, default=True)
+    balance: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
     bonus: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
-    white_list_update_active = Column(Boolean, default=False)
-    balance_payments = relationship("WBBalancePayment", back_populates="wb_cabinet", uselist=True)
-    bonus_payments = relationship("WBBonusPayment", back_populates="wb_cabinet", uselist=True)
+    white_list_update_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    balance_payments: Mapped[list[WBBalancePayment]] = relationship("WBBalancePayment", back_populates="wb_cabinet",
+                                                                    uselist=True)
+    bonus_payments: Mapped[list[WBBonusPayment]] = relationship("WBBonusPayment", back_populates="wb_cabinet",
+                                                                uselist=True)
     __table_args__ = (
         Index("idx_balance_bonus", "balance", "bonus"),
         Index("idx_balance", "balance"),
@@ -144,72 +160,75 @@ class WBCabinet(BaseTable):
     def calculated_balance(self) -> float:
         """Вычисляет баланс на основе начального значения balance и всех платежей"""
         if not self.balance_payments:
-            return self.balance  # Если нет платежей, возвращаем текущее значение
-
-        # Суммируем все платежи и начальное значение баланса
-        return self.balance + sum(payment.amount for payment in self.balance_payments)
+            return float(self.balance)
+        return float(self.balance + sum(float(payment.amount) for payment in self.balance_payments))
 
     @hybrid_property
     def calculated_bonus(self) -> float:
         """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
         if not self.bonus_payments:
-            return self.bonus  # Если нет платежей, возвращаем текущее значение
-
-        # Суммируем все платежи и начальное значение бонусов
-        return self.bonus + sum(payment.amount for payment in self.bonus_payments)
+            return float(self.bonus)
+        return float(self.bonus + sum(float(payment.amount) for payment in self.bonus_payments))
 
 
 class WBToken(BaseTable):
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"user_id: {self.user_id}"
 
     api_key: Mapped[str] = mapped_column(String, nullable=False)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
-    user = relationship("User", back_populates="wb_tokens", lazy="joined")
-    active = Column(Boolean, default=True)
-    shop_id: Mapped[str] = mapped_column(String, nullable=True)
+    user: Mapped[User] = relationship("User", back_populates="wb_tokens", lazy="joined")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    shop_id: Mapped[str | None] = mapped_column(String, nullable=True)
     __table_args__ = (
         UniqueConstraint("api_key", "user_id", name="_api_key_user_id_uc"),
-        Index("idx_shop_id", "shop_id"),  # Индекс для shop_id
+        Index("idx_shop_id", "shop_id"),
     )
 
     @property
-    def __payload(self):
+    def __payload(self) -> dict[str, object]:
         try:
             result = jwt.decode(self.api_key, options={"verify_signature": False})
-            return result
-        except:
+            if not isinstance(result, dict):
+                raise exceptions.NotValidTokenError
+            return cast(dict[str, object], result)
+        except Exception:
             raise exceptions.NotValidTokenError
 
     def check_valid(self) -> bool:
         try:
             assert self.api_key
             result = jwt.decode(self.api_key, options={"verify_signature": False})
-            if result:
-                return True
-            else:
-                return False
+            return bool(result)
         except (ValueError, DecodeError):
             return False
 
-    def get_payload(self, key) -> str | int | None:
+    def get_payload(self, key: str) -> str | int | None:
         payload = self.__payload
-        return payload.get(key)
+        value = payload.get(key)
+        if isinstance(value, (str, int)) or value is None:
+            return value
+        return None
 
     @property
-    def __expires(self):
-        return datetime.datetime.fromtimestamp(self.__payload.get("exp"))
+    def __expires(self) -> datetime.datetime:
+        exp = self.__payload.get("exp")
+        if isinstance(exp, (int, float, str)):
+            return datetime.datetime.fromtimestamp(int(exp))
+        raise exceptions.NotValidTokenError
 
     @property
-    def expires(self):
+    def expires(self) -> datetime.datetime:
         return self.__expires
 
     def get_shop_id_from_token(self) -> str:
-        return self.get_payload("sid")
+        sid = self.get_payload("sid")
+        if isinstance(sid, str):
+            return sid
+        raise exceptions.NotValidTokenError
 
     @property
     def read_only(self) -> bool:
-        # Проверяем, содержится ли категория "Токен только на чтение" в категориях
         return "Токен только на чтение" in self.categories
 
     @property
@@ -225,13 +244,12 @@ class WBToken(BaseTable):
             8: "Рекомендации",
             30: "Токен только на чтение",
         }
-        s = self.get_payload(
-            "s",
-        )
+        s = self.get_payload("s")
         categories = set()
-        for bit_position, category_name in categories_map.items():
-            if s & (1 << bit_position):
-                categories.add(category_name)
+        if isinstance(s, int):
+            for bit_position, category_name in categories_map.items():
+                if s & (1 << bit_position):
+                    categories.add(category_name)
         return categories
 
 
@@ -250,52 +268,57 @@ class AdvKeyword(BaseTable):
     __table_args__ = (UniqueConstraint("text", "date", "adv_setting_id", name="_text_date_adv_setting_id_uc"),)
 
 
-class WBCategory(BaseTable):
-    cabinet_id = Column(
-        Integer, ForeignKey("wbcabinet.id"), nullable=False
-    )  # Добавляем внешний ключ, ссылающийся на кабинет
-    wb_cabinet: Mapped[WBCabinet] = relationship(
-        "WBCabinet", back_populates="wb_categories"
-    )  # Добавляем связь обратно к WbCabinet
-    wb_category_name: Mapped[str] = mapped_column(String, nullable=False)
-    wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_category", uselist=True)
-    Index("ix_wb_category_name", "wb_category_name")
-
-
-class WBCard(BaseTable):  # Изменено название таблицы
+class WBCard(BaseTable):
     nmid: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
-    offer_id = Column(String)
-    name = Column(String)
-    wb_category_id = Column(Integer, ForeignKey("wbcategory.id"))
+    offer_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    wb_category_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wbcategory.id"), nullable=True)
     wb_category: Mapped[WBCategory] = relationship("WBCategory", back_populates="wb_cards", lazy="joined")
-    json: Mapped[str] = Column(JSONB)
-    wb_cabinet_id = Column(Integer, ForeignKey("wbcabinet.id"))  # Добавляем внешний ключ к WbCabinet
+    json: Mapped[str] = mapped_column(JSONB)
+    wb_cabinet_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=True)
     wb_cabinet: Mapped[WBCabinet] = relationship("WBCabinet", back_populates="wb_cards")
-    adv_setting_id = Column(Integer, ForeignKey("advsetting.id"))  # Добавлен внешний ключ
+    adv_setting_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("advsetting.id"), nullable=True)
     adv_setting: Mapped["AdvSetting"] = relationship("AdvSetting", back_populates="wb_cards")
-    updated = Column(Boolean, default=False)
-    add_to_db = Column(Boolean, default=False)
+    updated: Mapped[bool] = mapped_column(Boolean, default=False)
+    add_to_db: Mapped[bool] = mapped_column(Boolean, default=False)
 
     @hybrid_property
-    def card_json(self):
-        return json.loads(self.json)
+    def card_json(self) -> dict[str, object]:
+        data = json.loads(self.json)
+        if isinstance(data, dict):
+            return cast(dict[str, object], data)
+        return {}
 
     @property
-    def brand(self):
-        return self.card_json["brand"]
+    def brand(self) -> str:
+        brand = self.card_json.get("brand", "")
+        if isinstance(brand, str):
+            return brand
+        return str(brand)
 
     @property
-    def photos(self):
-        photos = self.card_json["photos"]
-        urls = []
-        for photo in photos:
-            url = photo["big"]
-            urls.append(url)
+    def photos(self) -> list[str]:
+        raw = self.card_json.get("photos")
+        if not isinstance(raw, list):
+            return []
+        urls: list[str] = []
+        for item in raw:
+            if isinstance(item, dict):
+                val = item.get("big")
+                if isinstance(val, str):
+                    urls.append(val)
+                else:
+                    urls.append(str(val))
         return urls
 
     @property
-    def SubjectId(self):
-        return self.card_json["subjectID"]
+    def SubjectId(self) -> int | None:
+        subject_id = self.card_json.get("subjectID")
+        if isinstance(subject_id, int) or subject_id is None:
+            return subject_id
+        if isinstance(subject_id, str) and subject_id.isdigit():
+            return int(subject_id)
+        return None
 
 
 class AdvSetting(BaseTable):
@@ -304,11 +327,12 @@ class AdvSetting(BaseTable):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._search_adv_id = None
+        # self._search_adv_id: int = None
         self._worst_promo_position = None
 
     def __repr__(self):
-        return f"name: {self.name}, adverdId: {self.adv_id}, bot_active: {self.bot_active}, active_status: {self.active_status}"
+        return (f"name: {self.name}, adverdId: {self.adv_id},"
+                f" bot_active: {self.bot_active}, active_status: {self.active_status}")
 
     favorite_users: Mapped[list[User]] = relationship(
         "User", secondary=favorite_advs_association, back_populates="favorites_advs"
@@ -344,7 +368,7 @@ class AdvSetting(BaseTable):
     )
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text("1"))
-    type: Mapped[int] = Column(Integer, nullable=True)
+    type: Mapped[int] = mapped_column(Integer, nullable=True)
     hard_min_ctr = Column(
         Float,
         nullable=True,
@@ -353,7 +377,7 @@ class AdvSetting(BaseTable):
     )
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
-    payments: Mapped[list[AdvPayment]] = relationship("AdvPayment", back_populates="adv_setting", uselist=True)
+    payments: Mapped[list['AdvPayment']] = relationship("AdvPayment", back_populates="adv_setting", uselist=True)
     parsing_active = mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
     bidder_active: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
@@ -366,7 +390,7 @@ class AdvSetting(BaseTable):
     target_ctr_mode_strategy = mapped_column(String, nullable=True, default="forward")  # forward, keep
     new_auto_min_ctr_mode = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     reset_place = mapped_column(Boolean, nullable=True, default=True, server_default=text("true"))
-    _search_adv_id = mapped_column(Integer, nullable=True)
+    _search_adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=settings.BIDDER_STEP)
     exponent_predict_ctr = mapped_column(
         Float,
@@ -430,33 +454,31 @@ class AdvSetting(BaseTable):
     )
 
     @property
-    def auction_adv_id(self):
+    def auction_adv_id(self) -> int | None:
         return self.search_adv_id
 
     @property
-    def search_adv_id(self):  # Аукцион
+    def search_adv_id(self) -> int | None:  # Аукцион
         if self._search_adv_id:
             return self._search_adv_id
         if not self.name:
             return None
-        name = self.name
-        name = name.replace(" ", "")
-        pattern = re.compile(r"<!-\[(\d+)\]-!>")  # Изменено на поиск по всей строке
+        name = self.name.replace(" ", "")
+        pattern = re.compile(r"<!-\[(\d+)\]-!>")
         match = re.search(pattern, name)
         if not match:
             return None
-        else:
-            return int(match.group(1))
+        return int(match.group(1))
 
-    @search_adv_id.setter
-    def search_adv_id(self, value: int):
-        assert isinstance(value, int)
-        self._search_adv_id = value
+    # @search_adv_id.setter
+    # def search_adv_id(self, value: int):
+    #     assert isinstance(value, int)
+    #     self._search_adv_id = value
 
-    @search_adv_id.setter
-    def search_adv_id(self, value: int):
-        assert isinstance(value, int)
-        self._search_adv_id = value
+    # @search_adv_id.setter
+    # def search_adv_id(self, value: int) -> None:
+    #     assert isinstance(value, int)
+    #     self._search_adv_id = value
 
     @property
     def max_pay_for_order(self) -> int | None:
@@ -518,7 +540,7 @@ class KeywordSetting(BaseTable):
         Index("ix_keywordsetting_text", "text"),
     )
 
-    def to_json(self):
+    def to_json(self) -> dict[str, object]:
         return {
             "id": self.id,
             "text": self.text,
@@ -531,11 +553,9 @@ class KeywordSetting(BaseTable):
         }
 
     @classmethod
-    def from_json(cls, data: dict):
-        """Создает объект KeywordSetting из JSON данных"""
+    def from_json(cls, data: dict[str, object]) -> "KeywordSetting":
         if isinstance(data, str):
             data = json.loads(data)
-
         return cls(
             id=data.get("id"),
             text=data.get("text"),
@@ -550,11 +570,11 @@ class KeywordSetting(BaseTable):
 
 @dataclass
 class WBItemPosition:
-    nmid: int = None
-    position: int = None
-    timestamp: datetime.datetime = None
-    adv_id: int = None
-    keyword_text: str = None
+    nmid: int | None = None
+    position: int | None = None
+    timestamp: datetime.datetime | None = None
+    adv_id: int | None = None
+    keyword_text: str | None = None
     adv_type: int | None = None
 
     @property
@@ -563,15 +583,17 @@ class WBItemPosition:
             return "search"
         elif self.adv_type == 8:
             return "auto"
+        else:
+            return "unknown"
 
-    def to_dict(self):
-        timestamp: datetime.datetime = self.timestamp
-        str_timestamp = timestamp.isoformat()
+    def to_dict(self) -> dict[str, object]:
+        timestamp = self.timestamp
+        str_timestamp = timestamp.isoformat() if timestamp else None
         return {
-            "real_position": self.position,  # Backward compatibility
-            "promo_position": self.position,  # Backward compatibility
-            "base_position": self.position,  # Backward compatibility
-            "position": self.position,  # Current key
+            "real_position": self.position,
+            "promo_position": self.position,
+            "base_position": self.position,
+            "position": self.position,
             "keyword_text": self.keyword_text,
             "adv_id": self.adv_id,
             "nmid": self.nmid,
@@ -580,25 +602,58 @@ class WBItemPosition:
         }
 
     @staticmethod
-    def from_dict(data):
+    def from_dict(data: dict[str, object]) -> "WBItemPosition":
         position = WBItemPosition()
-        # Backward compatibility: accept both keys
-        try:
-            position.position = data["position"]
-        except KeyError:
-            position.position = data.get("base_position", 0)
-        position.adv_id = data["adv_id"]
-        position.nmid = data["nmid"]
-        try:
-            str_timestamp = data["timestamp"]
-            position.timestamp = datetime.datetime.fromisoformat(str_timestamp)
-        except:
+        raw_position = data.get("position")
+        if isinstance(raw_position, int):
+            position.position = raw_position
+        elif isinstance(raw_position, str) and raw_position.isdigit():
+            position.position = int(raw_position)
+        else:
+            # fallback старый ключ
+            base_raw = data.get("base_position")
+            if isinstance(base_raw, int):
+                position.position = base_raw
+            elif isinstance(base_raw, str) and base_raw.isdigit():
+                position.position = int(base_raw)
+            else:
+                position.position = None
+
+        raw_adv_id = data.get("adv_id")
+        if isinstance(raw_adv_id, int):
+            position.adv_id = raw_adv_id
+        elif isinstance(raw_adv_id, str) and raw_adv_id.isdigit():
+            position.adv_id = int(raw_adv_id)
+        else:
+            position.adv_id = None
+
+        raw_nmid = data.get("nmid")
+        if isinstance(raw_nmid, int):
+            position.nmid = raw_nmid
+        elif isinstance(raw_nmid, str) and raw_nmid.isdigit():
+            position.nmid = int(raw_nmid)
+        else:
+            position.nmid = None
+
+        # timestamp
+        raw_ts = data.get("timestamp")
+        if isinstance(raw_ts, str):
+            try:
+                position.timestamp = datetime.datetime.fromisoformat(raw_ts)
+            except Exception:
+                position.timestamp = None
+        else:
             position.timestamp = None
 
-        position.keyword_text = data["keyword_text"]
-        try:
-            position.adv_type = data["adv_type"]
-        except KeyError:
+        raw_kw = data.get("keyword_text")
+        position.keyword_text = raw_kw if isinstance(raw_kw, str) else None
+
+        raw_adv_type = data.get("adv_type")
+        if isinstance(raw_adv_type, int):
+            position.adv_type = raw_adv_type
+        elif isinstance(raw_adv_type, str) and raw_adv_type.isdigit():
+            position.adv_type = int(raw_adv_type)
+        else:
             position.adv_type = None
 
         return position

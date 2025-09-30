@@ -18,18 +18,16 @@ from app.modules.wb_adv_updater.ML import Predictor
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.image_master import image_tools
 from app.utils.image_master.image_master2 import ImageMaster
-
-from ...core.redis_manager.base_redis_manager import BaseRedis
-from ...utils import redis_manager, text_cleaner
 from .gds_object import gds
 from .update_wb_adv_phrases_in_neo import update_wb_adv_phrases_in_neo
 from .word_to_vec_object import word2vec
+from ...core.redis_manager.base_redis_manager import BaseRedis
+from ...utils import redis_manager, text_cleaner
 
 logger = logging.getLogger(__name__)
 from . import fitter
 
 predictor = Predictor()
-
 
 image_master = ImageMaster()
 
@@ -145,7 +143,7 @@ async def __update_cards_in_graph_for_shops(adv_settings: list[AdvSetting]):
             )
 
 
-async def update_cards_in_graph_for_shops_big_cycle():
+async def update_cards_in_graph_for_shops_big_cycle() -> None:
     async with sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.active_status == "pause")
         result = await session.execute(stmt)
@@ -153,7 +151,7 @@ async def update_cards_in_graph_for_shops_big_cycle():
     await __update_cards_in_graph_for_shops(adv_settings)
 
 
-async def update_cards_in_graph_small_cycle():
+async def update_cards_in_graph_small_cycle() -> None:
     async with sm() as session:
         stmt = select(AdvSetting).where(
             AdvSetting.bot_active == True,
@@ -167,7 +165,7 @@ async def fit_and_save_model():
     await fitter.getGradientBoostingFullFitModel()
 
 
-async def update_model():
+async def update_model() -> None:
     logger.debug("Старт обучения и сохранения модели")
     await fit_and_save_model()
     logger.debug("Устанавливаю сет, разрешаю обновление ключей")
@@ -194,7 +192,7 @@ index = None
 keywords = []
 
 
-async def update_keywords_ctr_by_similary():
+async def update_keywords_ctr_by_similary() -> None:
     global index, keywords
     async with sm() as session:
         stmt = (
