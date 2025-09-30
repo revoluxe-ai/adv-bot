@@ -19,7 +19,7 @@ import asyncio
 
 
 async def run_shop_task(
-    shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
+        shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
 ) -> None:
     while True:
         try:

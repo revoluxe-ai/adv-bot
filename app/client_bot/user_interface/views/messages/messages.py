@@ -140,7 +140,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         )
         # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
 
-        for adv in self._adv_settings:
+        for adv in adv_settings:
             adv.check_last_24_hours = await redis_manager.check_last_24_hours(adv.id)
 
         return await super().__call__()
@@ -152,9 +152,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         if keywords_filter:
             clear_advs = []
             for adv in adv_settings:
-                if not adv.bot_active and adv.active_status == adv.ActiveStatuses.DONE.value:
-                    continue
-                if not adv.search_adv_id:
+                if not adv.bot_active and adv.active_status == adv.ActiveStatuses.DONE:
                     continue
                 name = adv.name
                 nmids = list(adv.nmids)
@@ -696,16 +694,16 @@ class NoMainPhotos(TextWithKeyboard):
     @property
     def text(self):
         text = (
-                "Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК\n"
-                "Данные кампании: \n"
-                "Название кампании: " + self.adv.name + "\n"
-                                                        f"ID кампании: {self.adv.adv_id}\n"
-                                                        "Что конкретно нужно сделать:\n"
-                                                        "1. Зайдите в рекламный кабинет на WB - https://cmp.wildberries.ru/\n"
-                                                        "2. Найдите в кабинете эту кампанию\n"
-                                                        "3. Укажите артикул WB (цифровой артикул товара WB - 123456789)\n"
-                                                        "4. Подождите 20-30 минут, пока данные обновятся\n"
-                                                        f"Если возникнут проблемы, то напишите сюда -> {const.SUPPORT_LINK}"
+            "Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК\n"
+            "Данные кампании: \n"
+            "Название кампании: " + self.adv.name + "\n"
+            f"ID кампании: {self.adv.adv_id}\n"
+            "Что конкретно нужно сделать:\n"
+            "1. Зайдите в рекламный кабинет на WB - https://cmp.wildberries.ru/\n"
+            "2. Найдите в кабинете эту кампанию\n"
+            "3. Укажите артикул WB (цифровой артикул товара WB - 123456789)\n"
+            "4. Подождите 20-30 минут, пока данные обновятся\n"
+            f"Если возникнут проблемы, то напишите сюда -> {const.SUPPORT_LINK}"
         )
         return text
 
