@@ -43,46 +43,8 @@ from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
 
-
-#
-# def get_budget_type_keyboard(balances):
-#     buttons = [
-#         [
-#             InlineKeyboardButton(
-#                 text=f"Счет: {balances.balance} руб.",
-#                 callback_data=BudgetForCreatingAdv(type="balance").pack(),
-#             )
-#         ],
-#         [
-#             InlineKeyboardButton(
-#                 text=f"Баланс: {balances.net} руб.",
-#                 callback_data=BudgetForCreatingAdv(type="net").pack(),
-#             )
-#         ],
-#         [
-#             InlineKeyboardButton(
-#                 text=f"Бонусы: {balances.bonus} руб.",
-#                 callback_data=BudgetForCreatingAdv(type="bonus").pack(),
-#             )
-#         ],
-#     ]
-#
-#     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-#
-#     return keyboard
-#
-#     def get_adv_list_keyboard(advs: list[Adv]):
-#         buttons = []
-#         for adv in advs:
-#             button = InlineKeyboardButton(text=adv.name, callback_data=\
-#                 callbacks.Adv(action='select', adv_original_id=adv.id).pack())
-#             buttons.append([button])
-#         keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-#     return keyboard
-
-
 def get_adv_setting_keyboard(
-        chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
+    chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
 ):
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -342,11 +304,11 @@ def get_adv_setting_keyboard(
 
 
 def get_advs_keyboard_with_paginator(
-        wb_user_cabinet_original_id: int,
-        adv_settings: list[AdvSetting],
-        page: int,
-        on_page: int,
-        keyword_filter,
+    wb_user_cabinet_original_id: int,
+    adv_settings: list[AdvSetting],
+    page: int,
+    on_page: int,
+    keyword_filter,
 ):
     active_part_advs = list(filter(lambda adv_local: adv_local.bot_active is True, adv_settings))
     not_active_part_advs = list(
@@ -357,6 +319,8 @@ def get_advs_keyboard_with_paginator(
     keyboard_buttons = []
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
+    filtred_advs = []
+    adv_settings = filtred_advs
     for adv in adv_settings[start_index:end_index]:
         check_last_24_hours = adv.check_last_24_hours
         check_text = "✅" if check_last_24_hours else "❓"
@@ -775,11 +739,11 @@ def get_keywords_setting_keyboard(
 
 
 def get_keyword_setting_keyboard(
-        chat_id: int,
-        keyword: KeywordSetting,
-        calculated_keyword: CalculatedKeyword,
-        adv_setting: AdvSetting,
-        page,
+    chat_id: int,
+    keyword: KeywordSetting,
+    calculated_keyword: CalculatedKeyword,
+    adv_setting: AdvSetting,
+    page,
 ) -> InlineKeyboardMarkup:
     adv_setting_original_id = adv_setting.id
     keyword_setting_original_id = keyword.id
@@ -792,9 +756,9 @@ def get_keyword_setting_keyboard(
         reason = None
 
     if (
-            calculated_keyword.hard_status == 1
-            and calculated_keyword.status == KeywordStatus.BAD
-            and calculated_keyword.reason != "max_position"
+        calculated_keyword.hard_status == 1
+        and calculated_keyword.status == KeywordStatus.BAD
+        and calculated_keyword.reason != "max_position"
     ):
         button = [
             InlineKeyboardButton(
@@ -853,8 +817,8 @@ def get_keyword_setting_keyboard(
     buttons.append(buttons_row)
 
     if (
-            keyword.hard_status in [AUTO_MODE, WHITE_LIST]
-            or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH
+        keyword.hard_status in [AUTO_MODE, WHITE_LIST]
+        or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH
     ):
         bottom = [
             InlineKeyboardButton(
