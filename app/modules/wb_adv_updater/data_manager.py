@@ -127,9 +127,10 @@ async def get_keyword_statistic_clickhouse(
 
 
 async def get_keywords_statistic_clickhouse(
-    adv_setting: AdvSetting,
-    pass_time: timedelta | None = timedelta(days=7),
-    last_views=None,
+        adv_setting: AdvSetting,
+        pass_time: timedelta | None = timedelta(days=7),
+        last_views=None,
+
 ) -> list[CalculatedKeyword]:
     async with get_clickhouse_client() as ch_client:
         advs: set[int] = set()
@@ -171,9 +172,9 @@ async def _get_keyword_settings(
 
 
 def _build_clickhouse_query(
-    adv_ids: set[int],
-    pass_time: timedelta | None,
-    last_views: int | None = None,
+        adv_ids: set[int],
+        pass_time: timedelta | None,
+        last_views: int | None = None,
 ) -> str:
     # Преобразуем список ID в строку для SQL
     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
@@ -266,6 +267,8 @@ async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
         wb_user_cabinet.wb_cabinet = wbcabinet
         wb_user_cabinet.user = super_user
     return wb_user_cabinet
+
+
 
 def __sort_by_update_keyword(keyword: WBItemPosition):
     if not (update := keyword.timestamp):
@@ -589,15 +592,11 @@ async def get_good_bad_phrases_for_min_ctr(
     text_to_predict_ctr: dict[str, float] = (
         await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
     )
-    # keyword_positions = await redis_manager.get_keywords_positions(adv_setting, texts)
-    # text_to_keyword_position: dict[str, WBItemPosition]\
-    #     = {position.keyword_text: position for position in keyword_positions}
     try:
         cpm_now = await get_cpm(adv_setting)
     except Exception as e:
         logger.error(f"Ошибка при получении cpm {e}", exc_info=True)
         cpm_now = None
-    new_statuses = []
 
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
@@ -1601,9 +1600,9 @@ async def get_all_keywords_from_ch(last_days=7) -> set[str]:
 
 
 async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(shop_id: str):
-    stmt = select(func.sum(coalesce(WBCabinet.balance, 0) + coalesce(WBCabinet.bonus, 0))).where(
-        WBCabinet.shop_id == shop_id
-    )
+    stmt = select(
+        func.sum(coalesce(WBCabinet.balance, 0) + coalesce(WBCabinet.bonus, 0))
+    ).where(WBCabinet.shop_id == shop_id)
     async with _sm() as session:
         result = await session.execute(stmt)
         return result.scalar_one()

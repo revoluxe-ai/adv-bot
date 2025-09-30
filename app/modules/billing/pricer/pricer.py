@@ -1,7 +1,6 @@
 """Модуль для расчета стоимости тарифов."""
 
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.settings import settings

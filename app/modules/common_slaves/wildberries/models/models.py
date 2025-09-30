@@ -57,17 +57,15 @@ class WBBalancePayment(BaseTable):
 
     __tablename__ = "wbbalancepayment"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
     wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="balance_payments")
 
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
-    description: Mapped[str | None] = mapped_column(String, nullable=True)
-    transaction_date_time: Mapped[datetime.datetime] = mapped_column(
-        DateTime, nullable=False, server_default=text("now()")
-    )
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    transaction_date_time = Column(DateTime, nullable=False, server_default=text("now()"))
     # Тип операции для унификации с бонусами: 'add', 'subtract', 'auto_subtract', 'reset' (если понадобится)
-    operation_type: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'subtract'"))
+    operation_type = Column(String, nullable=False, server_default=text("'subtract'"))
     __table_args__ = (
         Index("idx_wb_balance_payment_cabinet_id", "wb_cabinet_id"),
         Index("idx_wb_balance_payment_date", "transaction_date_time"),
@@ -87,18 +85,22 @@ class WBBonusPayment(BaseTable):
 
     __tablename__ = "wbbonuspayment"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wb_cabinet_id: Mapped[int] = Column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
     wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="bonus_payments")
 
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
-    description: Mapped[str | None] = mapped_column(String, nullable=True)
-    transaction_date_time: Mapped[datetime.datetime] = mapped_column(
-        DateTime, nullable=False, server_default=text("now()")
-    )
-    # 'add', 'subtract', 'reset', 'auto_subtract'
-    operation_type: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'subtract'"))
-    admin_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    transaction_date_time = Column(DateTime, nullable=False, server_default=text("now()"))
+
+    # Новые поля для поддержки операций администраторов
+    operation_type = Column(
+        String,
+        nullable=False,
+    )  # 'add', 'subtract', 'reset'
+    admin_user_id = Column(
+        Integer, nullable=True
+    )  # ID администратора, выполнившего операцию, NULL для обычных операций
 
     __table_args__ = (
         Index("idx_wb_bonus_payment_cabinet_id", "wb_cabinet_id"),
@@ -110,34 +112,29 @@ class WBBonusPayment(BaseTable):
             "wb_cabinet_id",
             text("DATE(transaction_date_time)"),
             unique=True,
-            postgresql_where=text(
-                "operation_type = 'auto_subtract' AND amount < 0 AND admin_user_id IS NULL"
-            ),
+            postgresql_where=text("operation_type = 'auto_subtract' AND amount < 0 AND admin_user_id IS NULL"),
         ),
     )
 
 
 class WBCabinet(BaseTable):
-    shop_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    shop_id: Mapped[str] = Column(String, nullable=False, unique=True)
     wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_cabinet", uselist=True)
-    wb_categories: Mapped[list[WBCategory]] = relationship("WBCategory", uselist=True)
-    adv_settings: Mapped[list['AdvSetting']] = relationship("AdvSetting", back_populates="wb_cabinet", uselist=True)
+    wb_categories = relationship("WBCategory", uselist=True)
+    adv_settings = relationship("AdvSetting", back_populates="wb_cabinet", uselist=True)
     wb_user_cabinets: Mapped[list[WBUserCabinet]] = relationship(
         "WBUserCabinet",
         back_populates="wb_cabinet",
     )
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
-    expiration_time: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False,
-                                                               server_default=text('datetime("now", "+7 days")'))
-    expiration_alarm_days_pass: Mapped[int | None] = mapped_column(Integer, default=None)
-    demo: Mapped[bool] = mapped_column(Boolean, default=True)
-    balance: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
+    active = Column(Boolean, default=True)
+    expiration_time = Column(DateTime, nullable=False, server_default=text('datetime("now", "+7 days")'))
+    expiration_alarm_days_pass = Column(Integer, default=None)
+    demo: Mapped[bool] = Column(Boolean, default=True)
+    balance = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
     bonus: Mapped[float] = mapped_column(Float, default=0, server_default=text("0"), nullable=False)
-    white_list_update_active: Mapped[bool] = mapped_column(Boolean, default=False)
-    balance_payments: Mapped[list[WBBalancePayment]] = relationship("WBBalancePayment", back_populates="wb_cabinet",
-                                                                    uselist=True)
-    bonus_payments: Mapped[list[WBBonusPayment]] = relationship("WBBonusPayment", back_populates="wb_cabinet",
-                                                                uselist=True)
+    white_list_update_active = Column(Boolean, default=False)
+    balance_payments = relationship("WBBalancePayment", back_populates="wb_cabinet", uselist=True)
+    bonus_payments = relationship("WBBonusPayment", back_populates="wb_cabinet", uselist=True)
     __table_args__ = (
         Index("idx_balance_bonus", "balance", "bonus"),
         Index("idx_balance", "balance"),
@@ -539,7 +536,7 @@ class KeywordSetting(BaseTable):
         Index("ix_keywordsetting_text", "text"),
     )
 
-    def to_json(self) -> dict[str, object]:
+    def to_json(self):
         return {
             "id": self.id,
             "text": self.text,
