@@ -319,8 +319,6 @@ def get_advs_keyboard_with_paginator(
     keyboard_buttons = []
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
-    filtred_advs = []
-    adv_settings = filtred_advs
     for adv in adv_settings[start_index:end_index]:
         check_last_24_hours = adv.check_last_24_hours
         check_text = "✅" if check_last_24_hours else "❓"
