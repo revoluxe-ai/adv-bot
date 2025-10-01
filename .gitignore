@@ -80,3 +80,4 @@ venv_linux/
 cursor-chat-export/
 .cursor/
 linux_venv/
+.vscode/
