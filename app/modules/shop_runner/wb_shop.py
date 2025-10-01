@@ -31,6 +31,7 @@ class WBShop:
             coroutines_manager.update_full_adv_stat(),
             coroutines_manager.adv_settings_auto_update(),
             coroutines_manager.update_top_key_in_advs(),
+            coroutines_manager.update_predict_ctr(),
         )
 
     async def _alive_worker_run(self):
