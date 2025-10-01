@@ -1,23 +1,32 @@
-from abc import abstractmethod
-from typing import Any
+from abc import abstractmethod, ABC
+from typing import Any, Optional
 
-from dependency_injector.wiring import Provide, inject
-from redis.asyncio import Redis
-
-from app.core.di.app_container import AppContainer
+from app.core.redis_manager_v2.redis_client import RedisClient
 
 
-class BaseRedisManager:
+class BaseRedisManager(ABC):
     prefix: str
+    default_ttl: Optional[int] = None
 
-    @inject
-    def __init__(self, redis_client: Redis = Provide[AppContainer.redis_client]):
+    def __init__(self, redis_client: RedisClient, ttl: Optional[int] = None) -> None:
         self.__client = redis_client
+        self._ttl: Optional[int] = ttl if ttl is not None else self.default_ttl
 
     @abstractmethod
-    def _get_key(self, *args: Any, **kwargs: Any) -> str: ...
+    def _get_key(self, *args: Any, **kwargs: Any) -> str:
+        ...
 
     @property
-    def _client(self) -> Redis:
+    def _client(self) -> RedisClient:
         """Геттер для доступа к клиенту Redis"""
         return self.__client
+
+    def _resolve_ttl(self, ttl: int | None = None) -> int | None:
+        """Определяет итоговый TTL для ключа Redis.
+        Возвращает None, если ни аргумент, ни self._ttl не заданы (без истечения).
+        """
+        if ttl is not None:
+            return ttl
+        if self._ttl is not None:
+            return self._ttl
+        return None

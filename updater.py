@@ -3,14 +3,13 @@ import logging
 import time
 from functools import partial
 from multiprocessing import Process
+from typing import Any, Callable, Coroutine, Never
 
 import dotenv
 import psutil
 
 from app.modules.wb_adv_updater.runner import (
-    run_main_coroutines,
-    run_update_all_keywords_on_wb,
-)
+    run_main_coroutines, run_update_all_keywords_on_wb, )
 from python_modules.logger import setup_logging
 
 dotenv.load_dotenv()
@@ -18,7 +17,7 @@ dotenv.load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-async def update_keywords_ctr_by_similary_run():
+async def update_keywords_ctr_by_similary_run() -> None:
     from app.modules.wb_adv_updater import (
         hard_ml_data_updater_process as hard_data_manager,
     )
@@ -31,14 +30,15 @@ async def update_keywords_ctr_by_similary_run():
         await asyncio.sleep(60)
 
 
-run_own_process_list = [
+# Явная аннотация типов для списка корутин
+run_own_process_list: list[Callable[..., Never]] = [
     update_keywords_ctr_by_similary_run,
     run_update_all_keywords_on_wb,
     run_main_coroutines,
 ]
 
 
-def process_controller(process_pids: list[int], process_names: list[str]):
+def process_controller(process_pids: list[int], process_names: list[str]) -> None:
     time.sleep(10)
     while True:
         for pid, name in zip(process_pids, process_names, strict=False):
@@ -52,14 +52,17 @@ def process_controller(process_pids: list[int], process_names: list[str]):
         time.sleep(60)
 
 
-def run_coroutines(coroutine):
-    asyncio.run(coroutine())
+# Обновлена типизация: принимаем обычную async-функцию без аргументов
+# (а не DI-провайдер)
+
+def run_coroutines(coroutine_func: Callable[..., Coroutine[Any, Any, Never]]) -> None:
+    asyncio.run(coroutine_func())
 
 
 def main() -> None:
-    processes = []
-    process_pids = []
-    process_names = []
+    processes: list[Process] = []
+    process_pids: list[int | None] = []
+    process_names: list[str] = []
 
     for run_own_process in run_own_process_list:
         func = partial(run_coroutines, run_own_process)
@@ -87,6 +90,5 @@ if __name__ == "__main__":
         except InterruptedError:
             raise  # Перевыбрасывание исключения
         except Exception as e:
-            logging.error("Произошла ошибка:", exc_info=True)
-            del e
-            continue  # Продолжение работы программы после других исключений
+            logging.critical("Произошла ошибка:", exc_info=True)
+            raise e

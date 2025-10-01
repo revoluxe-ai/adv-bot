@@ -1,42 +1,35 @@
 import asyncio
 import datetime
 import logging
-from collections.abc import Sequence
 
 from aiohttp import ClientSession
 from sqlalchemy import exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
 
-from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
-    WBBalancePayment,
-    WBBonusPayment,
     WBCabinet,
 )
 from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_adv_updater.models import AdvPayment
 from app.my_types import KeywordStat
 from app.utils import redis_manager
+from app.utils.NeoDataScience.driver import DataScience
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker
-from app.utils.NeoDataScience.driver import DataScience
-
-from ...core.wb_api.exceptions import ApiForbiddenError
-from ...core.wb_api.mixins.adv import MinCPMData
+from .ML import Predictor
+from .data_setter import DataSetter
+from .graph_vector_updater import GraphUpdater
+from .wb_adv_api import WBAdvAPI
 from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..relevant_phrase_manager import RelevantPhraseManager
 from ..relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
 from ..wb_update_state_manager import KeywordStatUpdateState
-from .data_setter import DataSetter
-from .graph_vector_updater import GraphUpdater
-from .ML import Predictor
-from .wb_adv_api import WBAdvAPI
+from ...core.wb_api.exceptions import ApiForbiddenError
+from ...core.wb_api.mixins.adv import MinCPMData
 
 logger = logging.getLogger(__name__)
 
@@ -62,72 +55,73 @@ async def check_adv_payment(session: AsyncSession, adv_setting: AdvSetting, curr
     return result.scalar()
 
 
-async def process_payment_for_advs() -> None:
-    current_date = datetime.datetime.now().date()
-    async with sm(read_only=False) as session:
-        stmt = (
-            select(AdvSetting)
-            .options(
-                joinedload(AdvSetting.payments),
-                joinedload(AdvSetting.wb_cabinet).selectinload(WBCabinet.balance_payments),
-                joinedload(AdvSetting.wb_cabinet).selectinload(WBCabinet.bonus_payments),
-            )
-            .where(
-                AdvSetting.bot_active == True,
-            )
-        )
-        result = await session.execute(stmt)
-        adv_settings_result: Sequence[AdvSetting] = result.unique().scalars().all()
-        adv_settings = list(adv_settings_result)
-        pricer: Pricer = Pricer()
-        for adv_setting in adv_settings:
-            if await check_adv_payment(session, adv_setting, current_date):
-                continue
-            wb_cabinet: WBCabinet = adv_setting.wb_cabinet
-            shop_id: str = str(wb_cabinet.shop_id)
-            PRICE_FOR_SHOP_FOR_DAY: float = await pricer.get_price_for_day_for_shop(shop_id)
-            count_advs_for_wb_cabinet: int = get_count_advs_for_wb_cabinet(wb_cabinet, adv_settings)
-            PRICE_FOR_ADV_FOR_DAY = float(PRICE_FOR_SHOP_FOR_DAY / count_advs_for_wb_cabinet)
-            # Используем гибридные свойства вместо прямого доступа к полям
-            calculated_bonus = float(wb_cabinet.calculated_bonus)
-            calculated_balance = wb_cabinet.calculated_balance
-
-            # Сначала проверяем наличие средств
-            if calculated_bonus >= PRICE_FOR_ADV_FOR_DAY:
-                # Создаем платеж и запись списания бонусов
-                payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
-                adv_setting.payments.append(payment)
-
-                bonus_payment = WBBonusPayment(
-                    wb_cabinet_id=wb_cabinet.id,
-                    amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
-                    description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
-                    operation_type="subtract",
-                )
-                session.add(bonus_payment)
-            elif calculated_balance >= PRICE_FOR_ADV_FOR_DAY:
-                # Создаем платеж и запись списания с баланса
-                payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
-                adv_setting.payments.append(payment)
-
-                balance_payment = WBBalancePayment(
-                    wb_cabinet_id=wb_cabinet.id,
-                    amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
-                    description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
-                )
-                session.add(balance_payment)
-            else:
-                # Если недостаточно средств, деактивируем бота
-                adv_setting.bot_active = False
-                adv_setting.auto_update_white_list = False
-                adv_setting.auto_update_target_place = False
-
-            await session.commit()
+#
+# async def process_payment_for_advs() -> None:
+#     current_date = datetime.datetime.now().date()
+#     async with sm(read_only=False) as session:
+#         stmt = (
+#             select(AdvSetting)
+#             .options(
+#                 joinedload(AdvSetting.payments),
+#                 joinedload(AdvSetting.wb_cabinet).selectinload(WBCabinet.balance_payments),
+#                 joinedload(AdvSetting.wb_cabinet).selectinload(WBCabinet.bonus_payments),
+#             )
+#             .where(
+#                 AdvSetting.bot_active == True,
+#             )
+#         )
+#         result = await session.execute(stmt)
+#         adv_settings_result: Sequence[AdvSetting] = result.unique().scalars().all()
+#         adv_settings = list(adv_settings_result)
+#         pricer: Pricer = Pricer()
+#         for adv_setting in adv_settings:
+#             if await check_adv_payment(session, adv_setting, current_date):
+#                 continue
+#             wb_cabinet: WBCabinet = adv_setting.wb_cabinet
+#             shop_id: str = str(wb_cabinet.shop_id)
+#             PRICE_FOR_SHOP_FOR_DAY: float = await pricer.get_price_for_day_for_shop(shop_id)
+#             count_advs_for_wb_cabinet: int = get_count_advs_for_wb_cabinet(wb_cabinet, adv_settings)
+#             PRICE_FOR_ADV_FOR_DAY = float(PRICE_FOR_SHOP_FOR_DAY / count_advs_for_wb_cabinet)
+#             # Используем гибридные свойства вместо прямого доступа к полям
+#             calculated_bonus = float(wb_cabinet.calculated_bonus)
+#             calculated_balance = wb_cabinet.calculated_balance
+#
+#             # Сначала проверяем наличие средств
+#             if calculated_bonus >= PRICE_FOR_ADV_FOR_DAY:
+#                 # Создаем платеж и запись списания бонусов
+#                 payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+#                 adv_setting.payments.append(payment)
+#
+#                 bonus_payment = WBBonusPayment(
+#                     wb_cabinet_id=wb_cabinet.id,
+#                     amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
+#                     description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
+#                     operation_type="subtract",
+#                 )
+#                 session.add(bonus_payment)
+#             elif calculated_balance >= PRICE_FOR_ADV_FOR_DAY:
+#                 # Создаем платеж и запись списания с баланса
+#                 payment = AdvPayment(date=current_date, amount=PRICE_FOR_ADV_FOR_DAY)
+#                 adv_setting.payments.append(payment)
+#
+#                 balance_payment = WBBalancePayment(
+#                     wb_cabinet_id=wb_cabinet.id,
+#                     amount=-PRICE_FOR_ADV_FOR_DAY,  # Отрицательное значение для списания
+#                     description=f"Списание за рекламную кампанию {adv_setting.adv_id}",
+#                 )
+#                 session.add(balance_payment)
+#             else:
+#                 # Если недостаточно средств, деактивируем бота
+#                 adv_setting.bot_active = False
+#                 adv_setting.auto_update_white_list = False
+#                 adv_setting.auto_update_target_place = False
+#
+#             await session.commit()
 
 
 async def graph_vector_update() -> None:
     graph_updater = GraphUpdater()
-    length = 2**4
+    length = 2 ** 4
     await graph_updater.update_graph_run(length)
     await asyncio.sleep(1)
     return
@@ -191,9 +185,9 @@ async def update_predict_ctr() -> None:
 
 
 async def update_all_keyword_data(
-    wb_api: WBApi,
-    adv_setting,
-    wb_cabinet: WBCabinet,
+        wb_api: WBApi,
+        adv_setting,
+        wb_cabinet: WBCabinet,
 ):
     shop_id = wb_cabinet.shop_id
     try:

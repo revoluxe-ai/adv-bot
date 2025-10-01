@@ -19,7 +19,7 @@ import asyncio
 
 
 async def run_shop_task(
-    shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
+        shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
 ) -> None:
     while True:
         try:
@@ -36,7 +36,7 @@ async def run_shop_task(
 
 
 async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: ClientSession) -> None:
-    # Получение списка магазинов с активными настройками
+    # TODO: Никогда не загрузяться компании, если в магазине нет активной рекламы
     stmt = (
         select(WBCabinet.shop_id)
         .distinct()
