@@ -6,7 +6,6 @@ from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.utils.click_house.client import get_clickhouse_client
-
 from .types.common_card_stat import CommonCardStat
 
 logger = logging.getLogger(__name__)
@@ -138,8 +137,11 @@ class WBCommonStatManager:
         except Exception as e:
             logger.error("Ошибка получения общей статистики", exc_info=True)
             raise e
-        # Добавляем статистику в ClickHouse
-        await self._add_common_statistic_to_clickhouse(statistics)
+        try:
+            await self._add_common_statistic_to_clickhouse(statistics)
+        except Exception as exc:
+            logger.error('Ошибка обновления статистики', exc_info=True)
+            raise exc
 
     @staticmethod
     async def _add_common_statistic_to_clickhouse(statistics: list[CommonStat]):
@@ -171,3 +173,4 @@ class WBCommonStatManager:
 
         async with get_clickhouse_client() as client:
             await client.query(query)
+        return None
