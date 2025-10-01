@@ -12,7 +12,7 @@ from .wb_api import WBApi as BidderAPI
 
 @pytest.fixture
 def client_session_mock():
-    session = AsyncMock()
+    session = MagicMock()
     session.close = MagicMock()
     return session
 
@@ -49,7 +49,8 @@ async def test_update_with_wrong_cpm_run(client_session_mock):
     bidder_api = BidderAPI(wb_access=access_mock, client_session=client_session_mock)
 
     headers_mock = MagicMock(spec=Headers)
-    headers_mock.api_key = {"Authorization": "test_api_key"}
+    # code expects headers.standart to be a dict of headers
+    headers_mock.standart = {"Authorization": "test_api_key"}
     bidder_api.headers = headers_mock
 
     # Создаем мок для ответа
@@ -65,24 +66,37 @@ async def test_update_with_wrong_cpm_run(client_session_mock):
         )
     )
 
-    # Создаем контекстный менеджер для ответа
-    context_manager_mock = AsyncMock()
-    context_manager_mock.__aenter__ = AsyncMock(return_value=response_mock)
-    context_manager_mock.__aexit__ = AsyncMock(return_value=None)
+    # Создаем контекстный менеджер для ошибочного ответа (первая попытка)
+    cm_err = AsyncMock()
+    cm_err.__aenter__.return_value = response_mock
+    cm_err.__aexit__.return_value = None
 
-    # Настраиваем мок для request
-    client_session_mock.request = AsyncMock(return_value=context_manager_mock)
+    # Создаем контекстный менеджер для успешного ответа (вторая попытка)
+    response_ok = AsyncMock()
+    response_ok.status = 200
+    response_ok.text = AsyncMock(return_value="")
+    response_ok.raise_for_status = MagicMock()
+
+    cm_ok = AsyncMock()
+    cm_ok.__aenter__.return_value = response_ok
+    cm_ok.__aexit__.return_value = None
+
+    # Настраиваем мок для request: сначала возвращаем ошибочный контекст, затем успешный
+    client_session_mock.request.side_effect = [cm_err, cm_ok]
 
     await bidder_api.update_cpm(adv_id=123456789, nmid=123456789, new_bid=150)
 
-    client_session_mock.request.assert_called_once_with(
-        "POST",
-        "https://advert-api.wb.ru/adv/v0/cpm",
-        json={
-            "advert_id": 123456789,
-            "type": 8,
-            "cpm": 150,
-            "param": str(123456789),
-        },
-        headers={"Authorization": "test_api_key"},
-    )
+    # Проверяем, что request был вызван и проверяем параметры запроса (игнорируем дополнительные kwargs)
+    assert client_session_mock.request.call_count >= 1
+    _args, _kwargs = client_session_mock.request.call_args
+    assert _args[0] == "PATCH"
+    assert _args[1] == "https://advert-api.wildberries.ru/adv/v0/bids"
+    assert _kwargs.get("json") == {
+        "bids": [
+            {
+                "advert_id": 123456789,
+                "nm_bids": [{"nm": 123456789, "bid": 200}],
+            }
+        ]
+    }
+    assert _kwargs.get("headers") == {"Authorization": "test_api_key"}

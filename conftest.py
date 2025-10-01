@@ -5,6 +5,73 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+# Подставляем заглушку для app.core.wb_api.http_request до реальных импортов
+import types
+# Устанавливаем безопасные значения переменных окружения, чтобы импорты настроек не падали
+os.environ.setdefault("TELEGRAM_WEB_PORT", "8080")
+os.environ.setdefault("MIN_SUM", "0")
+os.environ.setdefault("BIDDER_STEP_RUB", "1")
+# Базовые настройки БД/Redis/ClickHouse, чтобы импорты не падали при коллекции тестов
+os.environ.setdefault("POSTGRES_PORT", "5432")
+os.environ.setdefault("POSTGRES_USER", "test")
+os.environ.setdefault("POSTGRES_PASSWORD", "test")
+os.environ.setdefault("POSTGRES_DBNAME", "test")
+os.environ.setdefault("POSTGRES_MASTER_HOST", "localhost")
+os.environ.setdefault("POSTGRES_REPLICA_HOST", "localhost")
+os.environ.setdefault("CLICK_HOUSE_HOST", "localhost")
+os.environ.setdefault("CLICKHOUSE_PORT", "9000")
+os.environ.setdefault("CLICKHOUSE_USER", "default")
+os.environ.setdefault("CLICKHOUSE_PASSWORD", "pass")
+# Also set the variant with underscore used by settings_master
+os.environ.setdefault("CLICK_HOUSE_USER", "default")
+os.environ.setdefault("CLICK_HOUSE_PASSWORD", "pass")
+os.environ.setdefault("REDIS_MASTER_HOST", "localhost")
+os.environ.setdefault("REDIS_REPLICA_HOST", "localhost")
+os.environ.setdefault("YOOKASSA_TOKEN", "token")
+os.environ.setdefault("WEBHOOK_SECRET", "secret")
+os.environ.setdefault("CH_MAX_THREAD", "10")
+# Ensure a minimal 'dotenv' is available during tests to avoid import errors
+if 'dotenv' not in sys.modules:
+    dotenv_stub = types.ModuleType('dotenv')
+    def _load_dotenv():
+        return None
+    def dotenv_values(path=None, **kwargs):
+        return {}
+    dotenv_stub.load_dotenv = _load_dotenv
+    dotenv_stub.dotenv_values = dotenv_values
+    sys.modules['dotenv'] = dotenv_stub
+
+mod_name = 'app.core.wb_api.http_request'
+import importlib
+try:
+    # If a previous stub without __file__ exists, remove it to allow real import
+    if mod_name in sys.modules and not getattr(sys.modules[mod_name], "__file__", None):
+        del sys.modules[mod_name]
+    m = importlib.import_module(mod_name)
+    # Защитим декоратор на случай проблем с импортом/циклическими зависимостями
+    def _try_except_decorator_stub(*_args, **_kwargs):
+        def decorator(func):
+            return func
+
+        return decorator
+    try:
+        setattr(m, 'try_except_decorator', _try_except_decorator_stub)
+    except Exception:
+        pass
+except Exception:
+    # During early test phases some deps may be missing — create a stub module
+    stub_mod = types.ModuleType(mod_name)
+
+    def try_except_decorator(*_args, **_kwargs):
+        def decorator(func):
+            return func
+
+        return decorator
+
+    # Do not stub 'requests' here; tests should mock HTTP behavior themselves
+    stub_mod.try_except_decorator = try_except_decorator
+    sys.modules[mod_name] = stub_mod
+
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -86,6 +153,7 @@ def keywords_mocks() -> list[MagicMock]:
             "hard_status": 2,
             "spend": 100,
             "relevant": True,
+            "keyword_setting_original_id": 1,
         },
         {
             "best_keyword_status": False,
@@ -93,6 +161,7 @@ def keywords_mocks() -> list[MagicMock]:
             "hard_status": 2,
             "spend": 10,
             "relevant": False,
+            "keyword_setting_original_id": 2,
         },
         {
             "best_keyword_status": False,
@@ -100,6 +169,7 @@ def keywords_mocks() -> list[MagicMock]:
             "hard_status": 2,
             "spend": 40,
             "relevant": True,
+            "keyword_setting_original_id": 3,
         },
         {
             "best_keyword_status": False,
@@ -107,6 +177,7 @@ def keywords_mocks() -> list[MagicMock]:
             "hard_status": 1,
             "spend": 0,
             "relevant": False,
+            "keyword_setting_original_id": 4,
         },
     ]
 

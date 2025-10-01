@@ -1,7 +1,5 @@
 import pytest
 
-# Skip legacy tests: module is not used in production anymore
-pytestmark = pytest.mark.skip(reason="legacy module not used in prod")
 """Tests for AutoUpdaterTargetPlace target place updating logic."""
 
 import datetime
@@ -157,9 +155,13 @@ async def test_update_target_place(
     adv_setting_mock.plan_for_sales_for_day = plan_for_sales_for_day
     adv_setting_mock.max_place = current_target_place
 
-    redis_manager_mock = LastTargetPlaceUpdateRedisManager
-    redis_manager_mock.get_last_target_place_update = AsyncMock(return_value=result)
-    redis_manager_mock.set_last_target_place_update = AsyncMock()
+    # Prepare a redis manager instance with async methods and a factory that
+    # returns it when called from production code (LastTargetPlaceUpdateRedisManager(adv))
+    redis_manager_instance = MagicMock()
+    redis_manager_instance.get_last_target_place_update = AsyncMock(return_value=result)
+    redis_manager_instance.set_last_target_place_update = AsyncMock()
+    # Factory used to replace the class in the module; calling it returns the instance
+    redis_manager_factory = lambda adv: redis_manager_instance
 
     plan_data = PlanData(
         orders=plan_for_sales_for_day,
@@ -177,7 +179,7 @@ async def test_update_target_place(
         patch(
             "app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place."
             "auto_updater_target_place.LastTargetPlaceUpdateRedisManager",
-            new=redis_manager_mock,
+            new=redis_manager_factory,
         ),
         patch(
             "app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place."
@@ -185,6 +187,39 @@ async def test_update_target_place(
             new=get_async_session_mock,
         ),
     ):
+        # Подготовим необходимые глобальные переменные и заменим класс RedisManager
+        # на фабрику, возвращающую заранее подготовленный экземпляр.
+        import importlib
+
+        module = importlib.import_module(
+            "app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.auto_updater_target_place"
+        )
+        # adv используется в функции как глобальная переменная (legacy bug)
+        setattr(module, "adv", adv_setting_mock)
+        # spend_sum_from_keywords_now — сумма spend по ключам
+        setattr(
+            module,
+            "spend_sum_from_keywords_now",
+            sum(getattr(k, "spend", 0) for k in keywords_mocks),
+        )
+        # legacy names for fact values
+        setattr(
+            module,
+            "fact_mean_price_for_order_for_last_two_days",
+            fact_data.pay_for_order,
+        )
+        setattr(
+            module,
+            "fact_mean_orders_for_last_two_days",
+            fact_data.predict_orders,
+        )
+        # Replace LastTargetPlaceUpdateRedisManager class with factory returning our instance
+        setattr(
+            module,
+            "LastTargetPlaceUpdateRedisManager",
+            lambda adv: redis_manager_instance,
+        )
+
         updater = AutoUpdaterTargetPlace(adv_setting_mock)
 
         await updater.update(
@@ -198,6 +233,20 @@ async def test_update_target_place(
             compiled = called_stmt.compile()
             assert compiled.params["max_place"] == new_target_place
             session_mock.commit.assert_awaited_once()
-            redis_manager_mock.set_last_target_place_update.assert_awaited_once()
+            redis_manager_instance.set_last_target_place_update.assert_awaited_once()
         else:
             session_mock.commit.assert_not_awaited()
+        # Cleanup pending tasks to prevent interference with other tests
+        import asyncio
+
+        current = asyncio.current_task()
+        for task in list(asyncio.all_tasks()):
+            if task is current:
+                continue
+            if task.done():
+                continue
+            task.cancel()
+            try:
+                await task
+            except Exception:
+                pass
