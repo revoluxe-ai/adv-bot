@@ -31,9 +31,6 @@ new_venv
 *.class
 venv
 /image_master/image_sources/*
-*.jpg
-*.jpeg
-*.png
 *.gif
 *.bmp
 *.tiff
