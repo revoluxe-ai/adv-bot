@@ -1,8 +1,5 @@
 import logging
 
-from app import settings
-
-
 class SimpleStringFormatter(logging.Formatter):
     def format(self, record) -> str:
         log_time = self.formatTime(record, "%Y-%m-%d %H:%M:%S")
@@ -13,7 +10,9 @@ class SimpleStringFormatter(logging.Formatter):
         return result
 
 
-def setup_logging() -> None:
+def setup_logging(settings=None) -> None:
+    if not settings:
+        from app import settings
     """Настройка логирования"""
     try:
         logger = logging.getLogger()

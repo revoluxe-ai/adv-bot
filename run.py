@@ -1,8 +1,8 @@
 import logging
 
 from python_modules.logger import setup_logging
-
-setup_logging()
+from predict_ctr_service.utils.settings import settings
+setup_logging(settings)
 
 logger = logging.getLogger(__name__)
 
