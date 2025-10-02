@@ -8,7 +8,7 @@ from sqlalchemy.orm import configure_mappers
 from alembic import context
 from app.utils.db.base import BaseTable as Base
 from app.utils.db.session_maker import get_alchemy_row_for_migration
-
+import model_registratioin
 dotenv.load_dotenv()
 
 # this is the Alembic Config object, which provides
