@@ -104,5 +104,13 @@ class Settings:
             return None
         return value
 
+    @property
+    def LOG_LEVEL(self) -> str:
+        value = os.environ.get("LOG_LEVEL")
+        if value is None:
+            return "INFO"
+        return value
+
+
 
 settings = Settings()
