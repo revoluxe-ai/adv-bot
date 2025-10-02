@@ -27,6 +27,7 @@ def upgrade() -> None:
     predict_ctr_mode.create(op.get_bind(), checkfirst=True)
     op.drop_table('globalcategorysetting')
     op.drop_table('itemfeature')
+    op.drop_table('telegramfile')
     op.drop_table('keywordfeature')
     op.add_column('advsetting', sa.Column('predict_ctr_mode', sa.Enum('V1', 'V2', name='predictctrmode'), server_default='V1', nullable=True))
     op.create_index('ix_wb_category_name', 'wbcategory', ['wb_category_name'], unique=False)
