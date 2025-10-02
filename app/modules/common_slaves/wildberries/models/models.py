@@ -35,6 +35,15 @@ from app.utils.db.session_maker import get_async_session_maker
 
 if typing.TYPE_CHECKING:
     from app.modules.billing.models import AdvPayment
+    from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+
+
+class PredictCTRMode(Enum):
+    V1 = "v1"
+    V2 = "v2"
+
+
+
 
 _sm = get_async_session_maker
 
@@ -430,6 +439,12 @@ class AdvSetting(BaseTable):
         nullable=True,
         default=OrdersSourceForAutoMode.COMMON_STATISTIC,  # экземпляр Enum
         server_default=OrdersSourceForAutoMode.COMMON_STATISTIC.name  # строка
+    )
+    predict_ctr_mode: Mapped[PredictCTRMode] = mapped_column(
+        SAEnum(PredictCTRMode),
+        nullable=True,
+        default=PredictCTRMode.V1,  # экземпляр Enum
+        server_default=PredictCTRMode.V1.name,  # строка
     )
 
     __table_args__ = (
