@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "adv-bot"
+name = "predict-ctr-service"
 version = "0.1.0"
 description = ""
 authors = ["Andrey <vkitaebiz@gmail.com>"]
@@ -196,7 +196,6 @@ no-implicit-optional = "^1.4"
 types-redis = "^4.6.0.20241004"
 types-aiofiles = "^24.1.0.20250822"
 types-protobuf = "^6.32.1.20250918"
-
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

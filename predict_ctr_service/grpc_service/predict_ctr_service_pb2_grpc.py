@@ -16,7 +16,6 @@ try:
         GRPC_VERSION, GRPC_GENERATED_VERSION
     )
 except ImportError:
-    first_version_is_lower = None
     _version_not_supported = True
 
 if _version_not_supported:
@@ -88,7 +87,7 @@ class CtrService(object):
         timeout=None,
         metadata=None,
     ):
-        return getattr(grpc, "experimental", grpc).unary_unary(
+        return grpc.experimental.unary_unary(
             request,
             target,
             "/ctr.CtrService/PredictCtr",

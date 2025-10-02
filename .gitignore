@@ -78,3 +78,4 @@ cursor-chat-export/
 .cursor/
 linux_venv/
 app/modules/predict_ctr_service/model/model/model.json
+!predict_ctr_service/ml_model/model_data/model.joblib

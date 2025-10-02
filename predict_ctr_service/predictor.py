@@ -1,8 +1,10 @@
 import logging
 import numpy as np
 import pandas as pd
+
 from typing import Any, Dict, List, Tuple, Set
 from numpy.typing import NDArray
+
 
 # from xgboost import XGBModel  # Теперь используем pipeline
 
@@ -67,7 +69,7 @@ class Predictor:
         # Получаем и очищаем ключевые слова
         clear_keywords = [text_cleaner.clear(text) for text in texts]
 
-        keyword_features_result = await self._get_keyword_features(clear_keywords)
+        keyword_features_result: list[tuple[str, list[float]]] = await self._get_keyword_features(clear_keywords)
         keyword_features_dict: Dict[str, List[float]] = {row[0]: row[1] for row in keyword_features_result}
 
         data_rows: List[Dict[str, Any]] = []
@@ -77,7 +79,6 @@ class Predictor:
 
             if not keyword_features:
                 continue
-
             row: Dict[str, Any] = {
                 "keyword": text,
                 **avg_item_features,
@@ -87,11 +88,11 @@ class Predictor:
                 },
             }
             data_rows.append(row)
-
+        # Создаем DataFrame только один раз в конце
         df = pd.DataFrame(data_rows)
         return df
 
-    async def predict(self, nmids: List[int], texts: List[str]) -> Dict[str, float]:
+    async def predict(self, nmids: list[int], texts: list[str]) -> dict[str, float]:
         model = self._model
         if model is None:
             raise NotLoadModelError("Модель не загружена")
@@ -119,16 +120,35 @@ class Predictor:
 
         return result_dict
 
+    def _compute_avg_features_numpy(self, item_features_list: List[List[float]]) -> Dict[str, float]:
+        """
+        Оптимизированное вычисление средних признаков с использованием numpy
+        """
+        if not item_features_list:
+            return {}
+        # Преобразуем в numpy array для векторных операций
+        features_array = np.array(item_features_list)
+
+        # Вычисляем среднее по всем признакам одновременно
+        avg_features = np.mean(features_array, axis=0)
+
+        # Создаем словарь с результатами
+        return {
+            f"item_feature_{i}": float(avg_features[i])
+            for i in range(len(avg_features))
+        }
+
     async def predict_batch(
-        self, nmids: List[int], texts: List[str], batch_size: int = 1000
-    ) -> Dict[str, float]:
+        self, nmids: list[int], texts: list[str], batch_size: int = 1000
+    ) -> dict[str, float]:
         """
         Оптимизированный метод для предсказания с батчевой обработкой больших объемов данных
         """
         if len(texts) <= batch_size:
             return await self.predict(nmids, texts)
 
-        results: Dict[str, float] = {}
+        # Разбиваем на батчи для обработки больших объемов данных
+        results = {}
         for i in range(0, len(texts), batch_size):
             batch_texts = texts[i : i + batch_size]
             batch_results = await self.predict(nmids, batch_texts)
@@ -136,18 +156,3 @@ class Predictor:
 
         return results
 
-    def _compute_avg_features_numpy(self, item_features_list: List[List[float]]) -> Dict[str, float]:
-        """
-        Оптимизированное вычисление средних признаков с использованием numpy
-        """
-        if not item_features_list:
-            return {}
-
-        features_array = np.array(item_features_list)
-
-        avg_features = np.mean(features_array, axis=0)
-
-        return {
-            f"item_feature_{i}": float(avg_features[i])
-            for i in range(len(avg_features))
-        }

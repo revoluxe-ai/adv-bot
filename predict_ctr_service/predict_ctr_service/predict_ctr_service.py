@@ -86,7 +86,6 @@ class PredictCTRService(CtrServiceServicer):
                 self._model = model
             except Exception as exc:
                 raise exc
-            await asyncio.sleep(1)
 
     async def main(self) -> None:
         await asyncio.gather(self._serve(), self._update_model_loop())

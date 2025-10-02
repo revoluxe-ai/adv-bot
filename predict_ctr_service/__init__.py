@@ -1,4 +1,4 @@
-__all__ = ["PredictCTRService"]
 
+__all__ = ["PredictCTRService"]
 
 from .predict_ctr_service import PredictCTRService
