@@ -2,8 +2,6 @@ import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
-
-import numpy as np
 import pandas as pd  # type: ignore
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -267,11 +265,7 @@ def _get_enough_views(ctr: float) -> int:
     return int(1 / ctr)
 
 
-async def get_nmid_to_item_features(nmids_batch: set[int]) -> dict[int, np.ndarray]:
-    result = await data_getter.get_item_features_from_redis(nmids_batch)
-    result_list = []
-    for row in result:
-        nmid = row[0]
-        vector = row[1]
-        result_list.append((nmid, vector))
-    return dict(result_list)
+async def get_nmid_to_item_features(nmids_batch: set[int]) -> dict[int, list[float]]:
+    result: dict[int, list[float]] = await data_getter.get_item_features_from_redis(nmids_batch)
+    return result
+

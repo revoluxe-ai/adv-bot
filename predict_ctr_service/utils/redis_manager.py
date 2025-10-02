@@ -1,7 +1,8 @@
-from .clickhouse_client import get_clickhouse_client
 from shared_lib.models.calculated_keyword import CalculatedKeyword
+from .clickhouse_client import get_clickhouse_client
 from typing import List, Dict, Tuple, Any
-from datetime import timedelta
+import json
+
 
 from . import text_cleaner
 from .redis_client import redis_replica_client
@@ -56,47 +57,60 @@ def __calculate_clusters(preset_to_keywords: Dict[Any,
         views: int = 0
         clicks: int = 0
         spend: float = 0.0
-        query: float = 0.0
         for keyword in keywords:
             views += keyword.views
             clicks += keyword.clicks
             spend += keyword.spend
-            if isinstance(keyword.query, (int, float)):
-                query += float(keyword.query)
         cluster_keyword = CalculatedKeyword(
             text=keyword_cluster_name, views=views, clicks=clicks, spend=spend
         )
-        cluster_keyword.query = query if query else "<50"
         cluster_keyword.childs_keywords = keywords
         keyword_stats.append(cluster_keyword)
     return keyword_stats
 
-# _build_clickhouse_query
 
-def _build_clickhouse_query(
-    adv_ids: set[int],
-    pass_time: timedelta | None,
-    last_views: int | None = None,
-) -> str:
-    adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
-    # Здесь должен быть ваш SQL-запрос
-    query = f"SELECT ... FROM ... WHERE adv_id IN ({adv_ids_str})"  # Заглушка
-    return query
+async def get_nmid_vectors(nmids_batch: set[int]) -> dict[int, list[float]]:
+    """
+    Получить вектора для nmids из Redis.
+    Ключ: item_vector:{nmid}, значение: JSON-сериализованный список float.
+    """
+    if not nmids_batch:
+        return {}
+    result = {}
+    for nmid in nmids_batch:
+        key = f"item_vector:{nmid}"
+        vector_bytes = await redis_replica_client.get(key)
+        if vector_bytes:
+            vector_str = vector_bytes.decode("utf-8")
+            vector = json.loads(vector_str)
+            result[nmid] = vector
+    return result
+
+async def get_keywords_vectors(keywords: list[str]) -> list[tuple[str, list[float]]]:
+    """
+    Получить вектора для ключевых слов из Redis.
+    Ключ: keyword_vector:{keyword}, значение: JSON-сериализованный список float.
+    """
+    if not keywords:
+        return []
+    result = []
+    for keyword in keywords:
+        key = f"keyword_vector:{keyword}"
+        vector_bytes = await redis_replica_client.get(key)
+        if vector_bytes:
+            vector_str = vector_bytes.decode("utf-8")
+            vector = json.loads(vector_str)
+            result.append((keyword, vector))
+    return result
+
+
 
 __all__ = [
     "get_clickhouse_client",
     "set_predict_ctrs",
     "get_clusters_and_presets",
     "__calculate_clusters",
-    "_build_clickhouse_query",
     "get_nmid_vectors",
     "get_keywords_vectors"
 ]
 
-async def get_nmid_vectors(nmids_batch: set[int]) -> dict[int, list[float]]:
-    # Заглушка для примера
-    return {nmid: [0.0, 1.0] for nmid in nmids_batch}
-
-async def get_keywords_vectors(keywords: list[str]) -> list[tuple[str, list[float]]]:
-    # Заглушка для примера
-    return [(kw, [0.0, 1.0]) for kw in keywords]

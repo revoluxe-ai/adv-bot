@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
+from typing import Any
 
 import aiofiles
 import joblib
@@ -13,7 +14,8 @@ _MODEL_DIR = Path(__file__).parent / "model"  # predict_ctr_service/model/model
 JOBLIB_PATH = _MODEL_DIR / "model.joblib"
 
 
-async def load_model() -> joblib.Booster:
+async def load_model() -> Any:
+
     """Загружает XGBRegressor модель из joblib файла."""
     logger.debug(f"Загрузка модели из {JOBLIB_PATH}")
 

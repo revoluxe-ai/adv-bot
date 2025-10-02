@@ -40,4 +40,3 @@ class AdvSetting(BaseTable):
     type: Mapped[int] = Column(Integer, nullable=True)
     hard_min_ctr = Column(Float)
     # ...другие поля и методы по необходимости...
-

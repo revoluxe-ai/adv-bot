@@ -4,13 +4,14 @@ import platform
 from collections.abc import Callable
 from multiprocessing import Lock, Manager
 from multiprocessing.synchronize import Lock as LockType
-from typing import Any, Protocol, TypeVar, cast
+from typing import Any, Protocol, TypeVar, cast, Awaitable
+
 
 import clickhouse_connect
 from clickhouse_connect.driver.asyncclient import AsyncClient
 from urllib3 import PoolManager
 
-from .settings import settings
+from shared_lib import settings
 
 system_name = platform.system()
 
@@ -123,7 +124,9 @@ class get_clickhouse_client:
         global function_count_lock
         client = self.client
         if client is not None:
-            client.close()
+            result = client.close()
+            if isinstance(result, Awaitable):
+                await result
         if (
             system_name == "Linux"
             and connection_lock is not None

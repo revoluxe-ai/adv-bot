@@ -84,8 +84,8 @@ class PredictCTRService(CtrServiceServicer):
                 model = await fitter.fit_and_get_new_model()
                 await save_model(model)
                 self._model = model
-            except Exception:
-                logger.error("Ошибка при обновлении модели", exc_info=True)
+            except Exception as exc:
+                raise exc
             await asyncio.sleep(1)
 
     async def main(self) -> None:
