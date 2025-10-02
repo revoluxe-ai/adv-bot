@@ -15,7 +15,6 @@ JOBLIB_PATH = _MODEL_DIR / "model.joblib"
 
 
 async def load_model() -> Any:
-
     """Загружает XGBRegressor модель из joblib файла."""
     logger.debug(f"Загрузка модели из {JOBLIB_PATH}")
 
