@@ -1,8 +1,5 @@
+import asyncio
 import pytest
-
-pytestmark = pytest.mark.skip(
-    reason="relies on complex async mocks provoking pending tasks; skipped for pipeline speed"
-)
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -30,12 +27,12 @@ AsyncMock() по умолчанию возвращает coroutine-object; пр�
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("shop_id", ["7de14a75-4939-40ff-b4dd-9dd5472a4348"])
-# @pytest.mark.timeout(15)
 async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
     with patch("app.modules.common_slaves.wildberries.super_cabinet_manager.sm") as sm_mock:
         # Два отдельных async context manager для двух вызовов `async with sm()`
-        session1 = AsyncMock()
-        session2 = AsyncMock()
+        # Use plain MagicMock for sessions; AsyncMock only for awaited methods
+        session1 = MagicMock()
+        session2 = MagicMock()
 
         cm1 = MagicMock()
         cm1.__aenter__ = AsyncMock(return_value=session1)
@@ -70,3 +67,16 @@ async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
 
         access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
         assert isinstance(access, WBCabinetAccess)
+
+        # Ensure no pending tasks remain after test (cancel them)
+        current = asyncio.current_task()
+        for task in list(asyncio.all_tasks()):
+            if task is current:
+                continue
+            if task.done():
+                continue
+            task.cancel()
+            try:
+                await task
+            except Exception:
+                pass

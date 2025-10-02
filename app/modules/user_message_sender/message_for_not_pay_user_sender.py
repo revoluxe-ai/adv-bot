@@ -33,7 +33,7 @@ async def send_message_to_user(bot, user_telegram_id: int):
     await message()
 
 
-async def send_messages_to_users():
+async def send_messages_to_users() -> None:
     all_user_telegram_ids = await get_all_user_telegram_ids_with_not_balance()
     all_user_telegram_ids = list(set(all_user_telegram_ids))
     user_telegram_ids = await get_user_telegram_ids_for_condition(all_user_telegram_ids)

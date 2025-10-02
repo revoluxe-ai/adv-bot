@@ -6,12 +6,12 @@ import logging
 
 from aiohttp import ClientSession
 
+from app.core.di.di_manager import DIManager
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
-
-from ..user_message_sender import message_for_not_pay_user_sender
 from . import wb_manager
 from .ml_data_manager import update_model
+from ..user_message_sender import message_for_not_pay_user_sender
 
 set_config()
 
@@ -45,28 +45,26 @@ async def sender_message_to_not_pay_users():
 
 
 async def process_payment_for_advs() -> None:
-    from app.modules.billing import process_payment_for_advs
+    from app.modules.billing import process_payment_for_advs as billing_process_payment_for_advs
 
-    """Запуск один раз в сутки в 3:00"""
+    """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
     while True:
         now = datetime.datetime.now()
-
+        try:
+            await billing_process_payment_for_advs(global_ttl=900)
+            logger.info("Обработка платежей завершена успешно")
+        except Exception as e:
+            logger.critical(f"Ошибка обработки платежей: {e}", exc_info=True)
+            await asyncio.sleep(60)
+            continue
         # Вычисляем следующие 3:00
         next_run = now.replace(hour=3, minute=0, second=0, microsecond=0)
         if now.hour >= 3:
             next_run += datetime.timedelta(days=1)
-
         # Спим до 3:00
         sleep_seconds = (next_run - now).total_seconds()
         logger.info(f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)")
         await asyncio.sleep(sleep_seconds)
-
-        # Выполняем обработку
-        try:
-            await process_payment_for_advs()
-            logger.info("Обработка платежей завершена успешно")
-        except Exception as e:
-            logger.error(f"Ошибка обработки платежей: {e}", exc_info=True)
 
 
 async def run_update_vectors_in_redis() -> None:
@@ -87,40 +85,26 @@ async def run_update_model():
         await asyncio.sleep(0)
 
 
-async def update_wb_config_data(client_session) -> None:
-    await wb_manager.update_wb_config_data_run(client_session)
-
-
-async def main_loop(client_session):
+async def main_loop() -> None:
     await asyncio.gather(
         process_payment_for_advs(),
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),
-        update_wb_config_data(client_session),
     )
 
 
-async def run_main_coroutines():
+async def run_main_coroutines() -> None:
     from app.core.di.app_container import AppContainer
 
-    container = AppContainer()
-    try:
-        result = container.init_resources()
-        if result is not None:
-            await result
+    async with await DIManager.create(AppContainer):
         await __run_main_coroutines()
-    finally:
-        result = container.shutdown_resources()
-        if result is not None:
-            await result
 
 
-async def __run_main_coroutines():
-    async with ClientSession() as client_session:
-        while True:
-            try:
-                await main_loop(client_session)
-            except Exception as e:
-                logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
-                del e
-                await asyncio.sleep(0)
+async def __run_main_coroutines() -> None:
+    while True:
+        try:
+            await main_loop()
+        except Exception as e:
+            logger.error(f"Ошибка в главном цикле {e}", exc_info=True)
+            del e
+            await asyncio.sleep(0)

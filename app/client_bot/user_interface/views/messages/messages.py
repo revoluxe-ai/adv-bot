@@ -91,13 +91,13 @@ class GetCardsApiError(Text):
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
     def __init__(
-        self,
-        bot: Bot,
-        chat_id: int,
-        wb_user_cabinet_original_id: int,
-        adv_settings: list[AdvSetting],
-        state,
-        page: int = 1,
+            self,
+            bot: Bot,
+            chat_id: int,
+            wb_user_cabinet_original_id: int,
+            adv_settings: list[AdvSetting],
+            state,
+            page: int = 1,
     ) -> None:
         self._state = state
         super().__init__(bot, chat_id)
@@ -140,7 +140,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         )
         # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
 
-        for adv in adv_settings:
+        for adv in self._adv_settings:
             adv.check_last_24_hours = await redis_manager.check_last_24_hours(adv.id)
 
         return await super().__call__()
@@ -152,7 +152,7 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         if keywords_filter:
             clear_advs = []
             for adv in adv_settings:
-                if not adv.bot_active and adv.active_status == adv.ActiveStatuses.DONE:
+                if not adv.bot_active and adv.active_status == adv.ActiveStatuses.DONE.value:
                     continue
                 if not adv.search_adv_id:
                     continue
@@ -696,16 +696,16 @@ class NoMainPhotos(TextWithKeyboard):
     @property
     def text(self):
         text = (
-            "Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК\n"
-            "Данные кампании: \n"
-            "Название кампании: " + self.adv.name + "\n"
-            f"ID кампании: {self.adv.adv_id}\n"
-            "Что конкретно нужно сделать:\n"
-            "1. Зайдите в рекламный кабинет на WB - https://cmp.wildberries.ru/\n"
-            "2. Найдите в кабинете эту кампанию\n"
-            "3. Укажите артикул WB (цифровой артикул товара WB - 123456789)\n"
-            "4. Подождите 20-30 минут, пока данные обновятся\n"
-            f"Если возникнут проблемы, то напишите сюда -> {const.SUPPORT_LINK}"
+                "Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК\n"
+                "Данные кампании: \n"
+                "Название кампании: " + self.adv.name + "\n"
+                                                        f"ID кампании: {self.adv.adv_id}\n"
+                                                        "Что конкретно нужно сделать:\n"
+                                                        "1. Зайдите в рекламный кабинет на WB - https://cmp.wildberries.ru/\n"
+                                                        "2. Найдите в кабинете эту кампанию\n"
+                                                        "3. Укажите артикул WB (цифровой артикул товара WB - 123456789)\n"
+                                                        "4. Подождите 20-30 минут, пока данные обновятся\n"
+                                                        f"Если возникнут проблемы, то напишите сюда -> {const.SUPPORT_LINK}"
         )
         return text
 
@@ -785,7 +785,7 @@ class SettingMinCTR(TextWithKeyboard):
             f"Минимальный CTR для кампании {self._adv.name}"
             f" равен {round(self._min_ctr * 100, 1)} %,"
             f"""тип минимального CTR: {
-                "Задан в ручную" if not self._adv.new_auto_min_ctr_mode else "Определен автоматически"
+            "Задан в ручную" if not self._adv.new_auto_min_ctr_mode else "Определен автоматически"
             }\n"""
         )
 
@@ -1199,8 +1199,8 @@ class ShowFavoriteAdvs(TextWithKeyboard):
                 await self.bot.send_message(
                     self.user_telegram_id,
                     text="У вас нет избранных кампаний,"
-                    " добавить кампании в избранное вы сможете отдельно в каждом магазине"
-                    ". После этого сможете управлять всеми кампаниями ваших магазинов в одном месте.",
+                         " добавить кампании в избранное вы сможете отдельно в каждом магазине"
+                         ". После этого сможете управлять всеми кампаниями ваших магазинов в одном месте.",
                 )
                 return
         await super().__call__()

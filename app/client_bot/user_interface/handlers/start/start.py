@@ -49,7 +49,7 @@ redis_manager = RedisManager()
 
 
 async def callback_start_registration(
-    callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
+        callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
 ) -> None:
     await state.clear()
     async with sm() as session:
@@ -71,7 +71,7 @@ async def callback_start_registration(
 
 @router.callback_query(callbacks.ShopNew.filter())
 async def add_shop(
-    callback_query: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext
+        callback_query: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext
 ) -> None:
     await bot.send_message(callback_query.message.chat.id, "Добавление нового магазина (кабинета)")
     await state.set_state(states.CabinetRegistration.cabinet_name)
@@ -120,7 +120,7 @@ async def process_cabinet_name(message: Message, bot: aiogram.Bot, state: FSMCon
 
 @router.message(StateFilter(states.CabinetRegistration.api))
 async def process_cabinet_api(
-    message: Message, bot: aiogram.Bot, state: FSMContext, client_session: ClientSession
+        message: Message, bot: aiogram.Bot, state: FSMContext, client_session: ClientSession
 ) -> None:
     """
     Юзер вводит токен, который проверяется на валидность.
@@ -268,10 +268,10 @@ async def process_cabinet_api(
 
 @router.callback_query(callbacks.AddNewToken.filter())
 async def add_app_token(
-    callback_query: types.CallbackQuery,
-    callback_data: callbacks.AddNewToken,
-    bot: aiogram.Bot,
-    state: FSMContext,
+        callback_query: types.CallbackQuery,
+        callback_data: callbacks.AddNewToken,
+        bot: aiogram.Bot,
+        state: FSMContext,
 ):
     logger.debug("Текущее состояние: %s", await state.get_state())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
@@ -288,10 +288,10 @@ async def add_app_token(
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter())
 async def select_shop(
-    callback_query: types.CallbackQuery,
-    callback_data: callbacks.Shop,
-    bot: aiogram.Bot,
-    state: FSMContext,
+        callback_query: types.CallbackQuery,
+        callback_data: callbacks.Shop,
+        bot: aiogram.Bot,
+        state: FSMContext,
 ):
     reset_filter = callback_data.reset_filter
     if reset_filter:
@@ -312,7 +312,7 @@ async def select_shop(
             .order_by(AdvSetting.name)
         )
         result = await session.execute(stmt)
-        adv_settings = result.scalars().all()
+        adv_settings: list[AdvSetting] = result.scalars().all()
 
     await messages.AdvCompanyChoicing(
         bot, chat_id, wb_user_cabinet_original_id, adv_settings, state
@@ -322,10 +322,10 @@ async def select_shop(
 
 @router.callback_query(callbacks.Shop.filter(aiogram.F.action == Action.select))
 async def shop_menu_process(
-    callback: types.CallbackQuery,
-    callback_data: callbacks.Shop,
-    bot: aiogram.Bot,
-    state: FSMContext,
+        callback: types.CallbackQuery,
+        callback_data: callbacks.Shop,
+        bot: aiogram.Bot,
+        state: FSMContext,
 ):
     await state.update_data(
         last_wb_user_cabinet_original_id=callback_data.wb_user_cabinet_original_id
@@ -338,11 +338,11 @@ async def shop_menu_process(
 
 @router.callback_query(callbacks.UpdateCompanyFromWB.filter())
 async def update_company_from_wb(
-    callback_query: types.CallbackQuery,
-    bot: aiogram.Bot,
-    callback_data: callbacks.UpdateCompanyFromWB,
-    state: FSMContext,
-    client_session: ClientSession,
+        callback_query: types.CallbackQuery,
+        bot: aiogram.Bot,
+        callback_data: callbacks.UpdateCompanyFromWB,
+        state: FSMContext,
+        client_session: ClientSession,
 ):
     await messages.LongTimeOperation(bot, callback_query.message.chat.id)()
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id

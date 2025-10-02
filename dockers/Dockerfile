@@ -1,45 +1,36 @@
-FROM python:3.11
+FROM python:3.11-slim AS base
 
-# Установка рабочего каталога
+# Настройки Poetry
+ENV POETRY_VERSION=1.5.1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    PATH="/app/.venv/bin:$PATH"
+
+# Рабочая директория
 WORKDIR /app
 
-# Копирование только файла зависимостей (requirements.txt)
-COPY requirements.txt ./
-
-# Установка необходимых библиотек
-RUN apt-get update && apt-get install -y \
+# Установка необходимых системных пакетов
+RUN apt-get update && apt-get install -y --no-install-recommends \
     logrotate \
     cron \
     rsyslog \
     libsystemd-dev \
     pkg-config \
     wget \
-    ca-certificates && \
-    # Установка virtualenv
-    pip install --upgrade pip && \
-    pip install virtualenv && \
-    # Установка сертификатов для работы с Yandex PostgreSQL
-    mkdir -p ~/.postgresql && \
-    wget "https://storage.yandexcloud.net/cloud-certs/CA.pem" --output-document ~/.postgresql/root.crt && \
-    chmod 0600 ~/.postgresql/root.crt && \
-    mkdir --parents /usr/local/share/ca-certificates/Yandex && \
-    wget "https://storage.yandexcloud.net/cloud-certs/RootCA.pem" --output-document /usr/local/share/ca-certificates/Yandex/RootCA.crt && \
-    wget "https://storage.yandexcloud.net/cloud-certs/IntermediateCA.pem" --output-document /usr/local/share/ca-certificates/Yandex/IntermediateCA.crt && \
-    chmod 655 /usr/local/share/ca-certificates/Yandex/RootCA.crt /usr/local/share/ca-certificates/Yandex/IntermediateCA.crt && \
-    update-ca-certificates
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Создание виртуального окружения
-RUN python -m venv /app/venv
+# Установка Poetry
+RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
 
-# Активируем виртуальное окружение и устанавливаем зависимости
-RUN /bin/bash -c "source /app/venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt"
+# Сначала копируем только файлы зависимостей (чтобы кэшировать слои)
+COPY pyproject.toml poetry.lock ./
 
-# Настройка cron для запуска logrotate
-RUN echo "*/5 * * * * /usr/sbin/logrotate /etc/logrotate.conf" > /etc/cron.d/logrotate && \
-    chmod 0644 /etc/cron.d/logrotate
+# Установка зависимостей (без dev-зависимостей)
+RUN poetry install --no-interaction --no-root --without dev
 
-# Копирование исходного кода
+# Копируем весь исходный код
 COPY . .
 
-# Устанавливаем переменную окружения для использования виртуального окружения по умолчанию
-ENV PATH="/app/venv/bin:$PATH"
+# Настройка cron для запуска logrotate
+RUN echo "*/5 * * * * /usr/sbin/logrotate /etc/logrotate.conf" > /etc/cron.d/logrotate \
+    && chmod 0644 /etc/cron.d/logrotate

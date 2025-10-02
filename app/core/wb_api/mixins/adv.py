@@ -8,14 +8,13 @@ from app.core.wb_api.data_classes.adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
 from app.modules.common_slaves.wildberries.data_classes.adv import Balances
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
-
-from ..data_classes.advs import adv_fabric
-from ..exceptions import BadRequestError, MinAdvBidWBApiError
-from ..http_request import requests, try_except_decorator
 from .excs import (
     ItemCategoryNotInStockError,
     StartAdvError,
 )
+from ..data_classes.advs import adv_fabric
+from ..exceptions import BadRequestError, MinAdvBidWBApiError
+from ..http_request import requests, try_except_decorator
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ class AdvMixin(WBAPIProtocol):
 
         for advert in adverts:
             advert_type = advert.get("type")
-            if isinstance(advert_type, int) and advert_type == 8:
+            if isinstance(advert_type, int) and advert_type == 9:
                 advert_list: list[dict[str, Any]] = advert.get("advert_list", [])
                 for advert_item in advert_list:
                     advertId = advert_item["advertId"]
@@ -97,7 +96,7 @@ class AdvMixin(WBAPIProtocol):
         all_advs = []
         part = 50
         for i in range(0, len(adv_ids), part):
-            part_of_advs = adv_ids[i : i + part]
+            part_of_advs = adv_ids[i: i + part]
             advs = await self._get_advs(part_of_advs)
             if advs:
                 all_advs.extend(advs)
@@ -119,7 +118,7 @@ class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 60)
     async def create_auto_adv(
-        self, name: str, SubjectID: int, balance_type: int, start_status: bool
+            self, name: str, SubjectID: int, balance_type: int, start_status: bool
     ) -> int:
         url = "https://advert-api.wildberries.ru/adv/v1/save-ad"
         data = {
@@ -140,8 +139,8 @@ class AdvMixin(WBAPIProtocol):
         else:
             error_text = answer["error"]
             if (
-                error_text == "Invalid Params or payload:"
-                " Товары выбранной категории не в наличии, размещение невозможно"
+                    error_text == "Invalid Params or payload:"
+                                  " Товары выбранной категории не в наличии, размещение невозможно"
             ):
                 raise ItemCategoryNotInStockError()
             else:
@@ -186,7 +185,7 @@ class AdvMixin(WBAPIProtocol):
         return None
 
     async def update_nmids_in_adv(
-        self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
+            self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
     ):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
@@ -205,7 +204,7 @@ class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 2)
     async def update_nmids_in_auto_adv(
-        self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
+            self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
     ):
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
@@ -296,7 +295,7 @@ class AdvMixin(WBAPIProtocol):
             )
 
     async def get_adv_full_state(
-        self, adv_ids: list[int], dates: list[datetime.datetime.date] | None = None
+            self, adv_ids: list[int], dates: list[datetime.datetime.date] | None = None
     ) -> list[FullAdvStat] | None:
         if not adv_ids:
             return []
@@ -305,7 +304,7 @@ class AdvMixin(WBAPIProtocol):
 
         # Разбиваем список adv_ids на чанки по 100
         for i in range(0, len(adv_ids), 100):
-            chunk = adv_ids[i : i + 100]
+            chunk = adv_ids[i: i + 100]
             stats_chunk = await self._get_adv_full_state(chunk, dates)
             if stats_chunk:
                 all_stats.extend(stats_chunk)
@@ -314,7 +313,7 @@ class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 60)
     async def _get_adv_full_state(
-        self, adv_ids: list[int], dates: list[datetime.datetime.date] = None
+            self, adv_ids: list[int], dates: list[datetime.datetime.date] = None
     ) -> list[FullAdvStat] | None:
         assert [isinstance(dt, datetime.date) for dt in dates]
         assert [isinstance(adv_id, int) for adv_id in adv_ids]
