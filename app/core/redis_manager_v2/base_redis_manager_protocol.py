@@ -1,7 +1,7 @@
 from typing import Any
 from typing import Protocol
 
-from app.core.redis_manager_v2._redis_client import RedisClient
+from app.core.redis_manager_v2.redis_client import RedisClient
 
 
 class BaseRedisManagerProtocol(Protocol):
