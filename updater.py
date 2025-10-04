@@ -6,7 +6,7 @@ from multiprocessing import Process
 
 import dotenv
 import psutil
-
+from typing import NoReturn
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     run_update_all_keywords_on_wb,
@@ -18,7 +18,7 @@ dotenv.load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-async def update_keywords_ctr_by_similary_run() -> None:
+async def update_keywords_ctr_by_similary_run() -> NoReturn:
     from app.modules.wb_adv_updater import (
         hard_ml_data_updater_process as hard_data_manager,
     )
