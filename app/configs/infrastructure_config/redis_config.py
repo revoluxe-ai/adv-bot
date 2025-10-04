@@ -1,10 +1,11 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class RedisConfig(BaseSettings):
-    host: str
-    port: int
-    db: int = 0
+    host: str = Field(default="localhost")
+    port: int = Field(default=6379)
+    db: int = Field(default=0)
     password: str | None = None
 
     model_config = {
