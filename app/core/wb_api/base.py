@@ -2,17 +2,22 @@ import logging
 import typing
 from collections import defaultdict
 from collections.abc import Generator
-from typing import TypeVar
+from typing import Optional, TypeVar
 
 from aiohttp import ClientSession
+import aiohttp
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exceptions import ApiForbiddenError
 
 if typing.TYPE_CHECKING:
     from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
-    from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
-    from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+    from ...modules.common_slaves.wildberries.super_cabinet_manager import (
+        WBCabinetAccess,
+    )
+    from ...modules.common_slaves.wildberries.models import WBToken
+
+from ...modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +37,7 @@ class BaseAPI:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
         tokens: list['WBToken'] = wb_access.tokens
-        self.access: WBCabinetAccess = wb_access
+        self.access: "WBCabinetAccess" = wb_access
         if not tokens:
             raise ApiForbiddenError(
                 "Нет токенов для доступа к API",
@@ -64,7 +69,7 @@ class BaseAPI:
     @staticmethod
     def chunks(lst: list[T], n: int) -> Generator[list[T], None, None]:
         for i in range(0, len(lst), n):
-            yield lst[i: i + n]
+            yield lst[i : i + n]
 
     async def set_next_token(self, method_name: str) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
@@ -72,17 +77,21 @@ class BaseAPI:
         current_token_original_id = self._current_token.id
         self._bad_tokens_original_ids[method_name].add(current_token_original_id)
 
-        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[method_name]
+        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[
+            method_name
+        ]
 
         free_tokens = [
-            token for token in self._free_tokens if token.id not in all_bad_token_original_ids
+            token
+            for token in self._free_tokens
+            if token.id not in all_bad_token_original_ids
         ]
 
         if free_tokens:
             self._current_token = free_tokens[0]
             self.headers = Headers(self._current_token)
         else:
-            wb_cabinet: WBCabinet | None = self.access.wb_cabinet
+            wb_cabinet: Optional["WBCabinet"] = self.access.wb_cabinet
             if wb_cabinet is None:
                 raise ApiForbiddenError(
                     "Нет WBCabinet для деактивации, метод set_next_token не может быть использован"
