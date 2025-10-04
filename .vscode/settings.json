@@ -23,5 +23,8 @@
     "python.testing.autoTestDiscoverOnSaveEnabled": true,
 
     // ⚡ чтобы иногда не ругался на отсутствие тестов
-    "python.testing.cwd": "${workspaceFolder}"
+    "python.testing.cwd": "${workspaceFolder}",
+    "cursorpyright.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ]
 }
