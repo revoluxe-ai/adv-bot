@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "$schema": "vscode://schemas/launch",
+  "configurations": [
+    {
+      "name": "Python: new_wb_shop_update_run.py (Poetry)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/new_wb_shop_update_run.py", 
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "justMyCode": true
+    }
+  ]
+}

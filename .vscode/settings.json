@@ -1,9 +1,27 @@
 {
-    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
-    "python.analysis.useLibraryCodeForTypes": true,
-    "python.analysis.extraPaths": ["${workspaceFolder}/app"],
-    "python.analysis.indexing": true,
-    "chatgpt.openOnStartup": true
+    "python.defaultInterpreterPath": "C:\\Users\\vkita\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\adv-bot-rDw-hi0a-py3.11\\Scripts\\python.exe",
+    "python.terminal.activateEnvironment": true,
+    "python.envFile": "${workspaceFolder}/.env",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ],
+    "debugpy.debugJustMyCode": false,
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true
+    },
+
+    // 🧪 тесты
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [
+        "app",       // или "tests" — укажи где лежат твои тесты
+        "-vv"        // чтобы видеть полный вывод (можно убрать, если шумно)
+    ],
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+
+    // ⚡ чтобы иногда не ругался на отсутствие тестов
+    "python.testing.cwd": "${workspaceFolder}"
 }
-
-
