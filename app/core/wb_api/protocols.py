@@ -3,11 +3,14 @@
 
 """
 
-from typing import Any, Protocol, runtime_checkable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from aiohttp import ClientSession
 
-from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
+if TYPE_CHECKING:
+    from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
 
 @runtime_checkable
@@ -15,7 +18,7 @@ class WBAPIProtocol(Protocol):
     """Протокол для работы с WB API для миксинов"""
 
     PREFIX: str
-    headers: Headers
+    headers: "Headers"
     HOST: str
     api_call_state: dict[str, dict[str, Any]]
     shop_id: str
