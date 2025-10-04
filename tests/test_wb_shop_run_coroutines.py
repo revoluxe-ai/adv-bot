@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -39,7 +40,7 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
         return_value=coroutines_manager_mock,
     ):
         # Подменяем asyncio.gather, чтобы мы могли проверить, какие корутины были переданы
-        async def mock_gather(*args, **kwargs):
+        async def mock_gather(*args: Any, **kwargs: Any) -> list[Any]:
             # Создаем задачи для каждой корутины, но не запускаем их
             return [arg for arg in args]
 
@@ -60,7 +61,7 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
 
 
 @pytest.mark.asyncio
-async def test_wb_shop_run_gathers_correct_number_of_coroutines():
+async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
     """
     Тест проверяет, что метод run класса WBShop передает правильное количество
     корутин в asyncio.gather
@@ -105,10 +106,10 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
             # Получаем все аргументы, с которыми был вызван gather
             call_args = mock_gather.call_args[0]
 
-            # Проверяем, что gather был вызван с 9 аргументами (8 корутин + _alive_worker_run)
-            assert len(call_args) == 9, (
-                f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
-            )
+            # Проверяем, что gather был вызван с 10 аргументами (9 корутин + _alive_worker_run)
+            assert (
+                len(call_args) == 10
+            ), f"asyncio.gather должен быть вызван с 10 аргументами, получено {len(call_args)}"
 
             # Проверяем, что все методы были вызваны по одному разу
             coroutines_manager_mock.parsing_keywords_run.assert_called_once()
