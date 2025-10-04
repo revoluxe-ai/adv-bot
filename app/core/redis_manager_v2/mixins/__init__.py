@@ -1,3 +1,3 @@
 __all__ = ["PredictCTRRedisMixin"]
 
-from .predic_ctr import PredictCTRRedisMixin
+from .predict_ctr import PredictCTRRedisMixin
