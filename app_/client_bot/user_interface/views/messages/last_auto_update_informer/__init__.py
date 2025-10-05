@@ -1,1 +1,0 @@
-from .last_auto_update_informer import LastAutoUpdateSettingInformer

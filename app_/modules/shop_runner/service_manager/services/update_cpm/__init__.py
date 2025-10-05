@@ -1,3 +1,0 @@
-__all__ = ["UpdateCPMManager"]
-
-from .update_cpm_manager import UpdateCPMManager

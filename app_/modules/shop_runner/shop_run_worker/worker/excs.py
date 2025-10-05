@@ -1,2 +1,0 @@
-class ShopNotFoundInRedisQueueError(Exception):
-    pass

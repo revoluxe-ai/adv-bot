@@ -1,2 +1,0 @@
-class NotValidTokenError(Exception):
-    pass

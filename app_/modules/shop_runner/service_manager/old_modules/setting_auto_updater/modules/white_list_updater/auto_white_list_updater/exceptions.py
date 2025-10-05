@@ -1,2 +1,0 @@
-class AutoUpdateWhiteListFatalError(Exception):
-    pass

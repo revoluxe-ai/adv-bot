@@ -1,2 +1,0 @@
-class CpmNotFoundError(Exception):
-    pass
