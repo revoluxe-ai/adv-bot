@@ -2,7 +2,7 @@
 # This file only adds a global exclude so existing hooks are not modified.
 
 # Regex that matches the directory and its contents
-exclude: '^(?:app/core/mp/wb/_api_client/clients/promotion/generated|alembic/versions)(?:/|$)'
+exclude: '^(?:app/core/mp/wb/_api_client/clients/promotion/generated/|app/core/mp/wb/_api_client/clients/promotion/generated|alembic/versions)(?:/|$)'
 
 repos:
   - repo: local

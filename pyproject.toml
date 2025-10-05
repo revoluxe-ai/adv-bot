@@ -177,7 +177,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 # Exclude generated promotion clients from ruff checks
 exclude = [
-  "app/core/mp/wb/_api_client/clients/promotion/generated",
+  "app/core/mp/wb/_api_client/clients/promotion/generated/",
   "app/core/mp/wb/_api_client/clients/promotion/generated/*",
   "alembic/versions",
   "alembic/versions/*",
