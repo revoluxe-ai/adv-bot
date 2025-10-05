@@ -1,10 +1,7 @@
 # Игнорировать все .txt файлы, кроме requirements.txt
 *.txt
-!requirements.txt
-
 # Убедимся, что корень не игнорируется
 !./
-
 # Остальные правила оставляем
 node_modules/
 dist/
@@ -16,7 +13,6 @@ app/utils/faiss_manager/indexes/*
 *.zip
 *.rar
 *.ipynb
-celery_venv
 *.class
 venv
 /image_master/image_sources/*
@@ -57,3 +53,11 @@ app/keword_async_ml_updater/model/*
 *.index
 logs
 linux_venv/
+
+# Добавлено: исключить dev/IDE/локальные артефакты и тестовые/утилитарные файлы из образа
+.venv/
+.mypy_cache/
+.git/
+.github/
+.gitmodules
+.env
