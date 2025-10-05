@@ -16,10 +16,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main() -> None:
+def main(port=50053) -> None:
     parser = argparse.ArgumentParser(description="Predict CTR gRPC Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=50053, help="Port to bind to")
+    parser.add_argument("--port", type=int, default=port, help="Port to bind to")
     args = parser.parse_args()
 
     # Переопределяем HOST и PORT для сервиса (если нужно)
