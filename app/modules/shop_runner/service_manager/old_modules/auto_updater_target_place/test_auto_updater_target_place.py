@@ -5,7 +5,6 @@ import pytest
 import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from sqlalchemy import Result
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -19,7 +18,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
 )
 
-from .auto_updater_target_place import LastTargetPlaceUpdateRedisManager
 
 now = datetime.datetime.now()
 

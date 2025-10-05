@@ -28,7 +28,9 @@ class LastDateTimeDeleteWhiteListRedisManager(BaseRedis):
         adv_id = adv.adv_id
         return f"last_delete_phrase_from_white_list:{adv_id}"
 
-    async def get_last_delete_datetime(self, adv: AdvSetting) -> datetime.datetime | None:
+    async def get_last_delete_datetime(
+        self, adv: AdvSetting
+    ) -> datetime.datetime | None:
         key = self._get_key(adv)
         value = await self.client.get(key)
         if value:
@@ -48,7 +50,9 @@ class LastAddingToWhiteListRedisData(BaseRedis):
     def _get_key(adv: AdvSetting) -> str:
         return f"white_list:add:{adv.adv_id}"
 
-    async def get_last_adding_to_white_list(self, adv: AdvSetting) -> datetime.datetime | None:
+    async def get_last_adding_to_white_list(
+        self, adv: AdvSetting
+    ) -> datetime.datetime | None:
         key = self._get_key(adv)
         value = await self.client.get(key)
         if not value:

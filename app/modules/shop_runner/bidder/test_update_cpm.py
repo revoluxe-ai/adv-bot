@@ -1,5 +1,5 @@
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiohttp import ClientResponseError
@@ -56,7 +56,9 @@ async def test_update_with_wrong_cpm_run(client_session_mock):
     # Создаем мок для ответа
     response_mock = AsyncMock()
     response_mock.status = 400
-    response_mock.text = AsyncMock(return_value=get_test_response_for_min_bid_error(150, 200))
+    response_mock.text = AsyncMock(
+        return_value=get_test_response_for_min_bid_error(150, 200)
+    )
     response_mock.raise_for_status = MagicMock(
         side_effect=ClientResponseError(
             request_info=None,  # type: ignore

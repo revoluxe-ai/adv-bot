@@ -59,7 +59,9 @@ class AutoUpdaterTargetPlace:
         redis_manager = LastTargetPlaceUpdateRedisManager(adv)
         last_target_place_update_timestamp: datetime.datetime | None = None
         last_spend: float | None = None
-        result: tuple[datetime.datetime, float] | None = await redis_manager.get_last_target_place_update()
+        result: (
+            tuple[datetime.datetime, float] | None
+        ) = await redis_manager.get_last_target_place_update()
         if result:
             last_target_place_update_timestamp, last_spend = result
 
@@ -78,7 +80,10 @@ class AutoUpdaterTargetPlace:
             if fact_mean_orders_for_last_two_days < adv.plan_for_sales_for_day:
                 new_target_place = current_target_place - 1
             else:
-                if fact_mean_price_for_order_for_last_two_days > adv.target_price_for_order:
+                if (
+                    fact_mean_price_for_order_for_last_two_days
+                    > adv.target_price_for_order
+                ):
                     new_target_place = current_target_place + 1
                 else:
                     return None
@@ -88,10 +93,16 @@ class AutoUpdaterTargetPlace:
         if new_target_place == current_target_place:
             return None
 
-        stmt = update(AdvSetting).where(AdvSetting.id == adv.id).values(max_place=new_target_place)
+        stmt = (
+            update(AdvSetting)
+            .where(AdvSetting.id == adv.id)
+            .values(max_place=new_target_place)
+        )
         timestamp = datetime.datetime.now()
         async with sm(read_only=False) as session:
             await session.execute(stmt)
             await session.commit()
-        await redis_manager.set_last_target_place_update(adv, timestamp, spend_sum_from_keywords_now)
+        await redis_manager.set_last_target_place_update(
+            adv, timestamp, spend_sum_from_keywords_now
+        )
         return None

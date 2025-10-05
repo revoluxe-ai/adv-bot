@@ -127,7 +127,9 @@ async def get_daily_stats_by_last_days(
             return stats_per_day
 
         except Exception:
-            logger.error("Ошибка получения дневной статистики из ClickHouse", exc_info=True)
+            logger.error(
+                "Ошибка получения дневной статистики из ClickHouse", exc_info=True
+            )
             raise
 
 
@@ -278,10 +280,16 @@ async def get_keywords_spend(
             )
             result = res.first_item
 
-            return result["total_spend"] if result and result["total_spend"] is not None else 0.0
+            return (
+                result["total_spend"]
+                if result and result["total_spend"] is not None
+                else 0.0
+            )
 
         except Exception:
-            logger.error("Ошибка получения суммы трат по ключам из ClickHouse", exc_info=True)
+            logger.error(
+                "Ошибка получения суммы трат по ключам из ClickHouse", exc_info=True
+            )
             return 0.0
 
 

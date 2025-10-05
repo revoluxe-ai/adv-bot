@@ -55,7 +55,9 @@ class FirstKeyUpdater:
         async with sm(read_only=False) as session:
             stmt = (
                 update(KeywordSetting)
-                .where(KeywordSetting.id == top_relevant_phrase.keyword_setting_original_id)
+                .where(
+                    KeywordSetting.id == top_relevant_phrase.keyword_setting_original_id
+                )
                 .values(hard_status=2)
             )
             await session.execute(stmt)
