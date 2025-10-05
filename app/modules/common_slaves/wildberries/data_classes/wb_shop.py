@@ -9,7 +9,9 @@ class WbShop(interfaces.ShopInterface):
         self._name_shop = name_shop
 
     def _load_settings(self):
-        shops_dict = path_setting_funcs.get_document_by_key_name(self._setting_path, "shops")
+        shops_dict = path_setting_funcs.get_document_by_key_name(
+            self._setting_path, "shops"
+        )
         for shop in shops_dict:
             if shop["name"] == self._name_shop:
                 return shop
@@ -64,9 +66,6 @@ class WbShop(interfaces.ShopInterface):
         return int(
             self._load_settings().get("kn_for_ml", 1)
         )  # Указан 0 в качестве значения по умолчанию
-
-    def __repr__(self):
-        return self.name
 
     def __repr__(self):
         return self.name

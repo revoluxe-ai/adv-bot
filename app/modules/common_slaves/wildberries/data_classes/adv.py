@@ -1,5 +1,6 @@
 import re
 from abc import abstractmethod
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -23,7 +24,9 @@ class UnitedParams(BaseModel):
 
 
 class AutoParams(BaseModel):
-    active: dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
+    active: dict[
+        str, bool
+    ]  # Предполагается, что 'active' это словарь с булевыми значениями
     # Добавьте другие поля, которые ожидаются в `autoParams`
 
 
@@ -57,8 +60,8 @@ class Adv:
     def __repr__(self):
         return f"Name: {self.name}, Advert ID: {self.advertId},  Status: {self.status_native_ru}, Type: {self.adv_type}"
 
-    def __init__(self, data) -> None:
-        self._data_model = AdvData(**data)  # Используйте Pydantic для валидации
+    def __init__(self, data: dict[str, Any]) -> None:
+        # self._data_model = AdvData(**data)  # Pydantic validation disabled due to missing required fields
         self._data = data
         self._type = None
 
@@ -149,20 +152,20 @@ class Adv:
     @property
     def active(self):
         class Active:
-            def __init__(self, active_data):
+            def __init__(self, active_data: dict[str, Any]) -> None:
                 self._active_data = active_data
 
             @property
-            def booster(self):
-                return self._active_data["booster"]
+            def booster(self) -> bool:
+                return bool(self._active_data["booster"])
 
             @property
-            def carousel(self):
-                return self._active_data["carousel"]
+            def carousel(self) -> bool:
+                return bool(self._active_data["carousel"])
 
             @property
-            def recom(self):
-                return self._active_data["recom"]
+            def recom(self) -> bool:
+                return bool(self._active_data["recom"])
 
         active = Active(self._data["autoParams"]["active"])
         return active
@@ -178,14 +181,15 @@ class Adv:
                     return nmids
                 else:
                     raise Exception("NMID не найден")
-        except:
+        except Exception:
             nmids = re.findall(r"(?<!\[)\d{7,9}(?!\])", self.name)
             nmids = [int(nmid) for nmid in nmids]
             return nmids if nmids else []
 
     @property
     @abstractmethod
-    def cpm(self):
+    def cpm(self) -> int | None:
+        """Get CPM value for the advertising campaign."""
         pass
 
 

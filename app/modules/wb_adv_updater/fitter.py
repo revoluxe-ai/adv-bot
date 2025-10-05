@@ -146,10 +146,10 @@ async def _get_df_for_fit() -> pd.DataFrame:
                 f"Получение статистики ключевых слов из ClickHouse для кампании {adv.adv_id}"
             )
             try:
-                keyword_stats: list[CalculatedKeyword] = (
-                    await data_manager.get_keywords_statistic_clickhouse(
-                        adv, last_views=500
-                    )
+                keyword_stats: list[
+                    CalculatedKeyword
+                ] = await data_manager.get_keywords_statistic_clickhouse(
+                    adv, last_views=500
                 )
                 logger.debug(
                     f"Получено {len(keyword_stats)} ключевых слов для кампании {adv.adv_id}"
@@ -220,18 +220,18 @@ async def _get_df_for_fit() -> pd.DataFrame:
 async def __fetch_keyword_features(
     keywords: list[str],
 ) -> list[tuple[str, list[float]]]:
-    result: list[tuple[str, list[float]]] = (
-        await data_getter.get_keyword_features_from_redis(keywords)
-    )
+    result: list[
+        tuple[str, list[float]]
+    ] = await data_getter.get_keyword_features_from_redis(keywords)
     return result
 
 
 async def _bayesian_apply(df: pd.DataFrame) -> pd.DataFrame:
     adv_ids = df["adv_id"].unique()
     adv_ids = adv_ids.tolist()
-    adv_id_keyword_text_to_status: dict[tuple[int, str], int] = (
-        await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
-    )
+    adv_id_keyword_text_to_status: dict[
+        tuple[int, str], int
+    ] = await data_manager.get_adv_id_keyword_text_to_status(adv_ids)
 
     adv_id_to_min_ctr: dict[int, float] = await data_manager.get_adv_id_to_min_ctr(
         adv_ids

@@ -3,6 +3,7 @@
 import asyncio
 import datetime
 import logging
+from typing import Never
 
 from aiohttp import ClientSession
 
@@ -93,7 +94,7 @@ async def main_loop() -> None:
     )
 
 
-async def run_main_coroutines() -> None:
+async def run_main_coroutines() -> Never:
     from app.core.di.app_container import AppContainer
 
     async with await DIManager.create(AppContainer):
