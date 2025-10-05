@@ -36,7 +36,11 @@ def get_shop_bonus_keyboard(wb_cabinet_original_id: int) -> InlineKeyboardMarkup
                 ).pack(),
             )
         ],
-        [InlineKeyboardButton(text="🔙 Назад", callback_data=AdminBonus(action="menu").pack())],
+        [
+            InlineKeyboardButton(
+                text="🔙 Назад", callback_data=AdminBonus(action="menu").pack()
+            )
+        ],
     ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
