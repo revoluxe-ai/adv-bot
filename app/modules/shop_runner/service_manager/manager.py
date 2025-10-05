@@ -30,7 +30,6 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
-
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -38,7 +37,6 @@ from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
 
 logger = logging.getLogger(__name__)
-
 
 T = TypeVar("T")
 
@@ -54,6 +52,7 @@ class CoroutinesManager:
         self._wb_shop_data_manager = WBShopDataManager(wb_cabinet)
 
         self._wb_api = wb_api
+        self._access = wb_api.access
         self.shop_id = wb_api.shop_id
         self.__keywords_for_advs: dict[int, list[CalculatedKeyword]] = defaultdict(
             list[CalculatedKeyword]
@@ -124,7 +123,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-        shop_data_updater: ShopDataUpdater,
+            shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -136,7 +135,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _async_zip_longest(
-        *async_gens, fillvalue=None
+            *async_gens, fillvalue=None
     ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
