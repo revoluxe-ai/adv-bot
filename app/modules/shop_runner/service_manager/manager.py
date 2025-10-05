@@ -19,7 +19,6 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
-from app.modules.shop_runner.bidder.bidder_func import run_bidder_process_for_adv
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import (
@@ -45,7 +44,8 @@ T = TypeVar("T")
 
 
 class CoroutinesManagerProtocol(Protocol):
-    def test(self): ...
+    def test(self):
+        ...
 
 
 class CoroutinesManager:
@@ -109,7 +109,9 @@ class CoroutinesManager:
             if auction_adv_id := adv.search_adv_id:
                 all_adv_ids.add(auction_adv_id)
 
-        full_stats: list[FullAdvStat] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
+        full_stats: list[
+            FullAdvStat
+        ] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
             wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
         )
         if full_stats:
@@ -127,7 +129,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-            shop_data_updater: ShopDataUpdater,
+        shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -139,7 +141,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _async_zip_longest(
-            *async_gens, fillvalue=None
+        *async_gens, fillvalue=None
     ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
@@ -174,8 +176,10 @@ class CoroutinesManager:
         for adv in active_advs:
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
 
-            generator: AsyncGenerator[tuple[str, int], None] = (
-                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(adv, keywords)
+            generator: AsyncGenerator[
+                tuple[str, int], None
+            ] = parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
+                adv, keywords
             )
             generators.append(generator)
         zipped_generators = self._async_zip_longest(*generators)
@@ -188,7 +192,9 @@ class CoroutinesManager:
                     await asyncio.sleep(
                         settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
                     )  # Добавляем небольшую задержку между задачами
-                    logger.info(f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга")
+                    logger.info(
+                        f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
+                    )
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
@@ -223,16 +229,20 @@ class CoroutinesManager:
             FirstKeyUpdater,
         )
 
-        all_active_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
+        all_active_advs: list[
+            AdvSetting
+        ] = await self._wb_shop_data_manager.get_active_advs()
         tasks = []
         for adv in all_active_advs:
             if not adv.auto_update_white_list:
                 continue
-            keywords: Awaitable[list[CalculatedKeyword]] = (
-                self._wb_shop_data_manager.get_calculated_keywords(adv)
-            )
+            keywords: Awaitable[
+                list[CalculatedKeyword]
+            ] = self._wb_shop_data_manager.get_calculated_keywords(adv)
             updater = FirstKeyUpdater(adv)
-            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(keywords)
+            update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(
+                keywords
+            )
             task = asyncio.create_task(update_coroutine)
             tasks.append(task)
 

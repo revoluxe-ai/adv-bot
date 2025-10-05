@@ -31,4 +31,6 @@ async def set_new_status_for_auto_update_list_setting(
     chat_id = callback_query.message.chat.id
 
     new_status_str: str = "Включено" if new_status else "Выключено"
-    await bot.send_message(chat_id, f"Автообновление белого списка в кампании {new_status_str}")
+    await bot.send_message(
+        chat_id, f"Автообновление белого списка в кампании {new_status_str}"
+    )

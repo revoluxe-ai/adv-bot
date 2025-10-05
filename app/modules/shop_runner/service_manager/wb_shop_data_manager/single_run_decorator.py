@@ -12,7 +12,9 @@ def make_key(func_name: str, args: tuple[Any, ...], kwargs: dict[Any, Any]) -> s
     return f"{func_name}:{args}:{frozenset(kwargs.items())}"
 
 
-def single_run() -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+def single_run() -> (
+    Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]
+):
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         @wraps(func)
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
@@ -56,7 +58,9 @@ def single_run() -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awai
                 results[key] = result
                 return result
             except Exception:
-                logger.error(f"Ошибка обернутой функции: {func.__name__}", exc_info=True)
+                logger.error(
+                    f"Ошибка обернутой функции: {func.__name__}", exc_info=True
+                )
                 raise
             finally:
                 event.set()
