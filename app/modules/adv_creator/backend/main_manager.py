@@ -45,9 +45,13 @@ class MainAdvManager:
     async def _create_auto_adv(
         self, name: str, SubjectID: int, balance_type: int, start_status: bool
     ) -> int:
-        return await self.wb_api.create_auto_adv(name, SubjectID, balance_type, start_status)
+        return await self.wb_api.create_auto_adv(
+            name, SubjectID, balance_type, start_status
+        )
 
-    async def upcast_auto_adv(self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot):
+    async def upcast_auto_adv(
+        self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot
+    ):
         await bot.send_message(
             user_telegram_id, f"Пытаюсь найти и настроить Авто-РК для артикула {nmid}"
         )
@@ -89,12 +93,16 @@ class MainAdvManager:
 
                 if nmid not in nmids_in_adv:
                     try:
-                        await self.wb_api.update_nmids_in_adv(auto_adv_id, nmids_for_add, [])
+                        await self.wb_api.update_nmids_in_adv(
+                            auto_adv_id, nmids_for_add, []
+                        )
                     except Exception as exc:
                         logger.error(exc, exc_info=True)
                         pass
                 try:
-                    await self.wb_api.update_nmids_in_adv(auto_adv_id, [], nmids_for_del)
+                    await self.wb_api.update_nmids_in_adv(
+                        auto_adv_id, [], nmids_for_del
+                    )
                 except Exception as exc:
                     logger.error(exc, exc_info=True)
                     pass
@@ -112,7 +120,11 @@ class MainAdvManager:
         self, bot: Bot, user_telegram_id, nmid: int, hard_mode
     ) -> tuple[int, int]:
         exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
-        if not exist_adv or hard_mode is True or exist_adv.active_status in ["refused", "done"]:
+        if (
+            not exist_adv
+            or hard_mode is True
+            or exist_adv.active_status in ["refused", "done"]
+        ):
             balances = await self.wb_api.get_adv_balances()
             try:
                 target_card = await self.wb_api.get_card_by_text(nmid)
@@ -131,7 +143,9 @@ class MainAdvManager:
             new_adv_name = str(nmid) + " " + name
             new_adv_name = new_adv_name[:128]
             try:
-                balance_type_int, balance_property_str = self._get_balance_type(balances)
+                balance_type_int, balance_property_str = self._get_balance_type(
+                    balances
+                )
             except NotEnoughBalanceOnShopError as exc:
                 raise exc
 
@@ -147,7 +161,9 @@ class MainAdvManager:
             )
 
             search_adv_id = await self._create_search_adv(nmid, new_adv_name)
-            result: int = await self.wb_api.add_to_balance(search_adv_id, balance_type_int, 1000)
+            result: int = await self.wb_api.add_to_balance(
+                search_adv_id, balance_type_int, 1000
+            )
             logger.debug(f"Баланс успешно пополнен, новый баланс: {result}")
 
             setattr(
@@ -276,7 +292,10 @@ class MainAdvManager:
         bonus = balances.bonus
         full_balance: list[int] = [balance, net, bonus]
         logger.debug(f"Балансы: {full_balance}")
-        if sum(full_balance) >= 2000 or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2:
+        if (
+            sum(full_balance) >= 2000
+            or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2
+        ):
             return True
         return False
 
@@ -292,7 +311,9 @@ class MainAdvManager:
             (balances.bonus, "bonus"),
         ]
 
-        min_balance_property_name = min(list(filter(lambda row: row[0] > 1000, balance_rows)))[1]
+        min_balance_property_name = min(
+            list(filter(lambda row: row[0] > 1000, balance_rows))
+        )[1]
 
         if min_balance_property_name == "balance":
             balance_type = 0
