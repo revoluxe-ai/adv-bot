@@ -1,0 +1,23 @@
+## Auto-generated minimal pre-commit exclude to skip generated promotion clients
+# This file only adds a global exclude so existing hooks are not modified.
+
+# Regex that matches the directory and its contents
+exclude: '^(?:app/core/mp/wb/_api_client/clients/promotion/generated|alembic/versions)(?:/|$)'
+
+repos:
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (poetry)
+        entry: poetry run mypy
+        language: system
+        types: [python]
+        pass_filenames: true
+        args: [--config-file=mypy.ini]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
