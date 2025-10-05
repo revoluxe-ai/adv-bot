@@ -13,7 +13,9 @@ user_reflink_association = Table(
 favorite_advs_association = Table(
     "favorite_advs_association",
     Base.metadata,
-    Column("user_id", BIGINT, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "user_id", BIGINT, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
+    ),
     Column(
         "adv_id",
         BIGINT,

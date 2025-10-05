@@ -37,7 +37,11 @@ class AnalyticAsyncSession(AsyncSession):
             # Анализ стека для поиска вызывающего кода
             stack = traceback.extract_stack()
             caller = next(
-                (frame for frame in reversed(stack[:-1]) if "sqlalchemy" not in frame.filename),
+                (
+                    frame
+                    for frame in reversed(stack[:-1])
+                    if "sqlalchemy" not in frame.filename
+                ),
                 None,
             )
 
@@ -80,9 +84,7 @@ def get_alchemy_row(read_only):
     else:
         host = settings.postgres_replica_host
     # Для asyncpg используем ssl вместо sslmode
-    row_connector = (
-        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
-    )
+    row_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     # if ssl_mode:
     #     row_connector += f'?sslmode={ssl_mode}'
     # row_connector += f'&target_session_attrs={target_session}'
@@ -98,9 +100,7 @@ def get_alchemy_row_for_migration():
     postgres_user = settings.postgres_user
     host = settings.postgres_master_host
     # Для asyncpg используем ssl вместо sslmode
-    db_connector = (
-        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
-    )
+    db_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     return db_connector
 
 
@@ -143,7 +143,7 @@ read_write_session_maker = async_sessionmaker(
 
 @asynccontextmanager
 async def get_async_session_maker(
-        read_only=False,
+    read_only=False,
 ) -> AsyncGenerator[AsyncSession, None]:
     session_start = time()
     current_task = asyncio.current_task()
