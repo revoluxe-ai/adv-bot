@@ -47,7 +47,9 @@ async def set_new_step(message: Message, state: FSMContext, bot: Bot):
         return
     async with sm(read_only=False) as session:
         query = (
-            update(AdvSetting).filter(AdvSetting.id == adv_original_id).values(bidder_step=new_step)
+            update(AdvSetting)
+            .filter(AdvSetting.id == adv_original_id)
+            .values(bidder_step=new_step)
         )
         await session.execute(query)
         await session.commit()
