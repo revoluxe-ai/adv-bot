@@ -52,11 +52,10 @@ asyncpg = "^0.30.0"
 pydantic = "^2.11.9"
 redis = "^6.4.0"
 clickhouse-connect = "^0.9.2"
->>>>>>> temp-branch-for-implement-separate-predict-ctr-grpc-service
-
+scikit-learn = "^1.7.2"
 
 [tool.poetry.group.dev.dependencies]
-typing-extensions = "4.10.0"
+typing-extensions = ">=4.12.2"
 pytest = "8.0.2"
 pytest-asyncio = "0.21.0"
 ruff = "0.1.0"
