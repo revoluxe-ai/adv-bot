@@ -112,7 +112,8 @@ class get_clickhouse_client:
             database=database,
             pool_mgr=pool_mgr,
             port=settings.CLICKHOUSE_PORT,
-        )
+        )  # type: ignore[attr-defined]
+        assert self.client is not None
         return self.client
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -124,7 +125,7 @@ class get_clickhouse_client:
         global function_count_lock
         client = self.client
         if client is not None:
-            result = client.close()
+            result = client.close()  # type: ignore[no-untyped-call]
             if isinstance(result, Awaitable):
                 await result
         if (
