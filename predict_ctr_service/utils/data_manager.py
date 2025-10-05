@@ -115,68 +115,59 @@ def _build_clickhouse_query(
 ) -> str:
     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
 
-    query = f"""
-        SELECT
-            text,
-            SUM(total_clicks) AS total_clicks,
-            SUM(total_views) AS total_views,
-            SUM(total_spend) AS total_spend,
-            date
-        FROM (
-            SELECT
-                text,
-                COALESCE(SUM(clicks), 0) AS total_clicks,
-                COALESCE(SUM(views), 0) AS total_views,
-                COALESCE(SUM(spend), 0) AS total_spend,
-                date
-            FROM
-                default_db.advkeyword
-            WHERE
-                adv_id IN ({adv_ids_str})
-                AND (text, date, version) IN (
-                    SELECT
-                        text, date, MAX(version) AS version
-                    FROM
-                        default_db.advkeyword
-                    WHERE
-                        adv_id IN ({adv_ids_str})
-                    GROUP BY
-                        text, date
-                )
-    """
+    date_filter = ""
     if pass_time:
         start_time = datetime.now() - pass_time
-        query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
-    query += """
-            GROUP BY
-                text, date
-        ) AS latest_records
+        date_filter = f"AND date >= '{start_time.strftime('%Y-%m-%d')}'"
+
+    # базовый подзапрос: берём готовые агрегаты из MV
+    base_query = f"""
+        SELECT
+            text,
+            date,
+            argMaxMerge(clicks) AS clicks,
+            argMaxMerge(views)  AS views,
+            argMaxMerge(spend)  AS spend
+        FROM default_db.advkeyword_daily_mv
+        WHERE adv_id IN ({adv_ids_str})
+          {date_filter}
         GROUP BY text, date
     """
+
     if last_views:
+        # кумулятивный срез делаем уже по агрегированным данным
         query = f"""
-            WITH
-            records AS ({query}),
+            WITH records AS ({base_query}),
             cumulative_views AS (
                 SELECT
                     text,
-                    total_clicks,
-                    total_views,
-                    total_spend,
+                    clicks,
+                    views,
+                    spend,
                     date,
-                    SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
-                FROM
-                    records
+                    SUM(views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
+                FROM records
             )
             SELECT
                 text,
-                SUM(total_clicks) AS total_clicks,
-                SUM(total_views) AS total_views,
-                SUM(total_spend) AS total_spend
-            FROM
-                cumulative_views
-            WHERE
-                cumulative_total_views <= {last_views}
+                SUM(clicks) AS total_clicks,
+                SUM(views)  AS total_views,
+                SUM(spend)  AS total_spend
+            FROM cumulative_views
+            WHERE cumulative_total_views <= {last_views}
             GROUP BY text
         """
+    else:
+        query = f"""
+            SELECT
+                text,
+                SUM(clicks) AS total_clicks,
+                SUM(views)  AS total_views,
+                SUM(spend)  AS total_spend,
+                date
+            FROM ({base_query}) latest_records
+            GROUP BY text, date
+        """
+
     return query
+
