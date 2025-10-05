@@ -70,6 +70,7 @@ class BillingLockMixin:
     # ---- Контекстный менеджер (вариант 1) ----
     class _Lockable(Protocol):  # локальный протокол только с нужными методами
         async def acquire_lock(self, ttl: int) -> bool: ...  # noqa: D401,E701
+
         async def release_lock(self) -> None: ...  # noqa: D401,E701
 
     @asynccontextmanager
