@@ -65,13 +65,17 @@ class CommonAdvsStatDataManager:
         start_date = end_date - timedelta(days=pass_days)
 
         # Статистика для авто-рекламы
-        full_adv_stat_for_last_days_for_auto_adv = await full_wb_adv_stat.get_stats_by_last_days(
-            [adv_setting.adv_id], start_date, end_date
+        full_adv_stat_for_last_days_for_auto_adv = (
+            await full_wb_adv_stat.get_stats_by_last_days(
+                [adv_setting.adv_id], start_date, end_date
+            )
         )
 
         # Статистика для аукциона
-        full_adv_stat_for_last_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
-            [adv_setting.search_adv_id], start_date, end_date
+        full_adv_stat_for_last_days_for_auction = (
+            await full_wb_adv_stat.get_stats_by_last_days(
+                [adv_setting.search_adv_id], start_date, end_date
+            )
         )
 
         # Общий расход
@@ -81,7 +85,9 @@ class CommonAdvsStatDataManager:
         )
 
         # Общая статистика
-        common_stat: CommonCardStat | None = await common_stat_manager.get_stats_for_last_period(
+        common_stat: (
+            CommonCardStat | None
+        ) = await common_stat_manager.get_stats_for_last_period(
             int(adv_setting.nmids[0]), pass_days
         )
 
@@ -131,7 +137,8 @@ class CommonAdvsStatDataManager:
         )
 
         addition_spend_in_adv = (
-            full_adv_stat_for_last_days_for_auto_adv.spend - spend_for_keywords_in_auto_adv
+            full_adv_stat_for_last_days_for_auto_adv.spend
+            - spend_for_keywords_in_auto_adv
         )
 
         return CommonAdvsStatData(
