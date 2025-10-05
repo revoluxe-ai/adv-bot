@@ -96,9 +96,10 @@ async def get_adv_id_to_min_ctr(adv_ids: list[int]) -> dict[int, float]:
 async def get_adv_id_keyword_text_to_status(adv_ids: list[int]) -> dict[tuple[int, str], int]:
     async with _sm() as session:
         # Используем только необходимые колонки и убираем лишние алиасы
+        # Явный JOIN между AdvSetting и KeywordSetting по внешнему ключу
         stmt = (
             select(AdvSetting.adv_id, KeywordSetting.text, KeywordSetting.hard_status)
-
+            .join(KeywordSetting, KeywordSetting.adv_setting_id == AdvSetting.id)
             .where(AdvSetting.adv_id.in_(adv_ids))
         )
         result = await session.execute(stmt)
