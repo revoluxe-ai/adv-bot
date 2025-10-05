@@ -2,7 +2,10 @@ import logging
 from typing import Optional, Awaitable
 
 import grpc
+from dependency_injector.wiring import Provide
 
+from .di import PredictCTRManagerContainer
+from app.settings import settings
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -12,25 +15,30 @@ from app.modules.grpcs.predict_ctr_service.predict_ctr_client.predict_ctr_client
 )
 from .redis_manager import PredictCTRRedisManager
 
+
 logger = logging.getLogger(__name__)
 
 
 class PredictCTRUpdateManager:
     """Менеджер для обновления прогнозов CTR"""
 
-    def __init__(self) -> None:
-        self._redis_manager = PredictCTRRedisManager()
+    def __init__(
+        self,
+    ) -> None:
         self._grpc_client: Optional[PredictCTRClient] = None
 
     async def _get_grpc_client(self) -> PredictCTRClient:
         """Получить gRPC клиент для predict_ctr сервиса"""
         if self._grpc_client is None:
-            self._grpc_client = PredictCTRClient()
+            self._grpc_client = PredictCTRClient(
+                host=settings.PREDICT_CTR_HOST,
+                port=settings.PREDICT_CTR_PORT,
+            )
             await self._grpc_client.connect()
         return self._grpc_client
 
     async def update_predict_ctr(
-            self, adv: AdvSetting, keywords_coro: Awaitable[list[CalculatedKeyword]]
+        self, adv: AdvSetting, keywords_coro: Awaitable[list[CalculatedKeyword]]
     ) -> None:
         keywords = await keywords_coro
 
@@ -63,7 +71,7 @@ class PredictCTRUpdateManager:
                 return
 
             # Записываем результаты в Redis
-            await self._save_predictions_to_redis(adv, nmids, predictions)
+            await self._save_predictions_to_redis(adv, predictions)
 
         except grpc.RpcError as e:
             await self._handle_grpc_error(e, adv.adv_id)
@@ -74,7 +82,7 @@ class PredictCTRUpdateManager:
             )
 
     async def _make_grpc_request(
-            self, grpc_client: PredictCTRClient, nmids: list[int], phrases: list[str]
+        self, grpc_client: PredictCTRClient, nmids: list[int], phrases: list[str]
     ) -> dict[str, float] | None:
         """Выполнить gRPC запрос для получения прогнозов"""
         try:
@@ -87,11 +95,16 @@ class PredictCTRUpdateManager:
             return None
 
     async def _save_predictions_to_redis(
-            self, adv: AdvSetting, nmids: list[int], predictions: dict[str, float]
+        self,
+        adv: AdvSetting,
+        predictions: dict[str, float],
+        redis_manager: PredictCTRRedisManager = Provide[
+            PredictCTRManagerContainer.redis_manager
+        ],
     ) -> None:
         """Сохранить прогнозы в Redis через pipeline"""
         try:
-            pipeline = self._redis_manager._client.pipeline()
+            pipeline = redis_manager._client.write_pipeline()
             saved_count = 0
             skipped_count = 0
 
@@ -103,15 +116,12 @@ class PredictCTRUpdateManager:
                     )
                     skipped_count += 1
                     continue
-
-                # Записываем через legacy метод
-                await self._redis_manager.set_predict_ctr_with_pipeline_legacy(
-                    pipeline, adv.adv_id, key, predict_ctr
+                logger.debug(
+                    f"Сохраняем predictions для ключа '{key} значение: {predict_ctr}"
                 )
-
-                # Записываем через новый метод
-                await self._redis_manager.set_predict_ctr_with_pipeline_by_nmids(
-                    pipeline, nmids, key, predict_ctr
+                # Записываем через метод из миксина
+                await redis_manager.set_predict_ctr_with_pipeline(
+                    pipeline, adv, key, predict_ctr
                 )
 
                 saved_count += 1
@@ -134,17 +144,17 @@ class PredictCTRUpdateManager:
 
     async def _handle_grpc_error(self, error: grpc.RpcError, adv_id: int) -> None:
         """Обработать ошибки gRPC"""
-        if error.code() == grpc.StatusCode.INVALID_ARGUMENT:  # type: ignore
-            logger.error(f"Неверные аргументы для кампании {adv_id}: {error.details()}")  # type: ignore
-        elif error.code() in [grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.INTERNAL]:  # type: ignore
+        if error.code() == grpc.StatusCode.INVALID_ARGUMENT:
+            logger.error(f"Неверные аргументы для кампании {adv_id}: {error.details()}")
+        elif error.code() in [grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.INTERNAL]:
             logger.error(
                 f"Сервис недоступен или внутренняя ошибка для кампании {adv_id}: "
-                f"код={error.code()}, детали={error.details()}"  # type: ignore
+                f"код={error.code()}, детали={error.details()}"
             )
         else:
             logger.error(
-                f"gRPC ошибка для кампании {adv_id}: код={error.code()}, "  # type: ignore
-                f"детали={error.details()}",  # type: ignore
+                f"gRPC ошибка для кампании {adv_id}: код={error.code()}, "
+                f"детали={error.details()}",
                 exc_info=True,
             )
 

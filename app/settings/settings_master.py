@@ -401,18 +401,5 @@ class Settings:
             return 6379
         return int(value)
 
-    @property
-    def PARSING_QUEUE_MODE(self) -> 'ParsingQueueMode':
-        value = os.environ.get("PARSING_QUEUE_MODE")
-        from app.modules.wb_keywords_parser.wb_parser.parsing_queue_mode import ParsingQueueMode
-        if value is None:
-            return ParsingQueueMode.SIMPLE_QUEUE
-        value = value.lower()
-        if value == "simple_queue":
-            return ParsingQueueMode.SIMPLE_QUEUE
-        elif value == "smart_queue":
-            return ParsingQueueMode.SMART_QUEUE
-        raise ValueError("Не верное значение в PARSING_QUEUE_MODE")
-
 
 settings = Settings()
