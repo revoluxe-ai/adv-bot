@@ -155,6 +155,7 @@ yarl = "1.9.4"
 zipp = "3.18.0"
 zstandard = "0.23.0"
 tensorflow = "^2.20.0"
+types-grpcio = "^1.0.0.20251001"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "8.0.2"
@@ -172,3 +173,10 @@ debugpy = "^1.8.17"
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+
+[tool.ruff]
+# Exclude generated promotion clients from ruff checks
+exclude = [
+  "app/core/mp/wb/_api_client/clients/promotion/generated",
+  "app/core/mp/wb/_api_client/clients/promotion/generated/*",
+]
