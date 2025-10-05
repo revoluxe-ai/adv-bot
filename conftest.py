@@ -7,6 +7,7 @@ import pytest
 
 # Подставляем заглушку для app.core.wb_api.http_request до реальных импортов
 import types
+
 # Устанавливаем безопасные значения переменных окружения, чтобы импорты настроек не падали
 os.environ.setdefault("TELEGRAM_WEB_PORT", "8080")
 os.environ.setdefault("MIN_SUM", "0")
@@ -31,31 +32,37 @@ os.environ.setdefault("YOOKASSA_TOKEN", "token")
 os.environ.setdefault("WEBHOOK_SECRET", "secret")
 os.environ.setdefault("CH_MAX_THREAD", "10")
 # Ensure a minimal 'dotenv' is available during tests to avoid import errors
-if 'dotenv' not in sys.modules:
-    dotenv_stub = types.ModuleType('dotenv')
+if "dotenv" not in sys.modules:
+    dotenv_stub = types.ModuleType("dotenv")
+
     def _load_dotenv():
         return None
+
     def dotenv_values(path=None, **kwargs):
         return {}
+
     dotenv_stub.load_dotenv = _load_dotenv
     dotenv_stub.dotenv_values = dotenv_values
-    sys.modules['dotenv'] = dotenv_stub
+    sys.modules["dotenv"] = dotenv_stub
 
-mod_name = 'app.core.wb_api.http_request'
+mod_name = "app.core.wb_api.http_request"
 import importlib
+
 try:
     # If a previous stub without __file__ exists, remove it to allow real import
     if mod_name in sys.modules and not getattr(sys.modules[mod_name], "__file__", None):
         del sys.modules[mod_name]
     m = importlib.import_module(mod_name)
+
     # Защитим декоратор на случай проблем с импортом/циклическими зависимостями
     def _try_except_decorator_stub(*_args, **_kwargs):
         def decorator(func):
             return func
 
         return decorator
+
     try:
-        setattr(m, 'try_except_decorator', _try_except_decorator_stub)
+        setattr(m, "try_except_decorator", _try_except_decorator_stub)
     except Exception:
         pass
 except Exception:

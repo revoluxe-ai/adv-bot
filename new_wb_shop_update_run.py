@@ -7,14 +7,13 @@ import asyncio
 import platform
 
 import dotenv
+import logging
 
+from app.core.di.di_manager import DIManager
 from app.modules.shop_runner.exceptions import ShopRunnerCriticalError
-
-dotenv.load_dotenv()
 from app.modules.shop_runner import run_process_func
 from python_modules.logger import setup_logging
 from app.core.di import AppContainer
-import logging
 
 dotenv.load_dotenv()
 setup_logging()
@@ -33,30 +32,23 @@ async def run_process() -> None:
 
     TODO: Выпилить магазинные функции из общего процесса и перенести их в shop_runner. Тут оставить только общие.
     """
-    container = AppContainer()
     # TODO: Обновлять список пакетов/модулей в wire(), если появляются новые инъекции (@inject/Provide[...]).
     # Проверка/тест идеи
     # Быстрая проверка на запуск: этого достаточно.
     # Для системной проверки (позже): написать скрипт, который ищет Provide[...]/@inject и сверяет,
     # что соответствующие файлы входят в списки packages/modules переданные в wire().
     # Либо держать единый модуль app/core/di/wiring.py со списком пакетов, и дергать его из всех раннеров.
-    container.wire(
-        packages=["app.core.redis_manager_v2"],
-    )
     # Запуск процесса без явного lifecycle-менеджмента, ресурсы не требуются
     # TODO: При необходимости добавить точечную инициализацию ресурсов (например, Redis)
     try:
-        await run_process_func.run()
+        async with await DIManager.create(AppContainer):
+            await run_process_func.run()
     except ShopRunnerCriticalError as exc:
         logger.critical(f"Критическая ошибка в процессе: {exc}", exc_info=True)
         raise exc
     except Exception as exc:
         logger.error(f"Ошибка в процессе: {exc}", exc_info=True)
         raise exc
-    finally:
-        result = container.shutdown_resources()
-        if result is not None:
-            await result
 
 
 if __name__ == "__main__":
