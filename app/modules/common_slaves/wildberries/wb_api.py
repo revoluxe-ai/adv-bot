@@ -86,6 +86,7 @@ class AdvertApi(ABC_WB_API):
     auto_adv_types = [8, 9]
 
     @try_except_decorator(1, 1)
+    # метод не используется
     async def get_search_keywords_stat(self, adv_id):
         url = f"https://advert-api.wildberries.ru/adv/v1/stat/words?id={adv_id}"
         response_text = await requests(
