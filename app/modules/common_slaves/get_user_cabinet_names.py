@@ -19,7 +19,9 @@ async def get_user_cabinet_names(user_id: int) -> list[str]:
         cabinet_ids = result.scalars().all()
         cabinet_names = []
         for cabinet_id in cabinet_ids:
-            stmt = select(new.types.WBCabinet).where(new.types.WBCabinet.id == cabinet_id)
+            stmt = select(new.types.WBCabinet).where(
+                new.types.WBCabinet.id == cabinet_id
+            )
             result = await session.execute(stmt)
             cabinet_name = result.scalar()
             cabinet_names.append(cabinet_name)
