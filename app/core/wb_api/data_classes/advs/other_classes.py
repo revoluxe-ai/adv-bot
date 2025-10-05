@@ -20,7 +20,9 @@ class UnitedParams(BaseModel):
 
 
 class AutoParams(BaseModel):
-    active: dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
+    active: dict[
+        str, bool
+    ]  # Предполагается, что 'active' это словарь с булевыми значениями
     # Добавьте другие поля, которые ожидаются в `autoParams`
 
 
