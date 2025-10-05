@@ -26,5 +26,3 @@
    - НЕ ОТПРАВЛЯТЬ сообщения пользователю, это должен делать глобальный обработчик
 3. Централизованный обработчик данного модуля находится в isolated_router.py
 """
-
-from app.modules.cabinet_bonus_manager.state_manager import BonusManagerStateGroup
