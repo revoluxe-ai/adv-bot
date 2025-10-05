@@ -99,5 +99,9 @@ common_router.include_routers(strategy_setting.router)
 common_router.include_routers(shop_settings.router)
 # Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene
 # common_router.include_routers(cabinet_bonus_manager_router)
-common_router.callback_query.middleware(middleware_for_adding_task.AddingMessageTaskMiddleWare())
-common_router.message.middleware(middleware_for_adding_task.AddingMessageTaskMiddleWare())
+common_router.callback_query.middleware(
+    middleware_for_adding_task.AddingMessageTaskMiddleWare()
+)
+common_router.message.middleware(
+    middleware_for_adding_task.AddingMessageTaskMiddleWare()
+)

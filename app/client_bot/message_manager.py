@@ -29,5 +29,7 @@ class LastMessage(tp.Message):
         return time_diff < timedelta(hours=48)
 
 
-def __check_message_copy(last_message: LastMessage, text: str, keyboard: tp.InlineKeyboardMarkup):
+def __check_message_copy(
+    last_message: LastMessage, text: str, keyboard: tp.InlineKeyboardMarkup
+):
     return last_message.text == text and last_message.reply_markup == keyboard
