@@ -8,6 +8,7 @@
 - Возможность расширить модуль (добавить новые менеджеры) без изменения root контейнера
 - Тесты могут подменять BillingContainer целиком или отдельные провайдеры
 """
+
 from __future__ import annotations
 
 from dependency_injector import containers, providers
