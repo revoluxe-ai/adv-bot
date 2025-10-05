@@ -1,7 +1,7 @@
-FROM python:3.11-slim AS base
+FROM python:3.13-slim AS base
 
 # Настройки Poetry
-ENV POETRY_VERSION=1.5.1 \
+ENV POETRY_VERSION=2.2.1 \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
     PATH="/app/.venv/bin:$PATH"
 
