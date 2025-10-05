@@ -11,7 +11,7 @@ from app.modules.grpcs.predict_ctr_service.grpc_service.predict_ctr_service_pb2_
 class PredictCTRClient:
     """Асинхронный клиент gRPC для сервиса прогнозирования CTR"""
 
-    def __init__(self, host: str = "localhost", port: int = 50053):
+    def __init__(self, host: str, port: int):
         self._target = f"{host}:{port}"
         self._channel: grpc.aio.Channel | None = None
         self._stub: CtrServiceStub | None = None
