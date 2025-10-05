@@ -30,7 +30,7 @@ async def toggle_orders_source(
         )
         await session.execute(stmt)
         await session.commit()
-    
+
     assert callback_query.message
     chat_id = callback_query.message.chat.id
 
@@ -38,5 +38,5 @@ async def toggle_orders_source(
         status_str = "Включен режим анализа только рекламных заказов"
     else:
         status_str = "Включен режим анализа общей статистики заказов"
-    
+
     await bot.send_message(chat_id, status_str)
