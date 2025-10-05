@@ -176,7 +176,9 @@ async def confirm_payment(
         # Получаем кабинет
         cabinet = await session.get(WBCabinet, payment.wb_cabinet_id)
         if not cabinet:
-            raise CabinetNotFoundError(f"Кабинет с ID {payment.wb_cabinet_id} не найден")
+            raise CabinetNotFoundError(
+                f"Кабинет с ID {payment.wb_cabinet_id} не найден"
+            )
 
         # Если указано, создаем запись в общей таблице платежей
         if add_to_system_payments:
