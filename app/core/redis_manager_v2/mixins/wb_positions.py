@@ -3,36 +3,38 @@ __all__ = ("WBPositionsMixin",)
 import json
 import typing
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models import WBItemPosition
 from .wb_clusters import WBClustersMixin
+from ..base_redis_manager_protocol import BaseRedisManagerProtocol
 
-if typing.TYPE_CHECKING:
-    from ..base_redis_manager import BaseRedisManager
+if TYPE_CHECKING:
+    from typing import Any
 
 
 class WBPositionsMixin(WBClustersMixin):
     async def add_positions_to_redis(
-        self: BaseRedisManager, positions: list[WBItemPosition]
+        self: BaseRedisManagerProtocol, positions: list[WBItemPosition]
     ) -> None:
         base_key = "adv_positions"
         for position in positions:
             position.timestamp = datetime.now()
             key = f"{base_key}:{position.keyword_text}:{position.nmid}"
             position_dict = position.to_dict()
-            await self.client.set(key, json.dumps(position_dict))
+            await self._client.set(key, json.dumps(position_dict))
 
     async def get_keyword_position(
-        self: BaseRedisManager, keyword: str, nmid: int
+        self: BaseRedisManagerProtocol, keyword: str, nmid: int
     ) -> WBItemPosition | None:
         base_key = f"adv_positions:{keyword}:{nmid}"
-        json_data = await self.client.get(base_key)
+        json_data = await self._client.get(base_key)
         if not json_data:
             cluster, _ = await super().get_cluster_and_preset(keyword)
             if not cluster:
                 return None
             base_key = f"adv_positions:{cluster}:{nmid}"
-            json_data = await self.client.get(base_key)
+            json_data = await self._client.get(base_key)
             if not json_data:
                 return None
             else:
@@ -41,11 +43,13 @@ class WBPositionsMixin(WBClustersMixin):
         position = WBItemPosition.from_dict(json.loads(json_data))
         return position
 
-    async def get_keywords_positions(self: BaseRedisManager, adv_setting, texts):
+    async def get_keywords_positions(
+        self: BaseRedisManagerProtocol, adv_setting, texts
+    ):
         keys = [
             "adv_positions:" + text + ":" + str(adv_setting.nmids[0]) for text in texts
         ]
-        results = await self.client.mget(keys)
+        results = await self._client.mget(keys)
         positions = []
         missing_texts = []
 
@@ -69,7 +73,7 @@ class WBPositionsMixin(WBClustersMixin):
                     cluster_map[key] = text
 
             if cluster_keys:
-                cluster_results = await self.client.mget(cluster_keys)
+                cluster_results = await self._client.mget(cluster_keys)
 
                 for key, json_data in zip(cluster_keys, cluster_results):
                     if json_data:
@@ -79,13 +83,11 @@ class WBPositionsMixin(WBClustersMixin):
 
         return positions
 
-    async def set_position_to_out_index(self, position):
+    async def set_position_to_out_index(self: BaseRedisManagerProtocol, position):
         position_out_index = WBItemPosition()
-        position_out_index.real_position = 0
-        position_out_index.base_position = 0
-        position_out_index.promo_position = 0
-        position_out_index.keyword = position.keyword
+        position_out_index.position = 0
+        position_out_index.keyword_text = position.keyword_text
         position_out_index.adv_id = position.adv_id
         position_out_index.nmid = position.nmid
-        position_out_index.cpm = None
-        await self.add_positions_to_redis([position_out_index])
+        position_out_index.adv_type = position.adv_type
+        await typing.cast("Any", self).add_positions_to_redis([position_out_index])
