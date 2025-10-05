@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 from typing import Protocol, runtime_checkable
 
 
@@ -12,7 +12,9 @@ class WBTokenProtocol(Protocol):
     def __repr__(self) -> str: ...
 
     def check_valid(self) -> bool: ...
+
     def get_payload(self, key: str) -> str | int | None: ...
+
     def get_shop_id_from_token(self) -> str: ...
 
     @property
