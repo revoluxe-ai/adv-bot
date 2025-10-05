@@ -13,7 +13,9 @@ router = Router()
 
 
 @router.callback_query(
-    callbacks.ChangePlanSetting.filter(F.target_point == "change-plan-for-sales-for-day")
+    callbacks.ChangePlanSetting.filter(
+        F.target_point == "change-plan-for-sales-for-day"
+    )
 )
 async def change_plan_for_sales_for_day_handler(
     callback: CallbackQuery,
@@ -29,15 +31,21 @@ async def change_plan_for_sales_for_day_handler(
 
 
 @router.message(StateFilter("waiting_for_new_plan_for_sales_for_day"))
-async def set_new_exponent_for_predict_ctr(message: Message, state: FSMContext, bot: Bot):
+async def set_new_exponent_for_predict_ctr(
+    message: Message, state: FSMContext, bot: Bot
+):
     text = message.text
     if not text.isdigit():
-        await message.answer("Введите новый план по продажам в день (целое число от 1):")
+        await message.answer(
+            "Введите новый план по продажам в день (целое число от 1):"
+        )
         return
     new_value = int(text)
 
     if new_value < 1:
-        await message.answer("Введите новый план по продажам в день (целое число от 1):")
+        await message.answer(
+            "Введите новый план по продажам в день (целое число от 1):"
+        )
         return
     data = await state.get_data()
     adv_id: int = data["adv_id"]
