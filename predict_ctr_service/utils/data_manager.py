@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 async def get_keywords_statistic_clickhouse(
     adv_setting: AdvSetting,
     pass_time: timedelta | None = timedelta(days=7),
-    last_views=None,
+    last_views: int | None=None,
 ) -> list[CalculatedKeyword]:
     """
     Получение статистики ключевых слов из ClickHouse (реализация из легаси).
