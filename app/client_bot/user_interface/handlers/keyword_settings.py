@@ -88,7 +88,9 @@ async def setting_keywords_active_keywords(
             callback.from_user.id, adv_setting.wb_cabinet_id
         )
         if wb_user_cabinet_original_id is None:
-            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            await bot.send_message(
+                chat_id, "Не удалось найти кабинет пользователя для этой РК."
+            )
             return
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
@@ -126,7 +128,9 @@ async def setting_keywords_sort_by_ctr_desc(
         )
         result = await session.execute(stmt)
         adv_setting: AdvSetting = result.scalar()
-    keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(adv_setting)
+    keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(
+        adv_setting
+    )
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=1)
@@ -141,7 +145,9 @@ async def setting_keywords_sort_by_ctr_desc(
             callback.from_user.id, adv_setting.wb_cabinet_id
         )
         if wb_user_cabinet_original_id is None:
-            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            await bot.send_message(
+                chat_id, "Не удалось найти кабинет пользователя для этой РК."
+            )
             return
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
@@ -164,7 +170,9 @@ async def setting_keywords_sort_by_ctr_desc(
     return
 
 
-@router.callback_query(callbacks.SettingKeywords.filter(F.type == "show_keywords_is_hard"))
+@router.callback_query(
+    callbacks.SettingKeywords.filter(F.type == "show_keywords_is_hard")
+)
 async def setting_keywords_show_keywords_is_hard(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
@@ -194,7 +202,9 @@ async def setting_keywords_show_keywords_is_hard(
             callback.from_user.id, adv_setting.wb_cabinet_id
         )
         if wb_user_cabinet_original_id is None:
-            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            await bot.send_message(
+                chat_id, "Не удалось найти кабинет пользователя для этой РК."
+            )
             return
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
@@ -217,7 +227,9 @@ async def setting_keywords_show_keywords_is_hard(
     return
 
 
-@router.callback_query(callbacks.SettingKeywords.filter(F.type == "phrase_for_adding_to_white_list"))
+@router.callback_query(
+    callbacks.SettingKeywords.filter(F.type == "phrase_for_adding_to_white_list")
+)
 async def setting_keywords_white_list(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
@@ -239,7 +251,9 @@ async def setting_keywords_white_list(
     keywords = [
         keyword
         for keyword in keywords
-        if keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD and keyword.reason != "max_position"
+        if keyword.hard_status == 1
+        and keyword.status == KeywordStatus.BAD
+        and keyword.reason != "max_position"
     ]
     keywords.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
@@ -255,7 +269,9 @@ async def setting_keywords_white_list(
             callback.from_user.id, adv_setting.wb_cabinet_id
         )
         if wb_user_cabinet_original_id is None:
-            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            await bot.send_message(
+                chat_id, "Не удалось найти кабинет пользователя для этой РК."
+            )
             return
 
     try:
@@ -314,7 +330,9 @@ async def setting_keywords_white_list(
             callback.from_user.id, adv_setting.wb_cabinet_id
         )
         if wb_user_cabinet_original_id is None:
-            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            await bot.send_message(
+                chat_id, "Не удалось найти кабинет пользователя для этой РК."
+            )
             return
 
     try:
@@ -339,7 +357,9 @@ async def setting_keywords_white_list(
 
 
 @router.message(StateFilter(states.AdvSetting.waiting_for_filter_keywords))
-async def setting_keywords_by_adv(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def setting_keywords_by_adv(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+):
     text = message.text
     if not text:
         await bot.send_message(
@@ -353,7 +373,9 @@ async def setting_keywords_by_adv(message: types.Message, bot: aiogram.Bot, stat
         await start_registration(message, bot, state)
         return
     filter_keywords = text.splitlines()
-    filter_keywords = [keyword.strip().lower() for keyword in filter_keywords if keyword]
+    filter_keywords = [
+        keyword.strip().lower() for keyword in filter_keywords if keyword
+    ]
     await state.update_data(keywords_filter=filter_keywords)
     await message.answer("Пожалуйста подождите, эта операция займет немного времени")
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
@@ -381,7 +403,9 @@ async def setting_keywords_by_adv(message: types.Message, bot: aiogram.Bot, stat
             .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
             .options(
                 selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.adv_settings
+                ),
             )
             .where(
                 and_(
@@ -425,7 +449,9 @@ async def setting_keywords_by_adv(message: types.Message, bot: aiogram.Bot, stat
     return
 
 
-@router.callback_query(callbacks.SettingKeywords.filter(F.type == "hide_keywords_is_not_relevant"))
+@router.callback_query(
+    callbacks.SettingKeywords.filter(F.type == "hide_keywords_is_not_relevant")
+)
 async def setting_keywords_hide_keywords_is_hard(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
@@ -452,7 +478,9 @@ async def setting_keywords_hide_keywords_is_hard(
             callback.from_user.id, adv_setting.wb_cabinet_id
         )
         if wb_user_cabinet_original_id is None:
-            await bot.send_message(chat_id, "Не удалось найти кабинет пользователя для этой РК.")
+            await bot.send_message(
+                chat_id, "Не удалось найти кабинет пользователя для этой РК."
+            )
             return
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
@@ -475,7 +503,9 @@ async def setting_keywords_hide_keywords_is_hard(
     return
 
 
-@router.callback_query(callbacks.SettingKeywords.filter(F.type == "show_keywords_is_not_relevant"))
+@router.callback_query(
+    callbacks.SettingKeywords.filter(F.type == "show_keywords_is_not_relevant")
+)
 async def setting_keywords_hide_keywords_is_hard(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
@@ -529,7 +559,9 @@ async def setting_keywords_by_adv(
         await state.update_data(keywords_filter=None)
     await state.set_state(states.AdvSetting.waiting_for_filter_keywords)
     adv_original_id: int = callback_data.adv_original_id
-    await state.update_data(last_adv_original_id=adv_original_id, last_adv_page=callback_data.page)
+    await state.update_data(
+        last_adv_original_id=adv_original_id, last_adv_page=callback_data.page
+    )
 
     async with _sm() as session:
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
@@ -548,7 +580,9 @@ async def setting_keywords_by_adv(
             .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
             .options(
                 selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.adv_settings
+                ),
             )
             .where(
                 and_(
@@ -623,7 +657,9 @@ async def setting_keyword(
     page = data.get("last_keyword_setting_page", 1)
 
     chat_id = callback.message.chat.id
-    await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
+    await messages.KeywordSettingMessage(
+        bot, chat_id, keyword_setting_original_id, page
+    )()
     return
 
 
@@ -663,7 +699,9 @@ async def change_keyword_hard_status(
                         clicks,
                         views,
                         _,
-                    ) = await data_manager.get_keyword_statistic_clickhouse(client, keyword_setting.text, adv_ids)
+                    ) = await data_manager.get_keyword_statistic_clickhouse(
+                        client, keyword_setting.text, adv_ids
+                    )
                 if keyword_setting.added_clicks:
                     clicks += keyword_setting.added_clicks
                 if keyword_setting.added_views:
@@ -682,14 +720,18 @@ async def change_keyword_hard_status(
                     keyword_setting.added_clicks = 0
                 keyword_setting.added_clicks += add_clicks
 
-                await redis_manager.set_auto_block_status(keyword_setting_original_id, False)
+                await redis_manager.set_auto_block_status(
+                    keyword_setting_original_id, False
+                )
 
             await session.commit()
         data = await state.get_data()
         page = data.get("last_keyword_setting_page", 1)
 
         chat_id = callback.message.chat.id
-        await messages.KeywordSettingMessage(bot, chat_id, keyword_setting_original_id, page)()
+        await messages.KeywordSettingMessage(
+            bot, chat_id, keyword_setting_original_id, page
+        )()
 
         return
 
@@ -704,7 +746,9 @@ async def check_position(
     keyword_setting_original_id = callback_data.keyword_setting_original_id
     async with _sm() as session:
         result = await session.execute(
-            select(KeywordSetting.text).where(KeywordSetting.id == keyword_setting_original_id)
+            select(KeywordSetting.text).where(
+                KeywordSetting.id == keyword_setting_original_id
+            )
         )
         text: str = result.scalar()
         adv_setting_original_id = callback_data.adv_original_id
@@ -713,11 +757,15 @@ async def check_position(
         nmids: AdvSetting = result.scalar()
         nmid = nmids[0]
     await parser.add_wb_positions(text, {nmid}, delay=1)
-    await messages.KeywordSettingMessage(bot, callback.message.chat.id, keyword_setting_original_id, 1)()
+    await messages.KeywordSettingMessage(
+        bot, callback.message.chat.id, keyword_setting_original_id, 1
+    )()
 
 
 @router.message(StateFilter(states.AdvSetting.waiting_for_filter_by_query))
-async def setting_keywords_filter_by_query(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def setting_keywords_filter_by_query(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+):
     text = message.text
     if "/start" in text:
         await state.clear()
@@ -751,7 +799,9 @@ async def setting_keywords_filter_by_query(message: types.Message, bot: aiogram.
             .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
             .options(
                 selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.adv_settings
+                ),
             )
             .where(
                 and_(
@@ -796,7 +846,9 @@ async def reset_added_clicks(
 ):
     adv_setting_original_id = callback_data.adv_setting_original_id
     async with _sm(read_only=False) as session:
-        stmt = select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_setting_original_id)
+        stmt = select(KeywordSetting).where(
+            KeywordSetting.adv_setting_id == adv_setting_original_id
+        )
         result = await session.execute(stmt)
         keyword_settings = result.scalars().all()
         for keyword_setting in keyword_settings:
