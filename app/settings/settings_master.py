@@ -369,7 +369,7 @@ class Settings:
             return int(value)
 
     @property
-    def DEFAULT_CTR_EXPONENTA(self):
+    def DEFAULT_CTR_EXPONENTA(self) -> int:
         value = os.getenv("MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS")
         if not value:
             return 20
@@ -399,6 +399,20 @@ class Settings:
         value = os.environ.get("REDIS_PORT")
         if not value:
             return 6379
+        return int(value)
+
+    @property
+    def PREDICT_CTR_HOST(self) -> str:
+        value = os.environ.get("PREDICT_CTR_HOST")
+        if not value:
+            return "localhost"
+        return value
+
+    @property
+    def PREDICT_CTR_PORT(self) -> int:
+        value = os.environ.get("PREDICT_CTR_PORT")
+        if not value:
+            return 50053
         return int(value)
 
 

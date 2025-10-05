@@ -46,7 +46,9 @@ async def sender_message_to_not_pay_users():
 
 
 async def process_payment_for_advs() -> None:
-    from app.modules.billing import process_payment_for_advs as billing_process_payment_for_advs
+    from app.modules.billing import (
+        process_payment_for_advs as billing_process_payment_for_advs,
+    )
 
     """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
     while True:
@@ -64,7 +66,9 @@ async def process_payment_for_advs() -> None:
             next_run += datetime.timedelta(days=1)
         # Спим до 3:00
         sleep_seconds = (next_run - now).total_seconds()
-        logger.info(f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)")
+        logger.info(
+            f"Следующий запуск платежей: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
+        )
         await asyncio.sleep(sleep_seconds)
 
 
@@ -89,6 +93,7 @@ async def run_update_model():
 async def main_loop() -> None:
     await asyncio.gather(
         process_payment_for_advs(),
+        # TODO: этот функционал должен быть перенесен в shop_run, проверить не дублирует ли
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),
     )

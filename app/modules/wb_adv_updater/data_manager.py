@@ -1,3 +1,4 @@
+import asyncio
 import cProfile
 import io
 import json
@@ -395,11 +396,13 @@ async def convert_keyword_stats_in_clusters(
     preset_to_cluster_name = {}
     texts = [keyword.text for keyword in keyword_stats]
     try:
-        text_to_custer_and_present: dict[str, [tuple[str, int]]] = (
-            await redis_manager.get_clusters_and_presets(texts)
+        text_to_custer_and_present: dict[
+            str, tuple[str, int]
+        ] = await redis_manager.get_clusters_and_presets(texts)
+    except Exception as e:
+        logger.error(
+            f"Ошибк {e} получения кластеров и пресетов: {texts}", exc_info=True
         )
-    except:
-        logger.error(f"Ошибка получения кластеров и пресетов: {texts}", exc_info=True)
         return keyword_stats
     for keyword in keyword_stats:
         text = keyword.text
@@ -1243,7 +1246,8 @@ async def get_need_nmids_for_parsing(
 async def get_keywords_positions_dict_by_text(
     adv_setting: AdvSetting, texts: list[str]
 ) -> dict[str, WBItemPosition]:
-    positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    # Type ignore for untyped redis_manager call
+    positions = await redis_manager.get_keywords_positions(adv_setting, texts)  # type: ignore[no-untyped-call]
     positions = [position for position in positions if position]
     positions = {position.keyword_text: position for position in positions}
     return positions
@@ -1390,7 +1394,7 @@ async def get_all_active_shop_ids_with_active_advs() -> list[str]:
     async with _sm() as session:
         result = await session.execute(stmt)
         shop_ids = result.scalars().all()
-    return shop_ids
+    return list(shop_ids)
 
 
 async def get_all_shop_ids() -> list[str]:
@@ -1593,7 +1597,7 @@ async def get_last_full_stat_update(adv_id: int) -> datetime | None:
     return await redis_manager.get_last_full_stat_update(adv_id)
 
 
-async def get_all_keywords_from_ch(last_days=7) -> set[str]:
+async def get_all_keywords_from_ch(last_days: int = 7) -> set[str]:
     ch_query = """
     SELECT DISTINCT text FROM default_db.advkeyword 
     WHERE date >= today() - %(last_days)s
