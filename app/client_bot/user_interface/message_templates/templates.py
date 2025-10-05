@@ -31,7 +31,9 @@ def manage_file_id(func) -> Callable:
         old_image = self.image
         if old_image:
             logger.debug("Получение изображения")
-            image: io.BytesIO | str = await file_handler.get_telegram_image(old_image, self.bot)
+            image: io.BytesIO | str = await file_handler.get_telegram_image(
+                old_image, self.bot
+            )
 
             if isinstance(image, io.BytesIO):
                 new_image = BufferedInputFile(image.getvalue(), filename="wbgram.png")

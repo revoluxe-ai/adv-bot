@@ -6,7 +6,9 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 
-async def get_wb_user_cabinet_id_or_none(user_telegram_id: int, wb_cabinet_id: int) -> int | None:
+async def get_wb_user_cabinet_id_or_none(
+    user_telegram_id: int, wb_cabinet_id: int
+) -> int | None:
     async with get_async_session_maker() as session:
         stmt = (
             select(WBUserCabinet)
@@ -14,7 +16,9 @@ async def get_wb_user_cabinet_id_or_none(user_telegram_id: int, wb_cabinet_id: i
             .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
             .options(
                 selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(WBCabinet.adv_settings),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.adv_settings
+                ),
             )
             .where(
                 and_(
