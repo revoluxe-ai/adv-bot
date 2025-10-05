@@ -28,7 +28,9 @@ AsyncMock() по умолчанию возвращает coroutine-object; пр�
 @pytest.mark.asyncio
 @pytest.mark.parametrize("shop_id", ["7de14a75-4939-40ff-b4dd-9dd5472a4348"])
 async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
-    with patch("app.modules.common_slaves.wildberries.super_cabinet_manager.sm") as sm_mock:
+    with patch(
+        "app.modules.common_slaves.wildberries.super_cabinet_manager.sm"
+    ) as sm_mock:
         # Два отдельных async context manager для двух вызовов `async with sm()`
         # Use plain MagicMock for sessions; AsyncMock only for awaited methods
         session1 = MagicMock()

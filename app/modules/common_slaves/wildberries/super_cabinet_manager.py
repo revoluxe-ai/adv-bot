@@ -1,18 +1,12 @@
-import datetime
 import logging
 import typing
 from dataclasses import dataclass
-from unittest.mock import Mock
 
 from aiohttp import ClientSession
 from sqlalchemy import select
 
-from app.configs.infrastructure_config.wb_config import WBConfig
-from app.core.di import inject, Provide
-from app.core.di.app_container import AppContainer
 from app.core.wb_api.check_righter import CheckRighter
 from app.core.wb_api.exceptions import ApiForbiddenError
-from app.mocks.wb_token_mock import WBTokenMock
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 from . import exceptions
@@ -42,21 +36,19 @@ class WBCabinetAccess:
 
 async def get_access_for_wb_cabinet(
     wb_cabinet_id_or_shop_id: typing.Union[int, str],
-    wb_config: WBConfig = Provide[AppContainer.settings.provided.infrastructure.wb],
 ) -> WBCabinetAccess:
-
-    if wb_config.test_mode:
-        shop_id = "b90b2506-25e9-444a-aa2c-38e2e628f139"
-        wb_token_mock = Mock(spec=WBToken)
-        wb_token_mock.api_key = wb_config.test_token
-        wb_token_mock.hash = hash(wb_config.test_token)
-        wb_token_mock.expires = datetime.datetime.now() + datetime.timedelta(days=30)
-        wb_token_mock.shop_id = shop_id
-        wb_token_mock.is_expired = False
-        wb_cabinet_mock = Mock()
-        wb_cabinet_mock.shop_id = shop_id
-        access = WBCabinetAccess([wb_token_mock], None, wb_cabinet_mock)
-        return access
+    # if wb_config.test_mode:
+    #     shop_id = "b90b2506-25e9-444a-aa2c-38e2e628f139"
+    #     wb_token_mock = Mock(spec=WBToken)
+    #     wb_token_mock.api_key = wb_config.test_token
+    #     wb_token_mock.hash = hash(wb_config.test_token)
+    #     wb_token_mock.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+    #     wb_token_mock.shop_id = shop_id
+    #     wb_token_mock.is_expired = False
+    #     wb_cabinet_mock = Mock()
+    #     wb_cabinet_mock.shop_id = shop_id
+    #     access = WBCabinetAccess([wb_token_mock], None, wb_cabinet_mock)
+    #     return access
 
     if isinstance(wb_cabinet_id_or_shop_id, str):
         shop_id: str = wb_cabinet_id_or_shop_id
@@ -88,8 +80,12 @@ async def get_access_for_wb_cabinet(
             if token.shop_id == shop_id:
                 valited_tokens.append(token)
         if not valited_tokens:
-            raise ApiForbiddenError(f"Нет валидных токенов для кабинета с shop_id {shop_id}")
-        access = WBCabinetAccess(tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet)
+            raise ApiForbiddenError(
+                f"Нет валидных токенов для кабинета с shop_id {shop_id}"
+            )
+        access = WBCabinetAccess(
+            tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
+        )
         return access
 
 
@@ -100,8 +96,12 @@ async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
             if not wb_token.check_valid():
                 logger.debug(f"Не валидный токен {wb_token.api_key}")
                 continue
-            result = await token_check_righter.check_all_rights(wb_token, client_session)
+            result = await token_check_righter.check_all_rights(
+                wb_token, client_session
+            )
             if result:
-                access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
+                access = WBCabinetAccess(
+                    tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None
+                )
                 return access
     raise ApiForbiddenError("Нет валидных токенов для доступа к API")

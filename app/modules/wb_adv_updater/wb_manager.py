@@ -40,8 +40,14 @@ sm = get_async_session_maker
 keywords_hashs_in_neo = set()
 
 
-def get_count_advs_for_wb_cabinet(wb_cabinet: WBCabinet, adv_settings: list[AdvSetting]) -> int:
-    advs_for_wb_cabinet = [adv_setting for adv_setting in adv_settings if adv_setting.wb_cabinet_id == wb_cabinet.id]
+def get_count_advs_for_wb_cabinet(
+    wb_cabinet: WBCabinet, adv_settings: list[AdvSetting]
+) -> int:
+    advs_for_wb_cabinet = [
+        adv_setting
+        for adv_setting in adv_settings
+        if adv_setting.wb_cabinet_id == wb_cabinet.id
+    ]
     return len(advs_for_wb_cabinet)
 
 
@@ -134,9 +140,9 @@ async def update_predict_ctr() -> None:
 
 
 async def update_all_keyword_data(
-        wb_api: WBApi,
-        adv_setting,
-        wb_cabinet: WBCabinet,
+    wb_api: WBApi,
+    adv_setting,
+    wb_cabinet: WBCabinet,
 ):
     shop_id = wb_cabinet.shop_id
     try:
@@ -189,8 +195,8 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                 if update_tasks[adv_setting.id].done():
                     if update_tasks[adv_setting.id].exception():
                         logger.error(
-                            f"Ошибка обновления ключей:"
-                            f" {update_tasks[adv_setting.id].exception()}"
+                            "Ошибка обновления ключей: %s",
+                            update_tasks[adv_setting.id].exception()
                         )
                     del update_tasks[adv_setting.id]
             await asyncio.sleep(0)
