@@ -24,7 +24,9 @@ async def turn_white_list_update_on(
         await session.execute(stmt)
         await session.commit()
     chat_id = callback_query.message.chat.id
-    await bot.send_message(chat_id, "Автодобавление белого первого ключа в белый список включено")
+    await bot.send_message(
+        chat_id, "Автодобавление белого первого ключа в белый список включено"
+    )
 
 
 @router.callback_query(callbacks.TurnWhiteListUpdate.filter(F.action == "off"))
@@ -34,10 +36,14 @@ async def turn_white_list_update_off(
     bot: Bot,
 ):
     async with sm(read_only=False) as session:
-        stmt = select(WBCabinet).filter(WBCabinet.id == callback_data.wb_cabinet_original_id)
+        stmt = select(WBCabinet).filter(
+            WBCabinet.id == callback_data.wb_cabinet_original_id
+        )
         wb_cabinet = await session.execute(stmt)
         wb_cabinet = wb_cabinet.scalar()
         wb_cabinet.white_list_update_active = False
         await session.commit()
     chat_id = callback_query.message.chat.id
-    await bot.send_message(chat_id, "Автодобавление белого первого ключа в белый список выключено")
+    await bot.send_message(
+        chat_id, "Автодобавление белого первого ключа в белый список выключено"
+    )
