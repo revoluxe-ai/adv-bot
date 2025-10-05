@@ -79,7 +79,9 @@ class CachedRequests:
                 sleep(time_sleep)
 
             while True:
-                response = requests.request(method, url, json=json_data, headers=headers)
+                response = requests.request(
+                    method, url, json=json_data, headers=headers
+                )
                 if response.text == "":
                     return None
                 try:

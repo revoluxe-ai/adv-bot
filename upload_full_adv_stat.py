@@ -48,7 +48,11 @@ async def get_csv_stat(shop_ids: list[str], client_session):
     header = None
     rows = []
     for shop_id in shop_ids:
-        stmt = select(AdvSetting).join(AdvSetting.wb_cabinet).where(WBCabinet.shop_id == shop_id)
+        stmt = (
+            select(AdvSetting)
+            .join(AdvSetting.wb_cabinet)
+            .where(WBCabinet.shop_id == shop_id)
+        )
         async with sm() as session:
             result = await session.execute(stmt)
             adv_setting = result.scalar()
@@ -64,13 +68,17 @@ async def get_csv_stat(shop_ids: list[str], client_session):
         )
         max_stat_days = max([len(stat.days) for stat in stats])
         if header is None:
-            header = "shop_id; adv_id; name; " + ";".join([str(i) for i in range(max_stat_days)])
+            header = "shop_id; adv_id; name; " + ";".join(
+                [str(i) for i in range(max_stat_days)]
+            )
             header += "; Баланс"
         for stat in stats:
             adv: AdvSetting = await get_adv_setting(stat.advertId)
             name = adv.name
             adv_id = adv.adv_id
-            stat_days: list[DayStats] = sorted(stat.days, key=lambda x: x.date, reverse=True)
+            stat_days: list[DayStats] = sorted(
+                stat.days, key=lambda x: x.date, reverse=True
+            )
             shop_id = adv.wb_cabinet.shop_id
             row = f"""{shop_id}; {adv_id}; {name}; {";".join([str(day.orders) for day in stat_days])}"""
             row += f"; {total}"

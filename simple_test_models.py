@@ -6,14 +6,12 @@ import os
 
 import pytest
 from sqlalchemy import (
-    Boolean,
     Column,
     Float,
     ForeignKey,
     Integer,
     String,
     create_engine,
-    text,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
@@ -22,41 +20,41 @@ Base = declarative_base()
 DB_PATH = "simple_test_db.sqlite"
 
 
-# Определяем модели для тестирования
-class WBCabinet(Base):
-    __tablename__ = "wbcabinet"
-    id = Column(Integer, primary_key=True)
-    balance = Column(Float, default=0, server_default=text("0"), nullable=False)
-    bonus = Column(Float, default=0, server_default=text("0"), nullable=False)
-    active = Column(Boolean, default=True)
-    shop_id = Column(String, nullable=False, unique=True)
-    balance_payments = relationship(
-        "WBBalancePayment", back_populates="wb_cabinet", uselist=True
-    )
-    bonus_payments = relationship(
-        "WBBonusPayment", back_populates="wb_cabinet", uselist=True
-    )
+# # Определяем модели для тестирования
+# class WBCabinet(Base):
+#     __tablename__ = "wbcabinet"
+#     id = Column(Integer, primary_key=True)
+#     balance = Column(Float, default=0, server_default=text("0"), nullable=False)
+#     bonus = Column(Float, default=0, server_default=text("0"), nullable=False)
+#     active = Column(Boolean, default=True)
+#     shop_id = Column(String, nullable=False, unique=True)
+#     balance_payments = relationship(
+#         "WBBalancePayment", back_populates="wb_cabinet", uselist=True
+#     )
+#     bonus_payments = relationship(
+#         "WBBonusPayment", back_populates="wb_cabinet", uselist=True
+#     )
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
 
-    @property
-    def calculated_balance(self) -> float:
-        """Вычисляет баланс на основе начального значения balance и всех платежей"""
-        if not hasattr(self, "balance_payments") or not self.balance_payments:
-            return self.balance  # Возвращаем текущее значение, если нет платежей
+#     @property
+#     def calculated_balance(self) -> float:
+#         """Вычисляет баланс на основе начального значения balance и всех платежей"""
+#         if not hasattr(self, "balance_payments") or not self.balance_payments:
+#             return self.balance  # Возвращаем текущее значение, если нет платежей
 
-        # Суммируем все платежи и начальное значение баланса
-        return self.balance + sum(payment.amount for payment in self.balance_payments)
+#         # Суммируем все платежи и начальное значение баланса
+#         return self.balance + sum(payment.amount for payment in self.balance_payments)
 
-    @property
-    def calculated_bonus(self):
-        """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
-        if not hasattr(self, "bonus_payments") or not self.bonus_payments:
-            return self.bonus  # Возвращаем текущее значение, если нет платежей
+#     @property
+#     def calculated_bonus(self):
+#         """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
+#         if not hasattr(self, "bonus_payments") or not self.bonus_payments:
+#             return self.bonus  # Возвращаем текущее значение, если нет платежей
 
-        # Суммируем все платежи и начальное значение бонусов
-        return self.bonus + sum(payment.amount for payment in self.bonus_payments)
+#         # Суммируем все платежи и начальное значение бонусов
+#         return self.bonus + sum(payment.amount for payment in self.bonus_payments)
 
 
 class WBBalancePayment(Base):

@@ -121,7 +121,9 @@ if __name__ == "__main__":
                         await asyncio.wait_for(delete_task, timeout=5)
                         logger.info("✅ Вебхук удалён.")
                     except TimeoutError:
-                        logger.warning("⚠️ Таймаут при удалении вебхука. Продолжаем работу.")
+                        logger.warning(
+                            "⚠️ Таймаут при удалении вебхука. Продолжаем работу."
+                        )
                 else:
                     logger.info("ℹ️ Вебхук не был установлен, пропускаем удаление.")
             except TelegramAPIError as e:
@@ -131,15 +133,19 @@ if __name__ == "__main__":
                 logger.error(f"❌ Непредвиденная ошибка при удалении вебхука: {e}")
                 logger.info("⚠️ Продолжаем запуск несмотря на ошибку.")
                 del e
+            from app import AppContainer, DIManager
 
             try:
-                async with ClientSession() as client_session:
-                    dp = Dispatcher(client_session=client_session)
-                    dp.include_router(global_router)
+                from app import AppContainer, DIManager
 
-                    logger.info("🔄 Запуск бота в режиме POLLING...")
-                    # Запуск бота с использованием long polling
-                    await dp.start_polling(bot)
+                async with await DIManager.create(AppContainer):
+                    async with ClientSession() as client_session:
+                        dp = Dispatcher(client_session=client_session)
+                        dp.include_router(global_router)
+
+                        logger.info("🔄 Запуск бота в режиме POLLING...")
+                        # Запуск бота с использованием long polling
+                        await dp.start_polling(bot)
             finally:
                 await bot.session.close()
                 logger.info("✅ Сессия бота завершена.")

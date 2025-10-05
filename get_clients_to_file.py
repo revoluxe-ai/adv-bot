@@ -100,9 +100,14 @@ async def get_clients_to_file():
                         advs = advs.scalars().all()
 
                         total_advs += len(advs)
-                        active_advs_with_bot += len([adv for adv in advs if adv.bot_active])
+                        active_advs_with_bot += len(
+                            [adv for adv in advs if adv.bot_active]
+                        )
                     shop_ids = "; ".join(
-                        [wb_user_cabinet.wb_cabinet.shop_id for wb_user_cabinet in wb_user_cabinets]
+                        [
+                            wb_user_cabinet.wb_cabinet.shop_id
+                            for wb_user_cabinet in wb_user_cabinets
+                        ]
                     )
                     row = (
                         f"{user.id},"
