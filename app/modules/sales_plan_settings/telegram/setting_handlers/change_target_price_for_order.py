@@ -13,7 +13,9 @@ router = Router()
 
 
 @router.callback_query(
-    callbacks.ChangePlanSetting.filter(F.target_point == "change-target-price-for-order")
+    callbacks.ChangePlanSetting.filter(
+        F.target_point == "change-target-price-for-order"
+    )
 )
 async def change_plan_for_sales_for_day_handler(
     callback: CallbackQuery,
@@ -25,13 +27,17 @@ async def change_plan_for_sales_for_day_handler(
     await state.update_data(adv_id=adv_id)
     await state.set_state("waiting_for_new_target_price_for_order")
     message = callback.message
-    await message.answer("Введите новую целевую себестоимость число с плавающей точкой  от 1):")
+    await message.answer(
+        "Введите новую целевую себестоимость число с плавающей точкой  от 1):"
+    )
 
 
 @router.message(StateFilter("waiting_for_new_target_price_for_order"))
 async def set_new_target_price_for_order(message: Message, state: FSMContext, bot: Bot):
     text = message.text
-    message_text = "Введите новую целевую себестоимость число с плавающей точкой  от 1):"
+    message_text = (
+        "Введите новую целевую себестоимость число с плавающей точкой  от 1):"
+    )
     if not text.isdigit():
         await message.answer(message_text)
         return
