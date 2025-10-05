@@ -49,7 +49,9 @@ class GlobalParsingQueueManager(BaseRedis):
                 old_task = json.loads(old_data)
                 old_nmids = set(old_task.get("nmids", []))
                 nmids = old_nmids.union(nmids)
-                logger.debug(f"Updating existing task. Old nmids: {old_nmids}, New nmids: {nmids}")
+                logger.debug(
+                    f"Updating existing task. Old nmids: {old_nmids}, New nmids: {nmids}"
+                )
 
         # Формируем task_data после возможного объединения
         task_data = {
