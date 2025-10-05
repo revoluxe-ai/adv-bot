@@ -2,7 +2,7 @@ name: GitHub Container Registry Deploy
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
 
 jobs:
   deploy:
@@ -10,14 +10,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - service: common-wb-adv-bot
-            repo_name: adv-bot
+          - service: predict-ctr-service
+            repo_name: predict-ctr-service
             dockerfile: ./dockers/Dockerfile
+
     env:
       GHCR_NAMESPACE: revoluxe-ai
       CR_REPOSITORY: ${{ matrix.repo_name }}
       IMAGE_TAG: ${{ github.sha }}
-      LATEST_TAG: master
+      LATEST_TAG: stage
       GHCR_REGISTRY: ghcr.io
 
     steps:
@@ -26,17 +27,7 @@ jobs:
 
       - name: Log in to GitHub Container Registry
         run: |
-          echo "Checking access to GHCR..."
           echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.GHCR_REGISTRY }} -u ${{ github.actor }} --password-stdin
-          # Попробуем выполнить pull, но не прерываем пайплайн, если репозиторий еще не существует.
-          if ! docker pull ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:latest; then
-            echo "Warning: Repository not found or access denied (Invalid token or insufficient permissions). Continuing with build process."
-          fi
-
-      - name: Check available tags in GHCR
-        run: |
-          curl -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
-          https://ghcr.io/v2/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}/tags/list
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -44,7 +35,6 @@ jobs:
       - name: Build and push Docker image to GHCR
         run: |
           docker buildx build \
-            --no-cache \
             --platform=linux/amd64 \
             --push \
             -t ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
