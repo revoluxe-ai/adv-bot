@@ -115,6 +115,6 @@ def test_all_entry_points_exist():
 
     for entry_point in ENTRY_POINTS:
         file_path = project_root / entry_point
-        assert file_path.exists(), (
-            f"Точка входа '{entry_point}' не найдена по пути {file_path}"
-        )
+        assert (
+            file_path.exists()
+        ), f"Точка входа '{entry_point}' не найдена по пути {file_path}"
