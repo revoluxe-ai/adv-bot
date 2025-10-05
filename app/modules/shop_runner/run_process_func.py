@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from asyncio import Task
 
@@ -15,11 +16,10 @@ from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
-import asyncio
 
 
 async def run_shop_task(
-        shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
+    shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
 ) -> None:
     while True:
         try:
@@ -34,14 +34,16 @@ async def run_shop_task(
             raise exc
 
 
-async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: ClientSession) -> None:
+async def _update_tasks(
+    active_tasks: dict[str, Task[None]], client_session: ClientSession
+) -> None:
     # TODO: Никогда не загрузяться компании, если в магазине нет активной рекламы
     stmt = (
         select(WBCabinet.shop_id)
         .distinct()
         .join(WBCabinet.adv_settings)
         .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active == True),
+            WBCabinet.adv_settings.any(AdvSetting.bot_active.is_(True)),
         )
     )
 
@@ -56,7 +58,9 @@ async def _update_tasks(active_tasks: dict[str, Task[None]], client_session: Cli
         for shop_id in all_needs_for_run_shop_ids:
             if shop_id not in active_tasks:
                 # Создание асинхронной задачи
-                task = asyncio.create_task(run_shop_task(shop_id, client_session, redis_manager))
+                task = asyncio.create_task(
+                    run_shop_task(shop_id, client_session, redis_manager)
+                )
                 active_tasks[shop_id] = task
                 logger.debug(f"Процесс обновления магазина {shop_id} запущен")
             else:

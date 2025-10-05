@@ -5,7 +5,7 @@ import typing
 from dataclasses import dataclass
 from enum import Enum
 from typing import cast
-from venv import logger  # добавлено для типизации
+import logging
 
 import jwt
 from jwt import DecodeError
@@ -46,14 +46,16 @@ class PredictCTRMode(Enum):
     V2 = "v2"
 
 
-
-
 _sm = get_async_session_maker
 
 
 class WBUserCabinet(BaseTable):
-    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="wb_user_cabinets")
+    wb_cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="wb_user_cabinets"
+    )
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"), nullable=False)
     user: Mapped[User] = relationship("User", back_populates="wb_user_cabinets")
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -70,8 +72,12 @@ class WBBalancePayment(BaseTable):
     __tablename__ = "wbbalancepayment"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="balance_payments")
+    wb_cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="balance_payments"
+    )
 
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -79,7 +85,9 @@ class WBBalancePayment(BaseTable):
         DateTime, nullable=False, server_default=text("now()")
     )
     # Тип операции для унификации с бонусами: 'add', 'subtract', 'auto_subtract', 'reset' (если понадобится)
-    operation_type: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'subtract'"))
+    operation_type: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("'subtract'")
+    )
     __table_args__ = (
         Index("idx_wb_balance_payment_cabinet_id", "wb_cabinet_id"),
         Index("idx_wb_balance_payment_date", "transaction_date_time"),
@@ -100,8 +108,12 @@ class WBBonusPayment(BaseTable):
     __tablename__ = "wbbonuspayment"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="bonus_payments")
+    wb_cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="bonus_payments"
+    )
 
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -109,7 +121,9 @@ class WBBonusPayment(BaseTable):
         DateTime, nullable=False, server_default=text("now()")
     )
     # 'add', 'subtract', 'reset', 'auto_subtract'
-    operation_type: Mapped[str] = mapped_column(String, nullable=False, server_default=text("'subtract'"))
+    operation_type: Mapped[str] = mapped_column(
+        String, nullable=False, server_default=text("'subtract'")
+    )
     admin_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
@@ -130,12 +144,16 @@ class WBBonusPayment(BaseTable):
 
 
 class WBCategory(BaseTable):
-    cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped['WBCabinet'] = relationship(
+    cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
         "WBCabinet", back_populates="wb_categories"
     )
     wb_category_name: Mapped[str] = mapped_column(String, nullable=False)
-    wb_cards: Mapped[list["WBCard"]] = relationship("WBCard", back_populates="wb_category", uselist=True)
+    wb_cards: Mapped[list["WBCard"]] = relationship(
+        "WBCard", back_populates="wb_category", uselist=True
+    )
     __table_args__ = (Index("ix_wb_category_name", "wb_category_name"),)
 
 
@@ -146,7 +164,7 @@ class WBToken(BaseTable):
     api_key: Mapped[str] = mapped_column(String, nullable=False)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
     user: Mapped[User] = relationship("User", back_populates="wb_tokens", lazy="joined")
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    active: Mapped[bool | None] = mapped_column(Boolean, default=True, nullable=True)
     shop_id: Mapped[str | None] = mapped_column(String, nullable=True)
     __table_args__ = (
         UniqueConstraint("api_key", "user_id", name="_api_key_user_id_uc"),
@@ -262,15 +280,25 @@ class WBCard(BaseTable):
     nmid: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     offer_id: Mapped[str | None] = mapped_column(String, nullable=True)
     name: Mapped[str | None] = mapped_column(String, nullable=True)
-    wb_category_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wbcategory.id"), nullable=True)
-    wb_category: Mapped[WBCategory] = relationship("WBCategory", back_populates="wb_cards", lazy="joined")
+    wb_category_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("wbcategory.id"), nullable=True
+    )
+    wb_category: Mapped[WBCategory] = relationship(
+        "WBCategory", back_populates="wb_cards", lazy="joined"
+    )
     json: Mapped[str | None] = mapped_column(JSONB, nullable=True)
-    wb_cabinet_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=True)
+    wb_cabinet_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=True
+    )
     wb_cabinet: Mapped["WBCabinet"] = relationship(
         "WBCabinet", back_populates="wb_cards"
     )
-    adv_setting_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("advsetting.id"), nullable=True)
-    adv_setting: Mapped["AdvSetting"] = relationship("AdvSetting", back_populates="wb_cards")
+    adv_setting_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("advsetting.id"), nullable=True
+    )
+    adv_setting: Mapped["AdvSetting"] = relationship(
+        "AdvSetting", back_populates="wb_cards"
+    )
     updated: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
     add_to_db: Mapped[bool | None] = mapped_column(
         Boolean, default=False, nullable=True
@@ -329,10 +357,10 @@ class AdvSetting(BaseTable):
         self._worst_promo_position = None
 
     def __repr__(self):
-        return (f"name: {self.name},"
-                f" adverdId: {self.adv_id},"
-                f"bot_active: {self.bot_active},"
-                f" active_status: {self.active_status}")
+        return (
+            f"name: {self.name}, adverdId: {self.adv_id},"
+            f" bot_active: {self.bot_active}, active_status: {self.active_status}"
+        )
 
     favorite_users: Mapped[list[User]] = relationship(
         "User", secondary=favorite_advs_association, back_populates="favorites_advs"
@@ -343,8 +371,12 @@ class AdvSetting(BaseTable):
         nullable=True,
     )  # Автоматическая рекламная кампания
     name = mapped_column(String, nullable=False)
-    wb_cabinet_id: Mapped[int] = mapped_column(Integer, ForeignKey("wbcabinet.id"), nullable=False)
-    wb_cabinet: Mapped["WBCabinet"] = relationship("WBCabinet", back_populates="adv_settings", lazy="joined")
+    wb_cabinet_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("wbcabinet.id"), nullable=False
+    )
+    wb_cabinet: Mapped["WBCabinet"] = relationship(
+        "WBCabinet", back_populates="adv_settings", lazy="joined"
+    )
     wb_cards: Mapped[list[WBCard]] = relationship(
         "WBCard",
         back_populates="adv_setting",
@@ -377,7 +409,9 @@ class AdvSetting(BaseTable):
     )
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
-    payments: Mapped[list['AdvPayment']] = relationship("AdvPayment", back_populates="adv_setting", uselist=True)
+    payments: Mapped[list["AdvPayment"]] = relationship(
+        "AdvPayment", back_populates="adv_setting", uselist=True
+    )
     parsing_active = mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
     bidder_active: Mapped[bool | None] = mapped_column(
