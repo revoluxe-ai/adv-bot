@@ -52,7 +52,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
         self.image_mode = image_mode
 
-    async def __call__(self, state: FSMContext, sort_mode="by_adv") -> (LastMessage, str):
+    async def __call__(
+        self, state: FSMContext, sort_mode="by_adv"
+    ) -> (LastMessage, str):
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
@@ -64,7 +66,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 for keyword_filter in keywords_filter:
                     if '"' in keyword_filter or "'" in keyword_filter:
                         # Проверка на полное совпадение, если в фразе есть кавычки
-                        keyword_filter = keyword_filter.replace('"', "").replace("'", "")
+                        keyword_filter = keyword_filter.replace('"', "").replace(
+                            "'", ""
+                        )
                         if keyword_filter == keyword.text:
                             if keyword not in clear_keywords:
                                 clear_keywords.append(keyword)
@@ -92,7 +96,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if filter_by_query:
             clear_keywords = []
             for keyword in self._keywords:
-                if not isinstance(keyword.query, str) and keyword.query >= filter_by_query:
+                if (
+                    not isinstance(keyword.query, str)
+                    and keyword.query >= filter_by_query
+                ):
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
 
@@ -124,7 +131,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if self.image_mode == "graphic":
             graphic = await self._graphic_injection()
             if not graphic:
-                graphic = "app/core/telegram/static_images/not_keywords_position_graphic.jpg"
+                graphic = (
+                    "app/core/telegram/static_images/not_keywords_position_graphic.jpg"
+                )
             self._image = graphic
 
         common_days_stat_manager = CommonStatDataManager()
@@ -163,9 +172,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Заказов из Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
             f"Заказов из Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
         )
-        
+
         # Показываем источник данных для заказов
-        if self._adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
+        if (
+            self._adv_setting.orders_source_for_auto_mode
+            == OrdersSourceForAutoMode.ADV_SUM
+        ):
             text += "📊 Источник заказов: ТОЛЬКО рекламные заказы\n"
             text += f"Суммарные заказы из рекламы: {self.full_adv_stat_for_last_days_for_auto_adv.orders + self.full_adv_stat_for_last_days_for_auction.orders}\n"
         else:
@@ -181,12 +193,16 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         # Получаем целевые значения из настроек
         plan_for_sales_for_day = self._adv_setting.plan_for_sales_for_day
         plan_for_sales_for_day_str = (
-            str(round(plan_for_sales_for_day)) if plan_for_sales_for_day else "Не задано"
+            str(round(plan_for_sales_for_day))
+            if plan_for_sales_for_day
+            else "Не задано"
         )
 
         target_price_for_order = self._adv_setting.target_price_for_order
         target_price_for_order_str = (
-            str(round(target_price_for_order)) if target_price_for_order else "Не задано"
+            str(round(target_price_for_order))
+            if target_price_for_order
+            else "Не задано"
         )
 
         max_price_for_order = self._adv_setting.max_price_for_order
@@ -237,7 +253,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         else:
             graphic, legend = result
         if legend:
-            await KeywordGraphicPart_1(bot, user_telegram_id, graphic, adv_original_id)()
+            await KeywordGraphicPart_1(
+                bot, user_telegram_id, graphic, adv_original_id
+            )()
             return legend
         return graphic
 

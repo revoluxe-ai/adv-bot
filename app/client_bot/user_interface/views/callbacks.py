@@ -1,7 +1,5 @@
 from aiogram.filters.callback_data import CallbackData
 
-from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
-
 
 class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
     wb_user_cabinet_original_id: int
@@ -104,7 +102,9 @@ class ChangeMaxCPC(CallbackData, prefix="change_max_cpc"):
     adv_original_id: int
 
 
-class ChangeMinViewsForPredictCTR(CallbackData, prefix="change_min_views_for_predict_ctr"):
+class ChangeMinViewsForPredictCTR(
+    CallbackData, prefix="change_min_views_for_predict_ctr"
+):
     adv_setting_original_id: int
 
 
