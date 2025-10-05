@@ -179,4 +179,6 @@ build-backend = "poetry.core.masonry.api"
 exclude = [
   "app/core/mp/wb/_api_client/clients/promotion/generated",
   "app/core/mp/wb/_api_client/clients/promotion/generated/*",
+  "alembic/versions",
+  "alembic/versions/*",
 ]
