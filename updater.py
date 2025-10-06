@@ -7,6 +7,10 @@ from multiprocessing import Process
 import dotenv
 import psutil
 from typing import NoReturn
+
+# Use direct imports to avoid any re-export typing issues
+from app.core.di.di_manager import DIManager
+from app.core.di.app_container import AppContainer
 from app.modules.wb_adv_updater.runner import (
     run_main_coroutines,
     run_update_all_keywords_on_wb,
@@ -22,13 +26,13 @@ async def update_keywords_ctr_by_similary_run() -> NoReturn:
     from app.modules.wb_adv_updater import (
         hard_ml_data_updater_process as hard_data_manager,
     )
-
-    while True:
-        try:
-            await hard_data_manager.update_keywords_ctr_by_similary()
-        except Exception:
-            logger.error("Ошибка обновления по похожему CTR процессов", exc_info=True)
-        await asyncio.sleep(60)
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
+        while True:
+            try:
+                await hard_data_manager.update_keywords_ctr_by_similary()
+            except Exception:
+                logger.error("Ошибка обновления по похожему CTR процессов", exc_info=True)
+            await asyncio.sleep(60)
 
 
 # Явная аннотация типов для списка корутин

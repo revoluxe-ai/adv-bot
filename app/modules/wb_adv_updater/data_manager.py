@@ -51,6 +51,8 @@ from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
+from . import get_text_to_predict_ctr_dict
+
 
 logger = logging.getLogger(__name__)
 
@@ -435,6 +437,36 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> FullAdvStat | 
         return None
 
 
+# async def get_max_cpc(adv: AdvSetting)-> Optional[int]:
+#     max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
+#     if max_cpc and adv.max_cpc:
+#         return min(max_cpc, adv.max_cpc)
+#     if not max_cpc:
+#         return adv.max_cpc
+#     if not adv.max_cpc:
+#         return max_cpc
+
+#
+# async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
+#     max_pay_for_order: Optional[int]  = adv.max_pay_for_order
+#     if not max_pay_for_order:
+#         return None
+#     all_keywords = await data_manager
+#     cpm_now = await get_cpm_by_nmid(adv.nmids[0])
+#     if not cpm_now:
+#         return None
+#     full_stat: FullAdvStat = await get_full_adv_stat_for_adv_id_from_redis(adv.adv_id)
+#     if not full_stat:
+#         return None
+#     else:
+#         clicks = full_stat.clicks + 1
+#         orders = full_stat.orders + 1
+#         need_clicks_for_order = clicks/orders
+#         max_cpc = max_pay_for_order / need_clicks_for_order
+#         return max_cpc
+
+
+# @profile
 async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     max_cpc = None
     if not max_cpc:
@@ -614,11 +646,15 @@ async def get_good_bad_phrases_for_min_ctr(
             keyword_new.query = keywords_query.get_queries_of_keyword(text)
             keyword_stats.append(keyword_new)
 
-    adv_id = adv_setting.adv_id
+
     texts = [kw.text for kw in keyword_stats]
-    text_to_predict_ctr: dict[
-        str, float
-    ] = await redis_manager.get_adv_id_to_text_predict_ctr_dict(adv_id, texts)
+    try:
+        text_to_predict_ctr: dict[str, float] = await get_text_to_predict_ctr_dict.get(
+            adv_setting, texts
+        )
+    except Exception as  e:
+        logger.error('Ошибка получения предикта', exc_info=True)
+        raise e
     try:
         cpm_now = await get_cpm(adv_setting)
     except Exception as e:

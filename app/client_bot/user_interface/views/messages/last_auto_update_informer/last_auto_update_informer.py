@@ -5,8 +5,11 @@ from app.modules.shop_runner.service_manager import (
     LastSetDownTargetPlace,
     LastSetUpTargetPlace,
     LastUpdateFirstPhrase,
-    last_auto_update_phrases_to_white_list,
 )
+
+from app.modules.shop_runner.service_manager.\
+old_modules.setting_auto_updater.modules.white_list_updater.\
+    auto_white_list_updater.redis_cache import (last_auto_update_phrases_to_white_list)
 
 
 class LastAutoUpdateSettingInformer:
