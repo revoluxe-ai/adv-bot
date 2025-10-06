@@ -21,7 +21,8 @@ class AppContainer(containers.DeclarativeContainer):
     """Главный DI-контейнер приложения. Содержит все основные сервисы и конфигурации."""
     wiring_config = containers.WiringConfiguration(
         packages=[
-            "app.core.redis_manager_v2"]
+            "app.core.redis_manager_v2",]
+
     )
 
     settings = providers.Singleton(AppConfig.create)
