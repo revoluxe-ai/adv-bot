@@ -35,7 +35,7 @@ class AppContainer(containers.DeclarativeContainer):
         redis_client=redis_client,
     )
 
-    module_resources = providers.Container(
+    module_resources: providers.Container[ModuleResources] = providers.Container(
         ModuleResources,
         redis_client_wrapper=redis_client_wrapper,
     )
