@@ -5,6 +5,7 @@ import asyncio
 import dotenv
 from aiohttp import ClientSession
 
+from app import DIManager
 from app.modules.shop_runner.shop_run_worker.worker.worker import ShopWorker
 from python_modules.logger import setup_logging
 
@@ -16,18 +17,10 @@ async def run_shop_update_worker() -> None:
     """Запускает воркер для обновления магазинов."""
     from app.core.di import AppContainer
 
-    container = AppContainer()
-    result = container.init_resources()
-    if result is not None:
-        await result
-    try:
+    async with await DIManager.create(AppContainer):
         async with ClientSession() as session:
             worker = ShopWorker(session)
             await worker.update_active_shop_update_tasks_run()
-    finally:
-        result = container.shutdown_resources()
-        if result is not None:
-            await result
 
 
 if __name__ == "__main__":

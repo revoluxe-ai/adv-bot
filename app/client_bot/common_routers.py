@@ -29,6 +29,8 @@ from app.modules.white_list_updater import router as white_list_updater_router
 
 from ..settings import settings
 from .middlewars.return_to_start_from_state import ReturnToStart
+
+from .user_interface.handlers.keywords_positions_history import KeywordsPositionsHistoryRouter
 from .user_interface.handlers import (
     add_black_phrases,
     add_white_phrases,
@@ -43,7 +45,7 @@ from .user_interface.handlers import (
     get_shop_for_admin,
     keyword_relevant_setting,
     keyword_settings,
-    keywords_positions_history,
+
     min_views_for_ml_predict_ctr,
     orders_source_toggle,
     reset_place_setting,
@@ -57,7 +59,7 @@ common_router = Router()
 
 
 # admin_bot_api = path_setting_funcs.get_document_by_key_name(setting_path, 'admin_telegram_bot_api')
-common_router.include_routers(keywords_positions_history.handlers.router)
+common_router.include_routers(KeywordsPositionsHistoryRouter)
 if not settings.test_mode:
     common_router.include_routers(exceptions.user_router)
     common_router.include_routers(exceptions.admin_router)

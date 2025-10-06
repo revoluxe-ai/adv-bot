@@ -26,12 +26,17 @@ from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAu
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
-from app.modules.sales_plan_settings import SalesPlanSettingsMenuCallback
+from app.modules.sales_plan_settings.telegram.main_callback import (
+    SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
+)
 from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import (
     SettingAuctionBoostMode,
 )
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
     AutoUpdateTargetPlaceSettingCallBack,
+)
+from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
+    AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
     AutoUpdateWhiteListSetting,
