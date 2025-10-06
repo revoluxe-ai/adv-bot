@@ -29,14 +29,13 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
-from app.shared.application.dto.update_bids_in_advs.update_bids_in_search_adv_dto import (
-    UpdateBidsInSearchAdvDTO,
-)
+
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
 from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
+from ..bidder.bidder_func import run_bidder_process_for_adv
 
 logger = logging.getLogger(__name__)
 
