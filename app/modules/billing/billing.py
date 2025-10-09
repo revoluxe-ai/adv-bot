@@ -62,7 +62,25 @@ async def _safe_commit(session: AsyncSession, result: dict[str, int | bool | str
         return False
 
 
+
 async def _process_single_cabinet(
+        cabinet_id: int,
+        current_dt: datetime,
+        pricer: Pricer,
+        redis_manager: RedisManager,
+) -> dict[str, int | bool | str | float | None]:
+    async with sm() as session:
+        return await __process_single_cabinet(
+            session=session,
+            cabinet_id=cabinet_id,
+            current_dt=current_dt,
+            pricer=pricer,
+            redis_manager=redis_manager,
+        )
+
+
+
+async def __process_single_cabinet(
         session: AsyncSession,
         cabinet_id: int,
         current_dt: datetime,
@@ -155,8 +173,12 @@ async def _process_single_cabinet(
             result["reason"] = "already_processed_db"
             return result
 
-        # Расчёт цены
-        price_for_shop_for_day = await pricer.get_price_for_day_for_shop(str(wb_cabinet.shop_id))
+        try:
+            price_for_shop_for_day = await pricer.get_price_for_day_for_shop(session, wb_cabinet.shop_id)
+        except Exception as exc:
+            logger.error('Cabinet %s: ошибка получения цены: %s', cabinet_id, exc, exc_info=True)
+            raise exc
+
         result["price_for_day"] = price_for_shop_for_day
         if price_for_shop_for_day <= 0:
             try:
@@ -318,17 +340,16 @@ async def _process_payment_for_advs(
         return
     logger.debug(f"К обработке кабинетов: {len(cabinet_ids)}")
     tasks_list = []
-    async with sm(read_only=False) as session:
-        for cabinet_id in cabinet_ids:
-            task = _process_single_cabinet(
-                session=session,
-                cabinet_id=cabinet_id,
-                current_dt=current_dt,
-                pricer=pricer,
-                redis_manager=redis_manager,
-            )
-            tasks_list.append(task)
-        results = await asyncio.gather(*tasks_list, return_exceptions=True)
+
+    for cabinet_id in cabinet_ids:
+        task = _process_single_cabinet(
+            cabinet_id=cabinet_id,
+            current_dt=current_dt,
+            pricer=pricer,
+            redis_manager=redis_manager,
+        )
+        tasks_list.append(task)
+    results = await asyncio.gather(*tasks_list, return_exceptions=True)
     for res in results:
         if isinstance(res, Exception):
             logger.error("Ошибка в обработке кабинета: %s", res, exc_info=True)
