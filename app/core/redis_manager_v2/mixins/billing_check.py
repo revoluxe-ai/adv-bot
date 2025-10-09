@@ -8,7 +8,8 @@ if TYPE_CHECKING:
 
 
 class BillingCheckMixin:
-    """Mixin for billing check operations in Redis."""
+    prefix = "billing:processed"
+    default_ttl = 93600  # 1 день ровно
 
     def _get_key(self: 'BaseRedisManagerProtocol', wb_cabinet_id: int, day: datetime) -> str:
         """Generate a Redis key for billing processing check.
@@ -18,12 +19,6 @@ class BillingCheckMixin:
         """
         return f"{self.prefix}:{wb_cabinet_id}:{day.strftime('%Y-%m-%d')}"
 
-    # def _resolve_ttl(self: 'BaseRedisManagerProtocol', ttl: int | None) -> int | None:
-    #     """Возвращает итоговый TTL или None, если ни аргумент, ни self._ttl не заданы."""
-    #     if ttl is not None:
-    #         return ttl
-    #     stored = getattr(self, '_ttl', None)  # может отсутствовать у некоторых реализаций
-    #     return stored
 
     async def set_billing_process_for_day(self: 'BaseRedisManagerProtocol', wb_cabinet_id: int, day: datetime,
                                           ttl: int | None = None) -> None:
