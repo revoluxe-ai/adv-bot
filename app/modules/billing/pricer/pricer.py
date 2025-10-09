@@ -1,6 +1,7 @@
 """Модуль для расчета стоимости тарифов."""
 
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.settings import settings
@@ -20,36 +21,35 @@ class Pricer:
         self._tariffs = tariffs
 
     @staticmethod
-    async def get_advs_count(shop_id: str) -> int:
-        async with sm(read_only=True) as session:
-            stmt = (
-                select(func.count(AdvSetting.id))
-                .join(AdvSetting.wb_cabinet)
-                .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active == True)
-            )
-            result = await session.execute(stmt)
-            count_active_advs: int | None = result.scalar()
-            count_active_advs = count_active_advs or 0
-            return count_active_advs
+    async def get_advs_count(session: AsyncSession, shop_id: str) -> int:
+        stmt = (
+            select(func.count(AdvSetting.id))
+            .join(AdvSetting.wb_cabinet)
+            .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active == True)
+        )
+        result = await session.execute(stmt)
+        count_active_advs: int | None = result.scalar()
+        count_active_advs = count_active_advs or 0
+        return count_active_advs
 
-    async def get_month_tariff_for_count_advs(self, shop_id: str) -> int:
+    async def get_month_tariff_for_count_advs(self, session: AsyncSession, shop_id: str) -> int:
         """
         Возвращает стоимость за все артикулы в зависимости от количества артикулов.
         Цена за месяц = цена_тарифа * количество_артикулов
         """
-        count = await self.get_advs_count(shop_id)
+        count = await self.get_advs_count(session, shop_id)
         base_tariff: int | float = self.get_price_for_count_advs_in_cabinet_for_month(count)
-
-        automatic_tariff: int = await self.get_automactic_tariff(shop_id)
-
+        automatic_tariff: int = await self.get_automactic_tariff(session, shop_id)
         return int(base_tariff + automatic_tariff)
+
+
 
     @staticmethod
     def get_tariff_for_day(tariff_for_month: int) -> float:
         return round(tariff_for_month / 30, 2)
 
-    async def get_price_for_day_for_shop(self, shop_id: str) -> int | float:
-        price_for_month_for_shop = await self.get_month_tariff_for_count_advs(shop_id)
+    async def get_price_for_day_for_shop(self, session: AsyncSession, shop_id: str) -> int | float:
+        price_for_month_for_shop = await self.get_month_tariff_for_count_advs(session, shop_id)
         price_for_day = self.get_tariff_for_day(price_for_month_for_shop)
         return price_for_day
 
@@ -65,38 +65,40 @@ class Pricer:
     def get_payment_for_adv(sum_payment: int, count_advs: int) -> float:
         return sum_payment / count_advs
 
-    async def get_automactic_tariff(self, shop_id: str) -> int:
-        month_tariff_for_white_list_auto_updater = await self._get_month_tariff_for_white_list_updater(shop_id)
-        month_tariff_for_autoupdate_target_place = await self._get_month_tariff_for_autoupdate_target_place(shop_id)
+    async def get_automactic_tariff(self, session: AsyncSession, shop_id: str) -> int:
+        month_tariff_for_white_list_auto_updater = await self._get_month_tariff_for_white_list_updater(session,
+                                                                                                       shop_id)
+        month_tariff_for_autoupdate_target_place = await self._get_month_tariff_for_autoupdate_target_place(session,
+                                                                                                            shop_id)
         return month_tariff_for_white_list_auto_updater + month_tariff_for_autoupdate_target_place
 
-    async def _get_month_tariff_for_white_list_updater(self, shop_id: str) -> int:
-        async with sm(read_only=True) as session:
-            stmt = (
-                select(func.count(AdvSetting.id))
-                .join(WBCabinet)
-                .where(
-                    WBCabinet.shop_id == shop_id,
-                    AdvSetting.auto_update_white_list == True,
-                )
+    @staticmethod
+    async def _get_month_tariff_for_white_list_updater(session: AsyncSession, shop_id: str) -> int:
+        stmt = (
+            select(func.count(AdvSetting.id))
+            .join(WBCabinet)
+            .where(
+                WBCabinet.shop_id == shop_id,
+                AdvSetting.auto_update_white_list == True,
             )
-            result = await session.execute(stmt)
-            count = result.scalar() or 0
-            count = int(count)
-            sum_result: int = count * settings.WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF
-            return sum_result
+        )
+        result = await session.execute(stmt)
+        count = result.scalar() or 0
+        count = int(count)
+        sum_result: int = count * settings.WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF
+        return sum_result
 
-    async def _get_month_tariff_for_autoupdate_target_place(self, shop_id: str) -> int:
-        async with sm(read_only=True) as session:
-            stmt = (
-                select(func.count(AdvSetting.id))
-                .join(WBCabinet)
-                .where(
-                    WBCabinet.shop_id == shop_id,
-                    AdvSetting.auto_update_target_place == True,
-                )
+    @staticmethod
+    async def _get_month_tariff_for_autoupdate_target_place(session: AsyncSession, shop_id: str) -> int:
+        stmt = (
+            select(func.count(AdvSetting.id))
+            .join(WBCabinet)
+            .where(
+                WBCabinet.shop_id == shop_id,
+                AdvSetting.auto_update_target_place == True,
             )
-            result = await session.execute(stmt)
-            count = result.scalar() or 0
-            count = int(count)
-            return count * settings.AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF
+        )
+        result = await session.execute(stmt)
+        count = result.scalar() or 0
+        count = int(count)
+        return count * settings.AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF
