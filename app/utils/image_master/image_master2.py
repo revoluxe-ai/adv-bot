@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class ImageMaster:
-    def __init__(self, load_indexes=False):
+    def __init__(self, load_indexes=False) -> None:
         im_tools = image_tools
         self._im_tools = im_tools
         current_folder = os.path.dirname(os.path.abspath(__file__))
