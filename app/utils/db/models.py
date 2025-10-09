@@ -20,6 +20,7 @@ from app.utils.db.base import BaseTable
 
 
 class User(BaseTable):
+    # TODO Модель расшарена, отрефакторить перед изменениями
     user_telegram_id: Mapped[int] = mapped_column(BIGINT, nullable=False, unique=True)
     username: Mapped[str] = mapped_column(String, nullable=True)
     wb_user_cabinets: Mapped[list["WBUserCabinet"]] = relationship(

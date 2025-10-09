@@ -154,6 +154,8 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             for adv in adv_settings:
                 if not adv.bot_active and adv.active_status == adv.ActiveStatuses.DONE.value:
                     continue
+                if not adv.search_adv_id:
+                    continue
                 name = adv.name
                 nmids = list(adv.nmids)
                 nmids = [str(nmid) for nmid in nmids]
