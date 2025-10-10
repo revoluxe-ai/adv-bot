@@ -6,6 +6,8 @@ from app.modules.common_slaves.wildberries.models import WBItemPosition
 from app.modules.wb_keywords_parser.parsing_found_redis_manager import (
     ParsingFoundRedisManager,
 )
+from app.modules.wb_keywords_parser.wb_parser.parsing_queue_mode import ParsingQueueMode
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +17,11 @@ class ParsingQueueManager:
         self.redis_manager = ParsingFoundRedisManager()
 
     async def add_found_not_found_page(
-        self,
-        text: str,
-        positions: list[WBItemPosition],
-        need_nmids: set[int],
-        page: int,
+            self,
+            text: str,
+            positions: list[WBItemPosition],
+            need_nmids: set[int],
+            page: int,
     ) -> None:
         my_positions_dict: dict[int, WBItemPosition] = {
             pos.nmid: pos for pos in positions if pos.nmid in need_nmids
@@ -37,7 +39,8 @@ class ParsingQueueManager:
         found_pages_all = []
         not_found_pages_all = []
         remaining_pages_all = set(range(1, max_pages + 1))
-
+        if settings.PARSING_QUEUE_MODE == ParsingQueueMode.SIMPLE_QUEUE:
+            return list(range(1, max_pages + 1))
         for nmid in need_nmids:
             found_pages: list[int] = await self.redis_manager.get_found_pages_for_text_nmid(
                 text, nmid

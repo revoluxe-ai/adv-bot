@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 import dotenv
+
+if TYPE_CHECKING:
+    from app.modules.wb_keywords_parser.wb_parser.parsing_queue_mode import ParsingQueueMode
 
 dotenv.load_dotenv()
 import os
@@ -363,6 +368,19 @@ class Settings:
         elif value == "true":
             return True
         raise ValueError("Не верное значение")
+
+    @property
+    def PARSING_QUEUE_MODE(self) -> 'ParsingQueueMode':
+        value = os.environ.get("PARSING_QUEUE_MODE")
+        from app.modules.wb_keywords_parser.wb_parser.parsing_queue_mode import ParsingQueueMode
+        if value is None:
+            return ParsingQueueMode.SIMPLE_QUEUE
+        value = value.lower()
+        if value == "simple_queue":
+            return ParsingQueueMode.SIMPLE_QUEUE
+        elif value == "smart_queue":
+            return ParsingQueueMode.SMART_QUEUE
+        raise ValueError("Не верное значение в PARSING_QUEUE_MODE")
 
 
 settings = Settings()
