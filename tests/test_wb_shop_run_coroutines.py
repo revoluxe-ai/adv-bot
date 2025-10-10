@@ -22,16 +22,9 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
     # Создаем экземпляр WBShop
     wb_shop = WBShop(wb_api_mock, redis_manager_mock)
 
-    # Создаем мок для CoroutinesManager
+    # Создаем мок для CoroutinesManager (только активные методы)
     coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.parsing_keywords_run = AsyncMock()
-    coroutines_manager_mock.update_advs_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cards_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cpm_bid = AsyncMock()
-    coroutines_manager_mock.update_common_sale_stat = AsyncMock()
-    coroutines_manager_mock.update_full_adv_stat = AsyncMock()
-    coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
-    coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
+    coroutines_manager_mock.update_cpm_bid_in_search_advs = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -48,15 +41,8 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
             # Вызываем тестируемый метод
             await wb_shop.run()
 
-            # Проверяем, что все ожидаемые корутины были вызваны
-            coroutines_manager_mock.parsing_keywords_run.assert_called_once()
-            coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
-            coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
-            coroutines_manager_mock.update_cpm_bid.assert_called_once()
-            coroutines_manager_mock.update_common_sale_stat.assert_called_once()
-            coroutines_manager_mock.update_full_adv_stat.assert_called_once()
-            coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
-            coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
+            # Проверяем, что активный метод был вызван
+            coroutines_manager_mock.update_cpm_bid_in_search_advs.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -75,16 +61,9 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
     # Создаем экземпляр WBShop
     wb_shop = WBShop(wb_api_mock, redis_manager_mock)
 
-    # Создаем мок для CoroutinesManager
+    # Создаем мок для CoroutinesManager (только активные методы)
     coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.parsing_keywords_run = AsyncMock()
-    coroutines_manager_mock.update_advs_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cards_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cpm_bid = AsyncMock()
-    coroutines_manager_mock.update_common_sale_stat = AsyncMock()
-    coroutines_manager_mock.update_full_adv_stat = AsyncMock()
-    coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
-    coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
+    coroutines_manager_mock.update_cpm_bid_in_search_advs = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -105,17 +84,8 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines():
             # Получаем все аргументы, с которыми был вызван gather
             call_args = mock_gather.call_args[0]
 
-            # Проверяем, что gather был вызван с 9 аргументами (8 корутин + _alive_worker_run)
-            assert (
-                len(call_args) == 9
-            ), f"asyncio.gather должен быть вызван с 9 аргументами, получено {len(call_args)}"
+            # Проверяем, что gather был вызван с 2 аргументами (1 корутина + _alive_worker_run)
+            assert len(call_args) == 2, f"asyncio.gather должен быть вызван с 2 аргументами, получено {len(call_args)}"
 
-            # Проверяем, что все методы были вызваны по одному разу
-            coroutines_manager_mock.parsing_keywords_run.assert_called_once()
-            coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
-            coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
-            coroutines_manager_mock.update_cpm_bid.assert_called_once()
-            coroutines_manager_mock.update_common_sale_stat.assert_called_once()
-            coroutines_manager_mock.update_full_adv_stat.assert_called_once()
-            coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
-            coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
+            # Проверяем, что только активный метод был вызван
+            coroutines_manager_mock.update_cpm_bid_in_search_advs.assert_called_once()
