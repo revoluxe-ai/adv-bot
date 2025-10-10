@@ -37,11 +37,11 @@ class ShopMenu(TextWithKeyboard):
     parse_mode = ParseMode.HTML
 
     def __init__(
-        self,
-        bot: Bot,
-        chat_id: int,
-        state: FSMContext,
-        wb_user_cabinet_original_id: int,
+            self,
+            bot: Bot,
+            chat_id: int,
+            state: FSMContext,
+            wb_user_cabinet_original_id: int,
     ):
         self._user_telegram_id = chat_id
         self._state = state
@@ -111,8 +111,8 @@ class ShopMenu(TextWithKeyboard):
                 # 5. Расчет метрик для тарификации
                 if self.is_active_adv:
                     shop_id = self._wb_cabinet.shop_id
-                    self.price_for_month_for_shop = await self._pricer.get_month_tariff_for_count_advs(shop_id)
-                    self.total_amount_for_day = await self._pricer.get_price_for_day_for_shop(shop_id)
+                    self.price_for_month_for_shop = await self._pricer.get_month_tariff_for_count_advs(session, shop_id)
+                    self.total_amount_for_day = await self._pricer.get_price_for_day_for_shop(session, shop_id)
                 else:
                     self.price_for_month_for_shop = 0
                     self.total_amount_for_day = 0
