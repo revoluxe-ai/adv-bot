@@ -66,8 +66,26 @@ class ParserService:
                 products, cluster, preset, total_items = data
             else:
                 return []
-            if total_items:
-                total_pages.total_pages = total_items // 100 + 1
+            if total_items is not None:
+                # WB возвращает общее количество товаров. Если текущая страница
+                # оказывается больше доступного количества страниц, необходимо
+                # прекратить обработку и вернуть пустой результат, чтобы не
+                # использовать данные от первой страницы.
+                if total_items <= 0:
+                    total_pages.total_pages = 0
+                    return []
+
+                max_pages = total_items // 100 + (1 if total_items % 100 else 0)
+                total_pages.total_pages = max_pages
+
+                if page > max_pages:
+                    logger.debug(
+                        "Страница %s превышает общее количество страниц %s для ключа %s",
+                        page,
+                        max_pages,
+                        text,
+                    )
+                    return []
         except Exception as e:
             logger.debug(f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True)
             del e
