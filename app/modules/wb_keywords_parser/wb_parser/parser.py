@@ -66,8 +66,17 @@ class ParserService:
                 products, cluster, preset, total_items = data
             else:
                 return []
-            if total_items:
-                total_pages.total_pages = total_items // 100 + 1
+            if total_items is not None:
+                max_page = (total_items + 99) // 100 if total_items else 0
+                total_pages.total_pages = max_page
+                if max_page and page > max_page:
+                    logger.info(
+                        "Страница %s превышает максимальное количество страниц %s для ключа %s",
+                        page,
+                        max_page,
+                        text,
+                    )
+                    return []
         except Exception as e:
             logger.debug(f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True)
             del e
