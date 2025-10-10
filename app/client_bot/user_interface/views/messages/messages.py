@@ -38,6 +38,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBItemPosition,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.wb_adv_updater import data_manager
@@ -302,12 +303,20 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         else:
             max_cpc_text = f"Максимальная стоимость клика: {max_cpc} р."
 
+        # Determine predict CTR mode display text
+        predict_ctr_mode = self.adv.predict_ctr_mode or PredictCTRMode.V1
+        if predict_ctr_mode == PredictCTRMode.V1:
+            predict_ctr_mode_text = "v1 (по ID кампании)"
+        else:
+            predict_ctr_mode_text = "v2 (по артикулам товара)"
+
         text = (
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
             f"📌 Статус: {self.adv.active_status}\n"
             f"🎯 Минимальный CTR для кампании: {self._min_ctr} \n"
             f"🔢 Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n"
+            f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
             f"Последнее обновление обобщенной статистики ключевых слов в базе: {self.last_update_keyword_stat_str}\n"
             f"Последнее обновление минус-слов в авто-кампании: {self.keywords_status_last_update_auto_adv}\n"
             f"Последнее обновление минус-слов в аукционе: {self.keywords_status_last_update_search_adv}\n"
