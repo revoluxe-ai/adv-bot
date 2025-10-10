@@ -221,8 +221,7 @@ class ShopMenu(TextWithKeyboard):
             await self._load_all_data()
         except Exception as e:
             logger.error(f"Критическая ошибка в ShopMenu.__call__: {e}", exc_info=True)
-            del e
-            return  # Прерываем выполнение в случае ошибки
+            raise e
 
         # Проверка и обработка токенов только если это необходимо
         # Вызов метода _process_tokens закомментирован, так как из кода видно,
