@@ -5,7 +5,6 @@ from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable
 from datetime import datetime
 from typing import (
     Any,
-    Protocol,
     TypeVar,
 )
 
@@ -29,7 +28,6 @@ from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
     GlobalParsingQueueManager,
 )
 from app.settings import settings
-
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
@@ -41,10 +39,6 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-
-class CoroutinesManagerProtocol(Protocol):
-    def test(self):
-        ...
 
 
 class CoroutinesManager:
@@ -120,15 +114,10 @@ class CoroutinesManager:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
         return None
 
-    # @staticmethod
-    # async def _update_adv_data_from_wb_to_pg(
-    #     shop_data_updater: ShopDataUpdater,
-    # ) -> None:
-    #     await shop_data_updater.update_advs_data()
 
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-        shop_data_updater: ShopDataUpdater,
+            shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -140,7 +129,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _async_zip_longest(
-        *async_gens, fillvalue=None
+            *async_gens, fillvalue=None
     ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
