@@ -1,3 +1,5 @@
+# app/modules/wb_adv_updater/update_wb_adv_phrases_in_neo.py
+
 import asyncio
 import logging
 from collections.abc import Sequence

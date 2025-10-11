@@ -182,7 +182,7 @@ class WBToken(BaseTable):
     shop_id: Mapped[str | None] = mapped_column(String, nullable=True)
     __table_args__ = (
         UniqueConstraint("api_key", "user_id", name="_api_key_user_id_uc"),
-        Index("idx_shop_id", "shop_id"),
+        Index("idx_shop_id", "shop_id"),  # Индекс для shop_id
     )
 
     @property
@@ -229,6 +229,7 @@ class WBToken(BaseTable):
 
     @property
     def read_only(self) -> bool:
+        # Проверяем, содержится ли категория "Токен только на чтение" в категориях
         return "Токен только на чтение" in self.categories
 
     @property
@@ -244,12 +245,13 @@ class WBToken(BaseTable):
             8: "Рекомендации",
             30: "Токен только на чтение",
         }
-        s = self.get_payload("s")
+        s = self.get_payload(
+            "s",
+        )
         categories = set()
-        if isinstance(s, int):
-            for bit_position, category_name in categories_map.items():
-                if s & (1 << bit_position):
-                    categories.add(category_name)
+        for bit_position, category_name in categories_map.items():
+            if s & (1 << bit_position):
+                categories.add(category_name)
         return categories
 
 
@@ -329,12 +331,13 @@ class AdvSetting(BaseTable):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self._search_adv_id: int = None
         self._worst_promo_position = None
 
     def __repr__(self):
-        return (f"name: {self.name}, adverdId: {self.adv_id},"
-                f" bot_active: {self.bot_active}, active_status: {self.active_status}")
+        return (f"name: {self.name},"
+                f" adverdId: {self.adv_id},"
+                f"bot_active: {self.bot_active},"
+                f" active_status: {self.active_status}")
 
     favorite_users: Mapped[list[User]] = relationship(
         "User", secondary=favorite_advs_association, back_populates="favorites_advs"
@@ -472,15 +475,6 @@ class AdvSetting(BaseTable):
             return None
         return int(match.group(1))
 
-    # @search_adv_id.setter
-    # def search_adv_id(self, value: int):
-    #     assert isinstance(value, int)
-    #     self._search_adv_id = value
-
-    # @search_adv_id.setter
-    # def search_adv_id(self, value: int) -> None:
-    #     assert isinstance(value, int)
-    #     self._search_adv_id = value
 
     @property
     def max_pay_for_order(self) -> int | None:

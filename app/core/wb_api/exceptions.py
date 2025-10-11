@@ -23,10 +23,6 @@ class ApiErrorWithCode(Exception):
         )
 
 
-class NotValidTokenError(Exception):
-    pass
-
-
 class TokenExpiredError(Exception):
     def __init__(self, text):
         self.text = text
@@ -52,10 +48,6 @@ class TooManyRequests(Exception):
     pass
 
 
-class BadRequestError(Exception):
-    error_message: str
-
-
 class NotValidDataError(Exception):
     pass
 
@@ -73,4 +65,9 @@ class NotMatchWBApiError(Exception):
 
 
 class MinAdvBidWBApiError(Exception):
+    def __init__(self, new_min_bid: int):
+        self.new_min_bid = new_min_bid
+        m = "Минимальная ставка изменилась"
+        super().__init__(f"{m} new_min_bid: {self.new_min_bid}")
+
     new_min_bid: int

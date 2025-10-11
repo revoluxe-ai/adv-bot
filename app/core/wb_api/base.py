@@ -7,7 +7,6 @@ from typing import TypeVar
 from aiohttp import ClientSession
 
 from app.utils.db.session_maker import get_async_session_maker as sm
-
 from .exceptions import ApiForbiddenError
 
 if typing.TYPE_CHECKING:
@@ -17,11 +16,7 @@ from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinet
 
 logger = logging.getLogger(__name__)
 
-
 T = TypeVar("T")
-
-
-# !!!устаревший класс, новый тут app/core/wb_api/base_wb_api_v2.py!!!
 
 
 # TODO: АРХИТЕКТУРНАЯ ПРОБЛЕМА - Дублирование базовых классов API [СРЕДНИЙ ПРИОРИТЕТ]
@@ -31,7 +26,9 @@ T = TypeVar("T")
 class BaseAPI:
     HOST = "wildberries.ru"
 
-    def __init__(self, wb_access: WBCabinetAccess, client_session: ClientSession) -> None:
+    def __init__(self,
+                 wb_access: WBCabinetAccess,
+                 client_session) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
         tokens: list[WBToken] = wb_access.tokens
@@ -67,7 +64,7 @@ class BaseAPI:
     @staticmethod
     def chunks(lst: list[T], n: int) -> Generator[list[T], None, None]:
         for i in range(0, len(lst), n):
-            yield lst[i : i + n]
+            yield lst[i: i + n]
 
     async def set_next_token(self, method_name: str) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
