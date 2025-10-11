@@ -6,14 +6,13 @@ from multiprocessing import Process
 
 import dotenv
 import psutil
-from typing import NoReturn
+from typing import NoReturn, Callable, Never, Coroutine, Any
 
 # Use direct imports to avoid any re-export typing issues
 from app.core.di.di_manager import DIManager
 from app.core.di.app_container import AppContainer
 from app.modules.wb_adv_updater.runner import (
-    run_main_coroutines,
-    run_update_all_keywords_on_wb,
+    run_main_coroutines, run_update_all_keywords_on_wb,
 )
 from python_modules.logger import setup_logging
 
