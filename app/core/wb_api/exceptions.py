@@ -1,7 +1,4 @@
-from typing import TYPE_CHECKING, Union
-
-if TYPE_CHECKING:
-    import new
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 
 class MaxAttemptsError(Exception):
@@ -24,23 +21,21 @@ class ApiErrorWithCode(Exception):
 
 
 class TokenExpiredError(Exception):
-    def __init__(self, text):
+    def __init__(self, text: str) -> None:
         self.text = text
-        m = "Срок действия токена истек"
-        super().__init__(f"{m} text: {self.text}")
+        super().__init__(f"Token expired: {self.text}")
 
 
 class TokensFromDifferentShopsError(BaseException):
-    def __init__(self):
-        m = "Токены принадлежат разным магазинам"
+    def __init__(self, m: str) -> None:
         super().__init__(f"{m}")
 
 
 class ApiForbiddenError(Exception):
-    def __init__(self, text, wb_user_cabinet: Union["new.types.WBUserCabinet", None] = None):
+    def __init__(self, text: str, wb_user_cabinet: WBUserCabinet | None = None):
         self.text = text
         self.wb_user_cabinet = wb_user_cabinet
-        m = "API доступ запрещен"
+        m = "API доступ запрещён"
         super().__init__(f"{m} text: {self.text}")
 
 
@@ -65,9 +60,7 @@ class NotMatchWBApiError(Exception):
 
 
 class MinAdvBidWBApiError(Exception):
-    def __init__(self, new_min_bid: int):
+    def __init__(self, new_min_bid: int) -> None:
         self.new_min_bid = new_min_bid
-        m = "Минимальная ставка изменилась"
+        m = "Минимальная ставка изменена"
         super().__init__(f"{m} new_min_bid: {self.new_min_bid}")
-
-    new_min_bid: int
