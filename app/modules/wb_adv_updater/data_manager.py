@@ -1,4 +1,3 @@
-import asyncio
 import cProfile
 import io
 import json
@@ -286,7 +285,8 @@ async def set_positions(
         text_to_position = {position.keyword_text: position for position in positions}
     except Exception as e:
         logger.warning(
-            f"Ошибка {e} получения позиций из Redis для арк {adv_setting.adv_id}"
+            f"Ошибка {e}получения позиций из Redis для арк {adv_setting.adv_id}"
+
         )
         return keyword_stats
     for keyword_stat in keyword_stats:
@@ -374,6 +374,7 @@ def __calculate_clusters(
 
         cluster_keyword = CalculatedKeyword(
             text=keyword_cluster_name, views=views, clicks=clicks, spend=spend
+
         )
         cluster_keyword.query = str(query) if query else "<50"
         cluster_keyword.childs_keywords = keywords
@@ -400,7 +401,9 @@ async def convert_keyword_stats_in_clusters(
     try:
         text_to_custer_and_present: dict[
             str, tuple[str, int]
-        ] = await redis_manager.get_clusters_and_presets(texts)
+        ] = (
+            await redis_manager.get_clusters_and_presets(texts)
+        )
     except Exception as e:
         logger.error(
             f"Ошибк {e} получения кластеров и пресетов: {texts}", exc_info=True
@@ -437,46 +440,10 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> FullAdvStat | 
         return None
 
 
-# async def get_max_cpc(adv: AdvSetting)-> Optional[int]:
-#     max_cpc = await get_max_cpc_from_max_pay_for_order(adv)
-#     if max_cpc and adv.max_cpc:
-#         return min(max_cpc, adv.max_cpc)
-#     if not max_cpc:
-#         return adv.max_cpc
-#     if not adv.max_cpc:
-#         return max_cpc
-
-#
-# async def get_max_cpc_from_max_pay_for_order(adv: AdvSetting)-> Optional[int]:
-#     max_pay_for_order: Optional[int]  = adv.max_pay_for_order
-#     if not max_pay_for_order:
-#         return None
-#     all_keywords = await data_manager
-#     cpm_now = await get_cpm_by_nmid(adv.nmids[0])
-#     if not cpm_now:
-#         return None
-#     full_stat: FullAdvStat = await get_full_adv_stat_for_adv_id_from_redis(adv.adv_id)
-#     if not full_stat:
-#         return None
-#     else:
-#         clicks = full_stat.clicks + 1
-#         orders = full_stat.orders + 1
-#         need_clicks_for_order = clicks/orders
-#         max_cpc = max_pay_for_order / need_clicks_for_order
-#         return max_cpc
-
-
-# @profile
 async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
-    max_cpc = None
-    if not max_cpc:
-        max_cpc = int(max_cpc) if max_cpc is not None else None
-    else:
-        adv_max_cpc = getattr(adv, "max_cpc", None)
-        if max_cpc and adv_max_cpc and max_cpc > adv_max_cpc:
-            max_cpc = adv_max_cpc
+
     keywords: list[CalculatedKeyword] = await get_good_bad_phrases_for_min_ctr(
-        adv, max_cpc
+        adv, adv.max_cpc
     )
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
@@ -684,7 +651,9 @@ async def get_good_bad_phrases_for_min_ctr(
         original_predict_ctr = text_to_predict_ctr.get(text, None)
         keyword_stat.original_predict_ctr = original_predict_ctr
 
-    keyword_stats = __set_predict_ctr(keyword_stats, min_ctr, adv_setting)
+    keyword_stats = __set_predict_ctr(
+        keyword_stats, min_ctr, adv_setting
+    )
 
     best_keyword: CalculatedKeyword | None = get_best_keyword(keyword_stats)
     if best_keyword:
@@ -722,7 +691,7 @@ async def get_good_bad_phrases_for_min_ctr(
         if (
             not original_predict_ctr
             and enough_views / 2 > keyword_stat.views
-            and not (getattr(adv_setting, "min_views_for_ml_predict", None) or 0)
+            and not adv_setting.min_views_for_ml_predict
             and keyword_stat.hard_status in [1, 2]
         ):
             keyword_stat.status = KeywordStatus.GOOD
@@ -757,8 +726,7 @@ async def get_good_bad_phrases_for_min_ctr(
             keyword_stat.reason = "baes_ctr_more_than_min_ctr"
         else:
             assert keyword_stat.views is not None
-            min_views_ml = getattr(adv_setting, "min_views_for_ml_predict", None) or 0
-            if keyword_stat.views < min_views_ml:
+            if keyword_stat.views < adv_setting.min_views_for_ml_predict:
                 keyword_stat.status = KeywordStatus.GOOD
                 keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
             else:
@@ -803,7 +771,9 @@ async def get_good_bad_phrases_for_min_ctr(
                 assert value is not None
             except AssertionError:
                 # TODO: Удалить из всего проекта f-строки из логирования
-                logger.error(f"Ошибка в значении {property} для {keyword_stat.text}: {value}")
+                logger.error(
+                    f"Ошибка в значении {property} для {keyword_stat.text}: {value}"
+                )
 
     logger.debug("Слова по assert проверены")
     logger.debug("Возвращаю итоговую статистику")
@@ -853,10 +823,11 @@ async def __download_and_resize_image(
                 with Image.open(image_file) as img:
                     # Масштабируем изображение, сохраняя пропорции
                     img.thumbnail((max_size, max_size))
-                    # Безопасно сохраняем изображение в JPEG с обработкой альфаканала
-                    # Image processing temporarily disabled
-                    # TODO: Implement proper image handling
-                    return image_data if image_data else None
+
+                    # Сохраняем изображение в BytesIO объект
+                    with io.BytesIO() as output:
+                        img.save(output, format="JPEG")
+                        return output.getvalue()
 
 
 async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
@@ -871,9 +842,7 @@ async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
     adv_keyword_text_in_black_list: list[tuple[int, str]] = []
     for keyword_setting in keyword_settings:
         adv_setting = keyword_setting.adv_setting
-        adv_keyword_text_in_black_list.append(
-            (adv_setting.adv_id, str(keyword_setting.text))
-        )
+        adv_keyword_text_in_black_list.append((adv_setting.adv_id, str(keyword_setting.text)))
     return adv_keyword_text_in_black_list
 
 
@@ -890,7 +859,8 @@ async def get_adv_keyword_text_in_white_list() -> list[tuple[int, str]]:
     for keyword_setting in keyword_settings:
         adv_setting = keyword_setting.adv_setting
         adv_keyword_text_in_white_list.append(
-            (adv_setting.adv_id, str(keyword_setting.text))
+            (adv_setting.adv_id, str(keyword_setting.text)
+        )
         )
 
     return adv_keyword_text_in_white_list
@@ -934,13 +904,11 @@ async def get_adv_id_to_min_ctr(adv_ids: list[int]) -> dict[int, float]:
     return adv_id_to_min_ctr
 
 
-async def get_adv_id_keyword_text_to_status(
-    adv_ids: list[int],
-) -> dict[tuple[int, str], int]:
+async def get_adv_id_keyword_text_to_status(adv_ids: list[int]):
     async with _sm() as session:
         # Используем только необходимые колонки и убираем лишние алиасы
         stmt = (
-            select(AdvSetting.adv_id, KeywordSetting.text)
+            select(AdvSetting.adv_id, KeywordSetting.text, KeywordSetting.hard_status)
             .join(KeywordSetting, AdvSetting.id == KeywordSetting.adv_setting_id)
             .where(AdvSetting.adv_id.in_(adv_ids))
         )
@@ -949,10 +917,7 @@ async def get_adv_id_keyword_text_to_status(
         result = await session.execute(stmt)
 
         # Извлекаем данные в виде словаря сразу в процессе итерации по результату
-        adv_id_keyword_text_to_status = {
-            (row.adv_id, row.text): 1
-            for row in result  # Default hard_status to 1
-        }
+        adv_id_keyword_text_to_status = {(row.adv_id, row.text): row.hard_status for row in result}
 
     return adv_id_keyword_text_to_status
 
@@ -1028,15 +993,13 @@ async def _get_new_min_ctr(adv: AdvSetting) -> float:
             adv.adv_id, keyword.text
         )
 
-    if best_keyword:
-        logger.debug(
-            f"Лучшее ключевое слово {best_keyword.text} с рейтингом {best_keyword.rating_by_predict_ctr}"
-        )
-        best_predict_ctr = best_keyword.predict_ctr
-        if not best_predict_ctr:
-            return 0.09
-        return best_predict_ctr
-    else:
+    if best_keyword:logger.debug(
+        f"Лучшее ключевое слово {best_keyword.text} с рейтингом {best_keyword.rating_by_predict_ctr}"
+    )
+    best_predict_ctr = best_keyword.predict_ctr
+    if not best_predict_ctr:
+        return 0.09
+    return best_predict_ctrelse:
         return 0.09
 
 
@@ -1486,7 +1449,7 @@ async def get_max_adv_bid(adv_setting: AdvSetting) -> float:
         if not best_keyword:
             return setting_max_bid
         convert_views_to_order = views / orders
-        ctr = best_keyword.predict_ctr
+        ctr: int = best_keyword.predict_ctr
         if not ctr:
             return setting_max_bid
         max_bid_for_1000_views = (
