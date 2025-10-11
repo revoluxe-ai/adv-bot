@@ -2,12 +2,12 @@ import logging
 import typing
 from collections import defaultdict
 from collections.abc import Generator
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 from aiohttp import ClientSession
-import aiohttp
 
 from app.utils.db.session_maker import get_async_session_maker as sm
+
 from .exceptions import ApiForbiddenError
 
 if typing.TYPE_CHECKING:
@@ -22,6 +22,9 @@ from ...modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+# !!!устаревший класс, новый тут app/core/wb_api/base_wb_api_v2.py!!!
 
 
 # TODO: АРХИТЕКТУРНАЯ ПРОБЛЕМА - Дублирование базовых классов API [СРЕДНИЙ ПРИОРИТЕТ]
@@ -82,16 +85,14 @@ class BaseAPI:
         ]
 
         free_tokens = [
-            token
-            for token in self._free_tokens
-            if token.id not in all_bad_token_original_ids
+            token for token in self._free_tokens if token.id not in all_bad_token_original_ids
         ]
 
         if free_tokens:
             self._current_token = free_tokens[0]
             self.headers = Headers(self._current_token)
         else:
-            wb_cabinet: Optional["WBCabinet"] = self.access.wb_cabinet
+            wb_cabinet: WBCabinet | None = self.access.wb_cabinet
             if wb_cabinet is None:
                 raise ApiForbiddenError(
                     "Нет WBCabinet для деактивации, метод set_next_token не может быть использован"
