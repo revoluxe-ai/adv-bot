@@ -57,7 +57,7 @@ class CoroutinesManager:
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
 
-    @while_coroutine_decorator(3, 60)
+    @while_coroutine_decorator(60, 60)
     async def update_cpm_bid(self) -> None:
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
