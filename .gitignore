@@ -7,7 +7,7 @@ redis-data/
 node_modules/
 dist/
 group_adv_files/
-
+.dmypy.json
 */__pycache__
 
 # Compiled Java class files
