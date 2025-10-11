@@ -25,8 +25,7 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.core.wb_api import exceptions
+from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
@@ -190,10 +189,10 @@ class WBToken(BaseTable):
         try:
             result = jwt.decode(self.api_key, options={"verify_signature": False})
             if not isinstance(result, dict):
-                raise exceptions.NotValidTokenError
+                raise NotValidTokenError
             return cast(dict[str, object], result)
         except Exception:
-            raise exceptions.NotValidTokenError
+            raise NotValidTokenError
 
     def check_valid(self) -> bool:
         try:
@@ -215,7 +214,7 @@ class WBToken(BaseTable):
         exp = self.__payload.get("exp")
         if isinstance(exp, (int, float, str)):
             return datetime.datetime.fromtimestamp(int(exp))
-        raise exceptions.NotValidTokenError
+        raise NotValidTokenError
 
     @property
     def expires(self) -> datetime.datetime:
@@ -225,7 +224,7 @@ class WBToken(BaseTable):
         sid = self.get_payload("sid")
         if isinstance(sid, str):
             return sid
-        raise exceptions.NotValidTokenError
+        raise NotValidTokenError
 
     @property
     def read_only(self) -> bool:
