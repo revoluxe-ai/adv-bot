@@ -1,5 +1,4 @@
 import typing
-from typing import Any, Optional
 
 if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import WBUserCabinet
@@ -75,64 +74,10 @@ class BadRequestError(Exception):
         super().__init__(message, 400, response_text)
 
 class NotValidTokenError(Exception):
-    """Исключение для недействительного/tокена невалидного токена (совместимость)."""
-
     pass
-
-
-class ApiForbiddenError(Exception):
-    """Ошибка доступа API (для совместимости)."""
-
-    def __init__(
-        self,
-        message: str = "API access forbidden",
-        wb_user_cabinet: Optional["WBUserCabinet"] = None,
-    ) -> None:
-        super().__init__(message)
-        self.wb_user_cabinet = wb_user_cabinet
 
 
 class TooManyRequests(Exception):
     """Ошибка превышения лимита запросов (для совместимости)."""
-
-    pass
-
-
-class MaxAttemptsError(Exception):
-    """Ошибка превышения максимального количества попыток (для совместимости)."""
-
-    pass
-
-
-class UnknownApiRequestError(Exception):
-    """Неизвестная ошибка API запроса (для совместимости)."""
-
-    pass
-
-
-class ApiErrorWithCode(Exception):
-    """Ошибка API с кодом (для совместимости)."""
-
-    def __init__(self, code: int, message: str, rejection: Any | None = None) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.rejection = rejection
-
-
-class MinAdvBidWBApiError(Exception):
-    """Ошибка минимальной ставки (для совместимости)."""
-
-    def __init__(self, new_min_bid: int) -> None:
-        super().__init__()
-        self._new_min_bid = new_min_bid
-
-    @property
-    def new_min_bid(self) -> int:
-        return self._new_min_bid
-
-
-class NotMatchWBApiError(Exception):
-    """Ошибка несоответствия API (для совместимости)."""
 
     pass
