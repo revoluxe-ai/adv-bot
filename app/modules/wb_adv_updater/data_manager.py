@@ -969,31 +969,6 @@ def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | N
     return best_keyword
 
 
-async def _get_new_min_ctr(adv: AdvSetting) -> float:
-    keywords: list[CalculatedKeyword] = await get_keywords_statistic_clickhouse(
-        adv, timedelta(days=7)
-    )
-    best_keyword = get_best_keyword(keywords)
-    if not keywords:
-        return 0.05
-
-    for keyword in keywords:
-        position = await redis_manager.get_keyword_position(keyword.text, adv.nmids[0])
-        if not position or position.position == 0:
-            continue
-        keyword.predict_ctr = await redis_manager.get_predict_ctr(
-            adv.adv_id, keyword.text
-        )
-
-    if best_keyword:logger.debug(
-        f"Лучшее ключевое слово {best_keyword.text} с рейтингом {best_keyword.rating_by_predict_ctr}"
-    )
-    best_predict_ctr = best_keyword.predict_ctr
-    if not best_predict_ctr:
-        return 0.09
-    return best_predict_ctrelse:
-        return 0.09
-
 
 async def _get_min_ctr(adv: AdvSetting) -> float:
     async with _sm(read_only=True) as session:
