@@ -1,1 +1,0 @@
-# Адаптеры для Promotion API
