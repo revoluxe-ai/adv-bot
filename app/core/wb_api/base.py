@@ -11,8 +11,8 @@ from .exceptions import ApiForbiddenError
 
 if typing.TYPE_CHECKING:
     from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
-from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
-from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+    from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
+    from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +27,11 @@ class BaseAPI:
     HOST = "wildberries.ru"
 
     def __init__(self,
-                 wb_access: WBCabinetAccess,
-                 client_session) -> None:
+                 wb_access: 'WBCabinetAccess',
+                 client_session: ClientSession) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
-        tokens: list[WBToken] = wb_access.tokens
+        tokens: list['WBToken'] = wb_access.tokens
         self.access: WBCabinetAccess = wb_access
         if not tokens:
             raise ApiForbiddenError(
