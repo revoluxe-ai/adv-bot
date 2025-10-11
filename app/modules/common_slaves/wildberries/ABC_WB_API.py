@@ -2,15 +2,15 @@ import logging
 import os
 from abc import ABC
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from aiohttp import ClientSession
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-from . import models
-from .models import WBCabinet, WBToken
+if TYPE_CHECKING:
+    from .models import WBCabinet, WBToken
 
 __all__ = ["Headers"]
 
@@ -27,8 +27,8 @@ class WbRequestApiMixin(ABC):
 
 
 class Headers:
-    def __init__(self, token: models.WBToken):
-        self.current_token: models.WBToken = token
+    def __init__(self, token: 'WBToken'):
+        self.current_token: 'WBToken' = token
 
     @property
     def standart(self) -> dict[str, str]:
@@ -50,7 +50,7 @@ class ABC_WB_API(WbRequestApiMixin):
     def __init__(self, wb_access: "WBCabinetAccess", session: ClientSession) -> None:
         tokens: list[WBToken] = wb_access.tokens
         self.access = wb_access
-        wb_cabinet: WBCabinet = wb_access.wb_cabinet
+        wb_cabinet: Optional['WBCabinet'] = wb_access.wb_cabinet
         self.wb_cabinet = wb_cabinet
         assert wb_cabinet
         if not tokens:
