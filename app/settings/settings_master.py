@@ -222,9 +222,11 @@ class Settings:
 
     @property
     def MIN_SUM(self) -> int:
-        value = int(os.getenv("MIN_SUM"))
-        if value is None:
+        result = os.getenv("MIN_SUM")
+        if result is None:
             raise ValueError("MIN_SUM environment variable is not set")
+        assert result is not None
+        value = int(result)
         return value
 
     @property

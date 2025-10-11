@@ -3,7 +3,6 @@
 # TODO: Внедрить проверку библиотек-зависимостей перед деплоем
 
 import asyncio
-import logging
 import platform
 
 import dotenv
@@ -11,9 +10,10 @@ import dotenv
 from app.modules.shop_runner.exceptions import ShopRunnerCriticalError
 
 dotenv.load_dotenv()
-from app.core.di import AppContainer
 from app.modules.shop_runner import run_process_func
 from python_modules.logger import setup_logging
+from app.core.di import AppContainer
+import logging
 
 dotenv.load_dotenv()
 setup_logging()
@@ -23,7 +23,6 @@ if system == "Linux":
     import uvloop
 
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,9 @@
 import os
 
-import redis
+from redis.asyncio import Redis
+
+from app.settings import settings
 
 redis_host = os.environ.get("REDIS_HOST")
 
-
-redis_client = redis.asyncio.Redis(host=redis_host, port=6379, db=0)
+redis_client = Redis(host=redis_host, port=settings.REDIS_PORT, db=0)

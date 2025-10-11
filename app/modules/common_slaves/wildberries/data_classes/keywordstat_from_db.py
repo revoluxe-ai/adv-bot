@@ -1,6 +1,7 @@
 import datetime
 import json
-from typing import Annotated, Any
+from typing import Annotated
+from typing import Any
 
 from pydantic import BaseModel, PlainValidator
 
@@ -29,12 +30,6 @@ class KeywordStatus:
 
 
 class CalculatedKeyword(BaseModel):
-    # model_config = ConfigDict(
-    #     extra="forbid",
-    #     arbitrary_types_allowed=True,
-    #     frozen=True,  # Если возможно
-    # )
-
     text: str
     clicks: int
     views: int
@@ -77,8 +72,7 @@ class CalculatedKeyword(BaseModel):
 
     @property
     def rating_by_predict_ctr(self) -> float:
-        predict_ctr_exponent = self.predict_ctr_exponent
-        assert predict_ctr_exponent is not None
+        predict_ctr_exponent: float = self.predict_ctr_exponent
         rating = self.predict_ctr**predict_ctr_exponent * self.views
         return rating
 
@@ -130,7 +124,9 @@ class CalculatedKeyword(BaseModel):
             "hard_status": self.hard_status,
             "reason": self.reason,
             "position": self.position,
-            "position_update": (self.position_update.isoformat() if self.position_update else None),
+            "position_update": (
+                self.position_update.isoformat() if self.position_update else None
+            ),
             "query_static": self._query_static,
             "cluster_name": self.cluster_name,
             "preset": self.preset,
@@ -149,7 +145,9 @@ class CalculatedKeyword(BaseModel):
     def from_json(cls, json_str: str) -> "CalculatedKeyword":
         data = json.loads(json_str)
         data["position_update"] = (
-            validate_datetime(data["position_update"]) if data["position_update"] else None
+            validate_datetime(data["position_update"])
+            if data["position_update"]
+            else None
         )
         # Backward compatibility
         # 1) Map real_position -> position if no position

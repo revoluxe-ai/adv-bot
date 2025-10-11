@@ -3,13 +3,14 @@ import logging
 import time
 from functools import partial
 from multiprocessing import Process
-from typing import Any, Callable, Coroutine, Never
 
 import dotenv
 import psutil
 
 from app.modules.wb_adv_updater.runner import (
-    run_main_coroutines, run_update_all_keywords_on_wb, )
+    run_main_coroutines,
+    run_update_all_keywords_on_wb,
+)
 from python_modules.logger import setup_logging
 
 dotenv.load_dotenv()
