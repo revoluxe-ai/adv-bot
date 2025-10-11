@@ -1,4 +1,7 @@
-from app.modules.common_slaves.wildberries.models import WBUserCabinet
+import typing
+
+if typing.TYPE_CHECKING:
+    from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 
 class MaxAttemptsError(Exception):
@@ -32,7 +35,7 @@ class TokensFromDifferentShopsError(BaseException):
 
 
 class ApiForbiddenError(Exception):
-    def __init__(self, text: str, wb_user_cabinet: WBUserCabinet | None = None):
+    def __init__(self, text: str, wb_user_cabinet: typing.Optional['WBUserCabinet'] = None):
         self.text = text
         self.wb_user_cabinet = wb_user_cabinet
         m = "API доступ запрещён"
@@ -64,3 +67,7 @@ class MinAdvBidWBApiError(Exception):
         self.new_min_bid = new_min_bid
         m = "Минимальная ставка изменена"
         super().__init__(f"{m} new_min_bid: {self.new_min_bid}")
+
+
+class BadRequestError(Exception):
+    pass
