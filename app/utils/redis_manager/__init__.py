@@ -169,7 +169,7 @@ async def set_keyword_statistics(
     await redis_master_client.set(key, json_data, ex=cache_timeout)
 
 
-async def add_positions_to_redis(positions: list[WBItemPosition]) -> None:  # deprecated
+async def add_positions_to_redis(positions: list[WBItemPosition]) -> None:
     base_key = "adv_positions"
     for position in positions:
         position.timestamp = datetime.datetime.now()
@@ -178,7 +178,25 @@ async def add_positions_to_redis(positions: list[WBItemPosition]) -> None:  # de
         await redis_master_client.set(key, json.dumps(position_dict))
 
 
-async def get_keywords_positions(adv_setting, texts):  # deprecated
+async def get_keyword_position(keyword: str, nmid: int) -> WBItemPosition | None:
+    base_key = f"adv_positions:{keyword}:{nmid}"
+    json_data = await redis_replica_client.get(base_key)
+    if not json_data:
+        cluster, _ = await get_cluster_and_preset(keyword)
+        if not cluster:
+            return None
+        base_key = f"adv_positions:{cluster}:{nmid}"
+        json_data = await redis_replica_client.get(base_key)
+        if not json_data:
+            return None
+        else:
+            position = WBItemPosition.from_dict(json.loads(json_data))
+            return position
+    position = WBItemPosition.from_dict(json.loads(json_data))
+    return position
+
+
+async def get_keywords_positions(adv_setting, texts):
     keys = ["adv_positions:" + text + ":" + str(adv_setting.nmids[0]) for text in texts]
     results = await redis_replica_client.mget(keys)
     positions = []
@@ -409,31 +427,6 @@ async def get_cluster_name(text):
     return answer.decode("utf-8")
 
 
-# функция не работает и не используется
-# async def get_all_keywords_positions(text) -> list[WBItemPosition]:
-#     key_pattern = f'adv_positions:{text}:*'
-#     cursor = 0
-#     positions = []
-#
-#     while True:
-#         # Используем scan для поиска ключей
-#         cursor, keys = await redis_replica_client.scan(cursor=cursor, match=key_pattern)
-#
-#         # Получаем данные по всем ключам за один запрос с использованием mget
-#         if keys:
-#             json_data_list = await redis_replica_client.mget(*keys)
-#
-#             for json_data in json_data_list:
-#                 if json_data:
-#                     position = WBItemPosition.from_dict(json.loads(json_data))
-#                     positions.append(position)
-#
-#         # Если курсор вернулся в 0, значит, все ключи обработаны
-#         if cursor == 0:
-#             break
-#
-#     return positions
-
 async def get_keys(pattern):
     cursor = b"0"
     keys = []
@@ -443,27 +436,6 @@ async def get_keys(pattern):
         keys.extend(batch)
 
     return keys
-
-
-
-async def get_keyword_position(
-    keyword: str, nmid: int
-) -> WBItemPosition | None:  # deprecated
-    base_key = f"adv_positions:{keyword}:{nmid}"
-    json_data = await redis_replica_client.get(base_key)
-    if not json_data:
-        cluster, _ = await get_cluster_and_preset(keyword)
-        if not cluster:
-            return None
-        base_key = f"adv_positions:{cluster}:{nmid}"
-        json_data = await redis_replica_client.get(base_key)
-        if not json_data:
-            return None
-        else:
-            position = WBItemPosition.from_dict(json.loads(json_data))
-            return position
-    position = WBItemPosition.from_dict(json.loads(json_data))
-    return position
 
 
 async def get_all_cluster_names() -> set[str]:
