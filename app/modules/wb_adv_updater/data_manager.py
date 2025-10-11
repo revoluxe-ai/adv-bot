@@ -686,7 +686,6 @@ async def get_good_bad_phrases_for_min_ctr(
                         await redis_manager.set_auto_block_status(
                             int(keyword_setting.id), True
                         )
-                await asyncio.sleep(0)
                 continue
         if (
             not original_predict_ctr
@@ -696,28 +695,23 @@ async def get_good_bad_phrases_for_min_ctr(
         ):
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
-            await asyncio.sleep(0)
             continue
 
         if hard_status == 3:
             keyword_stat.status = KeywordStatus.BAD
             keyword_stat.reason = "turn_off"
-            await asyncio.sleep(0)
             continue
         if hard_status == 2:
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = "white_list"
-            await asyncio.sleep(0)
             continue
         elif hard_status == 0:
             keyword_stat.status = KeywordStatus.BAD
             keyword_stat.reason = "black_list"
-            await asyncio.sleep(0)
             continue
         if min_ctr == 0:
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = "min_ctr_is_zero"
-            await asyncio.sleep(0)
             continue
         baes_predict_ctr = keyword_stat.baes_predict_ctr
         assert baes_predict_ctr is not None
@@ -733,7 +727,6 @@ async def get_good_bad_phrases_for_min_ctr(
                 keyword_stat.status = KeywordStatus.BAD
                 keyword_stat.reason = "min_ctr"
         assert keyword_stat.predict_ctr
-        await asyncio.sleep(0)
     logger.debug("Проверяю статусы ключевых слов с assert")
 
     for keyword_stat in keyword_stats:
@@ -815,7 +808,6 @@ async def __download_and_resize_image(
     while True:
         async with session.get(url) as response:
             if response.status != 200:
-                await asyncio.sleep(1)
                 continue
             image_data = await response.read()
             # Открываем изображение используя BytesIO
@@ -1171,7 +1163,6 @@ async def clear_cards_in_db(nmids: list[int]) -> None:
         for card in wb_cards:
             await session.delete(card)
             await session.commit()
-            await asyncio.sleep(0)
 
 
 async def get_keywords_from_clickhouse(adv_id: int) -> list[str]:
