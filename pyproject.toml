@@ -168,8 +168,6 @@ mypy = "*"
 sqlalchemy = {extras = ["mypy"], version = "^2.0.43"}
 types-psutil = "^7.0.0.20250822"
 debugpy = "^1.8.17"
-poetry-types = "^0.6.0"
-no-implicit-optional = "^1.4"
 types-redis = "^4.6.0.20241004"
 
 [build-system]
