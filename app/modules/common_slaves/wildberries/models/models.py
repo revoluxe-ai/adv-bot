@@ -181,7 +181,6 @@ class WBToken(BaseTable):
 
     @property
     def __payload(self) -> dict[str, object]:
-        from .excs import NotValidTokenError
         try:
             result = jwt.decode(self.api_key, options={"verify_signature": False})
             if not isinstance(result, dict):
