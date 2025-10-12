@@ -1,23 +1,25 @@
 from abc import abstractmethod, ABC
 from typing import Any, Optional
 
-from app.core.redis_manager_v2.redis_client import RedisClient
+import typing
+
+if typing.TYPE_CHECKING:
+    from app.core.redis_manager_v2.redis_client import RedisClient
 
 
 class BaseRedisManager(ABC):
     prefix: str
     default_ttl: Optional[int] = None
 
-    def __init__(self, redis_client: RedisClient, ttl: Optional[int] = None) -> None:
+    def __init__(self, redis_client: "RedisClient", ttl: Optional[int] = None) -> None:
         self.__client = redis_client
         self._ttl: Optional[int] = ttl if ttl is not None else self.default_ttl
 
     @abstractmethod
-    def _get_key(self, *args: Any, **kwargs: Any) -> str:
-        ...
+    def _get_key(self, *args: Any, **kwargs: Any) -> str: ...
 
     @property
-    def _client(self) -> RedisClient:
+    def _client(self) -> "RedisClient":
         """Геттер для доступа к клиенту Redis"""
         return self.__client
 
