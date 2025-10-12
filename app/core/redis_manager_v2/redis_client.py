@@ -4,8 +4,6 @@ import asyncio
 from abc import ABC
 from typing import Any, cast, Mapping
 from typing import Awaitable, TypeVar
-from dependency_injector.wiring import inject, Provide
-from app.core.di.app_container import AppContainer
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
@@ -19,8 +17,7 @@ def ensure_awaitable(obj: Awaitable[T] | T) -> Awaitable[T]:
 
 
 class RedisClient(ABC):
-    @inject
-    def __init__(self, redis_client: Redis = Provide[AppContainer.redis_client]) -> None:
+    def __init__(self, redis_client: Redis) -> None:
         self._replica_read_client = redis_client
         self._replica_write_client = redis_client
 
@@ -106,10 +103,13 @@ class RedisClient(ABC):
         )
 
     async def scard(self, name: str) -> int:
-        return cast(int, await  ensure_awaitable( self._replica_read_client.scard(name)))
+        return cast(int, await ensure_awaitable(self._replica_read_client.scard(name)))
 
     async def sismember(self, name: str, value: str) -> bool:
-        return cast(bool, await  ensure_awaitable(self._replica_read_client.sismember(name, value)))
+        return cast(
+            bool,
+            await ensure_awaitable(self._replica_read_client.sismember(name, value)),
+        )
 
     # Методы для записи (через мастер)
     async def set(self, key: str, value: str | bytes, ex: int | None = None) -> bool:
@@ -227,9 +227,9 @@ class RedisClient(ABC):
         return cast(list[Any], results)
 
     async def execute_pipeline_batch(
-            self,
-            read_commands: list[list[Any]] | None = None,
-            write_commands: list[list[Any]] | None = None,
+        self,
+        read_commands: list[list[Any]] | None = None,
+        write_commands: list[list[Any]] | None = None,
     ) -> dict[str, list[Any]]:
         """Выполняет пакет команд чтения и записи"""
         results: dict[str, list[Any]] = {}
