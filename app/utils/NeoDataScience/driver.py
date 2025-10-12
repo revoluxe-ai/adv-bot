@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from collections import defaultdict
+from functools import wraps
 
 import neo4j
 from neo4j import AsyncGraphDatabase
@@ -16,7 +16,6 @@ from app.utils import redis_manager, text_cleaner
 
 logger = logging.getLogger(__name__)
 
-from functools import wraps
 
 max_tries = 50
 total_tries = 0
@@ -72,101 +71,7 @@ class DataScience(metaclass=AsyncMeta):
 
         self.SHOP_GRAPH_NAME = "shop_graph"
 
-    def get_keyword_phrase_vector_by_id(self, id_):
-        query = """
-        MATCH (phrase:KeywordPhrase ) WHERE
-        id(phrase) = $id_
-        RETURN phrase.text as text
-        """
 
-        with self._neo_driver.driver.session() as s:
-            vector = s.run(query, id_=id_).single()["text"]
-
-        return vector
-
-    def set_direct_dist_item_to_keywords(self, offer_ids: list[str]):
-        query = """
-        MATCH(source: Item
-        {offer_id: $offer_id})
-        CALL
-        gds.allShortestPaths.delta.write(
-            $g_name,
-            {  
-                sourceNode: id(source),
-                relationshipWeightProperty: 'dist',
-                writeRelationshipType: 'DIRECT_DIST'
-            }
-        )
-        YIELD
-        relationshipsWritten,
-        preProcessingMillis,
-        computeMillis,
-        postProcessingMillis,
-        writeMillis,
-        configuration
-        RETURN relationshipsWritten
-
-       """
-
-        with self._neo_driver.driver.session() as s:
-            for n, offer_id in enumerate(offer_ids):
-                print(n)
-                result = s.run(
-                    query, offer_id=offer_id[0], g_name=self.MAIN_GRAPH_NAME
-                ).data()
-                logger.debug(result)
-
-    def create_graph(self, graph_name, properties_for_all_nodes: list[str]):
-        query = """
-    CALL gds.graph.project(
-    $graph_name,
-    {
-        Item: {properties: $properties}, 
-        Image: {properties: $properties},
-        Keyword: {properties: $properties},
-        KeywordPhrase: {properties: $properties}
-    },
-    {
-        IS: {
-            type: 'IS',
-            properties: {
-                dist: {
-                    property: 'dist',
-                    defaultValue:1
-                }
-            }
-        },
-         LIKE: {
-            type: 'LIKE',
-            properties: {
-                dist: {
-                    property: 'dist',
-                    defaultValue: 1
-                }
-            }
-        },
-        
-        
-         IN: {
-            type: 'IN',
-            properties: {
-                dist: {
-                    property: 'dist',
-                    defaultValue: 1
-                }
-            }
-        }  
-        
-    }
-) YIELD graphName, nodeProjection, nodeCount, relationshipProjection, relationshipCount, projectMillis
-RETURN graphName
-        """
-        logger.debug(query, graph_name, properties_for_all_nodes)
-        with self._neo_driver.driver.session() as s:
-            result = s.run(
-                query, graph_name=graph_name, properties=properties_for_all_nodes
-            ).single()
-            logger.debug(f"Граф создан: {result.data()}")
 
     async def _graph_exists(self, graph_name):
         query = """
@@ -200,168 +105,6 @@ RETURN graphName
 
                 logger.debug(result)
 
-    def get_mean_distance(self, offer_id: str, phrase: list) -> float:
-        query = """
-        match (item:Item {offer_id: $offer_id})-[r:DIRECT_DIST]-(keyword:Keyword)
-        WHERE
-        keyword.text in $phrase
-        RETURN 
-        //item.offer_id as offer_id, 
-        avg(r.totalCost) as totalCost
-        //collect(keyword.text) as phrase
-        """
-
-        s = self._neo_driver.driver.session()
-        result = s.run(query, offer_id=offer_id, phrase=phrase).single()
-        totalCost = result["totalCost"]
-        s.close()
-        return totalCost
-
-    def set_dist_on_null_rels(self):
-        self._set_dist_for_rels_image_from_item()
-        self._set_dist_for_rels_item_from_image()
-        self._set_dist_for_rels_keyword_from_image()
-        self._set_dist_for_rels_image_from_keyword()
-        self._set_dist_rels_for_item_from_keyword()
-        self._set_dist_rels_for_keyword_from_item()
-
-    def _set_dist_for_rels_image_from_item(self):
-        query = """
-        MATCH (image:Image)<-[r:IS]-(:Item)
-                WITH count(r) as total_rels
-                MATCH (image:Image)<-[r:IS]-(:Item)
-                WITH image, COLLECT(r) as rels, count(r) as rels_loc, total_rels
-                FOREACH (rel in rels | SET rel.dist = toFloat(rels_loc) / total_rels)
-                RETURN image.image_id, rels_loc, total_rels
-
-        """
-        with self._neo_driver.driver.session() as s:
-            s.run(query).single()
-
-    def _set_dist_for_rels_item_from_image(self):
-        query = """
-          MATCH (item:Item)<-[r:IS]-(:Image)
-                WITH count(r) as total_rels
-                MATCH (item:Item)<-[r:IS]-(:Image)
-                WITH item, COLLECT(r) as rels, count(r) as rels_loc, total_rels
-                FOREACH (rel in rels | SET rel.dist = toFloat(rels_loc) / total_rels)
-                RETURN item.offer_id, rels_loc, total_rels
-               """
-        with self._neo_driver.driver.session() as s:
-            s.run(query).single()
-
-    def _set_dist_for_rels_keyword_from_image(self):
-        query = """
-        MATCH (keyword:Keyword)<-[r:IS]-(:Image)
-                WITH count(r) as total_rels
-                MATCH (keyword:Keyword)<-[r:IS]-(:Image)
-                WITH keyword, COLLECT(r) as rels, count(r) as rels_loc, total_rels
-                FOREACH (rel in rels | SET rel.dist = toFloat(rels_loc) / total_rels)
-                RETURN keyword.text, rels_loc, total_rels
-        """
-        with self._neo_driver.driver.session() as s:
-            s.run(query).single()
-
-    def _set_dist_for_rels_image_from_keyword(self):
-        query = """
-        MATCH (image:Image)<-[r:IS]-(:Keyword)
-                WITH count(r) as total_rels
-                MATCH (image:Image)<-[r:IS]-(:Keyword)
-                WITH image, COLLECT(r) as rels, count(r) as rels_loc, total_rels
-                FOREACH (rel in rels | SET rel.dist = toFloat(rels_loc) / total_rels)
-                RETURN image.image_id, rels_loc, total_rels
-               """
-        with self._neo_driver.driver.session() as s:
-            s.run(query).single()
-
-    def _set_dist_rels_for_item_from_keyword(self):
-        query = """
-        MATCH (item:Item)<-[r:IS]-(:Keyword)
-                WITH count(r) as total_rels
-                MATCH (item:Item)<-[r:IS]-(:Keyword)
-                WITH item, COLLECT(r) as rels, count(r) as rels_loc, total_rels
-                FOREACH (rel in rels | SET rel.dist = toFloat(rels_loc) / total_rels)
-                RETURN item.offer_id, rels_loc, total_rels
-                       """
-        with self._neo_driver.driver.session() as s:
-            s.run(query).single()
-
-    def _set_dist_rels_for_keyword_from_item(self):
-        query = """
-              MATCH (keyword:Keyword)<-[r:IS]-(:Item)
-                WITH count(r) as total_rels
-                MATCH (keyword:Keyword)<-[r:IS]-(item:Item)
-                WITH keyword, COLLECT(r) as rels, count(r) as rels_loc, total_rels
-                FOREACH (rel in rels | SET rel.dist = toFloat(rels_loc) / total_rels)
-                RETURN keyword.text, rels_loc, total_rels
-
-                               """
-        with self._neo_driver.driver.session() as s:
-            s.run(query).single()
-
-    def get_knn(self, offer_id, property):
-        query = f"""
-        match (i:Item {{offer_id: $offer_id}})-[r:KNN]-(i1:Item) 
-        
-        return i.offer_id, r.{property}, i1.offer_id
-        ORDER BY r.{property} DESC
-        """
-        with self._neo_driver.driver.session() as s:
-            result = s.run(query, offer_id=offer_id, property=property).data()
-        return result
-
-    def write_knn(
-        self,
-        graph_name,
-        labels=["Item", "Image", "Keyword"],
-        rels=["IS", "LIKE", "IN"],
-        topK=50,
-        jobid="knn",
-        property="fastrp",
-    ):
-        query = f"""
-        CALL gds.knn.write(
-          $name,
-          {{
-             nodeLabels: $labels,
-             relationshipTypes: $rels,
-             jobId: $jobid,
-             nodeProperties: {{{property}: 'EUCLIDEAN'}},
-             topK: $topK,
-             writeRelationshipType: 'KNN',
-             writeProperty: '{property}'
-          }}
-        ) 
-        """
-
-        with self._neo_driver.driver.session() as s:
-            s.run(
-                query, name=graph_name, labels=labels, rels=rels, topK=topK, jobid=jobid
-            )
-
-    def create_shop_graph(self, offer_ids):
-        query = """
-        MATCH (source:Item) WHERE source.offer_id in $offer_ids
-        OPTIONAL MATCH (source)-->(target:None)
-        WITH gds.graph.project(
-        $graph_name,
-        source,
-        target,
-        {
-        sourceNodeProperties: source {fastrp_32: source.fastrp_32},
-        targetNodeProperties: Null
-        }
-        ) AS g
-         RETURN g.graphName AS graph, g.nodeCount AS nodes
-    """
-
-        with self._neo_driver.driver.session() as s:
-            result = s.run(
-                query, graph_name=self.SHOP_GRAPH_NAME, offer_ids=offer_ids
-            ).data()
-            logger.debug(result)
-            print("""Граф  создан""")
-
     async def linking_images_and_keyword(self):
         try:
             await self.linking_images()
@@ -379,14 +122,7 @@ RETURN graphName
         await self._create_images_graph_if_not_exists(name)
         await self._set_knn_on_images(name)
 
-    @staticmethod
-    async def __create_graph_if_not_exists(tx, name):
-        result = await tx.run(
-            "CALL gds.graph.exists($name) YIELD exists RETURN exists", name=name
-        )
-        record = await result.single()
-        exists = record["exists"]
-        return exists
+
 
     async def _create_images_graph_if_not_exists(self, name):
         async with neo4j.AsyncGraphDatabase.driver(
@@ -457,25 +193,6 @@ RETURN graphName
         await self._set_knn_on_keywords(name)
         await self.drop_graph(name)
 
-    def _create_keywords_graph_if_not_exists(self, name):
-        if not self.gds.graph.exists(name).iloc[1]:
-            query = """
-            MATCH (source:Keyword)
-            WHERE source.word2vec is not null
-            OPTIONAL MATCH (source)--(target:Null)
-            WITH gds.graph.project($name, source, target,
-            {sourceNodeProperties: source { word2vec: source.word2vec},
-            targetNodeProperties: null}
-
-            ) AS g
-            RETURN
-  g.graphName AS graph, g.nodeCount AS nodes, g.relationshipCount AS rels
-
-            """
-            with self._neo_driver.driver.session() as s:
-                result = s.run(query, name=name)
-                logger.debug(result)
-
     async def _set_knn_on_keywords(self, name):
         stream_query = """
             CALL gds.knn.stream(
@@ -508,66 +225,6 @@ RETURN graphName
 
         return "KNN relationships for keywords updated successfully"
 
-    def get_near_offer_ids(self, card, free_offer_ids, topK):
-        query = """
-        MATCH (source_item:Item {offer_id: $offer_id})
-        -[r:KNN]->(target_item:Item) WHERE target_item.offer_id in $offer_ids
-        RETURN target_item.offer_id as offer_id  ORDER BY r.dist DESC 
-        LIMIT $topK
-        """
-
-        with self._neo_driver.driver.session() as s:
-            result = s.run(
-                query, offer_id=card.offer_id, offer_ids=free_offer_ids, topK=topK
-            ).value("offer_id")
-
-        return result
-
-    def get_k_mean_groups(self, k):
-        logger.debug("Начинаю запрос")
-        query = """
-       CALL gds.kmeans.stream(
-          'knn',
-          {
-              nodeProperty: 'fastrp',
-              k: $k,
-              maxIterations: 100,
-              deltaThreshold: 0.001
-          }
-        )
-        YIELD nodeId, communityId, distanceFromCentroid, silhouette
-        MATCH (node) WHERE id(node) = nodeId
-        RETURN node.offer_id AS offer_id, communityId as group
-        """
-
-        with self._neo_driver.driver.session() as s:
-            result = s.run(query, k=k).data()
-        logger.debug("Запрос выполнен")
-        result_dict = defaultdict(list)
-
-        for part in result:
-            group = part["group"]
-            offer_id = part["offer_id"]
-            result_dict[group].append(offer_id)
-        groups = result_dict.values()
-        return groups
-
-    def get_near_offer_ids_by_keyword(self, keyword, filter_offer_ids, limit):
-        query = """
-        MATCH (k:Keyword {text: $keyword})<-[r*1..2]-(:Image)<-[:IN]-(item:Item)
-        WHERE item.offer_id in  $filter_offer_ids
-            WITH item.offer_id AS offer_id,
-            REDUCE(s = 1, rel IN r | s * COALESCE(rel.dist, 1)) AS multiplication_result
-            RETURN offer_id
-            ORDER BY multiplication_result DESC LIMIT $limit
-        """
-
-        with self._neo_driver.driver.session() as s:
-            result = s.run(
-                query, keyword=keyword, filter_offer_ids=filter_offer_ids, limit=limit
-            ).value("offer_id")
-
-        return result
 
     async def update_fastrp(self, leingth):
         logger.debug("Обновление fastrp")
@@ -580,23 +237,6 @@ RETURN graphName
         await self.fit_fastrp(self.MAIN_GRAPH_NAME, fastrp_vector_len=leingth)
         logger.debug("fastrp обучен")
 
-    def set_knn_for_items_by_fastrp(self, graph_name, topK):
-        query = """
-         CALL gds.knn.write(
-                  $graph_name,
-                  {
-                     nodeLabels: ['Item'],
-                     relationshipTypes:  ['*'],
-                     jobId: 'knn',
-                     nodeProperties: {fastrp: 'EUCLIDEAN'},
-                     topK: $topK,
-                     writeRelationshipType: 'KNN',
-                     writeProperty: 'dist'
-                  }
-                )    YIELD  nodesCompared RETURN nodesCompared"""
-        with self._neo_driver.driver.session() as s:
-            result = s.run(query, graph_name=graph_name, topK=topK).data()
-            logger.debug(result)
 
     async def fit_fastrp(self, graph_name, fastrp_vector_len):
         query = """
@@ -688,56 +328,7 @@ RETURN graphName
                 result = await session.execute_write(create_base_graph, graph_name)
                 logger.debug(result)
 
-    #
-    # def create_shop_graph_for_item_knn(self, graph_name, offer_ids):
-    #      query = """
-    #       MATCH (source:Item) WHERE source.offer_id in $offer_ids
-    #     OPTIONAL MATCH (source)-->(target:None)
-    #     WITH gds.graph.project(
-    #     $graph_name,
-    #     source,
-    #     target,
-    #     {
-    #     sourceNodeProperties: {fastrp: source.fastrp},
-    #     targetNodeProperties: Null,
-    #     sourceNodeLabels: ['Item'],
-    #     targetNodeLabels: Null
-    #
-    #     }
-    #     ) AS g
-    #      RETURN g.graphName AS graph, g.nodeCount AS nodes
-    #
-    #      """
-    #
-    #      with self._neo_driver.driver.session() as s:
-    #          result = s.run(query, graph_name = graph_name, offer_ids = offer_ids).data()
-    #          logger.debug(result)
 
-    # def get_items_count(self):
-    #     query = """
-    #     MATCH (item:Item)
-    #     return count(item) AS count
-    #     """
-    #
-    #     with self._neo_driver.driver.session() as s:
-    #         result = s.run(query).single()
-    #
-    #     return result['count']
-    #
-    # def add_unknow_keyword(self, unknown_keyword:str, target_keyword:str, dist:float):
-    #     query = """
-    #     MERGE (unknow:Keyword {text: $unknow})
-    #     MERGE (target:Keyword {text: $unknow})
-    #     MERGE (unknow)-[r:LIKE]->(targer)
-    #     SET r.dist = $dist
-    #     """
-    #
-    #     with self._neo_driver.driver.session() as s:
-    #         result = s.run(query, unknow = unknown_keyword,
-    #                        target = target_keyword,
-    #                        dist = dist)
-    #
-    #         logger.debug(result)
 
     async def add_keyword_phrase(self, phrase_data_list: list[KeywordPhrase]):
         # Сериализация phrase_data в формат, подходящий для Cypher запроса
@@ -835,25 +426,6 @@ UNWIND phrase.words AS word
 
         return data
 
-    # def get_all_keyword_phrases(self):
-    #     query = """
-    #     MATCH (phrase:KeywordPhrase)
-    #     RETURN phrase.text as keyword
-    #     """
-    #     with self._neo_driver.driver.session() as s:
-    #         result = s.run(query).values('keyword')
-    #     result = [r[0] for r in result]
-    #     return result
-    #
-    # def get_keyword_phrases_without_vector(self):
-    #     query = """
-    #     MATCH (k:KeywordPhrase) WHERE k.fastrp IS NULL
-    #     RETURN COUNT (k) AS count
-    #     """
-    #
-    #     with self._neo_driver.driver.session() as s:
-    #         result = s.run(query).single()
-    #     return result['count']
 
     async def _create_sub_graph_for_like_keyword(self, graph_name):
         query = """
@@ -882,41 +454,6 @@ UNWIND phrase.words AS word
 
                 result = await session.execute_write(create_sub_graph, graph_name)
                 logger.debug(result)
-
-    # def add_keyword_phrase_without_item(self, phrase_data: KeywordPhrase):
-    #     # Предполагается, что kw.vector уже в формате списка чисел. Если нет, необходимо его преобразовать.
-    #     phrase_dict = {
-    #         'text': phrase_data.text,
-    #         'words': [{'word': word.text, 'vector': list(word.vector) if word.vector is not None else None} \
-    #                   for word in phrase_data.words],
-    #         # Преобразование vector в список, если это необходимо
-    #         'dist_to_word': phrase_data.dist_to_word
-    #     }
-    #
-    #     query = """
-    #         MERGE (keyword_phrase:KeywordPhrase {text: $text})
-    #         WITH keyword_phrase, $words AS words, $dist_to_word AS dist_to_word
-    #              UNWIND words AS wordData
-    #                  MERGE (keyword:Keyword {text: wordData.word})
-    #                  ON CREATE SET keyword.word2vec = wordData.vector
-    #                  ON MATCH SET keyword.word2vec = wordData.vector
-    #                  MERGE (keyword_phrase)-[rk2k:LIKE]->(keyword)
-    #                  ON CREATE SET rk2k.dist = dist_to_word
-    #                  ON MATCH SET rk2k.dist = dist_to_word
-    #                  MERGE (keyword_phrase)<-[rk2k_1:LIKE]-(keyword)
-    #                  ON CREATE SET rk2k_1.dist = dist_to_word
-    #                  ON MATCH SET rk2k_1.dist = dist_to_word
-    #          """
-    #     while True:
-    #         try:
-    #             with self._neo_driver.driver.session() as s:
-    #                 # Распаковка phrase_dict в качестве именованных параметров запроса
-    #                 result = s.run(query, **phrase_dict)
-    #                 logger.debug(result)
-    #                 break
-    #         except Exception as exc:
-    #             logger.error(exc)
-    #             time.sleep(5)
 
     async def get_status_job(self, jobid):
         query = """
@@ -997,79 +534,6 @@ UNWIND phrase.words AS word
 
         logger.debug("Добавили карточку")
 
-    async def get_keyword_phrases(self) -> list[str]:
-        query = """
-        MATCH (phrase:KeywordPhrase)
-        RETURN phrase.text as keyword
-        """
-
-        async def get_keyword_phrases(tx, query):
-            result = await tx.run(query)
-            records = await result.data()
-            return [record["keyword"] for record in records]
-
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
-            async with driver.session() as session:
-                data = await session.execute_read(get_keyword_phrases, query)
-
-        return data
-
-    async def clear_cards_in_neo4j(self, need_nmids: list[int]):
-        query = """
-    CALL apoc.periodic.iterate(
-    "MATCH (item:Item) WHERE NOT item.nmid IN $need_nmids RETURN item",
-    "DETACH DELETE item",
-    {batchSize: 100, params: {need_nmids: $need_nmids}}
-)
-        """
-
-        async def clear_cards(tx, query, need_nmids):
-            await tx.run(query, need_nmids=need_nmids)
-
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
-            async with driver.session() as session:
-                await session.execute_write(clear_cards, query, need_nmids)
-
-        return
-
-    async def clear_keywords_in_neo4j(self, need_keywords: list[str]):
-        query = """
-        CALL apoc.periodic.iterate(
-            "MATCH (keyword:KeywordPhrase) WHERE NOT keyword.text IN $need_keywords RETURN keyword",
-            "DETACH DELETE keyword",
-            {batchSize: 100, params: {need_keywords: $need_keywords}}
-        )
-        """
-
-        async def clear_keywords(tx, query, need_keywords):
-            await tx.run(query, need_keywords=need_keywords)
-
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
-            async with driver.session() as session:
-                await session.execute_write(clear_keywords, query, need_keywords)
-        return
-
-    async def clear_dead_nodes(self):
-        query = """
-        MATCH (n) WHERE NOT EXISTS ((n)--(:KeywordPhrase))
-        AND NOT EXISTS ((n)--(:Item))
-        DETACH DELETE n 
-        """
-
-        async def clear_dead_nodes(tx, query):
-            await tx.run(query)
-
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
-            async with driver.session() as session:
-                await session.execute_write(clear_dead_nodes, query)
 
     async def get_keywords_vectors_by_keywords(self, keywords: list[str]):
         query = """
@@ -1152,64 +616,6 @@ UNWIND phrase.words AS word
         texts: set[str] = await data_manager.get_all_keywords_from_ch(last_days=7)
         clear_texts = [text_cleaner.clear(text) for text in texts]
         await self._update_keywords_vectors_in_redis(clear_texts)
-
-    # async def __update_keywords_vectors_process(self):
-    #     batch_size = 1000  # Размер порции
-    #     last_processed_id = None  # Начальное значение для курсора
-    #
-    #     try:
-    #         async with sm() as session:
-    #             # Получаем количество уникальных текстов один раз
-    #             count_stmt = select(func.count()).select_from(
-    #                 select(KeywordSetting.text).distinct().join(KeywordSetting.adv_setting).where(
-    #                     AdvSetting.bot_active == True
-    #                 ).subquery()
-    #             )
-    #             total_count_result = await session.execute(count_stmt)
-    #             total_count = total_count_result.scalar_one()
-    #             logger.debug(f'Всего {total_count} уникальных текстов')
-    #
-    #         while True:
-    #             pass_texts = set()
-    #
-    #             # Запрос с курсором: если last_processed_id есть, начинаем с него
-    #             stmt = (
-    #                 select(KeywordSetting.id, KeywordSetting.text)
-    #                 .distinct(KeywordSetting.text)
-    #                 .join(KeywordSetting.adv_setting)
-    #                 # .where(AdvSetting.active_status.in_(['started']))
-    #                 .order_by(KeywordSetting.text, KeywordSetting.id)  # DISTINCT ON требует совпадения с ORDER BY
-    #                 .limit(batch_size)
-    #             )
-    #             if last_processed_id:
-    #                 stmt = stmt.where(KeywordSetting.id > last_processed_id)  # Пагинация по ID
-    #
-    #             stmt = stmt.limit(batch_size)
-    #
-    #             async with sm() as session:
-    #                 need_keywords_texts_result = await session.execute(stmt)
-    #                 rows = need_keywords_texts_result.all()
-    #
-    #             if not rows:
-    #                 break  # Завершаем, если нет данных
-    #
-    #             need_keywords_texts = []
-    #             for row in rows:
-    #                 if row.text not in pass_texts:
-    #                     pass_texts.add(row.text)
-    #                     need_keywords_texts.append(row.text)
-    #
-    #             # Очищаем текстовые данные
-    #             clear_need_texts = [text_cleaner.clear(text) for text in need_keywords_texts]
-    #
-    #             # Обновляем векторы ключевых фраз в Redis
-    #             await self._update_keywords_vectors_in_redis(clear_need_texts)
-    #
-    #             # Обновляем курсор на ID последней строки
-    #             last_processed_id = rows[-1].id  # Предполагается, что есть поле 'id'
-    #
-    #     except Exception as exc:
-    #         logger.error(f'Ошибка при обновлении векторов ключевых фраз в Redis: {exc}', exc_info=True)
 
     async def update_keywords_vectors(self):
         await self.__update_keywords_vectors()
@@ -1297,24 +703,4 @@ UNWIND phrase.words AS word
                 result = await session.execute_read(check_wb_card, query, nmid)
         return result
 
-    async def get_nmids_not_in_neo(self, all_nmids: set[int]):
-        query = """
-        MATCH (item:Item) WHERE item.nmid IN $all_nmids
-        RETURN item.nmid as nmid
-        """
 
-        async def get_nmids_not_in_neo(tx, query, all_nmids):
-            result = await tx.run(query, all_nmids=list(all_nmids))
-            records = await result.data()
-            nmids = [record["nmid"] for record in records]
-            return nmids
-
-        async with neo4j.AsyncGraphDatabase.driver(
-            self.__uri, auth=self.__auth
-        ) as driver:
-            async with driver.session() as session:
-                nmids_in_neo = await session.execute_read(
-                    get_nmids_not_in_neo, query, all_nmids
-                )
-        nmids_not_in_neo = [nmid for nmid in all_nmids if nmid not in nmids_in_neo]
-        return set(nmids_not_in_neo)
