@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import dotenv
 
 if TYPE_CHECKING:
-    pass
+    from app.modules.wb_keywords_parser.wb_parser.parsing_queue_mode import ParsingQueueMode
 
 dotenv.load_dotenv()
 import os
@@ -414,6 +414,20 @@ class Settings:
         if not value:
             return 50053
         return int(value)
+
+    @property
+    def PARSING_QUEUE_MODE(self) -> 'ParsingQueueMode':
+        from app.modules.wb_keywords_parser.wb_parser.parsing_queue_mode import ParsingQueueMode
+        value = os.getenv("PARSING_QUEUE_MODE")
+        if not value:
+            return ParsingQueueMode.SIMPLE_QUEUE
+        value = value.lower()
+        if value == ParsingQueueMode.SIMPLE_QUEUE.value:
+            return ParsingQueueMode.SIMPLE_QUEUE
+        elif value == ParsingQueueMode.SMART_QUEUE.value:
+            return ParsingQueueMode.SMART_QUEUE
+        else:
+            raise ValueError("Не верное значение в PARSING_QUEUE_MODE")
 
 
 settings = Settings()
