@@ -8,6 +8,7 @@ from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, Message
 from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from dependency_injector.wiring import inject, Provide
 from sqlalchemy import Result, select
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -41,6 +42,9 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
+from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import PredictCTRManagerContainer
+from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.redis_manager import \
+    PredictCTRRedisManager
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_update_state_manager import (
     AdvActiveKeywordUpdateStateManager,
@@ -94,13 +98,13 @@ class GetCardsApiError(Text):
 
 class AdvCompanyChoicing(TextWithKeyboardPagination):
     def __init__(
-        self,
-        bot: Bot,
-        chat_id: int,
-        wb_user_cabinet_original_id: int,
-        adv_settings: list[AdvSetting],
-        state,
-        page: int = 1,
+            self,
+            bot: Bot,
+            chat_id: int,
+            wb_user_cabinet_original_id: int,
+            adv_settings: list[AdvSetting],
+            state,
+            page: int = 1,
     ) -> None:
         self._state = state
         super().__init__(bot, chat_id)
@@ -160,8 +164,8 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             clear_advs = []
             for adv in adv_settings:
                 if (
-                    not adv.bot_active
-                    and adv.active_status == adv.ActiveStatuses.DONE.value
+                        not adv.bot_active
+                        and adv.active_status == adv.ActiveStatuses.DONE.value
                 ):
                     continue
                 name = adv.name
@@ -213,7 +217,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     # parse_mode = ParseMode.HTML
 
     def __init__(
-        self, bot: Bot, chat_id: int, wb_user_cabinet: WBUserCabinet, adv: AdvSetting
+            self, bot: Bot, chat_id: int, wb_user_cabinet: WBUserCabinet, adv: AdvSetting
     ):
         super().__init__(bot, chat_id)
         self._bot = bot
@@ -253,7 +257,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             return
 
         last_update_keyword_stat: (
-            datetime | None
+                datetime | None
         ) = await self._get_last_update_keyword_stat(self.adv.adv_id)
         if last_update_keyword_stat:
             self.last_update_keyword_stat_str = last_update_keyword_stat.strftime(
@@ -487,7 +491,10 @@ class KeywordSettingMessage(TextWithKeyboard):
         keyword = await redis_manager.get_calculated_keyword(adv_id, text)
         return keyword
 
-    async def __call__(self) -> tuple[Message, str]:
+    @inject
+    async def __call__(self, redis_manager_predict_ctr: PredictCTRRedisManager = Provide[
+        PredictCTRManagerContainer.redis_manager
+    ]) -> tuple[Message, str]:
         async with sm(read_only=True) as session:
             stmt = (
                 select(KeywordSetting)
@@ -533,7 +540,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         self.views = total_views
         self.fact_ctr = total_clicks / total_views if total_views else 0
 
-        self.original_predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
+        self.original_predict_ctr = await redis_manager_predict_ctr.get_predict_ctr(self._adv_setting, text)
 
         self.spend = total_spend
         return await super().__call__()
@@ -746,16 +753,16 @@ class NoMainPhotos(TextWithKeyboard):
     @property
     def text(self):
         text = (
-            "Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК\n"
-            "Данные кампании: \n"
-            "Название кампании: " + self.adv.name + "\n"
-            f"ID кампании: {self.adv.adv_id}\n"
-            "Что конкретно нужно сделать:\n"
-            "1. Зайдите в рекламный кабинет на WB - https://cmp.wildberries.ru/\n"
-            "2. Найдите в кабинете эту кампанию\n"
-            "3. Укажите артикул WB (цифровой артикул товара WB - 123456789)\n"
-            "4. Подождите 20-30 минут, пока данные обновятся\n"
-            f"Если возникнут проблемы, то напишите сюда -> {const.SUPPORT_LINK}"
+                "Я не смог загрузить карточки, участвующие в этой РК. Укажите артикул WB товара в названии кампании в личном кабинете - так я пойму какие товары участвуют в РК\n"
+                "Данные кампании: \n"
+                "Название кампании: " + self.adv.name + "\n"
+                                                        f"ID кампании: {self.adv.adv_id}\n"
+                                                        "Что конкретно нужно сделать:\n"
+                                                        "1. Зайдите в рекламный кабинет на WB - https://cmp.wildberries.ru/\n"
+                                                        "2. Найдите в кабинете эту кампанию\n"
+                                                        "3. Укажите артикул WB (цифровой артикул товара WB - 123456789)\n"
+                                                        "4. Подождите 20-30 минут, пока данные обновятся\n"
+                                                        f"Если возникнут проблемы, то напишите сюда -> {const.SUPPORT_LINK}"
         )
         return text
 
