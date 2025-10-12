@@ -19,7 +19,6 @@ class BillingCheckMixin:
         """
         return f"{self.prefix}:{wb_cabinet_id}:{day.strftime('%Y-%m-%d')}"
 
-
     async def set_billing_process_for_day(self: 'BaseRedisManagerProtocol', wb_cabinet_id: int, day: datetime,
                                           ttl: int | None = None) -> None:
         """Set a flag in Redis indicating that billing has been processed for the given shop and day.
@@ -27,7 +26,7 @@ class BillingCheckMixin:
         """
         key = self._get_key(wb_cabinet_id, day)
         effective_ttl = self._resolve_ttl(ttl)
-        await self.client.set(key, "1", ex=effective_ttl)
+        await self._client.set(key, "1", ex=effective_ttl)
 
     async def get_billing_process_for_day(self: "BaseRedisManager", wb_cabinet_id: int, day: datetime) -> bool:
         """Check if billing has been processed for the given shop and day."""
