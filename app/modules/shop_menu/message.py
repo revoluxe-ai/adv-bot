@@ -126,10 +126,10 @@ class ShopMenu(TextWithKeyboard):
                 if self.is_active_adv:
                     shop_id = self._wb_cabinet.shop_id
                     self.price_for_month_for_shop = (
-                        await self._pricer.get_month_tariff_for_count_advs(shop_id)
+                        await self._pricer.get_month_tariff_for_count_advs(session, shop_id)
                     )
                     self.total_amount_for_day = (
-                        await self._pricer.get_price_for_day_for_shop(shop_id)
+                        await self._pricer.get_price_for_day_for_shop(session, shop_id)
                     )
                 else:
                     self.price_for_month_for_shop = 0
