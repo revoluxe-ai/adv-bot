@@ -1,4 +1,5 @@
 import typing
+from typing import Any, Optional
 
 if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import WBUserCabinet
