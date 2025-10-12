@@ -2,10 +2,8 @@ import logging
 from typing import Optional, Awaitable
 
 import grpc
-from dependency_injector.wiring import Provide
+from dependency_injector.wiring import Provide, inject
 
-from .di import PredictCTRManagerContainer
-from app.settings import settings
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -13,8 +11,9 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.grpcs.predict_ctr_service.predict_ctr_client.predict_ctr_client import (
     PredictCTRClient,
 )
+from app.settings import settings
+from .di import PredictCTRManagerContainer
 from .redis_manager import PredictCTRRedisManager
-
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ class PredictCTRUpdateManager:
     """Менеджер для обновления прогнозов CTR"""
 
     def __init__(
-        self,
+            self,
     ) -> None:
         self._grpc_client: Optional[PredictCTRClient] = None
 
@@ -38,7 +37,7 @@ class PredictCTRUpdateManager:
         return self._grpc_client
 
     async def update_predict_ctr(
-        self, adv: AdvSetting, keywords_coro: Awaitable[list[CalculatedKeyword]]
+            self, adv: AdvSetting, keywords_coro: Awaitable[list[CalculatedKeyword]]
     ) -> None:
         keywords = await keywords_coro
 
@@ -82,7 +81,7 @@ class PredictCTRUpdateManager:
             )
 
     async def _make_grpc_request(
-        self, grpc_client: PredictCTRClient, nmids: list[int], phrases: list[str]
+            self, grpc_client: PredictCTRClient, nmids: list[int], phrases: list[str]
     ) -> dict[str, float] | None:
         """Выполнить gRPC запрос для получения прогнозов"""
         try:
@@ -94,13 +93,14 @@ class PredictCTRUpdateManager:
             logger.error(f"Ошибка выполнения gRPC запроса: {e}")
             return None
 
+    @inject
     async def _save_predictions_to_redis(
-        self,
-        adv: AdvSetting,
-        predictions: dict[str, float],
-        redis_manager: PredictCTRRedisManager = Provide[
-            PredictCTRManagerContainer.redis_manager
-        ],
+            self,
+            adv: AdvSetting,
+            predictions: dict[str, float],
+            redis_manager: PredictCTRRedisManager = Provide[
+                PredictCTRManagerContainer.redis_manager
+            ],
     ) -> None:
         """Сохранить прогнозы в Redis через pipeline"""
         try:
