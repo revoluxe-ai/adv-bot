@@ -8,7 +8,7 @@ from app.core.wb_api.http_request import requests, try_except_decorator
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
 from app.core.wb_api.protocols import WBAPIProtocol
 
-logger = logging
+logger = logging.getLogger(__name__)
 
 
 PREFIX = "https://content-api"
