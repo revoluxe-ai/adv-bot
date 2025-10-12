@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import dotenv
 
 if TYPE_CHECKING:
-    from app.modules.wb_keywords_parser.wb_parser.parsing_queue_mode import ParsingQueueMode
+    pass
 
 dotenv.load_dotenv()
 import os

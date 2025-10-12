@@ -106,7 +106,7 @@ class RedisClient(ABC):
         )
 
     async def scard(self, name: str) -> int:
-        return cast(int, await  ensure_awaitable(self._replica_read_client.scard(name)))
+        return cast(int, await  ensure_awaitable( self._replica_read_client.scard(name)))
 
     async def sismember(self, name: str, value: str) -> bool:
         return cast(bool, await  ensure_awaitable(self._replica_read_client.sismember(name, value)))

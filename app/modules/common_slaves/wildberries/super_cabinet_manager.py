@@ -8,11 +8,10 @@ from aiohttp import ClientSession
 from sqlalchemy import select
 
 from app.configs.infrastructure_config.wb_config import WBConfig
-from app.core.di import inject, Provide
+from app.core.di import Provide
 from app.core.di.app_container import AppContainer
 from app.core.wb_api.check_righter import CheckRighter
 from app.core.wb_api.exceptions import ApiForbiddenError
-from app.mocks.wb_token_mock import WBTokenMock
 from app.modules.common_slaves.wildberries.models import WBUserCabinet, WBCabinet
 from app.utils.db.session_maker import get_async_session_maker
 from . import exceptions
