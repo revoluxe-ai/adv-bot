@@ -14,6 +14,9 @@ from .ml_data_manager import update_model
 from ..user_message_sender import message_for_not_pay_user_sender
 from ... import AppContainer
 
+# Import token monitoring for expiration checks
+from app.modules.token_monitoring.services.token_expiration_service import run_token_expiration_check
+
 set_config()
 
 sm = get_async_session_maker
@@ -44,6 +47,29 @@ async def sender_message_to_not_pay_users():
             logger.error(f"Ошибка отправки сообщений {e}", exc_info=True)
             del e
         await asyncio.sleep(60 * 5)
+
+
+async def process_token_expiration_check() -> None:
+    """Запуск проверки истекающих токенов один раз в сутки в 9:00"""
+    while True:
+        now = datetime.datetime.now()
+
+        # Вычисляем следующие 9:00
+        next_run = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        if now.hour >= 9:
+            next_run += datetime.timedelta(days=1)
+
+        # Спим до 9:00
+        sleep_seconds = (next_run - now).total_seconds()
+        logger.info(f"Следующая проверка токенов: {next_run} (через {sleep_seconds / 3600:.1f} часов)")
+        await asyncio.sleep(sleep_seconds)
+
+        # Выполняем проверку токенов
+        try:
+            stats = await run_token_expiration_check()
+            logger.info(f"Проверка токенов завершена: {stats}")
+        except Exception as e:
+            logger.error(f"Ошибка проверки токенов: {e}", exc_info=True)
 
 
 async def process_payment_for_advs() -> None:
@@ -95,6 +121,7 @@ async def main_loop() -> None:
     await asyncio.gather(
         process_payment_for_advs(),
         # TODO: этот функционал должен быть перенесен в shop_run, проверить не дублирует ли
+        process_token_expiration_check(),
         run_update_vectors_in_redis(),
         run_vector_update_in_neo4j(),
     )
