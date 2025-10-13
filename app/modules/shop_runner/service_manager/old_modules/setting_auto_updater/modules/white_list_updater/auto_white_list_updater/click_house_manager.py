@@ -24,7 +24,9 @@ ORDER BY date
 
 async def get_sum_spend_for_complex_adv(auto_adv_id: int, auction_adv_id: int) -> float:
     async with get_clickhouse_client() as client:
-        result = await client.query(query, parameters={"adv_ids": [auto_adv_id, auction_adv_id]})
+        result = await client.query(
+            query, parameters={"adv_ids": [auto_adv_id, auction_adv_id]}
+        )
 
         sum_spend: float = result.first_item["spend"]
         return sum_spend

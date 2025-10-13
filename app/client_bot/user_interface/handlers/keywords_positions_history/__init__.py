@@ -1,1 +1,1 @@
-from . import handlers
+from .handlers import router as KeywordsPositionsHistoryRouter

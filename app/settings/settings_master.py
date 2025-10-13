@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 import dotenv
+
+if TYPE_CHECKING:
+    pass
 
 dotenv.load_dotenv()
 import os
@@ -143,36 +148,50 @@ class Settings:
     @property
     def TELEGRAM_WEB_PORT(self) -> int:
         value = os.environ.get("TELEGRAM_WEB_PORT")
+        if value is None:
+            raise ValueError("TELEGRAM_WEB_PORT is not set")
         return int(value)
 
     @property
     def CH_MAX_THREAD(self) -> int:
         value = os.environ.get("CH_MAX_THREAD")
+        if value is None:
+            raise ValueError("CH_MAX_THREAD is not set")
         return int(value)
 
     @property
     def BIDDER_STEP(self) -> int:
         value = os.environ.get("BIDDER_STEP_RUB")
+        if value is None:
+            raise ValueError("BIDDER_STEP_RUB is not set")
         return int(value)
 
     @property
     def CLICKHOUSE_PORT(self) -> int:
         value = os.environ.get("CLICKHOUSE_PORT")
+        if value is None:
+            raise ValueError("CLICKHOUSE_PORT is not set")
         return int(value)
 
     @property
     def postgres_port(self) -> int:
         value = os.environ.get("POSTGRES_PORT")
+        if value is None:
+            raise ValueError("POSTGRES_PORT is not set")
         return int(value)
 
     @property
     def ssl_mode(self) -> str | None:
         value = os.environ.get("POSTGRES_SSL_MODE")
+        if value is None:
+            raise ValueError("POSTGRES_SSL_MODE is not set")
         return value
 
     @property
     def postgres_hosts(self) -> str | None:
         value = os.environ.get("POSTGRES_HOST")
+        if value is None:
+            raise ValueError("POSTGRES_HOST is not set")
         return value
 
     @property
@@ -183,22 +202,31 @@ class Settings:
     @property
     def REDIS_MASTER_HOST(self) -> str | None:
         value = os.environ.get("REDIS_MASTER_HOST")
+        if value is None:
+            raise ValueError("REDIS_MASTER_HOST environment variable is not set")
         return value
 
     @property
     def REDIS_REPLICA_HOST(self) -> str | None:
         value = os.environ.get("REDIS_REPLICA_HOST")
+        if value is None:
+            raise ValueError("REDIS_REPLICA_HOST environment variable is not set")
         return value
 
     @property
     def YOOKASSA_TOKEN(self) -> str:
         value = os.environ.get("YOOKASSA_TOKEN")
-        assert value
+        if value is None:
+            raise ValueError("YOOKASSA_TOKEN environment variable is not set")
         return value
 
     @property
     def MIN_SUM(self) -> int:
-        value = int(os.getenv("MIN_SUM"))
+        result = os.getenv("MIN_SUM")
+        if result is None:
+            raise ValueError("MIN_SUM environment variable is not set")
+        assert result is not None
+        value = int(result)
         return value
 
     @property
@@ -242,6 +270,8 @@ class Settings:
     @property
     def TELEGRAM_BOT_TOKEN(self) -> str:
         value = os.environ.get("TELEGRAM_BOT_TOKEN")
+        if not value:
+            raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
         return value
 
     @property
@@ -339,7 +369,7 @@ class Settings:
             return int(value)
 
     @property
-    def DEFAULT_CTR_EXPONENTA(self):
+    def DEFAULT_CTR_EXPONENTA(self) -> int:
         value = os.getenv("MAX_HOURS_PERIOD_FOR_PARSING_KEYWORDS")
         if not value:
             return 20
@@ -363,6 +393,27 @@ class Settings:
         elif value == "true":
             return True
         raise ValueError("Не верное значение")
+
+    @property
+    def REDIS_PORT(self) -> int:
+        value = os.environ.get("REDIS_PORT")
+        if not value:
+            return 6379
+        return int(value)
+
+    @property
+    def PREDICT_CTR_HOST(self) -> str:
+        value = os.environ.get("PREDICT_CTR_HOST")
+        if not value:
+            return "localhost"
+        return value
+
+    @property
+    def PREDICT_CTR_PORT(self) -> int:
+        value = os.environ.get("PREDICT_CTR_PORT")
+        if not value:
+            return 50053
+        return int(value)
 
 
 settings = Settings()

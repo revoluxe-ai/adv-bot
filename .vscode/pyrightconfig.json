@@ -1,0 +1,10 @@
+{
+  "exclude": [
+    "**/venv",
+    "**/.venv",
+    "**/__pycache__",
+    "**/site-packages"
+  ],
+  // "reportMissingImports": "none",
+  // "reportMissingModuleSource": "none"
+}

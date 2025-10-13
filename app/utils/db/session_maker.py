@@ -7,8 +7,7 @@ from time import time
 from typing import Any
 
 from sqlalchemy import Result
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from app.settings import settings
 
@@ -19,9 +18,9 @@ conn_counter = 0
 pool_size = settings.PG_POOL_SIZE
 max_overflow = settings.PG_MAX_OVERFLOW
 
-
 count_sem = settings.COUNT_SEMAPHORE_TO_POSTGRES
 global_semaphore = asyncio.Semaphore(count_sem)
+
 
 #
 # ssl_context = ssl.create_default_context(cafile=RDS_CERT_PATH)
@@ -29,7 +28,7 @@ global_semaphore = asyncio.Semaphore(count_sem)
 
 
 class AnalyticAsyncSession(AsyncSession):
-    async def execute(self, statement, *args, **kwargs) -> Result[Any]:
+    async def execute(self, statement: Any, *args, **kwargs) -> Result[Any]:
         query_start = time()
         try:
             # Определяем тип операции
@@ -38,7 +37,11 @@ class AnalyticAsyncSession(AsyncSession):
             # Анализ стека для поиска вызывающего кода
             stack = traceback.extract_stack()
             caller = next(
-                (frame for frame in reversed(stack[:-1]) if "sqlalchemy" not in frame.filename),
+                (
+                    frame
+                    for frame in reversed(stack[:-1])
+                    if "sqlalchemy" not in frame.filename
+                ),
                 None,
             )
 
@@ -81,9 +84,7 @@ def get_alchemy_row(read_only):
     else:
         host = settings.postgres_replica_host
     # Для asyncpg используем ssl вместо sslmode
-    row_connector = (
-        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
-    )
+    row_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     # if ssl_mode:
     #     row_connector += f'?sslmode={ssl_mode}'
     # row_connector += f'&target_session_attrs={target_session}'
@@ -99,9 +100,7 @@ def get_alchemy_row_for_migration():
     postgres_user = settings.postgres_user
     host = settings.postgres_master_host
     # Для asyncpg используем ssl вместо sslmode
-    db_connector = (
-        f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
-    )
+    db_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     return db_connector
 
 
@@ -128,16 +127,15 @@ read_write_engine = create_async_engine(
     pool_pre_ping=True,
 )
 
-
 # Фабрики сессий
-read_only_session_maker = sessionmaker(
-    read_only_engine,
+read_only_session_maker = async_sessionmaker(
+    bind=read_only_engine,
     expire_on_commit=False,
     class_=AnalyticAsyncSession,
 )
 
-read_write_session_maker = sessionmaker(
-    read_write_engine,
+read_write_session_maker = async_sessionmaker(
+    bind=read_write_engine,
     expire_on_commit=False,
     class_=AnalyticAsyncSession,
 )
@@ -163,8 +161,11 @@ async def get_async_session_maker(
                 finally:
                     hold_time = time() - session_start
                     if hold_time > 1.0:
+                        task_name = current_task.get_name()
+                        if not task_name:
+                            task_name = "unknown"
                         logger.warning(
-                            f"Session held for too long: {hold_time:.2f}s by task {current_task.get_name()}"
+                            f"Session held for too long: {hold_time:.2f}s by task {task_name}"
                         )
     except Exception as e:
         logger.error(

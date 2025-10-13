@@ -23,7 +23,9 @@ F_Spec = ParamSpec("F_Spec")
 
 def while_coroutine_decorator(
     pause_on_success: int, pause_on_error: int = 5
-) -> Callable[[Callable[F_Spec, Awaitable[T_Result]]], Callable[F_Spec, Awaitable[T_Result]]]:
+) -> Callable[
+    [Callable[F_Spec, Awaitable[T_Result]]], Callable[F_Spec, Awaitable[T_Result]]
+]:
     def decorator(
         func: Callable[F_Spec, Awaitable[T_Result]],
     ) -> Callable[F_Spec, Awaitable[T_Result]]:

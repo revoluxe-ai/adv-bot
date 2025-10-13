@@ -22,7 +22,9 @@ class UnitedParams(BaseModel):
 
 
 class AutoParams(BaseModel):
-    active: dict[str, bool]  # Предполагается, что 'active' это словарь с булевыми значениями
+    active: dict[
+        str, bool
+    ]  # Предполагается, что 'active' это словарь с булевыми значениями
     # Добавьте другие поля, которые ожидаются в `autoParams`
 
 
@@ -70,6 +72,10 @@ class Adv:
     @property
     def adv_type(self) -> int:
         return self._data["type"]
+
+    @adv_type.setter
+    def adv_type(self, value: int):
+        self._type = value
 
     @property
     def status_native(self) -> str:
@@ -177,10 +183,6 @@ class Adv:
             nmids = re.findall(r"(?<!\[)\d{7,9}(?!\])", self.name)
             nmids = [int(nmid) for nmid in nmids]
             return nmids if nmids else []
-
-    @adv_type.setter
-    def adv_type(self, value):
-        self._type = value
 
 
 class Statistic:

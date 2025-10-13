@@ -1,7 +1,8 @@
-from typing import TYPE_CHECKING, Union
+import typing
+from typing import Any, Optional
 
-if TYPE_CHECKING:
-    import new
+if typing.TYPE_CHECKING:
+    from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 
 class MaxAttemptsError(Exception):
@@ -23,37 +24,24 @@ class ApiErrorWithCode(Exception):
         )
 
 
-class NotValidTokenError(Exception):
-    pass
-
 
 class TokenExpiredError(Exception):
-    def __init__(self, text):
+    def __init__(self, text: str) -> None:
         self.text = text
-        m = "Срок действия токена истек"
-        super().__init__(f"{m} text: {self.text}")
+        super().__init__(f"Token expired: {self.text}")
 
 
 class TokensFromDifferentShopsError(BaseException):
-    def __init__(self):
-        m = "Токены принадлежат разным магазинам"
+    def __init__(self, m: str) -> None:
         super().__init__(f"{m}")
 
 
 class ApiForbiddenError(Exception):
-    def __init__(self, text, wb_user_cabinet: Union["new.types.WBUserCabinet", None] = None):
+    def __init__(self, text: str, wb_user_cabinet: typing.Optional['WBUserCabinet'] = None):
         self.text = text
         self.wb_user_cabinet = wb_user_cabinet
-        m = "API доступ запрещен"
+        m = "API доступ запрещён"
         super().__init__(f"{m} text: {self.text}")
-
-
-class TooManyRequests(Exception):
-    pass
-
-
-class BadRequestError(Exception):
-    error_message: str
 
 
 class NotValidDataError(Exception):
@@ -73,4 +61,24 @@ class NotMatchWBApiError(Exception):
 
 
 class MinAdvBidWBApiError(Exception):
-    new_min_bid: int
+    def __init__(self, new_min_bid: int) -> None:
+        self.new_min_bid = new_min_bid
+        m = "Минимальная ставка изменена"
+        super().__init__(f"{m} new_min_bid: {self.new_min_bid}")
+
+class BadRequestError(Exception):
+    """Ошибка плохого запроса (для совместимости)."""
+
+    def __init__(
+        self, message: str = "Bad request", response_text: str | None = None
+    ) -> None:
+        super().__init__(message, 400, response_text)
+
+class NotValidTokenError(Exception):
+    pass
+
+
+class TooManyRequests(Exception):
+    """Ошибка превышения лимита запросов (для совместимости)."""
+
+    pass

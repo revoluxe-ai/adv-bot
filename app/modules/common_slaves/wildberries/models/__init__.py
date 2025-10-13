@@ -9,6 +9,18 @@ __all__ = [
     "WBToken",
     "WBBalancePayment",
     "WBBonusPayment",
+    "AdvKeyword",
 ]
-
-from .models import *
+from .wb_cabinet import WBCabinet
+from .models import (
+    KeywordSetting,
+    AdvSetting,
+    WBUserCabinet,
+    WBItemPosition,
+    WBCard,
+    WBCategory,
+    WBToken,
+    WBBalancePayment,
+    WBBonusPayment,
+    AdvKeyword,
+)

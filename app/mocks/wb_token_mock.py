@@ -11,7 +11,9 @@ class WBTokenMock:
         self._mock_payload = {
             "sid": shop_id,
             "s": 1275,  # бинарная маска для категорий (1,2,8,10 биты = Контент, Аналитика, Рекомендации, Статистика)
-            "exp": int((datetime.datetime.now() + datetime.timedelta(days=30)).timestamp()),
+            "exp": int(
+                (datetime.datetime.now() + datetime.timedelta(days=30)).timestamp()
+            ),
             "uid": 987654321,
         }
 

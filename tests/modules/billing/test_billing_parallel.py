@@ -64,22 +64,30 @@ def mock_cabinets():
 
 
 @patch("app.modules.billing.billing.sm")
-async def test_parallel_billing_all_shops(mock_sm, mock_redis_lock, mock_redis_manager, mock_pricer, mock_cabinets):
+async def test_parallel_billing_all_shops(
+    mock_sm, mock_redis_lock, mock_redis_manager, mock_pricer, mock_cabinets
+):
     # Мокаем сессию и preload выборку кабинетов
     preload_session = AsyncMock()
     preload_session.execute.return_value = MagicMock()
-    preload_session.execute.return_value.all.return_value = [(cab.id,) for cab in mock_cabinets]
+    preload_session.execute.return_value.all.return_value = [
+        (cab.id,) for cab in mock_cabinets
+    ]
     mock_sm.return_value.__aenter__.return_value = preload_session
     # Мокаем обработку одного кабинета (внутри _process_single_cabinet)
-    with patch("app.modules.billing.billing._process_single_cabinet", new_callable=AsyncMock) as mock_proc:
-        mock_proc.side_effect = lambda session, cabinet_id, current_dt, pricer, redis_manager: {
-            "cabinet_id": cabinet_id,
-            "processed": True,
-            "payment_successful": True,
-            "reason": "success",
-            "campaigns": 1,
-            "price_for_day": 100.0,
-        }
+    with patch(
+        "app.modules.billing.billing._process_single_cabinet", new_callable=AsyncMock
+    ) as mock_proc:
+        mock_proc.side_effect = (
+            lambda session, cabinet_id, current_dt, pricer, redis_manager: {
+                "cabinet_id": cabinet_id,
+                "processed": True,
+                "payment_successful": True,
+                "reason": "success",
+                "campaigns": 1,
+                "price_for_day": 100.0,
+            }
+        )
         await billing.process_payment_for_advs(
             redis_manager=mock_redis_manager,
             redis_lock=mock_redis_lock,
@@ -92,10 +100,14 @@ async def test_parallel_billing_all_shops(mock_sm, mock_redis_lock, mock_redis_m
 
 
 @patch("app.modules.billing.billing.sm")
-async def test_billing_global_lock_blocks_run(mock_sm, mock_redis_lock, mock_redis_manager, mock_pricer):
+async def test_billing_global_lock_blocks_run(
+    mock_sm, mock_redis_lock, mock_redis_manager, mock_pricer
+):
     mock_redis_lock.acquire_lock.return_value = False
     # Не должен быть вызван ни один процессинг
-    with patch("app.modules.billing.billing._process_payment_for_advs", new_callable=AsyncMock) as mock_proc:
+    with patch(
+        "app.modules.billing.billing._process_payment_for_advs", new_callable=AsyncMock
+    ) as mock_proc:
         await billing.process_payment_for_advs(
             redis_manager=mock_redis_manager,
             redis_lock=mock_redis_lock,
@@ -105,21 +117,28 @@ async def test_billing_global_lock_blocks_run(mock_sm, mock_redis_lock, mock_red
 
 
 @patch("app.modules.billing.billing.sm")
-async def test_billing_ttl_none_means_no_expiry(mock_sm, mock_redis_lock, mock_redis_manager, mock_pricer,
-                                                mock_cabinets):
+async def test_billing_ttl_none_means_no_expiry(
+    mock_sm, mock_redis_lock, mock_redis_manager, mock_pricer, mock_cabinets
+):
     preload_session = AsyncMock()
     preload_session.execute.return_value = MagicMock()
-    preload_session.execute.return_value.all.return_value = [(cab.id,) for cab in mock_cabinets]
+    preload_session.execute.return_value.all.return_value = [
+        (cab.id,) for cab in mock_cabinets
+    ]
     mock_sm.return_value.__aenter__.return_value = preload_session
-    with patch("app.modules.billing.billing._process_single_cabinet", new_callable=AsyncMock) as mock_proc:
-        mock_proc.side_effect = lambda session, cabinet_id, current_dt, pricer, redis_manager: {
-            "cabinet_id": cabinet_id,
-            "processed": True,
-            "payment_successful": True,
-            "reason": "success",
-            "campaigns": 1,
-            "price_for_day": 100.0,
-        }
+    with patch(
+        "app.modules.billing.billing._process_single_cabinet", new_callable=AsyncMock
+    ) as mock_proc:
+        mock_proc.side_effect = (
+            lambda session, cabinet_id, current_dt, pricer, redis_manager: {
+                "cabinet_id": cabinet_id,
+                "processed": True,
+                "payment_successful": True,
+                "reason": "success",
+                "campaigns": 1,
+                "price_for_day": 100.0,
+            }
+        )
         # TTL не передаём, должен быть default (3600) внутри функции
         await billing.process_payment_for_advs(
             redis_manager=mock_redis_manager,

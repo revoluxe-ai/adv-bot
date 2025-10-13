@@ -1,34 +1,24 @@
-from pydantic import BaseModel
-
-from .base_adv import Adv
-
-
-class UnitedParams(BaseModel):
-    nms: list[int]
-    searchCPM: int | None = None
-
-
-class Multibids(BaseModel):
-    nm: int
-    bid: int
+from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 
 
 class AuctionAdv(Adv):
-    unitedParams: list[UnitedParams] | None = None
-    auction_multibids: list[Multibids] | None = None
+    """Auction advertising campaign (type 9).
+
+    For auction campaigns, CPM is located in unitedParams[0].searchCPM.
+    """
 
     @property
-    def nmids(self) -> list[int] | None:
-        up = self.unitedParams
-        if up:
-            return up[0].nms
-        else:
+    def cpm(self) -> int | None:
+        """Get CPM for auction advertising campaign from unitedParams[0].searchCPM."""
+        try:
+            united_params = self._data.get("unitedParams", [])
+            if isinstance(united_params, list) and len(united_params) > 0:
+                first_param = united_params[0]
+                if isinstance(first_param, dict):
+                    return first_param.get("searchCPM")
+            return None
+        except (KeyError, TypeError, AttributeError, IndexError):
             return None
 
-    @property
-    def cpm(self) -> int:
-        if self.auction_multibids:
-            cpm = self.auction_multibids[0].bid
-            return cpm
-        else:
-            return self.unitedParams[0].searchCPM
+
+__all__ = ["AuctionAdv"]

@@ -28,12 +28,13 @@ class WBShop:
             coroutines_manager.update_cards_data_from_wb_to_pg(),
             coroutines_manager.update_cpm_bid(),
             coroutines_manager.update_common_sale_stat(),
-                coroutines_manager.update_full_adv_stat(),
-                coroutines_manager.adv_settings_auto_update(),
-                coroutines_manager.update_top_key_in_advs(),
+            coroutines_manager.update_full_adv_stat(),
+            coroutines_manager.adv_settings_auto_update(),
+            coroutines_manager.update_top_key_in_advs(),
+            coroutines_manager.update_predict_ctr(),
         )
 
-    async def _alive_worker_run(self):
+    async def _alive_worker_run(self) -> None:
         redis_manager: RedisShopManager = self._redis_manager
         ping_timeout = redis_manager.DEFAULT_TTL / 2
         while True:

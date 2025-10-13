@@ -5,8 +5,11 @@ from app.modules.shop_runner.service_manager import (
     LastSetDownTargetPlace,
     LastSetUpTargetPlace,
     LastUpdateFirstPhrase,
-    last_auto_update_phrases_to_white_list,
 )
+
+from app.modules.shop_runner.service_manager.\
+old_modules.setting_auto_updater.modules.white_list_updater.\
+    auto_white_list_updater.redis_cache import (last_auto_update_phrases_to_white_list)
 
 
 class LastAutoUpdateSettingInformer:
@@ -31,10 +34,18 @@ class LastAutoUpdateSettingInformer:
         self.delete_from_white_list_str = self.to_str_timestamp(
             await self._delete_from_white_list.get()
         )
-        self.add_to_white_list_str = self.to_str_timestamp(await self._add_to_white_list.get())
-        self.up_target_place_str = self.to_str_timestamp(await self._up_target_place.get())
-        self.down_target_place_str = self.to_str_timestamp(await self._down_target_place.get())
-        self.update_top_key_str = self.to_str_timestamp(await self._update_top_key.get())
+        self.add_to_white_list_str = self.to_str_timestamp(
+            await self._add_to_white_list.get()
+        )
+        self.up_target_place_str = self.to_str_timestamp(
+            await self._up_target_place.get()
+        )
+        self.down_target_place_str = self.to_str_timestamp(
+            await self._down_target_place.get()
+        )
+        self.update_top_key_str = self.to_str_timestamp(
+            await self._update_top_key.get()
+        )
 
     @staticmethod
     def to_str_timestamp(timestamp: datetime.datetime | None) -> str:

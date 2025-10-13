@@ -39,7 +39,9 @@ async def update_minus_keywords(
     adv_original_id = callback_data.adv_setting_original_id
     async with sm() as session:
         adv = await session.execute(
-            select(AdvSetting).join(AdvSetting.wb_cabinet).where(AdvSetting.id == adv_original_id)
+            select(AdvSetting)
+            .join(AdvSetting.wb_cabinet)
+            .where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
         wb_cabinet_id: int = adv.wb_cabinet.id
@@ -79,7 +81,9 @@ async def update_keyword_stat(
     adv_original_id = callback_data.adv_setting_original_id
     async with sm() as session:
         adv: AdvSetting = await session.execute(
-            select(AdvSetting).join(AdvSetting.wb_cabinet).where(AdvSetting.id == adv_original_id)
+            select(AdvSetting)
+            .join(AdvSetting.wb_cabinet)
+            .where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
         wb_cabinet_id: int = adv.wb_cabinet.id

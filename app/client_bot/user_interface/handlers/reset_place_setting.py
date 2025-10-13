@@ -20,7 +20,11 @@ async def on_reset_place(
 ):
     adv_original_id: int = callback_data.adv_setting_original_id
 
-    stmt = update(AdvSetting).filter(AdvSetting.id == adv_original_id).values(reset_place=True)
+    stmt = (
+        update(AdvSetting)
+        .filter(AdvSetting.id == adv_original_id)
+        .values(reset_place=True)
+    )
 
     async with sm(read_only=False) as session:
         await session.execute(stmt)
@@ -36,7 +40,11 @@ async def off_reset_place(
 ):
     adv_original_id: int = callback_data.adv_setting_original_id
 
-    stmt = update(AdvSetting).filter(AdvSetting.id == adv_original_id).values(reset_place=False)
+    stmt = (
+        update(AdvSetting)
+        .filter(AdvSetting.id == adv_original_id)
+        .values(reset_place=False)
+    )
 
     async with sm(read_only=False) as session:
         await session.execute(stmt)

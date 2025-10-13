@@ -27,12 +27,12 @@ async def test_client_bot_setup_registers_all_handlers():
 
     # Проверяем, что регистрация обработчиков была вызвана ожидаемое количество раз
     # Замените эти числа на реальные, соответствующие количеству регистрируемых обработчиков
-    assert dp_mock.message.register.call_count >= 1, (
-        "Недостаточно обработчиков сообщений зарегистрировано"
-    )
-    assert dp_mock.callback_query.register.call_count >= 1, (
-        "Недостаточно обработчиков callback-запросов зарегистрировано"
-    )
+    assert (
+        dp_mock.message.register.call_count >= 1
+    ), "Недостаточно обработчиков сообщений зарегистрировано"
+    assert (
+        dp_mock.callback_query.register.call_count >= 1
+    ), "Недостаточно обработчиков callback-запросов зарегистрировано"
 
 
 @pytest.mark.asyncio
@@ -52,12 +52,12 @@ async def test_client_bot_middleware_setup():
     setup_bot(bot_mock, dp_mock)
 
     # Проверяем, что middleware были добавлены
-    assert dp_mock.update.middleware.register.call_count >= 1, (
-        "Недостаточно middleware зарегистрировано для update"
-    )
-    assert dp_mock.message.middleware.register.call_count >= 1, (
-        "Недостаточно middleware зарегистрировано для message"
-    )
+    assert (
+        dp_mock.update.middleware.register.call_count >= 1
+    ), "Недостаточно middleware зарегистрировано для update"
+    assert (
+        dp_mock.message.middleware.register.call_count >= 1
+    ), "Недостаточно middleware зарегистрировано для message"
 
 
 @pytest.mark.asyncio

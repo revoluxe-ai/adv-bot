@@ -2,15 +2,15 @@ import logging
 import os
 from abc import ABC
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from aiohttp import ClientSession
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-from . import models
-from .models import WBCabinet, WBToken
+if TYPE_CHECKING:
+    from .models import WBCabinet, WBToken
 
 __all__ = ["Headers"]
 
@@ -27,8 +27,8 @@ class WbRequestApiMixin(ABC):
 
 
 class Headers:
-    def __init__(self, token: models.WBToken):
-        self.current_token: models.WBToken = token
+    def __init__(self, token: 'WBToken'):
+        self.current_token: 'WBToken' = token
 
     @property
     def standart(self) -> dict[str, str]:
@@ -50,7 +50,7 @@ class ABC_WB_API(WbRequestApiMixin):
     def __init__(self, wb_access: "WBCabinetAccess", session: ClientSession) -> None:
         tokens: list[WBToken] = wb_access.tokens
         self.access = wb_access
-        wb_cabinet: WBCabinet = wb_access.wb_cabinet
+        wb_cabinet: Optional['WBCabinet'] = wb_access.wb_cabinet
         self.wb_cabinet = wb_cabinet
         assert wb_cabinet
         if not tokens:
@@ -69,17 +69,6 @@ class ABC_WB_API(WbRequestApiMixin):
         self.session: ClientSession = session
         self._bad_tokens_original_ids: dict[str, set[int]] = defaultdict(set)
 
-    # @property
-    # @abstractmethod
-    # def _rights(self) -> set[str]:
-    #     pass
-
-    # @property
-    # @abstractmethod
-    # def _only_read(self):
-    #     pass
-    #
-
     @staticmethod
     def chunks(lst, n):
         for i in range(0, len(lst), n):
@@ -89,10 +78,14 @@ class ABC_WB_API(WbRequestApiMixin):
         current_token_original_id = self._current_token.id
         self._bad_tokens_original_ids[method_name].add(current_token_original_id)
 
-        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[method_name]
+        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[
+            method_name
+        ]
 
         free_tokens = [
-            token for token in self._free_tokens if token.id not in all_bad_token_original_ids
+            token
+            for token in self._free_tokens
+            if token.id not in all_bad_token_original_ids
         ]
 
         if free_tokens:

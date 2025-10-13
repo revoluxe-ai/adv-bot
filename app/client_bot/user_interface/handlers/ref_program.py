@@ -26,7 +26,9 @@ async def ref_program(message: types.Message, bot: aiogram.Bot):
 
 
 @router.callback_query(callbacks.RefProgram.filter(F.action == "new"))
-async def ref_program_new(callback: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext):
+async def ref_program_new(
+    callback: types.CallbackQuery, bot: aiogram.Bot, state: FSMContext
+):
     await callback.answer()
     await state.set_state(states.RefProgram.getting_name)
     message = callback.message
@@ -35,7 +37,9 @@ async def ref_program_new(callback: types.CallbackQuery, bot: aiogram.Bot, state
 
 
 @router.message(StateFilter(states.RefProgram.getting_name))
-async def ref_program_getting_name(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def ref_program_getting_name(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+):
     text = message.text
     if len(text) > 30:
         await messages.RefLinkNameTooLong(bot, message.chat.id)()

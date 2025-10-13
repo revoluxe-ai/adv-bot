@@ -24,7 +24,9 @@ router = Router()
 
 def extract_nmid_list(input_text):
     """Извлекает список артикулов из текста."""
-    return [int(nmid) for nmid in input_text.replace(",", " ").split() if nmid.isdigit()]
+    return [
+        int(nmid) for nmid in input_text.replace(",", " ").split() if nmid.isdigit()
+    ]
 
 
 def extract_nmid_from_file(file_content):
@@ -42,7 +44,9 @@ async def create_new_adv(
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm() as session:
         stmt = select(WBCabinet.id).where(
-            WBCabinet.wb_user_cabinets.any(WBUserCabinet.id == wb_user_cabinet_original_id)
+            WBCabinet.wb_user_cabinets.any(
+                WBUserCabinet.id == wb_user_cabinet_original_id
+            )
         )
         result = await session.execute(stmt)
         wb_cabinet_id = result.scalar_one()

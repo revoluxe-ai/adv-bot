@@ -1,3 +1,4 @@
+# .github/workflows/deploy_implement_poetry.yaml
 name: GitHub Container Registry Deploy
 
 on:
@@ -20,14 +21,58 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
       LATEST_TAG: stage
       GHCR_REGISTRY: ghcr.io
+      POETRY_VERSION: 1.5.1
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Установка Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          # Убрали cache: 'poetry' так как он требует предустановленного Poetry
+
+      # Установка Poetry с использованием официального метода
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Проверка установки Poetry
+      - name: Check Poetry installation
+        run: poetry --version
+
+      # Настройка Poetry для создания виртуального окружения в проекте
+      - name: Configure Poetry
+        run: poetry config virtualenvs.in-project true
+
+      # Кеширование виртуального окружения
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-
+
+      # Установка зависимостей
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      # Остальные шаги остаются без изменений
       - name: Log in to GitHub Container Registry
         run: |
           echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.GHCR_REGISTRY }} -u ${{ github.actor }} --password-stdin
+          if ! docker pull ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:latest; then
+            echo "Warning: Repository not found or access denied. Continuing with build process."
+          fi
+
+      - name: Check available tags in GHCR
+        run: |
+          curl -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
+          https://ghcr.io/v2/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}/tags/list
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

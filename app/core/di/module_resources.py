@@ -2,23 +2,32 @@
 Агрегатор модульных DI-контейнеров.
 """
 
-import typing
-
 from dependency_injector import containers, providers
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.billing.di import BillingContainer
-
-if typing.TYPE_CHECKING:
-    pass
+from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
+    PredictCTRManagerContainer,
+)
 
 
 class ModuleResources(containers.DeclarativeContainer):
     """Содержит DI-контейнеры всех модулей приложения."""
-    redis_client_wrapper: providers.Dependency[typing.Never] = providers.Dependency()
+
+    redis_client_wrapper: providers.Dependency[RedisClient] = providers.Dependency(
+        instance_of=RedisClient
+    )
 
     billing = providers.Container(
         BillingContainer,
         redis_client_wrapper=redis_client_wrapper,
+    )
+
+    predict_ctr_manager: providers.Container[PredictCTRManagerContainer] = (
+        providers.Container(
+            PredictCTRManagerContainer,
+            redis_client_wrapper=redis_client_wrapper,
+        )
     )
 
     # Пример для будущих модулей:

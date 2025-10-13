@@ -28,7 +28,9 @@ class ShopChoice(TextWithKeyboard):
         return get_shop_keyboard(self.__all_shops, self.user_telegram_id)
 
 
-def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> InlineKeyboardMarkup:
+def get_shop_keyboard(
+    all_shops: list[WBUserCabinet], user_telegram_id
+) -> InlineKeyboardMarkup:
     # Создаем список для строк кнопок
     keyboard_buttons = []
 
@@ -39,7 +41,9 @@ def get_shop_keyboard(all_shops: list[WBUserCabinet], user_telegram_id) -> Inlin
         )
         keyboard_buttons.append([admin_button])
 
-    button = InlineKeyboardButton(text="Добавить магазин", callback_data=callbacks.ShopNew().pack())
+    button = InlineKeyboardButton(
+        text="Добавить магазин", callback_data=callbacks.ShopNew().pack()
+    )
     keyboard_buttons.append([button])
 
     # button = InlineKeyboardButton(text='Избранные кампании', callback_data=callbacks.ShowFavorites().pack())

@@ -4,6 +4,7 @@
 перенесена в BillingLockMixin. Этот класс — тонкая обёртка для удобного использования
 через DI (наследует BaseRedisManager и миксин).
 """
+
 from __future__ import annotations
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
@@ -17,8 +18,9 @@ class RedisLock(BillingLockMixin, BaseRedisManager):
     Порядок наследования важен: миксин идёт первым, чтобы его _get_key
     закрыл абстрактный метод BaseRedisManager.
     """
+
     prefix = "billing_lock"
-    default_ttl = 60  # 1 минута по умолчанию
+    default_ttl = 600  # 1 минута по умолчанию
 
     # Дополнительная логика при необходимости может быть добавлена здесь.
     pass

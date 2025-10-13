@@ -21,7 +21,10 @@ class AppContainer(containers.DeclarativeContainer):
     """Главный DI-контейнер приложения. Содержит все основные сервисы и конфигурации."""
     wiring_config = containers.WiringConfiguration(
         packages=[
-            "app.core.redis_manager_v2"]
+            "app.core.redis_manager_v2",
+            "app.modules.wb_adv_updater.get_text_to_predict_ctr_dict",
+            "app.modules.common_slaves.wildberries.super_cabinet_manager",
+        ]
     )
 
     settings = providers.Singleton(AppConfig.create)
@@ -35,7 +38,7 @@ class AppContainer(containers.DeclarativeContainer):
         redis_client=redis_client,
     )
 
-    module_resources = providers.Container(
+    module_resources: providers.Container[ModuleResources] = providers.Container(
         ModuleResources,
         redis_client_wrapper=redis_client_wrapper,
     )

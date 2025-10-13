@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class RedisCalculatedKeywordsCacheManager(RedisManager):
-    async def set_calculated_keywords(self, keywords: list[CalculatedKeyword], adv_id: int) -> None:
+    async def set_calculated_keywords(
+        self, keywords: list[CalculatedKeyword], adv_id: int
+    ) -> None:
         """
         Сохранение списка ключевых слов в Redis.
         """
@@ -24,7 +26,9 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
                 pipe.hset(name=key, key=keyword.text, value=keyword.to_json())
             await pipe.execute()
 
-    async def get_calculated_keyword(self, adv_id: int, keyword: str) -> CalculatedKeyword | None:
+    async def get_calculated_keyword(
+        self, adv_id: int, keyword: str
+    ) -> CalculatedKeyword | None:
         """
         Получение одного ключевого слова из Redis.
         """
@@ -45,8 +49,14 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
         async with self.client.pipeline() as pipe:
             for keyword in keywords:
                 key = f"calculated_keywords:{keyword.adv_id}"
-                logger.debug(f"Getting keyword from key: {key}, keyword: {keyword.text}")
+                logger.debug(
+                    f"Getting keyword from key: {key}, keyword: {keyword.text}"
+                )
                 pipe.hget(name=key, key=keyword.text)
             results = await pipe.execute()
 
-        return [CalculatedKeyword.from_json(result) for result in results if result is not None]
+        return [
+            CalculatedKeyword.from_json(result)
+            for result in results
+            if result is not None
+        ]

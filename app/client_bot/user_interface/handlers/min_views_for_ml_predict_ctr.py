@@ -29,12 +29,18 @@ async def setting_min_views_for_predict_ctr(
 ):
     adv_original_id = callback_data.adv_setting_original_id
     await state.set_state(states.ChangeMinViewsForPredictCTR.waiting_for_new_min_views)
-    await messages.SettingMinViewsForPredictCTR(bot, callback.message.chat.id)(adv_original_id)
+    await messages.SettingMinViewsForPredictCTR(bot, callback.message.chat.id)(
+        adv_original_id
+    )
     return
 
 
-@router.message(StateFilter(states.ChangeMinViewsForPredictCTR.waiting_for_new_min_views))
-async def set_min_views_for_predict_ctr(message: types.Message, bot: Bot, state: FSMContext):
+@router.message(
+    StateFilter(states.ChangeMinViewsForPredictCTR.waiting_for_new_min_views)
+)
+async def set_min_views_for_predict_ctr(
+    message: types.Message, bot: Bot, state: FSMContext
+):
     data = await state.get_data()
     adv_original_id = data["last_adv_original_id"]
     text = message.text
@@ -54,14 +60,18 @@ async def set_min_views_for_predict_ctr(message: types.Message, bot: Bot, state:
     min_views = get_min_views_from_text(text)
     if min_views is not None:
         async with sm(read_only=False) as session:
-            adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+            adv = await session.execute(
+                select(AdvSetting).where(AdvSetting.id == adv_original_id)
+            )
             adv = adv.scalar()
             adv.min_views_for_ml_predict = min_views
             await session.commit()
             await messages.SettingMinViewsForPredictCTR(bot, chat_id)(adv_original_id)
             return
     async with sm() as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
         adv = adv.scalar()
     await messages.IncorrectMinViewsForPredictCTR(bot, chat_id, adv)()
     return

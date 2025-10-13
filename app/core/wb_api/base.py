@@ -12,11 +12,14 @@ from .exceptions import ApiForbiddenError
 
 if typing.TYPE_CHECKING:
     from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
-from ...modules.common_slaves.wildberries.models import WBCabinet, WBToken
-from ...modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+    from ...modules.common_slaves.wildberries.super_cabinet_manager import (
+        WBCabinetAccess,
+    )
+    from ...modules.common_slaves.wildberries.models import WBToken
+
+from ...modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 logger = logging.getLogger(__name__)
-
 
 T = TypeVar("T")
 
@@ -31,11 +34,13 @@ T = TypeVar("T")
 class BaseAPI:
     HOST = "wildberries.ru"
 
-    def __init__(self, wb_access: WBCabinetAccess, client_session: ClientSession) -> None:
+    def __init__(self,
+                 wb_access: 'WBCabinetAccess',
+                 client_session: ClientSession) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
-        tokens: list[WBToken] = wb_access.tokens
-        self.access: WBCabinetAccess = wb_access
+        tokens: list['WBToken'] = wb_access.tokens
+        self.access: "WBCabinetAccess" = wb_access
         if not tokens:
             raise ApiForbiddenError(
                 "Нет токенов для доступа к API",
@@ -75,7 +80,9 @@ class BaseAPI:
         current_token_original_id = self._current_token.id
         self._bad_tokens_original_ids[method_name].add(current_token_original_id)
 
-        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[method_name]
+        all_bad_token_original_ids: set[int] = self._bad_tokens_original_ids[
+            method_name
+        ]
 
         free_tokens = [
             token for token in self._free_tokens if token.id not in all_bad_token_original_ids

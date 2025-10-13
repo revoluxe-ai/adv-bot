@@ -3,6 +3,7 @@
 Простой глобальный лок: либо занят, либо нет. Никакой привязки к дате.
 Используется только для предотвращения параллельного запуска биллинга.
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -23,29 +24,31 @@ class BillingLockMixin:
     Закрываем абстрактный _get_key базового менеджера.
     """
 
-    def _get_key(self: 'BaseRedisManagerProtocol') -> str:  # noqa: D401
+    def _get_key(self: "BaseRedisManagerProtocol") -> str:  # noqa: D401
         """Вернуть фиксированный ключ глобального лока."""
         return _GLOBAL_LOCK_KEY
 
     # ---- Операции лока ----
     async def acquire_lock(
-            self: 'BaseRedisManagerProtocol',
-            ttl: int = DEFAULT_GLOBAL_BILLING_LOCK_TTL,
+        self: "BaseRedisManagerProtocol",
+        ttl: int = DEFAULT_GLOBAL_BILLING_LOCK_TTL,
     ) -> bool:
         key = self._get_key()
         try:
             return await self._client.set_if_not_exists(key, "1", ex=ttl)
         except AttributeError as e:  # pragma: no cover
-            raise RuntimeError("RedisClient должен реализовывать set_if_not_exists(key, value, ex=ttl)") from e
+            raise RuntimeError(
+                "RedisClient должен реализовывать set_if_not_exists(key, value, ex=ttl)"
+            ) from e
 
-    async def release_lock(self: 'BaseRedisManagerProtocol') -> None:
+    async def release_lock(self: "BaseRedisManagerProtocol") -> None:
         key = self._get_key()
         try:
             await self._client.delete(key)
         except Exception:  # pragma: no cover
             pass
 
-    async def is_locked(self: 'BaseRedisManagerProtocol') -> bool:
+    async def is_locked(self: "BaseRedisManagerProtocol") -> bool:
         key = self._get_key()
         try:
             return bool(await self._client.exists(key))
@@ -53,8 +56,8 @@ class BillingLockMixin:
             return False
 
     async def extend_lock(
-            self: 'BaseRedisManagerProtocol',
-            ttl: int = DEFAULT_GLOBAL_BILLING_LOCK_TTL,
+        self: "BaseRedisManagerProtocol",
+        ttl: int = DEFAULT_GLOBAL_BILLING_LOCK_TTL,
     ) -> bool:
         key = self._get_key()
         try:
@@ -67,10 +70,13 @@ class BillingLockMixin:
     # ---- Контекстный менеджер (вариант 1) ----
     class _Lockable(Protocol):  # локальный протокол только с нужными методами
         async def acquire_lock(self, ttl: int) -> bool: ...  # noqa: D401,E701
+
         async def release_lock(self) -> None: ...  # noqa: D401,E701
 
     @asynccontextmanager
-    async def billing_lock(self: _Lockable, ttl: int = DEFAULT_GLOBAL_BILLING_LOCK_TTL) -> AsyncIterator[bool]:
+    async def billing_lock(
+        self: _Lockable, ttl: int = DEFAULT_GLOBAL_BILLING_LOCK_TTL
+    ) -> AsyncIterator[bool]:
         """Асинхронный контекстный менеджер для глобального лока.
 
         Возвращает True если лок был получен, иначе False (release не вызывается).

@@ -76,8 +76,8 @@ async def test_worker_functions_without_errors():
             # Вызываем функцию и проверяем, что она работает без ошибок
             try:
                 result = await func(ctx, "test_arg")
-                assert result is True, (
-                    f"Функция {func_name} вернула неожиданный результат"
-                )
+                assert (
+                    result is True
+                ), f"Функция {func_name} вернула неожиданный результат"
             except Exception as e:
                 pytest.fail(f"Функция {func_name} вызвала исключение: {e}")

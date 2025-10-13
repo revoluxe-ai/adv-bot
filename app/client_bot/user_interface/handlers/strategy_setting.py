@@ -26,7 +26,9 @@ async def turn_on_min_ctr(
 ):
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
         adv: AdvSetting = adv.scalar()
         adv.target_ctr_mode = False
         await session.commit()
@@ -44,7 +46,9 @@ async def on_target_ctr(
 ):
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
         adv: AdvSetting = adv.scalar()
         adv.target_ctr_mode = True
         await session.commit()
@@ -52,7 +56,9 @@ async def on_target_ctr(
     return
 
 
-@router.callback_query(callbacks.StrategySetting.filter(F.action == "turn_on_forward_mode"))
+@router.callback_query(
+    callbacks.StrategySetting.filter(F.action == "turn_on_forward_mode")
+)
 async def turn_on_forward_mode(
     callback: types.CallbackQuery,
     bot: aiogram.Bot,
@@ -61,7 +67,9 @@ async def turn_on_forward_mode(
 ):
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
         adv: AdvSetting = adv.scalar()
         adv.target_ctr_mode_strategy = "forward"
         await session.commit()
@@ -69,7 +77,9 @@ async def turn_on_forward_mode(
     return
 
 
-@router.callback_query(callbacks.StrategySetting.filter(F.action == "turn_on_keep_mode"))
+@router.callback_query(
+    callbacks.StrategySetting.filter(F.action == "turn_on_keep_mode")
+)
 async def turn_on_keep_mode(
     callback: types.CallbackQuery,
     bot: aiogram.Bot,
@@ -78,7 +88,9 @@ async def turn_on_keep_mode(
 ):
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(select(AdvSetting).where(AdvSetting.id == adv_original_id))
+        adv = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
         adv: AdvSetting = adv.scalar()
         adv.target_ctr_mode_strategy = "keep"
         await session.commit()

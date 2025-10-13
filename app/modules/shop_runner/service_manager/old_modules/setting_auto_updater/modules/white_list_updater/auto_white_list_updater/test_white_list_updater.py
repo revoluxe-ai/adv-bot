@@ -2,9 +2,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
+    CalculatedKeyword,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
-from app.modules.shop_runner.wb_shop import WBShop
 
 from .auto_white_list_updater import WhiteListUpdateManager
 
@@ -66,7 +68,9 @@ async def test_update_white_list_threshold_triggered(
 
     redis_cache_mock = MagicMock()
     redis_cache_mock.last_auto_delete_white_list = MagicMock()
-    redis_cache_mock.last_auto_delete_white_list.check_pass_time = AsyncMock(return_value=True)
+    redis_cache_mock.last_auto_delete_white_list.check_pass_time = AsyncMock(
+        return_value=True
+    )
     redis_cache_mock.last_auto_delete_white_list.set = AsyncMock()
 
     with (
@@ -84,7 +88,11 @@ async def test_update_white_list_threshold_triggered(
         await manager.delete_last_white_phrase(keywords_mocks)
 
         # Recompute expected change based on the same filtering logic as in the manager
-        white_keywords = [kw for kw in keywords_mocks if kw.hard_status == 2 and not kw.best_keyword_status]
+        white_keywords = [
+            kw
+            for kw in keywords_mocks
+            if kw.hard_status == 2 and not kw.best_keyword_status
+        ]
         white_keywords.sort(key=lambda kw: kw.baes_ctr, reverse=True)
         white_keywords = white_keywords[1:]
         should_change = bool(white_keywords)
@@ -107,51 +115,147 @@ async def test_update_white_list_threshold_triggered(
 
 
 @pytest.mark.asyncio
-async def test_WBShop_delete_phrase_from_white_list_run(
-    adv_setting_mock, keywords_mocks
+async def test_white_list_manager_delete_phrase_functionality(
+    adv_setting_mock, keywords_mocks, common_mocks
 ):
-    wb_api_mock = MagicMock()
-    wb_api_mock.shop_id = "test_shop_id"
-    redis_manager_mock = MagicMock()
-    redis_manager_mock.DEFAULT_TTL = 60
-    redis_manager_mock.renew_shop_ttl = AsyncMock()
+    """Test that WhiteListUpdateManager properly deletes phrases from white list."""
+    session_mock, get_session_maker_mock = common_mocks
 
-    wb_shop = WBShop(wb_api_mock, redis_manager_mock)
-    wb_shop._update_advs_models = AsyncMock()
-    wb_shop._adv_settings = [adv_setting_mock]
-    wb_shop.get_calculated_keywords = AsyncMock(return_value=keywords_mocks)
+    # Setup Redis cache mock
+    redis_cache_mock = MagicMock()
+    redis_cache_mock.last_auto_delete_white_list = MagicMock()
+    redis_cache_mock.last_auto_delete_white_list.check_pass_time = AsyncMock(
+        return_value=True
+    )
+    redis_cache_mock.last_auto_delete_white_list.set = AsyncMock()
 
-    coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.parsing_keywords_run = AsyncMock()
-    coroutines_manager_mock.update_advs_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cards_data_from_wb_to_pg = AsyncMock()
-    coroutines_manager_mock.update_cpm_bid = AsyncMock()
-    coroutines_manager_mock.update_common_sale_stat = AsyncMock()
-    coroutines_manager_mock.update_full_adv_stat = AsyncMock()
-    coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
-    coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
-
-    with patch(
-        "app.modules.shop_runner.wb_shop.CoroutinesManager",
-        return_value=coroutines_manager_mock,
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.auto_white_list_updater.sm",
+            new=get_session_maker_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater."
+            "auto_white_list_updater.AdvSettingRedisCache",
+            return_value=redis_cache_mock,
+        ),
     ):
-        # Мокируем бесконечный alive воркер, чтобы gather не висел
-        wb_shop._alive_worker_run = AsyncMock()
+        manager = WhiteListUpdateManager(adv_setting_mock)
 
-        # Подменяем asyncio.gather чтобы не запускать реальные корутины и не зависать
-        async def _mock_gather(*args, **kwargs):
-            # вернём список переданных корутин (не будем их исполнять)
-            return [arg for arg in args]
+        # Test successful deletion
+        deleted, no_candidates = await manager.delete_last_white_phrase(keywords_mocks)
 
-        with patch("asyncio.gather", side_effect=_mock_gather):
-            await wb_shop.run()
+        # Should return True for deletion, False for no_candidates
+        assert deleted is True
+        assert no_candidates is False
 
-        # Проверяем, что все методы были вызваны
-        coroutines_manager_mock.parsing_keywords_run.assert_called_once()
-        coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
-        coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
-        coroutines_manager_mock.update_cpm_bid.assert_called_once()
-        coroutines_manager_mock.update_common_sale_stat.assert_called_once()
-        coroutines_manager_mock.update_full_adv_stat.assert_called_once()
-        coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
-        coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
+        # Verify database update was called
+        session_mock.execute.assert_called_once()
+        session_mock.commit.assert_called_once()
+
+        # Verify Redis cache was updated
+        redis_cache_mock.last_auto_delete_white_list.set.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_white_list_manager_delete_phrase_time_not_passed(
+    adv_setting_mock, keywords_mocks, common_mocks
+):
+    """Test that deletion is skipped when time hasn't passed."""
+    session_mock, get_session_maker_mock = common_mocks
+
+    # Setup Redis cache mock with time not passed
+    redis_cache_mock = MagicMock()
+    redis_cache_mock.last_auto_delete_white_list = MagicMock()
+    redis_cache_mock.last_auto_delete_white_list.check_pass_time = AsyncMock(
+        return_value=False
+    )
+    redis_cache_mock.last_auto_delete_white_list.set = AsyncMock()
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.auto_white_list_updater.sm",
+            new=get_session_maker_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater."
+            "auto_white_list_updater.AdvSettingRedisCache",
+            return_value=redis_cache_mock,
+        ),
+    ):
+        manager = WhiteListUpdateManager(adv_setting_mock)
+
+        # Test that deletion is skipped
+        deleted, no_candidates = await manager.delete_last_white_phrase(keywords_mocks)
+
+        # Should return False for both
+        assert deleted is False
+        assert no_candidates is False
+
+        # Verify no database operations
+        session_mock.execute.assert_not_called()
+        session_mock.commit.assert_not_called()
+
+        # Verify Redis cache was not updated
+        redis_cache_mock.last_auto_delete_white_list.set.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_white_list_manager_delete_phrase_no_candidates(
+    adv_setting_mock, common_mocks
+):
+    """Test behavior when there are no candidates for deletion."""
+    session_mock, get_session_maker_mock = common_mocks
+
+    # Create keywords with no white list candidates (all have hard_status != 2)
+    keywords_no_candidates = [
+        MagicMock(
+            spec=CalculatedKeyword,
+            hard_status=1,
+            best_keyword_status=False,
+            baes_ctr=0.5,
+        ),
+        MagicMock(
+            spec=CalculatedKeyword,
+            hard_status=1,
+            best_keyword_status=False,
+            baes_ctr=0.3,
+        ),
+    ]
+
+    # Setup Redis cache mock
+    redis_cache_mock = MagicMock()
+    redis_cache_mock.last_auto_delete_white_list = MagicMock()
+    redis_cache_mock.last_auto_delete_white_list.check_pass_time = AsyncMock(
+        return_value=True
+    )
+    redis_cache_mock.last_auto_delete_white_list.set = AsyncMock()
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.auto_white_list_updater.sm",
+            new=get_session_maker_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater."
+            "auto_white_list_updater.AdvSettingRedisCache",
+            return_value=redis_cache_mock,
+        ),
+    ):
+        manager = WhiteListUpdateManager(adv_setting_mock)
+
+        # Test with no candidates
+        deleted, no_candidates = await manager.delete_last_white_phrase(
+            keywords_no_candidates
+        )  # type: ignore
+
+        # Should return False for deletion, True for no_candidates
+        assert deleted is False
+        assert no_candidates is True
+
+        # Verify no database operations
+        session_mock.execute.assert_not_called()
+        session_mock.commit.assert_not_called()
+
+        # Verify Redis cache was not updated
+        redis_cache_mock.last_auto_delete_white_list.set.assert_not_called()

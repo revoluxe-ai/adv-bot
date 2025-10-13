@@ -9,7 +9,7 @@ from app.utils.NeoDataScience.driver import DataScience
 
 
 class DataGetter(AbcManager):
-    def __init__(self):
+    def __init__(self) -> None:
         self._gds = DataScience()
 
     @staticmethod

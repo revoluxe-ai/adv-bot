@@ -38,6 +38,7 @@ class GlobalCategorySetting(BaseTable):
     category_name = Column(String, nullable=False, unique=True)
     min_ctr = Column(Float, nullable=False)
 
+
 # class AdvPayment(BaseTable):
 #     __tablename__ = "advpayment"
 #     id = Column(Integer, primary_key=True, autoincrement=True)

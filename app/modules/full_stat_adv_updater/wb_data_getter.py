@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 from app.modules.shop_runner.modules.wb_api import WBApi
 
 
-async def get_full_adv_stat_for_adv_ids(wb_api: "WBApi", adv_ids: set[int], threshold_dates: int):
+async def get_full_adv_stat_for_adv_ids(
+    wb_api: "WBApi", adv_ids: set[int], threshold_dates: int
+):
     dates = []
     today = datetime.now().date()
     last_days = threshold_dates

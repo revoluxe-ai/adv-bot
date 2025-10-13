@@ -28,7 +28,9 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
 
         stmt = (
             select(User)
-            .options(joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet))
+            .options(
+                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
+            )
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)

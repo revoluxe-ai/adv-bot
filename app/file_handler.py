@@ -6,10 +6,10 @@ from io import BytesIO
 
 import aiofiles
 import aiogram
+from PIL import Image as PilImage
 from aiogram import Bot
 from aiogram.client.session import aiohttp
 from aiogram.types import BufferedInputFile, InputFile
-from PIL import Image as PilImage
 
 from app.admin_bot.sender.utils.db import db
 from app.utils.image_master import image_tools
@@ -30,7 +30,7 @@ def get_image_from_disc_path(image_path: str) -> str:
     return image_path
 
 
-async def get_image_from_disc(image_path: str) -> BytesIO:
+async def get_image_from_disc(image_path: str) -> BytesIO | None:
     image_path = get_image_from_disc_path(image_path)
     if os.path.exists(image_path):
         async with aiofiles.open(image_path, "rb") as f:
@@ -70,7 +70,9 @@ async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFil
                         buffered_image = BytesIO(image_bytes)
                         await save_image_to_disc(image_path, buffered_image)
                     else:
-                        raise Exception(f"Ошибка загрузки изображения: HTTP {response.status}")
+                        raise Exception(
+                            f"Ошибка загрузки изображения: HTTP {response.status}"
+                        )
         else:
             logger.debug(f"Загрузка изображения из локального файла: {image_path}")
             async with aiofiles.open(image_path, "rb") as f:

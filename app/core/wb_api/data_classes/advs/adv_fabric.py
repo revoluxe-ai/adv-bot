@@ -1,30 +1,28 @@
 import logging
-from typing import Any
+from typing import Any, assert_never
 
 from pydantic import ValidationError
 
 from .auction_adv import AuctionAdv
-from .auto_adv import AutoAdv
-from .base_adv import Adv
 
 logger = logging.getLogger(__name__)
 
 
-def get_adv_data_class(data_from_wb: dict[str, Any]) -> Adv | None:
+def get_adv_data_class(data_from_wb: dict[str, Any]) -> AuctionAdv:
+    """Create AuctionAdv instance from WB API data.
+
+    Since WB API now only returns auction campaigns (type 9),
+    we always return AuctionAdv instances.
+    """
     data = data_from_wb
     _type = data["type"]
-    if _type == 8:
+    if _type == 9:
         try:
-            return AutoAdv(**data)
+            return AuctionAdv(data)
         except ValidationError as exc:
-            logger.error(f"{exc}")
-            raise exc
-    elif _type == 9:
-        try:
-            return AuctionAdv(**data)
-        except ValidationError as exc:
-            logger.error(f"{exc}")
+            logger.error(f"Validation error creating AuctionAdv: {exc}")
             raise exc
     else:
-        logger.debug(f"Неизвестный типа кампании: тип {_type}")
-        return None
+        logger.error(f"Неожиданный тип кампании: {_type}, ожидался 9 (аукцион)")
+        # Use assert_never for type safety and exhaustiveness checking
+        assert_never(_type)
