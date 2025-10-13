@@ -20,8 +20,11 @@ from .redis_manager import PredictCTRRedisManager
 class PredictCTRManagerContainer(containers.DeclarativeContainer):
     wiring_config = containers.WiringConfiguration(
         modules=[
-            "app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.predict_ctr_update_manager",  # функции/корутины модуля predict_ctr_update_manager
-            "app.modules.wb_adv_updater.get_text_to_predict_ctr_dict",  # функция get для получения словаря предсказаний CTR
+            "app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.predict_ctr_update_manager",
+            # функции/корутины модуля predict_ctr_update_manager
+            "app.modules.wb_adv_updater.get_text_to_predict_ctr_dict",
+            # функция get для получения словаря предсказаний CTR
+            "app.client_bot.user_interface.views.messages.messages",  # views для взаимодействия с пользователем в боте
         ]
     )
 
