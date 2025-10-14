@@ -57,18 +57,6 @@ logger = logging.getLogger(__name__)
 _sm = get_async_session_maker
 
 
-async def measure_time(function: Callable[..., Any]) -> Callable[..., Any]:
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        start_time = time.time()
-        result = await function(
-            *args, **kwargs
-        )  # Используйте await для асинхронного вызова
-        end_time = time.time()
-        print(f"{function.__name__} выполнена за {end_time - start_time} секунд.")
-        return result
-
-    return wrapper
-
 
 async def get_keyword_statistic_clickhouse(
         client: Any, text: str, adv_ids: set[int], pass_days: int | None = 7
