@@ -192,10 +192,17 @@ class TestTokenMonitoringIntegration:
         expired_token.check_valid.return_value = False
         
         # Mock database queries
-        session.execute.return_value.scalars.return_value.all.side_effect = [
-            [valid_token, expired_token],  # tokens query
-        ]
-        session.execute.return_value.scalar.return_value = "Test Shop"
+        # First call to execute - get tokens
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [valid_token, expired_token]
+        mock_result_tokens = MagicMock()
+        mock_result_tokens.scalars.return_value = mock_scalars
+        
+        # Second call to execute - get shop name
+        mock_result_shop = MagicMock()
+        mock_result_shop.scalar.return_value = "Test Shop"
+        
+        session.execute = AsyncMock(side_effect=[mock_result_tokens, mock_result_shop])
         
         # Mock _get_expiring_tokens
         token_info_service._get_expiring_tokens = AsyncMock(return_value=[])
