@@ -169,6 +169,7 @@ sqlalchemy = {extras = ["mypy"], version = "^2.0.43"}
 types-psutil = "^7.0.0.20250822"
 debugpy = "^1.8.17"
 types-redis = "^4.6.0.20241004"
+coverage = '*'
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
