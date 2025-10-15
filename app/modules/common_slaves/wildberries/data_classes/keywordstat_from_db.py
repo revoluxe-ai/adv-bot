@@ -72,8 +72,9 @@ class CalculatedKeyword(BaseModel):
 
     @property
     def rating_by_predict_ctr(self) -> float:
-        predict_ctr_exponent: float = self.predict_ctr_exponent
-        rating = self.predict_ctr**predict_ctr_exponent * self.views
+        if self.predict_ctr is None or self.predict_ctr_exponent is None:
+            return 0.0
+        rating = self.predict_ctr**self.predict_ctr_exponent * self.views
         return rating
 
     @property
