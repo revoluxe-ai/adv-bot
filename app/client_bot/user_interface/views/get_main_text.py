@@ -1,3 +1,6 @@
+from app.client_bot import const
+
+
 def get_main_text(user_telegram_id: int):
     text = f"""
 Я бот-партнер в автоматизации рекламы на Wildberries: для агентств и крупных селлеров. 
@@ -31,9 +34,9 @@ def get_main_text(user_telegram_id: int):
 
 Самая актуальная информация на канале — https://t.me/sellerspub
 
-Видео про логику работы бота и его настройку — https://t.me/sellerspub/37
+Подробные инструкции по работе с ботом — https://t.me/sellerspub/175
 
-По любым вопросам писать — @vadyanc
+По любым вопросам писать — {const.SUPPORT_LINK}
 
 Ваш telegram id: {user_telegram_id}
 """

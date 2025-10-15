@@ -1,5 +1,5 @@
 import re
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Any
 
 from pydantic import BaseModel
@@ -56,7 +56,7 @@ class AdvType:
     KEYWORD_TEST = "KEYWORD_TEST"
 
 
-class Adv:
+class Adv(ABC):
     def __repr__(self):
         return f"Name: {self.name}, Advert ID: {self.advertId},  Status: {self.status_native_ru}, Type: {self.adv_type}"
 
