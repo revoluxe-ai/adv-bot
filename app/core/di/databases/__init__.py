@@ -1,4 +1,1 @@
-"""Контейнеры для DI-зависимостей баз данных."""
-
-from .neo4j import *
-from .redis import *
+from .redis import create_redis_client, RedisLifecycle
