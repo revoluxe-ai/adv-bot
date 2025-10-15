@@ -11,6 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 
 from app.settings import settings
 
+
+# TODO: Сделать отдельную настройку
+#  количества соединений для каждого микросервиса
+#  В перспективе Перейти на PGbouncer или Pgpool-II
+#  для балансировки нагрузки между мастером и репликами
+
 logger = logging.getLogger(__name__)
 
 conn_counter = 0
@@ -116,6 +122,7 @@ read_only_engine = create_async_engine(
     echo=False,
     pool_size=pool_size,
     max_overflow=max_overflow,
+    pool_recycle=180,
     pool_pre_ping=True,
 )
 
@@ -124,6 +131,7 @@ read_write_engine = create_async_engine(
     echo=False,
     pool_size=pool_size,
     max_overflow=max_overflow,
+    pool_recycle=180,
     pool_pre_ping=True,
 )
 
@@ -142,7 +150,7 @@ read_write_session_maker = async_sessionmaker(
 
 
 @asynccontextmanager
-async def get_async_session_maker(
+async def  get_async_session_maker(
     read_only=False,
 ) -> AsyncGenerator[AsyncSession, None]:
     session_start = time()
