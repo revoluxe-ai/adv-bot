@@ -711,7 +711,8 @@ def get_keywords_setting_keyboard(
         InlineKeyboardButton(
             text="Изменить экспоненту прог. ctr",
             callback_data=ChangeExponentSettinginAdvSettingCallback(
-                adv_id=adv_id
+                adv_id=adv_id,
+                wb_user_cabinet_original_id=wb_user_cabinet_original_id
             ).pack(),
         )
     ]
