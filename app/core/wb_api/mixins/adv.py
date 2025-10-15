@@ -272,7 +272,7 @@ class AdvMixin(WBAPIProtocol):
         self, adv_id: int, nmid: int, new_bid: int
     ) -> dict[str, Any]:
         data = {
-            "bids": [{"advert_id": adv_id, "nm_bids": [{"nm": nmid, "bid": new_bid}]}]
+            "bids": [{"advert_id": adv_id, "nm_bids": [{"nm": nmid, "bid": int(new_bid)}]}]
         }
         return data
 

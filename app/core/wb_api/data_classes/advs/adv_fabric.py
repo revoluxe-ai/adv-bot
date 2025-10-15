@@ -15,7 +15,7 @@ def get_adv_data_class(data_from_wb: dict[str, Any]) -> Adv | None:
     _type = data["type"]
     if _type == 8:
         try:
-            return AutoAdv(**data)
+            return AutoAdv(data)
         except ValidationError as exc:
             logger.error(f"{exc}")
             raise exc

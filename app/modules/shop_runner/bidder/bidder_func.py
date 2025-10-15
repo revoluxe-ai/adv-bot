@@ -94,7 +94,11 @@ async def run_bidder_process_for_adv(
 
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение ставок для биддера")
-        cpms: set[int] | None = await get_cpms_from_wb(adv_setting, wb_api)
+        try:
+            cpms: set[int] | None = await get_cpms_from_wb(adv_setting, wb_api)
+        except Exception as exc:
+            logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
+            raise exc
     except ApiForbiddenError as e:
         raise e
     except Exception:
