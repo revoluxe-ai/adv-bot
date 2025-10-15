@@ -25,7 +25,9 @@ async def change_exponent_setting(
     state: FSMContext,
 ):
     adv_id = callback_data.adv_id
-    await state.update_data(adv_id=adv_id)
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    await state.update_data(adv_id=adv_id,
+                            last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.set_state("waiting_for_new_exponent")
     message = callback.message
     await message.answer("Введите новое значение для экспоненты прогнозируемого CTR:")
