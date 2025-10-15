@@ -11,6 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 
 from app.settings import settings
 
+
+# TODO: Сделать отдельную настройку
+#  количества соединений для каждого микросервиса
+#  В перспективе Перейти на PGbouncer или Pgpool-II
+#  для балансировки нагрузки между мастером и репликами
+
 logger = logging.getLogger(__name__)
 
 conn_counter = 0
