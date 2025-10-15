@@ -94,7 +94,7 @@ class TestShopMenuTokenLoading:
         This test would have FAILED before the fix and exposed the bug.
         """
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.modules.shop_menu.message.get_shop_token_status') as mock_get_token_status:
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
                 # Setup database mocks - properly mock the async context manager
                 mock_session = AsyncMock()
                 mock_context_manager = AsyncMock()
@@ -104,11 +104,13 @@ class TestShopMenuTokenLoading:
                 
                 # Mock the database query result
                 mock_result = MagicMock()  # Result object is not async
-                mock_result.scalar_one.return_value = sample_wb_user_cabinet  # scalar_one() is sync
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)  # scalar_one() is sync
                 mock_session.execute = AsyncMock(return_value=mock_result)  # execute() is async
                 
                 # Mock the token status service
-                mock_get_token_status.return_value = sample_token_status
+                mock_token_service = AsyncMock()
+                mock_token_service.get_shop_token_status = AsyncMock(return_value=sample_token_status)
+                mock_token_service_class.return_value = mock_token_service
                 
                 # Mock the pricer methods - these are async methods
                 with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
@@ -137,7 +139,7 @@ class TestShopMenuTokenLoading:
                         assert shop_menu._token_status == sample_token_status, "Token status should match expected data"
                         
                         # Verify that get_shop_token_status was called
-                        mock_get_token_status.assert_called_once_with("test_shop_123")
+                        mock_token_service.get_shop_token_status.assert_called_once_with("test_shop_123")
 
     @pytest.mark.asyncio
     async def test_token_status_error_handling_during_loading(
@@ -149,7 +151,7 @@ class TestShopMenuTokenLoading:
         This verifies that if token status loading fails, the error is handled properly.
         """
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.modules.shop_menu.message.get_shop_token_status') as mock_get_token_status:
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
                 # Setup database mocks - properly mock the async context manager
                 mock_session = AsyncMock()
                 mock_context_manager = AsyncMock()
@@ -159,11 +161,13 @@ class TestShopMenuTokenLoading:
                 
                 # Mock the database query result
                 mock_result = MagicMock()  # Result object is not async
-                mock_result.scalar_one.return_value = sample_wb_user_cabinet  # scalar_one() is sync
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)  # scalar_one() is sync
                 mock_session.execute = AsyncMock(return_value=mock_result)  # execute() is async
                 
                 # Make token status loading fail
-                mock_get_token_status.side_effect = Exception("Token service error")
+                mock_token_service = AsyncMock()
+                mock_token_service.get_shop_token_status = AsyncMock(side_effect=Exception("Token service error"))
+                mock_token_service_class.return_value = mock_token_service
                 
                 # Mock the pricer methods - these are async methods
                 with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
@@ -187,7 +191,7 @@ class TestShopMenuTokenLoading:
                         assert shop_menu._token_status is None, "Token status should be None on error"
                         
                         # Verify that get_shop_token_status was called (and failed)
-                        mock_get_token_status.assert_called_once_with("test_shop_123")
+                        mock_token_service.get_shop_token_status.assert_called_once_with("test_shop_123")
 
     @pytest.mark.asyncio 
     async def test_full_integration_with_token_status_in_text(
@@ -200,7 +204,7 @@ class TestShopMenuTokenLoading:
         "Ошибка загрузки" instead of actual status.
         """
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.modules.shop_menu.message.get_shop_token_status') as mock_get_token_status:
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
                 # Setup all mocks - properly mock the async context manager
                 mock_session = AsyncMock()
                 mock_context_manager = AsyncMock()
@@ -208,11 +212,13 @@ class TestShopMenuTokenLoading:
                 mock_context_manager.__aexit__ = AsyncMock(return_value=None)
                 mock_sm.return_value = mock_context_manager
                 
-                mock_result = AsyncMock()
-                mock_result.scalar_one = AsyncMock(return_value=sample_wb_user_cabinet)
+                mock_result = MagicMock()
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)
                 mock_session.execute = AsyncMock(return_value=mock_result)
                 
-                mock_get_token_status.return_value = sample_token_status
+                mock_token_service = AsyncMock()
+                mock_token_service.get_shop_token_status = AsyncMock(return_value=sample_token_status)
+                mock_token_service_class.return_value = mock_token_service
                 
                 # Mock the pricer methods - these are async methods
                 with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
@@ -234,16 +240,15 @@ class TestShopMenuTokenLoading:
                         text = shop_menu.text
                         
                         # Verify token status information is present and correct
-                        assert "🔑 <b>Состояние токенов:</b> ✅" in text, "Should show successful token status"
-                        assert "• Всего токенов: 1" in text, "Should show total token count"
-                        assert "• Действующих: 1" in text, "Should show valid token count"
+                        assert "\n🔑 <b>Токены:</b> ✅ <b>Все в порядке</b>\n" in text, "Should show successful token status"
+                        assert "⏰ Сервис перестанет работать" in text, "Should show token expiration date"
                         
                         # Verify the error message is NOT present
                         assert "⚠️ Ошибка загрузки" not in text, "Should not show loading error"
 
     @pytest.mark.asyncio
     async def test_integration_shows_error_when_token_loading_fails(
-        self, mock_bot, mock_state, sample_wb_user_cabinet
+        self, mock_bot, mock_state, sample_wb_user_cabinet, sample_token_status
     ):
         """
         Test that when token loading fails, the error message is shown in text.
@@ -251,7 +256,7 @@ class TestShopMenuTokenLoading:
         This verifies the error handling path works correctly.
         """
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.modules.shop_menu.message.get_shop_token_status') as mock_get_token_status:
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
                 # Setup database mocks - properly mock the async context manager
                 mock_session = AsyncMock()
                 mock_context_manager = AsyncMock()
@@ -259,12 +264,14 @@ class TestShopMenuTokenLoading:
                 mock_context_manager.__aexit__ = AsyncMock(return_value=None)
                 mock_sm.return_value = mock_context_manager
                 
-                mock_result = AsyncMock()
-                mock_result.scalar_one = AsyncMock(return_value=sample_wb_user_cabinet)
+                mock_result = MagicMock()
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)
                 mock_session.execute = AsyncMock(return_value=mock_result)
                 
                 # Make token status loading fail
-                mock_get_token_status.side_effect = Exception("Token service unavailable")
+                mock_token_service = AsyncMock()
+                mock_token_service.get_shop_token_status = AsyncMock(side_effect=Exception("Token service unavailable"))
+                mock_token_service_class.return_value = mock_token_service
                 
                 # Mock the pricer methods - these are async methods
                 with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
@@ -286,7 +293,7 @@ class TestShopMenuTokenLoading:
                         text = shop_menu.text
                         
                         # Verify error message is shown
-                        assert "🔑 <b>Состояние токенов:</b> ⚠️ Ошибка загрузки" in text, "Should show loading error"
+                        assert "\n🔑 <b>Токены:</b> ⚠️ <b>Ошибка загрузки</b>\n" in text, "Should show loading error"
                         
                         # Verify successful token status is NOT shown
                         assert "• Всего токенов:" not in text, "Should not show token count on error"
@@ -301,38 +308,39 @@ class TestShopMenuTokenLoading:
         
         Before the fix, this test would fail because token status wasn't being loaded.
         """
-        # Simulate the original buggy behavior where get_shop_token_status is never called
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            # Don't patch get_shop_token_status - simulating the original bug
-            
-            # Setup database mocks - properly mock the async context manager
-            mock_session = AsyncMock()
-            mock_context_manager = AsyncMock()
-            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_context_manager.__aexit__ = AsyncMock(return_value=None)
-            mock_sm.return_value = mock_context_manager
-            
-            mock_result = MagicMock()
-            mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)
-            mock_session.execute = AsyncMock(return_value=mock_result)
-            
-            # Mock the pricer methods - these are async methods
-            with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
-                with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
-                    mock_month_tariff.return_value = 500
-                    mock_day_price.return_value = 100
-                    
-                    # Create ShopMenu instance
-                    shop_menu = ShopMenu(
-                        bot=mock_bot,
-                        chat_id=123456789,
-                        state=mock_state,
-                        wb_user_cabinet_original_id=1
-                    )
-                    
-                    # Mock get_shop_token_status to simulate successful token loading
-                    with patch.object(shop_menu, 'get_shop_token_status', new_callable=AsyncMock) as mock_get_token:
-                        mock_get_token.side_effect = lambda: setattr(shop_menu, '_token_status_loaded', True) or setattr(shop_menu, '_token_status', sample_token_status)
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
+                # Don't patch get_shop_token_status - simulating the original bug
+                
+                # Setup database mocks - properly mock the async context manager
+                mock_session = AsyncMock()
+                mock_context_manager = AsyncMock()
+                mock_context_manager.__aenter__ = AsyncMock(return_value=mock_session)
+                mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+                mock_sm.return_value = mock_context_manager
+                
+                mock_result = MagicMock()
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)
+                mock_session.execute = AsyncMock(return_value=mock_result)
+                
+                # Mock the pricer methods - these are async methods
+                with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
+                    with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
+                        mock_month_tariff.return_value = 500
+                        mock_day_price.return_value = 100
+                        
+                        # Create ShopMenu instance
+                        shop_menu = ShopMenu(
+                            bot=mock_bot,
+                            chat_id=123456789,
+                            state=mock_state,
+                            wb_user_cabinet_original_id=1
+                        )
+
+                        # Mock token status service to simulate a successful load for the *original* bug test
+                        mock_token_service = AsyncMock()
+                        mock_token_service.get_shop_token_status = AsyncMock(return_value=sample_token_status)
+                        mock_token_service_class.return_value = mock_token_service
                         
                         await shop_menu._load_all_data()
                         
