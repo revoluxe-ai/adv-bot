@@ -45,15 +45,15 @@ async def get_access_for_wb_cabinet(
 ) -> WBCabinetAccess:
 
     if wb_config.test_mode:
-        shop_id = "b90b2506-25e9-444a-aa2c-38e2e628f139"
+        test_shop_id = "b90b2506-25e9-444a-aa2c-38e2e628f139"
         wb_token_mock = Mock(spec=WBToken)
         wb_token_mock.api_key = wb_config.test_token
         wb_token_mock.hash = hash(wb_config.test_token)
         wb_token_mock.expires = datetime.datetime.now() + datetime.timedelta(days=30)
-        wb_token_mock.shop_id = shop_id
+        wb_token_mock.shop_id = test_shop_id
         wb_token_mock.is_expired = False
         wb_cabinet_mock = Mock()
-        wb_cabinet_mock.shop_id = shop_id
+        wb_cabinet_mock.shop_id = test_shop_id
         access = WBCabinetAccess([wb_token_mock], None, wb_cabinet_mock)
         return access
 
