@@ -210,12 +210,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             str(round(max_price_for_order)) if max_price_for_order else "Не задано"
         )
 
-        order_cost = (
-            self._spend_for_inner_adv_for_3_days / self._all_orders_for_last_days
-            if self._all_orders_for_last_days
-            else self._spend_for_inner_adv_for_3_days
-        )
-
         text += (
             f"\nВ среднем в день (срез за 2 дня):\n"
             f"Прогноз средних заказов в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
