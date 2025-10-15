@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from app.core.wb_api.data_classes.adv import Adv
+from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -17,7 +17,7 @@ from app.utils.db.session_maker import get_async_session_maker
 _sm = get_async_session_maker
 
 
-async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int) -> None:
+async def update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None:
     part = 10
     # Разбиваем список advs на части по 10 элементов
     for i in range(0, len(advs), part):
@@ -25,7 +25,7 @@ async def update_advs_in_db(advs: list[Adv], wb_cabinet_id: int) -> None:
         await _update_advs_in_db(advs_part, wb_cabinet_id)
 
 
-async def _update_advs_in_db(advs: list[Adv], wb_cabinet_id: int) -> None:
+async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None:
     # Преобразуем в список словарей
     adv_data = [
         {

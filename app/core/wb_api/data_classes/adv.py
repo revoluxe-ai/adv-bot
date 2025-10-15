@@ -141,7 +141,9 @@ class Adv:
 
     @property
     def cpm(self):
-        return self._data["price"]
+        # TODO: Временное решение: нужно переделать, чтобы ставка для каждого товара была своей
+        cpm = self._data["auction_multibids"][0]["bid"]
+        return cpm
 
     @property
     def data(self):
