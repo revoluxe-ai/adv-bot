@@ -825,14 +825,6 @@ async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
 
 
 
-async def get_all_users() -> list[User]:
-    async with _sm() as session:
-        stmt = select(User)
-        result = await session.execute(stmt)
-        users: list[User] = list(result.unique().scalars().all())
-    return users
-
-
 async def get_all_shops_for_user(user: User) -> list[WBUserCabinet]:
     async with _sm() as session:
         stmt = select(WBUserCabinet).where(WBUserCabinet.user_id == user.id)
