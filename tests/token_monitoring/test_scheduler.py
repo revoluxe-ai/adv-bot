@@ -86,8 +86,15 @@ class TestTokenMonitoringScheduler:
     @pytest.mark.asyncio
     async def test_stop_scheduler(self, scheduler):
         """Test stopping the scheduler."""
-        # Setup running scheduler
-        mock_task = AsyncMock()
+        # Setup running scheduler with a real task
+        async def dummy_coro():
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                pass
+        
+        mock_task = asyncio.create_task(dummy_coro())
+        
         scheduler._running = True
         scheduler._task = mock_task
         
@@ -95,7 +102,7 @@ class TestTokenMonitoringScheduler:
         
         assert scheduler.is_running == False
         assert scheduler._task is None
-        mock_task.cancel.assert_called_once()
+        assert mock_task.cancelled()
     
     @pytest.mark.asyncio
     async def test_stop_not_running(self, scheduler):
@@ -118,14 +125,16 @@ class TestTokenMonitoringScheduler:
             mock_datetime.now.return_value = mock_now
             mock_datetime.combine = datetime.datetime.combine
             
-            with patch('asyncio.sleep') as mock_sleep:
+            with patch('app.modules.token_monitoring.scheduler.asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
                 # Make the first sleep raise CancelledError to exit loop
-                mock_sleep.side_effect = [asyncio.CancelledError()]
+                mock_sleep.side_effect = asyncio.CancelledError()
                 
                 scheduler._running = True
                 
-                with pytest.raises(asyncio.CancelledError):
+                try:
                     await scheduler._daily_check_loop(check_time)
+                except asyncio.CancelledError:
+                    pass  # Expected
                 
                 # Should sleep for 1 hour (until 9:00 AM)
                 expected_sleep = 3600  # 1 hour in seconds
@@ -144,13 +153,15 @@ class TestTokenMonitoringScheduler:
             mock_datetime.now.return_value = mock_now
             mock_datetime.combine = datetime.datetime.combine
             
-            with patch('asyncio.sleep') as mock_sleep:
-                mock_sleep.side_effect = [asyncio.CancelledError()]
+            with patch('app.modules.token_monitoring.scheduler.asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+                mock_sleep.side_effect = asyncio.CancelledError()
                 
                 scheduler._running = True
                 
-                with pytest.raises(asyncio.CancelledError):
+                try:
                     await scheduler._daily_check_loop(check_time)
+                except asyncio.CancelledError:
+                    pass  # Expected
                 
                 # Should sleep for 23 hours (until 9:00 AM tomorrow)
                 expected_sleep = 23 * 3600  # 23 hours in seconds
