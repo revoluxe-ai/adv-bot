@@ -113,3 +113,10 @@ async def save_telegram_file(image: io.BytesIO, image_telegram_id: str, bot_id: 
     pil_image = PilImage.open(image)
     dhash = image_tools.dhash(pil_image)
     await db.add_file(image_telegram_id, dhash, bot_id)
+
+
+# TODO: Сделать расчет максимальной ставки
+
+# TODO: Сделать сравнения похожих товаров, но с большой разницей по результативности
+
+# TODO: Сделать, чтобы грузилась только 1 РК
