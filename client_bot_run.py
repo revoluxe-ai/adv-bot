@@ -14,6 +14,8 @@ from python_modules.logger import setup_logging
 
 logger = logging.getLogger(__name__)
 
+# TODO: Переделать кнопки в боте на более понятные, чтобы было видно какой режим сейчас включен, на какой пере
+# переключиться при нажатии
 
 setup_logging()
 
