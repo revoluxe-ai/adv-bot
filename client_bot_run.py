@@ -18,6 +18,8 @@ from app.modules.token_monitoring import initialize_token_monitoring, shutdown_t
 
 logger = logging.getLogger(__name__)
 
+# TODO: Переделать кнопки в боте на более понятные, чтобы было видно какой режим сейчас включен, на какой пере
+# переключиться при нажатии
 
 setup_logging()
 
