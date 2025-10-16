@@ -115,8 +115,6 @@ async def get_keywords_statistic_clickhouse(
         adv_setting: AdvSetting,
         pass_time: timedelta | None = timedelta(days=7),
         last_views: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
 ) -> list[CalculatedKeyword]:
     async with get_clickhouse_client() as ch_client:
         advs: set[int] = set()
@@ -124,7 +122,7 @@ async def get_keywords_statistic_clickhouse(
         advs.add(auto_adv_id)
         if search_adv_id := adv_setting.search_adv_id:
             advs.add(search_adv_id)
-        query = _build_clickhouse_query(advs, pass_time, last_views, limit, offset)
+        query = _build_clickhouse_query(advs, pass_time, last_views)
         result = await ch_client.query(query)
         rows = result.result_rows
         keywords = []
@@ -164,8 +162,6 @@ def _build_clickhouse_query(
     adv_ids: set[int],
     pass_time: timedelta | None = None,
     last_views: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
 ) -> str:
     """
     Запрос для ClickHouse AggregatingMergeTree-таблицы default_db.advkeyword_new
@@ -235,11 +231,6 @@ FROM cumulative
 WHERE cumulative_total_views <= {last_views}
 GROUP BY text
 """.strip()
-
-    if limit is not None:
-        query += f"\nLIMIT {limit}"
-    if offset is not None:
-        query += f"\nOFFSET {offset}"
 
     return query
 
@@ -350,6 +341,8 @@ def __calculate_clusters(
             spend += int(keyword.spend)
             if isinstance(keyword.query, int):
                 query += keyword.query
+            elif isinstance(keyword.query, str) and keyword.query.isdigit():
+                query += int(keyword.query)
 
         cluster_keyword = CalculatedKeyword(
             text=keyword_cluster_name, views=views, clicks=clicks, spend=spend
@@ -419,13 +412,9 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> FullAdvStat | 
         return None
 
 
-async def get_good_bad_phrases(
-        adv: AdvSetting,
-        limit: int | None = None,
-        offset: int | None = None,
-) -> list[CalculatedKeyword]:
+async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords: list[CalculatedKeyword] = await get_good_bad_phrases_for_min_ctr(
-        adv, int(adv.max_cpc) if adv.max_cpc is not None else None, None, limit, offset
+        adv, int(adv.max_cpc) if adv.max_cpc is not None else None
     )
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
@@ -448,7 +437,7 @@ async def get_cached_keyword(adv: AdvSetting, text: str) -> CalculatedKeyword | 
     cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}"
     cached_data = await redis_manager.get(cache_key)
 
-    if cached_data:
+    if cached_data and isinstance(cached_data, str):
         return CalculatedKeyword.model_validate_json(cached_data)
     return None
 
@@ -500,12 +489,10 @@ async def get_good_bad_phrases_for_min_ctr(
         adv_setting: AdvSetting,
         max_cpc: int | None = None,
         pass_time: timedelta | None = timedelta(days=7),
-        limit: int | None = None,
-        offset: int | None = None,
 ) -> list[CalculatedKeyword]:
     min_ctr = await get_min_ctr(adv_setting)
     logger.debug("Минимальный ctr получен")
-    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time, None, limit, offset)
+    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time,)
     async with _sm() as session:
         logger.debug("Начинаю получать фразы")
         stmt = select(KeywordSetting).where(
@@ -574,6 +561,7 @@ async def get_good_bad_phrases_for_min_ctr(
                     )
                 )
 
+                assert keyword_setting is not None
                 text_to_keyword_setting[keyword_text] = keyword_setting
 
         await session.commit()
@@ -588,7 +576,7 @@ async def get_good_bad_phrases_for_min_ctr(
                 clicks=0,
                 views=0,
                 spend=0,
-                keyword_setting_original_id=keyword_setting_for_text.id if keyword_setting_for_text else None,
+                keyword_setting_original_id=keyword_setting_for_text.id,
             )
             position = await redis_manager.get_keyword_position(
                 text, adv_setting.nmids[0]
@@ -667,10 +655,10 @@ async def get_good_bad_phrases_for_min_ctr(
                         )
                 continue
         if (
-            not original_predict_ctr
-            and enough_views / 2 > keyword_stat.views
-            and not adv_setting.min_views_for_ml_predict
-            and keyword_stat.hard_status in [1, 2]
+                not original_predict_ctr
+                and enough_views / 2 > keyword_stat.views
+                and not adv_setting.min_views_for_ml_predict
+                and keyword_stat.hard_status in [1, 2]
         ):
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
@@ -782,7 +770,7 @@ async def get_main_photos(nmids: list[int]) -> list[str]:
 
 
 async def __download_and_resize_image(
-    url: str, session: Any, max_size: int = 1280
+        url: str, session: Any, max_size: int = 1280
 ) -> bytes | None:
     while True:
         async with session.get(url) as response:
@@ -1190,9 +1178,10 @@ async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
         if not best_keyword:
             return setting_max_bid
         convert_views_to_order = views / orders
-        ctr: int = best_keyword.predict_ctr
-        if not ctr:
-            return setting_max_bid
+        ctr: float | None = best_keyword.predict_ctr
+        if ctr is None:
+            raise ValueError("predict_ctr cannot be None for max_adv_bid calculation")
+        assert ctr is not None # Утверждение, что ctr теперь не None
         max_bid_for_1000_views = (
                 (max_pay_for_order / convert_views_to_order) * ctr * 1000
         )
