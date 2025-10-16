@@ -28,6 +28,10 @@ AsyncMock() по умолчанию возвращает coroutine-object; пр�
 @pytest.mark.asyncio
 @pytest.mark.parametrize("shop_id", ["7de14a75-4939-40ff-b4dd-9dd5472a4348"])
 async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
+    # Mock WBConfig to avoid DI dependency
+    mock_wb_config = MagicMock()
+    mock_wb_config.test_mode = False  # Set to False to test the real flow
+    
     with patch(
         "app.modules.common_slaves.wildberries.super_cabinet_manager.sm"
     ) as sm_mock:
@@ -67,7 +71,8 @@ async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
         exec2.scalars.return_value = scalars
         session2.execute = AsyncMock(return_value=exec2)
 
-        access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
+        # Pass the mock config explicitly to avoid DI issues
+        access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id, wb_config=mock_wb_config)
         assert isinstance(access, WBCabinetAccess)
 
         # Ensure no pending tasks remain after test (cancel them)
