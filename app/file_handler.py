@@ -103,6 +103,7 @@ async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFil
         logger.debug(f"Найден существующий файл: {file_id}")
         return file_id
     else:
+        # TODO: Кажется не сохраняет в базе telegram_file_id после загрузки
         logger.debug("Файл не найден, создание нового BufferedInputFile")
         buffered_image.seek(0)
         return BufferedInputFile(buffered_image.getvalue(), filename="wbgram.png")
