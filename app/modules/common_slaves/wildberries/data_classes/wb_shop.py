@@ -1,6 +1,6 @@
 from python_modules import path_setting_funcs
 
-from . import interfaces
+from app.core.wb_api.data_classes import interfaces
 
 
 class WbShop(interfaces.ShopInterface):
