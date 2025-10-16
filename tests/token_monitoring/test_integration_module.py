@@ -63,12 +63,19 @@ class TestTokenMonitoringIntegration:
     def test_install_error_handling(self, integration):
         """Test error handling during installation."""
         with patch('app.core.wb_api.http_request') as mock_http_module:
-            mock_http_module.try_except_decorator = Exception("Import error")
+            mock_http_module.try_except_decorator = MagicMock()
+            
+            # Make wrap_try_except_decorator raise an exception
+            integration.monitoring_service.wrap_try_except_decorator = MagicMock(
+                side_effect=Exception("Wrap error")
+            )
             
             with patch('app.modules.token_monitoring.integration.logger') as mock_logger:
-                with pytest.raises(Exception):
+                # The method should raise the exception after logging
+                with pytest.raises(Exception, match="Wrap error"):
                     integration.install()
                 
+                # Verify that error was logged
                 mock_logger.error.assert_called()
                 error_call = mock_logger.error.call_args[0][0]
                 assert "Failed to install token monitoring" in error_call
@@ -119,14 +126,24 @@ class TestTokenMonitoringIntegration:
     def test_uninstall_error_handling(self, integration):
         """Test error handling during uninstallation."""
         integration._is_installed = True
+        integration._original_decorator = MagicMock()
         
         with patch('app.core.wb_api.http_request') as mock_http_module:
-            mock_http_module.try_except_decorator = Exception("Module error")
+            # Make setting try_except_decorator raise an exception
+            def raise_on_set(value):
+                raise Exception("Module error")
+            
+            type(mock_http_module).try_except_decorator = property(
+                fget=lambda self: None,
+                fset=lambda self, value: raise_on_set(value)
+            )
             
             with patch('app.modules.token_monitoring.integration.logger') as mock_logger:
-                with pytest.raises(Exception):
+                # The method should raise the exception after logging
+                with pytest.raises(Exception, match="Module error"):
                     integration.uninstall()
                 
+                # Verify that error was logged
                 mock_logger.error.assert_called()
                 error_call = mock_logger.error.call_args[0][0]
                 assert "Failed to uninstall token monitoring" in error_call
@@ -203,8 +220,9 @@ class TestTokenMonitoringServiceWrapping:
         """Test that the service properly wraps decorators."""
         integration = TokenMonitoringIntegration()
         
-        # Mock original decorator
+        # Mock original decorator with __name__ attribute
         original_decorator = MagicMock()
+        original_decorator.__name__ = "test_decorator"
         
         # Mock the service's wrap method to return a test function
         def mock_wrap_method(original_decorator):
@@ -220,11 +238,3 @@ class TestTokenMonitoringServiceWrapping:
             assert callable(result)
             wrapped_result = result()
             assert wrapped_result == f"wrapped_{original_decorator.__name__}"
-        
-        # Test wrapping
-        result = integration.monitoring_service.wrap_try_except_decorator(original_decorator)
-        
-        # Verify the wrapper works
-        assert callable(result)
-        wrapped_result = result()
-        assert wrapped_result == f"wrapped_{original_decorator.__name__}"
