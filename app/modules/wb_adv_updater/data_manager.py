@@ -824,25 +824,6 @@ async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
     return adv_keyword_text_in_black_list
 
 
-async def get_adv_keyword_text_in_white_list() -> list[tuple[int, str]]:
-    async with _sm() as session:
-        stmt = (
-            select(KeywordSetting)
-            .options(selectinload(KeywordSetting.adv_setting))
-            .where(KeywordSetting.hard_status.in_([2, 3]))
-        )
-        result = await session.execute(stmt)
-        keyword_settings: list[KeywordSetting] = list(result.unique().scalars().all())
-    adv_keyword_text_in_white_list: list[tuple[int, str]] = []
-    for keyword_setting in keyword_settings:
-        adv_setting = keyword_setting.adv_setting
-        adv_keyword_text_in_white_list.append(
-            (adv_setting.adv_id, str(keyword_setting.text)
-             )
-        )
-
-    return adv_keyword_text_in_white_list
-
 
 async def get_all_users() -> list[User]:
     async with _sm() as session:
