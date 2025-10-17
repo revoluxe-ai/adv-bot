@@ -4,8 +4,8 @@ import json
 import logging
 from typing import Any, TypeVar
 
-from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.core.wb_api.protocols import WBAPIProtocol
+from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 from app.modules.common_slaves.wildberries.data_classes.adv import Balances
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from .excs import (
@@ -99,7 +99,7 @@ class AdvMixin(WBAPIProtocol):
         all_advs = []
         part = 50
         for i in range(0, len(adv_ids), part):
-            part_of_advs = adv_ids[i : i + part]
+            part_of_advs = adv_ids[i: i + part]
             advs = await self._get_advs(part_of_advs)
             if advs:
                 all_advs.extend(advs)
@@ -121,7 +121,7 @@ class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 60)
     async def create_auto_adv(
-        self, name: str, SubjectID: int, balance_type: int, start_status: bool
+            self, name: str, SubjectID: int, balance_type: int, start_status: bool
     ) -> int:
         url = "https://advert-api.wildberries.ru/adv/v1/save-ad"
         data = {
@@ -142,8 +142,8 @@ class AdvMixin(WBAPIProtocol):
         else:
             error_text = answer["error"]
             if (
-                error_text == "Invalid Params or payload:"
-                " Товары выбранной категории не в наличии, размещение невозможно"
+                    error_text == "Invalid Params or payload:"
+                                  " Товары выбранной категории не в наличии, размещение невозможно"
             ):
                 raise ItemCategoryNotInStockError()
             else:
@@ -198,7 +198,7 @@ class AdvMixin(WBAPIProtocol):
         return None
 
     async def update_nmids_in_adv(
-        self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
+            self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
     ) -> None:
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
@@ -221,7 +221,7 @@ class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 2)
     async def update_nmids_in_auto_adv(
-        self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
+            self, adv_id: int, nmids_for_add: list[int], nmids_for_del: list[int]
     ) -> None:
         url = f"https://advert-api.wildberries.ru/adv/v1/auto/updatenm?id={adv_id}"
         data = {"add": nmids_for_add, "delete": nmids_for_del}
@@ -269,7 +269,7 @@ class AdvMixin(WBAPIProtocol):
         return advertIds
 
     def __get_update_cpm_data(
-        self, adv_id: int, nmid: int, new_bid: int
+            self, adv_id: int, nmid: int, new_bid: int
     ) -> dict[str, Any]:
         data = {
             "bids": [{"advert_id": adv_id, "nm_bids": [{"nm": nmid, "bid": int(new_bid)}]}]
@@ -322,7 +322,7 @@ class AdvMixin(WBAPIProtocol):
             )
 
     async def get_adv_full_state(
-        self, adv_ids: list[int], dates: list[datetime.date] | None = None
+            self, adv_ids: list[int], dates: list[datetime.date] | None = None
     ) -> list[FullAdvStat] | None:
         if not adv_ids:
             return []
@@ -331,7 +331,7 @@ class AdvMixin(WBAPIProtocol):
 
         # Разбиваем список adv_ids на чанки по 100
         for i in range(0, len(adv_ids), 100):
-            chunk = adv_ids[i : i + 100]
+            chunk = adv_ids[i: i + 100]
             stats_chunk = await self._get_adv_full_state(chunk, dates)
             if stats_chunk:
                 all_stats.extend(stats_chunk)
@@ -340,7 +340,7 @@ class AdvMixin(WBAPIProtocol):
 
     @try_except_decorator(1, 60)
     async def _get_adv_full_state(
-        self, adv_ids: list[int], dates: list[datetime.date] | None = None
+            self, adv_ids: list[int], dates: list[datetime.date] | None = None
     ) -> list[FullAdvStat] | None:
         if dates is None:
             return None
@@ -433,3 +433,33 @@ class AdvMixin(WBAPIProtocol):
             full_stats.append(full_stat)
 
         return full_stats
+
+    async def upcast_target_placement(self, adv_id: int, /, search: bool, recommendations: bool) -> None:
+        type_query = 'PUT'
+        url = 'https://advert-api.wildberries.ru/adv/v0/auction/placements'
+        data = {
+            "placements": [
+                {
+                    "advert_id": adv_id,
+                    "placements": {
+                        "search": search,
+                        "recommendations": recommendations
+                    }
+                }
+            ]
+        }
+
+        async with self.session.request(
+                method=type_query,
+                url=url,
+                headers=self.headers.standart,
+                json=data
+        ) as response:
+            if response.status != 200:
+                response_text = await response.text()
+                logger.error(f"Ошибка при обновлении таргетинга размещений"
+                             f" для РК {adv_id}: {response.status} - {response_text}")
+                raise Exception(f"Ошибка при обновлении таргетинга размещений для РК {adv_id}")
+            else:
+                logger.debug(f"Таргетинг размещений для РК {adv_id} успешно обновлен: search={search},"
+                             f" recommendations={recommendations}")
