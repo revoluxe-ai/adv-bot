@@ -39,11 +39,11 @@ class ShopMenu(TextWithKeyboard):
     parse_mode = ParseMode.HTML
 
     def __init__(
-        self,
-        bot: Bot,
-        chat_id: int,
-        state: FSMContext,
-        wb_user_cabinet_original_id: int,
+            self,
+            bot: Bot,
+            chat_id: int,
+            state: FSMContext,
+            wb_user_cabinet_original_id: int,
     ):
         self._user_telegram_id = chat_id
         self._state = state
@@ -70,7 +70,6 @@ class ShopMenu(TextWithKeyboard):
             logger.error(f"Failed to load token status: {e}", exc_info=True)
             self._token_status = None
             self._token_status_loaded = False
-
 
     async def _load_all_data(self):
         """Оптимизированная загрузка всех данных в одной транзакции"""
@@ -163,10 +162,6 @@ class ShopMenu(TextWithKeyboard):
             logger.error(
                 f"Ошибка при оптимизированной загрузке данных: {e}", exc_info=True
             )
-            await self.bot.send_message(
-                self.chat_id,
-                "Произошла ошибка при загрузке данных. Пожалуйста, попробуйте позже.",
-            )
             raise e
 
     async def _process_tokens(self):
@@ -237,8 +232,8 @@ class ShopMenu(TextWithKeyboard):
 
         # Проверка на истечение срока действия
         if (
-            expiration_time < datetime.now()
-            and user.user_telegram_id not in const.ADMINS
+                expiration_time < datetime.now()
+                and user.user_telegram_id not in const.ADMINS
         ):
             await self.bot.send_message(
                 self.chat_id,
