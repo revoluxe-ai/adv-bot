@@ -14,14 +14,13 @@ from app.core.wb_api.mixins.excs import (
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.settings import settings
 from app.utils.db.session_maker import get_async_session_maker as sm
-
-from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
 from .exc import (
     CardsNotFoundForShopError,
     NotEnoughBalanceOnShopError,
     StartComplexAdvError,
 )
 from .wb_api import WBApi
+from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
 
 if TYPE_CHECKING:
     from ...common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
@@ -37,20 +36,20 @@ class MainAdvManager:
 
     async def _create_search_adv(self, nmid: int, name: str) -> int:
         adv_name = name
-        adv_adv = await self.wb_api.create_search_adv([nmid], adv_name)
-        await self.wb_api.rename_adv(adv_adv, new_name=adv_name)
-
-        return adv_adv
+        adv_id: int = await self.wb_api.create_search_adv([nmid], adv_name)
+        await self.wb_api.rename_adv(adv_id, new_name=adv_name)
+        await self._upcast_target_placement(adv_id, search=True, recommendations=False)
+        return adv_id
 
     async def _create_auto_adv(
-        self, name: str, SubjectID: int, balance_type: int, start_status: bool
+            self, name: str, SubjectID: int, balance_type: int, start_status: bool
     ) -> int:
         return await self.wb_api.create_auto_adv(
             name, SubjectID, balance_type, start_status
         )
 
     async def upcast_auto_adv(
-        self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot
+            self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot
     ):
         await bot.send_message(
             user_telegram_id, f"Пытаюсь найти и настроить Авто-РК для артикула {nmid}"
@@ -117,13 +116,13 @@ class MainAdvManager:
                 break
 
     async def create_complex_advs(
-        self, bot: Bot, user_telegram_id, nmid: int, hard_mode
+            self, bot: Bot, user_telegram_id, nmid: int, hard_mode
     ) -> tuple[int, int]:
         exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
         if (
-            not exist_adv
-            or hard_mode is True
-            or exist_adv.active_status in ["refused", "done"]
+                not exist_adv
+                or hard_mode is True
+                or exist_adv.active_status in ["refused", "done"]
         ):
             balances = await self.wb_api.get_adv_balances()
             try:
@@ -293,8 +292,8 @@ class MainAdvManager:
         full_balance: list[int] = [balance, net, bonus]
         logger.debug(f"Балансы: {full_balance}")
         if (
-            sum(full_balance) >= 2000
-            or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2
+                sum(full_balance) >= 2000
+                or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2
         ):
             return True
         return False
@@ -324,3 +323,6 @@ class MainAdvManager:
         else:
             raise Exception("Неизвестный тип баланса")
         return balance_type, min_balance_property_name
+
+    async def _upcast_target_placement(self, adv_id, /, search, recommendations):
+        await self.wb_api.upcast_target_placement(adv_id, search, recommendations)

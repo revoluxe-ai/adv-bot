@@ -3,6 +3,7 @@ from typing import Any
 
 from arq import Retry
 
+from app import DIManager, AppContainer
 from app.client_bot import const
 from app.client_bot.bot import get_bot
 from app.core.wb_api.exceptions import ApiForbiddenError
@@ -18,28 +19,29 @@ logger = logging.getLogger(__name__)
 
 
 async def create_complex_advs(
-    ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
+        ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
-    try:
-        await _create_complex_advs(ctx, nmid, shop_id, hard_mode, user_telegram_id)
-    except ApiForbiddenError:
-        bot = get_bot()
-        await bot.send_message(
-            user_telegram_id,
-            f"Нет токенов с нужными правами. Обратитесь в поддержку {const.SUPPORT_LINK}",
-        )
-        return
-    except Exception:
-        delay = 1
-        logger.error(
-            f"Ошибка задачи create_complex_advs, повтор через {delay} сек",
-            exc_info=True,
-        )
-        raise Retry(defer=delay)
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
+        try:
+            await _create_complex_advs(ctx, nmid, shop_id, hard_mode, user_telegram_id)
+        except ApiForbiddenError:
+            bot = get_bot()
+            await bot.send_message(
+                user_telegram_id,
+                f"Нет токенов с нужными правами. Обратитесь в поддержку {const.SUPPORT_LINK}",
+            )
+            return
+        except Exception:
+            delay = 1
+            logger.error(
+                f"Ошибка задачи create_complex_advs, повтор через {delay} сек",
+                exc_info=True,
+            )
+            raise Retry(defer=delay)
 
 
 async def _create_complex_advs(
-    ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
+        ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
     bot = ctx["bot"]
     client_session = ctx["client_session"]
