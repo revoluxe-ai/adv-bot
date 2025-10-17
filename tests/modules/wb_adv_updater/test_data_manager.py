@@ -3,14 +3,16 @@
 import io
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock, MagicMock, ANY
 
 import pytest
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting, KeywordSetting, WBCabinet, WBUserCabinet, WBToken, WBCategory, WBCard
+from app.utils.db.models import User
+from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.data_manager import (
     __sort_by_update_keyword,
     get_best_keyword,
@@ -19,7 +21,25 @@ from app.modules.wb_adv_updater.data_manager import (
     get_keyword_statistic_clickhouse,
     get_keywords_statistic_clickhouse,
     _get_keyword_settings,
+    get_global_super_wb_user_cabinet,
+    set_positions,
+    set_position,
+    get_keywords_positions,
+    convert_keyword_stats_in_clusters,
+    get_full_adv_stat_for_adv_id_from_redis,
+    get_good_bad_phrases,
+    get_wb_category,
+    get_main_photos,
+    get_adv_keyword_text_in_black_list,
 )
+
+from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
+from app.utils.redis_manager import DataNotFoundError
+import json
+from app.modules.calculated_keywords_redis_cache_manager.redis_manager import RedisCalculatedKeywordsCacheManager
+from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
+from app.exc import CardNotFoundInDB
+from sqlalchemy import select
 
 
 @pytest.fixture
@@ -352,7 +372,6 @@ async def test_get_keyword_settings_basic(mock_sm):
     kw_setting1 = KeywordSetting(id=1, text="keyword1", adv_setting_id=100, hard_status=1)
     kw_setting2 = KeywordSetting(id=2, text="keyword2", adv_setting_id=100, hard_status=2)
 
-    # Мокируем result.scalars().all()
     mock_result = MagicMock()  # Это результат await session.execute(stmt)
     mock_scalars = MagicMock()  # Это результат result.scalars()
     mock_scalars.all.return_value = [kw_setting1, kw_setting2]  # .all() возвращает список
@@ -409,3 +428,857 @@ async def test_get_keyword_settings_no_matching_settings(mock_sm):
 
     assert len(result) == 0
     mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_global_super_wb_user_cabinet_basic(mock_sm):
+    mock_session = MagicMock()
+    mock_sm.return_value.__aenter__.return_value = mock_session
+
+    # Создаем фиктивные токены без spec, чтобы SQLAlchemy мог добавлять свои атрибуты
+    token1 = MagicMock(api_key="token1_key", user_id=1, shop_id="shop1")
+    token2 = MagicMock(api_key="token2_key", user_id=1, shop_id="shop1")
+    token3 = MagicMock(api_key="token3_key", user_id=2, shop_id="shop2")
+
+    # Создаем фиктивных пользователей без spec
+    user1 = MagicMock(id=1, wb_tokens=[token1, token2])
+    user2 = MagicMock(id=2, wb_tokens=[token3])
+
+    # Мокируем result.unique().scalars().all() для пользователей
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    mock_scalars.all.return_value = [user1, user2]
+    mock_unique.scalars.return_value = mock_scalars
+    mock_result.unique.return_value = mock_unique
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    cabinet = await get_global_super_wb_user_cabinet()
+
+    assert isinstance(cabinet, WBUserCabinet)
+    assert isinstance(cabinet.user, User)
+    assert isinstance(cabinet.wb_cabinet, WBCabinet)
+    assert len(cabinet.user.wb_tokens) == 3  # Все токены всех пользователей
+    assert cabinet.user.wb_tokens[0] == token1
+    assert cabinet.user.wb_tokens[1] == token2
+    assert cabinet.user.wb_tokens[2] == token3
+
+    mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_global_super_wb_user_cabinet_no_users(mock_sm):
+    mock_session = MagicMock()
+    mock_sm.return_value.__aenter__.return_value = mock_session
+
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    mock_scalars.all.return_value = []
+    mock_unique.scalars.return_value = mock_scalars
+    mock_result.unique.return_value = mock_unique
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    cabinet = await get_global_super_wb_user_cabinet()
+
+    assert isinstance(cabinet, WBUserCabinet)
+    assert isinstance(cabinet.user, User)
+    assert isinstance(cabinet.wb_cabinet, WBCabinet)
+    assert len(cabinet.user.wb_tokens) == 0
+
+    mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_global_super_wb_user_cabinet_users_no_tokens(mock_sm):
+    mock_session = MagicMock()
+    mock_sm.return_value.__aenter__.return_value = mock_session
+
+    user1 = MagicMock(spec=User, id=1, wb_tokens=[])
+    user2 = MagicMock(spec=User, id=2, wb_tokens=[])
+
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    mock_scalars.all.return_value = [user1, user2]
+    mock_unique.scalars.return_value = mock_scalars
+    mock_result.unique.return_value = mock_unique
+    mock_session.execute = AsyncMock(return_value=mock_result)
+
+    cabinet = await get_global_super_wb_user_cabinet()
+
+    assert isinstance(cabinet, WBUserCabinet)
+    assert isinstance(cabinet.user, User)
+    assert isinstance(cabinet.wb_cabinet, WBCabinet)
+    assert len(cabinet.user.wb_tokens) == 0
+
+    mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_set_positions_basic(mock_redis_manager):
+    # Создаем фиктивные данные
+    kw1 = CalculatedKeyword(text="keyword1", views=100, clicks=10, spend=10.0)
+    kw2 = CalculatedKeyword(text="keyword2", views=200, clicks=20, spend=20.0)
+    keyword_stats = [kw1, kw2]
+
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[1])
+
+    # Мокируем позиции из Redis
+    position1 = MagicMock(spec=WBItemPosition, keyword_text="keyword1", position=5)
+    position2 = MagicMock(spec=WBItemPosition, keyword_text="keyword2", position=10)
+    mock_redis_manager.get_keywords_positions = AsyncMock(return_value=[position1, position2])
+
+    # Мокируем кластеры и пресеты
+    mock_redis_manager.get_cluster_and_preset = AsyncMock(return_value=("cluster1", "preset1"))
+
+    result = await set_positions(keyword_stats, adv_setting)
+
+    assert len(result) == 2
+    assert result[0].position == 5
+    assert result[0].cluster_name == "cluster1"
+    assert result[0].preset == "preset1"
+    assert result[1].position == 10
+    assert result[1].cluster_name == "cluster1"
+    assert result[1].preset == "preset1"
+
+    mock_redis_manager.get_keywords_positions.assert_called_once_with(adv_setting, ["keyword1", "keyword2"])
+    assert mock_redis_manager.get_cluster_and_preset.call_count == 2
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_set_positions_redis_error(mock_redis_manager):
+    kw1 = CalculatedKeyword(text="keyword1", views=100, clicks=10, spend=10.0)
+    keyword_stats = [kw1]
+
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[1])
+
+    # Мокируем ошибку при получении позиций
+    mock_redis_manager.get_keywords_positions = AsyncMock(side_effect=Exception("Redis error"))
+
+    result = await set_positions(keyword_stats, adv_setting)
+
+    # Функция должна вернуть исходный список без изменений
+    assert len(result) == 1
+    assert result[0] == kw1
+    assert not hasattr(result[0], 'position') or result[0].position is None
+
+    mock_redis_manager.get_keywords_positions.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_set_positions_cluster_error(mock_redis_manager):
+    kw1 = CalculatedKeyword(text="keyword1", views=100, clicks=10, spend=10.0)
+    kw2 = CalculatedKeyword(text="keyword2", views=200, clicks=20, spend=20.0)
+    keyword_stats = [kw1, kw2]
+
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[1])
+
+    position1 = MagicMock(spec=WBItemPosition, keyword_text="keyword1", position=5)
+    position2 = MagicMock(spec=WBItemPosition, keyword_text="keyword2", position=10)
+    mock_redis_manager.get_keywords_positions = AsyncMock(return_value=[position1, position2])
+
+    # Мокируем ошибку при получении кластера для первого keyword, успех для второго
+    mock_redis_manager.get_cluster_and_preset = AsyncMock(
+        side_effect=[Exception("Cluster error"), ("cluster2", "preset2")]
+    )
+
+    result = await set_positions(keyword_stats, adv_setting)
+
+    assert len(result) == 2
+    # Первый keyword пропущен из-за ошибки (continue), поэтому ни позиция, ни кластер не установлены
+    assert not hasattr(result[0], 'position') or result[0].position is None
+    assert not hasattr(result[0], 'cluster_name') or result[0].cluster_name is None
+    # Второй keyword должен иметь и позицию, и кластер
+    assert result[1].position == 10
+    assert result[1].cluster_name == "cluster2"
+    assert result[1].preset == "preset2"
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_set_positions_with_child_keywords(mock_redis_manager):
+    # Создаем keyword с дочерними ключевыми словами
+    child_kw1 = CalculatedKeyword(text="child1", views=50, clicks=5, spend=5.0)
+    child_kw2 = CalculatedKeyword(text="child2", views=60, clicks=6, spend=6.0)
+    
+    parent_kw = CalculatedKeyword(text="parent", views=110, clicks=11, spend=11.0)
+    parent_kw.childs_keywords = [child_kw1, child_kw2]
+    
+    keyword_stats = [parent_kw]
+
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[1])
+
+    # Мокируем: нет позиции для родительского keyword
+    mock_redis_manager.get_keywords_positions = AsyncMock(side_effect=[
+        [],  # Первый вызов: нет позиций для "parent"
+        [  # Второй вызов: есть позиции для дочерних keywords
+            MagicMock(spec=WBItemPosition, keyword_text="child1", position=15, timestamp=datetime(2023, 1, 1)),
+            MagicMock(spec=WBItemPosition, keyword_text="child2", position=20, timestamp=datetime(2023, 1, 2)),
+        ]
+    ])
+
+    mock_redis_manager.get_cluster_and_preset = AsyncMock(return_value=("cluster_parent", "preset_parent"))
+
+    result = await set_positions(keyword_stats, adv_setting)
+
+    assert len(result) == 1
+    # Должна быть установлена позиция из дочернего keyword с максимальным timestamp
+    assert result[0].position == 20  # child2 имеет более поздний timestamp
+    assert result[0].cluster_name == "cluster_parent"
+    assert result[0].preset == "preset_parent"
+
+    assert mock_redis_manager.get_keywords_positions.call_count == 2
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_set_position_basic(mock_redis_manager):
+    kw = CalculatedKeyword(text="keyword1", views=100, clicks=10, spend=10.0)
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[12345])
+
+    # Мокируем позицию из Redis
+    position = MagicMock(spec=WBItemPosition, keyword_text="keyword1", position=25)
+    mock_redis_manager.get_keyword_position = AsyncMock(return_value=position)
+
+    result = await set_position(kw, adv_setting)
+
+    assert result.position == 25
+    mock_redis_manager.get_keyword_position.assert_called_once_with("keyword1", 12345)
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_set_position_no_position_found(mock_redis_manager):
+    kw = CalculatedKeyword(text="keyword1", views=100, clicks=10, spend=10.0)
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[12345])
+
+    # Мокируем: нет позиции
+    mock_redis_manager.get_keyword_position = AsyncMock(return_value=None)
+
+    result = await set_position(kw, adv_setting)
+
+    # Позиция не должна быть установлена
+    assert not hasattr(result, 'position') or result.position is None
+    mock_redis_manager.get_keyword_position.assert_called_once_with("keyword1", 12345)
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_set_position_with_child_keywords(mock_redis_manager):
+    child_kw1 = CalculatedKeyword(text="child1", views=50, clicks=5, spend=5.0)
+    child_kw2 = CalculatedKeyword(text="child2", views=60, clicks=6, spend=6.0)
+    
+    parent_kw = CalculatedKeyword(text="parent", views=110, clicks=11, spend=11.0)
+    parent_kw.childs_keywords = [child_kw1, child_kw2]
+    
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[12345])
+
+    # Мокируем: нет позиции для родительского keyword
+    mock_redis_manager.get_keyword_position = AsyncMock(return_value=None)
+    
+    # Мокируем: есть позиции для дочерних keywords
+    mock_redis_manager.get_keywords_positions = AsyncMock(return_value=[
+        MagicMock(spec=WBItemPosition, keyword_text="child1", position=30, timestamp=datetime(2023, 1, 1)),
+        MagicMock(spec=WBItemPosition, keyword_text="child2", position=35, timestamp=datetime(2023, 1, 2)),
+    ])
+
+    result = await set_position(parent_kw, adv_setting)
+
+    assert result.position == 35  # child2 имеет более поздний timestamp
+    mock_redis_manager.get_keyword_position.assert_called_once_with("parent", 12345)
+    mock_redis_manager.get_keywords_positions.assert_called_once_with(adv_setting, ["child1", "child2"])
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_set_position_no_child_positions(mock_redis_manager):
+    child_kw1 = CalculatedKeyword(text="child1", views=50, clicks=5, spend=5.0)
+    
+    parent_kw = CalculatedKeyword(text="parent", views=110, clicks=11, spend=11.0)
+    parent_kw.childs_keywords = [child_kw1]
+    
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[12345])
+
+    # Мокируем: нет позиции для родительского keyword и нет позиций для дочерних
+    mock_redis_manager.get_keyword_position = AsyncMock(return_value=None)
+    mock_redis_manager.get_keywords_positions = AsyncMock(return_value=[])
+
+    result = await set_position(parent_kw, adv_setting)
+
+    # Позиция не должна быть установлена
+    assert not hasattr(result, 'position') or result.position is None
+    mock_redis_manager.get_keyword_position.assert_called_once_with("parent", 12345)
+    mock_redis_manager.get_keywords_positions.assert_called_once_with(adv_setting, ["child1"])
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_get_keywords_positions_basic(mock_redis_manager):
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[12345])
+    texts = ["keyword1", "keyword2", "keyword3"]
+
+    # Мокируем позиции из Redis
+    positions = [
+        MagicMock(spec=WBItemPosition, keyword_text="keyword1", position=10),
+        MagicMock(spec=WBItemPosition, keyword_text="keyword2", position=20),
+        MagicMock(spec=WBItemPosition, keyword_text="keyword3", position=30),
+    ]
+    mock_redis_manager.get_keywords_positions = AsyncMock(return_value=positions)
+
+    result = await get_keywords_positions(adv_setting, texts)
+
+    assert len(result) == 3
+    assert result[0].position == 10
+    assert result[1].position == 20
+    assert result[2].position == 30
+    mock_redis_manager.get_keywords_positions.assert_called_once_with(adv_setting, texts)
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_get_keywords_positions_empty_list(mock_redis_manager):
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[12345])
+    texts = []
+
+    mock_redis_manager.get_keywords_positions = AsyncMock(return_value=[])
+
+    result = await get_keywords_positions(adv_setting, texts)
+
+    assert len(result) == 0
+    mock_redis_manager.get_keywords_positions.assert_called_once_with(adv_setting, texts)
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_get_keywords_positions_no_results(mock_redis_manager):
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[12345])
+    texts = ["keyword1", "keyword2"]
+
+    # Мокируем: Redis не нашел позиций
+    mock_redis_manager.get_keywords_positions = AsyncMock(return_value=[])
+
+    result = await get_keywords_positions(adv_setting, texts)
+
+    assert len(result) == 0
+    mock_redis_manager.get_keywords_positions.assert_called_once_with(adv_setting, texts)
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_keywords_query")
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_convert_keyword_stats_in_clusters_basic(mock_redis_manager):
+    kw1 = CalculatedKeyword(text="k1", clicks=10, views=100, spend=10.0)
+    kw2 = CalculatedKeyword(text="k2", clicks=20, views=200, spend=20.0)
+    kw3 = CalculatedKeyword(text="k3", clicks=5, views=50, spend=5.0)
+    keyword_stats = [kw1, kw2, kw3]
+
+    # Мокируем: k1 и k2 в одном кластере, k3 в другом
+    mock_redis_manager.get_clusters_and_presets = AsyncMock(return_value={
+        "k1": ("Cluster A", 1),
+        "k2": ("Cluster A", 1),
+        "k3": ("Cluster B", 2),
+    })
+
+    result = await convert_keyword_stats_in_clusters(keyword_stats)
+
+    assert len(result) == 2  # Два кластера
+    # Проверяем, что кластеры правильно агрегированы
+    cluster_a = next((c for c in result if c.text == "Cluster A"), None)
+    cluster_b = next((c for c in result if c.text == "Cluster B"), None)
+    
+    assert cluster_a is not None
+    assert cluster_a.clicks == 30  # 10 + 20
+    assert cluster_a.views == 300  # 100 + 200
+    
+    assert cluster_b is not None
+    assert cluster_b.clicks == 5
+    assert cluster_b.views == 50
+
+    mock_redis_manager.get_clusters_and_presets.assert_called_once_with(["k1", "k2", "k3"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_keywords_query")
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_convert_keyword_stats_in_clusters_no_cluster_info(mock_redis_manager):
+    kw1 = CalculatedKeyword(text="k1", clicks=10, views=100, spend=10.0)
+    kw2 = CalculatedKeyword(text="k2", clicks=20, views=200, spend=20.0)
+    keyword_stats = [kw1, kw2]
+
+    # Мокируем: нет информации о кластерах
+    mock_redis_manager.get_clusters_and_presets = AsyncMock(return_value={})
+
+    result = await convert_keyword_stats_in_clusters(keyword_stats)
+
+    # Каждое ключевое слово становится своим собственным кластером
+    assert len(result) == 2
+    assert result[0].text == "k1"
+    assert result[0].clicks == 10
+    assert result[1].text == "k2"
+    assert result[1].clicks == 20
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_convert_keyword_stats_in_clusters_redis_error(mock_redis_manager):
+    kw1 = CalculatedKeyword(text="k1", clicks=10, views=100, spend=10.0)
+    keyword_stats = [kw1]
+
+    # Мокируем ошибку Redis
+    mock_redis_manager.get_clusters_and_presets = AsyncMock(side_effect=Exception("Redis error"))
+
+    result = await convert_keyword_stats_in_clusters(keyword_stats)
+
+    # При ошибке возвращается исходный список
+    assert len(result) == 1
+    assert result[0] == kw1
+    mock_redis_manager.get_clusters_and_presets.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_keywords_query")
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+async def test_convert_keyword_stats_in_clusters_mixed(mock_redis_manager):
+    kw1 = CalculatedKeyword(text="k1", clicks=10, views=100, spend=10.0)
+    kw2 = CalculatedKeyword(text="k2", clicks=20, views=200, spend=20.0)
+    kw3 = CalculatedKeyword(text="k3", clicks=5, views=50, spend=5.0)
+    keyword_stats = [kw1, kw2, kw3]
+
+    # Мокируем: только k1 имеет кластер, остальные нет
+    mock_redis_manager.get_clusters_and_presets = AsyncMock(return_value={
+        "k1": ("Cluster A", 1),
+    })
+
+    result = await convert_keyword_stats_in_clusters(keyword_stats)
+
+    # Один кластер "Cluster A" и два отдельных ключевых слова k2, k3
+    assert len(result) == 3
+    
+    cluster_texts = {c.text for c in result}
+    assert "Cluster A" in cluster_texts
+    assert "k2" in cluster_texts
+    assert "k3" in cluster_texts
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+@patch('app.modules.wb_adv_updater.data_manager.FullAdvStat')
+async def test_get_full_adv_stat_for_adv_id_from_redis_basic(mock_full_adv_stat_cls, mock_redis_manager):
+    adv_id = 123
+    full_stat_json = '{"field1": "value1", "field2": 123}'
+    mock_redis_manager.get_full_stat_adv = AsyncMock(return_value=full_stat_json)
+
+    mock_full_adv_stat_instance = MagicMock(spec=FullAdvStat)
+    mock_full_adv_stat_cls.model_validate.return_value = mock_full_adv_stat_instance
+
+    result = await get_full_adv_stat_for_adv_id_from_redis(adv_id)
+
+    assert result == mock_full_adv_stat_instance
+    mock_redis_manager.get_full_stat_adv.assert_called_once_with(adv_id)
+    mock_full_adv_stat_cls.model_validate.assert_called_once_with(json.loads(full_stat_json))
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.redis_manager')
+@patch('app.modules.wb_adv_updater.data_manager.FullAdvStat')
+async def test_get_full_adv_stat_for_adv_id_from_redis_not_found(mock_full_adv_stat_cls, mock_redis_manager):
+    adv_id = 123
+    mock_redis_manager.get_full_stat_adv = AsyncMock(side_effect=DataNotFoundError)
+
+    result = await get_full_adv_stat_for_adv_id_from_redis(adv_id)
+
+    assert result is None
+    mock_redis_manager.get_full_stat_adv.assert_called_once_with(adv_id)
+    mock_full_adv_stat_cls.model_validate.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.get_good_bad_phrases_for_min_ctr')
+@patch('app.modules.wb_adv_updater.data_manager.RedisCalculatedKeywordsCacheManager')
+async def test_get_good_bad_phrases_basic(mock_redis_cache_manager_cls, mock_get_good_bad_phrases_for_min_ctr):
+    """Тест базового функционала get_good_bad_phrases"""
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, max_cpc=100, exponent_predict_ctr=0.5)
+
+    # Мокируем ключевые слова, возвращаемые get_good_bad_phrases_for_min_ctr
+    # Используем настоящие CalculatedKeyword объекты
+    # rating_by_predict_ctr = predict_ctr**predict_ctr_exponent * views
+    # Функция get_good_bad_phrases устанавливает predict_ctr_exponent=0.5 для всех keywords
+    # Поэтому используем predict_ctr_exponent=0.5 изначально
+    # Для kw1: 0.1**0.5 * 100 ≈ 31.6
+    kw1 = CalculatedKeyword(text="kw1", views=100, clicks=10, spend=10.0, predict_ctr=0.1, predict_ctr_exponent=0.5)
+    # Для kw2: predict_ctr=None дает rating 0.0
+    kw2 = CalculatedKeyword(text="kw2", views=50, clicks=5, spend=5.0, predict_ctr=None, predict_ctr_exponent=None)
+    # Для kw3: 0.2**0.5 * 100 ≈ 44.7 (больше чем kw1)
+    kw3 = CalculatedKeyword(text="kw3", views=100, clicks=20, spend=20.0, predict_ctr=0.2, predict_ctr_exponent=0.5)
+    mock_get_good_bad_phrases_for_min_ctr.return_value = [
+        kw1, kw2, kw3
+    ]
+
+    # Мокируем RedisCalculatedKeywordsCacheManager
+    mock_redis_cache_manager_instance = AsyncMock()
+    mock_redis_cache_manager_cls.return_value = mock_redis_cache_manager_instance
+
+    result = await get_good_bad_phrases(adv_setting)
+
+    # Проверяем, что predict_ctr_exponent установлен для всех ключевых слов
+    assert result[0].predict_ctr_exponent == 0.5
+    assert result[1].predict_ctr_exponent == 0.5
+    assert result[2].predict_ctr_exponent == 0.5
+
+    # Проверяем сортировку: сначала с рейтингом (по убыванию), потом без рейтинга
+    # kw3 (rating 44.7) -> kw1 (rating 31.6) -> kw2 (rating 0.0)
+    assert result[0].text == "kw3"
+    assert result[1].text == "kw1"
+    assert result[2].text == "kw2"
+    
+    mock_get_good_bad_phrases_for_min_ctr.assert_called_once_with(adv_setting, adv_setting.max_cpc)
+    mock_redis_cache_manager_cls.assert_called_once()
+    mock_redis_cache_manager_instance.set_calculated_keywords.assert_called_once()
+    
+    # Проверяем аргументы, переданные в set_calculated_keywords
+    call_args, call_kwargs = mock_redis_cache_manager_instance.set_calculated_keywords.call_args
+    assert call_kwargs == {}
+    
+    actual_keywords_passed = call_args[0]
+    actual_adv_id_passed = call_args[1]
+    
+    assert actual_adv_id_passed == adv_setting.adv_id
+    assert len(actual_keywords_passed) == 3
+    
+    # Проверяем атрибуты каждого ключевого слова в переданном списке
+    # ВАЖНО: set_calculated_keywords вызывается ДО сортировки,
+    # поэтому порядок здесь должен быть [kw1, kw2, kw3] (исходный порядок из mock)
+    assert actual_keywords_passed[0].text == "kw1"
+    assert actual_keywords_passed[0].predict_ctr_exponent == 0.5
+
+    assert actual_keywords_passed[1].text == "kw2"
+    assert actual_keywords_passed[1].predict_ctr_exponent == 0.5
+
+    assert actual_keywords_passed[2].text == "kw3"
+    assert actual_keywords_passed[2].predict_ctr_exponent == 0.5
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.get_good_bad_phrases_for_min_ctr')
+@patch('app.modules.wb_adv_updater.data_manager.RedisCalculatedKeywordsCacheManager')
+async def test_get_good_bad_phrases_no_keywords(mock_redis_cache_manager_cls, mock_get_good_bad_phrases_for_min_ctr):
+    """Тест get_good_bad_phrases с пустым списком ключевых слов"""
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, max_cpc=100, exponent_predict_ctr=0.5)
+
+    mock_get_good_bad_phrases_for_min_ctr.return_value = []
+
+    mock_redis_cache_manager_instance = AsyncMock()
+    mock_redis_cache_manager_cls.return_value = mock_redis_cache_manager_instance
+
+    result = await get_good_bad_phrases(adv_setting)
+
+    assert len(result) == 0
+    mock_get_good_bad_phrases_for_min_ctr.assert_called_once_with(adv_setting, adv_setting.max_cpc)
+    mock_redis_cache_manager_cls.assert_called_once()
+    mock_redis_cache_manager_instance.set_calculated_keywords.assert_called_once_with([], adv_setting.adv_id)
+
+  
+  # Получаем функцию __set_predict_ctr через getattr
+__set_predict_ctr = getattr(data_manager, '_DataManager__set_predict_ctr', None) or getattr(data_manager, '__set_predict_ctr', None)
+if __set_predict_ctr is None:
+    # Попробуем получить через dir
+    for name in dir(data_manager):
+        if 'set_predict_ctr' in name:
+            __set_predict_ctr = getattr(data_manager, name)
+            break
+
+
+def test_set_predict_ctr_basic():
+    """Тест базового функционала __set_predict_ctr"""
+    adv_setting = MagicMock(spec=AdvSetting, exponent_predict_ctr=0.5)
+    
+    kw1 = CalculatedKeyword(text="keyword1", views=100, clicks=10, spend=10.0)
+    kw1.original_predict_ctr = 0.1
+    keyword_stats = [kw1]
+    
+    result = __set_predict_ctr(keyword_stats, min_ctr=0.01, adv_setting=adv_setting)
+    
+    assert len(result) == 1
+    assert result[0].predict_ctr_exponent == 0.5
+    assert result[0].enough_views == 100  # int(1 / 0.01)
+    assert result[0].baes_ctr is not None
+    assert result[0].predict_ctr is not None
+
+
+def test_set_predict_ctr_zero_min_ctr():
+    """Тест __set_predict_ctr с min_ctr=0"""
+    adv_setting = MagicMock(spec=AdvSetting, exponent_predict_ctr=1.0)
+    
+    kw1 = CalculatedKeyword(text="keyword1", views=100, clicks=10, spend=10.0)
+    keyword_stats = [kw1]
+    
+    result = __set_predict_ctr(keyword_stats, min_ctr=0, adv_setting=adv_setting)
+    
+    assert len(result) == 1
+    assert result[0].enough_views == 100  # Когда min_ctr=0
+
+
+def test_set_predict_ctr_zero_clicks():
+    """Тест __set_predict_ctr с clicks=0"""
+    adv_setting = MagicMock(spec=AdvSetting, exponent_predict_ctr=0.5)
+    
+    kw1 = CalculatedKeyword(text="keyword1", views=100, clicks=0, spend=10.0)
+    keyword_stats = [kw1]
+    
+    result = __set_predict_ctr(keyword_stats, min_ctr=0.01, adv_setting=adv_setting)
+    
+    assert len(result) == 1
+    # clicks += 1, views += enough_views_calc (100)
+    # Но т.к. original_predict_ctr=None, predicted clicks/views не добавляются
+    assert result[0].calculated_clicks == 1  # 0 + 1
+    assert result[0].calculated_views == 200  # 100 + 100
+
+
+def test_set_predict_ctr_with_added_clicks():
+    """Тест __set_predict_ctr с added_clicks"""
+    adv_setting = MagicMock(spec=AdvSetting, exponent_predict_ctr=0.5)
+    
+    kw1 = CalculatedKeyword(text="keyword1", views=100, clicks=10, spend=10.0)
+    kw1.added_clicks = 5
+    keyword_stats = [kw1]
+    
+    result = __set_predict_ctr(keyword_stats, min_ctr=0.01, adv_setting=adv_setting)
+    
+    assert len(result) == 1
+    # clicks должен увеличиться на added_clicks
+    assert result[0].calculated_clicks >= 15  # 10 + 5
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_wb_category_basic(mock_sm):
+    """Тест get_wb_category с успешным получением категории"""
+    adv_setting = MagicMock(spec=AdvSetting, nmids=[123])
+    
+    mock_wb_category = MagicMock(spec=WBCategory, wb_category_name="TestCategory")
+    mock_wb_card = MagicMock(spec=WBCard, nmid=123, wb_category=mock_wb_category)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = mock_wb_card
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_wb_category(adv_setting)
+    
+    assert result == mock_wb_category
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once()
+    mock_result.scalar_one_or_none.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_wb_category_no_nmids(mock_sm):
+    """Тест get_wb_category с пустым списком nmids (вызывает исключение NotItemsInAdvSetting)"""
+    adv_setting = MagicMock(spec=AdvSetting, nmids=[])
+    
+    with pytest.raises(NotItemsInAdvSetting, match="У кампании в базе нет товаров"):
+        await get_wb_category(adv_setting)
+    
+    mock_sm.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_wb_category_card_not_found(mock_sm):
+    """Тест get_wb_category, когда карточка товара не найдена (вызывает исключение CardNotFoundInDB)"""
+    adv_setting = MagicMock(spec=AdvSetting, nmids=[123])
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    with pytest.raises(CardNotFoundInDB, match="В базе не найдена карточка товара: 123"):
+        await get_wb_category(adv_setting)
+
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once()
+    mock_result.scalar_one_or_none.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_main_photos_basic(mock_sm):
+    """Тест get_main_photos с успешным получением фотографий"""
+    nmids = [1, 2]
+    
+    mock_wb_card1 = MagicMock(spec=WBCard, photos=["url1_1", "url1_2"])
+    mock_wb_card2 = MagicMock(spec=WBCard, photos=["url2_1", "url2_2"])
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = [mock_wb_card1, mock_wb_card2]
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_main_photos(nmids)
+    
+    assert result == ["url1_1", "url2_1"]
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once()
+    mock_result.unique.assert_called_once()
+    mock_unique.scalars.assert_called_once()
+    mock_scalars.all.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_main_photos_no_nmids(mock_sm):
+    """Тест get_main_photos с пустым списком nmids"""
+    nmids = []
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = []
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_main_photos(nmids)
+    
+    assert result == []
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once_with(ANY)
+    mock_result.unique.assert_called_once()
+    mock_unique.scalars.assert_called_once()
+    mock_scalars.all.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_main_photos_no_cards_found(mock_sm):
+    """Тест get_main_photos, когда карточки не найдены"""
+    nmids = [1, 2]
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = []
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_main_photos(nmids)
+    
+    assert result == []
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once()
+    mock_result.unique.assert_called_once()
+    mock_unique.scalars.assert_called_once()
+    mock_scalars.all.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_adv_keyword_text_in_black_list_basic(mock_sm):
+    """Тест get_adv_keyword_text_in_black_list с базовыми данными"""
+    mock_adv_setting1 = MagicMock(spec=AdvSetting, id=1, adv_id=101)
+    mock_adv_setting2 = MagicMock(spec=AdvSetting, id=2, adv_id=102)
+    
+    mock_keyword_setting1 = MagicMock(spec=KeywordSetting, text="black_kw1", hard_status=0, adv_setting=mock_adv_setting1)
+    mock_keyword_setting2 = MagicMock(spec=KeywordSetting, text="black_kw2", hard_status=0, adv_setting=mock_adv_setting2)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = [mock_keyword_setting1, mock_keyword_setting2]
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_adv_keyword_text_in_black_list()
+    
+    assert len(result) == 2
+    assert (101, "black_kw1") in result
+    assert (102, "black_kw2") in result
+    
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once()
+    mock_result.unique.assert_called_once()
+    mock_unique.scalars.assert_called_once()
+    mock_scalars.all.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_adv_keyword_text_in_black_list_no_results(mock_sm):
+    """Тест get_adv_keyword_text_in_black_list без результатов"""
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = []
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_adv_keyword_text_in_black_list()
+    
+    assert len(result) == 0
+    assert result == []
+    
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once()
+    mock_result.unique.assert_called_once()
+    mock_unique.scalars.assert_called_once()
+    mock_scalars.all.assert_called_once()
