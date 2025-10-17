@@ -39,11 +39,11 @@ class ShopMenu(TextWithKeyboard):
     parse_mode = ParseMode.HTML
 
     def __init__(
-        self,
-        bot: Bot,
-        chat_id: int,
-        state: FSMContext,
-        wb_user_cabinet_original_id: int,
+            self,
+            bot: Bot,
+            chat_id: int,
+            state: FSMContext,
+            wb_user_cabinet_original_id: int,
     ):
         self._user_telegram_id = chat_id
         self._state = state
@@ -70,15 +70,6 @@ class ShopMenu(TextWithKeyboard):
             logger.error(f"Failed to load token status: {e}", exc_info=True)
             self._token_status = None
             self._token_status_loaded = False
-
-    async def _is_active_adv(self):
-        """Метод оставлен для обратной совместимости, но больше не используется
-        так как данные получаем сразу при основной загрузке
-        """
-        logger.debug(
-            "_is_active_adv больше не используется, и будет удален в будущих версиях"
-        )
-        return self.is_active_adv
 
     async def _load_all_data(self):
         """Оптимизированная загрузка всех данных в одной транзакции"""
@@ -159,7 +150,9 @@ class ShopMenu(TextWithKeyboard):
                 await self.get_shop_token_status()
 
                 # 7. Сохраняем данные в состояние
-                await self._state.update_data(last_wb_cabinet_original_id=self._wb_cabinet.id)
+                await self._state.update_data(
+                    last_wb_cabinet_original_id=self._wb_cabinet.id
+                )
 
                 logger.debug(
                     f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек"
@@ -169,10 +162,6 @@ class ShopMenu(TextWithKeyboard):
             # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
             logger.error(
                 f"Ошибка при оптимизированной загрузке данных: {e}", exc_info=True
-            )
-            await self.bot.send_message(
-                self.chat_id,
-                "Произошла ошибка при загрузке данных. Пожалуйста, попробуйте позже.",
             )
             raise e
 
@@ -245,8 +234,8 @@ class ShopMenu(TextWithKeyboard):
 
         # Проверка на истечение срока действия
         if (
-            expiration_time < datetime.now()
-            and user.user_telegram_id not in const.ADMINS
+                expiration_time < datetime.now()
+                and user.user_telegram_id not in const.ADMINS
         ):
             await self.bot.send_message(
                 self.chat_id,
@@ -404,9 +393,7 @@ class ShopMenu(TextWithKeyboard):
         user_telegram_id = self._user_telegram_id
         wb_user_cabinet = self._wb_user_cabinet
         wb_cabinet = self._wb_cabinet
-        is_active_adv = self.is_active_adv
         wb_cabinet_original_id = wb_cabinet.id
-        is_active_adv = True
         builder = InlineKeyboardBuilder()
         button = InlineKeyboardButton(
             text="Автоматические рекламные кампании",
@@ -445,14 +432,13 @@ class ShopMenu(TextWithKeyboard):
 
             builder.row(button)
 
-        if is_active_adv:
-            button = InlineKeyboardButton(
-                text="Отключить все кампании",
-                callback_data=TurnBot(
-                    action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
-                ).pack(),
-            )
-            builder.row(button)
+        button = InlineKeyboardButton(
+            text="Отключить все кампании",
+            callback_data=TurnBot(
+                action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+        builder.row(button)
 
         if self._wb_cabinet.white_list_update_active:
             button = InlineKeyboardButton(
