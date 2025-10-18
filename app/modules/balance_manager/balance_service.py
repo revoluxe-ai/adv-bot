@@ -126,6 +126,7 @@ async def add_bonus(
 
         return bonus_payment
 
+# TODO Проверить если нет и добавить ping токенов на все нужные права
 
 async def get_cabinet_balance(cabinet_id: int) -> tuple[float, float]:
     """Получает текущий баланс и бонусы кабинета с учетом всех платежей"""
