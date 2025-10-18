@@ -197,60 +197,46 @@ kubectl get prometheusrule -n kube-prometheus-stack | grep pod-error
 
 ## 3️⃣ НАСТРОЙКА УВЕДОМЛЕНИЙ (Telegram, Email, Slack)
 
-### Получить текущую конфигурацию AlertManager:
+### Шаг 3: Обновить AlertManager Config
+
+**Используйте скрипт `k8s/monitoring/setup-telegram-alerts.sh` для автоматизации:**
 
 ```bash
-kubectl get secret -n kube-prometheus-stack alertmanager-kube-prometheus-stack-alertmanager -o jsonpath='{.data.alertmanager\.yaml}' | base64 -d
+# Выполнить скрипт
+bash k8s/monitoring/setup-telegram-alerts.sh
 ```
 
-### Пример конфигурации AlertManager с Telegram:
+**Что делает скрипт:**
+1. Получает Telegram Bot Token из секрета `devops-bot` (namespace `default`).
+2. Генерирует `alertmanager.yaml` с вашим Chat ID (`373435337`) и токеном.
+3. Обновляет Secret `alertmanager-kube-prometheus-stack-alertmanager` в namespace `kube-prometheus-stack`.
+4. Перезапускает deployment Alertmanager.
+
+**Ручной способ (если скрипт не подходит):**
 
 ```bash
-cat > /tmp/alertmanager-config.yaml << 'EOF'
-global:
-  resolve_timeout: 5m
-  # Telegram settings
-  telegram_api_url: 'https://api.telegram.org'
+# 1. Получить текущий конфиг (если нужно, но скрипт обновит)
+kubectl get secret -n kube-prometheus-stack \
+  alertmanager-kube-prometheus-stack-alertmanager \
+  -o jsonpath='{.data.alertmanager\.yaml}' | base64 -d > /tmp/alertmanager.yaml
 
-route:
-  # Группировка алертов
-  group_by: ['alertname', 'cluster', 'service']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 12h
-  
-  # Основной receiver
-  receiver: 'telegram-notifications'
-  
-  # Специальные маршруты
-  routes:
-  - match:
-      severity: critical
-    receiver: 'telegram-critical'
-    repeat_interval: 4h
+# 2. Отредактировать /tmp/alertmanager.yaml и добавить секцию receivers и route, как показано в примере в этом файле.
+#    ВАЖНО: Замените <BOT_TOKEN> и <CHAT_ID> на актуальные значения.
 
-receivers:
-- name: 'telegram-notifications'
-  telegram_configs:
-  - bot_token: 'YOUR_TELEGRAM_BOT_TOKEN'
-    chat_id: YOUR_TELEGRAM_CHAT_ID
-    send_resolved: true
-    
-- name: 'telegram-critical'
-  telegram_configs:
-  - bot_token: 'YOUR_TELEGRAM_BOT_TOKEN'
-    chat_id: YOUR_TELEGRAM_CHAT_ID_CRITICAL
-    send_resolved: true
-
-inhibit_rules: []
-EOF
-
-# Создать Secret с конфигом
-kubectl create secret generic alertmanager-config-custom \
-  --from-file=/tmp/alertmanager-config.yaml \
-  -n kube-prometheus-stack \
+# 3. Создать/Обновить Secret с новым конфигом
+kubectl create secret generic alertmanager-kube-prometheus-stack-alertmanager -n kube-prometheus-stack \
+  --from-file=alertmanager.yaml=/tmp/alertmanager.yaml \
   --dry-run=client -o yaml | kubectl apply -f -
+
+# 4. Перезагрузить AlertManager
+kubeclt rollout restart deployment -n kube-prometheus-stack kube-prometheus-stack-alertmanager
 ```
+
+### Шаг 4: Проверить Уведомления
+
+- Откройте: **http://localhost:9093** (AlertManager UI)
+- Посмотрите на вкладку **Status** → **Receivers** → `telegram` должен быть виден.
+- Дождитесь срабатывания алерта или создайте тестовый алерт, чтобы проверить, приходят ли уведомления в Telegram.
 
 ---
 
