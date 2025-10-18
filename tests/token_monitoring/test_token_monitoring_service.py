@@ -2,7 +2,8 @@
 
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, Mock, PropertyMock
+import functools
 
 from app.modules.token_monitoring.services.token_monitoring_service import (
     TokenMonitoringService,
@@ -251,73 +252,112 @@ class TestTokenMonitoringServiceDecorator:
         """Create monitoring service for decorator testing."""
         return TokenMonitoringService()
     
-    @pytest.mark.skip(reason="Test needs to be rewritten to match actual decorator signature")
-    def test_decorator_preserves_original_behavior(self, monitoring_service):
+    @pytest.mark.asyncio
+    async def test_decorator_preserves_original_behavior(self, monitoring_service):
         """Test that enhanced decorator preserves original decorator behavior."""
         call_log = []
-        
-        def original_decorator(func):
-            def wrapper(*args, **kwargs):
-                call_log.append("original_called")
-                return func(*args, **kwargs)
-            return wrapper
-        
-        def test_function():
+
+        def original_decorator_mock(requests_per_interval, interval_seconds, max_attempts=50, max_delay=120):
+            def decorator(func):
+                async def wrapper(instance, *args, **kwargs):
+                    call_log.append("original_called")
+                    # Call the actual function
+                    return await func(instance, *args, **kwargs)
+                return wrapper
+            return decorator
+
+        class MockInstance:
+            # The instance passed to the decorated function
+            pass
+
+        async def test_function(instance):
             call_log.append("function_called")
             return "success"
-        
-        enhanced_decorator = monitoring_service.wrap_try_except_decorator(original_decorator)
+
+        # Wrap the decorator
+        enhanced_decorator_factory = monitoring_service.wrap_try_except_decorator(original_decorator_mock)
+        # Get the actual enhanced decorator
+        enhanced_decorator = enhanced_decorator_factory(requests_per_interval=10, interval_seconds=1)
+        # Apply the decorator to the test function
         wrapped_function = enhanced_decorator(test_function)
-        
-        result = wrapped_function()
-        
+
+        mock_instance = MockInstance()
+        result = await wrapped_function(mock_instance)
+
         assert result == "success"
         assert "original_called" in call_log
         assert "function_called" in call_log
     
-    @pytest.mark.skip(reason="Test needs to be rewritten to match actual decorator signature")
-    def test_decorator_handles_exceptions_properly(self, monitoring_service):
+    @pytest.mark.asyncio
+    async def test_decorator_handles_exceptions_properly(self, monitoring_service):
         """Test that enhanced decorator handles exceptions properly."""
-        def original_decorator(func):
-            def wrapper(*args, **kwargs):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    # Original decorator catches and re-raises
-                    raise e
-            return wrapper
-        
-        def failing_function():
+
+        def original_decorator_mock(requests_per_interval, interval_seconds, max_attempts=50, max_delay=120):
+            def decorator(func):
+                async def wrapper(instance, *args, **kwargs):
+                    try:
+                        return await func(instance, *args, **kwargs)
+                    except Exception as e:
+                        # Original decorator catches and re-raises
+                        raise e
+                return wrapper
+            return decorator
+
+        class MockInstance:
+            pass
+
+        async def failing_function(instance):
             raise ValueError("Test error")
-        
-        enhanced_decorator = monitoring_service.wrap_try_except_decorator(original_decorator)
+
+        enhanced_decorator_factory = monitoring_service.wrap_try_except_decorator(original_decorator_mock)
+        enhanced_decorator = enhanced_decorator_factory(requests_per_interval=10, interval_seconds=1)
         wrapped_function = enhanced_decorator(failing_function)
-        
+
+        mock_instance = MockInstance()
         # Should still raise the original exception
         with pytest.raises(ValueError, match="Test error"):
-            wrapped_function()
+            await wrapped_function(mock_instance)
     
-    @pytest.mark.skip(reason="Test needs to be rewritten to match actual decorator signature")
     @pytest.mark.asyncio
     async def test_decorator_with_shop_id_extraction(self, monitoring_service):
         """Test decorator with shop_id extraction from context."""
-        def original_decorator(func):
-            def wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
-            return wrapper
-        
-        def api_function_with_shop_id(shop_id="test_shop_123"):
+
+        def original_decorator_mock(requests_per_interval, interval_seconds, max_attempts=50, max_delay=120):
+            def decorator(func):
+                async def wrapper(instance, *args, **kwargs):
+                    return await func(instance, *args, **kwargs)
+                return wrapper
+            return decorator
+
+        class MockInstance:
+            def __init__(self, shop_id=None):
+                self.shop_id = shop_id
+
+        async def api_function_with_shop_id(instance):
+            # Simulate a real API call that might raise ApiForbiddenError
             raise ApiForbiddenError("Token invalid")
-        
-        enhanced_decorator = monitoring_service.wrap_try_except_decorator(original_decorator)
+
+        enhanced_decorator_factory = monitoring_service.wrap_try_except_decorator(original_decorator_mock)
+        enhanced_decorator = enhanced_decorator_factory(requests_per_interval=10, interval_seconds=1)
         wrapped_function = enhanced_decorator(api_function_with_shop_id)
-        
-        # Mock notification manager
-        with patch.object(monitoring_service, '_notification_manager') as mock_manager:
-            mock_manager.notify_token_issue = AsyncMock()
-            
+
+        # Mock notification manager and asyncio.create_task
+        with patch.object(type(monitoring_service), 'notification_manager', new_callable=PropertyMock) as mock_manager, \
+             patch.object(monitoring_service, '_handle_token_deactivation', new_callable=AsyncMock) as mock_handle, \
+             patch('asyncio.create_task') as mock_create_task:
+
+            mock_manager.return_value.notify_token_issue = AsyncMock()
+
+            mock_instance = MockInstance(shop_id="test_shop_123")
+
             with pytest.raises(ApiForbiddenError):
-                wrapped_function(shop_id="test_shop_123")
-            
-            # This is a simplified test - actual implementation would need more setup
-            # to verify notification is called with correct shop_id
+                await wrapped_function(mock_instance)
+
+            # Ensure we scheduled a task
+            mock_create_task.assert_called_once()
+            # Ensure our internal handler was invoked with expected args
+            mock_handle.assert_called_once()
+            called_args = mock_handle.call_args[0]
+            assert called_args[0] == "test_shop_123"
+            assert called_args[1] == "api_function_with_shop_id"
+            assert "Token invalid" in called_args[2]
