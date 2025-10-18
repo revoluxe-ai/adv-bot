@@ -1282,3 +1282,708 @@ async def test_get_adv_keyword_text_in_black_list_no_results(mock_sm):
     mock_result.unique.assert_called_once()
     mock_unique.scalars.assert_called_once()
     mock_scalars.all.assert_called_once()
+
+
+# Тесты для get_all_shops_for_user
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_all_shops_for_user_basic(mock_sm):
+    """Тест get_all_shops_for_user с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import get_all_shops_for_user
+    
+    user = MagicMock(id=1)
+    
+    # Создаем моки без spec для избежания проблем с hybrid properties
+    mock_wb_user_cabinet1 = MagicMock()
+    mock_wb_user_cabinet2 = MagicMock()
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    
+    # Имитируем result.scalar() который возвращает объект с методом all()
+    mock_scalar_result = MagicMock()
+    mock_scalar_result.all.return_value = [mock_wb_user_cabinet1, mock_wb_user_cabinet2]
+    mock_result.scalar.return_value = mock_scalar_result
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_all_shops_for_user(user)
+    
+    assert len(result) == 2
+    assert result[0] == mock_wb_user_cabinet1
+    assert result[1] == mock_wb_user_cabinet2
+    
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_all_shops_for_user_no_shops(mock_sm):
+    """Тест get_all_shops_for_user когда у пользователя нет магазинов"""
+    from app.modules.wb_adv_updater.data_manager import get_all_shops_for_user
+    
+    user = MagicMock(id=1)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    
+    # Когда нет магазинов, scalar() возвращает None
+    mock_result.scalar.return_value = None
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_all_shops_for_user(user)
+    
+    assert len(result) == 0
+    mock_sm.assert_called_once()
+
+
+# Тесты для get_mean_ctr и get_min_ctr
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+@patch('app.modules.wb_adv_updater.data_manager.get_good_bad_phrases')
+async def test_get_mean_ctr_basic(mock_get_good_bad_phrases, mock_sm):
+    """Тест get_mean_ctr с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import get_mean_ctr
+    
+    adv_setting = MagicMock(id=1, adv_id=101, nmids=[123])
+    
+    # Мокируем ключевые слова
+    kw1 = CalculatedKeyword(text="good_kw1", status="good", views=100, clicks=10, spend=10)
+    kw2 = CalculatedKeyword(text="good_kw2", status="good", views=200, clicks=20, spend=20)
+    mock_get_good_bad_phrases.return_value = [kw1, kw2]
+    
+    # Мокируем сессию БД
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one.return_value = 0.05
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_mean_ctr(adv_setting)
+    
+    assert result == 0.05
+    mock_get_good_bad_phrases.assert_called_once_with(adv_setting)
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.MinCtrManager')
+async def test_get_min_ctr_basic(mock_min_ctr_manager_cls):
+    """Тест get_min_ctr с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import get_min_ctr
+    
+    adv_setting = MagicMock(spec=AdvSetting, adv_id=101, nmids=[123], user_min_ctr=None)
+    
+    mock_min_ctr_manager = AsyncMock()
+    mock_min_ctr_manager.get_min_ctr.return_value = 0.03
+    mock_min_ctr_manager_cls.return_value = mock_min_ctr_manager
+    
+    result = await get_min_ctr(adv_setting)
+    
+    assert result == 0.03
+    mock_min_ctr_manager_cls.assert_called_once()
+    mock_min_ctr_manager.get_min_ctr.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.MinCtrManager')
+async def test_get_min_ctr_with_user_min_ctr(mock_min_ctr_manager_cls):
+    """Тест get_min_ctr с базовой логикой через MinCtrManager"""
+    from app.modules.wb_adv_updater.data_manager import get_min_ctr
+    
+    adv_setting = MagicMock(adv_id=101, nmids=[123])
+    
+    # Мокируем MinCtrManager
+    mock_min_ctr_manager = MagicMock()
+    mock_min_ctr_manager.get_min_ctr = AsyncMock(return_value=0.07)
+    mock_min_ctr_manager_cls.return_value = mock_min_ctr_manager
+    
+    result = await get_min_ctr(adv_setting)
+    
+    assert result == 0.07
+    mock_min_ctr_manager_cls.assert_called_once_with(adv_setting)
+    mock_min_ctr_manager.get_min_ctr.assert_called_once()
+
+
+# Тесты для get_active_search_advs
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_active_search_advs_basic(mock_sm):
+    """Тест get_active_search_advs с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import get_active_search_advs
+    
+    mock_adv1 = MagicMock(id=1, adv_id=101)
+    mock_adv2 = MagicMock(id=2, adv_id=102)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = [mock_adv1, mock_adv2]
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_active_search_advs()
+    
+    assert len(result) == 2
+    assert result[0] == mock_adv1
+    assert result[1] == mock_adv2
+    mock_sm.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_active_search_advs_no_advs(mock_sm):
+    """Тест get_active_search_advs когда нет активных кампаний"""
+    from app.modules.wb_adv_updater.data_manager import get_active_search_advs
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = []
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_active_search_advs()
+    
+    assert len(result) == 0
+    mock_sm.assert_called_once()
+
+
+# Тесты для add_white_phrases
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_add_white_phrases_basic(mock_sm):
+    """Тест add_white_phrases с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import add_white_phrases
+    
+    keywords = ["keyword1", "keyword2"]
+    adv_setting_id = 100
+    
+    mock_session = AsyncMock()
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    await add_white_phrases(keywords, adv_setting_id)
+    
+    # Проверяем, что execute был вызван для каждого ключевого слова
+    assert mock_session.execute.call_count >= len(keywords)
+    mock_session.commit.assert_called_once()
+    mock_sm.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_add_white_phrases_empty_list(mock_sm):
+    """Тест add_white_phrases с пустым списком"""
+    from app.modules.wb_adv_updater.data_manager import add_white_phrases
+    
+    keywords = []
+    adv_setting_id = 100
+    
+    mock_session = AsyncMock()
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    await add_white_phrases(keywords, adv_setting_id)
+    
+    # Не должно быть вызовов execute для пустого списка
+    mock_session.execute.assert_not_called()
+    mock_session.commit.assert_called_once()
+
+
+# Тесты для update_black_phrases
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_update_black_phrases_basic(mock_sm):
+    """Тест update_black_phrases с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import update_black_phrases
+    
+    keywords = ["bad_keyword1", "bad_keyword2"]
+    adv_setting_id = 100
+    
+    mock_session = AsyncMock()
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    await update_black_phrases(adv_setting_id, keywords)
+    
+    # Проверяем, что execute был вызван для каждого ключевого слова
+    assert mock_session.execute.call_count >= len(keywords)
+    mock_session.commit.assert_called_once()
+    mock_sm.assert_called_once()
+
+
+# Тесты для is_adv_in_favorites
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_is_adv_in_favorites_true(mock_sm):
+    """Тест is_adv_in_favorites когда кампания в избранном"""
+    from app.modules.wb_adv_updater.data_manager import is_adv_in_favorites
+    
+    adv_setting_id = 100
+    user = MagicMock(id=1)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar.return_value = 1  # Есть связь
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await is_adv_in_favorites(adv_setting_id, user)
+    
+    assert result is True
+    mock_sm.assert_called_once()
+    mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_is_adv_in_favorites_false(mock_sm):
+    """Тест is_adv_in_favorites когда кампании нет в избранном"""
+    from app.modules.wb_adv_updater.data_manager import is_adv_in_favorites
+    
+    adv_setting_id = 100
+    user = MagicMock(id=1)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar.return_value = 0  # Нет связи
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await is_adv_in_favorites(adv_setting_id, user)
+    
+    assert result is False
+    mock_sm.assert_called_once()
+
+
+# Тесты для get_expired_cabinets
+@pytest.mark.asyncio
+async def test_get_expired_cabinets_basic():
+    """Тест get_expired_cabinets с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import get_expired_cabinets
+    
+    mock_session = AsyncMock()
+    
+    expired_cabinet = MagicMock(shop_id="expired_shop")
+    
+    mock_result = MagicMock()
+    mock_scalars = MagicMock()
+    mock_scalars.all.return_value = [expired_cabinet]
+    mock_result.scalars.return_value = mock_scalars
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    
+    result = await get_expired_cabinets(mock_session)
+    
+    assert len(result) == 1
+    assert result[0] == expired_cabinet
+    mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_expired_cabinets_no_expired():
+    """Тест get_expired_cabinets когда нет просроченных кабинетов"""
+    from app.modules.wb_adv_updater.data_manager import get_expired_cabinets
+    
+    mock_session = AsyncMock()
+    
+    mock_result = MagicMock()
+    mock_scalars = MagicMock()
+    mock_scalars.all.return_value = []
+    mock_result.scalars.return_value = mock_scalars
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    
+    result = await get_expired_cabinets(mock_session)
+    
+    assert len(result) == 0
+    mock_session.execute.assert_called_once()
+
+
+# ==================== ТЕСТЫ ДЛЯ КРИТИЧНЫХ ФУНКЦИЙ ====================
+
+# Тесты для clear_keywords (23 использования, НЕ ТЕСТИРОВАНА)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_clear_keywords_basic(mock_sm):
+    """Тест clear_keywords с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import clear_keywords
+    
+    need_keywords = ["keep_kw1", "keep_kw2"]
+    
+    # Мокируем удаляемые ключевые слова
+    mock_kw_to_delete1 = MagicMock(text="delete_kw1")
+    mock_kw_to_delete2 = MagicMock(text="delete_kw2")
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = [mock_kw_to_delete1, mock_kw_to_delete2]
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.delete = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    await clear_keywords(need_keywords)
+    
+    # Проверяем, что execute был вызван с правильными аргументами
+    mock_session.execute.assert_called_once()
+    # Проверяем, что delete был вызван для каждого удаляемого keyword
+    assert mock_session.delete.call_count == 2
+    mock_session.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_clear_keywords_empty_to_delete(mock_sm):
+    """Тест clear_keywords когда нет ключевых слов для удаления"""
+    from app.modules.wb_adv_updater.data_manager import clear_keywords
+    
+    need_keywords = ["kw1", "kw2", "kw3"]
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = []  # Ничего не удаляем
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.delete = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    await clear_keywords(need_keywords)
+    
+    mock_session.delete.assert_not_called()
+    mock_session.commit.assert_called_once()
+
+
+# Тесты для get_last_full_stat_update (4 использования, НЕ ТЕСТИРОВАНА)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_last_full_stat_update_basic(mock_sm):
+    """Тест get_last_full_stat_update с существующей датой"""
+    from app.modules.wb_adv_updater.data_manager import get_last_full_stat_update
+    
+    adv_id = 123
+    last_update = datetime(2023, 10, 15, 12, 30, 0)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar.return_value = last_update
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_last_full_stat_update(adv_id)
+    
+    assert result == last_update
+    mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_last_full_stat_update_not_found(mock_sm):
+    """Тест get_last_full_stat_update когда нет записи"""
+    from app.modules.wb_adv_updater.data_manager import get_last_full_stat_update
+    
+    adv_id = 999
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar.return_value = None
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_last_full_stat_update(adv_id)
+    
+    assert result is None
+    mock_session.execute.assert_called_once()
+
+
+# Тесты для set_last_full_stat_update (2 использования, НЕ ТЕСТИРОВАНА)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_set_last_full_stat_update_basic(mock_sm):
+    """Тест set_last_full_stat_update установка последнего обновления"""
+    from app.modules.wb_adv_updater.data_manager import set_last_full_stat_update
+    
+    adv_id = 123
+    current_time = datetime.now()
+    
+    mock_session = AsyncMock()
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    await set_last_full_stat_update(adv_id, current_time)
+    
+    # Проверяем, что execute был вызван
+    mock_session.execute.assert_called_once()
+    mock_session.commit.assert_called_once()
+
+
+# Тесты для get_keywords_statistic (4 использования, НЕ ТЕСТИРОВАНА)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager.get_good_bad_phrases_for_min_ctr')
+async def test_get_keywords_statistic_basic(mock_get_good_bad):
+    """Тест get_keywords_statistic с базовыми данными"""
+    from app.modules.wb_adv_updater.data_manager import get_keywords_statistic
+    
+    adv_setting = MagicMock(id=1, adv_id=101)
+    
+    kw1 = CalculatedKeyword(text="kw1", views=100, clicks=10, spend=10)
+    kw2 = CalculatedKeyword(text="kw2", views=200, clicks=20, spend=20)
+    mock_get_good_bad.return_value = [kw1, kw2]
+    
+    result = await get_keywords_statistic(adv_setting)
+    
+    assert len(result) == 2
+    assert result[0].text == "kw1"
+    assert result[1].text == "kw2"
+    mock_get_good_bad.assert_called_once_with(adv_setting, None)
+
+
+# Тесты для clear_cards (3 использования, НЕ ТЕСТИРОВАНА)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_clear_cards_basic(mock_sm):
+    """Тест clear_cards удаление карточек из базы"""
+    from app.modules.wb_adv_updater.data_manager import clear_cards
+    
+    need_nmids = [1, 2, 3]
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_card1 = MagicMock(nmid=4)
+    mock_card2 = MagicMock(nmid=5)
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = [mock_card1, mock_card2]
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.delete = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    await clear_cards(need_nmids)
+    
+    # Проверяем, что delete был вызван для каждой карточки
+    assert mock_session.delete.call_count == 2
+    # commit должен быть вызван после каждой карточки
+    assert mock_session.commit.call_count == 2
+
+
+# Тесты для get_cpm (4 использования, НЕ ТЕСТИРОВАНА)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_cpm_basic(mock_sm):
+    """Тест get_cpm получение CPM для кампании"""
+    from app.modules.wb_adv_updater.data_manager import get_cpm
+    
+    auto_adv = MagicMock(id=1, adv_id=101)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar.return_value = 15.5
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_cpm(auto_adv)
+    
+    assert result == 15.5
+    mock_session.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_cpm_no_data(mock_sm):
+    """Тест get_cpm когда нет данных"""
+    from app.modules.wb_adv_updater.data_manager import get_cpm
+    
+    auto_adv = MagicMock(id=1, adv_id=101)
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar.return_value = None
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_cpm(auto_adv)
+    
+    assert result is None
+    mock_session.execute.assert_called_once()
+
+
+# Тесты для get_all_shop_ids (2 использования, НЕ ТЕСТИРОВАНА)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_all_shop_ids_basic(mock_sm):
+    """Тест get_all_shop_ids получение всех ID магазинов"""
+    from app.modules.wb_adv_updater.data_manager import get_all_shop_ids
+    
+    mock_cabinet1 = MagicMock(shop_id="shop_1")
+    mock_cabinet2 = MagicMock(shop_id="shop_2")
+    mock_cabinet3 = MagicMock(shop_id="shop_3")
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_scalars
+    mock_scalars.scalars.return_value.all.return_value = ["shop_1", "shop_2", "shop_3"]
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_all_shop_ids()
+    
+    assert len(result) == 3
+    mock_session.execute.assert_called_once()
+
+
+# Тесты для get_all_active_shop_ids_with_active_advs (2 использования, НЕ ТЕСТИРОВАНА)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_all_active_shop_ids_with_active_advs_basic(mock_sm):
+    """Тест get_all_active_shop_ids_with_active_advs"""
+    from app.modules.wb_adv_updater.data_manager import get_all_active_shop_ids_with_active_advs
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_unique = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_unique
+    mock_unique.scalars.return_value = mock_scalars
+    mock_scalars.all.return_value = ["shop_1", "shop_2"]
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_all_active_shop_ids_with_active_advs()
+    
+    assert len(result) == 2
+    mock_session.execute.assert_called_once()
+
+
+# Тесты для get_active_adv_ids_for_shop (1 использование)
+@pytest.mark.asyncio
+@patch('app.modules.wb_adv_updater.data_manager._sm')
+async def test_get_active_adv_ids_for_shop_basic(mock_sm):
+    """Тест get_active_adv_ids_for_shop получение активных ID кампаний"""
+    from app.modules.wb_adv_updater.data_manager import get_active_adv_ids_for_shop
+    
+    shop_id = "shop_123"
+    
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_scalars = MagicMock()
+    
+    mock_result.unique.return_value = mock_scalars
+    mock_scalars.scalars.return_value.all.return_value = [101, 102, 103]
+    
+    mock_session.execute = AsyncMock(return_value=mock_result)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    
+    mock_sm.return_value = mock_session
+    
+    result = await get_active_adv_ids_for_shop(shop_id)
+    
+    assert len(result) == 3
+    mock_session.execute.assert_called_once()
