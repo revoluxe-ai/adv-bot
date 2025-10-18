@@ -6,16 +6,15 @@ import logging
 
 from aiohttp import ClientSession
 
+from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
+# Import token monitoring for expiration checks
+from app.modules.token_monitoring.services.token_expiration_service import run_token_expiration_check
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
 from . import wb_manager
 from .ml_data_manager import update_model
 from ..user_message_sender import message_for_not_pay_user_sender
-from ... import AppContainer
-
-# Import token monitoring for expiration checks
-from app.modules.token_monitoring.services.token_expiration_service import run_token_expiration_check
 
 set_config()
 
