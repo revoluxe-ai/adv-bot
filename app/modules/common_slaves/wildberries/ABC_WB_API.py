@@ -8,16 +8,15 @@ from aiohttp import ClientSession
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.utils.db.session_maker import get_async_session_maker as sm
+from .models import WBCabinet
 
 if TYPE_CHECKING:
-    from .models import WBCabinet, WBToken
+    from .models import WBToken
 
 __all__ = ["Headers"]
 
-
 if TYPE_CHECKING:
     from .super_cabinet_manager import WBCabinetAccess
-
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,7 @@ class ABC_WB_API(WbRequestApiMixin):
     @staticmethod
     def chunks(lst, n):
         for i in range(0, len(lst), n):
-            yield lst[i : i + n]
+            yield lst[i: i + n]
 
     async def set_next_token(self, method_name: str) -> None:
         current_token_original_id = self._current_token.id
