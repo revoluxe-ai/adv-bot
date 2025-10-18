@@ -25,7 +25,7 @@ class TestRunnerTokenIntegration:
             "..",
             "..",
             "app",
-            "modulwwes",
+            "modules",
             "wb_adv_updater",
             "runner.py",
         )

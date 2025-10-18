@@ -5,7 +5,7 @@ import asyncio
 import dotenv
 from aiohttp import ClientSession
 
-from app import DIManager
+from app.core.di.di_manager import DIManager
 from app.modules.shop_runner.shop_run_worker.worker.worker import ShopWorker
 from python_modules.logger import setup_logging
 
@@ -15,7 +15,7 @@ setup_logging()
 
 async def run_shop_update_worker() -> None:
     """Запускает воркер для обновления магазинов."""
-    from app.core.di import AppContainer
+    from app.core.di.app_container import AppContainer
 
     async with await DIManager.create(AppContainer):
         async with ClientSession() as session:

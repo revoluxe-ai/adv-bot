@@ -144,37 +144,36 @@ class TestShopMenuTokenIntegration:
     ):
         """Test ShopMenu text generation with complete token status."""
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.modules.token_monitoring.services.token_info_service.get_shop_token_status') as mock_get_status:
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
                 # Setup mocks
-                mock_get_status.return_value = sample_token_status_complete
-                mock_sm.return_value.__aenter__.return_value.execute.return_value.scalar_one.return_value = sample_wb_user_cabinet
-                
-                shop_menu = ShopMenu(
-                    bot=mock_bot,
-                    chat_id=123456789,
-                    state=mock_state,
-                    wb_user_cabinet_original_id=1
-                )
-                
-                # Mock required attributes
-                shop_menu._wb_user_cabinet = sample_wb_user_cabinet
-                shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
-                shop_menu._balance = 1000.0
-                shop_menu._bonus = 200.0
-                shop_menu.count_active_advs = 0
-                shop_menu.total_amount_for_day = 100.0
-                shop_menu.price_for_month_for_shop = 500
-                shop_menu.is_active_adv = False
-                shop_menu._token_status = sample_token_status_complete
-                shop_menu._token_status_loaded = True
-                
-                text = shop_menu.text
-                
-                # Verify token status information is included
-                assert "🔑 <b>Состояние токенов:</b> ✅" in text
-                assert "• Всего токенов: 1" in text
-                assert "• Действующих: 1" in text
-                assert "Отсутствуют права" not in text  # Should not show missing permissions
+                mock_token_service_instance = AsyncMock()
+                mock_token_service_instance.get_shop_token_status.return_value = sample_token_status_complete
+                mock_token_service_class.return_value = mock_token_service_instance
+
+                mock_result = MagicMock()
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)
+                mock_sm.return_value.__aenter__.return_value.execute.return_value = mock_result
+
+                # Mock pricer methods - these are async methods
+                with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
+                    with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
+                        mock_month_tariff.return_value = 500
+                        mock_day_price.return_value = 100
+
+                        shop_menu = ShopMenu(
+                            bot=mock_bot,
+                            chat_id=123456789,
+                            state=mock_state,
+                            wb_user_cabinet_original_id=1
+                        )
+                        await shop_menu._load_all_data()
+
+                        text = shop_menu.text
+
+                        # Verify token status information is included
+                        assert "\n🔑 <b>Токены:</b> ✅ <b>Все в порядке</b>\n" in text
+                        assert "Отсутствуют права" not in text  # Should not show missing permissions
+                        assert "⏰ Сервис перестанет работать" in text # Verify expiration date is shown
     
     @pytest.mark.asyncio
     async def test_shop_menu_text_with_insufficient_tokens(
@@ -182,35 +181,34 @@ class TestShopMenuTokenIntegration:
     ):
         """Test ShopMenu text generation with insufficient token status."""
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.modules.token_monitoring.services.token_info_service.get_shop_token_status') as mock_get_status:
-                mock_get_status.return_value = sample_token_status_insufficient
-                mock_sm.return_value.__aenter__.return_value.execute.return_value.scalar_one.return_value = sample_wb_user_cabinet
-                
-                shop_menu = ShopMenu(
-                    bot=mock_bot,
-                    chat_id=123456789,
-                    state=mock_state,
-                    wb_user_cabinet_original_id=1
-                )
-                
-                # Mock required attributes
-                shop_menu._wb_user_cabinet = sample_wb_user_cabinet
-                shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
-                shop_menu._balance = 1000.0
-                shop_menu._bonus = 200.0
-                shop_menu.count_active_advs = 0
-                shop_menu.total_amount_for_day = 100.0
-                shop_menu.price_for_month_for_shop = 500
-                shop_menu.is_active_adv = False
-                shop_menu._token_status = sample_token_status_insufficient
-                shop_menu._token_status_loaded = True
-                
-                text = shop_menu.text
-                
-                # Verify token status information shows problems
-                assert "🔑 <b>Состояние токенов:</b> ⚠️" in text
-                assert "❌ <b>Отсутствуют права:</b> Аналитика, Продвижение" in text
-                assert "🔧 <b>Требуется обновление токенов</b>" in text
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
+                mock_token_service_instance = AsyncMock()
+                mock_token_service_instance.get_shop_token_status.return_value = sample_token_status_insufficient
+                mock_token_service_class.return_value = mock_token_service_instance
+
+                mock_result = MagicMock()
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)
+                mock_sm.return_value.__aenter__.return_value.execute.return_value = mock_result
+
+                with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
+                    with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
+                        mock_month_tariff.return_value = 500
+                        mock_day_price.return_value = 100
+
+                        shop_menu = ShopMenu(
+                            bot=mock_bot,
+                            chat_id=123456789,
+                            state=mock_state,
+                            wb_user_cabinet_original_id=1
+                        )
+                        await shop_menu._load_all_data()
+
+                        text = shop_menu.text
+
+                        # Verify token status information shows problems
+                        assert "\n🔑 <b>Токены:</b> ❌ <b>Требуется обновление</b>\n" in text
+                        assert "❌ <b>Отсутствуют права:</b> Аналитика, Продвижение\n" in text
+                        assert "🔧 <b>Добавьте новые токены для восстановления работы</b>\n" in text
     
     @pytest.mark.asyncio
     async def test_shop_menu_text_with_expiring_tokens(
@@ -218,62 +216,66 @@ class TestShopMenuTokenIntegration:
     ):
         """Test ShopMenu text generation with expiring tokens."""
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.modules.token_monitoring.services.token_info_service.get_shop_token_status') as mock_get_status:
-                mock_get_status.return_value = sample_token_status_expiring
-                mock_sm.return_value.__aenter__.return_value.execute.return_value.scalar_one.return_value = sample_wb_user_cabinet
-                
-                shop_menu = ShopMenu(
-                    bot=mock_bot,
-                    chat_id=123456789,
-                    state=mock_state,
-                    wb_user_cabinet_original_id=1
-                )
-                
-                # Mock required attributes
-                shop_menu._wb_user_cabinet = sample_wb_user_cabinet
-                shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
-                shop_menu._balance = 1000.0
-                shop_menu._bonus = 200.0
-                shop_menu.count_active_advs = 0
-                shop_menu.total_amount_for_day = 100.0
-                shop_menu.price_for_month_for_shop = 500
-                shop_menu.is_active_adv = False
-                shop_menu._token_status = sample_token_status_expiring
-                shop_menu._token_status_loaded = True
-                
-                text = shop_menu.text
-                
-                # Verify expiring token warning is shown
-                assert "🚨 <b>Токены истекают через 3 дн.!</b>" in text
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
+                mock_token_service_instance = AsyncMock()
+                mock_token_service_instance.get_shop_token_status.return_value = sample_token_status_expiring
+                mock_token_service_class.return_value = mock_token_service_instance
+
+                mock_result = MagicMock()
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)
+                mock_sm.return_value.__aenter__.return_value.execute.return_value = mock_result
+
+                with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
+                    with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
+                        mock_month_tariff.return_value = 500
+                        mock_day_price.return_value = 100
+
+                        shop_menu = ShopMenu(
+                            bot=mock_bot,
+                            chat_id=123456789,
+                            state=mock_state,
+                            wb_user_cabinet_original_id=1
+                        )
+                        await shop_menu._load_all_data()
+
+                        text = shop_menu.text
+
+                        # Verify expiring token warning is shown
+                        assert "\n🔑 <b>Токены:</b> ✅ <b>Все в порядке</b>\n" in text
+                        assert "🚨 <b>Сервис перестанет работать" in text
     
     @pytest.mark.asyncio
     async def test_shop_menu_text_with_token_loading_error(
         self, mock_bot, mock_state, sample_wb_user_cabinet
     ):
         """Test ShopMenu text generation when token loading fails."""
-        shop_menu = ShopMenu(
-            bot=mock_bot,
-            chat_id=123456789,
-            state=mock_state,
-            wb_user_cabinet_original_id=1
-        )
-        
-        # Mock required attributes
-        shop_menu._wb_user_cabinet = sample_wb_user_cabinet
-        shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
-        shop_menu._balance = 1000.0
-        shop_menu._bonus = 200.0
-        shop_menu.count_active_advs = 0
-        shop_menu.total_amount_for_day = 100.0
-        shop_menu.price_for_month_for_shop = 500
-        shop_menu.is_active_adv = False
-        shop_menu._token_status = None
-        shop_menu._token_status_loaded = False
-        
-        text = shop_menu.text
-        
-        # Verify error message is shown
-        assert "🔑 <b>Состояние токенов:</b> ⚠️ Ошибка загрузки" in text
+        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
+                mock_token_service_instance = AsyncMock()
+                mock_token_service_instance.get_shop_token_status.side_effect = Exception("Token service error")
+                mock_token_service_class.return_value = mock_token_service_instance
+
+                mock_result = MagicMock()
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)
+                mock_sm.return_value.__aenter__.return_value.execute.return_value = mock_result
+
+                with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
+                    with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
+                        mock_month_tariff.return_value = 500
+                        mock_day_price.return_value = 100
+
+                        shop_menu = ShopMenu(
+                            bot=mock_bot,
+                            chat_id=123456789,
+                            state=mock_state,
+                            wb_user_cabinet_original_id=1
+                        )
+                        await shop_menu._load_all_data()
+
+                        text = shop_menu.text
+
+                        # Verify error message is shown
+                        assert "\n🔑 <b>Токены:</b> ⚠️ <b>Ошибка загрузки</b>\n" in text
     
     @pytest.mark.asyncio
     async def test_token_status_actually_loaded_during_data_loading(
@@ -286,7 +288,7 @@ class TestShopMenuTokenIntegration:
         but this test actually calls _load_all_data() to verify token loading works.
         """
         with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.modules.shop_menu.message.get_shop_token_status') as mock_get_token_status:
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
                 # Setup database mocks - properly mock the async context manager
                 mock_session = AsyncMock()
                 mock_context_manager = AsyncMock()
@@ -296,11 +298,13 @@ class TestShopMenuTokenIntegration:
                 
                 # Mock the database query result
                 mock_result = MagicMock()  # Result object is not async
-                mock_result.scalar_one.return_value = sample_wb_user_cabinet  # scalar_one() is sync
+                mock_result.scalar_one = MagicMock(return_value=sample_wb_user_cabinet)  # scalar_one() is sync
                 mock_session.execute = AsyncMock(return_value=mock_result)  # execute() is async
                 
                 # Mock token status service
-                mock_get_token_status.return_value = sample_token_status_complete
+                mock_token_service = AsyncMock()
+                mock_token_service.get_shop_token_status = AsyncMock(return_value=sample_token_status_complete)
+                mock_token_service_class.return_value = mock_token_service
                 
                 # Mock pricer methods - these are async methods
                 with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
@@ -323,15 +327,9 @@ class TestShopMenuTokenIntegration:
                         # Call _load_all_data which should load token status
                         await shop_menu._load_all_data()
                         
-                        # After loading, token status should be populated
-                        assert shop_menu._token_status_loaded == True, "Token status should be marked as loaded"
-                        assert shop_menu._token_status is not None, "Token status should be populated"
+                        # Verify that token status was loaded
+                        assert shop_menu._token_status_loaded == True, "Should be loaded after _load_all_data()"
                         assert shop_menu._token_status == sample_token_status_complete, "Should have correct data"
                         
-                        # Verify that get_shop_token_status was called
-                        mock_get_token_status.assert_called_once_with("test_shop_123")
-                        
-                        # Verify text output shows correct token status
-                        text = shop_menu.text
-                        assert "🔑 <b>Состояние токенов:</b> ✅" in text
-                        assert "⚠️ Ошибка загрузки" not in text
+                        # Verify the service was called
+                        mock_token_service.get_shop_token_status.assert_called_once_with("test_shop_123")
