@@ -52,6 +52,28 @@ class TestTokenLoadingBugReproduction:
         
         return wb_user_cabinet
 
+    @pytest.fixture
+    def sample_token_status(self):
+        """Create sample token status."""
+        token_info = MagicMock()
+        token_info.is_valid = True
+        token_info.is_expired = False
+        token_info.is_read_only = False
+        token_info.expires = datetime.datetime.now() + datetime.timedelta(days=30)
+        
+        return TokenStatusReport(
+            shop_id="test_shop_123",
+            shop_name="Test Shop",
+            status="Complete",
+            all_tokens=[token_info],
+            valid_tokens=[token_info],
+            expired_tokens=[],
+            available_permissions={"Контент", "Статистика", "Аналитика", "Продвижение"},
+            missing_permissions=set(),
+            has_all_required_permissions=True,
+            expiring_tokens=[]
+        )
+
     def test_flawed_existing_test_approach(self, mock_bot, mock_state):
         """
         This demonstrates how the existing tests were flawed.
@@ -129,9 +151,12 @@ class TestTokenLoadingBugReproduction:
                 expiring_tokens=[]
             )
             
-            with patch('app.modules.shop_menu.message.get_shop_token_status') as mock_get_token_status:
-                mock_get_token_status.return_value = sample_token_status
-                
+            # Create a mock for TokenInfoService class
+            with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_info_service_class:
+                mock_token_info_service_instance = AsyncMock()
+                mock_token_info_service_instance.get_shop_token_status.return_value = sample_token_status
+                mock_token_info_service_class.return_value = mock_token_info_service_instance
+
                 # Mock the pricer methods - these are async methods
                 with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
                     with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
@@ -159,13 +184,13 @@ class TestTokenLoadingBugReproduction:
                         assert shop_menu._token_status == sample_token_status, "Should have correct data"
                         
                         # Verify the service was called
-                        mock_get_token_status.assert_called_once_with("test_shop_123")
+                        mock_token_info_service_instance.get_shop_token_status.assert_called_once_with("test_shop_123")
                         
                         print("✅ PROPER TEST: This test actually verifies the loading process")
 
     @pytest.mark.asyncio
     async def test_demonstrates_original_bug_scenario(
-        self, mock_bot, mock_state, sample_wb_user_cabinet
+        self, mock_bot, mock_state, sample_wb_user_cabinet, sample_token_status
     ):
         """
         This test demonstrates what happened with the original bug.
@@ -185,10 +210,12 @@ class TestTokenLoadingBugReproduction:
             mock_result.scalar_one.return_value = sample_wb_user_cabinet  # scalar_one() is sync
             mock_session.execute = AsyncMock(return_value=mock_result)  # execute() is async
             
-            # Mock the pricer methods
-            with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', return_value=500):
-                with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', return_value=100):
-                    
+            # Mock the pricer methods - these are async methods
+            with patch('app.modules.billing.pricer.Pricer.get_month_tariff_for_count_advs', new_callable=AsyncMock) as mock_month_tariff:
+                with patch('app.modules.billing.pricer.Pricer.get_price_for_day_for_shop', new_callable=AsyncMock) as mock_day_price:
+                    mock_month_tariff.return_value = 500
+                    mock_day_price.return_value = 100
+
                     # Create ShopMenu
                     shop_menu = ShopMenu(
                         bot=mock_bot,
@@ -196,23 +223,29 @@ class TestTokenLoadingBugReproduction:
                         state=mock_state,
                         wb_user_cabinet_original_id=1
                     )
-                    
-                    # Call _load_all_data (with our fix, this now loads token status)
-                    await shop_menu._load_all_data()
-                    
-                    # With the fix, token status should now be loaded
-                    # (Before the fix, this would have remained False)
-                    assert shop_menu._token_status_loaded == True, "After fix: should be loaded"
-                    
-                    # Check that the text doesn't show the error message
-                    text = shop_menu.text
-                    
-                    # Before the fix, this would have shown "Ошибка загрузки"
-                    # After the fix, it should show actual token status
-                    if "⚠️ Ошибка загрузки" in text:
-                        pytest.fail("Token status loading is still broken!")
-                    else:
-                        print("✅ Bug is fixed: Token status loads properly")
+
+                    # Mock TokenInfoService to simulate successful token loading
+                    with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service_class:
+                        mock_token_service_instance = AsyncMock()
+                        mock_token_service_instance.get_shop_token_status.return_value = sample_token_status
+                        mock_token_service_class.return_value = mock_token_service_instance
+
+                        # Call _load_all_data (with our fix, this now loads token status)
+                        await shop_menu._load_all_data()
+
+                        # With the fix, token status should now be loaded
+                        # (Before the fix, this would have remained False)
+                        assert shop_menu._token_status_loaded == True, "After fix: should be loaded"
+
+                        # Check that the text doesn't show the error message
+                        text = shop_menu.text
+
+                        # Before the fix, this would have shown "Ошибка загрузки"
+                        # After the fix, it should show actual token status
+                        if "⚠️ Ошибка загрузки" in text:
+                            pytest.fail("Token status loading is still broken!")
+                        else:
+                            print("✅ Bug is fixed: Token status loads properly")
 
     def test_why_existing_tests_failed_to_catch_bug(self):
         """
