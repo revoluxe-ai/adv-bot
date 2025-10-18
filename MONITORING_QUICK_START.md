@@ -128,37 +128,30 @@ kubectl get events -A --sort-by='.lastTimestamp' | grep -i "error\|failed\|crash
 
 ## 📱 СЛЕДУЮЩИЙ ШАГ: Уведомления в Telegram
 
-### Шаг 1: Создать Telegram Bot
-1. Откройте Telegram
-2. Найдите **@BotFather**
-3. Команда: `/newbot`
-4. Назовите бота, получите **TOKEN**
+### Автоматическая настройка (РЕКОМЕНДУЕТСЯ):
 
-### Шаг 2: Получить Chat ID
-1. Найдите бота **@userinfobot**
-2. Получите **USER_ID**
-3. Пишите боту любое сообщение
-4. **USER_ID** = chat_id
+Используйте скрипт `k8s/monitoring/setup-telegram-alerts.sh`.
 
-### Шаг 3: Обновить AlertManager Config
 ```bash
-# Получить текущий конфиг
-kubectl get secret -n kube-prometheus-stack \
-  alertmanager-kube-prometheus-stack-alertmanager \
-  -o jsonpath='{.data.alertmanager\.yaml}' | base64 -d > /tmp/alertmanager.yaml
-
-# Отредактировать и добавить Telegram receiver
-# ... (инструкции см. в MONITORING_SETUP_GUIDE.md)
-
-# Применить новый конфиг
-kubectl create secret generic alertmanager-config \
-  --from-file=/tmp/alertmanager.yaml \
-  -n kube-prometheus-stack \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-# Перезагрузить AlertManager
-kubectl rollout restart deployment -n kube-prometheus-stack kube-prometheus-stack-alertmanager
+bash k8s/monitoring/setup-telegram-alerts.sh
 ```
+
+**Что делает скрипт:**
+1. Получает Telegram Bot Token из секрета `devops-bot` (namespace `default`).
+2. Генерирует `alertmanager.yaml` с вашим Chat ID (`373435337`) и токеном.
+3. Обновляет Secret `alertmanager-kube-prometheus-stack-alertmanager` в namespace `kube-prometheus-stack`.
+4. Перезапускает deployment Alertmanager.
+
+### Ручная настройка (если скрипт не подходит, см. MONITORING_SETUP_GUIDE.md для деталей):
+
+1. Создать Telegram Bot (@BotFather)
+2. Получить Chat ID (@userinfobot)
+3. Обновить `alertmanager-kube-prometheus-stack-alertmanager` Secret с новыми настройками Telegram receiver.
+4. Перезапустить AlertManager deployment.
+
+### Проверка уведомлений:
+- Откройте AlertManager UI: **http://localhost:9093** -> **Status** -> **Receivers** -> `telegram` должен быть виден.
+- Дождитесь срабатывания тестового алерта или сгенерируйте его вручную.
 
 ---
 
