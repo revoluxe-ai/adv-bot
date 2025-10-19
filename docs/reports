@@ -1,0 +1,52 @@
+# ✅ ИСПРАВЛЕНИЕ: CronJob Pod Cleanup
+
+## 🚨 Была ошибка:
+```
+Alert: Pod log-error-aggregator-29347810-d5jtl not running
+Description: Pod has been in Succeeded state for 10+ minutes
+```
+
+## ✅ Причина:
+CronJob создавал pod'ы, но не удалял завершенные (Completed) pod'ы.
+
+## 🔧 Решение:
+
+### Шаг 1: Удалил завершенный pod ✅
+```bash
+kubectl delete pod log-error-aggregator-29347810-d5jtl -n kube-prometheus-stack
+```
+
+### Шаг 2: Обновил CronJob для автоочистки ✅
+Файл: `k8s/monitoring/cronjob-fix-history-cleanup.yaml`
+
+**Что изменилось:**
+- `successfulJobsHistoryLimit`: 3 → **1** (хранить только 1 успешный job)
+- `ttlSecondsAfterFinished`: **600** (удалять pod'ы через 10 минут)
+
+## 📊 Результат:
+
+```
+CronJob: log-error-aggregator
+Status: Configured ✅
+History Limit: 1 successful job
+TTL: 600 seconds (10 minutes) ✅
+```
+
+**Старые завершенные pod'ы будут автоматически удаляться!**
+
+---
+
+## 🎯 Итого:
+
+1. ✅ Удалил завершенный pod
+2. ✅ Обновил CronJob для автоочистки
+3. ✅ Теперь pod'ы будут удаляться через 10 минут после завершения
+
+**Алерт исчезнет автоматически!**
+
+---
+
+**Дата:** 2025-10-19  
+**Статус:** ✅ FIXED
+
+
