@@ -1,0 +1,355 @@
+---
+alwaysApply: false
+---
+# 🚀 AI DevOps Assistant - Полная Инструкция
+
+## 📋 КОНТЕКСТ ПРОЕКТА
+
+### Архитектура системы:
+- **Проект:** adv-bot - система управления рекламными кампаниями Wildberries через Telegram
+- **Тип:** Модульный монолит на Python (aiogram, SQLAlchemy, Redis, Neo4j, ClickHouse)
+- **Инфраструктура:** Kubernetes кластер на Timeweb Cloud
+- **Мониторинг:** Prometheus + Alertmanager + Grafana (kube-prometheus-stack)
+- **Основные компоненты:**
+  - `adv-bot` - Telegram бот
+  - `adv-bot-updater` - обновление кампаний
+  - `run-shop-update-worker` - воркеры магазинов (4 реплики)
+  - `predict-ctr-service` - ML предсказания
+  - `log-error-aggregator` - CronJob сбора ошибок
+
+### Текущий статус:
+- ✅ Все основные сервисы работают
+- ✅ Память оптимизирована (requests 512Mi, limits 768Mi)
+- ✅ ResourceQuota настроены (default: 100Gi, kube-prometheus-stack: 20Gi)
+- ✅ CSI Driver и инфраструктурные алерты заглушены
+- ✅ Production ready
+
+---
+
+## ⚠️ КРИТИЧЕСКИЕ ПРАВИЛА РАБОТЫ С КОМАНДАМИ
+
+### 🔴 ПРОБЛЕМА: PowerShell vs Bash конфликт
+**Windows 10 + Git Bash + Cursor часто запускает PowerShell вместо bash**
+
+### ✅ ПРАВИЛА ВЫПОЛНЕНИЯ КОМАНД:
+
+1. **НИКОГДА не использовать PowerShell синтаксис:**
+   - ❌ `&&` в PowerShell
+   - ❌ `>nul`, `2>&1`
+   - ❌ `@"`, `"@`
+   - ❌ `Out-File`, `Set-Content`
+
+2. **ВСЕГДА использовать bash-совместимые команды:**
+   - ✅ `bash -c "command1 && command2"`
+   - ✅ `command1; command2` (для последовательности)
+   - ✅ POSIX команды: `grep`, `awk`, `base64 -d`, `cat`, `echo`, `sed`
+
+3. **Для сложных команд - создавать скрипты:**
+   - ✅ Создать `.sh` файл с `chmod +x`
+   - ✅ Запускать через `bash script.sh`
+
+4. **Проверка типа shell:**
+   ```bash
+   # Если команда падает с ошибкой PowerShell - переписать через bash
+   bash -c "your-command-here"
+   ```
+
+### 🔧 Примеры правильных команд:
+
+```bash
+# ✅ Правильно - bash pipe
+kubectl get secret devops-bot -n default -o jsonpath='{.data.telegram-token}' | base64 -d; echo
+
+# ✅ Правильно - последовательность команд
+kubectl apply -f file1.yaml; kubectl apply -f file2.yaml
+
+# ✅ Правильно - сложная команда через bash
+bash -c "kubectl get pods -A | grep -v Running | wc -l"
+
+# ❌ Неправильно - PowerShell перехватит
+kubectl get pods -A | grep -v Running && echo "Found issues"
+```
+
+---
+
+## 🎯 KUBERNETES ОПЕРАЦИИ
+
+### Основные namespace'ы:
+- `default` - основное приложение
+- `kube-prometheus-stack` - мониторинг
+- `kube-system` - система
+- `csi-driver` - storage (может не работать, это OK)
+
+### Диагностические команды:
+```bash
+# Статус всех подов
+kubectl get pods -A -o wide
+
+# Использование ресурсов
+kubectl top nodes
+kubectl top pods -A
+
+# Проверка ResourceQuota
+kubectl get resourcequota -A
+
+# Статус алертов (если доступен UI)
+# http://prometheus:9090/alerts
+# http://alertmanager:9093
+```
+
+### Применение изменений:
+```bash
+# Всегда проверять перед применением
+kubectl apply --dry-run=client -f filename.yaml
+
+# Применять файлы
+kubectl apply -f k8s/monitoring/
+
+# Рестарт deployment'а
+kubectl rollout restart deployment/deployment-name -n namespace
+
+# Проверка статуса после изменений
+kubectl rollout status deployment/deployment-name -n namespace
+```
+
+---
+
+## 📊 МОНИТОРИНГ И АЛЕРТЫ
+
+### Философия обработки алертов:
+1. **Не все FIRING = проблема** - многие алерты это noise
+2. **Приоритет: основное приложение** (adv-bot, updater, worker)
+3. **Инфраструктурные компоненты** (CSI Driver) можно заглушить если не критичны
+4. **INFO/DEBUG алерты** - заглушить, оставить только CRITICAL/WARNING
+
+### Типы алертов и действия:
+
+| Тип алерта | Действие | Пример |
+|------------|----------|--------|
+| Memory/CPU overcommit | Исправить requests/limits | ✅ Уже исправлено |
+| Pod CrashLoopBackOff (основное приложение) | Исправить код/конфигурацию | Критично |
+| Pod CrashLoopBackOff (CSI Driver) | Заглушить алерт | ✅ Заглушено |
+| CPU throttling INFO | Заглушить алерт | ✅ Заглушено |
+| Watchdog/Test alerts | Заглушить алерт | ✅ Заглушено |
+| Service endpoints down | Проверить нужен ли сервис | Заглушено если не нужен |
+
+### Заглушение алертов:
+
+1. **AlertmanagerConfig (рекомендуется):**
+```yaml
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: silence-noise
+  namespace: kube-prometheus-stack
+spec:
+  route:
+    receiver: blackhole
+    matchers:
+    - name: namespace
+      value: csi-driver
+      matchType: =
+  receivers:
+  - name: blackhole
+    webhookConfigs:
+    - url: http://127.0.0.1:65535
+      sendResolved: false
+```
+
+2. **Через Alertmanager API (временно):**
+```bash
+curl -X POST "http://alertmanager:9093/api/v1/silences" \
+  -H "Content-Type: application/json" \
+  -d '{"matchers":[{"name":"namespace","value":"csi-driver"}]}'
+```
+
+---
+
+## 🔧 ДИАГНОСТИКА И ИСПРАВЛЕНИЕ ПРОБЛЕМ
+
+### Memory/CPU overcommit:
+1. Проверить текущее использование: `kubectl top nodes`
+2. Найти проблемные pod'ы: `kubectl top pods -A --sort-by=memory`
+3. Уменьшить requests в deployment'ах
+4. Увеличить ResourceQuota если нужно
+5. Добавить LimitRange для предотвращения
+
+### Pod проблемы:
+```bash
+# Статус и события
+kubectl describe pod pod-name -n namespace
+
+# Логи
+kubectl logs pod-name -n namespace --tail=100
+
+# Предыдущие логи (если рестартовал)
+kubectl logs pod-name -n namespace --previous
+
+# Exec внутрь пода (для отладки)
+kubectl exec -it pod-name -n namespace -- /bin/sh
+```
+
+### CronJob проблемы:
+```bash
+# История джобов
+kubectl get jobs -n namespace
+
+# Добавить TTL для автоочистки
+spec:
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 600  # 10 минут
+```
+
+---
+
+## 📁 СТРУКТУРА ПРОЕКТА
+
+```
+adv-bot/
+├── app/                     # Исходный код Python
+│   ├── client_bot/         # Telegram бот
+│   ├── modules/            # Бизнес логика
+│   ├── core/               # DI, API клиенты
+│   └── configs/            # Конфигурация
+├── k8s/                    # Kubernetes манифесты
+│   ├── monitoring/         # ResourceQuota, алерты, скрипты
+│   │   ├── resourcequota-default.yaml
+│   │   ├── resourcequota-kube-prometheus-stack.yaml
+│   │   ├── alertmanager-silence-csi-driver.yaml
+│   │   ├── silence-all-infrastructure-alerts.yaml
+│   │   ├── pod-error-checker.sh
+│   │   ├── error_monitor.py
+│   │   └── *.sh           # Скрипты диагностики
+│   ├── deployments/        # (для GitOps)
+│   └── GITOPS_SETUP_PLAN.md
+├── docs/                   # Документация
+│   ├── reports/            # Отчеты и сводки
+│   │   ├── FINAL_ALERT_CLEANUP_REPORT.md
+│   │   ├── CSI_DRIVER_*.md
+│   │   ├── CRONJOB_*.md
+│   │   └── *.md
+│   ├── monitoring/         # Мониторинг документация
+│   │   ├── ERROR_LOGS_TO_TELEGRAM_SUMMARY.md
+│   │   ├── MONITORING_ERROR_*.md
+│   │   └── ERROR_MONITORING_COMPLETE_SETUP.md
+│   ├── internal/           # Внутренние инструкции
+│   │   └── AI_DEVOPS_INSTRUCTION_PROMPT.md
+│   └── *.md                # Основная документация (existing)
+├── scripts/                # Скрипты
+│   └── INSTALL_ERROR_MONITORING.sh
+├── argocd/                 # GitOps (будет добавлено)
+│   └── applications/       # ArgoCD Applications (будет)
+├── DEVOPS_INDEX.md         # Главный индекс документации
+├── DEVOPS_INSTRUCTIONS_SUMMARY.md
+├── DEVOPS_QUICK_START.md
+├── START_HERE.md
+├── PROBLEM_AND_SOLUTION_EXPLAINED.md
+├── APPLY_FIX_STEP_BY_STEP.md
+├── MEMORY_OVERCOMMIT_ALERT_FIX.md
+└── predict-ctr-service.yaml
+```
+
+---
+
+## 🚨 TROUBLESHOOTING CHECKLIST
+
+### Если команда не выполняется:
+1. ✅ Проверить, не перехватил ли PowerShell команду
+2. ✅ Переписать через `bash -c "..."`
+3. ✅ Создать .sh скрипт если команда сложная
+4. ✅ Проверить наличие kubectl в PATH
+
+### Если алерт не заглушается:
+1. ✅ Проверить точное имя алерта и labels
+2. ✅ Использовать AlertmanagerConfig вместо PrometheusRule
+3. ✅ Проверить что Alertmanager перезагрузил конфиг
+4. ✅ Подождать 5-10 минут на распространение
+
+### Если pod не стартует:
+1. ✅ `kubectl describe pod` - посмотреть события
+2. ✅ `kubectl logs` - посмотреть логи
+3. ✅ Проверить image pull policy и доступность образа
+4. ✅ Проверить resources requests/limits
+5. ✅ Проверить secrets и configmaps
+
+### Если memory overcommit:
+1. ✅ `kubectl top nodes` - текущее использование
+2. ✅ Найти deployment'ы с большими requests
+3. ✅ Уменьшить requests до реальных потребностей
+4. ✅ Увеличить ResourceQuota если нужно
+
+---
+
+## 🎯 ЛУЧШИЕ ПРАКТИКИ
+
+### Безопасность команд:
+- Всегда использовать `--dry-run=client` перед применением
+- Делать backup важных ресурсов: `kubectl get deployment -o yaml > backup.yaml`
+- Проверять результат после каждого изменения
+
+### Мониторинг:
+- Заглушать noise, оставлять только важные алерты
+- Документировать каждое заглушение с объяснением
+- Регулярно пересматривать заглушенные алерты
+
+### Документирование:
+- Создавать .md файлы для каждого fix'а
+- Включать команды для проверки и отката
+- Обновлять START_HERE.md с текущим статусом
+
+---
+
+## ⚡ БЫСТРЫЙ СТАРТ ДЛЯ НОВЫХ ЗАДАЧ
+
+1. **Проанализировать проблему:**
+   - Это реальная проблема или noise?
+   - Влияет ли на основное приложение (adv-bot)?
+   - Какая severity (CRITICAL > WARNING > INFO)?
+
+2. **Выбрать стратегию:**
+   - Исправить root cause (для критичных проблем)
+   - Заглушить алерт (для infrastructure noise)
+   - Оптимизировать ресурсы (для overcommit)
+
+3. **Применить изменения:**
+   - Создать/обновить .yaml файлы
+   - Применить через kubectl (с --dry-run сначала)
+   - Проверить результат
+   - Задокументировать
+
+4. **Проверить результат:**
+   - Подождать 5-10 минут
+   - Проверить статус pod'ов
+   - Проверить что алерты исчезли
+   - Обновить документацию
+
+---
+
+## 📞 КОНТАКТЫ И ССЫЛКИ
+
+- **Prometheus UI:** http://prometheus:9090
+- **Alertmanager UI:** http://alertmanager:9093  
+- **Grafana:** http://grafana:3000
+- **Kubernetes Docs:** https://kubernetes.io/docs/
+- **Alertmanager Config:** https://prometheus.io/docs/alerting/latest/configuration/
+
+---
+
+**Дата создания:** 2025-10-19  
+**Статус:** Production Ready  
+**Версия:** 1.0
+
+---
+
+## 🎉 ИТОГОВОЕ НАПУТСТВИЕ
+
+Этот проект уже настроен и работает стабильно. Основные проблемы решены:
+- ✅ Memory overcommit исправлен
+- ✅ Все noise алерты заглушены  
+- ✅ ResourceQuota настроены
+- ✅ Кластер готов к production
+
+**Главное правило:** Не сломать то, что уже работает. Сначала диагностика, потом действие. Всегда делать backup и использовать --dry-run.
+
+Удачи в DevOps задачах! 🚀
