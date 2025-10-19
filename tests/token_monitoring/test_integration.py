@@ -15,6 +15,8 @@ from app.modules.token_monitoring import (
 )
 from app.modules.token_monitoring.models import NotificationType
 from app.modules.token_monitoring.integration import TokenMonitoringIntegration
+from app.utils.db.models import User
+from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 
 class TestTokenMonitoringIntegration:
@@ -39,8 +41,8 @@ class TestTokenMonitoringIntegration:
     @pytest.mark.asyncio
     async def test_complete_system_initialization(self):
         """Test complete system initialization and shutdown."""
-        with patch('app.modules.token_monitoring.integration.install_token_monitoring') as mock_install:
-            with patch('app.modules.token_monitoring.scheduler.start_token_monitoring_scheduler') as mock_scheduler:
+        with patch('app.modules.token_monitoring.startup.install_token_monitoring', new_callable=MagicMock) as mock_install:
+            with patch('app.modules.token_monitoring.startup.start_token_monitoring_scheduler') as mock_scheduler:
                 # Test initialization
                 await initialize_token_monitoring(
                     enable_decorator_monitoring=True,
@@ -69,8 +71,6 @@ class TestTokenMonitoringIntegration:
         notification_manager = NotificationManager(bot=mock_bot, session_maker=session_maker)
         
         # Mock user data
-        from app.modules.common_slaves.wildberries.models import WBUserCabinet
-        from app.utils.db.models import User
         
         user = MagicMock(spec=User)
         user.user_telegram_id = 123456789
@@ -122,13 +122,13 @@ class TestTokenMonitoringIntegration:
         expiring_token = MagicMock(spec=WBToken)
         expiring_token.id = 1
         expiring_token.shop_id = "test_shop_123"
-        expiring_token.expires = datetime.datetime.now() + datetime.timedelta(days=14)
+        fixed_now = datetime.datetime(2025, 10, 15, 9, 0, 0)
+        expiring_token.expires = fixed_now + datetime.timedelta(days=14)
         expiring_token.categories = {"Контент", "Статистика"}
         expiring_token.read_only = False
         expiring_token.check_valid.return_value = True
         
         # Mock user data
-        from app.modules.common_slaves.wildberries.models import WBUserCabinet
         from app.utils.db.models import User
         
         user = MagicMock(spec=User)
@@ -143,22 +143,23 @@ class TestTokenMonitoringIntegration:
         expiration_service._notification_already_sent = AsyncMock(return_value=False)
         notification_manager._get_shop_users = AsyncMock(return_value=[user_cabinet])
         
-        # Run expiration check
-        stats = await expiration_service.check_token_expiration()
-        
-        # Verify results
-        assert stats["total_tokens_checked"] == 1
-        assert stats["expiring_tokens_found"] == 1
-        assert stats["notifications_sent"] == 1
-        assert stats["warnings_by_stage"][14] == 1
-        
-        # Verify notification was sent
-        mock_bot.send_message.assert_called_once()
-        args, kwargs = mock_bot.send_message.call_args
-        
-        assert args[0] == 123456789
-        assert "2 недели" in args[1]
-        assert "Test Shop" in args[1]
+        with patch('datetime.datetime', MagicMock(now=MagicMock(return_value=fixed_now))):
+            # Run expiration check
+            stats = await expiration_service.check_token_expiration()
+
+            # Verify results
+            assert stats["total_tokens_checked"] == 1
+            assert stats["expiring_tokens_found"] == 1
+            assert stats["notifications_sent"] == 1
+            assert stats["warnings_by_stage"][14] == 1
+
+            # Verify notification was sent
+            mock_bot.send_message.assert_called_once()
+            args, kwargs = mock_bot.send_message.call_args
+
+            assert args[0] == 123456789
+            assert "2 недели" in args[1]
+            assert "Test Shop" in args[1]
     
     @pytest.mark.asyncio
     async def test_token_info_service_integration(self, mock_session_maker):
@@ -192,10 +193,17 @@ class TestTokenMonitoringIntegration:
         expired_token.check_valid.return_value = False
         
         # Mock database queries
-        session.execute.return_value.scalars.return_value.all.side_effect = [
-            [valid_token, expired_token],  # tokens query
-        ]
-        session.execute.return_value.scalar.return_value = "Test Shop"
+        # First call to execute - get tokens
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [valid_token, expired_token]
+        mock_result_tokens = MagicMock()
+        mock_result_tokens.scalars.return_value = mock_scalars
+        
+        # Second call to execute - get shop name
+        mock_result_shop = MagicMock()
+        mock_result_shop.scalar.return_value = "Test Shop"
+        
+        session.execute = AsyncMock(side_effect=[mock_result_tokens, mock_result_shop])
         
         # Mock _get_expiring_tokens
         token_info_service._get_expiring_tokens = AsyncMock(return_value=[])
@@ -278,12 +286,9 @@ class TestTokenMonitoringIntegration:
         
         # Mock bot to raise exception
         from aiogram.exceptions import TelegramForbiddenError
-        mock_bot.send_message.side_effect = TelegramForbiddenError("User blocked bot")
+        mock_bot.send_message.side_effect = TelegramForbiddenError(message="User blocked bot", method="test_method")
         
         # Mock user data
-        from app.modules.common_slaves.wildberries.models import WBUserCabinet
-        from app.utils.db.models import User
-        
         user = MagicMock(spec=User)
         user.user_telegram_id = 123456789
         
@@ -313,9 +318,6 @@ class TestTokenMonitoringIntegration:
         notification_manager = NotificationManager(bot=mock_bot, session_maker=session_maker)
         
         # Mock user data
-        from app.modules.common_slaves.wildberries.models import WBUserCabinet
-        from app.utils.db.models import User
-        
         user = MagicMock(spec=User)
         user.user_telegram_id = 123456789
         
@@ -353,12 +355,13 @@ class TestTokenMonitoringIntegration:
         # Mock tokens at different warning stages
         from app.modules.common_slaves.wildberries.models import WBToken
         
+        fixed_now = datetime.datetime(2025, 10, 15, 9, 0, 0)
         tokens = []
         for days, shop_suffix in [(14, "shop1"), (3, "shop2"), (1, "shop3")]:
             token = MagicMock(spec=WBToken)
             token.id = days
             token.shop_id = f"test_{shop_suffix}"
-            token.expires = datetime.datetime.now() + datetime.timedelta(days=days)
+            token.expires = fixed_now + datetime.timedelta(days=days)
             token.categories = {"Контент"}
             token.read_only = False
             token.check_valid.return_value = True
@@ -380,16 +383,17 @@ class TestTokenMonitoringIntegration:
         expiration_service._notification_already_sent = AsyncMock(return_value=False)
         notification_manager._get_shop_users = AsyncMock(side_effect=user_cabinets)
         
-        # Run expiration check
-        stats = await expiration_service.check_token_expiration()
-        
-        # Verify all warning stages were processed
-        assert stats["total_tokens_checked"] == 3
-        assert stats["expiring_tokens_found"] == 3
-        assert stats["notifications_sent"] == 3
-        assert stats["warnings_by_stage"][14] == 1
-        assert stats["warnings_by_stage"][3] == 1
-        assert stats["warnings_by_stage"][1] == 1
-        
-        # Verify all notifications were sent
-        assert mock_bot.send_message.call_count == 3
+        with patch('datetime.datetime', MagicMock(now=MagicMock(return_value=fixed_now))):
+            # Run expiration check
+            stats = await expiration_service.check_token_expiration()
+
+            # Verify all warning stages were processed
+            assert stats["total_tokens_checked"] == 3
+            assert stats["expiring_tokens_found"] == 3
+            assert stats["notifications_sent"] == 3
+            assert stats["warnings_by_stage"][14] == 1
+            assert stats["warnings_by_stage"][3] == 1
+            assert stats["warnings_by_stage"][1] == 1
+
+            # Verify all notifications were sent
+            assert mock_bot.send_message.call_count == 3

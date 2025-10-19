@@ -70,8 +70,6 @@ app/utils/text_master/w2v_cc_300d_ru
 logs
 .env
 venv_linux/
-.qoder
-!.qoder/rules/
 cursor-chat-export/
 .cursor/
 linux_venv/

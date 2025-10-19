@@ -516,6 +516,10 @@ class AdvSetting(BaseTable):
     def auction_adv_id(self) -> int | None:
         return self.search_adv_id
 
+    @auction_adv_id.setter
+    def auction_adv_id(self, value: int) -> None:
+        self._search_adv_id = value
+
     @property
     def search_adv_id(self) -> int | None:  # Аукцион
         if self._search_adv_id:
@@ -529,6 +533,9 @@ class AdvSetting(BaseTable):
             return None
         return int(match.group(1))
 
+    @search_adv_id.setter
+    def search_adv_id(self, value: int) -> None:
+        self._search_adv_id = value
 
     @property
     def max_pay_for_order(self) -> int | None:

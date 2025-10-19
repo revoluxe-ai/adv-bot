@@ -78,7 +78,7 @@ async def test_process_single_cabinet_bonus_success(
     ):
         # scalar для подсчета уже существующих платежей -> нули
         mock_session.scalar.return_value = 0
-        result = await billing._process_single_cabinet(
+        result = await billing.__process_single_cabinet(
             session=mock_session,
             cabinet_id=cab.id,
             current_dt=datetime.datetime(2024, 1, 1, 10, 0, 0),
@@ -102,7 +102,7 @@ async def test_process_single_cabinet_insufficient_funds(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
     ):
         mock_session.scalar.return_value = 0
-        result = await billing._process_single_cabinet(
+        result = await billing.__process_single_cabinet(
             session=mock_session,
             cabinet_id=cab.id,
             current_dt=datetime.datetime(2024, 1, 2, 10, 0, 0),
@@ -124,7 +124,7 @@ async def test_process_single_cabinet_zero_price(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
     ):
         mock_session.scalar.return_value = 0
-        result = await billing._process_single_cabinet(
+        result = await billing.__process_single_cabinet(
             session=mock_session,
             cabinet_id=cab.id,
             current_dt=datetime.datetime(2024, 1, 3, 10, 0, 0),
@@ -140,7 +140,7 @@ async def test_process_single_cabinet_already_flagged_in_redis(
 ):
     cab = _make_cabinet(bonus=200.0, balance=0.0, advs=[active_adv])
     mock_redis_manager.get_billing_process_for_day.return_value = True
-    result = await billing._process_single_cabinet(
+    result = await billing.__process_single_cabinet(
         session=mock_session,
         cabinet_id=cab.id,
         current_dt=datetime.datetime(2024, 1, 4, 10, 0, 0),
