@@ -23,6 +23,8 @@ sm = get_async_session_maker
 logger = logging.getLogger(__name__)
 
 
+# TODO: добавить статус -1 в кампании, что значит "кампания на стадии удаления"
+
 async def run_update_predict_ctr() -> None:
     await wb_manager.update_predict_ctr()
 
