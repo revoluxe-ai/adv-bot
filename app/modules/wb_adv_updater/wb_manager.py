@@ -148,7 +148,7 @@ async def update_all_keyword_data(
     try:
         await common_keyword_stat_update(adv_setting, wb_api)
     except ApiForbiddenError:
-        logger.error(f"Нет доступов для обновления данных магазина: {shop_id}")
+        logger.warning(f"Нет доступов для обновления данных магазина: {shop_id}")
 
         return
     except Exception as exc:
@@ -187,6 +187,7 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                 wb_api = WBApi(access, client_session)
                 wb_cabinet = access.wb_cabinet
                 assert wb_cabinet
+                # TODO: Перенести это все в магазины и переделать под таск-группы
                 task = asyncio.create_task(
                     update_all_keyword_data(wb_api, adv_setting, wb_cabinet=wb_cabinet)
                 )
