@@ -41,6 +41,7 @@ kubectl rollout restart deployment wbgram-original -n default
 | **MEMORY_OVERCOMMIT_ALERT_FIX.md** | 5 мин | 🟢 Быстро | Краткий обзор |
 | **k8s/MEMORY_FIX_INDEX.md** | 10 мин | 🟡 Полный | Полная навигация |
 | **k8s/MEMORY_OVERCOMMIT_FIX.md** | 30 мин | 🔴 Эксперт | Полный анализ |
+| **docs/DEVOPS_SOLUTIONS.md** | 15 мин | 🟡 Средний | Решения для CSI Driver и Telegram интеграции |
 
 ---
 
