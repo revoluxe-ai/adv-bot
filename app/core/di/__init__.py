@@ -4,7 +4,10 @@ __all__ = [
     "AppContainer",
     "inject",
     "Provide",
+    'DIManager',
 ]
 
-from .app_container import AppContainer
 from dependency_injector.wiring import inject, Provide
+
+from .app_container import AppContainer
+from .di_manager import DIManager
