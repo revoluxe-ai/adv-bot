@@ -21,56 +21,14 @@ alwaysApply: false
 - ✅ Все основные сервисы работают
 - ✅ Память оптимизирована (requests 512Mi, limits 768Mi)
 - ✅ ResourceQuota настроены (default: 100Gi, kube-prometheus-stack: 20Gi)
-- ✅ CSI Driver и инфраструктурные алерты заглушены
+- ✅ CSI Driver восстановлен и работает
+- ✅ Neo4j запущен успешно
 - ✅ Production ready
 
----
-
-## ⚠️ КРИТИЧЕСКИЕ ПРАВИЛА РАБОТЫ С КОМАНДАМИ
-
-### 🔴 ПРОБЛЕМА: PowerShell vs Bash конфликт
-**Windows 10 + Git Bash + Cursor часто запускает PowerShell вместо bash**
-
-### ✅ ПРАВИЛА ВЫПОЛНЕНИЯ КОМАНД:
-
-1. **НИКОГДА не использовать PowerShell синтаксис:**
-   - ❌ `&&` в PowerShell
-   - ❌ `>nul`, `2>&1`
-   - ❌ `@"`, `"@`
-   - ❌ `Out-File`, `Set-Content`
-
-2. **ВСЕГДА использовать bash-совместимые команды:**
-   - ✅ `bash -c "command1 && command2"`
-   - ✅ `command1; command2` (для последовательности)
-   - ✅ POSIX команды: `grep`, `awk`, `base64 -d`, `cat`, `echo`, `sed`
-
-3. **Для сложных команд - создавать скрипты:**
-   - ✅ Создать `.sh` файл с `chmod +x`
-   - ✅ Запускать через `bash script.sh`
-
-4. **Проверка типа shell:**
-   ```bash
-   # Если команда падает с ошибкой PowerShell - переписать через bash
-   bash -c "your-command-here"
-   ```
-
-### 🔧 Примеры правильных команд:
-
-```bash
-# ✅ Правильно - bash pipe
-kubectl get secret devops-bot -n default -o jsonpath='{.data.telegram-token}' | base64 -d; echo
-
-# ✅ Правильно - последовательность команд
-kubectl apply -f file1.yaml; kubectl apply -f file2.yaml
-
-# ✅ Правильно - сложная команда через bash
-bash -c "kubectl get pods -A | grep -v Running | wc -l"
-
-# ❌ Неправильно - PowerShell перехватит
-kubectl get pods -A | grep -v Running && echo "Found issues"
-```
-
----
+### Среда разработки:
+- **ОС:** Windows 10
+- **Shell:** PowerShell (kubectl установлен в PowerShell, НЕ в Git Bash/WSL)
+- **⚠️ ВАЖНО:** См. файл `.cursor/rules/terminal.mdc` для правил работы с командами
 
 ## 🎯 KUBERNETES ОПЕРАЦИИ
 

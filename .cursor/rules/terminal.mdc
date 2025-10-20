@@ -1,0 +1,213 @@
+---
+alwaysApply: true
+---
+# 🔴 КРИТИЧЕСКИЕ ПРАВИЛА: PowerShell в Windows
+
+## 🎯 КОНТЕКСТ СРЕДЫ
+**ОС:** Windows 10  
+**Shell:** PowerShell 5.1 (единственный используемый)  
+**kubectl:** v1.34.1 (Docker Desktop)
+
+## 🚀 QUICK REFERENCE (частые команды)
+
+```powershell
+# Просмотр подов
+kubectl get pods -A | Select-String "neo4j"
+kubectl get pods -n default -o wide
+
+# Применение файлов (ТОЛЬКО Windows пути с \)
+kubectl apply -f .\k8s\monitoring\file.yaml
+
+# Логи и диагностика
+kubectl logs pod-name -n namespace --tail=50
+kubectl describe pod pod-name -n namespace
+
+# Управление
+kubectl delete pod pod-name -n namespace
+kubectl scale deployment name --replicas=3 -n namespace
+kubectl rollout restart deployment name -n namespace
+
+# Секреты
+kubectl create secret generic name -n ns --from-literal=key=value
+kubectl get secret name -n ns -o jsonpath='{.data.key}'
+
+# Последовательность команд (НИКОГДА НЕ &&)
+kubectl apply -f file.yaml; kubectl get pods
+```
+
+## ⚠️ АБСОЛЮТНЫЕ ПРАВИЛА (ВСЕГДА СОБЛЮДАТЬ)
+
+### 1️⃣ **ВСЕГДА PowerShell синтаксис**
+```powershell
+# ✅ ПРАВИЛЬНО
+kubectl get pods -n default
+kubectl get pods -n default | Select-String "neo4j"
+kubectl apply -f .\k8s\file.yaml
+
+# ❌ НЕПРАВИЛЬНО - Unix команды НЕ работают
+kubectl get pods | grep neo4j
+kubectl apply -f k8s/file.yaml  # может не найти файл
+```
+
+### 2️⃣ **Пути к файлам - ТОЛЬКО Windows стиль**
+```powershell
+# ✅ ПРАВИЛЬНО
+kubectl apply -f .\k8s\monitoring\file.yaml
+kubectl apply -f k8s\monitoring\file.yaml
+kubectl apply -f C:\path\to\file.yaml
+
+# ❌ НЕПРАВИЛЬНО
+kubectl apply -f k8s/monitoring/file.yaml  # может работать, но не надёжно
+kubectl apply -f ./k8s/monitoring/file.yaml  # НЕ PowerShell стиль
+```
+
+### 3️⃣ **Фильтрация - Select-String, НЕ grep**
+```powershell
+# ✅ ПРАВИЛЬНО
+kubectl get pods -A | Select-String "neo4j"
+kubectl get pods -A | Where-Object { $_ -match "Running" }
+
+# ✅ ИЛИ встроенные kubectl фильтры
+kubectl get pods -A --field-selector status.phase=Running
+
+# ❌ НЕПРАВИЛЬНО
+kubectl get pods | grep neo4j  # grep НЕ существует в PowerShell
+```
+
+### 4️⃣ **Последовательность команд - точка с запятой**
+```powershell
+# ✅ ПРАВИЛЬНО
+kubectl apply -f file.yaml; kubectl get pods
+
+# ✅ ИЛИ с проверкой успеха
+kubectl apply -f file.yaml
+if ($?) { kubectl get pods }
+
+# ❌ НЕПРАВИЛЬНО
+kubectl apply -f file.yaml && kubectl get pods  # && НЕ работает
+```
+
+### 5️⃣ **Base64 декодирование**
+```powershell
+# ✅ ПРАВИЛЬНО
+$secret = kubectl get secret mysecret -n namespace -o jsonpath='{.data.token}'
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($secret))
+
+# ❌ НЕПРАВИЛЬНО
+kubectl get secret -o jsonpath='{.data.token}' | base64 -d  # base64 НЕ существует
+```
+
+### 6️⃣ **Проверка существования файлов**
+```powershell
+# ✅ ПРАВИЛЬНО
+Test-Path .\k8s\file.yaml
+if (Test-Path .\k8s\file.yaml) { kubectl apply -f .\k8s\file.yaml }
+
+# ❌ НЕПРАВИЛЬНО
+[ -f "k8s/file.yaml" ]  # bash синтаксис НЕ работает
+```
+
+---
+
+## 📋 PowerShell CMDLETS (вместо Unix команд)
+
+| Unix команда | PowerShell аналог | Пример |
+|--------------|-------------------|--------|
+| `grep` | `Select-String` | `... \| Select-String "pattern"` |
+| `grep -v` | `Select-String -NotMatch` | `... \| Select-String -NotMatch "pattern"` |
+| `awk '{print $1}'` | `ForEach-Object` | `... \| ForEach-Object { $_.Split()[0] }` |
+| `wc -l` | `Measure-Object -Line` | `... \| Measure-Object -Line` |
+| `cat file` | `Get-Content file` | `Get-Content .\file.yaml` |
+| `head -n 10` | `Select-Object -First 10` | `... \| Select-Object -First 10` |
+| `tail -n 10` | `Select-Object -Last 10` | `... \| Select-Object -Last 10` |
+| `ls` | `Get-ChildItem` или `dir` | `Get-ChildItem .\k8s\` |
+| `find` | `Get-ChildItem -Recurse` | `Get-ChildItem -Recurse -Filter *.yaml` |
+
+---
+
+## ❌ ЧАСТЫЕ ОШИБКИ
+
+### Ошибка: grep не найден
+```powershell
+# ❌ НЕПРАВИЛЬНО
+kubectl get pods | grep neo4j
+
+# ✅ ПРАВИЛЬНО
+kubectl get pods | Select-String "neo4j"
+```
+
+### Ошибка: файл не найден (пути)
+```powershell
+# ❌ НЕПРАВИЛЬНО
+kubectl apply -f k8s/monitoring/file.yaml
+
+# ✅ ПРАВИЛЬНО
+kubectl apply -f k8s\monitoring\file.yaml
+kubectl apply -f .\k8s\monitoring\file.yaml
+```
+
+### Ошибка: && не работает
+```powershell
+# ❌ НЕПРАВИЛЬНО
+kubectl apply -f file.yaml && kubectl get pods
+
+# ✅ ПРАВИЛЬНО
+kubectl apply -f file.yaml; kubectl get pods
+```
+
+### Ошибка: base64 не найден
+```powershell
+# ❌ НЕПРАВИЛЬНО
+kubectl get secret -o jsonpath='{.data.token}' | base64 -d
+
+# ✅ ПРАВИЛЬНО
+$token = kubectl get secret mysecret -o jsonpath='{.data.token}'
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($token))
+```
+
+---
+
+## 📝 ЧЕКЛИСТ ПЕРЕД КАЖДОЙ КОМАНДОЙ
+
+- [ ] Используется kubectl? → Проверить что мы в PowerShell
+- [ ] Есть pipe `|`? → Использовать `Select-String`, НЕ `grep`
+- [ ] Есть путь к файлу? → Использовать `\` (обратный слэш)
+- [ ] Есть `&&`? → Заменить на `;`
+- [ ] Нужна фильтрация? → `Select-String` или `Where-Object`
+- [ ] Нужен base64? → Использовать .NET классы
+- [ ] Нужна проверка файла? → `Test-Path`
+
+---
+
+## 🚫 ЧТО НИКОГДА НЕ ДЕЛАТЬ
+
+1. ❌ НЕ использовать `grep`, `awk`, `sed`, `base64`, `wc`
+2. ❌ НЕ использовать `&&` или `||` для цепочки команд
+3. ❌ НЕ использовать Unix пути (`/c/Users/...`, `./path/...`)
+4. ❌ НЕ использовать bash команды (`bash -c "..."`)
+5. ❌ НЕ смешивать PowerShell и bash синтаксис
+
+---
+
+## ✅ ЧТО ВСЕГДА ДЕЛАТЬ
+
+1. ✅ Использовать PowerShell cmdlets
+2. ✅ Использовать Windows пути с `\`
+3. ✅ Использовать `;` для последовательности команд
+4. ✅ Использовать kubectl встроенные фильтры где возможно
+5. ✅ Проверять пути через `Test-Path` перед применением
+
+---
+
+## 🎯 ЗОЛОТОЕ ПРАВИЛО
+
+**Если команда содержит `grep`, `awk`, `&&`, `/` в путях, или `base64` - она НЕПРАВИЛЬНАЯ для PowerShell!**
+
+Переписать на PowerShell синтаксис перед выполнением.
+
+---
+
+**Дата создания:** 2025-10-20  
+**Среда:** Windows 10 + PowerShell 5.1  
+**kubectl:** v1.34.1 (через Docker Desktop)  
+**Статус:** Production Ready
