@@ -26,5 +26,6 @@
     "python.testing.cwd": "${workspaceFolder}",
     "cursorpyright.analysis.extraPaths": [
         "${workspaceFolder}"
-    ]
+    ],
+    "todo-tree.tree.scanMode": "workspace only"
 }

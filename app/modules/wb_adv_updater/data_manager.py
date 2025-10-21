@@ -57,18 +57,6 @@ logger = logging.getLogger(__name__)
 _sm = get_async_session_maker
 
 
-async def measure_time(function: Callable[..., Any]) -> Callable[..., Any]:
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        start_time = time.time()
-        result = await function(
-            *args, **kwargs
-        )  # Используйте await для асинхронного вызова
-        end_time = time.time()
-        print(f"{function.__name__} выполнена за {end_time - start_time} секунд.")
-        return result
-
-    return wrapper
-
 
 async def get_keyword_statistic_clickhouse(
         client: Any, text: str, adv_ids: set[int], pass_days: int | None = 7
@@ -836,33 +824,6 @@ async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
     return adv_keyword_text_in_black_list
 
 
-async def get_adv_keyword_text_in_white_list() -> list[tuple[int, str]]:
-    async with _sm() as session:
-        stmt = (
-            select(KeywordSetting)
-            .options(selectinload(KeywordSetting.adv_setting))
-            .where(KeywordSetting.hard_status.in_([2, 3]))
-        )
-        result = await session.execute(stmt)
-        keyword_settings: list[KeywordSetting] = list(result.unique().scalars().all())
-    adv_keyword_text_in_white_list: list[tuple[int, str]] = []
-    for keyword_setting in keyword_settings:
-        adv_setting = keyword_setting.adv_setting
-        adv_keyword_text_in_white_list.append(
-            (adv_setting.adv_id, str(keyword_setting.text)
-             )
-        )
-
-    return adv_keyword_text_in_white_list
-
-
-async def get_all_users() -> list[User]:
-    async with _sm() as session:
-        stmt = select(User)
-        result = await session.execute(stmt)
-        users: list[User] = list(result.unique().scalars().all())
-    return users
-
 
 async def get_all_shops_for_user(user: User) -> list[WBUserCabinet]:
     async with _sm() as session:
@@ -960,6 +921,8 @@ def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | N
     if not keywords:
         return None
     best_keyword_with_boost = [kw for kw in keywords if kw.position != 0]
+    if not best_keyword_with_boost:
+        return None
 
     best_keyword = sorted(
         best_keyword_with_boost, key=lambda x: x.rating_by_predict_ctr, reverse=True
