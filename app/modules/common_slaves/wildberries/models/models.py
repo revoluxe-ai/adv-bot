@@ -1,11 +1,11 @@
 import datetime
 import json
+import logging
 import re
 import typing
 from dataclasses import dataclass
 from enum import Enum
 from typing import cast
-import logging
 
 import jwt
 from jwt import DecodeError
@@ -26,6 +26,7 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.settings import settings
@@ -176,10 +177,6 @@ class WBToken(BaseTable):
         return hash(self.api_key)
 
     @property
-    def hash(self):
-        return hash(self.api_key)
-
-    @property
     def __payload(self) -> dict[str, object]:
         try:
             result = jwt.decode(self.api_key, options={"verify_signature": False})
@@ -208,7 +205,8 @@ class WBToken(BaseTable):
     def __expires(self) -> datetime.datetime:
         exp = self.__payload.get("exp")
         if isinstance(exp, (int, float, str)):
-            return datetime.datetime.fromtimestamp(int(exp))
+            # Make the datetime timezone-aware (UTC)
+            return datetime.datetime.fromtimestamp(int(exp), tz=datetime.timezone.utc)
         raise NotValidTokenError
 
     @property
@@ -251,7 +249,8 @@ class WBToken(BaseTable):
     def is_expired(self) -> bool:
         """Проверяет, истёк ли токен"""
         try:
-            return datetime.datetime.utcnow() >= self.__expires
+            # Compare using timezone-aware UTC now
+            return datetime.datetime.now(datetime.timezone.utc) >= self.__expires
         except Exception:
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным
@@ -413,7 +412,7 @@ class AdvSetting(BaseTable):
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
     payments: Mapped[list["AdvPayment"]] = relationship(
-        "AdvPayment", back_populates="adv_setting", uselist=True
+        "app.modules.billing.models.AdvPayment", back_populates="adv_setting", uselist=True
     )
     parsing_active = mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
