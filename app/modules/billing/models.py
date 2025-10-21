@@ -18,7 +18,7 @@ class AdvPayment(BaseTable):
         Integer, ForeignKey("advsetting.id"), nullable=False
     )
     adv_setting: Mapped["AdvSetting"] = relationship(
-        "app.modules.common_slaves.wildberries.models.models.AdvSetting",
+        "AdvSetting",
         back_populates="payments",
         uselist=False,
     )
