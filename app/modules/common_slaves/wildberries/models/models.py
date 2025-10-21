@@ -35,6 +35,13 @@ from app.utils.db.base import BaseTable
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
+# Ensure billing models (AdvPayment) are imported and registered before mapper configuration
+try:
+    from app.modules.billing import models as _billing_models  # noqa: F401
+except Exception:
+    # In minimal test contexts billing may be absent; relationship will fallback to string resolution
+    pass
+
 if typing.TYPE_CHECKING:
     from app.modules.billing.models import AdvPayment
     from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -412,7 +419,7 @@ class AdvSetting(BaseTable):
     max_cpc = Column(Float, nullable=True)
     min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
     payments: Mapped[list["AdvPayment"]] = relationship(
-        "app.modules.billing.models.AdvPayment", back_populates="adv_setting", uselist=True
+        "AdvPayment", back_populates="adv_setting", uselist=True
     )
     parsing_active = mapped_column(Boolean, default=False)
     last_update = mapped_column(DateTime, nullable=True)
