@@ -181,6 +181,45 @@ class Settings:
         return int(value)
 
     @property
+    def POSTGRES_SSL_CA(self) -> str | None:
+        """Путь к CA для проверки серверного сертификата Postgres (опционально)."""
+        value = os.environ.get("POSTGRES_SSL_CA")
+        return value
+
+    @property
+    def POSTGRES_SSL_INSECURE(self) -> bool:
+        """Флаг для временной отладки: отключить проверку сертификата (не использовать в проде)."""
+        value = os.environ.get("POSTGRES_SSL_INSECURE")
+        if value is None:
+            return False
+        value = value.lower()
+        if value == "false":
+            return False
+        elif value == "true":
+            return True
+        raise ValueError("Не верное значение в POSTGRES_SSL_INSECURE")
+
+    @property
+    def POSTGRES_MASTER_HOST(self) -> str | None:
+        return os.environ.get("POSTGRES_MASTER_HOST")
+
+    @property
+    def POSTGRES_REPLICA_HOST(self) -> str | None:
+        return os.environ.get("POSTGRES_REPLICA_HOST")
+
+    @property
+    def POSTGRES_DB(self) -> str | None:
+        return os.environ.get("POSTGRES_DBNAME")
+
+    @property
+    def POSTGRES_USER(self) -> str | None:
+        return os.environ.get("POSTGRES_USER")
+
+    @property
+    def POSTGRES_PASSWORD(self) -> str | None:
+        return os.environ.get("POSTGRES_PASSWORD")
+
+    @property
     def ssl_mode(self) -> str | None:
         value = os.environ.get("POSTGRES_SSL_MODE")
         if value is None:

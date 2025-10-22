@@ -1,0 +1,166 @@
+## ==============================================
+## DO NOT APPLY IN PROVIDER-MANAGED CLUSTERS
+## This file is for reference only. CSI is managed by the hosting provider.
+## Applying this may break storage provisioning. Use only in lab environments
+## with explicit approval. See docs/reports/CSI_DRIVER_POSTMORTEM_2025-10-20.md
+## ==============================================
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-driver-timeweb-cloud-node
+  namespace: csi-driver
+  labels:
+    app: csi-driver-timeweb-cloud
+spec:
+  selector:
+    matchLabels:
+      app: csi-driver-timeweb-cloud
+  template:
+    metadata:
+      labels:
+        app: csi-driver-timeweb-cloud
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: csi-driver-timeweb-cloud-node
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: csi-plugin
+          image: cr-internal.twcstorage.ru/network-drives-csi/driver:latest
+          imagePullPolicy: Always
+          env:
+            - name: LOG_LEVEL
+              value: debug
+            - name: LOG_JSON
+              value: "true"
+            - name: GRPC_LISTEN_SOCKET
+              value: unix:///csi/csi.sock
+            - name: TW_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: csi-driver-timeweb-cloud-controller
+                  key: api-secret
+            - name: IS_WORKER
+              value: "true"
+            - name: TW_CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: csi-driver-timeweb-cloud-config
+                  key: cluster-id
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          ports:
+            - containerPort: 9808
+              name: healthz
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 2
+            failureThreshold: 5
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: /var/lib/k0s/kubelet
+              name: mountpoint-dir
+              mountPropagation: Bidirectional
+            - mountPath: /data
+              name: data-dir
+            - mountPath: /dev
+              name: dev
+
+        - name: liveness-probe
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.9.0
+          args:
+            - --v=4
+            - --csi-address=/csi/csi.sock
+          resources:
+            requests:
+              cpu: 50m
+              memory: 50Mi
+            limits:
+              cpu: 50m
+              memory: 50Mi
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+
+        - name: node-driver-registrar
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.6.3
+          imagePullPolicy: IfNotPresent
+          args:
+            - --v=4
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+            - --health-port=9809
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/k0s/kubelet/plugins/network-drives.csi.timeweb.cloud/csi.sock
+          ports:
+            - containerPort: 9809
+              name: healthz
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - rm -rf /registration/network-drives.csi.timeweb.cloud /registration/network-drives.csi.timeweb.cloud-reg.sock
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: /registration
+              name: registration-dir
+
+      volumes:
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/k0s/kubelet/plugins_registry/
+            type: Directory
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/k0s/kubelet/plugins/network-drives.csi.timeweb.cloud
+            type: DirectoryOrCreate
+        - name: mountpoint-dir
+          hostPath:
+            path: /var/lib/k0s/kubelet
+            type: DirectoryOrCreate
+        - name: data-dir
+          hostPath:
+            path: /data
+            type: DirectoryOrCreate
+        - name: dev
+          hostPath:
+            path: /dev
+            type: Directory
+

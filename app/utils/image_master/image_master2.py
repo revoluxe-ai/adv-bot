@@ -10,6 +10,8 @@ from app.utils.faiss_manager.faiss_index import Index
 from app.utils.faiss_manager.faiss_index_manager import FaissManager
 from app.utils.image_master import image_tools
 from app.utils.image_master.database.model import Image
+from keras.applications.vgg19 import VGG19, preprocess_input
+from keras.preprocessing.image import img_to_array
 
 from .database import model
 
@@ -35,6 +37,7 @@ class ImageMaster:
         self._images_folder = os.path.join(current_folder, "image_sources")
         if load_indexes:
             self._indexes = FaissManager()
+        self._model = VGG19(include_top=False)
         # self._alchemy_session_maker = get_session_maker()
 
     def __enter__(self):
@@ -54,10 +57,7 @@ class ImageMaster:
         if img.mode != "RGB":
             img = img.convert("RGB")
 
-        from keras.applications.vgg19 import VGG19, preprocess_input
-        from keras.preprocessing.image import img_to_array
 
-        self._model = VGG19(include_top=False)
         # Ensure the tensor has three channels
         img = img.resize((224, 224))
         x = img_to_array(img)

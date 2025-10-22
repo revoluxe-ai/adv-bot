@@ -1,3 +1,4 @@
+# type: ignore
 import asyncio
 import logging
 import traceback
@@ -8,6 +9,7 @@ from typing import Any
 
 from sqlalchemy import Result
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+import ssl
 
 from app.settings import settings
 
@@ -34,7 +36,7 @@ global_semaphore = asyncio.Semaphore(count_sem)
 
 
 class AnalyticAsyncSession(AsyncSession):
-    async def execute(self, statement: Any, *args, **kwargs) -> Result[Any]:
+    async def execute(self, statement: Any, *args: Any, **kwargs: Any) -> Result[Any]:
         query_start = time()
         try:
             # Определяем тип операции
@@ -55,9 +57,16 @@ class AnalyticAsyncSession(AsyncSession):
             duration = time() - query_start
 
             if duration > 1.0:
+                # caller может быть None
+                if caller is not None:
+                    filename = caller.filename
+                    lineno = caller.lineno
+                else:
+                    filename = "unknown"
+                    lineno = 0
                 logger.warning(
                     f"Slow query ({duration:.2f}s), Type: {operation_type} "
-                    f"Location: {caller.filename}:{caller.lineno} Statement: {statement}"
+                    f"Location: {filename}:{lineno} Statement: {statement}"
                 )
             return result
         except Exception as e:
@@ -80,7 +89,7 @@ class AnalyticAsyncSession(AsyncSession):
 #     logger.debug(f"Количество соединений: {conn_counter}")
 
 
-def get_alchemy_row(read_only):
+def get_alchemy_row(read_only: bool) -> str:
     port = settings.postgres_port
     postgres_dbname = settings.postgres_dbname
     postgres_password = settings.postgres_password
@@ -89,7 +98,7 @@ def get_alchemy_row(read_only):
         host = settings.postgres_master_host
     else:
         host = settings.postgres_replica_host
-    # Для asyncpg используем ssl вместо sslmode
+    # Для asyncpg используем ssl через connect_args, не передаём sslmode в URL
     row_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     # if ssl_mode:
     #     row_connector += f'?sslmode={ssl_mode}'
@@ -99,13 +108,13 @@ def get_alchemy_row(read_only):
     return db_connector
 
 
-def get_alchemy_row_for_migration():
+def get_alchemy_row_for_migration() -> str:
     port = settings.postgres_port
     postgres_dbname = settings.postgres_dbname
     postgres_password = settings.postgres_password
     postgres_user = settings.postgres_user
     host = settings.postgres_master_host
-    # Для asyncpg используем ssl вместо sslmode
+    # Для asyncpg используем ssl через connect_args, не передаём sslmode в URL
     db_connector = f"postgresql://{postgres_user}:{postgres_password}@{host}:{port}/{postgres_dbname}"
     return db_connector
 
@@ -117,6 +126,30 @@ read_write_db_connector = get_alchemy_row(read_only=False).replace(
     "postgresql://", "postgresql+asyncpg://"
 )
 
+
+def get_ssl_context(insecure: bool) -> ssl.SSLContext:
+    """Возвращает SSLContext.
+
+    Если insecure=True — отключаем проверку (только для отладки).
+    В противном случае используем системные корни и, при наличии,
+    передаём путь к CA из настроек.
+    """
+    if insecure:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+
+    # Безопасный путь: используем системные корни или указанный CA
+    from app.settings import settings
+    ca = getattr(settings, "POSTGRES_SSL_CA", None)
+    if ca:
+        return ssl.create_default_context(cafile=ca)
+    return ssl.create_default_context()
+
+
+ssl_ctx = get_ssl_context(getattr(settings, "POSTGRES_SSL_INSECURE", False))
+
 read_only_engine = create_async_engine(
     read_only_db_connector,
     echo=False,
@@ -124,6 +157,7 @@ read_only_engine = create_async_engine(
     max_overflow=max_overflow,
     pool_recycle=180,
     pool_pre_ping=True,
+    connect_args={"ssl": ssl_ctx},
 )
 
 read_write_engine = create_async_engine(
@@ -133,6 +167,7 @@ read_write_engine = create_async_engine(
     max_overflow=max_overflow,
     pool_recycle=180,
     pool_pre_ping=True,
+    connect_args={"ssl": ssl_ctx},
 )
 
 # Фабрики сессий
@@ -150,8 +185,8 @@ read_write_session_maker = async_sessionmaker(
 
 
 @asynccontextmanager
-async def  get_async_session_maker(
-    read_only=False,
+async def get_async_session_maker(
+    read_only: bool = False,
 ) -> AsyncGenerator[AsyncSession, None]:
     session_start = time()
     current_task = asyncio.current_task()
@@ -169,8 +204,12 @@ async def  get_async_session_maker(
                 finally:
                     hold_time = time() - session_start
                     if hold_time > 1.0:
-                        task_name = current_task.get_name()
-                        if not task_name:
+                        if current_task is not None:
+                            try:
+                                task_name = current_task.get_name()
+                            except Exception:
+                                task_name = "unknown"
+                        else:
                             task_name = "unknown"
                         logger.warning(
                             f"Session held for too long: {hold_time:.2f}s by task {task_name}"

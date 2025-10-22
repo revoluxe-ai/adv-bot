@@ -1,0 +1,25 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: postgres-db
+  namespace: prod-adv-bot
+spec:
+  teamId: "adv-bot"
+  numberOfInstances: 1
+  volume:
+    size: 5Gi
+    storageClass: nvme.network-drives.csi.timeweb.cloud
+  users:
+    advupdater:  # пользователь
+      - superuser
+      - createdb
+  databases:
+    adv_updater: advupdater
+  postgresql:
+    version: "17"
+    parameters:
+      ssl: "off"
+      log_statement: "none"
+      shared_buffers: "128MB"
+      max_connections: "50"
+  enableConnectionPooler: false

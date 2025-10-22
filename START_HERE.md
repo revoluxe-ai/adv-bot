@@ -19,6 +19,34 @@ Deployment запрашивает `1Gi` памяти, но кластер мож
 
 ## ⚡ БЫСТРАЯ ПРИМЕНЕНИЕ (5 минут)
 
+Перед началом — убедиться в готовности Storage (PowerShell):
+```powershell
+# 1. Проверить доступные StorageClass
+kubectl get storageclass --kubeconfig=new-cluster-config.yaml
+# Должны быть `hdd.network-drives.csi.timeweb.cloud` и `nvme.network-drives.csi.timeweb.cloud`
+
+# 2. Создать тестовый PVC (должен перейти в статус Bound)
+kubectl apply -f - --kubeconfig=new-cluster-config.yaml <<'YAML'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-storage-check-pvc
+  namespace: default
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: nvme.network-drives.csi.timeweb.cloud # Используй доступный SC
+  resources:
+    requests:
+      storage: 1Gi
+YAML
+
+# 3. Проверить статус тестового PVC (должен быть Bound)
+kubectl get pvc test-storage-check-pvc -n default --kubeconfig=new-cluster-config.yaml
+
+# 4. Удалить тестовый PVC
+kubectl delete pvc test-storage-check-pvc -n default --kubeconfig=new-cluster-config.yaml
+```
+
 Выполни эти **4 команды** по порядку:
 
 ```bash
@@ -41,7 +69,6 @@ kubectl rollout restart deployment wbgram-original -n default
 | **MEMORY_OVERCOMMIT_ALERT_FIX.md** | 5 мин | 🟢 Быстро | Краткий обзор |
 | **k8s/MEMORY_FIX_INDEX.md** | 10 мин | 🟡 Полный | Полная навигация |
 | **k8s/MEMORY_OVERCOMMIT_FIX.md** | 30 мин | 🔴 Эксперт | Полный анализ |
-| **docs/DEVOPS_SOLUTIONS.md** | 15 мин | 🟡 Средний | Решения для CSI Driver и Telegram интеграции |
 
 ---
 
