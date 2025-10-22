@@ -127,39 +127,28 @@ read_write_db_connector = get_alchemy_row(read_only=False).replace(
 )
 
 
-def _build_ssl_context() -> ssl.SSLContext:
-    """
-    Возвращает SSLContext для asyncpg.
-    Предпочитаем безопасную конфигурацию. Для локальной отладки допускаем POSTGRES_SSL_INSECURE=true.
-    """
-    from app.settings import settings
-    ca_path = None
-    try:
-        ca_path = getattr(settings, "POSTGRES_SSL_CA")
-    except Exception:
-        ca_path = None
-    insecure = False
-    try:
-        insecure = bool(getattr(settings, "POSTGRES_SSL_INSECURE", False))
-    except Exception:
-        insecure = False
+def get_ssl_context(insecure: bool) -> ssl.SSLContext:
+    """Возвращает SSLContext.
 
+    Если insecure=True — отключаем проверку (только для отладки).
+    В противном случае используем системные корни и, при наличии,
+    передаём путь к CA из настроек.
+    """
     if insecure:
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         return ctx
 
-    if ca_path:
-        ctx = ssl.create_default_context(cafile=ca_path)
-    else:
-        # Без указания CA все равно проверяем системные корни
-        ctx = ssl.create_default_context()
-    # По умолчанию hostname check включен, verify_mode = CERT_REQUIRED
-    return ctx
+    # Безопасный путь: используем системные корни или указанный CA
+    from app.settings import settings
+    ca = getattr(settings, "POSTGRES_SSL_CA", None)
+    if ca:
+        return ssl.create_default_context(cafile=ca)
+    return ssl.create_default_context()
 
 
-ssl_ctx = _build_ssl_context()
+ssl_ctx = get_ssl_context(getattr(settings, "POSTGRES_SSL_INSECURE", False))
 
 read_only_engine = create_async_engine(
     read_only_db_connector,
