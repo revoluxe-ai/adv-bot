@@ -31,7 +31,7 @@ async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
     # Mock WBConfig to avoid DI dependency
     mock_wb_config = MagicMock()
     mock_wb_config.test_mode = False  # Set to False to test the real flow
-    
+
     with patch(
         "app.modules.common_slaves.wildberries.super_cabinet_manager.sm"
     ) as sm_mock:

@@ -65,7 +65,6 @@ async def check_adv_payment(
     result = await session.execute(adv_payment_check_stmt)
     return result.scalar()
 
-
 async def graph_vector_update() -> None:
     graph_updater = GraphUpdater()
     length = 2**4

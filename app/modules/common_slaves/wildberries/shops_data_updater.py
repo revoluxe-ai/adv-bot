@@ -27,9 +27,7 @@ async def consumer():
         logger.info("Consumer waiting for task")
         if _coroutine_parallel_run_queue.empty() and active_tasks:
             logger.info("Consumer waiting for task")
-            done, _ = await asyncio.wait(
-                active_tasks, return_when=asyncio.FIRST_COMPLETED
-            )
+            done, _ = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
             # Удалять задачи из списка active_tasks здесь не нужно, так как мы используем колбэки для их удаления
         else:
             coroutine: asyncio.Future = await _coroutine_parallel_run_queue.get()
@@ -58,9 +56,7 @@ class ShopDataUpdater:
         advert_api = wb_api
         adv_ids: list[int] = await advert_api.get_advertIds()
         async with sm() as session:
-            stmt = select(models.AdvSetting).where(
-                models.AdvSetting.adv_id.in_(adv_ids)
-            )
+            stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
             exist_advs_result = (await session.execute(stmt)).unique()
             existing_advs: list[models.AdvSetting] = exist_advs_result.scalars().all()
             existind_advs_ids: set[int] = {adv.adv_id for adv in existing_advs}
