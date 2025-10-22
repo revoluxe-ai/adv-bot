@@ -38,6 +38,8 @@ kubectl port-forward -n kube-prometheus-stack svc/kube-prometheus-stack-grafana 
 
 **Подробнее**: [`DEVOPS_QUICK_START.md`](DEVOPS_QUICK_START.md)
 
+> Важно: CSI-драйверы управляются провайдером. Не применять файлы `k8s/**csi**.yaml`. См. постмортем: [`docs/reports/CSI_DRIVER_POSTMORTEM_2025-10-20.md`](docs/reports/CSI_DRIVER_POSTMORTEM_2025-10-20.md)
+
 ---
 
 ## 📚 ПОЛНАЯ ДОКУМЕНТАЦИЯ
@@ -222,10 +224,10 @@ adv-bot/
 ├── DEVOPS_QUICK_START.md                     ← Быстрый старт (5-15 мин)
 ├── DEVOPS_INSTRUCTIONS_SUMMARY.md            ← Полный обзор всех инструкций
 │
-├── k8s/
+├── k8s/                                      ← Kubernetes манифесты и скрипты (от корня проекта)
 │   ├── GITOPS_SETUP_PLAN.md                  ← GitOps setup (ArgoCD)
 │   │
-│   └── monitoring/
+│   └── monitoring/                            ← Мониторинг, правила и утилиты
 │       ├── 00-START-HERE.md                  ← Начало (ориентация)
 │       ├── QUICK_REFERENCE.md                ← Шпаргалка команд
 │       ├── ERROR_MONITORING_GUIDE.md         ← Полное руководство
