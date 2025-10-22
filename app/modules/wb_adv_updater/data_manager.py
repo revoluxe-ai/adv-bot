@@ -266,15 +266,14 @@ async def set_positions(
 ) -> list[CalculatedKeyword]:
     texts = [keyword.text for keyword in keyword_stats]
     try:
-        # Type ignore for untyped redis_manager call
-        positions = await redis_manager.get_keywords_positions(adv_setting, texts)  # type: ignore[no-untyped-call]
-        text_to_position = {position.keyword_text: position for position in positions}
-    except Exception as e:
+        positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    except:
         logger.warning(
             f"Ошибка {e}получения позиций из Redis для арк {adv_setting.adv_id}"
 
         )
         return keyword_stats
+    text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
         try:
@@ -293,7 +292,6 @@ async def set_positions(
             keywords = keyword_stat.childs_keywords
             if keywords:
                 texts = [kw.text for kw in keywords]
-                # Type ignore for untyped redis_manager call
                 positions = await redis_manager.get_keywords_positions(
                     adv_setting, texts
                 )  # type: ignore[no-untyped-call]
@@ -307,7 +305,7 @@ async def set_positions(
 
 
 async def set_position(
-        keyword_stat: CalculatedKeyword, adv_setting: AdvSetting
+    keyword_stat: CalculatedKeyword, adv_setting: AdvSetting
 ) -> CalculatedKeyword:
     text = keyword_stat.text
     main_nmid = int(adv_setting.nmids[0])
@@ -355,8 +353,6 @@ def __calculate_clusters(
             spend += int(keyword.spend)
             if isinstance(keyword.query, int):
                 query += keyword.query
-            elif isinstance(keyword.query, str) and keyword.query.isdigit():
-                query += int(keyword.query)
 
         cluster_keyword = CalculatedKeyword(
             text=keyword_cluster_name, views=views, clicks=clicks, spend=spend
@@ -441,7 +437,7 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
     keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
 
-    keywords_without_rating.sort(key=lambda x: x.predict_ctr or 0, reverse=True)
+    keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
     keywords = keywords_with_rating + keywords_without_rating
     return keywords
 
@@ -451,7 +447,7 @@ async def get_cached_keyword(adv: AdvSetting, text: str) -> CalculatedKeyword | 
     cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}"
     cached_data = await redis_manager.get(cache_key)
 
-    if cached_data and isinstance(cached_data, str):
+    if cached_data:
         return CalculatedKeyword.model_validate_json(cached_data)
     return None
 
@@ -616,28 +612,22 @@ async def get_good_bad_phrases_for_min_ctr(
 
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
-        keyword_setting = text_to_keyword_setting.get(text)
-        if not keyword_setting:
-            continue
-        # Handle SQLAlchemy Column type for added_clicks
-        added_clicks_val = getattr(keyword_setting, "added_clicks", None)
-        added_clicks_value = (
-            float(added_clicks_val) if added_clicks_val is not None else 0.0
-        )
+        keyword_setting = text_to_keyword_setting[text]
+        added_clicks = keyword_setting.added_clicks
         keyword_stat.relevant = keyword_setting.relevant
-        if not added_clicks_value:
-            added_clicks_value = 0
-        keyword_stat.added_clicks = int(added_clicks_value)
+        if not added_clicks:
+            added_clicks = 0
+        keyword_stat.added_clicks = added_clicks
         keyword_stat.keyword_setting_original_id = keyword_setting.id
         keyword_stat.adv_id = adv_setting.adv_id
         if not keyword_setting:
             continue
-        original_hard_status: int = int(keyword_setting.hard_status or 1)
+        original_hard_status: int = int(keyword_setting.hard_status)
         keyword_stat.hard_status = original_hard_status
         original_predict_ctr = text_to_predict_ctr.get(text, None)
         keyword_stat.original_predict_ctr = original_predict_ctr
 
-    keyword_stats = __set_predict_ctr(
+    keyword_stats: list[CalculatedKeyword] = __set_predict_ctr(
         keyword_stats, min_ctr, adv_setting
     )
 
@@ -653,12 +643,12 @@ async def get_good_bad_phrases_for_min_ctr(
         enough_views = keyword_stat.enough_views
         assert enough_views is not None
         original_predict_ctr = keyword_stat.original_predict_ctr
-        hard_status = int(keyword_stat.hard_status or 1)
+        hard_status = int(keyword_stat.hard_status)
         keyword_setting = text_to_keyword_setting.get(keyword_stat.text)
         """TODO: Выпилить из кода reason max_position, т.е. больше функции отключения позиции, если база больше
          или равна целевой - нет. """
         if max_cpc:
-            if cpm_now and keyword_stat.predict_ctr:
+            if cpm_now:
                 cpc = (cpm_now / 1000) / keyword_stat.predict_ctr
             elif clicks > 0:
                 cpc = views / clicks
@@ -674,10 +664,10 @@ async def get_good_bad_phrases_for_min_ctr(
                         )
                 continue
         if (
-                not original_predict_ctr
-                and enough_views / 2 > keyword_stat.views
-                and not adv_setting.min_views_for_ml_predict
-                and keyword_stat.hard_status in [1, 2]
+            not original_predict_ctr
+            and enough_views / 2 > keyword_stat.views
+            and not adv_setting.min_views_for_ml_predict
+            and keyword_stat.hard_status in [1, 2]
         ):
             keyword_stat.status = KeywordStatus.GOOD
             keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
@@ -789,7 +779,7 @@ async def get_main_photos(nmids: list[int]) -> list[str]:
 
 
 async def __download_and_resize_image(
-        url: str, session: Any, max_size: int = 1280
+    url: str, session: Any, max_size: int = 1280
 ) -> bytes | None:
     while True:
         async with session.get(url) as response:
@@ -820,7 +810,10 @@ async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
     adv_keyword_text_in_black_list: list[tuple[int, str]] = []
     for keyword_setting in keyword_settings:
         adv_setting = keyword_setting.adv_setting
-        adv_keyword_text_in_black_list.append((adv_setting.adv_id, str(keyword_setting.text)))
+        adv_keyword_text_in_black_list.append(
+            (adv_setting.adv_id, keyword_setting.text)
+        )
+
     return adv_keyword_text_in_black_list
 
 
@@ -855,7 +848,9 @@ async def get_adv_id_to_min_ctr(adv_ids: list[int]) -> dict[int, float]:
     return adv_id_to_min_ctr
 
 
-async def get_adv_id_keyword_text_to_status(adv_ids: list[int]):
+async def get_adv_id_keyword_text_to_status(
+    adv_ids: list[int],
+) -> dict[tuple[int, str], int]:
     async with _sm() as session:
         # Используем только необходимые колонки и убираем лишние алиасы
         stmt = (
@@ -868,7 +863,9 @@ async def get_adv_id_keyword_text_to_status(adv_ids: list[int]):
         result = await session.execute(stmt)
 
         # Извлекаем данные в виде словаря сразу в процессе итерации по результату
-        adv_id_keyword_text_to_status = {(row.adv_id, row.text): row.hard_status for row in result}
+        adv_id_keyword_text_to_status = {
+            (row.adv_id, row.text): row.hard_status for row in result
+        }
 
     return adv_id_keyword_text_to_status
 
@@ -878,7 +875,6 @@ class ReferralStatistic:
     name: str
     referrals_count: int
     total_payments: float
-
 
 @dataclass
 class ReferralLink:
@@ -908,7 +904,7 @@ async def get_mean_ctr(adv: AdvSetting) -> float:
         )
         result = await session.execute(stmt)
         mean_ctr = result.scalar_one()
-    return mean_ctr if mean_ctr is not None else 0.0
+        return mean_ctr  # Возвращаем значение mean_ctr вместо pass
 
 
 async def get_min_ctr(adv: AdvSetting) -> float:
@@ -1160,12 +1156,10 @@ async def get_need_nmids_for_parsing(
             result = await session.execute(stmt)
             nmids = result.scalars().all()
             if nmids:
-                nmids_list: list[int] = [nmid for row in nmids for nmid in row]
-                for adv_id_with_text_loop in not_found_adv_id:
-                    for nmid in nmids_list:
-                        # Type ignore for untyped redis_manager call
-                        await redis_manager.set_nmid(adv_id_with_text_loop, nmid)  # type: ignore[no-untyped-call]
-                nmids_need = nmids_need.union(set(nmids_list))
+                nmids = [nmid for row in nmids for nmid in row]
+                for nmid in nmids:
+                    await redis_manager.set_nmid(adv_id, nmid)
+                nmids_need = nmids_need.union(nmids)
     return nmids_need
 
 
@@ -1358,9 +1352,9 @@ async def get_keywords_statistic(adv_setting: AdvSetting) -> list[CalculatedKeyw
     return keywords
 
 
-async def get_max_adv_bid(adv_setting: AdvSetting) -> float:
-    setting_max_bid = float(adv_setting.max_cpm or 0)
-    max_pay_for_order = float(adv_setting.max_pay_for_order or 0)
+async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
+    setting_max_bid = adv_setting.max_cpm
+    max_pay_for_order = adv_setting.max_pay_for_order
     if not max_pay_for_order:
         return setting_max_bid
     if adv_setting.auto_max_bid:
@@ -1427,16 +1421,11 @@ ORDER BY date, text
 
     async with get_clickhouse_client() as client:
         result = await client.query(query, parameters=parameters)
-        result_rows = result.result_rows
-        positions = []
-        for row in result_rows:
-            position = WBItemPosition()
-            position.nmid = nmid
-            position.position = int(row[2]) if row[2] is not None else None
-            position.timestamp = row[0] if isinstance(row[0], datetime) else None
-            position.keyword_text = str(row[1]) if row[1] is not None else None
-            positions.append(position)
-        return positions
+        result = result.result_rows
+        return [
+            WBItemPosition(nmid=nmid, position=row[1], timestamp=row[0])
+            for row in result
+        ]
 
 
 async def add_positions_to_clickhouse(positions: list[WBItemPosition]) -> None:
@@ -1445,11 +1434,7 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]) -> None:
             try:
                 # Генерация версии и подготовка timestamp
                 version = __calculate_version(position)
-                timestamp_str = (
-                    position.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-                    if position.timestamp
-                    else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                )
+                timestamp_str = position.timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
                 # Всегда вставляем новые данные
                 query_insert = f"""
@@ -1465,7 +1450,7 @@ async def add_positions_to_clickhouse(positions: list[WBItemPosition]) -> None:
                 )
                 VALUES (
                     {position.nmid},
-                    '{(position.keyword_text or '').replace("'", "''")}',  # Экранирование одинарных кавычек
+                    '{position.keyword_text.replace("'", "''")}',  # Экранирование одинарных кавычек
                     {position.position if position.position else 0},
                     {position.position if position.position else 0},
                     {0},
