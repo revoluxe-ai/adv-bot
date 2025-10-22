@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from PIL import Image
+from PIL import Image # type: ignore
 from sqlalchemy import and_, func, select, case, Float, distinct, cast
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import NoResultFound
@@ -117,6 +117,8 @@ async def get_keywords_statistic_clickhouse(
         adv_setting: AdvSetting,
         pass_time: timedelta | None = timedelta(days=7),
         last_views: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
 ) -> list[CalculatedKeyword]:
     async with get_clickhouse_client() as ch_client:
         advs: set[int] = set()
@@ -124,7 +126,7 @@ async def get_keywords_statistic_clickhouse(
         advs.add(auto_adv_id)
         if search_adv_id := adv_setting.search_adv_id:
             advs.add(search_adv_id)
-        query = _build_clickhouse_query(advs, pass_time, last_views)
+        query = _build_clickhouse_query(advs, pass_time, last_views, limit, offset)
         result = await ch_client.query(query)
         rows = result.result_rows
         keywords = []
@@ -161,6 +163,8 @@ def _build_clickhouse_query(
         adv_ids: set[int],
         pass_time: timedelta | None,
         last_views: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
 ) -> str:
     # Преобразуем список ID в строку для SQL
     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
@@ -236,6 +240,12 @@ def _build_clickhouse_query(
                 cumulative_total_views <= {last_views}
             GROUP BY text
         """
+
+    # Добавляем LIMIT и OFFSET, если они указаны
+    if limit is not None:
+        query += f" LIMIT {limit}"
+    if offset is not None:
+        query += f" OFFSET {offset}"
 
     return query
 
@@ -426,9 +436,13 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> FullAdvStat | 
         return None
 
 
-async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
+async def get_good_bad_phrases(
+        adv: AdvSetting,
+        limit: int | None = None,
+        offset: int | None = None,
+) -> list[CalculatedKeyword]:
     keywords: list[CalculatedKeyword] = await get_good_bad_phrases_for_min_ctr(
-        adv, adv.max_cpc
+        adv, int(adv.max_cpc) if adv.max_cpc is not None else None, None, limit, offset
     )
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
@@ -502,11 +516,13 @@ def __set_predict_ctr(
 async def get_good_bad_phrases_for_min_ctr(
         adv_setting: AdvSetting,
         max_cpc: int | None = None,
-        pass_time: timedelta = timedelta(days=7),
+        pass_time: timedelta | None = timedelta(days=7),
+        limit: int | None = None,
+        offset: int | None = None,
 ) -> list[CalculatedKeyword]:
     min_ctr = await get_min_ctr(adv_setting)
     logger.debug("Минимальный ctr получен")
-    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time)
+    keyword_stats = await get_keywords_statistic_clickhouse(adv_setting, pass_time, None, limit, offset)
     async with _sm() as session:
         logger.debug("Начинаю получать фразы")
         stmt = select(KeywordSetting).where(
@@ -589,7 +605,7 @@ async def get_good_bad_phrases_for_min_ctr(
                 clicks=0,
                 views=0,
                 spend=0,
-                keyword_setting_original_id=keyword_setting_for_text.id,
+                keyword_setting_original_id=keyword_setting_for_text.id if keyword_setting_for_text else None,
             )
             position = await redis_manager.get_keyword_position(
                 text, adv_setting.nmids[0]
@@ -602,7 +618,7 @@ async def get_good_bad_phrases_for_min_ctr(
 
     texts = [kw.text for kw in keyword_stats]
     try:
-        text_to_predict_ctr: dict[str, float] = await get_text_to_predict_ctr_dict.get(
+        text_to_predict_ctr: dict[str, float | None] = await get_text_to_predict_ctr_dict.get(
             adv_setting, texts
         )
     except Exception as e:
@@ -634,7 +650,7 @@ async def get_good_bad_phrases_for_min_ctr(
             continue
         original_hard_status: int = int(keyword_setting.hard_status or 1)
         keyword_stat.hard_status = original_hard_status
-        original_predict_ctr = text_to_predict_ctr.get(text, None)
+        original_predict_ctr: float | None = text_to_predict_ctr.get(text, None)
         keyword_stat.original_predict_ctr = original_predict_ctr
 
     keyword_stats = __set_predict_ctr(

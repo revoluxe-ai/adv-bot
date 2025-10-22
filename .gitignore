@@ -75,3 +75,4 @@ linux_venv/
 app/modules/predict_ctr_service/model/model/model.json
 .dmypy.json
 .coverage
+!k8s/*
