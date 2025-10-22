@@ -55,13 +55,13 @@ kubectl get resourcequota -A
 # http://alertmanager:9093
 ```
 
-### Применение изменений:
-```bash
+### Применение изменений (PowerShell):
+```powershell
 # Всегда проверять перед применением
-kubectl apply --dry-run=client -f filename.yaml
+kubectl apply --dry-run=client -f .\filename.yaml
 
 # Применять файлы
-kubectl apply -f k8s/monitoring/
+kubectl apply -f .\k8s\monitoring\
 
 # Рестарт deployment'а
 kubectl rollout restart deployment/deployment-name -n namespace
@@ -69,6 +69,12 @@ kubectl rollout restart deployment/deployment-name -n namespace
 # Проверка статуса после изменений
 kubectl rollout status deployment/deployment-name -n namespace
 ```
+
+### Политика по CSI (Критично)
+- CSI-драйверы (`network-drives.csi.timeweb.cloud`, `ru.yandex.s3.csi`) управляются провайдером.
+- Запрещено применять/редактировать любые манифесты `k8s/**csi**.yaml` в кластере провайдера.
+- Любые проблемы с PVC/PV/Pending эскалируются в поддержку провайдера.
+- См. постмортем: `docs/reports/CSI_DRIVER_POSTMORTEM_2025-10-20.md`.
 
 ---
 
@@ -293,6 +299,22 @@ adv-bot/
 - **Alertmanager Config:** https://prometheus.io/docs/alerting/latest/configuration/
 
 ---
+
+## 🔗 Основная DevOps-документация (ссылка на репозиторий файлов)
+
+Этот файл (`.cursor/rules/devops.mdc`) является главным справочником для задач DevOps — **отсюда** должны быть явные ссылки на все остальные DevOps-документы и скрипты. Все остальные DevOps-файлы находятся внутри каталога `k8s/` в корне проекта (`adv-bot/k8s/`).
+
+- **Главная страница DevOps**: [`DEVOPS_INDEX.md`](DEVOPS_INDEX.md)
+- **Быстрый старт**: [`DEVOPS_QUICK_START.md`](DEVOPS_QUICK_START.md)
+- **Полный обзор инструкций**: [`DEVOPS_INSTRUCTIONS_SUMMARY.md`](DEVOPS_INSTRUCTIONS_SUMMARY.md)
+- **Kubernetes манифесты и скрипты** (все от корня): `k8s/`
+  - GitOps / ArgoCD: [`k8s/GITOPS_SETUP_PLAN.md`](k8s/GITOPS_SETUP_PLAN.md)
+  - Мониторинг: [`k8s/monitoring/`](k8s/monitoring/)
+    - Быстрый референс: [`k8s/monitoring/QUICK_REFERENCE.md`](k8s/monitoring/QUICK_REFERENCE.md)
+    - Полный гайд: [`k8s/monitoring/ERROR_MONITORING_GUIDE.md`](k8s/monitoring/ERROR_MONITORING_GUIDE.md)
+    - Скрипты и инструменты: `k8s/monitoring/pod-error-checker.sh`, `k8s/monitoring/error_monitor.py`
+
+Пожалуйста, при добавлении новых DevOps-файлов размещайте их внутри `k8s/` и добавляйте ссылку в этот раздел.
 
 **Дата создания:** 2025-10-19  
 **Статус:** Production Ready  

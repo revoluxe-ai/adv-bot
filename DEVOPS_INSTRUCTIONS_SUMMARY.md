@@ -16,6 +16,7 @@
 ---
 
 ## 🚀 1. GITOPS SETUP (ArgoCD)
+> Политика CSI (важно): В кластерах провайдера CSI-драйверы управляются провайдером. Не применять файлы `k8s/**csi**.yaml`. При проблемах с PVC/PV эскалировать в поддержку. См. `docs/reports/CSI_DRIVER_POSTMORTEM_2025-10-20.md`.
 
 ### 📄 Файл: `k8s/GITOPS_SETUP_PLAN.md`
 

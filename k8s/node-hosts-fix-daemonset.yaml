@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: harbor-hosts-fix
+  namespace: kube-system
+  labels:
+    app: harbor-hosts-fix
+spec:
+  selector:
+    matchLabels:
+      app: harbor-hosts-fix
+  template:
+    metadata:
+      labels:
+        app: harbor-hosts-fix
+    spec:
+      hostNetwork: true
+      hostPID: true
+      tolerations:
+        - operator: Exists
+      volumes:
+        - name: etc-hosts
+          hostPath:
+            path: /etc/hosts
+            type: File
+      containers:
+        - name: patch-hosts
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              if ! grep -q 'harborskyline.duckdns.org' /etc/hosts; then
+                echo '72.56.64.30 harborskyline.duckdns.org' >> /etc/hosts
+              fi
+              # keep container alive so the DaemonSet stays running
+              sleep 3600000
+          volumeMounts:
+            - name: etc-hosts
+              mountPath: /etc/hosts
+              readOnly: false
+          securityContext:
+            privileged: true
+
