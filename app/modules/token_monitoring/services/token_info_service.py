@@ -19,6 +19,8 @@ REQUIRED_RIGHTS = {
 }
 
 
+# TODO: Подписать РК где Авто, где Аукцион
+
 # --- Time helpers (ensure timezone-aware UTC) ---
 
 def utcnow() -> datetime.datetime:
