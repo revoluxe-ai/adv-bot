@@ -19,6 +19,34 @@ Deployment запрашивает `1Gi` памяти, но кластер мож
 
 ## ⚡ БЫСТРАЯ ПРИМЕНЕНИЕ (5 минут)
 
+Перед началом — убедиться в готовности Storage (PowerShell):
+```powershell
+# 1. Проверить доступные StorageClass
+kubectl get storageclass --kubeconfig=new-cluster-config.yaml
+# Должны быть `hdd.network-drives.csi.timeweb.cloud` и `nvme.network-drives.csi.timeweb.cloud`
+
+# 2. Создать тестовый PVC (должен перейти в статус Bound)
+kubectl apply -f - --kubeconfig=new-cluster-config.yaml <<'YAML'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-storage-check-pvc
+  namespace: default
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: nvme.network-drives.csi.timeweb.cloud # Используй доступный SC
+  resources:
+    requests:
+      storage: 1Gi
+YAML
+
+# 3. Проверить статус тестового PVC (должен быть Bound)
+kubectl get pvc test-storage-check-pvc -n default --kubeconfig=new-cluster-config.yaml
+
+# 4. Удалить тестовый PVC
+kubectl delete pvc test-storage-check-pvc -n default --kubeconfig=new-cluster-config.yaml
+```
+
 Выполни эти **4 команды** по порядку:
 
 ```bash

@@ -3,7 +3,7 @@
 **Дата**: 18 октября 2025  
 **Статус**: ✅ Ready  
 **Язык**: Русский  
-**Shell**: Git Bash
+**Shell**: PowerShell (Windows 10). См. правила по PowerShell в always_applied_workspace_rules и используйте `;` вместо `&&`, `Select-String` вместо `grep`, Windows-пути с `\\`.
 
 ---
 
@@ -23,7 +23,28 @@ kubectl port-forward -n kube-prometheus-stack svc/kube-prometheus-stack-grafana 
 # http://localhost:3000 (admin/admin)
 ```
 
-### 2️⃣ Развернуть Monitoring (10 мин)
+### 2️⃣ Проверка Storage (обязательно, 3 мин)
+
+```powershell
+kubectl get storageclass
+# Быстрый тест динамического провижининга
+kubectl apply -f - <<'YAML'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quickstart-test-pvc
+  namespace: default
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: nvme.network-drives.csi.timeweb.cloud
+  resources: { requests: { storage: 1Gi } }
+YAML
+kubectl get pvc quickstart-test-pvc -n default; kubectl delete pvc quickstart-test-pvc -n default
+```
+
+⚠ Важно: CSI-драйвер управляется провайдером. Не применять файлы `k8s/**csi**.yaml`.
+
+### 3️⃣ Развернуть Monitoring (10 мин)
 
 ```bash
 # Применить Prometheus Rules
