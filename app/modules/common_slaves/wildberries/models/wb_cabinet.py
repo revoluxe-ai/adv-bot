@@ -73,6 +73,13 @@ class WBCabinet(BaseTable):
             + sum(float(payment.amount) for payment in self.balance_payments)
         )
 
+    @calculated_balance.expression
+    def calculated_balance(cls):
+        # В контексте SQLAlchemy вернём простое выражение по колонке balance.
+        # Это предотвращает попытки интерпретации Python-итераторов при доступе к
+        # атрибутам класса (например, при MagicMock(spec=...)).
+        return cls.balance
+
     @hybrid_property
     def calculated_bonus(self) -> float:
         """Вычисляет бонусы на основе начального значения bonus и всех платежей"""
@@ -81,3 +88,8 @@ class WBCabinet(BaseTable):
         return float(
             self.bonus + sum(float(payment.amount) for payment in self.bonus_payments)
         )
+
+    @calculated_bonus.expression
+    def calculated_bonus(cls):
+        # Аналогично — возвращаем колонку bonus в качестве SQL-выражения.
+        return cls.bonus

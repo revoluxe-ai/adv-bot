@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
+from app.client_bot.user_interface.views.callbacks import AddNewToken
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
     ChoiceAdvPaginator,
@@ -65,7 +66,7 @@ class ShopMenu(TextWithKeyboard):
             shop_id = self._wb_cabinet.shop_id
             self._token_status = await token_service.get_shop_token_status(shop_id)
             self._token_status_loaded = True
-            logger.debug(f"Token status loaded for shop {shop_id}: {self._token_status.status}")
+            logger.debug(f"Token status loaded for shop {shop_id}: {self._token_status.status if self._token_status else 'None'}")
         except Exception as e:
             logger.error(f"Failed to load token status: {e}", exc_info=True)
             self._token_status = None
@@ -390,6 +391,12 @@ class ShopMenu(TextWithKeyboard):
         wb_cabinet = self._wb_cabinet
         wb_cabinet_original_id = wb_cabinet.id
         builder = InlineKeyboardBuilder()
+        button = InlineKeyboardButton(
+            text="➕ Добавить токен/Обновить токены",
+            callback_data=AddNewToken(wb_user_cabinet_original_id=wb_user_cabinet.id).pack(),
+        )
+        builder.row(button)
+
         button = InlineKeyboardButton(
             text="Автоматические рекламные кампании",
             callback_data=ChoiceAdvPaginator(
