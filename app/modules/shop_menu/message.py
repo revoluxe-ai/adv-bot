@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime, timedelta
-import logging
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
@@ -312,7 +311,7 @@ class ShopMenu(TextWithKeyboard):
         text = (
             f"📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n"
             f"""Ваш тариф в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else "Нет активных РК"}"""
-            f"(больше РК -> ниже цена, тарифы -> https://telegra.ph/Tarify-03-17)\n"
+            f"(больше РК -> ниже цена, тарифы -> https://golnk.ru/pwN2L)\n"
             f"💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n"
         )
 
