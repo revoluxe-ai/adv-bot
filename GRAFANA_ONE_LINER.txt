@@ -1,0 +1,120 @@
+═══════════════════════════════════════════════════════════════════════════════
+                     GRAFANA - ОДНА КОМАНДА ДЛЯ ЗАПУСКА
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ POD БЫЛ ПЕРЕСОЗДАН - ИСПОЛЬЗУЙТЕ ПРАВИЛЬНЫЙ ПАРОЛЬ!
+
+─────────────────────────────────────────────────────────────────────────────
+
+ШАГ 1: ВЫПОЛНИ ВСЕ ЭТИ КОМАНДЫ В GIT BASH ПО ОЧЕРЕДИ:
+
+# Убедитесь что pod работает (статус должен быть 3/3 Running)
+kubectl get pods -n kube-prometheus-stack -l app.kubernetes.io/name=grafana
+
+# Запустите port-forward (ОСТАВЬТЕ ЭТО ОКНО ОТКРЫТЫМ!)
+kubectl port-forward -n kube-prometheus-stack svc/kube-prometheus-stack-grafana 3000:80
+
+─────────────────────────────────────────────────────────────────────────────
+
+ШАГ 2: ОТКРОЙТЕ В БРАУЗЕРЕ:
+
+http://localhost:3000
+
+─────────────────────────────────────────────────────────────────────────────
+
+ШАГ 3: АВТОРИЗУЙТЕСЬ:
+
+Username: admin
+Password: admin
+
+─────────────────────────────────────────────────────────────────────────────
+
+ШАГ 4: ОТКРОЙТЕ DASHBOARD:
+
+1. Слева в меню → Dashboards
+2. Поищите "Pod Error Monitoring"
+3. Кликните на него
+
+─────────────────────────────────────────────────────────────────────────────
+
+✅ ВСЕ! ВЫ ВИДИТЕ ГРАФИКИ И ТАБЛИЦЫ С ДАННЫМИ О ОШИБКАХ!
+
+─────────────────────────────────────────────────────────────────────────────
+
+ЕСЛИ ЛОГИН НЕ ПОДХОДИТ:
+
+# Вариант 1: Пересоздайте pod
+kubectl delete pod -n kube-prometheus-stack -l app.kubernetes.io/name=grafana
+kubectl get pods -n kube-prometheus-stack -l app.kubernetes.io/name=grafana -w
+# Подождите пока статус не станет 3/3 Running (20-30 секунд)
+# Потом повторите шаги выше
+
+# Вариант 2: Проверьте пароль в Secret
+kubectl get secret -n kube-prometheus-stack kube-prometheus-stack-grafana \
+  -o jsonpath="{.data.admin-password}" | powershell -Command \
+  "[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String((Read-Host)))"
+
+─────────────────────────────────────────────────────────────────────────────
+
+ВАЖНО:
+
+✓ Оставьте терминал с port-forward командой открытым!
+✓ Если закроете терминал, Grafana не будет доступна
+✓ Если хотите остановить, нажмите Ctrl+C
+✓ Port-forward должен быть запущен в ОТДЕЛЬНОМ терминале
+
+─────────────────────────────────────────────────────────────────────────────
+
+ДОПОЛНИТЕЛЬНО:
+
+Если хотите открыть все dashboards сразу (Grafana + Prometheus + AlertManager):
+
+# В ОТДЕЛЬНЫХ окнах терминала запустите:
+
+# Окно 1: Grafana
+kubectl port-forward -n kube-prometheus-stack svc/kube-prometheus-stack-grafana 3000:80
+
+# Окно 2: Prometheus
+kubectl port-forward -n kube-prometheus-stack svc/kube-prometheus-stack-prometheus 9090:9090
+
+# Окно 3: AlertManager
+kubectl port-forward -n kube-prometheus-stack svc/kube-prometheus-stack-alertmanager 9093:9093
+
+Затем откройте в браузере:
+- http://localhost:3000   (Grafana)
+- http://localhost:9090   (Prometheus)
+- http://localhost:9093   (AlertManager)
+
+─────────────────────────────────────────────────────────────────────────────
+
+БЫСТРАЯ ПРОВЕРКА:
+
+Если http://localhost:3000 не открывается:
+
+1. Проверьте что kubectl работает:
+   kubectl get pods -n kube-prometheus-stack
+
+2. Проверьте что Grafana pod работает (статус 3/3 Running):
+   kubectl get pods -n kube-prometheus-stack -l app.kubernetes.io/name=grafana
+
+3. Проверьте что port-forward запущен в другом терминале:
+   kubectl port-forward -n kube-prometheus-stack svc/kube-prometheus-stack-grafana 3000:80
+
+4. Очистите кэш браузера:
+   Ctrl+Shift+Delete и нажмите "Clear All"
+
+5. Попробуйте другой браузер (Chrome, Firefox, Edge)
+
+─────────────────────────────────────────────────────────────────────────────
+
+✅ ЧЕК-ЛИСТ:
+
+[ ] kubectl работает
+[ ] Pod Grafana в состоянии 3/3 Running
+[ ] Port-forward запущен в отдельном терминале
+[ ] Браузер открыт на http://localhost:3000
+[ ] Username: admin, Password: admin введены
+[ ] Dashboard "Pod Error Monitoring" открыт
+
+═══════════════════════════════════════════════════════════════════════════════
+

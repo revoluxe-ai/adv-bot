@@ -1,11 +1,11 @@
 import datetime
 import json
+import logging
 import re
 import typing
 from dataclasses import dataclass
 from enum import Enum
 from typing import cast
-import logging
 
 import jwt
 from jwt import DecodeError
@@ -26,6 +26,7 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.settings import settings
@@ -33,6 +34,13 @@ from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+
+# Ensure billing models (AdvPayment) are imported and registered before mapper configuration
+try:
+    from app.modules.billing import models as _billing_models  # noqa: F401
+except Exception:
+    # In minimal test contexts billing may be absent; relationship will fallback to string resolution
+    pass
 
 if typing.TYPE_CHECKING:
     from app.modules.billing.models import AdvPayment
@@ -176,10 +184,6 @@ class WBToken(BaseTable):
         return hash(self.api_key)
 
     @property
-    def hash(self):
-        return hash(self.api_key)
-
-    @property
     def __payload(self) -> dict[str, object]:
         try:
             result = jwt.decode(self.api_key, options={"verify_signature": False})
@@ -208,7 +212,8 @@ class WBToken(BaseTable):
     def __expires(self) -> datetime.datetime:
         exp = self.__payload.get("exp")
         if isinstance(exp, (int, float, str)):
-            return datetime.datetime.fromtimestamp(int(exp))
+            # Make the datetime timezone-aware (UTC)
+            return datetime.datetime.fromtimestamp(int(exp), tz=datetime.timezone.utc)
         raise NotValidTokenError
 
     @property
@@ -250,7 +255,8 @@ class WBToken(BaseTable):
     def is_expired(self) -> bool:
         """Проверяет, истёк ли токен"""
         try:
-            return datetime.datetime.utcnow() >= self.__expires
+            # Compare using timezone-aware UTC now
+            return datetime.datetime.now(datetime.timezone.utc) >= self.__expires
         except Exception:
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным

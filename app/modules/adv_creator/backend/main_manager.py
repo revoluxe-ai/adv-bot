@@ -38,7 +38,10 @@ class MainAdvManager:
         adv_name = name
         adv_id: int = await self.wb_api.create_search_adv([nmid], adv_name)
         await self.wb_api.rename_adv(adv_id, new_name=adv_name)
-        await self._upcast_target_placement(adv_id, search=True, recommendations=False)
+        try:
+            await self._upcast_target_placement(adv_id, search=True, recommendations=False)
+        except Exception as exc:
+            logger.error(f"Ошибка при настройке таргетинга РК {adv_id}: {exc}", exc_info=True)
         return adv_id
 
     async def _create_auto_adv(

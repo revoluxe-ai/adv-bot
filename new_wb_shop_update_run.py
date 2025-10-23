@@ -4,16 +4,16 @@
 """
 
 import asyncio
+import logging
 import platform
 
 import dotenv
-import logging
 
-from app.core.di.di_manager import DIManager
-from app.modules.shop_runner.exceptions import ShopRunnerCriticalError
-from app.modules.shop_runner import run_process_func
-from python_modules.logger import setup_logging
 from app.core.di import AppContainer
+from app.core.di.di_manager import DIManager
+from app.modules.shop_runner import run_process_func
+from app.modules.shop_runner.exceptions import ShopRunnerCriticalError
+from python_modules.logger import setup_logging
 
 dotenv.load_dotenv()
 setup_logging()
@@ -54,5 +54,6 @@ async def run_process() -> None:
 
 
 if __name__ == "__main__":
-    # TODO: Проверять активность кампаний перед обновлением ставок
+    # TODO(k8s): При ошибке в этом раннере pod не рестартует. Проверить стратегию перезапуска/пробки
+    # и убедиться, что процесс завершается ненулевым кодом при исключениях (иначе Kubernetes не перезапустит).
     asyncio.run(run_process())

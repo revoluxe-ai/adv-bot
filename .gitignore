@@ -71,7 +71,8 @@ logs
 .env
 venv_linux/
 cursor-chat-export/
-.cursor/
 linux_venv/
 app/modules/predict_ctr_service/model/model/model.json
 .dmypy.json
+.coverage
+!k8s/*

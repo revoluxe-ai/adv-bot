@@ -17,8 +17,10 @@ class AdvPayment(BaseTable):
     adv_setting_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("advsetting.id"), nullable=False
     )
-    adv_setting: Mapped[list["AdvSetting"]] = relationship(
-        "AdvSetting", back_populates="payments"
+    adv_setting: Mapped["AdvSetting"] = relationship(
+        "AdvSetting",
+        back_populates="payments",
+        uselist=False,
     )
     type: Mapped[str] = mapped_column(String, nullable=True)
     amount: Mapped[float] = mapped_column(Float, nullable=True, default=None)

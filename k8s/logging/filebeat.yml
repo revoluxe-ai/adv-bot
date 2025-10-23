@@ -8,3 +8,5 @@ output.elasticsearch:
   hosts: ["http://147.45.151.145:9200"]
   username: "elastic"
   password: "123456789"
+
+

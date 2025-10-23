@@ -3,9 +3,9 @@ from typing import Any
 
 from arq import Retry
 
-from app import DIManager, AppContainer
 from app.client_bot import const
 from app.client_bot.bot import get_bot
+from app.core.di import AppContainer, DIManager
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
 from app.modules.adv_creator.backend import CardsNotFoundForShopError, MainAdvManager
