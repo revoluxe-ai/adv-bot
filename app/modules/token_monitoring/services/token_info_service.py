@@ -174,7 +174,7 @@ class TokenStatusReport:
 class TokenInfoService:
     """Service for analyzing token permissions and status."""
 
-    def __init__(self, session_maker=None):
+    def __init__(self, session_maker=None) -> None:
         self.session_maker = session_maker or get_async_session_maker
 
     async def get_shop_token_status(self, shop_id: str) -> TokenStatusReport:
