@@ -1,6 +1,6 @@
-# type: ignore
 import asyncio
 import logging
+import ssl
 import traceback
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -9,10 +9,8 @@ from typing import Any
 
 from sqlalchemy import Result
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-import ssl
 
 from app.settings import settings
-
 
 # TODO: Сделать отдельную настройку
 #  количества соединений для каждого микросервиса
@@ -186,7 +184,7 @@ read_write_session_maker = async_sessionmaker(
 
 @asynccontextmanager
 async def get_async_session_maker(
-    read_only: bool = False,
+        read_only: bool = False,
 ) -> AsyncGenerator[AsyncSession, None]:
     session_start = time()
     current_task = asyncio.current_task()

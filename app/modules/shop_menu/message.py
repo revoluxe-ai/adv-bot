@@ -26,7 +26,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBToken,
     WBUserCabinet,
 )
-from app.modules.token_monitoring.services.token_info_service import TokenInfoService
+from app.modules.token_monitoring.services.token_info_service import TokenInfoService, TokenStatusReport
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
@@ -52,25 +52,26 @@ class ShopMenu(TextWithKeyboard):
         self._pricer = Pricer()
 
         # Initialize token status attributes
-        self._token_status = None
+        self._token_status: TokenStatusReport | None = None
         self._token_status_loaded = False
 
         super().__init__(bot, chat_id)
 
-    async def get_shop_token_status(self):
+    async def get_shop_token_status(self) -> None:
         """Load token status for the shop."""
         try:
             token_service = TokenInfoService()
             shop_id = self._wb_cabinet.shop_id
             self._token_status = await token_service.get_shop_token_status(shop_id)
             self._token_status_loaded = True
+            assert self._token_status is not None
             logger.debug(f"Token status loaded for shop {shop_id}: {self._token_status.status}")
         except Exception as e:
             logger.error(f"Failed to load token status: {e}", exc_info=True)
             self._token_status = None
             self._token_status_loaded = False
 
-    async def _load_all_data(self):
+    async def _load_all_data(self) -> bool:
         """Оптимизированная загрузка всех данных в одной транзакции"""
         start_time = datetime.now()
         logger.debug(
@@ -102,7 +103,7 @@ class ShopMenu(TextWithKeyboard):
                         selectinload(WBUserCabinet.user),
                         # Предзагружаем активные рекламные кампании
                         selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                            WBCabinet.adv_settings.and_(AdvSetting.bot_active == True)
+                            WBCabinet.adv_settings.and_(AdvSetting.bot_active.is_(True))
                         ),
                     )
                     .where(WBUserCabinet.id == self._wb_user_cabinet_original_id)
@@ -181,9 +182,11 @@ class ShopMenu(TextWithKeyboard):
                 # Сразу фильтруем токены для конкретного магазина
                 stmt = select(WBToken).where(WBToken.shop_id == shop_id)
                 result = await session.execute(stmt)
-                work_tokens: list[WBToken] = result.scalars().all()
+                work_tokens: list[WBToken] = list(result.scalars().all())
                 logger.debug(
-                    f"Найдено токенов для магазина {shop_id}: {len(work_tokens)} (запрос выполнен за {(datetime.now() - token_start_time).total_seconds():.2f} сек)"
+                    f"Найдено токенов для магазина {shop_id}:"
+                    f" {len(work_tokens)} (запрос выполнен за "
+                    f"{(datetime.now() - token_start_time).total_seconds():.2f} сек)"
                 )
         except Exception as e:
             logger.error(f"Ошибка при загрузке токенов из БД: {e}", exc_info=True)
@@ -238,7 +241,8 @@ class ShopMenu(TextWithKeyboard):
         ):
             await self.bot.send_message(
                 self.chat_id,
-                "Срок действия токена истек. Пожалуйста, обновите токен.\nДля этого добавьте магазин под другим именем с новым токеном",
+                "Срок действия токена истек. Пожалуйста, обновите токен.\n"
+                "Для этого добавьте магазин под другим именем с новым токеном",
             )
             return False
 
@@ -303,14 +307,15 @@ class ShopMenu(TextWithKeyboard):
         total_money = balance + bonus
         total_amount_for_day = self.total_amount_for_day
         if self.total_amount_for_day:
-            last_for_days = int(total_money / self.total_amount_for_day)
+            last_for_days = str(int(total_money / self.total_amount_for_day))
         else:
             last_for_days = "∞"
 
         # 💰 MONEY SECTION - All financial information grouped together
         text = (
             f"📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n"
-            f"""Ваш тариф в месяц: {self.price_for_month_for_shop if self.price_for_month_for_shop else "Нет активных РК"}"""
+            f"""Ваш тариф в месяц: {self.price_for_month_for_shop if
+            self.price_for_month_for_shop else "Нет активных РК"}"""
             f"(больше РК -> ниже цена, тарифы -> https://golnk.ru/pwN2L)\n"
             f"💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n"
         )
@@ -359,7 +364,8 @@ class ShopMenu(TextWithKeyboard):
                         if days_until_break <= 3:
                             text += f"🚨 <b>Сервис перестанет работать {date_str} (через {days_until_break} дн.)!</b>\n"
                         elif days_until_break <= 7:
-                            text += f"⚠️ <b>Внимание:</b> Сервис перестанет работать {date_str} (через {days_until_break} дн.)\n"
+                            text += (f"⚠️ <b>Внимание:</b> Сервис перестанет работать {date_str} "
+                                     f"(через {days_until_break} дн.)\n")
                         elif days_until_break <= 30:
                             text += f"⏰ Сервис перестанет работать {date_str} (через {days_until_break} дн.)\n"
                         else:
@@ -382,7 +388,8 @@ class ShopMenu(TextWithKeyboard):
         )
 
         text += """
-<a href="https://telegra.ph/Bystryj-start-02-11">Инструкция по быстрому старту работы</a>. Подходит для базовой автоматизации.
+<a href="https://telegra.ph/Bystryj-start-02-11">Инструкция по быстрому старту работы</a>.
+ Подходит для базовой автоматизации.
                 """
 
         return text
