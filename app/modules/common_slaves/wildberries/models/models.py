@@ -246,10 +246,9 @@ class WBToken(BaseTable):
         }
         s = self.get_payload("s")
         categories = set()
-        if isinstance(s, int):
-            for bit_position, category_name in categories_map.items():
-                if s & (1 << bit_position):
-                    categories.add(category_name)
+        for bit_position, category_name in categories_map.items():
+            if s & (1 << bit_position):
+                categories.add(category_name)
         return categories
 
     @property
