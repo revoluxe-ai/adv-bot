@@ -17,6 +17,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 logger = logging.getLogger(__name__)
 
+# TODO: Сделать уникальность токенов на уровне пользователя, сейчас проверка при только при добавлении в базу
 
 class NotificationManager:
     """Manager for sending token-related notifications to users."""
@@ -40,7 +41,7 @@ class NotificationManager:
         ),
     }
     
-    def __init__(self, bot: Optional[Bot] = None, session_maker=None):
+    def __init__(self, bot: Optional[Bot] = None, session_maker=None) -> None:
         """
         Initialize the notification manager.
         
@@ -266,7 +267,7 @@ class NotificationManager:
             
             await session.commit()
             
-            logger.info(
+            logger.debug(
                 f"Marked {resolved_count} notifications as resolved for shop {shop_id}, "
                 f"type: {notification_type}"
             )
@@ -297,7 +298,10 @@ class NotificationManager:
             )
             
             result = await session.execute(stmt)
-            return result.scalars().all()
+        if not result:
+            return []
+        
+        return list(result.scalars().all())
 
 
 # Convenience functions

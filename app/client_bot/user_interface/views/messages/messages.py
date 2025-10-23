@@ -435,8 +435,9 @@ class AddNewTokenGet(TextWithImage):
     @property
     def text(self):
         return (
-            f"Пришлите новый Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n"
-            "Для работы бота нужны права Контент, Статистика,  Аналитика, Продвижение"
+            f"""Пришлите новый Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n"""
+            """Для работы бота нужны права Контент, Статистика,  Аналитика, Продвижение. Галочку 'Только для чтения'"""
+            """ НЕ ставить!!!"""
         )
 
     @property
@@ -446,6 +447,8 @@ class AddNewTokenGet(TextWithImage):
     @image.setter
     def image(self, value):
         self._image = value
+
+# TODO: Навести порядок с БД мастер-репликами
 
 
 class GetMinCtr(Text):
