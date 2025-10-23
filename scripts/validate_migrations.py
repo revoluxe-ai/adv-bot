@@ -28,8 +28,9 @@ def analyze_migration(filepath: Path) -> dict:
     
     # Extract down_revision
     # This handles multiple typing patterns: str | None, Union[str, None], etc.
+    # We use [^=] to avoid matching across multiple assignments
     down_match = re.search(
-        r'down_revision[:\s]*(?:.*?)\s*=\s*(.+)',
+        r'down_revision[:\s]*(?:[^=]*?)\s*=\s*(.+)',
         content,
         re.MULTILINE
     )
@@ -131,9 +132,15 @@ def validate_migrations(versions_dir: Path) -> tuple[bool, list[str]]:
         head = list(heads)[0]
         print(f"✓ Single head revision: {head}")
     else:
+        heads_list = sorted(heads)
+        if len(heads_list) == 2:
+            merge_cmd = f"alembic merge -m \"merge message\" {' '.join(heads_list)}"
+        else:
+            merge_cmd = f"alembic merge -m \"merge message\" {' '.join(heads_list[:2])} (and {len(heads_list) - 2} more)"
+        
         errors.append(
             f"❌ Multiple heads found: {', '.join(heads)}. "
-            f"Merge them with: alembic merge -m \"merge message\" {' '.join(list(heads)[:2])}"
+            f"Merge them with: {merge_cmd}"
         )
     
     # Find roots (revisions with no parents)
