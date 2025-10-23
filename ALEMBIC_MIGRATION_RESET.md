@@ -157,6 +157,20 @@ python scripts/reset_alembic.py --stamp
 
 This will automatically stamp your database to the current head.
 
+## Validating Migration Chain
+
+To ensure the migration files are consistent and valid, you can run:
+
+```bash
+python scripts/validate_migrations.py
+```
+
+This will check:
+- All migrations have valid revision IDs
+- All referenced parent revisions exist
+- There's exactly one head revision
+- No circular dependencies exist
+
 ## Prevention
 
 To avoid this issue in the future:
