@@ -98,15 +98,12 @@ async def set_minus_keywords_for_search_adv(adv_setting, keywords, client_sessio
 
 
 async def update_keyword_phrases_for_search_adv(
-    adv_setting: AdvSetting, keywords: Iterable[CalculatedKeyword], client_session
+        adv_setting: AdvSetting, keywords: Iterable[CalculatedKeyword], client_session
 ):
     search_adv_id = adv_setting.search_adv_id
     if not search_adv_id:
         return None
-    if adv_setting.auction_boost_all_phrase_mode is False:
-        await set_fix_keywords_phrases_for_search_adv(adv_setting, keywords, client_session)
-    else:
-        await set_minus_keywords_for_search_adv(adv_setting, keywords, client_session)
+    await set_minus_keywords_for_search_adv(adv_setting, keywords, client_session)
 
 
 async def _set_keyword_phrases_for_search_advs(adv_settinds, client_session) -> None:
@@ -120,42 +117,3 @@ async def _set_keyword_phrases_for_search_advs(adv_settinds, client_session) -> 
             await task
         except:
             logger.error("Ошибка установки фраз для поисковых РК", exc_info=True)
-
-
-#
-# async def _update_cpm_in_search_advs(adv_settinds: list[AdvSetting]):
-#     for adv in adv_settinds:
-#         try:
-#             wb_cabinet_id = adv.wb_cabinet_id
-#             access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
-#             api = WBApi(access)
-#             search_adv_id = adv.search_adv_id
-#             cpm = await data_manager.get_cpm()
-#             if not cpm:
-#                 cpm = adv.max_cpm
-#             if cpm < 150:
-#                 cpm = 150
-#         except Exception as e:
-#              logger.error(f'Ошибка получения CPM для {adv.name}: {e}', exc_info=True)
-#              return
-#         try:
-#              await api.advert.set_search_cpm(search_adv_id, cpm)
-#         except Exception as e:
-#              logger.error(f'Ошибка установки CPM для {adv.name}: {e}', exc_info=True)
-#              return
-
-
-# TODO: Легаси, на удаление
-
-
-async def update_search_advs_module_run():
-    while True:
-        try:
-            adv_settinds: list[AdvSetting] = await data_manager.get_active_search_advs()
-            await asyncio.gather(
-                _set_keyword_phrases_for_search_advs(adv_settinds, client_session),
-            )
-        except:
-            logger.error("Ошибка обновления статистики по ключам для поисковых РК", exc_info=True)
-        finally:
-            await asyncio.sleep(0)
