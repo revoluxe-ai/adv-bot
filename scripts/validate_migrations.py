@@ -27,9 +27,11 @@ def analyze_migration(filepath: Path) -> dict:
     revision = rev_match.group(1)
     
     # Extract down_revision
+    # This handles multiple typing patterns: str | None, Union[str, None], etc.
     down_match = re.search(
-        r'down_revision:\s*(?:(?:str|Union)\s*\|\s*None|Union\[str,\s*None\])\s*=\s*(.+)',
-        content
+        r'down_revision[:\s]*(?:.*?)\s*=\s*(.+)',
+        content,
+        re.MULTILINE
     )
     if not down_match:
         return None
@@ -59,7 +61,14 @@ def analyze_migration(filepath: Path) -> dict:
 
 
 def validate_migrations(versions_dir: Path) -> tuple[bool, list[str]]:
-    """Validate all migrations in the versions directory."""
+    """
+    Validate all migrations in the versions directory.
+    
+    Returns:
+        tuple[bool, list[str]]: (is_valid, error_messages)
+            - is_valid: True if all validations pass, False otherwise
+            - error_messages: List of error descriptions (empty if valid)
+    """
     errors = []
     migrations = {}
     
@@ -124,7 +133,7 @@ def validate_migrations(versions_dir: Path) -> tuple[bool, list[str]]:
     else:
         errors.append(
             f"❌ Multiple heads found: {', '.join(heads)}. "
-            "Consider merging them with 'alembic merge'"
+            f"Merge them with: alembic merge -m \"merge message\" {' '.join(list(heads)[:2])}"
         )
     
     # Find roots (revisions with no parents)
@@ -141,10 +150,24 @@ def validate_migrations(versions_dir: Path) -> tuple[bool, list[str]]:
 def main() -> int:
     """Main entry point."""
     project_root = Path(__file__).parent.parent
-    versions_dir = project_root / "alembic" / "versions"
     
-    if not versions_dir.exists():
-        print(f"❌ Versions directory not found: {versions_dir}")
+    # Try common locations for alembic versions directory
+    possible_paths = [
+        project_root / "alembic" / "versions",
+        project_root / "migrations" / "versions",
+        project_root / "db" / "alembic" / "versions",
+    ]
+    
+    versions_dir = None
+    for path in possible_paths:
+        if path.exists():
+            versions_dir = path
+            break
+    
+    if not versions_dir:
+        print(f"❌ Versions directory not found. Tried:")
+        for path in possible_paths:
+            print(f"   - {path}")
         return 1
     
     print("=" * 70)
