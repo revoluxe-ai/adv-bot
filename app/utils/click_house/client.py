@@ -148,11 +148,6 @@ class get_clickhouse_client:
             pool_mgr=pool_mgr,
             port=settings.CLICKHOUSE_PORT,
         )
-        # Initialize required ClickHouse schema (database and tables) in target database
-        try:
-            await init_schema(self.client, database)
-        except Exception as e:
-            logger.error(f"Ошибка инициализации схемы ClickHouse: {e}")
 
         # Теперь переподключаемся к нужной базе данных
         self.client.close()  # type: ignore[no-untyped-call]
