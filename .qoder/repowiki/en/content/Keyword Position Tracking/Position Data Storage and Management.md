@@ -236,7 +236,7 @@ ORDER BY day
 ### Time-Series Analysis
 Queries filter data by time ranges for recent analysis:
 ```sql
-SELECT DISTINCT text FROM default_db.advkeyword 
+SELECT DISTINCT text FROM default_db.advkeyword_new 
 WHERE date >= today() - %(last_days)s
 ```
 
