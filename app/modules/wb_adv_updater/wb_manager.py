@@ -1,8 +1,11 @@
 import asyncio
+import csv
 import datetime
+import io
 import logging
 
 from aiohttp import ClientSession
+from clickhouse_connect.driver.external import ExternalData
 from sqlalchemy import exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -15,7 +18,7 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager
 from app.my_types import KeywordStat
-from app.utils import redis_manager
+from app.utils import redis_manager, text_cleaner
 from app.utils.NeoDataScience.driver import DataScience
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker
@@ -23,6 +26,7 @@ from .ML import Predictor
 from .data_setter import DataSetter
 from .graph_vector_updater import GraphUpdater
 from .wb_adv_api import WBAdvAPI
+from ..billing import AdvPayment
 from ..common_slaves.wildberries import super_cabinet_manager
 from ..common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
 from ..relevant_phrase_manager import RelevantPhraseManager
@@ -86,38 +90,86 @@ async def update_vectors_in_redis() -> None:
     await gds.update_vectors_in_redis()
 
 
-async def insert_or_update_keywords(keyword_stats, adv_id, table_name: str):
-    # Подготовка данных для вставки
+
+async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
     new_version = int(datetime.datetime.now().timestamp())
-    data_to_insert = []
+
+    buffer = io.StringIO()
+    writer = csv.writer(
+        buffer,
+        delimiter=",",
+        quotechar='"',
+        quoting=csv.QUOTE_MINIMAL,
+        lineterminator="\n"
+    )
+
     for kw in keyword_stats:
-        date_time = datetime.datetime.combine(
-            kw.date, datetime.datetime.min.time()
-        )  # просто добавляем время к дате
-        data_to_insert.append(
-            [kw.text, date_time, adv_id, kw.views, kw.clicks, kw.spend, new_version]
-        )
+        try:
+            text_val = text_cleaner.clear(kw.text or "").strip().replace("\n", " ").replace("\r", " ")
+            if not text_val:
+                continue
+
+            date_val = kw.date
+            if isinstance(date_val, (datetime.datetime, datetime.date)):
+                date_str = date_val.strftime("%Y-%m-%d")
+            else:
+                continue
+
+            writer.writerow([
+                adv_id,
+                text_val,
+                date_str,
+                int(kw.clicks),
+                int(kw.views),
+                float(kw.spend),
+                new_version
+            ])
+        except Exception as e:
+            logger.warning("Ошибка при подготовке CSV строки: %s", e, exc_info=True)
+            continue
+
+    csv_data = buffer.getvalue()
+    if not csv_data.endswith("\n"):
+        csv_data += "\n"
+
+    csv_bytes = csv_data.encode("utf-8")
+
+    # Важно: имя таблицы в external_data должно совпадать с тем, что используется в запросе
+    ext_data = ExternalData(
+        data=csv_bytes,
+        file_name="data.csv",
+        structure="adv_id UInt64, text String, date Date, clicks UInt32, views UInt32, spend Float64, version UInt64",
+        fmt="CSV"
+    )
+
+    # ИСПРАВЛЕНИЕ: убираем input() из запроса, ссылаемся на external table по имени файла
+    query = """
+    INSERT INTO default_db.advkeyword_new (adv_id, text, date, clicks_state, views_state, spend_state)
+    SELECT
+        adv_id,
+        text,
+        toDate(date) AS date,
+        argMaxState(clicks, version) AS clicks_state,
+        argMaxState(views, version) AS views_state,
+        argMaxState(spend, version) AS spend_state
+    FROM data
+    GROUP BY adv_id, text, date
+    """
+
     async with get_clickhouse_client() as client:
-        await client.insert(
-            table=f"default_db.{table_name}",
-            data=data_to_insert,
-            column_names=[
-                "text",
-                "date",
-                "adv_id",
-                "views",
-                "clicks",
-                "spend",
-                "version",
-            ],
-        )
+        await client.query(query, external_data=ext_data)
+
+    logger.debug(f"Inserted/updated %s rows into advkeyword_new" % len(keyword_stats))
+
+
+
 
 
 async def update_keywords_stat_in_click_house(
-    keyword_stats: list[KeywordStat], adv_id: int, table_name: str
+    keyword_stats: list[KeywordStat], adv_id: int,
 ) -> None:
     if keyword_stats:
-        await insert_or_update_keywords(keyword_stats, adv_id, table_name)
+        await insert_or_update_keywords(keyword_stats, adv_id,)
 
 
 async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
@@ -226,7 +278,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             auto_adv_id
         )
         await update_keywords_stat_in_click_house(
-            keywords_from_auto, auto_adv_id, "advkeyword"
+            keywords_from_auto, auto_adv_id,
         )
 
     except ApiForbiddenError as exc:
@@ -247,7 +299,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
                 auction_adv_id
             )
             await update_keywords_stat_in_click_house(
-                keywords_from_search_adv, auction_adv_id, "advkeyword"
+                keywords_from_search_adv, auction_adv_id,
             )
     except Exception as exc:
         keywords_from_search_adv = []
