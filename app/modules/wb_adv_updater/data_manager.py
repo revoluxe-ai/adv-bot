@@ -977,19 +977,6 @@ async def clear_cards_in_db(nmids: list[int]) -> None:
 
 
 
-async def get_nmids_for_keyword_text(text: str) -> set[int]:
-    query = """
-    SELECT DISTINCT adv_id
-    FROM default_db.advkeyword 
-    WHERE text = %(text)s
-    """
-    params = {"text": text}
-    async with get_clickhouse_client() as client:
-        result = await client.query(query, parameters=params)
-        nmids = result.result_rows
-    return set([nmid[0] for nmid in nmids if nmid])
-
-
 async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(
         shop_id: str,
 ) -> float | None:
@@ -999,36 +986,6 @@ async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(
     async with _sm() as session:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
-
-
-async def get_need_nmids_for_parsing(
-        text: str, adv_id: int, adv_ids: set[int]
-) -> set[int]:
-    adv_ids_with_text: set[int] = await get_nmids_for_keyword_text(text)
-    nmids_need = set()
-    not_found_adv_id = set()
-    for adv_id_with_text in adv_ids_with_text:
-        if adv_id_with_text not in adv_ids:
-            continue
-        # Type ignore for untyped redis_manager call
-        nmid = await redis_manager.get_nmid(adv_id_with_text)  # type: ignore[no-untyped-call]
-        if not nmid:
-            not_found_adv_id.add(adv_id_with_text)
-        else:
-            nmids_need.add(nmid)
-    if not_found_adv_id:
-        async with _sm() as session:
-            stmt = select(distinct(AdvSetting.nmids)).where(
-                AdvSetting.adv_id.in_(not_found_adv_id)
-            )
-            result = await session.execute(stmt)
-            nmids = result.scalars().all()
-            if nmids:
-                nmids = [nmid for row in nmids for nmid in row]
-                for nmid in nmids:
-                    await redis_manager.set_nmid(adv_id, nmid)
-                nmids_need = nmids_need.union(nmids)
-    return nmids_need
 
 
 async def get_keywords_positions_dict_by_text(
@@ -1378,7 +1335,7 @@ async def get_last_full_stat_update(adv_id: int) -> datetime | None:
 
 async def get_all_keywords_from_ch(last_days: int = 7) -> set[str]:
     ch_query = """
-    SELECT DISTINCT text FROM default_db.advkeyword 
+    SELECT DISTINCT text FROM default_db.advkeyword_new 
     WHERE date >= today() - %(last_days)s
     """
 
