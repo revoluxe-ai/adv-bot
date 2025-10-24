@@ -275,24 +275,16 @@ async def set_positions(
         keyword_stats: list[CalculatedKeyword], adv_setting: AdvSetting
 ) -> list[CalculatedKeyword]:
     texts = [keyword.text for keyword in keyword_stats]
-    try:
-        positions = await redis_manager.get_keywords_positions(adv_setting, texts)
-    except:
-        logger.warning(
-            f"Ошибка {e}получения позиций из Redis для арк {adv_setting.adv_id}"
-
-        )
+    positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    if not positions:
         return keyword_stats
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
-        try:
-            cluster, preset = await redis_manager.get_cluster_and_preset(text)
-        except Exception as e:
-            logger.error(
-                f"Ошибка {e} получения кластера и пресета для {text}", exc_info=True
-            )
+        data = await redis_manager.get_cluster_and_preset(text)
+        if not data:
             continue
+        cluster, preset = data
         keyword_stat.cluster_name = cluster
         keyword_stat.preset = preset
         if position := text_to_position.get(text):
