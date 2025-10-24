@@ -53,38 +53,23 @@ class MinCtrManager:
                 "texts": tuple(texts),
             }
             query = """
-            WITH
-                latest_versions AS (
+                WITH stats AS (
                     SELECT
                         text,
-                        date,
-                        MAX(version) AS latest_version
-                    FROM
-                        default_db.advkeyword
-                    WHERE
-                        adv_id IN %(adv_ids)s
-                        AND text IN %(texts)s
-                    GROUP BY
-                        text, date
+                        argMaxMerge(clicks_state) AS clicks,
+                        argMaxMerge(views_state) AS views
+                    FROM default_db.advkeyword_new
+                        WHERE adv_id IN %(adv_ids)s
+                            GROUP BY adv_id, text, date    
                 ),
-                stats AS (
-                    SELECT
-                        a.text,
-                        SUM(a.clicks) AS total_clicks,
-                        SUM(a.views) AS total_views
-                    FROM
-                        default_db.advkeyword a
-                    INNER JOIN
-                        latest_versions lv
-                    ON
-                        a.text = lv.text
-                        AND a.date = lv.date
-                        AND a.version = lv.latest_version
-                    WHERE
-                        a.adv_id IN %(adv_ids)s
-                    GROUP BY
-                        a.text
-                )
+             total_stats AS ( 
+             SELECT
+                text,
+                SUM(clicks) AS total_clicks,
+                SUM(views) AS total_views
+                    FROM stats
+                        GROUP BY text
+            )
             SELECT
                 text,
                 total_clicks / CASE
@@ -93,7 +78,7 @@ class MinCtrManager:
                 END AS ctr,
                 total_views AS views
             FROM
-                stats
+                total_stats
             WHERE
                 total_clicks > 0
             """
