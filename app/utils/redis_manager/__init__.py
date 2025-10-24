@@ -213,7 +213,10 @@ async def get_keywords_positions(adv_setting, texts):
         cluster_map = {}
 
         for text in missing_texts:
-            cluster, _ = await get_cluster_and_preset(text)
+            data = await get_cluster_and_preset(text)
+            if data is None:
+                continue
+            cluster, _ = data
             if cluster:
                 key = "adv_positions:" + cluster + ":" + str(adv_setting.nmids[0])
                 cluster_keys.append(key)
