@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 # It should be called during application startup or upon first client acquisition
 # to ensure required database and tables exist.
 
+# TODO: Внедрить правильно бутстрап схемы ClickHouse при инициализации клиента и проверить, что это не тормозит работу
+
+
 
 async def init_schema(client: Any, database: str = "default_db") -> None:
     # Create database if not exists
