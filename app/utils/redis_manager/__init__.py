@@ -5,7 +5,9 @@ import logging
 import time
 import typing
 from types import NoneType
-
+from urllib.parse import quote, unquote
+from typing import Any
+import redis
 from redis.asyncio.client import Pipeline
 
 from app.core.wb_api.mixins.adv import MinCPMData
@@ -13,17 +15,13 @@ from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.utils import text_cleaner
 from app.utils.redis_manager.exc import DataNotFoundError
 from app.utils.text_cleaner import clear
-
-logger = logging.getLogger(__name__)
-
-import redis
-
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
+from app.settings import settings
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
-from urllib.parse import quote, unquote
-from app.settings import settings
+
+logger = logging.getLogger(__name__)
 
 redis_host_master = settings.REDIS_MASTER_HOST
 assert redis_host_master
@@ -39,18 +37,18 @@ redis_replica_client = redis.asyncio.StrictRedis(
 )
 
 
-def encode_key(raw_key):
+def encode_key(raw_key) -> str:
     encoded_key = quote(raw_key)
     return encoded_key
 
 
-def decode_key(key):
+def decode_key(key) -> str:
     decoded_key = unquote(key)
     return decoded_key
 
 
 class RedisEvent(asyncio.Event):
-    def __init__(self, key=None):
+    def __init__(self, key=None) -> None:
         if key:
             self.key = key
         else:
@@ -58,18 +56,18 @@ class RedisEvent(asyncio.Event):
         super().__init__()
 
     @staticmethod
-    async def _get_redis(type: str = "read"):
+    async def _get_redis(type: str = "read") -> redis.asyncio.StrictRedis:
         if type == "read":
             return redis_replica_client
         elif type == "white":
             return redis_master_client
 
-    async def set(self):
+    async def set(self) -> None:
         redis = await self._get_redis("white")
         await redis.set(self.key, 1)
         super().set()
 
-    async def clear(self):
+    async def clear(self) -> None:
         redis = await self._get_redis("white")
         await redis.delete(self.key)
         super().clear()
@@ -272,7 +270,7 @@ async def get_adv_id_to_text_predict_ctr_dict(
     return result
 
 
-async def get_predict_ctr(adv_id: int, keyword: str):
+async def get_predict_ctr(adv_id: int, keyword: str) -> float | None:
     keyword = text_cleaner.clear(keyword)
     key = f"predict_ctr:{adv_id}:{keyword}"
     try:
@@ -492,12 +490,10 @@ async def get_cluster_and_preset(
         return None, None
     value = value.decode("utf-8")
     value = str(value)
-    data = value.split(":")
-    try:
-        cluster, preset = data
-    except:
-        logger.error("Ошибка распаковки данных о кластере и пресете")
+    if not value:
         return None, None
+    data = value.split(":")
+    cluster, preset = data
     return cluster, preset
 
 
@@ -744,7 +740,7 @@ async def set_black_phrases(self, black_phrases: list[str]) -> None:
     await self.client.set(self.key, json.dumps(black_phrases))
 
 
-async def get_black_phrases(self) -> list[str]:
+async def get_black_phrases(self) -> Any:
     """Получает фразы, автоматически конвертируя старый формат в новый."""
     answer = await self.client.get(self.key)
 
