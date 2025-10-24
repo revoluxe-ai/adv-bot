@@ -131,8 +131,7 @@ class AdvertApi(ABC_WB_API):
     @try_except_decorator(5, 60)
     async def get_keywords_stat(self, adv_id) -> list[KeywordStat]:
         keywords = []
-        # Используем дату по московскому времени (UTC+3)
-        moscow_tz = datetime.timezone(datetime.timedelta(hours=3))
+        moscow_tz = datetime.timezone(datetime.timedelta())
         date_now_msk = datetime.datetime.now(moscow_tz)
         date_to = date_now_msk.date()
         date_from = date_to - datetime.timedelta(days=6)
