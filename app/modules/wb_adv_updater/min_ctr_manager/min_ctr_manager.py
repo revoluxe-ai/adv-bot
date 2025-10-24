@@ -113,11 +113,11 @@ class MinCtrManager:
                 real_ctr = text_to_real_ctr.get(text)
                 if real_ctr:
                     real_ctrs.append(text_to_real_ctr[text])
-                predict_ctr = await redis_manager.get_predict_ctr(auto_adv_id, text)
+                predict_ctr: float | None = await redis_manager.get_predict_ctr(auto_adv_id, text)
                 if predict_ctr:
                     predict_ctrs.append(predict_ctr)
             if predict_ctrs:
                 return float(min(predict_ctrs))
             if real_ctrs:
                 return float(min(real_ctrs))
-            return settings.DEFAULT_MIN_CTR
+        return settings.DEFAULT_MIN_CTR
