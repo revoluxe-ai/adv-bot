@@ -8,6 +8,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.grpcs.predict_ctr_service.predict_ctr_client.predict_ctr_client import (
     PredictCTRClient,
 )
@@ -120,7 +121,7 @@ class PredictCTRUpdateManager:
                     f"Сохраняем predictions для ключа '{key} значение: {predict_ctr}"
                 )
                 # Записываем через метод из миксина
-                await redis_manager.set_predict_ctr_with_pipeline(
+                await redis_manager.set_predict_ctr_with_pipeline_by_v2(
                     pipeline, adv, key, predict_ctr
                 )
 
