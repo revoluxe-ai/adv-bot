@@ -25,7 +25,7 @@ from ...core.redis_manager.base_redis_manager import BaseRedis
 from ...utils import redis_manager, text_cleaner
 
 logger = logging.getLogger(__name__)
-from . import fitter
+from . import fitter, ml_common_funcs
 
 predictor = Predictor()
 
@@ -164,7 +164,8 @@ async def update_cards_in_graph_small_cycle() -> None:
 
 
 async def fit_and_save_model():
-    await fitter.getGradientBoostingFullFitModel()
+    model = await fitter.fit_and_get_new_model()
+    await asyncio.to_thread(ml_common_funcs.save_model, model)
 
 
 async def update_model() -> None:
