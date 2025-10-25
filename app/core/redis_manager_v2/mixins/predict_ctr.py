@@ -39,7 +39,9 @@ class PredictCTRRedisMixin:
         nmids_str = ",".join(map(str, sorted_nmids))
         return f"predict_ctr_v2:{nmids_str}:{clear(keyword)}"
 
-    async def set_predict_ctr_with_pipeline(
+    # Новый метод записи прогноза CTR, только V2, старый метод - легаси, если будет не нужен - тот удалим
+    # полностью и там старый redis_manager
+    async def set_predict_ctr_with_pipeline_by_v2(
         self,
         redis_pipeline: Pipeline,
         adv: AdvSetting,
@@ -47,7 +49,7 @@ class PredictCTRRedisMixin:
         predict_ctr: float,
     ) -> None:
         """Новый метод записи прогноза CTR в Redis по nmids"""
-        key = self._get_key(adv, keyword)
+        key = self._get_key_v2(adv, keyword)
         redis_pipeline.set(key, predict_ctr)
 
     async def get_predict_ctr(self, adv: AdvSetting, keyword: str) -> float | None:
