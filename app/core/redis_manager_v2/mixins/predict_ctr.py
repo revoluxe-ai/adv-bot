@@ -49,7 +49,7 @@ class PredictCTRRedisMixin:
         predict_ctr: float,
     ) -> None:
         """Новый метод записи прогноза CTR в Redis по nmids"""
-        key = self._get_key_v2(adv, keyword)
+        key = self._get_key_v2(adv.nmids, keyword)
         redis_pipeline.set(key, predict_ctr)
 
     async def get_predict_ctr(self, adv: AdvSetting, keyword: str) -> float | None:
