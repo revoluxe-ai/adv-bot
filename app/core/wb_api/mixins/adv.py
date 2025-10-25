@@ -13,6 +13,7 @@ from .excs import (
     StartAdvError,
 )
 from ..data_classes.advs import adv_fabric
+from ..data_classes.advs.auction_adv import AuctionAdv
 from ..exceptions import BadRequestError, MinAdvBidWBApiError
 from ..http_request import requests, try_except_decorator
 
@@ -93,7 +94,7 @@ class AdvMixin(WBAPIProtocol):
         return advs
 
     @try_except_decorator(1, 1)
-    async def get_advs(self, adv_ids: list[int] | None = None) -> list[Adv]:
+    async def get_advs(self, adv_ids: list[int] | None = None) -> list[AuctionAdv]:
         if not adv_ids:
             adv_ids = await self.get_advertIds()
         all_advs = []
