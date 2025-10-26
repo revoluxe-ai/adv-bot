@@ -30,7 +30,11 @@ async def get_cpms_from_wb(advs: list[AdvSetting]) -> set[int] | None:
     return {adv.cpm for adv in advs}
 
 
-async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> list[AuctionAdv]:
+async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> list[AuctionAdv] | None:
+    """ TODO: Пользователь может ошибится и указать в скобках ID самой РК, а не Аукционно
+   Сейчас, чтобы убрать ошибку добавления одинаковых строк, я просто пропущу через set adv_ids
+   Но надо что-то подумать, чтобы не прятать такие ошибки, например, писать большими буквами, что эта РК с ошибкой
+    """
     adv_ids = []
     if auto_adv.bidder_for_auto:
         adv_ids.append(auto_adv.adv_id)
@@ -38,12 +42,13 @@ async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> l
         adv_ids.append(search_adv_id)
     if not adv_ids:
         return None
+    adv_ids = list(set(adv_ids))
     advs: list[AuctionAdv] = await wb_api.get_advs(adv_ids)
     try:
         assert wb_api.access.wb_cabinet is not None
         wb_cabinet_original_id: int = int(wb_api.access.wb_cabinet.id)
         await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id)
-    except Exception:
+    except: # ignore
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
 
