@@ -1,6 +1,7 @@
 import logging
 
-from app.core.wb_api.data_classes.adv import Adv
+from dependency_injector.wiring import inject, Provide
+import typing
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import wb_db_manager
@@ -14,11 +15,16 @@ from app.modules.wb_keywords_parser.wb_parser import parser
 from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
+from ..modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+from ..modules.max_auto_bid_manager.di import AutoMaxCpmContainer
+
+if typing.TYPE_CHECKING:
+    from ..modules.max_auto_bid_manager.max_cpm_redis_status_manager import MaxCpmRedisStatusManager
 
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from ..bidder.wb_api import WBApi as BidderAPI
+
 from ..modules.wb_api import WBApi
 
 logger = logging.getLogger(__name__)
@@ -26,11 +32,15 @@ logger = logging.getLogger(__name__)
 # TODO: включить проверку РК: обновлять только если РК активна и не приостановлена
 
 
-async def get_cpms_from_wb(advs: list[AdvSetting]) -> set[int] | None:
+async def get_cpms_from_wb(advs: list[AuctionAdv]) -> set[int] | None:
     return {adv.cpm for adv in advs}
 
 
-async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> list[AuctionAdv]:
+async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> list[AuctionAdv] | None:
+    """ TODO: Пользователь может ошибится и указать в скобках ID самой РК, а не Аукционно
+   Сейчас, чтобы убрать ошибку добавления одинаковых строк, я просто пропущу через set adv_ids
+   Но надо что-то подумать, чтобы не прятать такие ошибки, например, писать большими буквами, что эта РК с ошибкой
+    """
     adv_ids = []
     if auto_adv.bidder_for_auto:
         adv_ids.append(auto_adv.adv_id)
@@ -38,18 +48,21 @@ async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> l
         adv_ids.append(search_adv_id)
     if not adv_ids:
         return None
+    adv_ids = list(set(adv_ids))
     advs: list[AuctionAdv] = await wb_api.get_advs(adv_ids)
     try:
         assert wb_api.access.wb_cabinet is not None
         wb_cabinet_original_id: int = int(wb_api.access.wb_cabinet.id)
         await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id)
-    except Exception:
+    except: # ignore
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
 
-
+@inject
 async def run_bidder_process_for_adv(
-    adv_setting: AdvSetting, wb_api: WBApi, keywords: list[CalculatedKeyword]
+    adv_setting: AdvSetting, wb_api: WBApi,
+    keywords: list[CalculatedKeyword],
+    max_cmp_redis_status: 'MaxCpmRedisStatusManager' = Provide[AutoMaxCpmContainer.max_cpm_redis_status_manager]
 ) -> None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
@@ -71,6 +84,21 @@ async def run_bidder_process_for_adv(
     if not max_cpm:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не задана!")
         return
+    if adv_setting.auto_max_cpm_mode:
+        max_auto_bid_manager = AutoMaxBidManager(adv_setting, keywords, max_cpm)
+        try:
+            auto_max_cpm = await max_auto_bid_manager.get_max_cpm()
+        except Exception as exc:
+            logger.error(
+                "[%s [%s] Ошибка при получении авто макс ставки",
+                shop_id,
+                adv_id,
+                exc_info=True,
+            )
+            raise exc
+        if auto_max_cpm and auto_max_cpm > max_cpm:
+            max_cpm = auto_max_cpm
+            await max_cmp_redis_status.set(adv_setting, auto_max_cpm)
 
     step = adv_setting.bidder_step or settings.BIDDER_STEP
     max_position = adv_setting.max_place
@@ -82,7 +110,7 @@ async def run_bidder_process_for_adv(
     best_keyword = data_manager.get_best_keyword(white_keywords)
 
     if not (adv_setting.nmids and best_keyword):
-        logger.error(f"[{shop_id}] [{adv_id}] Нет ключа в белом списке или артикулов")
+        logger.warning(f"[{shop_id}] [{adv_id}] Нет ключа в белом списке или артикулов")
         return
 
     text = best_keyword.text
@@ -111,7 +139,7 @@ async def run_bidder_process_for_adv(
         return
 
     if not cpms:
-        logger.error(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
+        logger.warning(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
         return
 
     try:

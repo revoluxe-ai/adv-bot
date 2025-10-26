@@ -1093,6 +1093,23 @@ class CPMSetting(TextWithKeyboard):
 
         builder.row(bottom)
 
+        # Auto Max CPM toggle
+        if self.adv_setting.auto_max_cpm_mode:
+            bottom = InlineKeyboardButton(
+                text="Выключить АвтоМаксимальную ставку",
+                callback_data=callbacks.CPMSettingMenu(
+                    action="turn_off_auto_max_cpm_mode", adv_original_id=self.adv_setting.id
+                ).pack(),
+            )
+        else:
+            bottom = InlineKeyboardButton(
+                text="Включить АвтоМаксимальную ставку",
+                callback_data=callbacks.CPMSettingMenu(
+                    action="turn_on_auto_max_cpm_mode", adv_original_id=self.adv_setting.id
+                ).pack(),
+            )
+        builder.row(bottom)
+
         bottom = InlineKeyboardButton(
             text="Изменить ставку (Максимальную ставку)",
             callback_data=callbacks.CPMSettingMenu(action="set_manual_cpm", adv_original_id=self.adv_setting.id).pack(),

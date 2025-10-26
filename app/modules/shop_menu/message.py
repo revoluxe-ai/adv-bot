@@ -78,7 +78,8 @@ class ShopMenu(TextWithKeyboard):
         """Оптимизированная загрузка всех данных в одной транзакции"""
         start_time = datetime.now()
         logger.debug(
-            f"Начало оптимизированной загрузки данных для кабинета {self._wb_user_cabinet_original_id}"
+            "Начало оптимизированной загрузки данных для кабинета %s",
+            self._wb_user_cabinet_original_id
         )
 
         # Сохраняем ID в состояние
@@ -173,7 +174,8 @@ class ShopMenu(TextWithKeyboard):
         user: User = self._wb_user_cabinet.user
         shop_id = self._wb_cabinet.shop_id
         logger.debug(
-            f"Обработка токенов для пользователя {user.user_telegram_id}, магазин {shop_id}"
+            f"Обработка токенов для пользователя %s, магазин %s",
+            user.user_telegram_id, shop_id
         )
 
         # Оптимизированная загрузка токенов - фильтруем сразу на уровне SQL
@@ -257,7 +259,8 @@ class ShopMenu(TextWithKeyboard):
             self.last_days_for_token = (expiration_time - datetime.now()).days
 
         logger.debug(
-            f"Обработка токенов успешно завершена, установлен срок действия {self.last_days_for_token} дней"
+            f"Обработка токенов успешно завершена, установлен срок действия %s дней",
+            self.last_days_for_token
         )
         return True
 
@@ -289,7 +292,9 @@ class ShopMenu(TextWithKeyboard):
         result = await super().__call__()
 
         logger.debug(
-            f"Меню магазина отображено за {(datetime.now() - display_start_time).total_seconds():.2f} сек"
+            "Меню магазина отображено"
+            " за %s сек" ,
+            round((datetime.now() - display_start_time).total_seconds(), 2)
         )
         total_time = (datetime.now() - start_time).total_seconds()
         logger.debug(
