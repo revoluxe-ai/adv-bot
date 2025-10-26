@@ -494,8 +494,8 @@ class AdvSetting(BaseTable):
     predict_ctr_mode: Mapped[PredictCTRMode] = mapped_column(
         SAEnum(PredictCTRMode),
         nullable=True,
-        default=PredictCTRMode.V1,  # экземпляр Enum
-        server_default=PredictCTRMode.V1.name,  # строка
+        default=PredictCTRMode.V2,  # экземпляр Enum
+        server_default=PredictCTRMode.V2.name,  # строка
     )
 
     __table_args__ = (
