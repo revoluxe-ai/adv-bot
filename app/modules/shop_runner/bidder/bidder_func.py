@@ -110,7 +110,7 @@ async def run_bidder_process_for_adv(
     best_keyword = data_manager.get_best_keyword(white_keywords)
 
     if not (adv_setting.nmids and best_keyword):
-        logger.error(f"[{shop_id}] [{adv_id}] Нет ключа в белом списке или артикулов")
+        logger.warning(f"[{shop_id}] [{adv_id}] Нет ключа в белом списке или артикулов")
         return
 
     text = best_keyword.text
@@ -139,7 +139,7 @@ async def run_bidder_process_for_adv(
         return
 
     if not cpms:
-        logger.error(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
+        logger.warning(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
         return
 
     try:
