@@ -58,58 +58,59 @@ _sm = get_async_session_maker
 
 
 async def get_keyword_statistic_clickhouse(
-        client: Any, text: str, adv_ids: set[int], pass_days: int | None = 7
-) -> tuple[int, int, int]:
+    client: Any,
+    text: str,
+    adv_ids: set[int],
+    pass_days: int | None = 7,
+) -> tuple[int, int, float]:
+    """
+    Возвращает суммарную статистику по ключевому слову text из агрегирующей таблицы advkeyword_new:
+    - total_clicks
+    - total_views
+    - total_spend
+
+    Таблица хранит агрегаты вида argMaxState(...), которые нужно раскрывать через argMaxMerge().
+    """
+
     today = datetime.now().date()
     start_date_clause = ""
     if pass_days:
         start_date = today - timedelta(days=pass_days)
         start_date_clause = f"AND date >= '{start_date}'"
 
-    adv_ids_str = ", ".join(map(str, adv_ids))  # безопасно вставляем в IN (...)
+    adv_ids_str = ", ".join(map(str, adv_ids))
 
     query = f"""
         SELECT
             COALESCE(SUM(total_clicks), 0) AS total_clicks,
-            COALESCE(SUM(total_views), 0) AS total_views,
-            COALESCE(SUM(total_spend), 0) AS total_spend
+            COALESCE(SUM(total_views), 0)  AS total_views,
+            COALESCE(SUM(total_spend), 0)  AS total_spend
         FROM (
             SELECT
-                clicks AS total_clicks,
-                views AS total_views,
-                spend AS total_spend
-            FROM
-                default_db.advkeyword
+                argMaxMerge(clicks_state) AS total_clicks,
+                argMaxMerge(views_state)  AS total_views,
+                argMaxMerge(spend_state)  AS total_spend
+            FROM default_db.advkeyword_new
             WHERE
                 adv_id IN ({adv_ids_str})
                 AND text = %(text)s
-                AND (text, date, version) IN (
-                    SELECT
-                        text,
-                        date,
-                        MAX(version) AS version
-                    FROM
-                        default_db.advkeyword
-                    WHERE
-                        adv_id IN ({adv_ids_str})
-                        AND text = %(text)s
-                        {start_date_clause}
-                    GROUP BY text, date
-                )
-        ) AS latest_records
+                {start_date_clause}
+            GROUP BY adv_id, text, date
+        ) AS merged
     """
 
-    result = await client.query(query, {"text": text})
+    result = await client.query(query, parameters={"text": text})
 
     if not result.result_rows:
-        return 0, 0, 0
+        return 0, 0, 0.0
 
     total_clicks, total_views, total_spend = result.result_rows[0]
 
+    # исправляем кейс, когда кликов больше показов (из-за округлений или некорректных данных)
     if total_clicks > total_views:
         total_views = total_clicks
 
-    return total_clicks, total_views, total_spend
+    return int(total_clicks), int(total_views), float(total_spend)
 
 
 async def get_keywords_statistic_clickhouse(
