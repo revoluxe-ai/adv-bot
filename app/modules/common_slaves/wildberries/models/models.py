@@ -37,6 +37,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 # Ensure billing models (AdvPayment) are imported and registered before mapper configuration
 try:
+    # TODO: Надо разобраться что это за конструкция такая, и постараться ее убрать без рейса исключения
     from app.modules.billing import models as _billing_models  # noqa: F401
 except Exception:
     # In minimal test contexts billing may be absent; relationship will fallback to string resolution
@@ -244,7 +245,7 @@ class WBToken(BaseTable):
             8: "Рекомендации",
             30: "Токен только на чтение",
         }
-        s = self.get_payload("s")
+        s = int(self.get_payload("s"))
         categories = set()
         for bit_position, category_name in categories_map.items():
             if s & (1 << bit_position):
@@ -426,6 +427,7 @@ class AdvSetting(BaseTable):
         Boolean, default=False, nullable=True
     )
     max_cpm = mapped_column(Integer, nullable=True)
+    auto_max_cpm_mode = mapped_column(Boolean, nullable=True, default=False, server_default=text("false"))
     max_place = mapped_column(Integer, nullable=True)
     use_incremental_stats = mapped_column(
         Boolean,
@@ -433,7 +435,7 @@ class AdvSetting(BaseTable):
         default=False,
         server_default="false",
         comment="Использовать инкрементальный учет продаж вместо дневных агрегатов",
-    ) # поле от недоделанного модуля инкрементальной статистики
+    )  # поле от недоделанного модуля инкрементальной статистики
     min_block_position = mapped_column(Integer, nullable=True, default=0)
     clusters_mode = mapped_column(Boolean, nullable=True, default=True)
     target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)

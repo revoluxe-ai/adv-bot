@@ -1,6 +1,7 @@
 import logging
 
-from app.core.wb_api.data_classes.adv import Adv
+from dependency_injector.wiring import inject, Provide
+import typing
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import wb_db_manager
@@ -14,11 +15,16 @@ from app.modules.wb_keywords_parser.wb_parser import parser
 from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
+from ..modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+from ..modules.max_auto_bid_manager.di import AutoMaxCpmContainer
+
+if typing.TYPE_CHECKING:
+    from ..modules.max_auto_bid_manager.max_cpm_redis_status_manager import MaxCpmRedisStatusManager
 
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from ..bidder.wb_api import WBApi as BidderAPI
+
 from ..modules.wb_api import WBApi
 
 logger = logging.getLogger(__name__)
@@ -26,7 +32,7 @@ logger = logging.getLogger(__name__)
 # TODO: включить проверку РК: обновлять только если РК активна и не приостановлена
 
 
-async def get_cpms_from_wb(advs: list[AdvSetting]) -> set[int] | None:
+async def get_cpms_from_wb(advs: list[AuctionAdv]) -> set[int] | None:
     return {adv.cpm for adv in advs}
 
 
@@ -52,9 +58,11 @@ async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> l
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
 
-
+@inject
 async def run_bidder_process_for_adv(
-    adv_setting: AdvSetting, wb_api: WBApi, keywords: list[CalculatedKeyword]
+    adv_setting: AdvSetting, wb_api: WBApi,
+    keywords: list[CalculatedKeyword],
+    max_cmp_redis_status: 'MaxCpmRedisStatusManager' = Provide[AutoMaxCpmContainer.max_cpm_redis_status_manager]
 ) -> None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
@@ -76,6 +84,21 @@ async def run_bidder_process_for_adv(
     if not max_cpm:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не задана!")
         return
+    if adv_setting.auto_max_cpm_mode:
+        max_auto_bid_manager = AutoMaxBidManager(adv_setting, keywords, max_cpm)
+        try:
+            auto_max_cpm = await max_auto_bid_manager.get_max_cpm()
+        except Exception as exc:
+            logger.error(
+                "[%s [%s] Ошибка при получении авто макс ставки",
+                shop_id,
+                adv_id,
+                exc_info=True,
+            )
+            raise exc
+        if auto_max_cpm and auto_max_cpm > max_cpm:
+            max_cpm = auto_max_cpm
+            await max_cmp_redis_status.set(adv_setting, auto_max_cpm)
 
     step = adv_setting.bidder_step or settings.BIDDER_STEP
     max_position = adv_setting.max_place

@@ -24,6 +24,13 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater im
     AdvSettingAutoUpdater,
 )
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
+from dependency_injector.wiring import inject, Provide
+from app.modules.shop_runner.modules.max_auto_bid_manager.max_cpm_redis_status_manager import (
+    MaxCpmRedisStatusManager,
+)
+from app.modules.shop_runner.modules.max_auto_bid_manager.di import (
+    AutoMaxCpmContainer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +59,14 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
         self.image_mode = image_mode
 
+    @inject
     async def __call__(
-        self, state: FSMContext, sort_mode="by_adv"
+        self,
+        state: FSMContext,
+        sort_mode="by_adv",
+        max_cpm_mgr: MaxCpmRedisStatusManager = Provide[
+            AutoMaxCpmContainer.max_cpm_redis_status_manager
+        ],
     ) -> (LastMessage, str):
         self.sort_mode = sort_mode
         self._state = state
@@ -148,6 +161,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         self._fact_data = fact_data
 
+        # Получаем данные по Автомаксимальной ставке из Redis (через DI)
+        self._auto_max_cpm_mode: bool = bool(
+            getattr(self._adv_setting, "auto_max_cpm_mode", False)
+        )
+        self._auto_max_cpm_value: int | None = None
+        if self._auto_max_cpm_mode:
+            self._auto_max_cpm_value: int | None = await max_cpm_mgr.get(self._adv_setting)
+
+
         await super().__call__()
         return
 
@@ -226,6 +248,16 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
         text += f"Максимальная ставка: {self._adv_setting.max_cpm}\n"
+
+        if not self._auto_max_cpm_mode:
+            text += "Авто-Максимальная ставка: не активна\n"
+        else:
+            value_str = (
+                str(self._auto_max_cpm_value)
+                if self._auto_max_cpm_value is not None
+                else "нет данных"
+            )
+            text += f"Авто-Максимальная ставка: {value_str}\n"
         return text
 
     @property
