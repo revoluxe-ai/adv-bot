@@ -251,46 +251,44 @@ async def insert(stats: Iterable[FullAdvStat]) -> None:
 
 
 async def get_keywords_spend(
-    adv_ids: list[int], start_date: datetime, end_date: datetime, table_name: str
+    adv_ids: list[int],
+    start_date: datetime,
+    end_date: datetime,
+    table_name: str = "advkeyword_new",
 ) -> float:
-    end_date_str = end_date.strftime("%Y-%m-%d")
-    start_date_str = start_date.strftime("%Y-%m-%d")
+    """
+    Возвращает общие затраты по ключевым словам за период [start_date, end_date]
+    из агрегирующей таблицы (AggregatingMergeTree) default_db.advkeyword_new.
+    """
 
-    async with get_clickhouse_client() as client:
-        query = f"""
-        WITH max_versions AS (
-            SELECT *, 
-                   ROW_NUMBER() OVER (PARTITION BY adv_id, date, text ORDER BY version DESC) AS row_num
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    adv_ids_str = ", ".join(map(str, adv_ids))
+
+    query = f"""
+        SELECT
+            COALESCE(SUM(total_spend), 0) AS total_spend
+        FROM (
+            SELECT
+                argMaxMerge(spend_state) AS total_spend
             FROM default_db.{table_name}
-            WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
-            AND adv_id IN %(adv_ids)s
-        )
-        SELECT SUM(spend) AS total_spend
-        FROM max_versions
-        WHERE row_num = 1
-        """
-        try:
-            res = await client.query(
-                query,
-                parameters={
-                    "start_date": start_date_str,
-                    "end_date": end_date_str,
-                    "adv_ids": adv_ids,
-                },
-            )
+            WHERE
+                adv_id IN ({adv_ids_str})
+                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
+            GROUP BY adv_id, text, date
+        ) AS merged
+    """
+
+    try:
+        async with get_clickhouse_client() as client:
+            res = await client.query(query)
             result = res.first_item
 
-            return (
-                result["total_spend"]
-                if result and result["total_spend"] is not None
-                else 0.0
-            )
+            return float(result["total_spend"]) if result and result["total_spend"] else 0.0
 
-        except Exception:
-            logger.error(
-                "Ошибка получения суммы трат по ключам из ClickHouse", exc_info=True
-            )
-            return 0.0
+    except Exception:
+        logger.error("Ошибка получения суммы трат по ключам из ClickHouse", exc_info=True)
+        return 0.0
 
 
 async def get_keyword_stats_by_last_days(
