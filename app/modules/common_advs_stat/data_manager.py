@@ -133,7 +133,7 @@ class CommonAdvsStatDataManager:
 
         # Получаем расходы на ключевые слова
         spend_for_keywords_in_auto_adv = await full_wb_adv_stat.get_keywords_spend(
-            [adv_setting.adv_id], start_date, end_date, "advkeyword"
+            [adv_setting.adv_id], start_date, end_date, "advkeyword_new"
         )
 
         addition_spend_in_adv = (
