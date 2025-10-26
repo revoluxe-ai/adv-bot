@@ -12,7 +12,7 @@ from app.utils.NeoDataScience.driver import DataScience
 
 from .ABC_manager import AbcManager
 from .data_getter import DataGetter
-from .models import ItemFeature, KeywordFeature
+
 
 logger = logging.getLogger(__name__)
 
@@ -70,59 +70,4 @@ class GraphUpdater:
                 else:
                     raise e  # Перебросить исключение, если ошибка не связана с выполняющимся заданием
 
-    async def _update_nmids_vectors(self) -> None:
-        async with sm() as session:
-            stmt = select(ItemFeature.nmid)
-            result = await session.execute(stmt)
-            nmids = result.scalars().all()
-        nmids = list(nmids)
-        nmids_vectors: list[tuple[int, list[float]]] = await self._gds.get_nmid_vectors(
-            nmids
-        )
 
-        async with sm(read_only=False) as session:
-            for nmid, vector in nmids_vectors:
-                stmt = (
-                    pg_insert(ItemFeature)
-                    .values(nmid=nmid, vector=vector)
-                    .on_conflict_do_update(
-                        index_elements=[
-                            "nmid"
-                        ],  # Specify the column(s) that trigger a conflict
-                        set_=dict(vector=vector),  # Specify which columns to update
-                    )
-                )
-                await session.execute(stmt)
-            await session.commit()
-        logger.debug("Вектора для nmids обновлены")
-
-    async def _update_keywords_vectors(self) -> None:
-        keywords_vectors: list[
-            tuple[str, list[float]]
-        ] = await self._gds.get_keywords_vectors()
-        async with sm(read_only=False) as session:
-            count = 0  # Счетчик для отслеживания количества обработанных записей
-            BATCH_SIZE = 100  # Размер порции для коммита
-            for keyword_text, vector in keywords_vectors:
-                stmt = select(KeywordFeature).where(
-                    KeywordFeature.keyword == keyword_text
-                )
-                result = await session.execute(stmt)
-                existing_keyword = result.scalar()
-                if existing_keyword:
-                    existing_keyword.vector = vector
-                    keyword = existing_keyword
-                    keyword.vector = vector
-                else:
-                    keyword = KeywordFeature(keyword=keyword_text, vector=vector)
-                    session.add(keyword)
-                count += 1  # Увеличиваем счетчик на 1
-                if count % BATCH_SIZE == 0:  # Если достигнут размер порции
-                    await session.commit()  # Выполняем коммит
-                    logger.debug("Промежуточный коммит выполнен")
-
-            if (
-                count % BATCH_SIZE != 0
-            ):  # Если после последнего коммита остались несохраненные записи
-                await session.commit()  # Выполняем окончательный коммит
-                logger.debug("Вектора для ключей обновлены")
