@@ -60,7 +60,7 @@ async def update_wb_adv_phrases_in_neo():
 
     async with get_clickhouse_client() as ch_client:
         query = (
-            f"SELECT DISTINCT text FROM default_db.advkeyword WHERE adv_id IN {list(all_adv_ids)}"
+            f"SELECT DISTINCT text FROM default_db.advkeyword_new WHERE adv_id IN {list(all_adv_ids)}"
         )
         result = await ch_client.query(query)
         texts = [text[0] for text in result.result_rows]
