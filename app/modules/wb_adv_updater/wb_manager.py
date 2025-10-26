@@ -226,6 +226,8 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
         for adv_setting in adv_settings:
+            if adv_setting.adv_id != 29702376:
+                continue
             if adv_setting.id not in update_tasks:
                 wb_cabinet_id = adv_setting.wb_cabinet_id
                 access: WBCabinetAccess = (
