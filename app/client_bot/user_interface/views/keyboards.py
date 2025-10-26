@@ -156,19 +156,6 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     builder.row(button)
 
-    # Добавляем кнопку переключения режима прогноза CTR
-    if adv_setting.predict_ctr_mode == PredictCTRMode.V1:
-        text = "Переключить на режим прогноза CTR v2 (по артикулам)"
-        new_mode = PredictCTRMode.V2.value
-    else:
-        text = "Переключить на режим прогноза CTR v1 (по ID кампании)"
-        new_mode = PredictCTRMode.V1.value
-
-    callback = PredictCTRModeToggle(
-        new_mode=new_mode, adv_setting_original_id=adv_setting.id
-    ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    builder.row(button)
 
     button = InlineKeyboardButton(
         text="План продаж",
