@@ -49,7 +49,7 @@ class TokenNotificationTracker(BaseTable):
     )
     
     # When the token issue was resolved (nullable until resolved)
-    resolved_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True, index=True)
     
     __table_args__ = (
         # Unique constraint prevents duplicate notifications for same shop/user/type
