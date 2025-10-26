@@ -3,7 +3,6 @@ import io
 import json
 import logging
 import pstats
-import time
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -159,95 +158,92 @@ async def _get_keyword_settings(
         return list(result.scalars().all())
 
 
+
+
+
 def _build_clickhouse_query(
-        adv_ids: set[int],
-        pass_time: timedelta | None,
-        last_views: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
+    adv_ids: set[int],
+    pass_time: timedelta | None = None,
+    last_views: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> str:
-    # Преобразуем список ID в строку для SQL
+    """
+    Запрос для ClickHouse AggregatingMergeTree-таблицы default_db.advkeyword_new
+    (fields: adv_id, text, date, clicks_state, views_state, spend_state)
+    Возвращает: text, total_clicks, total_views, total_spend, date
+    """
+
     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
 
-    # Формируем основной запрос
-    query = f"""
-        SELECT
-            text,
-            SUM(total_clicks) AS total_clicks,
-            SUM(total_views) AS total_views,
-            SUM(total_spend) AS total_spend,
-            date
-        FROM (
-            SELECT
-                text,
-                COALESCE(SUM(clicks), 0) AS total_clicks,
-                COALESCE(SUM(views), 0) AS total_views,
-                COALESCE(SUM(spend), 0) AS total_spend,
-                date
-            FROM
-                default_db.advkeyword
-            WHERE
-                adv_id IN ({adv_ids_str})
-                AND (text, date, version) IN (
-                    SELECT
-                        text, date, MAX(version) AS version
-                    FROM
-                        default_db.advkeyword
-                    WHERE
-                        adv_id IN ({adv_ids_str})
-                    GROUP BY
-                        text, date
-                )
-    """
+    # --- Внутренний подзапрос: извлекаем агрегаты для каждой кампании ---
+    inner = [
+        "SELECT",
+        "    adv_id,",
+        "    text,",
+        "    argMaxMerge(clicks_state) AS total_clicks,",
+        "    argMaxMerge(views_state)  AS total_views,",
+        "    argMaxMerge(spend_state)  AS total_spend,",
+        "    date",
+        "FROM default_db.advkeyword_new",
+        f"WHERE adv_id IN ({adv_ids_str})",
+    ]
 
-    # Добавляем условие для pass_time
     if pass_time:
         start_time = datetime.now() - pass_time
-        query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
+        inner.append(f"  AND date >= '{start_time.strftime('%Y-%m-%d')}'")
 
-    # Завершаем основной подзапрос
-    query += """
-            GROUP BY
-                text, date
-        ) AS latest_records
-        GROUP BY text, date
-    """
+    inner.append("GROUP BY adv_id, text, date")
+    inner_query = "\n".join(inner)
 
-    # Если указаны last_views, добавляем дополнительный запрос с CTE
+    # --- Внешний уровень: суммируем по text/date ---
+    outer = [
+        "SELECT",
+        "    text,",
+        "    SUM(total_clicks) AS total_clicks,",
+        "    SUM(total_views)  AS total_views,",
+        "    SUM(total_spend)  AS total_spend,",
+        "    date",
+        "FROM (",
+        inner_query,
+        ") AS merged",
+        "GROUP BY text, date",
+    ]
+    query = "\n".join(outer)
+
+    # --- Если есть last_views — оборачиваем в CTE ---
     if last_views:
         query = f"""
-            WITH
-            records AS ({query}),
-            cumulative_views AS (
-                SELECT
-                    text,
-                    total_clicks,
-                    total_views,
-                    total_spend,
-                    date,
-                    SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
-                FROM
-                    records
-            )
-            SELECT
-                text,
-                SUM(total_clicks) AS total_clicks,
-                SUM(total_views) AS total_views,
-                SUM(total_spend) AS total_spend
-            FROM
-                cumulative_views
-            WHERE
-                cumulative_total_views <= {last_views}
-            GROUP BY text
-        """
+WITH base AS (
+{query}
+),
+cumulative AS (
+    SELECT
+        text,
+        total_clicks,
+        total_views,
+        total_spend,
+        date,
+        SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
+    FROM base
+)
+SELECT
+    text,
+    SUM(total_clicks) AS total_clicks,
+    SUM(total_views)  AS total_views,
+    SUM(total_spend)  AS total_spend
+FROM cumulative
+WHERE cumulative_total_views <= {last_views}
+GROUP BY text
+""".strip()
 
-    # Добавляем LIMIT и OFFSET, если они указаны
     if limit is not None:
-        query += f" LIMIT {limit}"
+        query += f"\nLIMIT {limit}"
     if offset is not None:
-        query += f" OFFSET {offset}"
+        query += f"\nOFFSET {offset}"
 
     return query
+
 
 
 async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
