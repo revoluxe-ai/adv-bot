@@ -93,6 +93,8 @@ class Adv(ABC):
             return "done"
         elif self.status == 8:
             return "refused"
+        elif self.status == -1:
+            return "on_delete"
         else:
             raise Exception(f"Статус {str(self.status)} не реализован")
 
