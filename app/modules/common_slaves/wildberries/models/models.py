@@ -422,6 +422,13 @@ class AdvSetting(BaseTable):
     )
     max_cpm = mapped_column(Integer, nullable=True)
     max_place = mapped_column(Integer, nullable=True)
+    use_incremental_stats = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Использовать инкрементальный учет продаж вместо дневных агрегатов",
+    ) # поле от недоделанного модуля инкрементальной статистики
     min_block_position = mapped_column(Integer, nullable=True, default=0)
     clusters_mode = mapped_column(Boolean, nullable=True, default=True)
     target_ctr_mode = mapped_column(Boolean, nullable=True, default=False)
