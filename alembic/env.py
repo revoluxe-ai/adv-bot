@@ -9,6 +9,26 @@ from alembic import context
 from app.utils.db.base import BaseTable as Base
 from app.utils.db.session_maker import get_alchemy_row_for_migration
 
+# Ensure all SQLAlchemy models are imported before metadata is inspected.
+# Without these imports Alembic sees an empty metadata and thinks that all
+# tables were removed, generating destructive migrations.
+MODEL_MODULES = (
+    "app.utils.db.models",
+    "app.payments.db.models",
+    "app.admin_bot.sender.utils.db.models",
+    "app.modules.billing.models",
+    "app.modules.common_slaves.wildberries.models",
+    "app.modules.token_monitoring.models",
+    "app.modules.wb_adv_updater.models",
+)
+
+
+def _import_model_modules() -> None:
+    from importlib import import_module
+
+    for module in MODEL_MODULES:
+        import_module(module)
+
 dotenv.load_dotenv()
 
 # this is the Alembic Config object, which provides
@@ -23,6 +43,9 @@ config.set_main_option("sqlalchemy.url", row)
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Import model modules before metadata reflection.
+_import_model_modules()
 
 # add your model's MetaData object here
 # for 'autogenerate' support
