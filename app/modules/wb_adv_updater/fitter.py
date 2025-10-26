@@ -25,11 +25,6 @@ logger = logging.getLogger(__name__)
 data_getter = DataGetter()
 
 
-async def getGradientBoostingFullFitModel():
-    await _fit_modelGradientBoosting()
-    logger.debug("Модель обучена")
-
-
 async def fit_and_get_new_model():
     """Возвращает обученную модель XGBRegressor (без нормализации)"""
     model = await _fit_modelGradientBoosting()

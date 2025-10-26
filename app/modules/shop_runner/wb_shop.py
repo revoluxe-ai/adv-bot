@@ -34,6 +34,8 @@ class WBShop:
             coroutines_manager.update_predict_ctr(),
         )
 
+        # TODO: Перенести PV кликхаус на более маленький диск
+
     async def _alive_worker_run(self) -> None:
         redis_manager: RedisShopManager = self._redis_manager
         ping_timeout = redis_manager.DEFAULT_TTL / 2

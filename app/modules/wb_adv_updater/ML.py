@@ -91,7 +91,7 @@ class Predictor:
         model = load_model()
         logger.debug("Модель загружена")
         try:
-            X = df.drop(["keyword", "adv_id"], axis=1)
+            X = df.drop(["keyword", "adv_id", "adv_type"], axis=1)
         except Exception as exc:
             logger.error(f"Ошибка удаления столбцов, длина df: {len(df)}")
             raise exc

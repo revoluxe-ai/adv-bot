@@ -53,38 +53,23 @@ class MinCtrManager:
                 "texts": tuple(texts),
             }
             query = """
-            WITH
-                latest_versions AS (
+                WITH stats AS (
                     SELECT
                         text,
-                        date,
-                        MAX(version) AS latest_version
-                    FROM
-                        default_db.advkeyword
-                    WHERE
-                        adv_id IN %(adv_ids)s
-                        AND text IN %(texts)s
-                    GROUP BY
-                        text, date
+                        argMaxMerge(clicks_state) AS clicks,
+                        argMaxMerge(views_state) AS views
+                    FROM default_db.advkeyword_new
+                        WHERE adv_id IN %(adv_ids)s
+                            GROUP BY adv_id, text, date    
                 ),
-                stats AS (
-                    SELECT
-                        a.text,
-                        SUM(a.clicks) AS total_clicks,
-                        SUM(a.views) AS total_views
-                    FROM
-                        default_db.advkeyword a
-                    INNER JOIN
-                        latest_versions lv
-                    ON
-                        a.text = lv.text
-                        AND a.date = lv.date
-                        AND a.version = lv.latest_version
-                    WHERE
-                        a.adv_id IN %(adv_ids)s
-                    GROUP BY
-                        a.text
-                )
+             total_stats AS ( 
+             SELECT
+                text,
+                SUM(clicks) AS total_clicks,
+                SUM(views) AS total_views
+                    FROM stats
+                        GROUP BY text
+            )
             SELECT
                 text,
                 total_clicks / CASE
@@ -93,7 +78,7 @@ class MinCtrManager:
                 END AS ctr,
                 total_views AS views
             FROM
-                stats
+                total_stats
             WHERE
                 total_clicks > 0
             """
@@ -113,11 +98,11 @@ class MinCtrManager:
                 real_ctr = text_to_real_ctr.get(text)
                 if real_ctr:
                     real_ctrs.append(text_to_real_ctr[text])
-                predict_ctr = await redis_manager.get_predict_ctr(auto_adv_id, text)
+                predict_ctr: float | None = await redis_manager.get_predict_ctr(auto_adv_id, text)
                 if predict_ctr:
                     predict_ctrs.append(predict_ctr)
             if predict_ctrs:
                 return float(min(predict_ctrs))
             if real_ctrs:
                 return float(min(real_ctrs))
-            return settings.DEFAULT_MIN_CTR
+        return settings.DEFAULT_MIN_CTR

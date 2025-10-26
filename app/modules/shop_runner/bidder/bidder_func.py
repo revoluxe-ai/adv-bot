@@ -1,6 +1,7 @@
 import logging
 
 from app.core.wb_api.data_classes.adv import Adv
+from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
@@ -25,7 +26,11 @@ logger = logging.getLogger(__name__)
 # TODO: включить проверку РК: обновлять только если РК активна и не приостановлена
 
 
-async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: BidderAPI) -> set[int] | None:
+async def get_cpms_from_wb(advs: list[AdvSetting]) -> set[int] | None:
+    return {adv.cpm for adv in advs}
+
+
+async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> list[AuctionAdv]:
     adv_ids = []
     if auto_adv.bidder_for_auto:
         adv_ids.append(auto_adv.adv_id)
@@ -33,16 +38,14 @@ async def get_cpms_from_wb(auto_adv: AdvSetting, wb_api: BidderAPI) -> set[int] 
         adv_ids.append(search_adv_id)
     if not adv_ids:
         return None
-
-    advs: list[Adv] = await wb_api.get_advs(adv_ids)
+    advs: list[AuctionAdv] = await wb_api.get_advs(adv_ids)
     try:
         assert wb_api.access.wb_cabinet is not None
         wb_cabinet_original_id: int = int(wb_api.access.wb_cabinet.id)
         await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id)
     except Exception:
         logger.error("Ошибка обновления РК в базе", exc_info=True)
-
-    return {adv.cpm for adv in advs}
+    return advs
 
 
 async def run_bidder_process_for_adv(
@@ -50,6 +53,8 @@ async def run_bidder_process_for_adv(
 ) -> None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
+    advs: list[AuctionAdv] = await _update_and_get_advs_from_wb(adv_setting, wb_api)
+    advs_from_wb_with_active_company: list[AuctionAdv] = [adv for adv in advs if adv.status_native == 'started']
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение максимальной ставки")
         max_cpm = await data_manager.get_max_adv_bid(adv_setting)
@@ -95,7 +100,7 @@ async def run_bidder_process_for_adv(
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение ставок для биддера")
         try:
-            cpms: set[int] | None = await get_cpms_from_wb(adv_setting, wb_api)
+            cpms: set[int] | None = await get_cpms_from_wb(advs_from_wb_with_active_company)
         except Exception as exc:
             logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
             raise exc

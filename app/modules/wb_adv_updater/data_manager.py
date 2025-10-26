@@ -3,7 +3,6 @@ import io
 import json
 import logging
 import pstats
-import time
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -59,58 +58,59 @@ _sm = get_async_session_maker
 
 
 async def get_keyword_statistic_clickhouse(
-        client: Any, text: str, adv_ids: set[int], pass_days: int | None = 7
-) -> tuple[int, int, int]:
+    client: Any,
+    text: str,
+    adv_ids: set[int],
+    pass_days: int | None = 7,
+) -> tuple[int, int, float]:
+    """
+    Возвращает суммарную статистику по ключевому слову text из агрегирующей таблицы advkeyword_new:
+    - total_clicks
+    - total_views
+    - total_spend
+
+    Таблица хранит агрегаты вида argMaxState(...), которые нужно раскрывать через argMaxMerge().
+    """
+
     today = datetime.now().date()
     start_date_clause = ""
     if pass_days:
         start_date = today - timedelta(days=pass_days)
         start_date_clause = f"AND date >= '{start_date}'"
 
-    adv_ids_str = ", ".join(map(str, adv_ids))  # безопасно вставляем в IN (...)
+    adv_ids_str = ", ".join(map(str, adv_ids))
 
     query = f"""
         SELECT
             COALESCE(SUM(total_clicks), 0) AS total_clicks,
-            COALESCE(SUM(total_views), 0) AS total_views,
-            COALESCE(SUM(total_spend), 0) AS total_spend
+            COALESCE(SUM(total_views), 0)  AS total_views,
+            COALESCE(SUM(total_spend), 0)  AS total_spend
         FROM (
             SELECT
-                clicks AS total_clicks,
-                views AS total_views,
-                spend AS total_spend
-            FROM
-                default_db.advkeyword
+                argMaxMerge(clicks_state) AS total_clicks,
+                argMaxMerge(views_state)  AS total_views,
+                argMaxMerge(spend_state)  AS total_spend
+            FROM default_db.advkeyword_new
             WHERE
                 adv_id IN ({adv_ids_str})
                 AND text = %(text)s
-                AND (text, date, version) IN (
-                    SELECT
-                        text,
-                        date,
-                        MAX(version) AS version
-                    FROM
-                        default_db.advkeyword
-                    WHERE
-                        adv_id IN ({adv_ids_str})
-                        AND text = %(text)s
-                        {start_date_clause}
-                    GROUP BY text, date
-                )
-        ) AS latest_records
+                {start_date_clause}
+            GROUP BY adv_id, text, date
+        ) AS merged
     """
 
-    result = await client.query(query, {"text": text})
+    result = await client.query(query, parameters={"text": text})
 
     if not result.result_rows:
-        return 0, 0, 0
+        return 0, 0, 0.0
 
     total_clicks, total_views, total_spend = result.result_rows[0]
 
+    # исправляем кейс, когда кликов больше показов (из-за округлений или некорректных данных)
     if total_clicks > total_views:
         total_views = total_clicks
 
-    return total_clicks, total_views, total_spend
+    return int(total_clicks), int(total_views), float(total_spend)
 
 
 async def get_keywords_statistic_clickhouse(
@@ -159,95 +159,92 @@ async def _get_keyword_settings(
         return list(result.scalars().all())
 
 
+
+
+
 def _build_clickhouse_query(
-        adv_ids: set[int],
-        pass_time: timedelta | None,
-        last_views: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
+    adv_ids: set[int],
+    pass_time: timedelta | None = None,
+    last_views: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> str:
-    # Преобразуем список ID в строку для SQL
+    """
+    Запрос для ClickHouse AggregatingMergeTree-таблицы default_db.advkeyword_new
+    (fields: adv_id, text, date, clicks_state, views_state, spend_state)
+    Возвращает: text, total_clicks, total_views, total_spend, date
+    """
+
     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
 
-    # Формируем основной запрос
-    query = f"""
-        SELECT
-            text,
-            SUM(total_clicks) AS total_clicks,
-            SUM(total_views) AS total_views,
-            SUM(total_spend) AS total_spend,
-            date
-        FROM (
-            SELECT
-                text,
-                COALESCE(SUM(clicks), 0) AS total_clicks,
-                COALESCE(SUM(views), 0) AS total_views,
-                COALESCE(SUM(spend), 0) AS total_spend,
-                date
-            FROM
-                default_db.advkeyword
-            WHERE
-                adv_id IN ({adv_ids_str})
-                AND (text, date, version) IN (
-                    SELECT
-                        text, date, MAX(version) AS version
-                    FROM
-                        default_db.advkeyword
-                    WHERE
-                        adv_id IN ({adv_ids_str})
-                    GROUP BY
-                        text, date
-                )
-    """
+    # --- Внутренний подзапрос: извлекаем агрегаты для каждой кампании ---
+    inner = [
+        "SELECT",
+        "    adv_id,",
+        "    text,",
+        "    argMaxMerge(clicks_state) AS total_clicks,",
+        "    argMaxMerge(views_state)  AS total_views,",
+        "    argMaxMerge(spend_state)  AS total_spend,",
+        "    date",
+        "FROM default_db.advkeyword_new",
+        f"WHERE adv_id IN ({adv_ids_str})",
+    ]
 
-    # Добавляем условие для pass_time
     if pass_time:
         start_time = datetime.now() - pass_time
-        query += f" AND date >= '{start_time.strftime('%Y-%m-%d')}'"
+        inner.append(f"  AND date >= '{start_time.strftime('%Y-%m-%d')}'")
 
-    # Завершаем основной подзапрос
-    query += """
-            GROUP BY
-                text, date
-        ) AS latest_records
-        GROUP BY text, date
-    """
+    inner.append("GROUP BY adv_id, text, date")
+    inner_query = "\n".join(inner)
 
-    # Если указаны last_views, добавляем дополнительный запрос с CTE
+    # --- Внешний уровень: суммируем по text/date ---
+    outer = [
+        "SELECT",
+        "    text,",
+        "    SUM(total_clicks) AS total_clicks,",
+        "    SUM(total_views)  AS total_views,",
+        "    SUM(total_spend)  AS total_spend,",
+        "    date",
+        "FROM (",
+        inner_query,
+        ") AS merged",
+        "GROUP BY text, date",
+    ]
+    query = "\n".join(outer)
+
+    # --- Если есть last_views — оборачиваем в CTE ---
     if last_views:
         query = f"""
-            WITH
-            records AS ({query}),
-            cumulative_views AS (
-                SELECT
-                    text,
-                    total_clicks,
-                    total_views,
-                    total_spend,
-                    date,
-                    SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
-                FROM
-                    records
-            )
-            SELECT
-                text,
-                SUM(total_clicks) AS total_clicks,
-                SUM(total_views) AS total_views,
-                SUM(total_spend) AS total_spend
-            FROM
-                cumulative_views
-            WHERE
-                cumulative_total_views <= {last_views}
-            GROUP BY text
-        """
+WITH base AS (
+{query}
+),
+cumulative AS (
+    SELECT
+        text,
+        total_clicks,
+        total_views,
+        total_spend,
+        date,
+        SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
+    FROM base
+)
+SELECT
+    text,
+    SUM(total_clicks) AS total_clicks,
+    SUM(total_views)  AS total_views,
+    SUM(total_spend)  AS total_spend
+FROM cumulative
+WHERE cumulative_total_views <= {last_views}
+GROUP BY text
+""".strip()
 
-    # Добавляем LIMIT и OFFSET, если они указаны
     if limit is not None:
-        query += f" LIMIT {limit}"
+        query += f"\nLIMIT {limit}"
     if offset is not None:
-        query += f" OFFSET {offset}"
+        query += f"\nOFFSET {offset}"
 
     return query
+
 
 
 async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
@@ -275,24 +272,16 @@ async def set_positions(
         keyword_stats: list[CalculatedKeyword], adv_setting: AdvSetting
 ) -> list[CalculatedKeyword]:
     texts = [keyword.text for keyword in keyword_stats]
-    try:
-        positions = await redis_manager.get_keywords_positions(adv_setting, texts)
-    except:
-        logger.warning(
-            f"Ошибка {e}получения позиций из Redis для арк {adv_setting.adv_id}"
-
-        )
+    positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    if not positions:
         return keyword_stats
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
-        try:
-            cluster, preset = await redis_manager.get_cluster_and_preset(text)
-        except Exception as e:
-            logger.error(
-                f"Ошибка {e} получения кластера и пресета для {text}", exc_info=True
-            )
+        data = await redis_manager.get_cluster_and_preset(text)
+        if not data:
             continue
+        cluster, preset = data
         keyword_stat.cluster_name = cluster
         keyword_stat.preset = preset
         if position := text_to_position.get(text):
@@ -474,7 +463,7 @@ def __set_predict_ctr(
         original_predict_ctr = keyword_stat.original_predict_ctr
         if not original_predict_ctr:
             original_predict_ctr = keyword_stat.predict_ctr
-        logger.debug(f"Обрабатываю ключевое слово {keyword_stat.text}")
+        logger.debug(f"Обрабатываю ключевое слово %s", keyword_stat.text)
         if min_ctr == 0:
             enough_views_calc = 100
         else:
@@ -943,135 +932,6 @@ def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | N
     return best_keyword
 
 
-async def _get_min_ctr(adv: AdvSetting) -> float:
-    async with _sm(read_only=True) as session:
-        stmt = select(KeywordSetting.text).where(
-            KeywordSetting.hard_status == 2,
-            KeywordSetting.adv_setting_id == adv.id,
-        )
-        result = await session.execute(stmt)
-        texts = result.all()
-
-    texts = [text[0] for text in texts if text[0]]
-
-    if texts:
-        adv_ids: set[int] = set()
-        auto_adv_id = adv.adv_id
-        adv_ids.add(auto_adv_id)
-        if search_adv_id := adv.search_adv_id:
-            adv_ids.add(search_adv_id)
-
-        adv_ids_list_str = ", ".join(str(adv_id) for adv_id in adv_ids)
-        query = """
-        WITH
-            latest_versions AS (
-                SELECT
-                    text,
-                    date,
-                    MAX(version) AS latest_version
-                FROM
-                    default_db.advkeyword
-                WHERE
-                    adv_id IN %(adv_ids_list_str)s
-                    AND text = %(texts)s
-                GROUP BY
-                    text, date
-            ),
-            stats AS (
-                SELECT
-                    a.text,
-                    SUM(a.clicks) AS total_clicks,
-                    SUM(a.views) AS total_views
-                FROM
-                    default_db.advkeyword a
-                INNER JOIN
-                    latest_versions lv
-                ON
-                    a.text = lv.text
-                    AND a.date = lv.date
-                    AND a.version = lv.latest_version
-                WHERE
-                    a.adv_id IN %(adv_ids_list_str)s
-                GROUP BY
-                    a.text
-            )
-        SELECT
-            text,
-            total_clicks / CASE
-                WHEN total_views = 0 THEN 1
-                ELSE total_views
-            END AS ctr,
-            total_views AS views
-        FROM
-            stats
-        WHERE
-            total_clicks > 0
-        """
-
-        params = {
-            "adv_ids_list_str": adv_ids_list_str,
-            "texts": tuple(texts),
-        }
-
-        try:
-            async with get_clickhouse_client() as client:
-                result_from_click_house = await client.query(query, params)
-                rows = result_from_click_house.result_rows
-        except Exception:
-            logger.error("Ошибка получения статистики из ch", exc_info=True)
-            raise
-
-        text_to_real_ctr = {row[0]: row[1] for row in rows}
-        real_ctrs = []
-        predict_ctrs = []
-        for text in texts:
-            real_ctr = text_to_real_ctr.get(text)
-            if real_ctr:
-                real_ctrs.append(text_to_real_ctr[text])
-            predict_ctr = await redis_manager.get_predict_ctr(auto_adv_id, str(text))
-            if predict_ctr:
-                predict_ctrs.append(predict_ctr)
-        if predict_ctrs:
-            return float(min(predict_ctrs))
-
-        if real_ctrs:
-            return float(min(real_ctrs))
-
-    category = await get_wb_category(adv)
-    if not category:
-        return settings.DEFAULT_MIN_CTR
-    category_name = category.wb_category_name
-    async with _sm() as session:
-        stmt_min_ctr = select(GlobalCategorySetting.min_ctr).where(
-            GlobalCategorySetting.category_name == category_name
-        )
-        result = await session.execute(stmt_min_ctr)
-        try:
-            min_ctr = result.scalar_one()
-        except NoResultFound:
-            return settings.DEFAULT_MIN_CTR
-    return float(min_ctr)
-
-
-async def get_needs_nmids() -> list[int]:
-    async with _sm() as session:
-        stmt = select(AdvSetting)
-        result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = list(result.unique().scalars().all())
-    nmids: list[int] = []
-    for adv_setting in adv_settings:
-        if adv_setting.nmids:
-            nmids.extend(adv_setting.nmids)
-    return nmids
-
-
-async def get_all_keywords() -> list[str]:
-    async with _sm() as session:
-        stmt = select(KeywordSetting)
-        result = await session.execute(stmt)
-        keyword_settings: list[KeywordSetting] = list(result.unique().scalars().all())
-    return [str(keyword_setting.text) for keyword_setting in keyword_settings]
-
 
 async def clear_cards(need_nmids: list[int]) -> None:
     async with _sm(read_only=False) as session:
@@ -1113,30 +973,6 @@ async def clear_cards_in_db(nmids: list[int]) -> None:
             await session.commit()
 
 
-async def get_keywords_from_clickhouse(adv_id: int) -> list[str]:
-    query = f"""
-SELECT DISTINCT text
-FROM default_db.advkeyword 
-WHERE adv_id = {adv_id}
-"""
-    async with get_clickhouse_client() as client:
-        result = await client.query(query)
-        keywords = result.result_rows
-    return [keyword[0] for keyword in keywords if keyword]
-
-
-async def get_nmids_for_keyword_text(text: str) -> set[int]:
-    query = """
-    SELECT DISTINCT adv_id
-    FROM default_db.advkeyword 
-    WHERE text = %(text)s
-    """
-    params = {"text": text}
-    async with get_clickhouse_client() as client:
-        result = await client.query(query, parameters=params)
-        nmids = result.result_rows
-    return set([nmid[0] for nmid in nmids if nmid])
-
 
 async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(
         shop_id: str,
@@ -1147,36 +983,6 @@ async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(
     async with _sm() as session:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
-
-
-async def get_need_nmids_for_parsing(
-        text: str, adv_id: int, adv_ids: set[int]
-) -> set[int]:
-    adv_ids_with_text: set[int] = await get_nmids_for_keyword_text(text)
-    nmids_need = set()
-    not_found_adv_id = set()
-    for adv_id_with_text in adv_ids_with_text:
-        if adv_id_with_text not in adv_ids:
-            continue
-        # Type ignore for untyped redis_manager call
-        nmid = await redis_manager.get_nmid(adv_id_with_text)  # type: ignore[no-untyped-call]
-        if not nmid:
-            not_found_adv_id.add(adv_id_with_text)
-        else:
-            nmids_need.add(nmid)
-    if not_found_adv_id:
-        async with _sm() as session:
-            stmt = select(distinct(AdvSetting.nmids)).where(
-                AdvSetting.adv_id.in_(not_found_adv_id)
-            )
-            result = await session.execute(stmt)
-            nmids = result.scalars().all()
-            if nmids:
-                nmids = [nmid for row in nmids for nmid in row]
-                for nmid in nmids:
-                    await redis_manager.set_nmid(adv_id, nmid)
-                nmids_need = nmids_need.union(nmids)
-    return nmids_need
 
 
 async def get_keywords_positions_dict_by_text(
@@ -1526,7 +1332,7 @@ async def get_last_full_stat_update(adv_id: int) -> datetime | None:
 
 async def get_all_keywords_from_ch(last_days: int = 7) -> set[str]:
     ch_query = """
-    SELECT DISTINCT text FROM default_db.advkeyword 
+    SELECT DISTINCT text FROM default_db.advkeyword_new 
     WHERE date >= today() - %(last_days)s
     """
 

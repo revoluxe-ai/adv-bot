@@ -59,11 +59,36 @@ def get_adv_setting_keyboard(
         )
     )
 
+    if adv_setting.bot_active:
+        builder.row(
+            InlineKeyboardButton(
+                text="$ Выключить автоматическое управление",
+                callback_data=TurnBot(
+                    action="off",
+                    adv_original_id=adv_setting.id,
+                    wb_user_cabinet_original_id=wb_user_cabinet.id,
+                ).pack(),
+            )
+        )
+
+    else:
+        builder.row(
+            InlineKeyboardButton(
+                text="Включить автоматическое управление (платно, см. тарифы)",
+                callback_data=TurnBot(
+                    action="on",
+                    adv_original_id=adv_setting.id,
+                    wb_user_cabinet_original_id=wb_user_cabinet.id,
+                ).pack(),
+            )
+        )
+
+
     if adv_setting.auto_update_white_list:
-        text = "Выключить автообновление белого списка"
+        text = "$ Выключить автообновление белого списка"
         new_status = False
     else:
-        text = "Включить автообновление белого списка"
+        text = "Включить автообновление белого списка (платно, см. тарифы)"
         new_status = True
 
     callback = AutoUpdateWhiteListSetting(
@@ -73,10 +98,10 @@ def get_adv_setting_keyboard(
     builder.row(button)
 
     if adv_setting.auto_update_target_place:
-        text = "Выключить автоуправление целевой позицией"
+        text = "$ Выключить автоуправление целевой позицией"
         new_status = False
     else:
-        text = "Включить автоуправление целевой позицией"
+        text = "Включить автоуправление целевой позицией (платно, см. тарифы)"
         new_status = True
 
     callback = AutoUpdateTargetPlaceSettingCallBack(
@@ -122,29 +147,7 @@ def get_adv_setting_keyboard(
 
     builder.row(button)
 
-    if adv_setting.bot_active:
-        builder.row(
-            InlineKeyboardButton(
-                text="Выключить автоматическое управление",
-                callback_data=TurnBot(
-                    action="off",
-                    adv_original_id=adv_setting.id,
-                    wb_user_cabinet_original_id=wb_user_cabinet.id,
-                ).pack(),
-            )
-        )
 
-    else:
-        builder.row(
-            InlineKeyboardButton(
-                text="Включить автоматическое управление",
-                callback_data=TurnBot(
-                    action="on",
-                    adv_original_id=adv_setting.id,
-                    wb_user_cabinet_original_id=wb_user_cabinet.id,
-                ).pack(),
-            )
-        )
 
     button = InlineKeyboardButton(
         text="Управление ставкой",

@@ -66,7 +66,9 @@ class ShopMenu(TextWithKeyboard):
             self._token_status = await token_service.get_shop_token_status(shop_id)
             self._token_status_loaded = True
             assert self._token_status is not None
-            logger.debug(f"Token status loaded for shop {shop_id}: {self._token_status.status}")
+            logger.debug(f"Token status loaded for shop %s: %s",
+                         shop_id, self._token_status.status
+                         )
         except Exception as e:
             logger.error(f"Failed to load token status: {e}", exc_info=True)
             self._token_status = None
@@ -397,6 +399,7 @@ class ShopMenu(TextWithKeyboard):
         wb_cabinet = self._wb_cabinet
         wb_cabinet_original_id = wb_cabinet.id
         builder = InlineKeyboardBuilder()
+
         button = InlineKeyboardButton(
             text="➕ Добавить токен/Обновить токены",
             callback_data=AddNewToken(wb_user_cabinet_original_id=wb_user_cabinet.id).pack(),
@@ -408,6 +411,12 @@ class ShopMenu(TextWithKeyboard):
             callback_data=ChoiceAdvPaginator(
                 wb_user_cabinet_original_id=wb_user_cabinet.id, page=1
             ).pack(),
+        )
+        builder.row(button)
+
+        button = InlineKeyboardButton(
+            text="➕ Добавить токен/Обновить токены",
+            callback_data=AddNewToken(wb_user_cabinet_original_id=wb_user_cabinet.id).pack(),
         )
         builder.row(button)
 
