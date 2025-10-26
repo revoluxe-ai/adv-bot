@@ -192,21 +192,6 @@ def get_adv_setting_keyboard(
 
     builder.row(button)
 
-    if adv_setting.auction_boost_all_phrase_mode:
-        text = "Включить фикс. в аукционе"
-        new_mode = False
-    else:
-        text = "Включить все фразы в аукционе"
-        new_mode = True
-
-    button = InlineKeyboardButton(
-        text=text,
-        callback_data=SettingAuctionBoostMode(
-            new_mode=new_mode, adv_id=adv_setting.adv_id
-        ).pack(),
-    )
-    builder.row(button)
-
     button = InlineKeyboardButton(
         text="История позиций ключевых слов",
         callback_data=callbacks.KeywordPositionHistory(
