@@ -575,11 +575,12 @@ class KeywordSettingMessage(TextWithKeyboard):
             f"""Текущий статус ключа: {calculated_keyword.status}\n"""
             f"🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n"
             f"📈 *Показы:* {self.views}\n"
-            f"🖱 *Клики:* {self.clicks}\n"
-            f"Прогнозируемый CTR: {self.original_predict_ctr * 100 if self.original_predict_ctr else 'Не просчитан'}%\n"
-            f"📊 *Фактический CTR:* {self.fact_ctr * 100}%\n"
-            f"💰 *Расход:* {round(self.spend, 2)} руб.\n"
-        )
+            f"🖱 *Клики:* {self.clicks}\n")
+        text += f"Прогнозируемый CTR: {self.original_predict_ctr * 100:.2f}%\n" \
+                if self.original_predict_ctr else "Не просчитан"
+        text +=   (f"📊 *Фактический CTR:* {self.fact_ctr * 100}%\n"
+                  f"💰 *Расход:* {round(self.spend, 2)} руб.\n")
+
         if self.position:
             text += (
                 f"📈 *Позиция:* {self.position.position}\n"
