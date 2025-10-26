@@ -8,7 +8,7 @@ from sqlalchemy.orm import configure_mappers
 from alembic import context
 from app.admin_bot.sender.utils.db.models import *
 from app.modules.common_slaves.wildberries.models import *
-from app.modules.wb_adv_updater.models import *
+from app.modules.token_monitoring.models import *
 from app.payments.db.models import *
 from app.utils.db.models import *
 from app.utils.db.base import BaseTable as Base
