@@ -2,11 +2,15 @@ import logging
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import select
 
 from app.client_bot.user_interface.message_templates import (
     LastMessage,
     TextWithKeyboardAndImage,
 )
+
+from app.utils.db.session_maker import get_async_session_maker as sm
+
 from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
@@ -168,8 +172,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._auto_max_cpm_value: int | None = None
         if self._auto_max_cpm_mode:
             self._auto_max_cpm_value: int | None = await max_cpm_mgr.get(self._adv_setting)
-
-
+        self._status_auction: str =  await self._get_status_auction(self._adv_setting.search_adv_id)
         await super().__call__()
         return
 
@@ -177,13 +180,14 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     def text(self) -> str:
         total_page = len(self._keywords) // self._on_page
         text = (
-            "Название кампании: " + str(self._adv_setting.name) + "\n"
-            f"Статус: {self._adv_setting.active_status}\n"
+            "Название: " + str(self._adv_setting.name) + "\n"
+            f"Статус Авто: {self._adv_setting.active_status}\n"
+            f"Статус Аукциона: {self._status_auction}\n"                                                      
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
             "ID кампании: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аукциона: {self._adv_setting.search_adv_id}\n"
-            f"Общая статистика за 2 дня:\n"
-            f"Минимальный CRT для кампании: {self.min_ctr * 100:.2f}%\n"
+            f"Cтатистика за 2 дня:\n"
+            f"Мин. CRT для кампании: {self.min_ctr * 100:.2f}%\n"
             f"Страница: {self._page}/{total_page + 1}\n"
             f"Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n"
             f"Общий расход на рекламу: {self.total_spend:.2f}\n"
@@ -300,3 +304,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             sort_mode=self.sort_mode,
             image_mode=self.image_mode,
         )
+    @staticmethod
+    async def _get_status_auction( search_adv_id: int) -> str:
+        if not search_adv_id:
+            return 'не подключен'
+        stmt = select(AdvSetting.active_status).where(AdvSetting.adv_id == search_adv_id)
+        async with sm(read_only=True) as session:
+            result = await session.execute(stmt)
+            return str(result.scalar_one())
