@@ -301,7 +301,10 @@ class ShopMenu(TextWithKeyboard):
             f"💸 <b>Расход в сутки</b>: {self._total_tariff_for_month/30:.2f} р.\n"
         )
 
-        last_for_days = int(total_money/self._total_tariff_for_month*30)
+        if self._total_tariff_for_month == 0:
+            last_for_days = 'ထ'
+        else:
+            last_for_days = int(total_money/self._total_tariff_for_month*30)
 
         # Money status with appropriate warnings
         if isinstance(last_for_days, int):
