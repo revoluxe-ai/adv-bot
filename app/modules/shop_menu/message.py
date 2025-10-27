@@ -297,7 +297,7 @@ class ShopMenu(TextWithKeyboard):
             f' Базовый тариф: {self._base_tariff:.2f} р. в месяц\n'
             f" Доплата за автонастройку РК: {self._automatic_tariff:.2f} р. в месяц\n"
             f"""Итоговая плата: {self._total_tariff_for_month:.2f} в месяц"""
-            f"(больше РК -> ниже цена, тарифы -> https://golnk.ru/pwN2L)\n"
+            f"(больше РК -> ниже цена, тарифы -> {const.SUPPORT_LINK})\n"
             f"💸 <b>Расход в сутки</b>: {self._total_tariff_for_month/30:.2f} р.\n"
         )
 

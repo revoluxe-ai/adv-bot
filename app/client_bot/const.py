@@ -43,3 +43,6 @@ min_sum = settings.MIN_SUM
 MIN_SUM = min_sum
 
 SUPPORT_LINK = "https://t.me/skyline360_1"
+
+
+PRICE_LINK = 'https://golnk.ru/pwN2L'
