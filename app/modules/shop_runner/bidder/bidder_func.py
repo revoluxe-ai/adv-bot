@@ -81,7 +81,7 @@ async def run_bidder_process_for_adv(
         return
     if adv_setting.auto_max_cpm_mode:
         auto_max_cpm = await auto_max_bid_manager.get_max_cpm(adv_setting, keywords, max_cpm)
-        if auto_max_cpm and auto_max_cpm > max_cpm:
+        if auto_max_cpm and auto_max_cpm < max_cpm:
             max_cpm = auto_max_cpm
 
     step = adv_setting.bidder_step or settings.BIDDER_STEP
