@@ -591,7 +591,7 @@ class KeywordSettingMessage(TextWithKeyboard):
             f"📈 *Показы:* {self.views}\n"
             f"🖱 *Клики:* {self.clicks}\n")
         text += f"Прогнозируемый CTR: {self.original_predict_ctr * 100:.2f}%\n" \
-                if self.original_predict_ctr else "Не просчитан"
+                if self.original_predict_ctr else "Не просчитан\n"
         text +=   (f"📊 *Фактический CTR:* {self.fact_ctr * 100}%\n"
                   f"💰 *Расход:* {round(self.spend, 2)} руб.\n")
 
