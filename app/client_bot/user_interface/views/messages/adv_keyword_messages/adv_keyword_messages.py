@@ -29,12 +29,10 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater im
 )
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
 from dependency_injector.wiring import inject, Provide
-from app.modules.shop_runner.modules.max_auto_bid_manager.max_cpm_redis_status_manager import (
-    MaxCpmRedisStatusManager,
-)
-from app.modules.shop_runner.modules.max_auto_bid_manager.di import (
-    AutoMaxCpmContainer,
-)
+
+
+from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +66,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self,
         state: FSMContext,
         sort_mode="by_adv",
-        max_cpm_mgr: MaxCpmRedisStatusManager = Provide[
-            AutoMaxCpmContainer.max_cpm_redis_status_manager
-        ],
     ) -> (LastMessage, str):
         self.sort_mode = sort_mode
         self._state = state
@@ -171,8 +166,13 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         )
         self._auto_max_cpm_value: int | None = None
         if self._auto_max_cpm_mode:
-            self._auto_max_cpm_value: int | None = await max_cpm_mgr.get(self._adv_setting)
-        self._status_auction: str =  await self._get_status_auction(self._adv_setting.search_adv_id)
+            user_max_cpm = self._adv_setting.max_cpm
+            auto_max_bid_manager = AutoMaxBidManager(self._adv_setting,
+                                                     self._keywords,
+                                                     user_max_cpm)
+            self._auto_max_cpm_value = await auto_max_bid_manager.get_max_cpm()
+
+
         await super().__call__()
         return
 
