@@ -32,6 +32,7 @@ from dependency_injector.wiring import inject, Provide
 
 
 from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+from app.modules.shop_runner.modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 
 
 logger = logging.getLogger(__name__)
@@ -66,10 +67,13 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self,
         state: FSMContext,
         sort_mode="by_adv",
+        auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_bid_manager],
     ) -> (LastMessage, str):
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
+        self._status_auction = await self._get_status_auction(self._adv_setting.search_adv_id)
+
         keywords_filter: list[str] = data.get("keywords_filter")
         clear_keywords = []
         if keywords_filter:
@@ -167,10 +171,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._auto_max_cpm_value: int | None = None
         if self._auto_max_cpm_mode:
             user_max_cpm = self._adv_setting.max_cpm
-            auto_max_bid_manager = AutoMaxBidManager(self._adv_setting,
-                                                     self._keywords,
-                                                     user_max_cpm)
-            self._auto_max_cpm_value = await auto_max_bid_manager.get_max_cpm()
+            self._auto_max_cpm_value = await auto_max_bid_manager.get_max_cpm(
+                self._adv_setting, self._keywords, user_max_cpm
+            )
 
 
         await super().__call__()
