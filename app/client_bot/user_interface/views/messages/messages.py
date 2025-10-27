@@ -590,13 +590,14 @@ class KeywordSettingMessage(TextWithKeyboard):
             f"🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n"
             f"📈 *Показы:* {self.views}\n"
             f"🖱 *Клики:* {self.clicks}\n")
-        text += f"Прогнозируемый CTR: {self.original_predict_ctr * 100:.2f}%\n" \
-                if self.original_predict_ctr else "Не просчитан\n"
-        text +=   (f"📊 *Фактический CTR:* {self.fact_ctr * 100}%\n"
-                  f"💰 *Расход:* {round(self.spend, 2)} руб.\n")
+        if self.original_predict_ctr is not None:
+            predict_ctr_text = f"{self.original_predict_ctr * 100:.2f}%"
+        else:
+            predict_ctr_text = "Не просчитан"
 
         if self.position:
             text += (
+                f"Прогнозируемый CTR: {predict_ctr_text}\n"
                 f"📈 *Позиция:* {self.position.position}\n"
                 f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n"""
                 f"""Тип кампании: {self.position.type_native if self.position.type_native else "Нет"}\n"""
