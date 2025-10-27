@@ -17,7 +17,7 @@ class AutoMaxBidManager:
     async def get_max_cpm(self, adv: AdvSetting,
                           keywords: list[CalculatedKeyword],
                           user_max_cpm: int,
-                          period_days: int = 7,
+                          period_days: int = 2,
                           ) -> int:
         max_cpm = await self._get_max_cpm(adv, keywords, period_days)
         if max_cpm is None:
@@ -81,5 +81,7 @@ class AutoMaxBidManager:
                 clicks += keyword.clicks or 0
         if clicks == 0:
             clicks = 1
+        if views ==0:
+            views = 100
         return views / clicks
 
