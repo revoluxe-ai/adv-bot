@@ -79,6 +79,7 @@ class AutoMaxBidManager:
             if keyword.status == 'good':
                 views += keyword.views or 0
                 clicks += keyword.clicks or 0
+        # TODO: Тут подумать над дефолтными показами
         if clicks == 0:
             clicks = 1
         if views ==0:
