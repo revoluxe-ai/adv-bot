@@ -225,7 +225,20 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
 
+
+    # TODO Дублирует аналогичную в app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages.AdvKeywordsSetting._get_status_auction
+    @staticmethod
+    async def _get_status_auction(search_adv_id: int) -> str:
+        if not search_adv_id:
+            return 'не подключен'
+        stmt = select(AdvSetting.active_status).where(AdvSetting.adv_id == search_adv_id)
+        async with sm(read_only=True) as session:
+            result = await session.execute(stmt)
+            return str(result.scalar_one())
+
     async def __call__(self) -> Message:
+        auction_adv_id = self.adv.search_adv_id
+        self._status_auction = await self._get_status_auction(auction_adv_id)
         self._min_ctr: float | str
         self._min_ctr = await data_manager.get_min_ctr(self.adv)
         if not self._min_ctr:
@@ -317,7 +330,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         text = (
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
-            f"📌 Статус: {self.adv.active_status}\n"
+            f"📌 Статус Авто: {self.adv.active_status}\n"
+            f"📌 Статус Аукциона: {self._status_auction}\n"
             f"🎯 Минимальный CTR для кампании: {self._min_ctr} \n"
             f"🔢 Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n"
             f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"

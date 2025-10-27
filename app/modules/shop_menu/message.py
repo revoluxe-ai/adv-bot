@@ -21,6 +21,7 @@ from app.client_bot.user_interface.views.callbacks import (
     TurnWhiteListUpdate,
 )
 from app.modules.adv_creator.telegram.into_callback import CreateNewAdvs
+from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBCabinet,
@@ -86,87 +87,71 @@ class ShopMenu(TextWithKeyboard):
         await self._state.update_data(
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id
         )
-
-        try:
-            async with sm(read_only=True) as session:
-                # 1. Основной запрос с загрузкой WBUserCabinet и связанных данных
-                stmt = (
-                    select(WBUserCabinet)
-                    .join(WBUserCabinet.wb_cabinet)
-                    .options(
-                        # Загружаем WBCabinet со всеми необходимыми связями
-                        selectinload(WBUserCabinet.wb_cabinet),
-                        selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                            WBCabinet.bonus_payments
-                        ),
-                        selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                            WBCabinet.balance_payments
-                        ),
-                        # Загружаем пользователя
-                        selectinload(WBUserCabinet.user),
-                        # Предзагружаем активные рекламные кампании
-                        selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                            WBCabinet.adv_settings.and_(AdvSetting.bot_active.is_(True))
-                        ),
-                    )
-                    .where(WBUserCabinet.id == self._wb_user_cabinet_original_id)
+        async with sm(read_only=True) as session:
+            # 1. Основной запрос с загрузкой WBUserCabinet и связанных данных
+            stmt = (
+                select(WBUserCabinet)
+                .join(WBUserCabinet.wb_cabinet)
+                .options(
+                    # Загружаем WBCabinet со всеми необходимыми связями
+                    selectinload(WBUserCabinet.wb_cabinet),
+                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                        WBCabinet.bonus_payments
+                    ),
+                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                        WBCabinet.balance_payments
+                    ),
+                    # Загружаем пользователя
+                    selectinload(WBUserCabinet.user),
+                    # Предзагружаем активные рекламные кампании
+                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                        WBCabinet.adv_settings.and_(AdvSetting.bot_active.is_(True))
+                    ),
                 )
-
-                result = await session.execute(stmt)
-                self._wb_user_cabinet = result.scalar_one()
-                self._wb_cabinet = self._wb_user_cabinet.wb_cabinet
-
-                # 2. Получаем сразу активные рекламные кампании
-                active_advs = [
-                    adv for adv in self._wb_cabinet.adv_settings if adv.bot_active
-                ]
-                self.count_active_advs = len(active_advs)
-                self.is_active_adv = self.count_active_advs > 0
-
-                # 3. Расчет метрик кабинета
-                self._now = datetime.now()
-                self._expiration_time = self._wb_cabinet.expiration_time
-                self._expiration_time_str = self._expiration_time.strftime(
-                    "%d-%m-%Y-%H:%M"
-                )
-                self.days_left = (self._expiration_time - self._now).days + 1
-                self.bonus_days = self.days_left * 2
-
-                # 4. Получаем данные баланса
-                self._balance = self._wb_cabinet.calculated_balance
-                self._bonus = self._wb_cabinet.calculated_bonus
-
-                # 5. Расчет метрик для тарификации
-                if self.is_active_adv:
-                    shop_id = self._wb_cabinet.shop_id
-                    self.price_for_month_for_shop = (
-                        await self._pricer.get_month_tariff_for_count_advs(session, shop_id)
-                    )
-                    self.total_amount_for_day = (
-                        await self._pricer.get_price_for_day_for_shop(session, shop_id)
-                    )
-                else:
-                    self.price_for_month_for_shop = 0
-                    self.total_amount_for_day = 0
-
-                # 6. Load token status
-                await self.get_shop_token_status()
-
-                # 7. Сохраняем данные в состояние
-                await self._state.update_data(
-                    last_wb_cabinet_original_id=self._wb_cabinet.id
-                )
-
-                logger.debug(
-                    f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек"
-                )
-                return True
-        except Exception as e:
-            # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
-            logger.error(
-                f"Ошибка при оптимизированной загрузке данных: {e}", exc_info=True
+                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id)
             )
-            raise e
+
+            result = await session.execute(stmt)
+            self._wb_user_cabinet = result.scalar_one()
+            self._wb_cabinet = self._wb_user_cabinet.wb_cabinet
+
+            # 3. Расчет метрик кабинета
+            self._now = datetime.now()
+            self._expiration_time = self._wb_cabinet.expiration_time
+            self._expiration_time_str = self._expiration_time.strftime(
+                "%d-%m-%Y-%H:%M"
+            )
+            self.days_left = (self._expiration_time - self._now).days + 1
+            self.bonus_days = self.days_left * 2
+
+            # 4. Получаем данные баланса
+            self._balance = self._wb_cabinet.calculated_balance
+            self._bonus = self._wb_cabinet.calculated_bonus
+            # 6. Load token status
+            await self.get_shop_token_status()
+
+            # 7. Сохраняем данные в состояние
+            await self._state.update_data(
+                last_wb_cabinet_original_id=self._wb_cabinet.id
+            )
+
+            logger.debug(
+                f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек"
+            )
+
+        # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
+        shop_id = self._wb_cabinet.shop_id
+        pricer = Pricer()
+        async with sm() as session:
+            self._total_active_advs_count: int = await pricer.get_active_complex_advs_count(session, shop_id)
+            self._base_tariff: int | float = \
+                pricer.get_price_for_count_advs_in_cabinet_for_month(self._total_active_advs_count)
+            self._automatic_tariff: int = await pricer.get_automactic_tariff(session,
+                                                                             shop_id,
+                                                                             self._total_active_advs_count)
+            self._total_tariff_for_month = self._base_tariff + self._automatic_tariff
+
+        return True
 
     async def _process_tokens(self):
         """Обработка токенов для магазина"""
@@ -270,11 +255,7 @@ class ShopMenu(TextWithKeyboard):
         logger.debug(f"Вызов ShopMenu для кабинета {self._wb_user_cabinet_original_id}")
 
         # Единый метод загрузки всех данных вместо трех отдельных
-        try:
-            await self._load_all_data()
-        except Exception as e:
-            logger.error(f"Критическая ошибка в ShopMenu.__call__: {e}", exc_info=True)
-            raise e
+        await self._load_all_data()
 
         # Проверка и обработка токенов только если это необходимо
         # Вызов метода _process_tokens закомментирован, так как из кода видно,
@@ -289,7 +270,6 @@ class ShopMenu(TextWithKeyboard):
         logger.debug("Отображение меню магазина (вызов родительского метода __call__)")
 
         # Вызываем родительский метод __call__, который отвечает за отправку сообщения
-        result = await super().__call__()
 
         logger.debug(
             "Меню магазина отображено"
@@ -300,28 +280,28 @@ class ShopMenu(TextWithKeyboard):
         logger.debug(
             f"Общее время выполнения метода ShopMenu.__call__: {total_time:.2f} сек"
         )
+        result = await super().__call__()
         return result
 
     @property
     def text(self):
         balance = self._balance
         bonus = self._bonus
-        count_active_advs = self.count_active_advs
+        count_active_advs = self._total_active_advs_count
+
         total_money = balance + bonus
-        total_amount_for_day = self.total_amount_for_day
-        if self.total_amount_for_day:
-            last_for_days = str(int(total_money / self.total_amount_for_day))
-        else:
-            last_for_days = "∞"
 
         # 💰 MONEY SECTION - All financial information grouped together
         text = (
             f"📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n"
-            f"""Ваш тариф в месяц: {self.price_for_month_for_shop if
-            self.price_for_month_for_shop else "Нет активных РК"}"""
+            f' Базовый тариф: {self._base_tariff:.2f} р. в месяц\n'
+            f" Доплата за автонастройку РК: {self._automatic_tariff:.2f} р. в месяц\n"
+            f"""Итоговая плата: {self._total_tariff_for_month:.2f} в месяц"""
             f"(больше РК -> ниже цена, тарифы -> https://golnk.ru/pwN2L)\n"
-            f"💸 <b>Расход в сутки</b>: {total_amount_for_day} р.\n"
+            f"💸 <b>Расход в сутки</b>: {self._total_tariff_for_month/30:.2f} р.\n"
         )
+
+        last_for_days = int(total_money/self._total_tariff_for_month*30)
 
         # Money status with appropriate warnings
         if isinstance(last_for_days, int):
