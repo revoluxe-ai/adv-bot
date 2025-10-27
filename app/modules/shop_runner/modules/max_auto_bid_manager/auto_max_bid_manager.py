@@ -4,7 +4,9 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater \
     import AdvSettingAutoUpdater as PlanFactGetter
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import PlanData, FactData
-
+from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
+from app.modules.wb_adv_updater import data_manager
+from app.utils.db.session_maker import get_async_session_maker as sm
 
 class AutoMaxBidManager:
 
@@ -79,3 +81,4 @@ class AutoMaxBidManager:
         if clicks == 0:
             clicks = 1
         return views / clicks
+
