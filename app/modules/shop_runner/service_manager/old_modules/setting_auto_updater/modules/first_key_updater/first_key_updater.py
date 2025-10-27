@@ -32,7 +32,7 @@ class FirstKeyUpdater:
     ) -> None:
         if not keywords:
             return None
-        clear_keywords = [kw for kw in keywords if kw.hard_status not in [0, 3] and kw.position > 0]
+        clear_keywords = [kw for kw in keywords if kw.hard_status not in [0, 3] and kw.position and kw.position > 0]
         if not clear_keywords:
             return None
         clear_keywords = sorted(
