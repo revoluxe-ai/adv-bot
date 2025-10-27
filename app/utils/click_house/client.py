@@ -1,5 +1,7 @@
+import asyncio
 import inspect
 import logging
+import os
 import platform
 from collections.abc import Callable
 from multiprocessing import Lock, Manager
@@ -11,6 +13,7 @@ from clickhouse_connect.driver.asyncclient import AsyncClient
 from urllib3 import PoolManager
 
 from app.settings import settings
+from app.utils.click_house.bootstrap import bootstrap_clickhouse
 
 system_name = platform.system()
 
@@ -33,6 +36,10 @@ grand_caller_function_connection_count: Any = {}
 connection_count: ValueProtocol | None = None
 connection_lock: LockType | None = None
 function_count_lock: LockType | None = None
+
+# Одноразовый флаг и лок для запуска bootstrap схемы ClickHouse
+_clickhouse_bootstrap_done: bool = False
+_clickhouse_bootstrap_lock: asyncio.Lock = asyncio.Lock()
 
 if system_name == "Linux":
     # Используем Manager для создания разделяемых между процессами словарей
@@ -78,10 +85,10 @@ class get_clickhouse_client:
         global function_count_lock
 
         if (
-            system_name == "Linux"
-            and connection_lock is not None
-            and connection_count is not None
-            and function_count_lock is not None
+                system_name == "Linux"
+                and connection_lock is not None
+                and connection_count is not None
+                and function_count_lock is not None
         ):
             # Извлекаем имя текущей функции, её вызывающей функции и функции,
             # которая вызвала вызывающую функцию из стека вызовов
@@ -124,8 +131,8 @@ class get_clickhouse_client:
                 # Функция 3-го уровня
                 if self.grand_caller_func_name:
                     if (
-                        self.grand_caller_func_name
-                        not in grand_caller_function_connection_count
+                            self.grand_caller_func_name
+                            not in grand_caller_function_connection_count
                     ):
                         grand_caller_function_connection_count[
                             self.grand_caller_func_name
@@ -137,6 +144,22 @@ class get_clickhouse_client:
                         f"Grand caller function '{self.grand_caller_func_name}' open connections count:"
                         f" {grand_caller_function_connection_count[self.grand_caller_func_name]}"
                     )
+
+        # Перед созданием клиента запускаем bootstrap схемы один раз (если нужно)
+        global _clickhouse_bootstrap_done
+        global _clickhouse_bootstrap_lock
+
+        if os.getenv("CLICKHOUSE_INIT", "0") == "1":
+            # безопасно блокируем, чтобы только один таск выполнил bootstrap
+            if not _clickhouse_bootstrap_done:
+                async with _clickhouse_bootstrap_lock:
+                    if not _clickhouse_bootstrap_done:
+                        try:
+                            await bootstrap_clickhouse(get_clickhouse_client)
+                            _clickhouse_bootstrap_done = True
+                        except Exception as e:
+                            logger.error(f"❌ Ошибка bootstrap ClickHouse: {e}")
+                            # не прерываем создание клиента
 
         # Тип игнорируется, так как библиотека может не иметь типов
         self.client = await clickhouse_connect.create_async_client(  # type: ignore
@@ -161,10 +184,10 @@ class get_clickhouse_client:
             client.close()
 
         if (
-            system_name == "Linux"
-            and connection_lock is not None
-            and connection_count is not None
-            and function_count_lock is not None
+                system_name == "Linux"
+                and connection_lock is not None
+                and connection_count is not None
+                and function_count_lock is not None
         ):
             with connection_lock:
                 connection_count.value -= 1
@@ -183,8 +206,8 @@ class get_clickhouse_client:
                 # Вызывающая функция
                 caller_func_name = self.caller_func_name
                 if (
-                    caller_func_name is not None
-                    and caller_func_name in caller_function_connection_count
+                        caller_func_name is not None
+                        and caller_func_name in caller_function_connection_count
                 ):
                     caller_function_connection_count[caller_func_name] -= 1
                     logger.debug(
@@ -195,8 +218,8 @@ class get_clickhouse_client:
                 # Функция 3-го уровня
                 grand_caller_func_name = self.grand_caller_func_name
                 if (
-                    grand_caller_func_name is not None
-                    and grand_caller_func_name in grand_caller_function_connection_count
+                        grand_caller_func_name is not None
+                        and grand_caller_func_name in grand_caller_function_connection_count
                 ):
                     grand_caller_function_connection_count[grand_caller_func_name] -= 1
                     logger.debug(

@@ -34,9 +34,6 @@ from app.modules.sales_plan_settings.telegram.main_callback import (
 from app.modules.shop_runner.auction_boost_mode_settings.telegram.callbacks import (
     SettingAuctionBoostMode,
 )
-from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
-    AutoUpdateTargetPlaceSettingCallBack,
-)
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
     AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
 )
@@ -44,13 +41,13 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
     AutoUpdateWhiteListSetting,
     RelevantKeywordStatusSetting,
 )
-from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
 
+
 def get_adv_setting_keyboard(
-    chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
+        chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
 ):
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -124,6 +121,25 @@ def get_adv_setting_keyboard(
     )
 
     builder.row(button)
+
+    # Переключатель режима учета продаж (классический/инкрементальный)
+    if adv_setting.use_incremental_stats:
+        incr_text = "Статистика v2.: Инкрементальная ⚡ (переключить на классическую)"
+        new_increment_status = False
+    else:
+        incr_text = "Статистика v1.: Классическая 📊 (переключить на инкрементальную)"
+        new_increment_status = True
+
+    incr_button = InlineKeyboardButton(
+        text=incr_text,
+        callback_data=callbacks.ToggleIncrementalStats(
+            adv_setting_original_id=adv_setting.id,
+            wb_user_cabinet_original_id=wb_user_cabinet.id,
+            new_increment_status=new_increment_status,
+
+        ).pack(),
+    )
+    builder.row(incr_button)
 
     if adv_setting.bot_active:
         builder.row(
@@ -342,11 +358,11 @@ def get_adv_setting_keyboard(
 
 
 def get_advs_keyboard_with_paginator(
-    wb_user_cabinet_original_id: int,
-    adv_settings: list[AdvSetting],
-    page: int,
-    on_page: int,
-    keyword_filter,
+        wb_user_cabinet_original_id: int,
+        adv_settings: list[AdvSetting],
+        page: int,
+        on_page: int,
+        keyword_filter,
 ):
     active_part_advs = list(
         filter(lambda adv_local: adv_local.bot_active is True, adv_settings)
@@ -468,17 +484,17 @@ def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
 
 
 def get_keywords_setting_keyboard(
-    keywords: list[CalculatedKeyword],
-    adv_setting: AdvSetting,
-    adv_choice_last_page,
-    wb_user_cabinet_original_id: int,
-    page,
-    return_from_filter_bottom: bool,
-    on_page,
-    min_ctr,
-    hide_keywords_is_not_relevant,
-    sort_mode="default",
-    image_mode="graphic",
+        keywords: list[CalculatedKeyword],
+        adv_setting: AdvSetting,
+        adv_choice_last_page,
+        wb_user_cabinet_original_id: int,
+        page,
+        return_from_filter_bottom: bool,
+        on_page,
+        min_ctr,
+        hide_keywords_is_not_relevant,
+        sort_mode="default",
+        image_mode="graphic",
 ):
     def sorting_keywords(keywords, sort_mode):
         if sort_mode in ["by_adv", "only_out_index"]:
@@ -517,7 +533,7 @@ def get_keywords_setting_keyboard(
             keyword
             for keyword in keywords
             if isinstance(keyword.query, int)
-            and keyword.query >= adv_setting.hide_small_query_keywords
+               and keyword.query >= adv_setting.hide_small_query_keywords
         ]
 
     bottoms = []
@@ -788,11 +804,11 @@ def get_keywords_setting_keyboard(
 
 
 def get_keyword_setting_keyboard(
-    chat_id: int,
-    keyword: KeywordSetting,
-    calculated_keyword: CalculatedKeyword,
-    adv_setting: AdvSetting,
-    page,
+        chat_id: int,
+        keyword: KeywordSetting,
+        calculated_keyword: CalculatedKeyword,
+        adv_setting: AdvSetting,
+        page,
 ) -> InlineKeyboardMarkup:
     adv_setting_original_id = adv_setting.id
     keyword_setting_original_id = keyword.id
@@ -805,9 +821,9 @@ def get_keyword_setting_keyboard(
         reason = None
 
     if (
-        calculated_keyword.hard_status == 1
-        and calculated_keyword.status == KeywordStatus.BAD
-        and calculated_keyword.reason != "max_position"
+            calculated_keyword.hard_status == 1
+            and calculated_keyword.status == KeywordStatus.BAD
+            and calculated_keyword.reason != "max_position"
     ):
         button = [
             InlineKeyboardButton(
@@ -866,8 +882,8 @@ def get_keyword_setting_keyboard(
     buttons.append(buttons_row)
 
     if (
-        keyword.hard_status in [AUTO_MODE, WHITE_LIST]
-        or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH
+            keyword.hard_status in [AUTO_MODE, WHITE_LIST]
+            or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH
     ):
         bottom = [
             InlineKeyboardButton(
@@ -964,7 +980,7 @@ def get_return_for_your_ref_links():
 
 
 def get_shop_menu_keyboard(
-    wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True
+        wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True
 ):
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     expiration_time: datetime.datetime = wb_cabinet.expiration_time
@@ -1148,8 +1164,8 @@ def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]):
 
         button = InlineKeyboardButton(
             text="Пополнить "
-            + wb_user_cabinet.name
-            + f" Текущий общий баланс({total_money})",
+                 + wb_user_cabinet.name
+                 + f" Текущий общий баланс({total_money})",
             callback_data=callbacks.AddBalance(
                 wb_cabinet_original_id=wb_user_cabinet.id
             ).pack(),

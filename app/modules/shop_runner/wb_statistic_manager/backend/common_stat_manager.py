@@ -147,6 +147,29 @@ class WBCommonStatManager:
 
     @staticmethod
     async def _add_common_statistic_to_clickhouse(statistics: list[CommonStat]):
+        """
+        Двойная запись статистики:
+        1. В старую таблицу wb_common_stat (обратная совместимость)
+        2. В новую инкрементальную таблицу (новая функциональность)
+        """
+        # 1. Сохраняем в старую таблицу (для обратной совместимости)
+        await WBCommonStatManager._save_to_legacy_table(statistics)
+
+        # 2. Сохраняем инкрементальные изменения в новую таблицу
+        try:
+            from .incremental_stat_manager import IncrementalCommonStatManager
+
+            incremental_manager = IncrementalCommonStatManager()
+            await incremental_manager.save_incremental_stats(statistics)
+        except Exception as exc:
+            logger.warning(
+                f"Ошибка сохранения инкрементальной статистики (не критично): {exc}"
+            )
+            # Не пробрасываем исключение, чтобы не ломать основной функционал
+
+    @staticmethod
+    async def _save_to_legacy_table(statistics: list[CommonStat]):
+        """Сохранение в старую таблицу wb_common_stat (ReplacingMergeTree)"""
         # Подготовка данных для вставки в таблицу
         values = [
             (

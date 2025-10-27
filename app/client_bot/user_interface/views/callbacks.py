@@ -212,6 +212,14 @@ class ResetPlace(CallbackData, prefix="reset_place"):
     adv_setting_original_id: int
 
 
+class ToggleIncrementalStats(CallbackData, prefix="toggle_incr_stats"):
+    """Переключатель режима учета продаж (классический/инкрементальный)"""
+
+    adv_setting_original_id: int
+    new_increment_status: bool
+    wb_user_cabinet_original_id: int
+
+
 class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
     action: str
     wb_cabinet_original_id: int

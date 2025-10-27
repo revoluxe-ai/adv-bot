@@ -216,9 +216,36 @@ def _get_insert_query() -> str:
 
 
 async def insert(stats: Iterable[FullAdvStat]) -> None:
+    """
+    Двойная запись статистики рекламы:
+    1. В старую таблицу full_adv_wb_stat (обратная совместимость)
+    2. В новую инкрементальную таблицу (новая функциональность)
+    """
     if not stats:
         return
 
+    stats_list = list(stats)
+
+    # 1. Сохраняем в старую таблицу
+    await _insert_to_legacy_table(stats_list)
+
+    # 2. Сохраняем инкрементальные изменения
+    try:
+        from app.modules.shop_runner.wb_statistic_manager.backend.incremental_stat_manager import (
+            IncrementalAdvStatManager,
+        )
+
+        incremental_manager = IncrementalAdvStatManager()
+        await incremental_manager.save_incremental_stats(stats_list)
+    except Exception as exc:
+        logger.warning(
+            f"Ошибка сохранения инкрементальной статистики рекламы (не критично): {exc}"
+        )
+        # Не пробрасываем исключение, чтобы не ломать основной функционал
+
+
+async def _insert_to_legacy_table(stats: list[FullAdvStat]) -> None:
+    """Вставка в старую таблицу full_adv_wb_stat (ReplacingMergeTree)"""
     async with get_clickhouse_client() as client:
         # Получаем запрос для вставки
         query = _get_insert_query()
