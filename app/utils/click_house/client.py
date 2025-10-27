@@ -11,7 +11,6 @@ from clickhouse_connect.driver.asyncclient import AsyncClient
 from urllib3 import PoolManager
 
 from app.settings import settings
-from app.utils.click_house import init_schema
 
 system_name = platform.system()
 
