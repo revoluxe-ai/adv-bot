@@ -52,6 +52,9 @@ class TargetPlaceUpdater:
             return False, False
         adv = self._adv
         target_place = self._target_place
+        # TODO Для избежания ошибок в случаях, когда целевая позиция не задана, временное решение, пересмотреть логику
+        if not target_place:
+            target_place = 100
         new_target_place = target_place + 1
         if new_target_place > 100_000:
             new_target_place = 100_000
