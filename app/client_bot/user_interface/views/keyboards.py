@@ -140,23 +140,6 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     builder.row(button)
 
-    # Добавляем кнопку переключения источника заказов для автоуправления
-    if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
-        text = "Переключить на общую статистику заказов"
-        new_source = (
-            OrdersSourceForAutoMode.COMMON_STATISTIC.value
-        )  # Use .value for string
-    else:
-        text = "Переключить на заказы только из рекламы"
-        new_source = OrdersSourceForAutoMode.ADV_SUM.value  # Use .value for string
-
-    callback = OrdersSourceToggle(
-        new_source=new_source, adv_setting_original_id=adv_setting.id
-    ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    builder.row(button)
-
-
     button = InlineKeyboardButton(
         text="План продаж",
         callback_data=SalesPlanSettingsMenuCallback(adv_id=adv_setting.adv_id).pack(),
