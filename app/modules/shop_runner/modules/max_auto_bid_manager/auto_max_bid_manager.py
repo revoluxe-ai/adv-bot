@@ -50,7 +50,6 @@ class AutoMaxBidManager:
         # TODO: тут логика завязана на 1 артикул в РК
         adv_ids = [
             adv.adv_id,
-            adv.search_adv_id
         ]
         clicks_to_order_ratio: float = await (clickhouse_manager.
                                               get_clicks_to_orders_ration_on_phrases(adv_ids,
