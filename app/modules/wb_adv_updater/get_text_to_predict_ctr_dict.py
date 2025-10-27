@@ -20,7 +20,7 @@ async def get(
     ],
 ) -> dict[str, float | None]:
     result: dict[str, float | None] = {}
-
+    # TODO: Не понятно как Мин CTR Определяется по РК, кажется где-то ошибк - баг
     for text in texts:
         result_for_text = await predict_ctr_redis_manager.get_predict_ctr(  # type: ignore[attr-defined]
             adv_setting, text
