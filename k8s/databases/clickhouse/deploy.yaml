@@ -13,6 +13,37 @@ spec:
         templates:
           podTemplate: clickhouse-template
           volumeClaimTemplate: storage-template
+    settings:
+      # === ОТКЛЮЧЕНИЕ ТЯЖЕЛЫХ СИСТЕМНЫХ ЛОГОВ ===
+      processors_profile_log: _removed_
+      metric_log: _removed_
+      query_thread_log: _removed_
+      
+      # === СРОК ЖИЗНИ ЛОГОВ (секунды) ===
+      max_system_log_age: 43200  # 12 часов = 43200 сек
+      
+      # === ФОНОВЫЕ СЛИЯНИЯ ===
+      background_pool_size: 6
+      background_merges_mutations_concurrency_ratio: 5
+      
+      # === НАСТРОЙКИ MERGETREE ===
+      merge_tree:
+        # КРИТИЧНО: удаление целых частей по TTL
+        ttl_only_drop_parts: 1
+        
+        # Частота слияний с TTL
+        merge_with_ttl_timeout: 1800  # 30 минут
+        merge_with_recompression_ttl_timeout: 1800
+        
+        # Параллелизм TTL слияний
+        max_number_of_merges_with_ttl_in_pool: 4
+        max_replicated_merges_with_ttl_in_queue: 4
+        
+        # Баланс больших/малых слияний
+        number_of_free_entries_in_pool_to_lower_max_size_of_merge: 3
+        number_of_free_entries_in_pool_to_execute_optimize_entire_partition: 20
+    
+    # === НАСТРОЙКА TTL ДЛЯ СИСТЕМНЫХ ТАБЛИЦ ===
     files:
       users.d/adv_bot_user.xml: |
         <clickhouse>
@@ -36,26 +67,38 @@ spec:
             <count>10</count>
           </logger>
         </clickhouse>
-      config.d/log_ttl.xml: |
+      config.d/system_logs_ttl.xml: |
         <clickhouse>
-          <system_logs>
-            <query_log><ttl>event_time + INTERVAL 1 HOUR DELETE</ttl></query_log>
-            <query_thread_log><ttl>event_time + INTERVAL 1 HOUR DELETE</ttl></query_thread_log>
-            <part_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></part_log>
-            <metric_log><ttl>event_time + INTERVAL 6 HOUR DELETE</ttl></metric_log>
-            <processors_profile_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></processors_profile_log>
-            <trace_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></trace_log>
-            <query_views_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></query_views_log>
-            <query_metric_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></query_metric_log>
-            <text_log><ttl>event_time + INTERVAL 6 HOUR DELETE</ttl></text_log>
-            <asynchronous_metric_log><ttl>event_time + INTERVAL 6 HOUR DELETE</ttl></asynchronous_metric_log>
-          </system_logs>
+          <!-- Отключить тяжелые логи -->
+          <processors_profile_log remove="1"/>
+          <metric_log remove="1"/>
+          <query_thread_log remove="1"/>
+          
+          <!-- TTL для оставшихся логов -->
+          <query_log>
+            <database>system</database>
+            <table>query_log</table>
+            <partition_by>toYYYYMMDD(event_date)</partition_by>
+            <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+          </query_log>
+          
+          <trace_log>
+            <database>system</database>
+            <table>trace_log</table>
+            <partition_by>toYYYYMMDD(event_date)</partition_by>
+            <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+          </trace_log>
+          
+          <part_log>
+            <database>system</database>
+            <table>part_log</table>
+            <partition_by>toYYYYMMDD(event_date)</partition_by>
+            <ttl>event_date + INTERVAL 2 DAY DELETE</ttl>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+          </part_log>
         </clickhouse>
-    settings:
-      max_system_log_age: 86400
-      max_system_log_size: 1073741824
-      system_logs_flush_interval_milliseconds: 10000
-    
   templates:
     podTemplates:
       - name: clickhouse-template
