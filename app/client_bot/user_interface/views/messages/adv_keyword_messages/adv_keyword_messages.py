@@ -182,25 +182,26 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     @property
     def text(self) -> str:
         total_page = len(self._keywords) // self._on_page
+        # TODO: Текст стал слишком большим, на спех сократил. Нужно перед изменением сообщений сделать тесты, проверяющие длину текста и его корректность
         text = (
-            "Название: " + str(self._adv_setting.name) + "\n"
-            f"Статус Авто: {self._adv_setting.active_status}\n"
-            f"Статус Аукциона: {self._status_auction}\n"                                                      
+                str(self._adv_setting.name) + "\n"
+            f"Авто: {self._adv_setting.active_status}\n"
+            f"Аукцион: {self._status_auction}\n"
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
-            "ID кампании: " + str(self._adv_setting.adv_id) + "\n"
+            "ID Авто: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аукциона: {self._adv_setting.search_adv_id}\n"
-            f"Cтатистика за 2 дня:\n"
-            f"Мин. CRT для кампании: {self.min_ctr * 100:.2f}%\n"
-            f"Страница: {self._page}/{total_page + 1}\n"
-            f"Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n"
-            f"Общий расход на рекламу: {self.total_spend:.2f}\n"
+            f"Cтат. за 2 дня:\n"
+            f"Мин. CRT: {self.min_ctr * 100:.2f}%\n"
+            f"Стр.: {self._page}/{total_page + 1}\n"
+            f"Экс. прог.CTR: {self._adv_setting.exponent_predict_ctr}\n"
+            f"Общий расход: {self.total_spend:.2f}\n"
             f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
             f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
             f"Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n"
-            f"Общее число заказов: {self._all_orders_for_last_days}\n"
-            f"Заказов из Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
-            f"Заказов из Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
-        )
+            f"Общие заказы: {self._all_orders_for_last_days}\n"
+            f"  -Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
+            f"  -Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
+)
 
         # Показываем источник данных для заказов
         if (
