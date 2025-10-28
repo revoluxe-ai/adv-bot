@@ -589,12 +589,15 @@ class KeywordSettingMessage(TextWithKeyboard):
         nmids = [str(nmid) for nmid in nmids]
         nmids_str = ", ".join(nmids)
         text = (
-            f"""Артикул: {nmids_str}\n"""
-            f"""Хард-статус: {self.get_str_rus_hard_status(calculated_keyword.hard_status)}\n"""
-            f"""Текущий статус ключа: {calculated_keyword.status}\n"""
-            f"🔑 *Статистика и настройка ключевого слова:* \n\n {keyword_text}\n\n"
-            f"📈 *Показы:* {self.views}\n"
-            f"🖱 *Клики:* {self.clicks}\n")
+            f"📦 *Артикул:* {nmids_str}\n"
+            f"⚙️ *Хард-статус:* {self.get_str_rus_hard_status(calculated_keyword.hard_status)}\n"
+            f"🔄 *Текущий статус ключа:* {calculated_keyword.status}\n\n"
+            f"🔑 *Ключевое слово и настройки:*\n{keyword_text}\n\n"
+            f"📊 *Показы:* {self.views}\n"
+            f"🖱 *Клики:* {self.clicks}\n"
+            f"📈 *Фактический CTR:* {self.fact_ctr * 100:.2f}%\n"
+            f"💰 *Расход:* {self.spend:.2f} ₽\n"
+        )
         if self.original_predict_ctr is not None:
             predict_ctr_text = f"{self.original_predict_ctr * 100:.2f}%"
         else:
