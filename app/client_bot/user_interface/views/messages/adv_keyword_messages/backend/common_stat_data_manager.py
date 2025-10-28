@@ -105,9 +105,10 @@ class CommonStatDataManager:
         max_price_for_order = adv.max_price_for_order
 
         text += (
-            f"План: продажи: {target_sales if target_sales else ' Не задано'},"
-            f" цель: {str(target_price) + 'р.' if target_sales else ' Не задано'},"
-            f" макс: {str(max_price_for_order) + 'р.' if max_price_for_order else ' Не задано'}"
+            f"План:\n"
+            f"  -продажи: {target_sales if target_sales else ' Не задано'}\n"
+            f"  -цель: {str(target_price) + 'р.' if target_sales else ' Не задано'}\n"
+            f"  -макс: {str(max_price_for_order) + 'р.' if max_price_for_order else ' Не задано'}\n"
         )
 
         return text
