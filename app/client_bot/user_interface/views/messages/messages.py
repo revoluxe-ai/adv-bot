@@ -239,8 +239,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 status = "РК не найдена"
             else:
                 str(status)
-
-
+            return status
 
     async def __call__(self) -> Message:
         auction_adv_id = self.adv.search_adv_id
