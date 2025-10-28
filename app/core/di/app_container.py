@@ -25,6 +25,9 @@ class AppContainer(containers.DeclarativeContainer):
             "app.modules.wb_adv_updater.get_text_to_predict_ctr_dict",
             "app.modules.common_slaves.wildberries.super_cabinet_manager",
             "app.modules.shop_runner.bidder.bidder_func",
+            "app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager",
+            "app.client_bot",  # client_bot utils используют data_manager
+            "app.modules.wb_adv_updater",  # wb_adv_updater использует min_ctr_manager
         ]
     )
 

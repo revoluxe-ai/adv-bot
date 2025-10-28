@@ -15,6 +15,4 @@ class AutoMaxCpmContainer(DeclarativeContainer):
     )
     redis_client_wrapper = Dependency(instance_of=RedisClient)
     max_cpm_redis_status_manager = Singleton(MaxCpmRedisStatusManager, redis_client=redis_client_wrapper)
-    auto_max_bid_manager = Factory(AutoMaxBidManager,
-                                   max_cpm_status_manager=max_cpm_redis_status_manager,
-                                   )
+    auto_max_cpm_bid_manager = Singleton(AutoMaxBidManager, max_cpm_status_manager=max_cpm_redis_status_manager)
