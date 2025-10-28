@@ -33,24 +33,25 @@ class AdvSettingAutoUpdater:
 
         self._max_last_period = max_last_period
 
-    async def get_fact_data_and_stat(self, keywords: list[CalculatedKeyword]) -> tuple[FactData, CommonAdvsStatData]:
+    async def __get_stat_data(self, keywords: list[CalculatedKeyword]) -> CommonAdvsStatData:
         common_stat_manager = CommonAdvsStatDataManager()
         stat: CommonAdvsStatData = await common_stat_manager.get_data(
             self._adv, keywords, last_days=self._max_last_period
         )
-        fact = self.get_fact_data_from_stat(stat)
+        return stat
+
+    async def get_fact_data_and_stat(self, keywords: list[CalculatedKeyword]) -> tuple[FactData, CommonAdvsStatData]:
+        stat = await self.__get_stat_data(keywords)
+        fact = self._get_fact_data_from_stat(stat)
         return fact, stat
 
-    def get_fact_data_from_stat(self, common_stat_data: CommonAdvsStatData) -> FactData:
+    def _get_fact_data_from_stat(self, common_stat_data: CommonAdvsStatData) -> FactData:
         fact_data = self.__get_fact_data_from_stats(common_stat_data)
         return fact_data
 
     async def get_fact_data(self, keywords: list[CalculatedKeyword]) -> FactData:
-        common_stat_manager = CommonAdvsStatDataManager()
-        stat: CommonAdvsStatData = await common_stat_manager.get_data(
-            self._adv, keywords, last_days=self._max_last_period
-        )
-        fact = self.get_fact_data_from_stat(stat)
+        stat = await self.__get_stat_data(keywords)
+        fact = self._get_fact_data_from_stat(stat)
         return fact
 
     async def update(
