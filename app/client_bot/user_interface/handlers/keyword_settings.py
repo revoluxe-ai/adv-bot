@@ -670,6 +670,10 @@ async def change_keyword_hard_status(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
+    # TODO Показать ключи в в не индекса - не работает
+    # TODO: Не работает кнопка Скрыть не релевантные фразы
+    # TODO: Тестировать дальше - не работает!!!!
+    # TODO: Подумать над ограничением фраз 
     async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
         new_hard_status = callback_data.new_hard_status
         keyword_setting_original_id = callback_data.keyword_setting_original_id

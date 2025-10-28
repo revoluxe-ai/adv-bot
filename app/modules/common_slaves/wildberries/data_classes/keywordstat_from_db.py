@@ -95,7 +95,6 @@ class CalculatedKeyword(BaseModel):
             f" views: {self.views}"
             f" spend: {self.spend}"
             f" status: {self.status}"
-            f" keyword_setting: {self.keyword_setting}"
             f" cpc: {self.cpc}"
             f" ctr: {self.ctr}"
             f" hard_status: {self.hard_status}"
@@ -165,3 +164,8 @@ class CalculatedKeyword(BaseModel):
                 or 0
             )
         return cls(**data)
+
+    @property
+    def is_in_white_list(self) -> bool:
+        return self.hard_status == 2
+

@@ -41,8 +41,6 @@ from app.modules.common_slaves.wildberries.models import (
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.keywords_query import keywords_query
 from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
-from app.modules.wb_adv_updater.models import GlobalCategorySetting
-from app.settings import settings
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.assoc_tables import favorite_advs_association

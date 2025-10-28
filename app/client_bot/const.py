@@ -33,7 +33,7 @@ ADMINS = [
     373435337,  # я
     # 1603000351, #Леля
     707068503,  # Лена
-    1121102685,  # Владислав
+    # 1121102685,  # Владислав
 ]
 
 DEFAULT_BIDDER_STEP = 2
@@ -43,3 +43,6 @@ min_sum = settings.MIN_SUM
 MIN_SUM = min_sum
 
 SUPPORT_LINK = "https://t.me/skyline360_1"
+
+
+PRICE_LINK = 'https://golnk.ru/pwN2L'

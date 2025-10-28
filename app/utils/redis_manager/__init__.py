@@ -729,7 +729,7 @@ async def get_min_cpm_by_category_name(category_name: str) -> int | None:
         result = await result
     min_cpm_data = result
     if min_cpm_data is None:
-        return 125
+        return 10
     return int(min_cpm_data)
 
 

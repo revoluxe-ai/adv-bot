@@ -6,7 +6,7 @@ import logging
 
 from aiohttp import ClientSession
 from clickhouse_connect.driver.external import ExternalData
-from sqlalchemy import exists
+from sqlalchemy import exists, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -60,9 +60,10 @@ async def check_adv_payment(
 ) -> bool:
     """Проверяет наличие платежа для настройки рекламы на указанную дату."""
     adv_payment_check_stmt = select(
-        exists().where(
-            AdvPayment.adv_setting_id == adv_setting.id, AdvPayment.date == current_date
-        )
+        exists().where(and_(
+            AdvPayment.adv_setting_id == adv_setting.id,
+            AdvPayment.date == current_date
+        ))
     )
 
     result = await session.execute(adv_payment_check_stmt)
@@ -248,7 +249,8 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                 if update_tasks[adv_setting.id].done():
                     if update_tasks[adv_setting.id].exception():
                         logger.error(
-                            f"Ошибка обновления ключей: {update_tasks[adv_setting.id].exception()}"
+                            "Ошибка обновления ключей: %s",
+                            update_tasks[adv_setting.id].exception()
                         )
                     del update_tasks[adv_setting.id]
             await asyncio.sleep(0)
@@ -306,7 +308,10 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     except Exception as exc:
         keywords_from_search_adv = []
         logger.error(
-            f"Ошибка получения статистики по ключевым словам для {adv_setting.name}, {exc}"
+            f"Ошибка получения статистики по ключевым словам для %s, %s",
+            adv_setting.name,
+            exc
+
         )
         del exc
 
@@ -330,7 +335,8 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     full_stat_keywords = full_stat
 
     logger.debug(
-        f"Получено {len(full_stat_keywords)} ключевых слов для {adv_setting.name}"
+        f"Получено %s ключевых слов для %s",
+        len(full_stat_keywords), adv_setting.name
     )
     texts_for_adv_setting = {keyword.text for keyword in full_stat_keywords}
     clusters = set()
@@ -369,7 +375,9 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             await session.commit()
     except Exception as exc:
         logger.error(
-            f"Ошибка добавления ключевых слов в базу данных: {exc}", exc_info=True
+            f"Ошибка добавления ключевых слов в базу данных: %s",
+            exc,
+            exc_info=True
         )
         raise exc
 

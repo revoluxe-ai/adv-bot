@@ -2,11 +2,15 @@ import logging
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
+from sqlalchemy import select
 
 from app.client_bot.user_interface.message_templates import (
     LastMessage,
     TextWithKeyboardAndImage,
 )
+
+from app.utils.db.session_maker import get_async_session_maker as sm
+
 from app.client_bot.user_interface.views import keyboards
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
@@ -24,6 +28,12 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater im
     AdvSettingAutoUpdater,
 )
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
+from dependency_injector.wiring import inject, Provide
+
+
+from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+from app.modules.shop_runner.modules.max_auto_bid_manager.di import AutoMaxCpmContainer
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +62,18 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._on_page = 24
         self.image_mode = image_mode
 
+    @inject
     async def __call__(
-        self, state: FSMContext, sort_mode="by_adv"
+        self,
+        state: FSMContext,
+        sort_mode="by_adv",
+        auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_bid_manager],
     ) -> (LastMessage, str):
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
+        self._status_auction = await self._get_status_auction(self._adv_setting.search_adv_id)
+
         keywords_filter: list[str] = data.get("keywords_filter")
         clear_keywords = []
         if keywords_filter:
@@ -148,30 +164,44 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         self._fact_data = fact_data
 
+        # Получаем данные по Автомаксимальной ставке из Redis (через DI)
+        self._auto_max_cpm_mode: bool = bool(
+            getattr(self._adv_setting, "auto_max_cpm_mode", False)
+        )
+        self._auto_max_cpm_value: int | None = None
+        if self._auto_max_cpm_mode:
+            user_max_cpm = self._adv_setting.max_cpm
+            self._auto_max_cpm_value = await auto_max_bid_manager.get_max_cpm(
+                self._adv_setting, self._keywords, user_max_cpm
+            )
+
+
         await super().__call__()
         return
 
     @property
     def text(self) -> str:
         total_page = len(self._keywords) // self._on_page
+        # TODO: Текст стал слишком большим, на спех сократил. Нужно перед изменением сообщений сделать тесты, проверяющие длину текста и его корректность
         text = (
-            "Название кампании: " + str(self._adv_setting.name) + "\n"
-            f"Статус: {self._adv_setting.active_status}\n"
+                str(self._adv_setting.name) + "\n"
+            f"Авто: {self._adv_setting.active_status}\n"
+            f"Аукцион: {self._status_auction}\n"
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
-            "ID кампании: " + str(self._adv_setting.adv_id) + "\n"
+            "ID Авто: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аукциона: {self._adv_setting.search_adv_id}\n"
-            f"Общая статистика за 2 дня:\n"
-            f"Минимальный CRT для кампании: {self.min_ctr * 100:.2f}%\n"
-            f"Страница: {self._page}/{total_page + 1}\n"
-            f"Экспонента прог.CTR: {self._adv_setting.exponent_predict_ctr}\n"
-            f"Общий расход на рекламу: {self.total_spend:.2f}\n"
+            f"Cтат. за 2 дня:\n"
+            f"Мин. CRT: {self.min_ctr * 100:.2f}%\n"
+            f"Стр.: {self._page}/{total_page + 1}\n"
+            f"Экс. прог.CTR: {self._adv_setting.exponent_predict_ctr}\n"
+            f"Общий расход: {self.total_spend:.2f}\n"
             f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
             f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
             f"Расход на доп.трафик в Авто: {self.addition_spend_in_adv:.2f} р.\n"
-            f"Общее число заказов: {self._all_orders_for_last_days}\n"
-            f"Заказов из Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
-            f"Заказов из Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
-        )
+            f"Общие заказы: {self._all_orders_for_last_days}\n"
+            f"  -Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
+            f"  -Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
+)
 
         # Показываем источник данных для заказов
         if (
@@ -226,6 +256,16 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
         text += f"Максимальная ставка: {self._adv_setting.max_cpm}\n"
+
+        if not self._auto_max_cpm_mode:
+            text += "Авто-Максимальная ставка: не активна\n"
+        else:
+            value_str = (
+                str(self._auto_max_cpm_value)
+                if self._auto_max_cpm_value is not None
+                else "нет данных"
+            )
+            text += f"Авто-Максимальная ставка: {value_str}\n"
         return text
 
     @property
@@ -268,3 +308,14 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             sort_mode=self.sort_mode,
             image_mode=self.image_mode,
         )
+    @staticmethod
+    async def _get_status_auction( search_adv_id: int) -> str:
+        if not search_adv_id:
+            return 'не подключен'
+        stmt = select(AdvSetting.active_status).where(AdvSetting.adv_id == search_adv_id)
+        async with sm(read_only=True) as session:
+            result = await session.execute(stmt)
+            status: str | None = result.scalar_one_or_none()
+            if not status:
+                status = 'Не найдена'
+            return status

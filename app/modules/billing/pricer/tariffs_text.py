@@ -1,4 +1,5 @@
 from app import settings
+from app.client_bot import const
 
 is_first = True
 
@@ -16,13 +17,17 @@ def declension(number: int) -> str:
 
 
 text = f"""
-Актуальный прайс  -> https://telegra.ph/Tarify-03-17
+Актуальный прайс  -> {const.PRICE_LINK}
 
 В стоимость входят:
 — Парсинг активных ключей для кампании
 — Биддер (управление ставками) 
+В связи со сменой реквизитов оплата через бот временно не принимается.
+По вопросам пополнения баланса обращайтесь -> {const.SUPPORT_LINK}
 
-Минимальная сумма пополнения: {settings.MIN_SUM} р.
+
 """
+# # Минимальная сумма пополнения: {settings.MIN_SUM} р.
+
 
 text = text.strip()

@@ -1,6 +1,7 @@
 import logging
 
-from app.core.wb_api.data_classes.adv import Adv
+from dependency_injector.wiring import inject, Provide
+import typing
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import wb_db_manager
@@ -14,11 +15,16 @@ from app.modules.wb_keywords_parser.wb_parser import parser
 from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
+from ..modules.max_auto_bid_manager.di import AutoMaxCpmContainer
+
+if typing.TYPE_CHECKING:
+    from ..modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+
 
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
-from ..bidder.wb_api import WBApi as BidderAPI
+
 from ..modules.wb_api import WBApi
 
 logger = logging.getLogger(__name__)
@@ -31,14 +37,14 @@ async def get_cpms_from_wb(advs: list[AdvSetting]) -> set[int] | None:
 
 
 async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> list[AuctionAdv]:
-    adv_ids = []
+    adv_ids = set()
     if auto_adv.bidder_for_auto:
-        adv_ids.append(auto_adv.adv_id)
+        adv_ids.add(auto_adv.adv_id)
     if search_adv_id := auto_adv.search_adv_id:
-        adv_ids.append(search_adv_id)
+        adv_ids.add(search_adv_id)
     if not adv_ids:
         return None
-    advs: list[AuctionAdv] = await wb_api.get_advs(adv_ids)
+    advs: list[AuctionAdv] = await wb_api.get_advs(list(adv_ids))
     try:
         assert wb_api.access.wb_cabinet is not None
         wb_cabinet_original_id: int = int(wb_api.access.wb_cabinet.id)
@@ -47,9 +53,11 @@ async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> l
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
 
-
+@inject
 async def run_bidder_process_for_adv(
-    adv_setting: AdvSetting, wb_api: WBApi, keywords: list[CalculatedKeyword]
+    adv_setting: AdvSetting, wb_api: WBApi,
+    keywords: list[CalculatedKeyword],
+    auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_bid_manager],
 ) -> None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
@@ -71,6 +79,10 @@ async def run_bidder_process_for_adv(
     if not max_cpm:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не задана!")
         return
+    if adv_setting.auto_max_cpm_mode:
+        auto_max_cpm = await auto_max_bid_manager.get_max_cpm(adv_setting, keywords, max_cpm)
+        if auto_max_cpm and auto_max_cpm < max_cpm:
+            max_cpm = auto_max_cpm
 
     step = adv_setting.bidder_step or settings.BIDDER_STEP
     max_position = adv_setting.max_place

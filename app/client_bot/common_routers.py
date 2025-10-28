@@ -38,6 +38,7 @@ from .user_interface.handlers import (
     add_white_phrases,
     adv_setting,
     change_cpm,
+    auto_max_cpm_toggle,
     change_max_cpc,
     clusters,
     cpm_builder,
@@ -75,6 +76,7 @@ common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(orders_source_toggle.router)
 common_router.include_routers(predict_ctr_mode_toggle.router)
+common_router.include_routers(auto_max_cpm_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
 common_router.include_routers(AuctionBoostModeSettingsRouter)

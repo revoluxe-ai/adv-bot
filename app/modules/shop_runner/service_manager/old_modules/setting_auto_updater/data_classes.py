@@ -24,3 +24,12 @@ class PlanData(BaseModel):
                 raise ValueError("Дробное значение недопустимо")
             return int(value)
         return value
+
+    @property
+    def full_settings(self) -> bool:
+        return all([
+            self.orders is not None,
+            self.target_pay_for_order is not None,
+            self.max_pay_for_order is not None
+        ])
+
