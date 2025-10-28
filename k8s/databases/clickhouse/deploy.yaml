@@ -1,0 +1,122 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: clickhouse
+  namespace: prod-analytics
+spec:
+  configuration:
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+        templates:
+          podTemplate: clickhouse-template
+          volumeClaimTemplate: storage-template
+    files:
+      users.d/adv_bot_user.xml: |
+        <clickhouse>
+          <users>
+            <adv_bot_user>
+              <password_sha256_hex>161314a4524df179390ec030c6b999e37eeaf77dbbf04f56f9dcbfa7504fbacf</password_sha256_hex>
+              <networks>
+                <ip>::/0</ip>
+              </networks>
+              <profile>default</profile>
+            </adv_bot_user>
+          </users>
+        </clickhouse>
+      config.d/log_path.xml: |
+        <clickhouse>
+          <logger>
+            <level>information</level>
+            <log>/opt/bitnami/clickhouse/logs/clickhouse-server.log</log>
+            <errorlog>/opt/bitnami/clickhouse/logs/clickhouse-error.log</errorlog>
+            <size>100M</size>
+            <count>10</count>
+          </logger>
+        </clickhouse>
+      config.d/log_ttl.xml: |
+        <clickhouse>
+          <system_logs>
+            <query_log><ttl>event_time + INTERVAL 1 HOUR DELETE</ttl></query_log>
+            <query_thread_log><ttl>event_time + INTERVAL 1 HOUR DELETE</ttl></query_thread_log>
+            <part_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></part_log>
+            <metric_log><ttl>event_time + INTERVAL 6 HOUR DELETE</ttl></metric_log>
+            <processors_profile_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></processors_profile_log>
+            <trace_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></trace_log>
+            <query_views_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></query_views_log>
+            <query_metric_log><ttl>event_time + INTERVAL 3 HOUR DELETE</ttl></query_metric_log>
+            <text_log><ttl>event_time + INTERVAL 6 HOUR DELETE</ttl></text_log>
+            <asynchronous_metric_log><ttl>event_time + INTERVAL 6 HOUR DELETE</ttl></asynchronous_metric_log>
+          </system_logs>
+        </clickhouse>
+    settings:
+      max_system_log_age: 86400
+      max_system_log_size: 1073741824
+      system_logs_flush_interval_milliseconds: 10000
+    
+  templates:
+    podTemplates:
+      - name: clickhouse-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: harborskyline.duckdns.org/bitnami-cache/bitnami/clickhouse:25.7.5-debian-12-r0
+              imagePullPolicy: IfNotPresent
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: tcp
+                  containerPort: 9000
+              env:
+                - name: CLICKHOUSE_LOGS_DIR
+                  value: /bitnami/clickhouse/data/logs
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: 4Gi
+                limits:
+                  cpu: "4"
+                  memory: 8Gi
+              volumeMounts:
+                - name: storage-template
+                  mountPath: /bitnami/clickhouse/data
+                - name: storage-template
+                  mountPath: /opt/bitnami/clickhouse/logs
+                  subPath: logs
+                - name: storage-template
+                  mountPath: /opt/bitnami/clickhouse/tmp
+                  subPath: tmp
+          initContainers:
+            - name: fix-permissions
+              image: bitnami/minideb:bookworm
+              command:
+                - sh
+                - -c
+                - |
+                  echo "Fixing permissions for ClickHouse volume..."
+                  mkdir -p /bitnami/clickhouse/{data,logs,tmp}
+                  chown -R 1001:1001 /bitnami/clickhouse
+              securityContext:
+                runAsUser: 0
+              volumeMounts:
+                - name: storage-template
+                  mountPath: /bitnami/clickhouse
+          imagePullSecrets:
+            - name: harbor-login-secret
+          securityContext:
+            fsGroup: 1001
+            runAsGroup: 1001
+            runAsUser: 1001
+
+    volumeClaimTemplates:
+      - name: storage-template
+        reclaimPolicy: Retain
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          storageClassName: nvme.network-drives.csi.timeweb.cloud
+          resources:
+            requests:
+              storage: 40Gi
+    
