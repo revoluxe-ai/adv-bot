@@ -106,14 +106,15 @@ class AdvSettingAutoUpdater:
 
         return plan
 
+    @staticmethod
     async def add_top_keyword_to_white_list(
-        self, keywords: list[CalculatedKeyword]
+            keywords: list[CalculatedKeyword]
     ) -> None:
         if not keywords:
             return None
         assert keywords
-        keywords.sort(key=lambda kw: kw.predict_ctr, reverse=True)
-
+        keywords.sort(key=lambda kw: kw.predict_ctr, reverse=True)  # ignore: type: ignore # predict_ctr не может быть
+        # None здесь. Надо переделать CalculatedKeyword, чтобы у него не было полей с None, как минимум для predict_ctr
         first_kw = keywords[0]
 
         if first_kw.relevant and first_kw.hard_status == 1:
@@ -127,9 +128,9 @@ class AdvSettingAutoUpdater:
                 await session.commit()
         return None
 
+    @staticmethod
     def __get_mean_orders(
-        self,
-        stat_data: list[SmallFullAdvStatPerDay],
+            stat_data: list[SmallFullAdvStatPerDay],
     ) -> float:
         assert len(stat_data) > 1, "Должно быть данных больше, чем за 2 дня"
         stat_data = stat_data[:2]
@@ -149,11 +150,11 @@ class AdvSettingAutoUpdater:
         predict_order_for_day = mean_orders_for_sec * 24 * 60 * 60
         return predict_order_for_day
 
+    @staticmethod
     def __get_mean_pay_for_order(
-        self,
-        stat_data: list[SmallFullAdvStatPerDay],
-    ):
-        stat_data.sort(key=lambda stat: stat.date, reverse=True)
+            stat_data: list[SmallFullAdvStatPerDay],
+    ) -> float:
+        stat_data.sort(key=lambda st: st.date, reverse=True)
         for n, stat in enumerate(stat_data):
             if stat.orders > 0:
                 n += 1

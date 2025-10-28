@@ -40,17 +40,17 @@ logger = logging.getLogger(__name__)
 
 class AdvKeywordsSetting(TextWithKeyboardAndImage):
     def __init__(
-        self,
-        bot: Bot,
-        chat_id,
-        keywords: list[CalculatedKeyword],
-        adv_setting: AdvSetting,
-        wb_user_cabinet_original_id,
-        adv_choice_last_page,
-        image: str,
-        page,
-        image_mode="graphic",
-    ):
+            self,
+            bot: Bot,
+            chat_id: int,
+            keywords: list[CalculatedKeyword],
+            adv_setting: AdvSetting,
+            wb_user_cabinet_original_id: int,
+            adv_choice_last_page,
+            image: str,
+            page: int,
+            image_mode: str = "graphic",
+    ) -> None:
         super().__init__(bot, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
@@ -64,11 +64,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
     @inject
     async def __call__(
-        self,
-        state: FSMContext,
-        sort_mode="by_adv",
-        auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_cpm_bid_manager],
-    ):
+            self,
+            state: FSMContext,
+            sort_mode: str = "by_adv",
+            auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_cpm_bid_manager],
+    ) -> tuple[LastMessage, str]:
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
@@ -113,8 +113,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             clear_keywords = []
             for keyword in self._keywords:
                 if (
-                    not isinstance(keyword.query, str)
-                    and keyword.query >= filter_by_query
+                        not isinstance(keyword.query, str)
+                        and keyword.query >= filter_by_query
                 ):
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
@@ -168,14 +168,14 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 self._adv_setting, self._keywords, user_max_cpm
             )
 
-
-        await super().__call__()
-        return
+        result = await super().__call__()
+        return result
 
     @property
     def text(self) -> str:
         total_page = len(self._keywords) // self._on_page
-        # TODO: Текст стал слишком большим, на спех сократил. Нужно перед изменением сообщений сделать тесты, проверяющие длину текста и его корректность
+        # TODO: Текст стал слишком большим, на спех сократил. Нужно перед изменением
+        #  сообщений сделать тесты, проверяющие длину текста и его корректность
         text = (
                 str(self._adv_setting.name) + "\n"
             f"Авто: {self._adv_setting.active_status}\n"
@@ -198,19 +198,19 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         # Показываем источник данных для заказов
         if (
-            self._adv_setting.orders_source_for_auto_mode
-            == OrdersSourceForAutoMode.ADV_SUM
+                self._adv_setting.orders_source_for_auto_mode
+                == OrdersSourceForAutoMode.ADV_SUM
         ):
             text += "📊 Источник заказов: ТОЛЬКО рекламные заказы\n"
             text += f"Суммарные заказы из рекламы: {self.full_adv_stat_for_last_days_for_auto_adv.orders + self.full_adv_stat_for_last_days_for_auction.orders}\n"
         else:
             text += "📊 Источник заказов: Общая статистика (включая органику)\n"
             text += f"""Заказов из Органики: {
-                self._all_orders_for_last_days
-                - self.full_adv_stat_for_last_days_for_auction.orders
-                - self.full_adv_stat_for_last_days_for_auto_adv.orders
-                if self._all_orders_for_last_days
-                else 0
+            self._all_orders_for_last_days
+            - self.full_adv_stat_for_last_days_for_auction.orders
+            - self.full_adv_stat_for_last_days_for_auto_adv.orders
+            if self._all_orders_for_last_days
+            else 0
             }\n"""
 
         # Получаем целевые значения из настроек
@@ -301,8 +301,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             sort_mode=self.sort_mode,
             image_mode=self.image_mode,
         )
+
     @staticmethod
-    async def _get_status_auction( search_adv_id: int) -> str:
+    async def _get_status_auction(search_adv_id: int) -> str:
         if not search_adv_id:
             return 'не подключен'
         stmt = select(AdvSetting.active_status).where(AdvSetting.adv_id == search_adv_id)
