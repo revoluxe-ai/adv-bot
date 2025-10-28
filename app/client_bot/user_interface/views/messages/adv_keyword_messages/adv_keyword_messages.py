@@ -1,4 +1,5 @@
 import logging
+import typing
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
@@ -8,6 +9,8 @@ from app.client_bot.message_manager import LastMessage
 from app.client_bot.user_interface.message_templates import (
     TextWithKeyboardAndImage,
 )
+if typing.TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import FactData
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -122,7 +125,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         fact_data, stat_data = await auto_update_manager.get_fact_data_and_stat(self._keywords)
 
-        self._fact_data = fact_data
+        self._fact_data: 'FactData' = fact_data
 
         # Устанавливаем полученные данные
         self.min_ctr = stat_data.min_ctr
