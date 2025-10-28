@@ -1,5 +1,5 @@
 from dependency_injector.containers import DeclarativeContainer
-from dependency_injector.providers import Dependency, Singleton, Factory
+from dependency_injector.providers import Dependency, Singleton
 from dependency_injector import containers
 
 from app.core.redis_manager_v2.redis_client import RedisClient
