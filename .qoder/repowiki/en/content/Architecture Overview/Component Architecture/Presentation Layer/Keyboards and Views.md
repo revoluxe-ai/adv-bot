@@ -226,6 +226,8 @@ The system includes robust error handling mechanisms to deal with common issues:
 ```python
 # Example error handler for stale callbacks
 @router.errors(ExceptionTypeFilter(TelegramBadRequest))
+# TODO: Нужно перехватывать только "Устарела кнопка", остальные ошибки пробрасывать дальше
+
 async def stale_callback_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
     if error_event.update.callback_query:
         assert error_event.update.callback_query.message
