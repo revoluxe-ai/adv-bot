@@ -28,7 +28,6 @@ class KeywordStatus:
     MAX_CPM = "max_cpm"
     MAX_CPC = "max_cpc"
 
-
 class CalculatedKeyword(BaseModel):
     text: str
     clicks: int

@@ -18,7 +18,7 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.c
 from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
     KeywordGraphicPart_1,
 )
-from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
+
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -118,12 +118,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 ):
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
+        auto_update_manager = AdvSettingAutoUpdater(self._adv_setting)
 
-        # Получаем данные через CommonAdvsStatDataManager
-        common_stat_data_manager = CommonAdvsStatDataManager()
-        stat_data: CommonAdvsStatData = await common_stat_data_manager.get_data(
-            self._adv_setting, self._keywords, 2
-        )
+        fact_data, stat_data = await auto_update_manager.get_fact_data_and_stat(self._keywords)
+
+        self._fact_data = fact_data
 
         # Устанавливаем полученные данные
         self.min_ctr = stat_data.min_ctr
@@ -157,12 +156,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(
             self._adv_setting, 2
         )
-
-        auto_update_manager = AdvSettingAutoUpdater(self._adv_setting, 2)
-
-        fact_data = auto_update_manager.get_fact_data_from_stat(stat_data)
-
-        self._fact_data = fact_data
 
         # Получаем данные по Автомаксимальной ставке из Redis (через DI)
         self._auto_max_cpm_mode: bool = bool(

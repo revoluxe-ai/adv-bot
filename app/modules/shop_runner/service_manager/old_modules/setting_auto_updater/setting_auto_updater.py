@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class AdvSettingAutoUpdater:
-    def __init__(self, adv: AdvSetting, max_last_period: int):
+    def __init__(self, adv: AdvSetting, max_last_period: int = 2):
         self._adv = adv
         auto_adv_id = self._adv.adv_id
         self._all_adv_ids = [auto_adv_id]
@@ -32,6 +32,14 @@ class AdvSettingAutoUpdater:
             self._all_adv_ids.append(auction_id)
 
         self._max_last_period = max_last_period
+
+    async def get_fact_data_and_stat(self, keywords: list[CalculatedKeyword]) -> tuple[FactData, CommonAdvsStatData]:
+        common_stat_manager = CommonAdvsStatDataManager()
+        stat: CommonAdvsStatData = await common_stat_manager.get_data(
+            self._adv, keywords, last_days=self._max_last_period
+        )
+        fact = self.get_fact_data_from_stat(stat)
+        return fact, stat
 
     def get_fact_data_from_stat(self, common_stat_data: CommonAdvsStatData) -> FactData:
         fact_data = self.__get_fact_data_from_stats(common_stat_data)
@@ -46,7 +54,7 @@ class AdvSettingAutoUpdater:
         return fact
 
     async def update(
-        self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]
+            self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]
     ) -> None:
         keywords = await keywords_coroutine
         plan = self.get_plan_data(self._adv)
@@ -62,8 +70,8 @@ class AdvSettingAutoUpdater:
         return None
 
     def __get_fact_data_from_stats(
-        self,
-        common_stat_data: CommonAdvsStatData,
+            self,
+            common_stat_data: CommonAdvsStatData,
     ) -> FactData:
         assert common_stat_data.mean_orders_for_last_days is not None
         assert common_stat_data.mean_price_for_order is not None
