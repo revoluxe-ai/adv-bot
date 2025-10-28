@@ -29,6 +29,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from .fact_methods_enum import FactMethods
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
@@ -499,6 +500,14 @@ class AdvSetting(BaseTable):
         default=PredictCTRMode.V2,  # экземпляр Enum
         server_default=PredictCTRMode.V2.name,  # строка
     )
+
+    sales_predict_method: Mapped[FactMethods] = mapped_column(
+        SAEnum(FactMethods),
+        nullable=True,
+        default=FactMethods.DIRECT_SALES,  # экземпляр Enum
+        server_default=FactMethods.DIRECT_SALES.name, ) # строка
+
+
 
     __table_args__ = (
         # Составной индекс для основного запроса
