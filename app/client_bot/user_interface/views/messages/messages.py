@@ -234,7 +234,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         stmt = select(AdvSetting.active_status).where(AdvSetting.adv_id == search_adv_id)
         async with sm(read_only=True) as session:
             result = await session.execute(stmt)
-            return str(result.scalar_one())
+            status = result.scalar_one_or_none()
+            if not status:
+                status = "РК не найдена"
+            else:
+                str(status)
+
+
 
     async def __call__(self) -> Message:
         auction_adv_id = self.adv.search_adv_id
