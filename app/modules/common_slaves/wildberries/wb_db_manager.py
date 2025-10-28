@@ -26,6 +26,16 @@ async def update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None:
 
 
 async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None:
+    """  TODO Была ошибка, когда пытаемся добавить две одинаковых РК. Вообще, такого быть не должно
+    но есть, если юзеры не правильно прописывают в названии артикул Аукциона
+    """
+    advs_to_process = []
+    seen_adv_ids = set()
+    for adv in advs:
+        if adv.advertId not in seen_adv_ids:
+            advs_to_process.append(adv)
+            seen_adv_ids.add(adv.advertId)
+
     # Преобразуем в список словарей
     adv_data = [
         {
@@ -37,7 +47,7 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
             "type": adv.type,
             "cpm": adv.cpm,
         }
-        for adv in advs
+        for adv in advs_to_process
     ]
 
     # Выполняем UPSERT
