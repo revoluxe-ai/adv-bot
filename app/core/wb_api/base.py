@@ -39,8 +39,8 @@ class BaseAPI:
     ) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
-        tokens: list["WBToken"] = wb_access.tokens
-        self.access: "WBCabinetAccess" = wb_access
+        tokens: list[WBToken] = wb_access.tokens
+        self.access: WBCabinetAccess = wb_access
         if not tokens:
             raise ApiForbiddenError(
                 "Нет токенов для доступа к API",

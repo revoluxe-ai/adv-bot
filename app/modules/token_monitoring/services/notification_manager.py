@@ -45,7 +45,7 @@ class NotificationManager:
         ),
     }
 
-    def __init__(self, bot: Optional[Bot] = None, session_maker=None) -> None:
+    def __init__(self, bot: Bot | None = None, session_maker=None) -> None:
         """
         Initialize the notification manager.
 
@@ -69,8 +69,8 @@ class NotificationManager:
         self,
         shop_id: str,
         notification_type: str,
-        expiry_date: Optional[datetime.datetime] = None,
-        context: Optional[Dict[str, Any]] = None,
+        expiry_date: datetime.datetime | None = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """
         Send token issue notification to all users of a shop.
@@ -133,7 +133,7 @@ class NotificationManager:
         user_cabinet: WBUserCabinet,
         notification_type: str,
         message: str,
-        expiry_date: Optional[datetime.datetime] = None,
+        expiry_date: datetime.datetime | None = None,
     ) -> bool:
         """
         Send notification to a single user and record it in database.
@@ -214,7 +214,7 @@ class NotificationManager:
         self,
         notification_type: str,
         shop_name: str,
-        expiry_date: Optional[datetime.datetime] = None,
+        expiry_date: datetime.datetime | None = None,
     ) -> str:
         """
         Format notification message based on type and parameters.
@@ -318,7 +318,7 @@ class NotificationManager:
 
 # Convenience functions
 async def notify_token_deactivation(
-    shop_id: str, context: Optional[Dict[str, Any]] = None
+    shop_id: str, context: dict[str, Any] | None = None
 ) -> None:
     """Send token deactivation notification."""
     manager = NotificationManager()

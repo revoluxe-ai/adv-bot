@@ -20,7 +20,7 @@ class TestSimplifiedTokenDisplay:
 
     def create_shop_menu_mock(
         self,
-        token_status: Optional[TokenStatusReport] = None,
+        token_status: TokenStatusReport | None = None,
         token_status_loaded: bool = True,
     ):
         """Create a mock ShopMenu with minimal required attributes."""
@@ -50,7 +50,7 @@ class TestSimplifiedTokenDisplay:
         self,
         status: str,
         missing_permissions: set[str],
-        expiration_date: Optional[datetime] = None,
+        expiration_date: datetime | None = None,
     ) -> TokenStatusReport:
         """Create a TokenStatusReport with proper parameters."""
         # Create mock tokens if needed

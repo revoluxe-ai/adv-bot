@@ -26,8 +26,8 @@ def parse_memory_string(memory_str: str) -> float:
     return int(memory_str) / (1024 * 1024)  # Assume bytes if no suffix
 
 
-def analyze_pods_memory_from_stdin() -> List[Dict[str, Any]]:
-    anomalous_pods: List[Dict[str, Any]] = []
+def analyze_pods_memory_from_stdin() -> list[dict[str, Any]]:
+    anomalous_pods: list[dict[str, Any]] = []
     data = json.load(sys.stdin)
 
     for item in data["items"]:

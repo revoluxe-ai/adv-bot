@@ -215,7 +215,7 @@ class WBToken(BaseTable):
         exp = self.__payload.get("exp")
         if isinstance(exp, (int, float, str)):
             # Make the datetime timezone-aware (UTC)
-            return datetime.datetime.fromtimestamp(int(exp), tz=datetime.timezone.utc)
+            return datetime.datetime.fromtimestamp(int(exp), tz=datetime.UTC)
         raise NotValidTokenError
 
     @property
@@ -258,7 +258,7 @@ class WBToken(BaseTable):
         """Проверяет, истёк ли токен"""
         try:
             # Compare using timezone-aware UTC now
-            return datetime.datetime.now(datetime.timezone.utc) >= self.__expires
+            return datetime.datetime.now(datetime.UTC) >= self.__expires
         except Exception:
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным

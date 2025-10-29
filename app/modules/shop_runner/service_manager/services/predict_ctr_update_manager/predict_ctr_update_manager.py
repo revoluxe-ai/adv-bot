@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Awaitable
+from typing import Optional
+from collections.abc import Awaitable
 
 import grpc
 from dependency_injector.wiring import Provide, inject
@@ -25,7 +26,7 @@ class PredictCTRUpdateManager:
     def __init__(
         self,
     ) -> None:
-        self._grpc_client: Optional[PredictCTRClient] = None
+        self._grpc_client: PredictCTRClient | None = None
 
     async def _get_grpc_client(self) -> PredictCTRClient:
         """Получить gRPC клиент для predict_ctr сервиса"""

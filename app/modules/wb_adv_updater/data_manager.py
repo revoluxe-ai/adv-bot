@@ -442,7 +442,7 @@ def __set_predict_ctr(
         original_predict_ctr = keyword_stat.original_predict_ctr
         if not original_predict_ctr:
             original_predict_ctr = keyword_stat.predict_ctr
-        logger.debug(f"Обрабатываю ключевое слово %s", keyword_stat.text)
+        logger.debug("Обрабатываю ключевое слово %s", keyword_stat.text)
         if min_ctr == 0:
             enough_views_calc = 100
         else:

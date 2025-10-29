@@ -136,7 +136,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._keywords
         )
 
-        self._fact_data: "FactData" = fact_data
+        self._fact_data: FactData = fact_data
 
         # Устанавливаем полученные данные
         self.min_ctr = stat_data.min_ctr

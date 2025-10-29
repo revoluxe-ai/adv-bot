@@ -20,8 +20,8 @@ class TokenMonitoringScheduler:
 
     def __init__(
         self,
-        expiration_service: Optional[TokenExpirationService] = None,
-        notification_manager: Optional[NotificationManager] = None,
+        expiration_service: TokenExpirationService | None = None,
+        notification_manager: NotificationManager | None = None,
     ):
         """
         Initialize the scheduler.
@@ -129,7 +129,7 @@ class TokenMonitoringScheduler:
         except Exception as e:
             logger.error(f"Failed to run token expiration check: {e}", exc_info=True)
 
-    async def run_manual_check(self) -> Dict[str, Any]:
+    async def run_manual_check(self) -> dict[str, Any]:
         """
         Run a manual token expiration check immediately.
 
@@ -139,7 +139,7 @@ class TokenMonitoringScheduler:
         logger.info("Running manual token expiration check")
         return await self.expiration_service.check_token_expiration()
 
-    async def get_expiring_tokens_report(self, days_ahead: int = 30) -> Dict[str, Any]:
+    async def get_expiring_tokens_report(self, days_ahead: int = 30) -> dict[str, Any]:
         """
         Get a report of tokens expiring within specified days.
 
@@ -181,13 +181,13 @@ async def stop_token_monitoring_scheduler() -> None:
     await scheduler.stop()
 
 
-async def run_manual_token_check() -> Dict[str, Any]:
+async def run_manual_token_check() -> dict[str, Any]:
     """Run a manual token expiration check."""
     scheduler = get_token_monitoring_scheduler()
     return await scheduler.run_manual_check()
 
 
-async def get_token_expiration_report(days_ahead: int = 30) -> Dict[str, Any]:
+async def get_token_expiration_report(days_ahead: int = 30) -> dict[str, Any]:
     """Get a report of expiring tokens."""
     scheduler = get_token_monitoring_scheduler()
     return await scheduler.get_expiring_tokens_report(days_ahead)

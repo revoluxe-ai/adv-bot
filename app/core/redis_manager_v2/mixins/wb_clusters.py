@@ -14,7 +14,7 @@ class WBClustersMixin:
         return self._prefix + quote(text)
 
     async def set_cluster_and_preset(
-        self: BaseRedisManagerProtocol, text, cluster: str, preset: typing.Optional[int]
+        self: BaseRedisManagerProtocol, text, cluster: str, preset: int | None
     ):
         key = self._get_key(text)
         if cluster is None or preset is None:

@@ -6,7 +6,8 @@ from multiprocessing import Process
 
 import dotenv
 import psutil
-from typing import NoReturn, Callable, Never, Coroutine, Any
+from typing import NoReturn, Never, Any
+from collections.abc import Callable, Coroutine
 
 # Use direct imports to avoid any re-export typing issues
 from app.core.di.di_manager import DIManager

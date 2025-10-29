@@ -93,7 +93,7 @@ async def demo_expiration_monitoring():
 
         stats = await run_token_expiration_check()
 
-        logger.info(f"Expiration check results:")
+        logger.info("Expiration check results:")
         logger.info(f"  Tokens checked: {stats['total_tokens_checked']}")
         logger.info(f"  Expiring tokens found: {stats['expiring_tokens_found']}")
         logger.info(f"  Notifications sent: {stats['notifications_sent']}")
@@ -178,12 +178,12 @@ async def demo_notification_system():
         expiry_date = datetime.datetime.now() + datetime.timedelta(days=3)
         # Uncomment to send actual notification:
         # await notify_token_expiring(shop_id, 3, expiry_date)
-        logger.info(f"  3-day warning: 'Внимание! Токен истекает через 3 дня...'")
+        logger.info("  3-day warning: 'Внимание! Токен истекает через 3 дня...'")
 
         expiry_date = datetime.datetime.now() + datetime.timedelta(days=1)
         # Uncomment to send actual notification:
         # await notify_token_expiring(shop_id, 1, expiry_date)
-        logger.info(f"  1-day warning: 'СРОЧНО! Токен истекает завтра...'")
+        logger.info("  1-day warning: 'СРОЧНО! Токен истекает завтра...'")
 
         # Example 3: Get notification history
         logger.info("\\n3. Notification history")

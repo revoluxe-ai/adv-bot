@@ -7,7 +7,8 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Protocol, AsyncIterator
+from typing import TYPE_CHECKING, Protocol
+from collections.abc import AsyncIterator
 
 DEFAULT_GLOBAL_BILLING_LOCK_TTL = 900  # 15 минут по умолчанию
 _GLOBAL_LOCK_KEY = "billing_lock:global"
@@ -24,13 +25,13 @@ class BillingLockMixin:
     Закрываем абстрактный _get_key базового менеджера.
     """
 
-    def _get_key(self: "BaseRedisManagerProtocol") -> str:  # noqa: D401
+    def _get_key(self: BaseRedisManagerProtocol) -> str:  # noqa: D401
         """Вернуть фиксированный ключ глобального лока."""
         return _GLOBAL_LOCK_KEY
 
     # ---- Операции лока ----
     async def acquire_lock(
-        self: "BaseRedisManagerProtocol",
+        self: BaseRedisManagerProtocol,
         ttl: int = DEFAULT_GLOBAL_BILLING_LOCK_TTL,
     ) -> bool:
         key = self._get_key()
@@ -41,14 +42,14 @@ class BillingLockMixin:
                 "RedisClient должен реализовывать set_if_not_exists(key, value, ex=ttl)"
             ) from e
 
-    async def release_lock(self: "BaseRedisManagerProtocol") -> None:
+    async def release_lock(self: BaseRedisManagerProtocol) -> None:
         key = self._get_key()
         try:
             await self._client.delete(key)
         except Exception:  # pragma: no cover
             pass
 
-    async def is_locked(self: "BaseRedisManagerProtocol") -> bool:
+    async def is_locked(self: BaseRedisManagerProtocol) -> bool:
         key = self._get_key()
         try:
             return bool(await self._client.exists(key))
@@ -56,7 +57,7 @@ class BillingLockMixin:
             return False
 
     async def extend_lock(
-        self: "BaseRedisManagerProtocol",
+        self: BaseRedisManagerProtocol,
         ttl: int = DEFAULT_GLOBAL_BILLING_LOCK_TTL,
     ) -> bool:
         key = self._get_key()

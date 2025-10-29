@@ -49,7 +49,7 @@ class TokenExpirationService:
         self.notification_manager = notification_manager or NotificationManager()
         self.session_maker = session_maker or get_async_session_maker
 
-    async def check_token_expiration(self) -> Dict[str, Any]:
+    async def check_token_expiration(self) -> dict[str, Any]:
         """
         Check all tokens for expiration and send appropriate notifications.
 
@@ -98,7 +98,7 @@ class TokenExpirationService:
             return stats
 
     async def _check_single_token_expiration(
-        self, session: AsyncSession, token: WBToken, stats: Dict[str, Any]
+        self, session: AsyncSession, token: WBToken, stats: dict[str, Any]
     ) -> None:
         """
         Check a single token for expiration and send notifications if needed.
@@ -167,7 +167,7 @@ class TokenExpirationService:
 
     async def _get_active_tokens_with_expiry(
         self, session: AsyncSession
-    ) -> List[WBToken]:
+    ) -> list[WBToken]:
         """Get all active tokens that have expiration dates."""
         now = datetime.datetime.now()
         max_check_ahead = datetime.timedelta(days=max(self.WARNING_STAGES))
@@ -199,7 +199,7 @@ class TokenExpirationService:
         result = await session.execute(stmt)
         return result.scalar() is not None
 
-    async def get_expiring_tokens_summary(self, days_ahead: int = 30) -> Dict[str, Any]:
+    async def get_expiring_tokens_summary(self, days_ahead: int = 30) -> dict[str, Any]:
         """
         Get summary of tokens expiring within specified days.
 
@@ -305,13 +305,13 @@ class TokenExpirationService:
 
 
 # Convenience functions for external use
-async def run_token_expiration_check() -> Dict[str, Any]:
+async def run_token_expiration_check() -> dict[str, Any]:
     """Run token expiration check."""
     service = TokenExpirationService()
     return await service.check_token_expiration()
 
 
-async def get_expiring_tokens_summary(days_ahead: int = 30) -> Dict[str, Any]:
+async def get_expiring_tokens_summary(days_ahead: int = 30) -> dict[str, Any]:
     """Get summary of expiring tokens."""
     service = TokenExpirationService()
     return await service.get_expiring_tokens_summary(days_ahead)

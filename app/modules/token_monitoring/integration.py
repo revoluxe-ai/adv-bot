@@ -1,7 +1,8 @@
 """Integration module for installing token monitoring into the existing HTTP decorator."""
 
 import logging
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from app.modules.token_monitoring.services.token_monitoring_service import (
     TokenMonitoringService,

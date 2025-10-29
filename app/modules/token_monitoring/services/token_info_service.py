@@ -30,7 +30,7 @@ REQUIRED_RIGHTS = {
 
 def utcnow() -> datetime.datetime:
     """Return current time as timezone-aware UTC datetime."""
-    return datetime.datetime.now(datetime.timezone.utc)
+    return datetime.datetime.now(datetime.UTC)
 
 
 def _to_aware_utc(dt: datetime.datetime) -> datetime.datetime:
@@ -41,8 +41,8 @@ def _to_aware_utc(dt: datetime.datetime) -> datetime.datetime:
     - If datetime is tz-aware, it's converted to UTC.
     """
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=datetime.timezone.utc)
-    return dt.astimezone(datetime.timezone.utc)
+        return dt.replace(tzinfo=datetime.UTC)
+    return dt.astimezone(datetime.UTC)
 
 
 @dataclass

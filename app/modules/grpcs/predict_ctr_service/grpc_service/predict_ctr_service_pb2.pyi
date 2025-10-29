@@ -14,8 +14,8 @@ class PredictCtrRequest(_message.Message):
     phrases: _containers.RepeatedScalarFieldContainer[str]
     def __init__(
         self,
-        nmids: _Optional[_Iterable[int]] = ...,
-        phrases: _Optional[_Iterable[str]] = ...,
+        nmids: _Iterable[int] | None = ...,
+        phrases: _Iterable[str] | None = ...,
     ) -> None: ...
 
 class PredictCtrResponse(_message.Message):
@@ -28,9 +28,9 @@ class PredictCtrResponse(_message.Message):
         key: str
         value: float
         def __init__(
-            self, key: _Optional[str] = ..., value: _Optional[float] = ...
+            self, key: str | None = ..., value: float | None = ...
         ) -> None: ...
 
     PREDICTIONS_FIELD_NUMBER: _ClassVar[int]
     predictions: _containers.ScalarMap[str, float]
-    def __init__(self, predictions: _Optional[_Mapping[str, float]] = ...) -> None: ...
+    def __init__(self, predictions: _Mapping[str, float] | None = ...) -> None: ...

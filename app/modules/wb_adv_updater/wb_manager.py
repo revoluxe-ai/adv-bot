@@ -169,7 +169,7 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
     async with get_clickhouse_client() as client:
         await client.query(query, external_data=ext_data)
 
-    logger.debug(f"Inserted/updated %s rows into advkeyword_new" % len(keyword_stats))
+    logger.debug("Inserted/updated %s rows into advkeyword_new" % len(keyword_stats))
 
 
 async def update_keywords_stat_in_click_house(
@@ -320,7 +320,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     except Exception as exc:
         keywords_from_search_adv = []
         logger.error(
-            f"Ошибка получения статистики по ключевым словам для %s, %s",
+            "Ошибка получения статистики по ключевым словам для %s, %s",
             adv_setting.name,
             exc,
         )
@@ -346,7 +346,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     full_stat_keywords = full_stat
 
     logger.debug(
-        f"Получено %s ключевых слов для %s", len(full_stat_keywords), adv_setting.name
+        "Получено %s ключевых слов для %s", len(full_stat_keywords), adv_setting.name
     )
     texts_for_adv_setting = {keyword.text for keyword in full_stat_keywords}
     clusters = set()
@@ -385,7 +385,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             await session.commit()
     except Exception as exc:
         logger.error(
-            f"Ошибка добавления ключевых слов в базу данных: %s", exc, exc_info=True
+            "Ошибка добавления ключевых слов в базу данных: %s", exc, exc_info=True
         )
         raise exc
 

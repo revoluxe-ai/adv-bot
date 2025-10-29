@@ -27,7 +27,7 @@ class WbRequestApiMixin(ABC):
 
 class Headers:
     def __init__(self, token: "WBToken"):
-        self.current_token: "WBToken" = token
+        self.current_token: WBToken = token
 
     @property
     def standart(self) -> dict[str, str]:
@@ -49,7 +49,7 @@ class ABC_WB_API(WbRequestApiMixin):
     def __init__(self, wb_access: "WBCabinetAccess", session: ClientSession) -> None:
         tokens: list[WBToken] = wb_access.tokens
         self.access = wb_access
-        wb_cabinet: Optional["WBCabinet"] = wb_access.wb_cabinet
+        wb_cabinet: WBCabinet | None = wb_access.wb_cabinet
         self.wb_cabinet = wb_cabinet
         assert wb_cabinet
         if not tokens:

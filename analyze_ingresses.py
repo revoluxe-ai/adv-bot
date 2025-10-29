@@ -4,17 +4,17 @@ from typing import Dict, Any, Set, List
 
 
 def analyze_ingresses(
-    ingresses_data: Dict[str, Any], services_data: Dict[str, Any]
+    ingresses_data: dict[str, Any], services_data: dict[str, Any]
 ) -> None:
     """Analyzes Ingresses to find those pointing to non-existent Services."""
-    existing_services: Set[str] = set()
+    existing_services: set[str] = set()
 
     for item in services_data.get("items", []):
         service_name = item["metadata"]["name"]
         namespace = item["metadata"]["namespace"]
         existing_services.add(f"{namespace}/{service_name}")
 
-    ingresses_with_missing_services: List[Dict[str, Any]] = []
+    ingresses_with_missing_services: list[dict[str, Any]] = []
 
     for item in ingresses_data.get("items", []):
         ingress_name = item["metadata"]["name"]
@@ -64,9 +64,9 @@ def analyze_ingresses(
 
 if __name__ == "__main__":
     try:
-        with open("ingresses.json", "r", encoding="utf-16") as f:
+        with open("ingresses.json", encoding="utf-16") as f:
             ingresses_data = json.load(f)
-        with open("services.json", "r", encoding="utf-16") as f:
+        with open("services.json", encoding="utf-16") as f:
             services_data = json.load(f)
 
         analyze_ingresses(ingresses_data, services_data)

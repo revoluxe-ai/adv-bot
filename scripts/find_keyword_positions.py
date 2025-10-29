@@ -18,7 +18,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
-from typing import Iterable
+from collections.abc import Iterable
 
 from aiogram.client.session import aiohttp
 

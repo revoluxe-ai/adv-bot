@@ -1,6 +1,6 @@
 """Модуль для расчета стоимости тарифов."""
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlalchemy import func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession

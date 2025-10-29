@@ -55,7 +55,7 @@ class PodError:
     message: str
     timestamp: str
     restarts: int = 0
-    last_exit_code: Optional[int] = None
+    last_exit_code: int | None = None
 
 
 class KubernetesMonitor:
@@ -63,9 +63,9 @@ class KubernetesMonitor:
 
     def __init__(self, namespace: str = "default"):
         self.namespace = namespace
-        self.errors: List[PodError] = []
+        self.errors: list[PodError] = []
 
-    def run_kubectl(self, cmd: List[str]) -> Dict[Any, Any]:
+    def run_kubectl(self, cmd: list[str]) -> dict[Any, Any]:
         """Выполнить kubectl команду и получить JSON"""
         try:
             result = subprocess.run(
@@ -78,11 +78,11 @@ class KubernetesMonitor:
         except json.JSONDecodeError:
             return {}
 
-    def get_pods(self) -> Dict[Any, Any]:
+    def get_pods(self) -> dict[Any, Any]:
         """Получить все поды в namespace"""
         return self.run_kubectl(["get", "pods", "-n", self.namespace, "-o", "json"])
 
-    def get_events(self) -> Dict[Any, Any]:
+    def get_events(self) -> dict[Any, Any]:
         """Получить события namespace"""
         return self.run_kubectl(
             [
@@ -96,7 +96,7 @@ class KubernetesMonitor:
             ]
         )
 
-    def analyze_pod(self, pod_data: Dict[Any, Any]) -> None:
+    def analyze_pod(self, pod_data: dict[Any, Any]) -> None:
         """Анализировать один pod"""
         pod_name = pod_data.get("metadata", {}).get("name", "unknown")
         namespace = pod_data.get("metadata", {}).get("namespace", self.namespace)
@@ -139,7 +139,7 @@ class KubernetesMonitor:
         pod_name: str,
         namespace: str,
         container_name: str,
-        status: Dict[Any, Any],
+        status: dict[Any, Any],
         restart_count: int,
     ) -> None:
         """Проверить состояние ожидания контейнера"""
@@ -177,7 +177,7 @@ class KubernetesMonitor:
         pod_name: str,
         namespace: str,
         container_name: str,
-        status: Dict[Any, Any],
+        status: dict[Any, Any],
         restart_count: int,
     ) -> None:
         """Проверить состояние завершения контейнера"""
@@ -320,7 +320,7 @@ class KubernetesMonitor:
             json.dump(data, f, indent=2, default=str)
         print(f"✓ Ошибки экспортированы в {filename}")
 
-    def get_critical_pods(self) -> List[str]:
+    def get_critical_pods(self) -> list[str]:
         """Получить список критичных подов"""
         return list(
             set(e.pod_name for e in self.errors if e.severity == Severity.CRITICAL)

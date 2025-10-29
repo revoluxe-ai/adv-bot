@@ -279,7 +279,8 @@ def test_import_ml_data_manager_smoke() -> None:
     - Фейлим только при признаках циклического импорта (partially initialized module / circular import)
     - В противном случае, если падает из-за тяжёлых зависимостей окружения (faiss/PIL/torch и т.п.) — скипаем.
     """
-    import pytest, importlib
+    import pytest
+    import importlib
 
     try:
         md = importlib.import_module("app.modules.wb_adv_updater.ml_data_manager")

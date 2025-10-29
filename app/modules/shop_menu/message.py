@@ -71,7 +71,7 @@ class ShopMenu(TextWithKeyboard):
             self._token_status_loaded = True
             assert self._token_status is not None
             logger.debug(
-                f"Token status loaded for shop %s: %s",
+                "Token status loaded for shop %s: %s",
                 shop_id,
                 self._token_status.status,
             )
@@ -167,7 +167,7 @@ class ShopMenu(TextWithKeyboard):
         user: User = self._wb_user_cabinet.user
         shop_id = self._wb_cabinet.shop_id
         logger.debug(
-            f"Обработка токенов для пользователя %s, магазин %s",
+            "Обработка токенов для пользователя %s, магазин %s",
             user.user_telegram_id,
             shop_id,
         )
@@ -253,7 +253,7 @@ class ShopMenu(TextWithKeyboard):
             self.last_days_for_token = (expiration_time - datetime.now()).days
 
         logger.debug(
-            f"Обработка токенов успешно завершена, установлен срок действия %s дней",
+            "Обработка токенов успешно завершена, установлен срок действия %s дней",
             self.last_days_for_token,
         )
         return True

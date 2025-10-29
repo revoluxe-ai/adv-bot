@@ -1,7 +1,8 @@
 import asyncio
 import logging
 from functools import wraps
-from typing import Callable, TypeVar, ParamSpec, Awaitable, Any
+from typing import TypeVar, ParamSpec, Any
+from collections.abc import Callable, Awaitable
 
 import neo4j
 from neo4j import AsyncGraphDatabase

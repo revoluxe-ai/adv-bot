@@ -1,6 +1,7 @@
 import logging
 from contextlib import AbstractAsyncContextManager
-from typing import Type, TypeVar, Generic, Any, Awaitable, Optional, Never
+from typing import Type, TypeVar, Generic, Any, Optional, Never
+from collections.abc import Awaitable
 
 from dependency_injector import providers, containers
 
@@ -29,7 +30,7 @@ class DIManager(AbstractAsyncContextManager[T], Generic[T]):
 
     @classmethod
     async def create(
-        cls, container_cls: Type[T], *args: Any, **kwargs: Any
+        cls, container_cls: type[T], *args: Any, **kwargs: Any
     ) -> "DIManager[T]":
         self = object.__new__(cls)
         self._container = container_cls(*args, **kwargs)
@@ -100,7 +101,7 @@ class DIManager(AbstractAsyncContextManager[T], Generic[T]):
         return self._container
 
     async def __aexit__(
-        self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Any
+        self, exc_type: type | None, exc_val: BaseException | None, exc_tb: Any
     ) -> None:  # pragma: no cover
         container = self._container
         shutdown_result = getattr(container, "shutdown_resources", lambda: None)()

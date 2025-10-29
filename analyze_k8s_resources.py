@@ -47,7 +47,7 @@ def parse_resource_string(resource_string: str, resource_type: str) -> float:
     return 0.0
 
 
-def calculate_total_resources(data: Dict[str, Any]) -> Dict[str, float]:
+def calculate_total_resources(data: dict[str, Any]) -> dict[str, float]:
     """Calculates total CPU and memory requests and limits for Deployments and DaemonSets."""
     total_cpu_requests = 0.0
     total_cpu_limits = 0.0
@@ -89,7 +89,7 @@ def calculate_total_resources(data: Dict[str, Any]) -> Dict[str, float]:
     }
 
 
-def analyze_resources(data: Dict[str, Any]) -> None:
+def analyze_resources(data: dict[str, Any]) -> None:
     print(
         f"{'TYPE':<10} {'NAMESPACE':<20} {'NAME':<30} {'CONTAINER':<30} {'CPU_REQ':<10} {'CPU_LIM':<10} {'MEM_REQ':<10} {'MEM_LIM':<10}"
     )
@@ -126,9 +126,9 @@ def analyze_resources(data: Dict[str, Any]) -> None:
             )
 
 
-def analyze_services_without_endpoints(data: Dict[str, Any]) -> None:
+def analyze_services_without_endpoints(data: dict[str, Any]) -> None:
     """Analyzes Kubernetes Services to find those without active Endpoints."""
-    services_without_endpoints: List[Dict[str, Any]] = []
+    services_without_endpoints: list[dict[str, Any]] = []
 
     for item in data.get("items", []):
         service_name = item["metadata"]["name"]
@@ -175,7 +175,7 @@ def analyze_services_without_endpoints(data: Dict[str, Any]) -> None:
         )
 
 
-def analyze_pvcs(pvc_data: Dict[str, Any]) -> None:
+def analyze_pvcs(pvc_data: dict[str, Any]) -> None:
     """Analyzes PersistentVolumeClaims to find unused or pending ones."""
     print("\n--- Анализ PersistentVolumeClaims (PVC) ---")
     print(f"{'NAMESPACE':<20} {'PVC_NAME':<30} {'STATUS':<10} {'CAPACITY':<10}")
@@ -202,14 +202,14 @@ def analyze_pvcs(pvc_data: Dict[str, Any]) -> None:
     )
 
 
-def analyze_pvcs_with_pods(pvc_data: Dict[str, Any], pods_data: Dict[str, Any]) -> None:
+def analyze_pvcs_with_pods(pvc_data: dict[str, Any], pods_data: dict[str, Any]) -> None:
     print("\n--- Анализ PersistentVolumeClaims (PVC) с учетом подов ---")
     print(
         f"{'NAMESPACE':<20} {'PVC_NAME':<30} {'STATUS':<10} {'CAPACITY':<10} {'USED_BY_POD':<30}"
     )
     print("-" * 120)
 
-    used_pvcs: Set[str] = set()
+    used_pvcs: set[str] = set()
 
     # Собираем информацию о том, какие PVC используются подами
     for pod_item in pods_data.get("items", []):
@@ -251,12 +251,12 @@ def analyze_pvcs_with_pods(pvc_data: Dict[str, Any], pods_data: Dict[str, Any]) 
 
 if __name__ == "__main__":
     try:
-        with open("deployments.json", "r", encoding="utf-16") as f:
+        with open("deployments.json", encoding="utf-16") as f:
             deployments_data = json.load(f)
-        with open("daemonsets.json", "r", encoding="utf-16") as f:
+        with open("daemonsets.json", encoding="utf-16") as f:
             daemonsets_data = json.load(f)
 
-        all_items: List[Dict[str, Any]] = []
+        all_items: list[dict[str, Any]] = []
         all_items.extend(deployments_data.get("items", []))
         all_items.extend(daemonsets_data.get("items", []))
 
@@ -279,19 +279,19 @@ if __name__ == "__main__":
         )
 
         print("\n--- Анализ Service'ов без Endpoint'ов ---")
-        with open("services.json", "r", encoding="utf-16") as f:
+        with open("services.json", encoding="utf-16") as f:
             services_data = json.load(f)
             analyze_services_without_endpoints(services_data)
 
         print("\n--- Анализ PersistentVolumeClaims (PVC) ---")
-        with open("pvcs.json", "r", encoding="utf-16") as f:
+        with open("pvcs.json", encoding="utf-16") as f:
             pvcs_data = json.load(f)
             analyze_pvcs(pvcs_data)
 
         print("\n--- Анализ PersistentVolumeClaims (PVC) с учетом подов ---")
-        with open("pods.json", "r", encoding="utf-16") as f:
+        with open("pods.json", encoding="utf-16") as f:
             pods_data = json.load(f)
-        with open("pvcs.json", "r", encoding="utf-16") as f:
+        with open("pvcs.json", encoding="utf-16") as f:
             pvcs_data = json.load(f)
             analyze_pvcs_with_pods(pvcs_data, pods_data)
 
