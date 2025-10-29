@@ -8,10 +8,12 @@ class FactData(BaseModel):
     original_orders: int
     pay_for_order: float
     fact_method: FactMethods
-
-
     # Настройки для автоматического преобразования типов
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True,
+                              use_enum_values=True,  # Enum -> value
+                              ser_json_timedelta="iso8601",  # если где-то timedelta
+                              ser_json_bytes="base64"  # на будущее
+                              )
 
     @property
     def method_ru(self) -> str:
@@ -46,3 +48,8 @@ class PlanData(BaseModel):
             self.max_pay_for_order is not None
         ])
 
+    model_config = ConfigDict(
+        use_enum_values=True,  # Enum -> value
+        ser_json_timedelta="iso8601",  # если где-то timedelta
+        ser_json_bytes="base64"  # на будущее
+    )

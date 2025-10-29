@@ -34,8 +34,8 @@ class ChangePlanFact(AdvSettingRedisCache, RedisCacheBase, prefix="ChangePlanFac
 
     async def set_new_plan_fact(self, plan: PlanData, fact: FactData) -> None:
         key = self._key
-        plan_value: str = json.dumps(plan.model_dump())
-        fact_value: str = json.dumps(fact.model_dump())
+        plan_value: str = json.dumps(plan.model_dump(mode='json'))
+        fact_value: str = json.dumps(fact.model_dump(mode='json'))
         value = f"{plan_value}|{fact_value}"
         await self._client.set(key, value)
 
