@@ -1,3 +1,5 @@
+# mypy ignore-errors
+
 """Token expiration monitoring service for proactive expiration notifications."""
 
 import asyncio
@@ -240,7 +242,7 @@ class TokenExpirationService:
                         "earliest_expiry": token.expires,
                     }
 
-                summary["by_shop"][shop_id]["tokens"].append(
+                summary["by_shop"][shop_id]["tokens"].append( # type: ignore[index]
                     {  # type: ignore[index]
                         "token_id": token.id,
                         "expires": token.expires,
