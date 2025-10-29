@@ -1,4 +1,5 @@
 import re
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -55,10 +56,10 @@ class AdvType:
 
 
 class Adv:
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Name: {self.name}, Advert ID: {self.advertId},  Status: {self.status_native_ru}, Type: {self.adv_type}"
 
-    def __init__(self, data):
+    def __init__(self, data: dict[str, Any]) -> None:
         self._data = data
 
     @property
@@ -71,21 +72,22 @@ class Adv:
 
     @property
     def adv_type(self) -> int:
-        return self._data["type"]
+        return int(self._data["type"])
 
     @adv_type.setter
-    def adv_type(self, value: int):
+    def adv_type(self, value: int) -> None:
         self._type = value
 
     @property
     def status_native(self) -> str:
-        if self.status == 4:
+        status = int(self.status)
+        if status == 4:
             return "ready_for_start"
-        elif self.status == 11:
+        elif status == 11:
             return "pause"
-        elif self.status == 9:
+        elif status == 9:
             return "started"
-        elif self.status == 7:
+        elif status == 7:
             return "done"
         else:
             raise Exception(f"Статус {str(self.status)} не реализован")
@@ -104,49 +106,49 @@ class Adv:
             raise Exception(f"Статус {str(self.status_native)} не реализован")
 
     @property
-    def advertId(self):
-        return self._data["advertId"]
+    def advertId(self) -> int:
+        return int(self._data["advertId"])
 
     @property
-    def changeTime(self):
-        return self._data["changeTime"]
+    def changeTime(self) -> str:
+        return str(self._data["changeTime"])
 
     @property
-    def createTime(self):
-        return self._data["createTime"]
+    def createTime(self) -> str:
+        return str(self._data["createTime"])
 
     @property
-    def dailyBudget(self):
-        return self._data["dailyBudget"]
+    def dailyBudget(self) -> int:
+        return int(self._data["dailyBudget"])
 
     @property
-    def endTime(self):
-        return self._data["endTime"]
+    def endTime(self) -> str:
+        return str(self._data["endTime"])
 
     @property
-    def name(self):
-        return self._data["name"]
+    def name(self) -> str:
+        return str(self._data["name"])
 
     @property
-    def startTime(self):
-        return self._data["startTime"]
+    def startTime(self) -> str:
+        return str(self._data["startTime"])
 
     @property
-    def status(self):
-        return self._data["status"]
+    def status(self) -> int:
+        return int(self._data["status"])
 
     @property
-    def type(self):
-        return self._data["type"]
+    def type(self) -> int:
+        return int(self._data["type"])
 
     @property
-    def cpm(self):
+    def cpm(self) -> int:
         # TODO: Временное решение: нужно переделать, чтобы ставка для каждого товара была своей
         cpm = self._data["auction_multibids"][0]["bid"]
-        return cpm
+        return int(cpm)
 
     @property
-    def data(self):
+    def data(self) -> dict[str, Any]:
         return self._data
 
     @property
@@ -171,7 +173,7 @@ class Adv:
         return active
 
     @property
-    def nmids(self):
+    def nmids(self) -> list[int]:
         try:
             if self._data["type"] == 9:
                 return self._data["unitedParams"][0]["nms"]
@@ -188,62 +190,64 @@ class Adv:
 
 
 class Statistic:
-    def __init__(self, data):
+    def __init__(self, data: list[dict[str, Any]]) -> None:
         assert isinstance(data, list)
         self._data = data[0]
 
     @property
-    def advert_id(self):
-        return self._data["advertId"]
+    def advert_id(self) -> int:
+        return int(self._data["advertId"])
 
     @property
-    def begin(self):
-        return self._data["begin"]
+    def begin(self) -> str:
+        return str(self._data["begin"])
 
     @property
-    def end(self):
-        return self._data["end"]
+    def end(self) -> str:
+        return str(self._data["end"])
 
     @property
-    def days(self):
-        return self._data["days"]
+    def days(self) -> list[dict[str, Any]]:
+        return cast(list[dict[str, Any]], self._data["days"])
 
     @property
     def views(self):
         return self._data["views"]
+    def views(self) -> int:
+        return int(self._data["views"])
 
     @property
-    def clicks(self):
-        return self._data["clicks"]
+    def clicks(self) -> int:
+        return int(self._data["clicks"])
 
     @property
-    def ctr(self):
-        return self._data["ctr"]
+    def ctr(self) -> float:
+        return float(self._data["ctr"])
 
     @property
-    def cpc(self):
-        return self._data["cpc"]
+    def cpc(self) -> float:
+        return float(self._data["cpc"])
 
     @property
-    def sum(self):
-        return self._data["sum"]
+    def sum(self) -> float:
+        return float(self._data["sum"])
 
     @property
-    def atbs(self):
-        return self._data["atbs"]
+    def atbs(self) -> int:
+        return int(self._data["atbs"])
 
     @property
-    def orders(self):
-        return self._data["orders"]
+    def orders(self) -> int:
+        return int(self._data["orders"])
 
     @property
-    def cr(self):
-        return self._data["cr"]
+    def cr(self) -> float:
+        return float(self._data["cr"])
 
     @property
-    def in_shks(self):
-        return self._data["shks"]
+    def in_shks(self) -> int:
+        return int(self._data["shks"])
 
     @property
-    def sum_price(self):
-        return self._data["sum_price"]
+    def sum_price(self) -> float:
+        return float(self._data["sum_price"])
