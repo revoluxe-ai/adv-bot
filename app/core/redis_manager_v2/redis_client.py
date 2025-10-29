@@ -2,8 +2,10 @@ __all__ = ("RedisClient",)
 
 import asyncio
 from abc import ABC
-from typing import Any, cast, Mapping
-from typing import Awaitable, TypeVar
+from typing import Any, cast
+from collections.abc import Mapping
+from typing import TypeVar
+from collections.abc import Awaitable
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 

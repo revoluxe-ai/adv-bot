@@ -1,13 +1,19 @@
 import logging
+import typing
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 
+from app.client_bot.message_manager import LastMessage
 from app.client_bot.user_interface.message_templates import (
-    LastMessage,
     TextWithKeyboardAndImage,
 )
+
+if typing.TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+        FactData,
+    )
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -18,7 +24,7 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.c
 from app.client_bot.user_interface.views.messages.positions_graphic_messanges.positions_graphic_messanges import (
     KeywordGraphicPart_1,
 )
-from app.modules.common_advs_stat import CommonAdvsStatData, CommonAdvsStatDataManager
+
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -31,7 +37,9 @@ from app.utils.graphic_positions_creator import get_keyword_history_graphic
 from dependency_injector.wiring import inject, Provide
 
 
-from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager import (
+    AutoMaxBidManager,
+)
 from app.modules.shop_runner.modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 
 
@@ -42,15 +50,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     def __init__(
         self,
         bot: Bot,
-        chat_id,
+        chat_id: int,
         keywords: list[CalculatedKeyword],
         adv_setting: AdvSetting,
-        wb_user_cabinet_original_id,
+        wb_user_cabinet_original_id: int,
         adv_choice_last_page,
         image: str,
-        page,
-        image_mode="graphic",
-    ):
+        page: int,
+        image_mode: str = "graphic",
+    ) -> None:
         super().__init__(bot, chat_id)
         self._keywords = keywords
         self._adv_setting = adv_setting
@@ -66,13 +74,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
     async def __call__(
         self,
         state: FSMContext,
-        sort_mode="by_adv",
-        auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_cpm_bid_manager],
-    ) -> (LastMessage, str):
+        sort_mode: str = "by_adv",
+        auto_max_bid_manager: "AutoMaxBidManager" = Provide[
+            AutoMaxCpmContainer.auto_max_cpm_bid_manager
+        ],
+    ) -> tuple[LastMessage, str]:
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
-        self._status_auction = await self._get_status_auction(self._adv_setting.search_adv_id)
+        self._status_auction = await self._get_status_auction(
+            self._adv_setting.search_adv_id
+        )
 
         keywords_filter: list[str] = data.get("keywords_filter")
         clear_keywords = []
@@ -118,12 +130,13 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 ):
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
+        auto_update_manager = AdvSettingAutoUpdater(self._adv_setting)
 
-        # Получаем данные через CommonAdvsStatDataManager
-        common_stat_data_manager = CommonAdvsStatDataManager()
-        stat_data: CommonAdvsStatData = await common_stat_data_manager.get_data(
-            self._adv_setting, self._keywords, 2
+        fact_data, stat_data = await auto_update_manager.get_fact_data_and_stat(
+            self._keywords
         )
+
+        self._fact_data: FactData = fact_data
 
         # Устанавливаем полученные данные
         self.min_ctr = stat_data.min_ctr
@@ -158,12 +171,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._adv_setting, 2
         )
 
-        auto_update_manager = AdvSettingAutoUpdater(self._adv_setting, 2)
-
-        fact_data = auto_update_manager.get_fact_data_from_stat(stat_data)
-
-        self._fact_data = fact_data
-
         # Получаем данные по Автомаксимальной ставке из Redis (через DI)
         self._auto_max_cpm_mode: bool = bool(
             getattr(self._adv_setting, "auto_max_cpm_mode", False)
@@ -175,16 +182,16 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 self._adv_setting, self._keywords, user_max_cpm
             )
 
-
-        await super().__call__()
-        return
+        result = await super().__call__()
+        return result
 
     @property
     def text(self) -> str:
         total_page = len(self._keywords) // self._on_page
-        # TODO: Текст стал слишком большим, на спех сократил. Нужно перед изменением сообщений сделать тесты, проверяющие длину текста и его корректность
+        # TODO: Текст стал слишком большим, на спех сократил. Нужно перед изменением
+        #  сообщений сделать тесты, проверяющие длину текста и его корректность
         text = (
-                str(self._adv_setting.name) + "\n"
+            str(self._adv_setting.name) + "\n"
             f"Авто: {self._adv_setting.active_status}\n"
             f"Аукцион: {self._status_auction}\n"
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
@@ -201,7 +208,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Общие заказы: {self._all_orders_for_last_days}\n"
             f"  -Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
             f"  -Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
-)
+        )
 
         # Показываем источник данных для заказов
         if (
@@ -213,11 +220,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         else:
             text += "📊 Источник заказов: Общая статистика (включая органику)\n"
             text += f"""Заказов из Органики: {
-                self._all_orders_for_last_days
-                - self.full_adv_stat_for_last_days_for_auction.orders
-                - self.full_adv_stat_for_last_days_for_auto_adv.orders
-                if self._all_orders_for_last_days
-                else 0
+            self._all_orders_for_last_days
+            - self.full_adv_stat_for_last_days_for_auction.orders
+            - self.full_adv_stat_for_last_days_for_auto_adv.orders
+            if self._all_orders_for_last_days
+            else 0
             }\n"""
 
         # Получаем целевые значения из настроек
@@ -240,9 +247,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             str(round(max_price_for_order)) if max_price_for_order else "Не задано"
         )
 
+        fact_method_ru = self._fact_data.method_ru
         text += (
-            f"\nВ среднем в день (срез за 2 дня):\n"
-            f"Прогноз средних заказов в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
+            f"\n Факт-продажи({fact_method_ru}):\n"
+            f"Прогноз заказов в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
             f"Себестоимость: {round(self._fact_data.pay_for_order, 2)} р."
             f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})"
         )
@@ -308,14 +316,17 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             sort_mode=self.sort_mode,
             image_mode=self.image_mode,
         )
+
     @staticmethod
-    async def _get_status_auction( search_adv_id: int) -> str:
+    async def _get_status_auction(search_adv_id: int) -> str:
         if not search_adv_id:
-            return 'не подключен'
-        stmt = select(AdvSetting.active_status).where(AdvSetting.adv_id == search_adv_id)
+            return "не подключен"
+        stmt = select(AdvSetting.active_status).where(
+            AdvSetting.adv_id == search_adv_id
+        )
         async with sm(read_only=True) as session:
             result = await session.execute(stmt)
             status: str | None = result.scalar_one_or_none()
             if not status:
-                status = 'Не найдена'
+                status = "Не найдена"
             return status

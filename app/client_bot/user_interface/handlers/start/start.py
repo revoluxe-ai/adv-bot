@@ -39,7 +39,9 @@ from app.modules.shop_runner.modules.wb_api import WBApi
 from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-from app.modules.token_monitoring.services.notification_manager import NotificationManager
+from app.modules.token_monitoring.services.notification_manager import (
+    NotificationManager,
+)
 from app.modules.token_monitoring.models import NotificationType
 
 logger = logging.getLogger(__name__)
@@ -163,7 +165,7 @@ async def process_cabinet_api(
     if len(token_text) < 24:  # эвристика: валидные токены заметно длиннее
         await bot.send_message(
             chat_id,
-            "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен."
+            "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
         )
         return True
 
@@ -174,20 +176,21 @@ async def process_cabinet_api(
         logger.info("Token is read-only for user %s", user_telegram_id)
         await bot.send_message(
             chat_id,
-            "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами."
+            "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами.",
         )
-        await state.set_state(states.CabinetRegistration.api) # Возвращаем пользователя в состояние ввода токена
+        await state.set_state(
+            states.CabinetRegistration.api
+        )  # Возвращаем пользователя в состояние ввода токена
         return True
     try:
         shop_id = wb_token.get_shop_id_from_token()
     except NotValidTokenError:
         logger.info("Invalid token (NotValidTokenError) for user %s", user_telegram_id)
-        await bot.send_message(
-            chat_id,
-            "Токен не валиден, попробуйте еще раз:"
-        )
+        await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
         # Не сбрасываем state — пользователь остаётся в состоянии ввода токена
-        logger.info("Sent invalid token message to user %s, keeping state", user_telegram_id)
+        logger.info(
+            "Sent invalid token message to user %s, keeping state", user_telegram_id
+        )
         return True
     except Exception as e:
         # Catch all unexpected exceptions from token parsing to avoid silent failures
@@ -199,10 +202,13 @@ async def process_cabinet_api(
         )
         await bot.send_message(
             chat_id,
-            "Токен не валиден или произошла ошибка при его обработке. Попробуйте ввести токен еще раз."
+            "Токен не валиден или произошла ошибка при его обработке. Попробуйте ввести токен еще раз.",
         )
         # Не сбрасываем state — пользователь остаётся в состоянии ввода
-        logger.info("Sent error message to user %s after token parse exception, returning", user_telegram_id)
+        logger.info(
+            "Sent error message to user %s after token parse exception, returning",
+            user_telegram_id,
+        )
         return True
     async with sm() as session:
         # Получаем ID пользователя
@@ -243,23 +249,21 @@ async def process_cabinet_api(
 
             # Normalize simple numeric/string ids
             try:
-                normalized_existing_user_id = int(existing_user_id) if existing_user_id is not None else None
+                normalized_existing_user_id = (
+                    int(existing_user_id) if existing_user_id is not None else None
+                )
             except Exception:
                 normalized_existing_user_id = existing_user_id
 
             if normalized_existing_user_id == user_id:
                 # Token already saved for the same user — nothing to change.
-                await bot.send_message(
-                    chat_id,
-                    "Этот токен уже есть в системе."
-                )
+                await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
                 return True
             else:
                 # Token belongs to another user — users must have unique tokens.
                 await bot.send_message(
-                    chat_id,
-                    "Ошибка: этот токен используется другим пользователем."
+                    chat_id, "Ошибка: этот токен используется другим пользователем."
                 )
                 return True
 
@@ -363,7 +367,11 @@ async def add_app_token(
         "AddNewToken callback: set state=%s for user=%s chat=%s",
         current_state,
         callback_query.from_user.id if callback_query.from_user else None,
-        callback_query.message.chat.id if callback_query.message and callback_query.message.chat else None,
+        (
+            callback_query.message.chat.id
+            if callback_query.message and callback_query.message.chat
+            else None
+        ),
     )
     chat_id = callback_query.message.chat.id
     cabinet_name = wb_user_cabinet.name
@@ -398,7 +406,7 @@ async def process_add_new_token(
     if len(token_text) < 24:
         await bot.send_message(
             chat_id,
-            "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен."
+            "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
         )
         return None
     # Получение данных из состояния
@@ -407,8 +415,7 @@ async def process_add_new_token(
 
     if not wb_user_cabinet_original_id:
         await bot.send_message(
-            chat_id,
-            "Ошибка: магазин не найден. Начните процесс заново."
+            chat_id, "Ошибка: магазин не найден. Начните процесс заново."
         )
         await state.clear()
         return None
@@ -420,18 +427,17 @@ async def process_add_new_token(
         logger.info("Token is read-only for user %s", user_telegram_id)
         await bot.send_message(
             chat_id,
-            "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами."
+            "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами.",
         )
-        await state.set_state(states.AddNewToken.token) # Возвращаем пользователя в состояние ввода токена
+        await state.set_state(
+            states.AddNewToken.token
+        )  # Возвращаем пользователя в состояние ввода токена
         return None
 
     try:
         shop_id = wb_token.get_shop_id_from_token()
     except NotValidTokenError:
-        await bot.send_message(
-            chat_id,
-            "Токен не валиден, попробуйте еще раз:"
-        )
+        await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
         # Не сбрасываем state — пользователь остаётся в состоянии ввода токена
         return None
     except Exception as e:
@@ -444,14 +450,19 @@ async def process_add_new_token(
         )
         await bot.send_message(
             chat_id,
-            "Токен не валиден или при его проверке произошла ошибка. Попробуйте ещё раз или свяжитесь с поддержкой."
+            "Токен не валиден или при его проверке произошла ошибка. Попробуйте ещё раз или свяжитесь с поддержкой.",
         )
         # Не сбрасываем state — пользователь остаётся в состоянии ввода
-        logger.info("Sent error message to user %s after token parse exception, returning", user_telegram_id)
+        logger.info(
+            "Sent error message to user %s after token parse exception, returning",
+            user_telegram_id,
+        )
         return None
     # Получение user_id из БД
     async with sm() as session:
-        stmt_for_select_user_id: Select = select(User.id).where(User.user_telegram_id == user_telegram_id)
+        stmt_for_select_user_id: Select = select(User.id).where(
+            User.user_telegram_id == user_telegram_id
+        )
         result = await session.execute(stmt_for_select_user_id)
         user_id = result.scalar()
 
@@ -474,8 +485,7 @@ async def process_add_new_token(
     # Проверка соответствия shop_id
     if wb_user_cabinet.wb_cabinet.shop_id != shop_id:
         await bot.send_message(
-            chat_id,
-            "Ошибка: токен принадлежит другому магазину. Попробуйте еще раз:"
+            chat_id, "Ошибка: токен принадлежит другому магазину. Попробуйте еще раз:"
         )
         return None
 
@@ -491,12 +501,8 @@ async def process_add_new_token(
         # Это устранит гонки и лишний SELECT.
         # Проверка существующего токена
         # Для этого надо удалить дубли и добавить UNIQUE(api_key, shop_id) в модель WBToken.
-        stmt_check = (
-            select(WBToken)
-            .where(
-                WBToken.api_key == wb_token.api_key,
-                WBToken.shop_id == shop_id
-            )
+        stmt_check = select(WBToken).where(
+            WBToken.api_key == wb_token.api_key, WBToken.shop_id == shop_id
         )
         result = await session.execute(stmt_check)
         existing_token = result.scalar()
@@ -507,23 +513,21 @@ async def process_add_new_token(
 
             # Normalize simple numeric/string ids
             try:
-                normalized_existing_user_id = int(existing_user_id) if existing_user_id is not None else None
+                normalized_existing_user_id = (
+                    int(existing_user_id) if existing_user_id is not None else None
+                )
             except Exception:
                 normalized_existing_user_id = existing_user_id
 
             if normalized_existing_user_id == user_id:
                 # Token already saved for the same user — nothing to change.
-                await bot.send_message(
-                    chat_id,
-                    "Этот токен уже есть в системе."
-                )
+                await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
                 return True
             else:
                 # Token belongs to another user — users must have unique tokens.
                 await bot.send_message(
-                    chat_id,
-                    "Ошибка: этот токен используется другим пользователем."
+                    chat_id, "Ошибка: этот токен используется другим пользователем."
                 )
                 return True
 
@@ -537,7 +541,9 @@ async def process_add_new_token(
             await session.rollback()
             # Получаем существующий токен, чтобы понять чей он
             stmt_existing = (
-                select(WBToken).options(load_only(WBToken.user_id)).where(
+                select(WBToken)
+                .options(load_only(WBToken.user_id))
+                .where(
                     WBToken.api_key == wb_token.api_key,
                     WBToken.shop_id == wb_token.shop_id,
                 )
@@ -548,30 +554,29 @@ async def process_add_new_token(
             if existing_token:
                 existing_user_id = getattr(existing_token, "user_id", None)
                 try:
-                    normalized_existing_user_id = int(existing_user_id) if existing_user_id is not None else None
+                    normalized_existing_user_id = (
+                        int(existing_user_id) if existing_user_id is not None else None
+                    )
                 except Exception:
                     normalized_existing_user_id = existing_user_id
 
                 if normalized_existing_user_id == user_id:
-                    await bot.send_message(
-                        chat_id,
-                        "Этот токен уже есть в системе."
-                    )
+                    await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                     await state.clear()
                     return True
                 else:
                     await bot.send_message(
-                        chat_id,
-                        "Ошибка: этот токен используется другим пользователем."
+                        chat_id, "Ошибка: этот токен используется другим пользователем."
                     )
                     return True
             # Если по какой-то причине existing_token не найден — сообщаем об общей ошибке
-            await bot.send_message(chat_id, "Ошибка при добавлении токена. Попробуйте снова.")
+            await bot.send_message(
+                chat_id, "Ошибка при добавлении токена. Попробуйте снова."
+            )
             return True
 
         logger.info(
-            f"Новый токен успешно добавлен для shop_id={shop_id}, "
-            f"user_id={user_id}"
+            f"Новый токен успешно добавлен для shop_id={shop_id}, " f"user_id={user_id}"
         )
 
     # Резолв всех уведомлений для этого магазина
@@ -588,8 +593,7 @@ async def process_add_new_token(
 
         for notif_type in notification_types:
             resolved_count = await notification_manager.mark_notifications_resolved(
-                shop_id=shop_id,
-                notification_type=notif_type
+                shop_id=shop_id, notification_type=notif_type
             )
             total_resolved += resolved_count
 
@@ -601,31 +605,21 @@ async def process_add_new_token(
     except Exception as e:
         # Не прерываем процесс, если не удалось зарезолвить уведомления
         logger.error(
-            f"Ошибка при резолве уведомлений для shop_id={shop_id}: {e}",
-            exc_info=True
+            f"Ошибка при резолве уведомлений для shop_id={shop_id}: {e}", exc_info=True
         )
 
     # Отправка сообщений об успехе
-    await bot.send_message(
-        chat_id,
-        "Токен проверяется..."
-    )
+    await bot.send_message(chat_id, "Токен проверяется...")
 
     await bot.send_message(
-        chat_id,
-        f"Токен успешно добавлен для магазина {wb_user_cabinet.name}!"
+        chat_id, f"Токен успешно добавлен для магазина {wb_user_cabinet.name}!"
     )
 
     # Очистка состояния
     await state.clear()
 
     # Переход в меню магазина
-    await ShopMenu(
-        bot,
-        chat_id,
-        state,
-        wb_user_cabinet_original_id
-    )()
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
     return True
 
 
@@ -645,7 +639,7 @@ async def select_shop(
         last_wb_user_cabinet_original_id=wb_user_cabinet_original_id
     )
     message = callback_query.message
-    assert message.chat  is not None
+    assert message.chat is not None
     chat_id = int(message.chat.id)
     # Получаем список рекламных кампаний
     async with sm() as session:
@@ -679,7 +673,9 @@ async def shop_menu_process(
     )
     logger.debug("Текущее состояние: %s", await state.get_data())
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    await ShopMenu(bot, int(callback.message.chat.id), state, wb_user_cabinet_original_id)()
+    await ShopMenu(
+        bot, int(callback.message.chat.id), state, wb_user_cabinet_original_id
+    )()
     pass
 
 

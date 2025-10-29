@@ -41,6 +41,9 @@ class DataBase:
     def get_background_images(self):
         session = self.Session()
         images = (
-            session.query(Image).where(Image.is_background == True).order_by(Image.id).yield_per(50)
+            session.query(Image)
+            .where(Image.is_background == True)
+            .order_by(Image.id)
+            .yield_per(50)
         )
         return images, session

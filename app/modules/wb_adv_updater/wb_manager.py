@@ -60,14 +60,17 @@ async def check_adv_payment(
 ) -> bool:
     """Проверяет наличие платежа для настройки рекламы на указанную дату."""
     adv_payment_check_stmt = select(
-        exists().where(and_(
-            AdvPayment.adv_setting_id == adv_setting.id,
-            AdvPayment.date == current_date
-        ))
+        exists().where(
+            and_(
+                AdvPayment.adv_setting_id == adv_setting.id,
+                AdvPayment.date == current_date,
+            )
+        )
     )
 
     result = await session.execute(adv_payment_check_stmt)
     return result.scalar()
+
 
 async def graph_vector_update() -> None:
     graph_updater = GraphUpdater()
@@ -91,7 +94,6 @@ async def update_vectors_in_redis() -> None:
     await gds.update_vectors_in_redis()
 
 
-
 async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
     new_version = int(datetime.datetime.now().timestamp())
 
@@ -101,12 +103,17 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
         delimiter=",",
         quotechar='"',
         quoting=csv.QUOTE_MINIMAL,
-        lineterminator="\n"
+        lineterminator="\n",
     )
 
     for kw in keyword_stats:
         try:
-            text_val = text_cleaner.clear(kw.text or "").strip().replace("\n", " ").replace("\r", " ")
+            text_val = (
+                text_cleaner.clear(kw.text or "")
+                .strip()
+                .replace("\n", " ")
+                .replace("\r", " ")
+            )
             if not text_val:
                 continue
 
@@ -116,15 +123,17 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
             else:
                 continue
 
-            writer.writerow([
-                adv_id,
-                text_val,
-                date_str,
-                int(kw.clicks),
-                int(kw.views),
-                float(kw.spend),
-                new_version
-            ])
+            writer.writerow(
+                [
+                    adv_id,
+                    text_val,
+                    date_str,
+                    int(kw.clicks),
+                    int(kw.views),
+                    float(kw.spend),
+                    new_version,
+                ]
+            )
         except Exception as e:
             logger.warning("Ошибка при подготовке CSV строки: %s", e, exc_info=True)
             continue
@@ -140,7 +149,7 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
         data=csv_bytes,
         file_name="data.csv",
         structure="adv_id UInt64, text String, date Date, clicks UInt32, views UInt32, spend Float64, version UInt64",
-        fmt="CSV"
+        fmt="CSV",
     )
 
     # ИСПРАВЛЕНИЕ: убираем input() из запроса, ссылаемся на external table по имени файла
@@ -160,17 +169,18 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
     async with get_clickhouse_client() as client:
         await client.query(query, external_data=ext_data)
 
-    logger.debug(f"Inserted/updated %s rows into advkeyword_new" % len(keyword_stats))
-
-
-
+    logger.debug("Inserted/updated %s rows into advkeyword_new" % len(keyword_stats))
 
 
 async def update_keywords_stat_in_click_house(
-    keyword_stats: list[KeywordStat], adv_id: int,
+    keyword_stats: list[KeywordStat],
+    adv_id: int,
 ) -> None:
     if keyword_stats:
-        await insert_or_update_keywords(keyword_stats, adv_id,)
+        await insert_or_update_keywords(
+            keyword_stats,
+            adv_id,
+        )
 
 
 async def get_existing_keyword_settings(adv_setting_id) -> set[str]:
@@ -250,7 +260,7 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                     if update_tasks[adv_setting.id].exception():
                         logger.error(
                             "Ошибка обновления ключей: %s",
-                            update_tasks[adv_setting.id].exception()
+                            update_tasks[adv_setting.id].exception(),
                         )
                     del update_tasks[adv_setting.id]
             await asyncio.sleep(0)
@@ -282,7 +292,8 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             auto_adv_id
         )
         await update_keywords_stat_in_click_house(
-            keywords_from_auto, auto_adv_id,
+            keywords_from_auto,
+            auto_adv_id,
         )
 
     except ApiForbiddenError as exc:
@@ -303,15 +314,15 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
                 auction_adv_id
             )
             await update_keywords_stat_in_click_house(
-                keywords_from_search_adv, auction_adv_id,
+                keywords_from_search_adv,
+                auction_adv_id,
             )
     except Exception as exc:
         keywords_from_search_adv = []
         logger.error(
-            f"Ошибка получения статистики по ключевым словам для %s, %s",
+            "Ошибка получения статистики по ключевым словам для %s, %s",
             adv_setting.name,
-            exc
-
+            exc,
         )
         del exc
 
@@ -335,8 +346,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     full_stat_keywords = full_stat
 
     logger.debug(
-        f"Получено %s ключевых слов для %s",
-        len(full_stat_keywords), adv_setting.name
+        "Получено %s ключевых слов для %s", len(full_stat_keywords), adv_setting.name
     )
     texts_for_adv_setting = {keyword.text for keyword in full_stat_keywords}
     clusters = set()
@@ -375,9 +385,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             await session.commit()
     except Exception as exc:
         logger.error(
-            f"Ошибка добавления ключевых слов в базу данных: %s",
-            exc,
-            exc_info=True
+            "Ошибка добавления ключевых слов в базу данных: %s", exc, exc_info=True
         )
         raise exc
 

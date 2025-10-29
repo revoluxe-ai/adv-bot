@@ -140,9 +140,7 @@ class ParserService:
         return positions
 
     @staticmethod
-    async def __parse_keywords_from_wb(
-        text: str, page: int
-    ) -> tuple[
+    async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
         list[dict] | None,
         str | None,
         int | None,
@@ -256,7 +254,7 @@ async def _add_positions_from_page(
     page: int,
     need_nmids: set[int],
     total_pages: TotalPages,
-) -> (list[WBItemPosition],):
+) -> tuple[list[WBItemPosition]]:
     if stop_event.is_set():
         return []
     try:

@@ -10,12 +10,12 @@ router = Router()
 
 
 @router.callback_query(
-    callbacks.CPMSettingMenu.filter(F.action == "turn_on_auto_max_cpm_mode")  #ignore
+    callbacks.CPMSettingMenu.filter(F.action == "turn_on_auto_max_cpm_mode")  # ignore
 )
 async def turn_on_auto_max_cpm_mode(
-        callback_query: CallbackQuery,
-        callback_data: callbacks.CPMSettingMenu,
-        bot: Bot,
+    callback_query: CallbackQuery,
+    callback_data: callbacks.CPMSettingMenu,
+    bot: Bot,
 ) -> None:
     adv_original_id: int = callback_data.adv_original_id
 
@@ -37,9 +37,9 @@ async def turn_on_auto_max_cpm_mode(
     callbacks.CPMSettingMenu.filter(F.action == "turn_off_auto_max_cpm_mode")
 )
 async def turn_off_auto_max_cpm_mode(
-        callback_query: CallbackQuery,
-        callback_data: callbacks.CPMSettingMenu,
-        bot: Bot,
+    callback_query: CallbackQuery,
+    callback_data: callbacks.CPMSettingMenu,
+    bot: Bot,
 ) -> None:
     adv_original_id: int = callback_data.adv_original_id
 

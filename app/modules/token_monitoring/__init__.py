@@ -3,7 +3,7 @@
 __all__ = [
     # Models
     "TokenNotificationTracker",
-    "NotificationType", 
+    "NotificationType",
     # Services
     "TokenInfoService",
     "TokenMonitoringService",

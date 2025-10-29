@@ -42,7 +42,7 @@ class CommonStatDataManager:
         )
 
         auction_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            [auction_adv_id], start_date, end_date
+            [auction_adv_id], start_date, end_date  # type: ignore[list-item]
         )
 
         concatenated_result = full_wb_adv_stat.concatenate_stats(
@@ -105,9 +105,10 @@ class CommonStatDataManager:
         max_price_for_order = adv.max_price_for_order
 
         text += (
-            f"План: продажи: {target_sales if target_sales else ' Не задано'},"
-            f" цель: {str(target_price) + 'р.' if target_sales else ' Не задано'},"
-            f" макс: {str(max_price_for_order) + 'р.' if max_price_for_order else ' Не задано'}"
+            f"План:\n"
+            f"  -продажи: {target_sales if target_sales else ' Не задано'}\n"
+            f"  -цель: {str(target_price) + 'р.' if target_sales else ' Не задано'}\n"
+            f"  -макс: {str(max_price_for_order) + 'р.' if max_price_for_order else ' Не задано'}\n"
         )
 
         return text

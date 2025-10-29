@@ -26,7 +26,7 @@ async def update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None:
 
 
 async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None:
-    """  TODO Была ошибка, когда пытаемся добавить две одинаковых РК. Вообще, такого быть не должно
+    """TODO Была ошибка, когда пытаемся добавить две одинаковых РК. Вообще, такого быть не должно
     но есть, если юзеры не правильно прописывают в названии артикул Аукциона
     """
     advs_to_process = []

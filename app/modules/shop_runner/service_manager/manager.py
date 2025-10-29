@@ -40,7 +40,6 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-
 class CoroutinesManager:
     def __init__(self, wb_api: WBApi):
         wb_cabinet = wb_api.wb_cabinet
@@ -67,15 +66,19 @@ class CoroutinesManager:
             return None
         logger.debug(f"Обновляю ставки для магазина {self.shop_id}")
         await asyncio.gather(
-            *[self.__run_bidder_process_for_adv(adv, self._wb_api) for adv in adv_settings]
+            *[
+                self.__run_bidder_process_for_adv(adv, self._wb_api)
+                for adv in adv_settings
+            ]
         )
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
         return None
 
-    async def __run_bidder_process_for_adv(self, adv_setting: AdvSetting, wb_api: WBApi) -> None:
+    async def __run_bidder_process_for_adv(
+        self, adv_setting: AdvSetting, wb_api: WBApi
+    ) -> None:
         keywords = await self._wb_shop_data_manager.get_calculated_keywords(adv_setting)
         await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
-
 
     @while_coroutine_decorator(5 * 60)
     async def update_common_sale_stat(self) -> None:
@@ -102,10 +105,10 @@ class CoroutinesManager:
             if auction_adv_id := adv.search_adv_id:
                 all_adv_ids.add(auction_adv_id)
 
-        full_stats: list[
-            FullAdvStat
-        ] = await wb_data_getter.get_full_adv_stat_for_adv_ids(
-            wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
+        full_stats: list[FullAdvStat] = (
+            await wb_data_getter.get_full_adv_stat_for_adv_ids(
+                wb_api, all_adv_ids, threshold_dates=settings.FULL_STAT_THRESHOLD_DATES
+            )
         )
         if full_stats:
             await self._update_full_stat_in_click_house(full_stats)
@@ -114,10 +117,9 @@ class CoroutinesManager:
                 await data_manager.set_last_full_stat_update(stat.advertId, date_time)
         return None
 
-
     @staticmethod
     async def _update_cards_data_from_wb_to_pg(
-            shop_data_updater: ShopDataUpdater,
+        shop_data_updater: ShopDataUpdater,
     ) -> None:
         await shop_data_updater.update_cards_data()
 
@@ -129,7 +131,7 @@ class CoroutinesManager:
 
     @staticmethod
     async def _async_zip_longest(
-            *async_gens, fillvalue=None
+        *async_gens, fillvalue=None
     ) -> AsyncGenerator[tuple[Any, ...], None]:
         iterators = [gen.__aiter__() for gen in async_gens]
         finished = [False] * len(iterators)
@@ -164,10 +166,10 @@ class CoroutinesManager:
         for adv in active_advs:
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
 
-            generator: AsyncGenerator[
-                tuple[str, int], None
-            ] = parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
-                adv, keywords
+            generator: AsyncGenerator[tuple[str, int], None] = (
+                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
+                    adv, keywords
+                )
             )
             generators.append(generator)
         zipped_generators = self._async_zip_longest(*generators)
@@ -217,16 +219,16 @@ class CoroutinesManager:
             FirstKeyUpdater,
         )
 
-        all_active_advs: list[
-            AdvSetting
-        ] = await self._wb_shop_data_manager.get_active_advs()
+        all_active_advs: list[AdvSetting] = (
+            await self._wb_shop_data_manager.get_active_advs()
+        )
         tasks = []
         for adv in all_active_advs:
             if not adv.auto_update_white_list:
                 continue
-            keywords: Awaitable[
-                list[CalculatedKeyword]
-            ] = self._wb_shop_data_manager.get_calculated_keywords(adv)
+            keywords: Awaitable[list[CalculatedKeyword]] = (
+                self._wb_shop_data_manager.get_calculated_keywords(adv)
+            )
             updater = FirstKeyUpdater(adv)
             update_coroutine: Coroutine[Any, Any, None] = updater.top_key_auto_update(
                 keywords

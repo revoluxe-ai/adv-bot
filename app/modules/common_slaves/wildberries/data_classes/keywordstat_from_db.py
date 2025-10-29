@@ -168,4 +168,3 @@ class CalculatedKeyword(BaseModel):
     @property
     def is_in_white_list(self) -> bool:
         return self.hard_status == 2
-

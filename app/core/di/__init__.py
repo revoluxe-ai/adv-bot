@@ -5,7 +5,7 @@ __all__ = [
     "DIManager",
     "inject",
     "Provide",
-    'DIManager',
+    "DIManager",
 ]
 
 from .app_container import AppContainer

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class AdvSettingAutoUpdater:
-    def __init__(self, adv: AdvSetting, max_last_period: int):
+    def __init__(self, adv: AdvSetting, max_last_period: int = 2):
         self._adv = adv
         auto_adv_id = self._adv.adv_id
         self._all_adv_ids = [auto_adv_id]
@@ -33,16 +33,31 @@ class AdvSettingAutoUpdater:
 
         self._max_last_period = max_last_period
 
-    def get_fact_data_from_stat(self, common_stat_data: CommonAdvsStatData) -> FactData:
-        fact_data = self.__get_fact_data_from_stats(common_stat_data)
-        return fact_data
-
-    async def get_fact_data(self, keywords: list[CalculatedKeyword]) -> FactData:
+    async def __get_stat_data(
+        self, keywords: list[CalculatedKeyword]
+    ) -> CommonAdvsStatData:
         common_stat_manager = CommonAdvsStatDataManager()
         stat: CommonAdvsStatData = await common_stat_manager.get_data(
             self._adv, keywords, last_days=self._max_last_period
         )
-        fact = self.get_fact_data_from_stat(stat)
+        return stat
+
+    async def get_fact_data_and_stat(
+        self, keywords: list[CalculatedKeyword]
+    ) -> tuple[FactData, CommonAdvsStatData]:
+        stat = await self.__get_stat_data(keywords)
+        fact = self._get_fact_data_from_stat(stat)
+        return fact, stat
+
+    def _get_fact_data_from_stat(
+        self, common_stat_data: CommonAdvsStatData
+    ) -> FactData:
+        fact_data = self.__get_fact_data_from_stats(common_stat_data)
+        return fact_data
+
+    async def get_fact_data(self, keywords: list[CalculatedKeyword]) -> FactData:
+        stat = await self.__get_stat_data(keywords)
+        fact = self._get_fact_data_from_stat(stat)
         return fact
 
     async def update(
@@ -78,6 +93,7 @@ class AdvSettingAutoUpdater:
             predict_orders=mean_orders,
             pay_for_order=mean_pay_for_order,
             original_orders=common_stat_data.all_orders_for_last_days,
+            fact_method=common_stat_data.sales_predict_method,
         )
 
         return fact_data
@@ -98,14 +114,15 @@ class AdvSettingAutoUpdater:
 
         return plan
 
-    async def add_top_keyword_to_white_list(
-        self, keywords: list[CalculatedKeyword]
-    ) -> None:
+    @staticmethod
+    async def add_top_keyword_to_white_list(keywords: list[CalculatedKeyword]) -> None:
         if not keywords:
             return None
         assert keywords
-        keywords.sort(key=lambda kw: kw.predict_ctr, reverse=True)
-
+        keywords.sort(
+            key=lambda kw: kw.predict_ctr, reverse=True
+        )  # ignore: type: ignore # predict_ctr не может быть
+        # None здесь. Надо переделать CalculatedKeyword, чтобы у него не было полей с None, как минимум для predict_ctr
         first_kw = keywords[0]
 
         if first_kw.relevant and first_kw.hard_status == 1:
@@ -119,8 +136,8 @@ class AdvSettingAutoUpdater:
                 await session.commit()
         return None
 
+    @staticmethod
     def __get_mean_orders(
-        self,
         stat_data: list[SmallFullAdvStatPerDay],
     ) -> float:
         assert len(stat_data) > 1, "Должно быть данных больше, чем за 2 дня"
@@ -141,11 +158,11 @@ class AdvSettingAutoUpdater:
         predict_order_for_day = mean_orders_for_sec * 24 * 60 * 60
         return predict_order_for_day
 
+    @staticmethod
     def __get_mean_pay_for_order(
-        self,
         stat_data: list[SmallFullAdvStatPerDay],
-    ):
-        stat_data.sort(key=lambda stat: stat.date, reverse=True)
+    ) -> float:
+        stat_data.sort(key=lambda st: st.date, reverse=True)
         for n, stat in enumerate(stat_data):
             if stat.orders > 0:
                 n += 1

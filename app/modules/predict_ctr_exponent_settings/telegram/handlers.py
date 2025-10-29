@@ -23,23 +23,34 @@ async def change_exponent_setting(
     callback: CallbackQuery,
     callback_data: ChangeExponentSettinginAdvSettingCallback,
     state: FSMContext,
-):
+) -> None:
     adv_id = callback_data.adv_id
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    await state.update_data(adv_id=adv_id,
-                            last_wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    await state.update_data(
+        adv_id=adv_id, last_wb_user_cabinet_original_id=wb_user_cabinet_original_id
+    )
     await state.set_state("waiting_for_new_exponent")
     message = callback.message
-    await message.answer("Введите новое значение для экспоненты прогнозируемого CTR:")
+    if message is None:
+        return  # Или обработать ошибку иным образом
+    if isinstance(message, Message):
+        await message.answer(
+            "Введите новое значение для экспоненты прогнозируемого CTR:"
+        )
+    else:
+        # Обработать случай, когда message является InaccessibleMessage, например, log или просто return
+        return
 
 
 @router.message(StateFilter("waiting_for_new_exponent"))
 async def set_new_exponent_for_predict_ctr(
     message: Message, state: FSMContext, bot: Bot
-):
+) -> None:
     data = await state.get_data()
     adv_id: int = data["adv_id"]
-    text = message.text
+    text: str | None = message.text
+    if text is None:
+        return  # Или обработать ошибку
     if text == "/start":
         await state.set_state(None)
         await start_registration(message, bot, state)
@@ -68,13 +79,12 @@ async def set_new_exponent_for_predict_ctr(
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
-    chat_id = message.from_user.id
+    chat_id: int | None = message.from_user.id if message.from_user else None
+    if chat_id is None:
+        return  # или обработать ошибку
     adv_choice_last_page = 1
-    try:
-        main_photos = await data_manager.get_main_photos(nmids[:1])
-    except:
-        await messages.NoMainPhotos(bot, chat_id)(adv_setting)
-        return
+
+    main_photos = await data_manager.get_main_photos(nmids[:1])
 
     await messages.AdvKeywordsSetting(
         bot,

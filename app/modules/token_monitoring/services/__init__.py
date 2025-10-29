@@ -2,7 +2,7 @@
 
 __all__ = [
     "TokenInfoService",
-    "TokenStatusReport", 
+    "TokenStatusReport",
     "TokenInfo",
     "ExpiringToken",
     "PermissionValidation",

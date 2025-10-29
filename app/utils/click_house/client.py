@@ -78,10 +78,10 @@ class get_clickhouse_client:
         global function_count_lock
 
         if (
-                system_name == "Linux"
-                and connection_lock is not None
-                and connection_count is not None
-                and function_count_lock is not None
+            system_name == "Linux"
+            and connection_lock is not None
+            and connection_count is not None
+            and function_count_lock is not None
         ):
             # Извлекаем имя текущей функции, её вызывающей функции и функции,
             # которая вызвала вызывающую функцию из стека вызовов
@@ -124,8 +124,8 @@ class get_clickhouse_client:
                 # Функция 3-го уровня
                 if self.grand_caller_func_name:
                     if (
-                            self.grand_caller_func_name
-                            not in grand_caller_function_connection_count
+                        self.grand_caller_func_name
+                        not in grand_caller_function_connection_count
                     ):
                         grand_caller_function_connection_count[
                             self.grand_caller_func_name
@@ -162,10 +162,10 @@ class get_clickhouse_client:
             client.close()
 
         if (
-                system_name == "Linux"
-                and connection_lock is not None
-                and connection_count is not None
-                and function_count_lock is not None
+            system_name == "Linux"
+            and connection_lock is not None
+            and connection_count is not None
+            and function_count_lock is not None
         ):
             with connection_lock:
                 connection_count.value -= 1
@@ -184,8 +184,8 @@ class get_clickhouse_client:
                 # Вызывающая функция
                 caller_func_name = self.caller_func_name
                 if (
-                        caller_func_name is not None
-                        and caller_func_name in caller_function_connection_count
+                    caller_func_name is not None
+                    and caller_func_name in caller_function_connection_count
                 ):
                     caller_function_connection_count[caller_func_name] -= 1
                     logger.debug(
@@ -196,8 +196,8 @@ class get_clickhouse_client:
                 # Функция 3-го уровня
                 grand_caller_func_name = self.grand_caller_func_name
                 if (
-                        grand_caller_func_name is not None
-                        and grand_caller_func_name in grand_caller_function_connection_count
+                    grand_caller_func_name is not None
+                    and grand_caller_func_name in grand_caller_function_connection_count
                 ):
                     grand_caller_function_connection_count[grand_caller_func_name] -= 1
                     logger.debug(

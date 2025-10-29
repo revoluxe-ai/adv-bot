@@ -1,13 +1,31 @@
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+
 
 class FactData(BaseModel):
     predict_orders: float
     original_orders: int
     pay_for_order: float
-
+    fact_method: FactMethods
     # Настройки для автоматического преобразования типов
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        use_enum_values=True,  # Enum -> value
+        ser_json_timedelta="iso8601",  # если где-то timedelta
+        ser_json_bytes="base64",  # на будущее
+    )
+
+    @property
+    def method_ru(self) -> str:
+        if self.fact_method == FactMethods.DIRECT_SALES:
+            return "По прямым продажам"
+        elif self.fact_method == FactMethods.BY_CARTS:
+            return "По корзинам"
+        else:
+            raise NotImplementedError(
+                f"Неизвестный метод расчета факта: {self.fact_method}"
+            )
 
 
 class PlanData(BaseModel):
@@ -27,9 +45,16 @@ class PlanData(BaseModel):
 
     @property
     def full_settings(self) -> bool:
-        return all([
-            self.orders is not None,
-            self.target_pay_for_order is not None,
-            self.max_pay_for_order is not None
-        ])
+        return all(
+            [
+                self.orders is not None,
+                self.target_pay_for_order is not None,
+                self.max_pay_for_order is not None,
+            ]
+        )
 
+    model_config = ConfigDict(
+        use_enum_values=True,  # Enum -> value
+        ser_json_timedelta="iso8601",  # если где-то timedelta
+        ser_json_bytes="base64",  # на будущее
+    )

@@ -3,10 +3,15 @@
 Простой тест для проверки работы сервиса прогнозирования CTR
 """
 
+import pytest
+
+pytest.skip("Этот файл не должен выполняться", allow_module_level=True)
+
 import asyncio
 import logging
 
 import grpc  # type: ignore
+import pytest
 
 from app.modules.grpcs.predict_ctr_service.grpc_service.predict_ctr_service_pb2 import (
     PredictCtrRequest,

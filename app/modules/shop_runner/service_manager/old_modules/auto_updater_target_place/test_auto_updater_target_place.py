@@ -1,5 +1,7 @@
 import pytest
 
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+
 """Tests for AutoUpdaterTargetPlace target place updating logic."""
 
 import datetime
@@ -38,7 +40,8 @@ def result_mock():
     "max_price_for_order,"
     "plan_for_sales_for_day,"
     "current_target_place,"
-    "new_target_place",
+    "new_target_place,"
+    "predict_method",
     [
         (
             200,  # факт цена заказа
@@ -52,6 +55,7 @@ def result_mock():
             10,  # план продаж в день
             5,  # начальная целевая позиция
             6,  # новая целевая позиция
+            FactMethods.BY_CARTS.value,
         ),
         (
             50,  # факт цена заказа
@@ -65,6 +69,7 @@ def result_mock():
             10,  # план продаж в день
             2,  # начальная целевая позиция
             1,  # новая целевая позиция
+            FactMethods.BY_CARTS.value,
         ),
         (
             50,  # факт цена заказа
@@ -77,7 +82,8 @@ def result_mock():
             150,  # максимальная цена заказа
             10,  # план продаж в день
             1,  # начальная целевая позиция
-            1,  # новая целевая позиция
+            1,  # новая целевая позиция,
+            FactMethods.BY_CARTS.value,
         ),
         (
             50,  # факт цена заказа
@@ -90,7 +96,8 @@ def result_mock():
             150,  # максимальная цена заказа
             10,  # план продаж в день
             5,  # начальная целевая позиция
-            5,  # новая целевая позиция
+            5,  # новая целевая позиция,
+            FactMethods.BY_CARTS.value,
         ),
         (
             10,  # факт цена заказа
@@ -103,7 +110,8 @@ def result_mock():
             150,  # максимальная цена заказа
             10,  # план продаж в день
             5,  # начальная целевая позиция
-            5,  # новая целевая позиция
+            5,  # новая целевая позиция,
+            FactMethods.BY_CARTS.value,
         ),
         (
             60,  # факт цена заказа
@@ -116,7 +124,8 @@ def result_mock():
             150,  # максимальная цена заказа
             10,  # план продаж в день
             5,  # начальная целевая позиция
-            5,  # новая целевая позиция
+            5,  # новая целевая позиция,
+            FactMethods.BY_CARTS.value,
         ),
         (
             60,  # факт цена заказа
@@ -129,10 +138,111 @@ def result_mock():
             150,  # максимальная цена заказа
             10,  # план продаж в день
             5,  # начальная целевая позиция
+            6,  # новая целевая позиция,
+            FactMethods.BY_CARTS.value,
+        ),
+        #################
+        (
+            200,  # факт цена заказа
+            1,  # факт количество заказов
+            (
+                now - datetime.timedelta(hours=5),  # прошлое последнее обновление
+                10,  # сумма spend по ключам из редис
+            ),
+            50,  # целевая цена заказа
+            150,  # максимальная цена заказа
+            10,  # план продаж в день
+            5,  # начальная целевая позиция
             6,  # новая целевая позиция
+            FactMethods.DIRECT_SALES.value,
+        ),
+        (
+            50,  # факт цена заказа
+            1,  # факт количество заказов
+            (
+                now - datetime.timedelta(hours=5),  # прошлое последнее обновление
+                10,  # сумма spend по ключам из редис
+            ),
+            50,  # целевая цена заказа
+            150,  # максимальная цена заказа
+            10,  # план продаж в день
+            2,  # начальная целевая позиция
+            1,  # новая целевая позиция
+            FactMethods.DIRECT_SALES.value,
+        ),
+        (
+            50,  # факт цена заказа
+            1,  # факт количество заказов
+            (
+                now - datetime.timedelta(hours=5),  # прошлое последнее обновление
+                10,  # сумма spend по ключам из редис
+            ),
+            50,  # целевая цена заказа
+            150,  # максимальная цена заказа
+            10,  # план продаж в день
+            1,  # начальная целевая позиция
+            1,  # новая целевая позиция,
+            FactMethods.DIRECT_SALES.value,
+        ),
+        (
+            50,  # факт цена заказа
+            15,  # факт количество заказов
+            (
+                now - datetime.timedelta(hours=5),  # прошлое последнее обновление
+                10,  # сумма spend по ключам из редис
+            ),
+            50,  # целевая цена заказа
+            150,  # максимальная цена заказа
+            10,  # план продаж в день
+            5,  # начальная целевая позиция
+            5,  # новая целевая позиция,
+            FactMethods.DIRECT_SALES.value,
+        ),
+        (
+            10,  # факт цена заказа
+            15,  # факт количество заказов
+            (
+                now - datetime.timedelta(hours=5),  # прошлое последнее обновление
+                10,  # сумма spend по ключам из редис
+            ),
+            50,  # целевая цена заказа
+            150,  # максимальная цена заказа
+            10,  # план продаж в день
+            5,  # начальная целевая позиция
+            5,  # новая целевая позиция,
+            FactMethods.DIRECT_SALES.value,
+        ),
+        (
+            60,  # факт цена заказа
+            15,  # факт количество заказов
+            (
+                now - datetime.timedelta(minutes=20),  # прошлое последнее обновление
+                10,  # сумма spend по ключам из редис
+            ),
+            50,  # целевая цена заказа
+            150,  # максимальная цена заказа
+            10,  # план продаж в день
+            5,  # начальная целевая позиция
+            5,  # новая целевая позиция,
+            FactMethods.DIRECT_SALES.value,
+        ),
+        (
+            60,  # факт цена заказа
+            15,  # факт количество заказов
+            (
+                now - datetime.timedelta(minutes=70),  # прошлое последнее обновление
+                10,  # сумма spend по ключам из редис
+            ),
+            50,  # целевая цена заказа
+            150,  # максимальная цена заказа
+            10,  # план продаж в день
+            5,  # начальная целевая позиция
+            6,  # новая целевая позиция,
+            FactMethods.DIRECT_SALES.value,
         ),
     ],
 )
+@pytest.mark.asyncio
 async def test_update_target_place(
     fact_mean_price_for_order_for_last_two_days: float,
     fact_mean_orders_for_last_two_days: int,
@@ -146,6 +256,7 @@ async def test_update_target_place(
     keywords_mocks: list[CalculatedKeyword],
     get_async_session_mock,
     session_mock,
+    predict_method: FactMethods,
 ) -> None:
     """Verify target place update logic across scenarios."""
     adv_setting_mock.max_price_for_order = max_price_for_order
@@ -163,14 +274,15 @@ async def test_update_target_place(
 
     plan_data = PlanData(
         orders=plan_for_sales_for_day,
-        target_pay_for_order=target_price_for_order,
-        max_pay_for_order=max_price_for_order,
+        target_pay_for_order=int(target_price_for_order),
+        max_pay_for_order=int(max_price_for_order),
     )
 
     fact_data = FactData(
         predict_orders=fact_mean_orders_for_last_two_days,
         pay_for_order=fact_mean_price_for_order_for_last_two_days,
         original_orders=fact_mean_orders_for_last_two_days,
+        fact_method=predict_method,
     )
 
     with (

@@ -46,7 +46,9 @@ async def update_wb_adv_phrases_in_neo():
     async with sm() as session:
         stmt = (
             select(AdvSetting)
-            .options(load_only(AdvSetting.name, AdvSetting._search_adv_id, AdvSetting.adv_id))
+            .options(
+                load_only(AdvSetting.name, AdvSetting._search_adv_id, AdvSetting.adv_id)
+            )
             .where(AdvSetting.bot_active == True)
         )
         result_for_advs = await session.execute(stmt)
@@ -59,9 +61,7 @@ async def update_wb_adv_phrases_in_neo():
                 all_adv_ids.add(search_adv_id)
 
     async with get_clickhouse_client() as ch_client:
-        query = (
-            f"SELECT DISTINCT text FROM default_db.advkeyword_new WHERE adv_id IN {list(all_adv_ids)}"
-        )
+        query = f"SELECT DISTINCT text FROM default_db.advkeyword_new WHERE adv_id IN {list(all_adv_ids)}"
         result = await ch_client.query(query)
         texts = [text[0] for text in result.result_rows]
         clear_texts = set()
@@ -75,7 +75,9 @@ async def update_wb_adv_phrases_in_neo():
             if cluster:
                 cluster = text_cleaner.clear(cluster)
                 hash_text = get_text_hash(cluster)
-                check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(hash_text)
+                check_in_neo_by_redis = await redis_manager.check_phrase_in_neo(
+                    hash_text
+                )
                 if not check_in_neo_by_redis:
                     clear_texts.add(cluster)
         texts = clear_texts

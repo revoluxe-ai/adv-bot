@@ -3,7 +3,13 @@ import datetime
 
 class CommonCardStat:
     def __init__(
-        self, nmid, open_card, add_to_cart, orders, orders_sum, buy_outs
+        self,
+        nmid: int,
+        open_card: int,
+        add_to_cart: int,
+        orders: int,
+        orders_sum: int,
+        buy_outs: int,
     ) -> None:
         self.nmid = nmid
         self.open_card = open_card

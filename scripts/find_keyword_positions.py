@@ -18,7 +18,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
-from typing import Iterable
+from collections.abc import Iterable
 
 from aiogram.client.session import aiohttp
 
@@ -194,7 +194,9 @@ async def main_async(keyword: str, nmids: Iterable[int], max_pages: int) -> None
     found_nmid = {placement.nmid for placement in placements}
     missing = set(nmids) - found_nmid
     if missing:
-        print("Не найдены в выдаче: %s" % ", ".join(str(nmid) for nmid in sorted(missing)))
+        print(
+            "Не найдены в выдаче: %s" % ", ".join(str(nmid) for nmid in sorted(missing))
+        )
 
 
 def main() -> None:
@@ -221,4 +223,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

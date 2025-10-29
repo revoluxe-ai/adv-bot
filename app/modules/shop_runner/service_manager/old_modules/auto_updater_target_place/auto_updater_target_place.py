@@ -59,9 +59,9 @@ class AutoUpdaterTargetPlace:
         redis_manager = LastTargetPlaceUpdateRedisManager(adv)
         last_target_place_update_timestamp: datetime.datetime | None = None
         last_spend: float | None = None
-        result: (
-            tuple[datetime.datetime, float] | None
-        ) = await redis_manager.get_last_target_place_update()
+        result: tuple[datetime.datetime, float] | None = (
+            await redis_manager.get_last_target_place_update()
+        )
         if result:
             last_target_place_update_timestamp, last_spend = result
 
