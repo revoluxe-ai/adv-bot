@@ -87,6 +87,7 @@ class AdvSettingAutoUpdater:
             predict_orders=mean_orders,
             pay_for_order=mean_pay_for_order,
             original_orders=common_stat_data.all_orders_for_last_days,
+            fact_method=common_stat_data.sales_predict_method,
         )
 
         return fact_data

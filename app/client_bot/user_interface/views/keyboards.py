@@ -11,6 +11,7 @@ from app.client_bot.user_interface.views.callbacks import (
     TurnBot,
     OrdersSourceToggle,
     PredictCTRModeToggle,
+    SalesPredictMethodToggle,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -24,6 +25,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
@@ -126,13 +128,27 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     builder.row(button)
 
+    # Кнопка переключения метода прогноза продаж (сразу под источником заказов)
+    if adv_setting.sales_predict_method == FactMethods.DIRECT_SALES:
+        text = "Переключить на прогноз продаж по корзинам"
+        new_method = FactMethods.BY_CARTS
+    else:
+        text = "Переключить на прямой прогноз продаж"
+        new_method = FactMethods.DIRECT_SALES
+
+    callback = SalesPredictMethodToggle(
+        new_method=new_method, adv_setting_original_id=adv_setting.id
+    ).pack()
+    button = InlineKeyboardButton(text=text, callback_data=callback)
+    builder.row(button)
+
     # Добавляем кнопку переключения режима прогноза CTR
     if adv_setting.predict_ctr_mode == PredictCTRMode.V1:
         text = "Переключить на режим прогноза CTR v2 (по артикулам)"
-        new_mode = PredictCTRMode.V2.value
+        new_mode = PredictCTRMode.V2
     else:
         text = "Переключить на режим прогноза CTR v1 (по ID кампании)"
-        new_mode = PredictCTRMode.V1.value
+        new_mode = PredictCTRMode.V1
 
     callback = PredictCTRModeToggle(
         new_mode=new_mode, adv_setting_original_id=adv_setting.id

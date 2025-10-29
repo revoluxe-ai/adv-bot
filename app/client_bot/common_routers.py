@@ -51,6 +51,7 @@ from .user_interface.handlers import (
     min_views_for_ml_predict_ctr,
     orders_source_toggle,
     predict_ctr_mode_toggle,
+    sales_predict_method_toggle,
     reset_place_setting,
     setting_min_ctr,
     shop_settings,
@@ -76,6 +77,7 @@ common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(orders_source_toggle.router)
 common_router.include_routers(predict_ctr_mode_toggle.router)
+common_router.include_routers(sales_predict_method_toggle.router)
 common_router.include_routers(auto_max_cpm_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)

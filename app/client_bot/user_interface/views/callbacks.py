@@ -1,5 +1,9 @@
 from aiogram.filters.callback_data import CallbackData
 
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+
 
 class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
     wb_user_cabinet_original_id: int
@@ -218,10 +222,15 @@ class TurnWhiteListUpdate(CallbackData, prefix="turn_white_list_update"):
 
 
 class OrdersSourceToggle(CallbackData, prefix="orders_source_toggle"):
-    new_source: str  # OrdersSourceForAutoMode enum value as string
+    new_source: OrdersSourceForAutoMode
     adv_setting_original_id: int
 
 
 class PredictCTRModeToggle(CallbackData, prefix="predict_ctr_mode_toggle"):
-    new_mode: str  # PredictCTRMode enum value as string
+    new_mode: PredictCTRMode
+    adv_setting_original_id: int
+
+
+class SalesPredictMethodToggle(CallbackData, prefix="sales_predict_method_toggle"):
+    new_method: FactMethods
     adv_setting_original_id: int

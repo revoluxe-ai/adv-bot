@@ -1,13 +1,26 @@
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+
 
 class FactData(BaseModel):
     predict_orders: float
     original_orders: int
     pay_for_order: float
+    fact_method: FactMethods
+
 
     # Настройки для автоматического преобразования типов
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @property
+    def method_ru(self) -> str:
+        if self.fact_method == FactMethods.DIRECT_SALES:
+            return 'По прямым продажам'
+        elif self.fact_method == FactMethods.BY_CARTS:
+            return 'По корзинам'
+        else:
+            raise NotImplementedError(f"Неизвестный метод расчета факта: {self.fact_method}")
 
 
 class PlanData(BaseModel):
