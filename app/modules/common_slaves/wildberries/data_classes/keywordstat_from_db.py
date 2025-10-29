@@ -42,7 +42,7 @@ class CalculatedKeyword(BaseModel):
     position: int | None = None
     position_update: DatetimeType | None = None
     childs_keywords: list["CalculatedKeyword"] | None = None
-    _query_static: int | None = None
+    _query_static: int | str | None = None
     cluster_name: str | None = None
     preset: int | None = None
     original_predict_ctr: float | None = None
@@ -58,24 +58,24 @@ class CalculatedKeyword(BaseModel):
     adv_id: int | None = None
     relevant: bool | None = None
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Очистка кэшированных свойств"""
         for attr in ["_query_static", "_mean_ctr_cache", "_rating_cache"]:
             if hasattr(self, attr):
                 delattr(self, attr)
 
     @property
-    def mean_ctr(self):
+    def mean_ctr(self) -> float:
         assert self.predict_ctr is not None
         assert self.baes_ctr is not None
         return (self.predict_ctr + self.baes_ctr) / 2
 
     @property
     def rating_by_predict_ctr(self) -> float:
-        if self.predict_ctr is None or self.predict_ctr_exponent is None:
-            return 0.0
+        assert self.predict_ctr_exponent is not None
+        assert self.predict_ctr is not None
         rating = self.predict_ctr**self.predict_ctr_exponent * self.views
-        return rating
+        return float(rating)
 
     @property
     def query(self) -> int | str:
@@ -85,7 +85,7 @@ class CalculatedKeyword(BaseModel):
             return self._query_static
 
     @query.setter
-    def query(self, value: int | str):
+    def query(self, value: int | str) -> None:
         self._query_static = value
 
     def __repr__(self) -> str:

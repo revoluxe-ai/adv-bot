@@ -3,35 +3,32 @@ import logging
 from abc import abstractmethod
 from collections.abc import Callable
 from functools import wraps
-from typing import TypeVar
+from typing import TypeVar, Any
 
 import aiogram
 from aiogram import types
 from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, Message
 
 from app import file_handler
+from app.client_bot.message_manager import LastMessage as ActualLastMessage
 
 from .base import Base
 
 logger = logging.getLogger(__name__)
 
 
-class LastMessage(types.Message):
-    message_type: str
+T = TypeVar("T", bound=Message)
 
 
-T = TypeVar("T")
-
-
-def manage_file_id(func) -> Callable:
+def manage_file_id(func: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(func)
-    async def wrapper(self, *args, **kwargs) -> T | None:
+    async def wrapper(self: Any, *args: Any, **kwargs: Any) -> T | None:
         logger.debug("Вызов обертки manage_file_id")
         # Получение и изменение file_id перед вызовом основной функции
         old_image = self.image
         if old_image:
             logger.debug("Получение изображения")
-            image: io.BytesIO | str = await file_handler.get_telegram_image(
+            image: io.BytesIO | str | types.InputFile = await file_handler.get_telegram_image(
                 old_image, self.bot
             )
 
@@ -41,13 +38,13 @@ def manage_file_id(func) -> Callable:
             else:
                 self.image = image
         else:
-            image = None
+            image: io.BytesIO | str | types.InputFile | None = None
 
         # Вызов основной функции
         message: T = await func(self, *args, **kwargs)
 
         # Обработка результата выполнения основной функции для сохранения image_id
-        image_id = message.photo[-1].file_id
+        image_id = message.photo[-1].file_id # type: ignore[index]
         if isinstance(image, io.BytesIO):
             bot: aiogram.Bot = self.bot
             bot_id = bot.id
@@ -68,7 +65,7 @@ class TextWithKeyboard(Base):
     def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
-    async def __call__(self) -> tuple[Message, str]:
+    async def __call__(self) -> tuple[ActualLastMessage, str]:
         await super().__call__()
         text = self.text
         parse_mode = getattr(self, "parse_mode", None)
@@ -90,16 +87,16 @@ class TextWithKeyboard(Base):
 class TextWithImage(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
     @property
     @abstractmethod
-    def image(self):
+    def image(self) -> io.BytesIO | str | BufferedInputFile | None:
         pass
 
     @manage_file_id
-    async def __call__(self):
+    async def __call__(self) -> Message:
         parse_mode = getattr(self, "parse_mode", None)
 
         last_message = await self.bot.send_photo(
@@ -114,10 +111,10 @@ class TextWithImage(Base):
 class Text(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
-    async def __call__(self) -> (LastMessage, str):
+    async def __call__(self) -> Any:
         # Отправка нового сообщения без попытки редактирования существующего
         last_message = await self.bot.send_message(
             chat_id=self.chat_id,
@@ -131,20 +128,20 @@ class Text(Base):
 class TextWithKeyboardPagination(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
     @property
     @abstractmethod
-    def keyboard(self):
+    def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
     @property
     @abstractmethod
-    def on_page(self):
+    def on_page(self) -> int:
         pass
 
-    async def __call__(self) -> (LastMessage, str):
+    async def __call__(self) -> tuple[ActualLastMessage, str]:
         last_message = await self.bot.send_message(
             chat_id=self.chat_id,
             text=self.text,
@@ -157,20 +154,20 @@ class TextWithKeyboardPagination(Base):
 class TextWithKeyboardAndImage(Base):
     @property
     @abstractmethod
-    def text(self):
+    def text(self) -> str:
         pass
 
     @property
     @abstractmethod
-    def keyboard(self):
+    def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
     @property
-    def image(self):
+    def image(self) -> io.BytesIO | str | BufferedInputFile | None:
         return self._image
 
     @image.setter
-    def image(self, value):
+    def image(self, value: io.BytesIO | str | BufferedInputFile | None) -> None:
         self._image = value
 
     @manage_file_id

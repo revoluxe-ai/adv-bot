@@ -2,8 +2,10 @@ import datetime
 
 
 class CommonCardStat:
+    _date: datetime.date | None
+
     def __init__(
-        self, nmid, open_card, add_to_cart, orders, orders_sum, buy_outs
+        self, nmid: int, open_card: int, add_to_cart: int, orders: int, orders_sum: int, buy_outs: int
     ) -> None:
         self.nmid = nmid
         self.open_card = open_card
@@ -14,7 +16,9 @@ class CommonCardStat:
         self._date = None
 
     @property
-    def date(self) -> datetime.datetime:
+    def date(self) -> datetime.date:
+        if self._date is None:
+            raise ValueError("Date is not set.")
         return self._date
 
     @date.setter

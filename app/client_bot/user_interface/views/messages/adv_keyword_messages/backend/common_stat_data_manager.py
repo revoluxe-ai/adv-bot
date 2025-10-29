@@ -42,7 +42,7 @@ class CommonStatDataManager:
         )
 
         auction_adv_stat = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            [auction_adv_id], start_date, end_date
+            [auction_adv_id], start_date, end_date # type: ignore[list-item]
         )
 
         concatenated_result = full_wb_adv_stat.concatenate_stats(

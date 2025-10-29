@@ -234,31 +234,31 @@ class TokenExpirationService:
                 
                 # Add to shop summary
                 if shop_id not in summary["by_shop"]:
-                    summary["by_shop"][shop_id] = {
+                    summary["by_shop"][shop_id] = { # type: ignore[index]
                         "tokens": [],
                         "earliest_expiry": token.expires
                     }
                 
-                summary["by_shop"][shop_id]["tokens"].append({
+                summary["by_shop"][shop_id]["tokens"].append({ # type: ignore[index]
                     "token_id": token.id,
                     "expires": token.expires,
                     "days_until_expiry": days_until_expiry
                 })
                 
-                if token.expires < summary["by_shop"][shop_id]["earliest_expiry"]:
-                    summary["by_shop"][shop_id]["earliest_expiry"] = token.expires
+                if token.expires < summary["by_shop"][shop_id]["earliest_expiry"]: # type: ignore[index]
+                    summary["by_shop"][shop_id]["earliest_expiry"] = token.expires # type: ignore[index]
                 
                 # Add to days summary
                 if days_until_expiry <= 1:
-                    summary["by_days"]["1"].append({"shop_id": shop_id, "token_id": token.id})
+                    summary["by_days"]["1"].append({"shop_id": shop_id, "token_id": token.id}) # type: ignore[index]
                 elif days_until_expiry <= 3:
-                    summary["by_days"]["3"].append({"shop_id": shop_id, "token_id": token.id})
+                    summary["by_days"]["3"].append({"shop_id": shop_id, "token_id": token.id}) # type: ignore[index]
                 elif days_until_expiry <= 7:
-                    summary["by_days"]["7"].append({"shop_id": shop_id, "token_id": token.id})
+                    summary["by_days"]["7"].append({"shop_id": shop_id, "token_id": token.id}) # type: ignore[index]
                 elif days_until_expiry <= 14:
-                    summary["by_days"]["14"].append({"shop_id": shop_id, "token_id": token.id})
+                    summary["by_days"]["14"].append({"shop_id": shop_id, "token_id": token.id}) # type: ignore[index]
                 else:
-                    summary["by_days"]["30"].append({"shop_id": shop_id, "token_id": token.id})
+                    summary["by_days"]["30"].append({"shop_id": shop_id, "token_id": token.id}) # type: ignore[index]
             
             return summary
     

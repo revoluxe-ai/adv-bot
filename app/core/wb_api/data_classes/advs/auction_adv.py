@@ -1,4 +1,5 @@
 from app.modules.common_slaves.wildberries.data_classes.adv import Adv
+from typing import cast
 
 
 class AuctionAdv(Adv):
@@ -10,7 +11,7 @@ class AuctionAdv(Adv):
         cpm = self._data["auction_multibids"][0]["bid"]
     except KeyError:
       cpm = None
-    return cpm
+    return cast(int | None, cpm)
 
 
 __all__ = ["AuctionAdv"]

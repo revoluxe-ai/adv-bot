@@ -34,8 +34,7 @@ class GraphUpdater:
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
 
-    def linking_keywords(self):
-        self._gds.linking_keywords()
+
 
     def _check_file_hash(self):
         if os.path.exists(self._hash_file_path):

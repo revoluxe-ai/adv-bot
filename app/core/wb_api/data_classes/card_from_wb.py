@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, cast
 
 # class Size:
 #     def __init__(self, data):
@@ -47,32 +47,32 @@ class CardFromWB:
 
     @property
     def name(self) -> str:
-        return self.data["title"]
+        return str(self.data["title"])
 
     @property
     def techSize(self) -> str:
-        return self.data["sizes"][0]["techSize"]
+        return str(self.data["sizes"][0]["techSize"])
 
     @property
     def wb_mediaFiles(self) -> list[str]:
-        media = [image["big"] for image in self.data.get("photos", [])]
+        media = [str(image["big"]) for image in self.data.get("photos", [])]
         return media
 
     @property
     def subjectID(self) -> int:
-        return self.data["subjectID"]
+        return int(self.data["subjectID"])
 
     @property
     def wb_barcode(self) -> str:
-        return self.data["sizes"][0]["skus"][0]
+        return str(self.data["sizes"][0]["skus"][0])
 
     @property
     def offer_id(self) -> str:
-        return self.data["vendorCode"]
+        return str(self.data["vendorCode"])
 
     @property
     def brand(self) -> str:
-        return self.data["brand"]
+        return str(self.data["brand"])
 
     # def item_size(self):
     #     size = Size(self.data)
@@ -80,17 +80,17 @@ class CardFromWB:
 
     @property
     def characterisics(self) -> list[dict[str, Any]]:
-        return self.data["characteristics"]
+        return cast(list[dict[str, Any]], self.data["characteristics"])
 
     def createdAt(self) -> str:
-        return self.data["createdAt"]
+        return str(self.data["createdAt"])
 
     def updatedAt(self) -> str:
-        return self.data["updatedAt"]
+        return str(self.data["updatedAt"])
 
     @property
     def wb_category_name(self) -> str:
-        return self.data["subjectName"]
+        return str(self.data["subjectName"])
 
     @property
     def nmid(self) -> int:
@@ -102,21 +102,21 @@ class CardFromWB:
 
     @property
     def imtID(self) -> int:
-        return self.data["imtID"]
+        return int(self.data["imtID"])
 
 
 class CardFromError:
-    _nmid: Any
-    _offer_id: Any
+    _nmid: int
+    _offer_id: str
 
-    def __init__(self, dict_: dict[str, Any]):
-        self._nmid = dict_["nmid"]
-        self._offer_id = dict_["offer_id"]
+    def __init__(self, dict_: dict[str, Any]) -> None:
+        self._nmid = int(dict_["nmid"])
+        self._offer_id = str(dict_["offer_id"])
 
     @property
-    def nmid(self) -> Any:
+    def nmid(self) -> int:
         return self._nmid
 
     @property
-    def offer_id(self) -> Any:
+    def offer_id(self) -> str:
         return self._offer_id

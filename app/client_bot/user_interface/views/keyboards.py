@@ -417,7 +417,7 @@ def get_advs_keyboard_with_paginator(
         ).pack(),
     )
 
-    keyboard_buttons.append([button])
+    keyboard_buttons.append([button]) # type: ignore[list-item]
     button = InlineKeyboardButton(
         text="Полностью обновить мета-данные от WB",
         callback_data=callbacks.UpdateCompanyFromWB(
@@ -425,7 +425,7 @@ def get_advs_keyboard_with_paginator(
         ).pack(),
     )
 
-    keyboard_buttons.append([button])
+    keyboard_buttons.append([button]) # type: ignore[list-item]
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     return keyboard
 
@@ -952,7 +952,7 @@ def get_return_for_your_ref_links():
 
 
 def get_shop_menu_keyboard(
-        wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True
+        wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True # type: ignore[valid-type]
 ):
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     expiration_time: datetime.datetime = wb_cabinet.expiration_time

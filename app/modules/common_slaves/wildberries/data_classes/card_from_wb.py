@@ -96,7 +96,7 @@ class CardFromWB:
 
     @property
     def imtID(self) -> int:
-        return self.data["imtID"]
+        return int(self.data["imtID"])
 
 
 class CardFromError:

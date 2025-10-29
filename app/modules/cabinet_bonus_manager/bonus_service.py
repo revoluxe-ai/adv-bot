@@ -29,7 +29,7 @@ async def get_cabinet_by_id(cabinet_id: int) -> WBCabinet:
                 selectinload(WBCabinet.balance_payments),
             )
         )
-        result: Result[WBCabinet] = await session.execute(stmt)
+        result: Result[tuple[WBCabinet]] = await session.execute(stmt)
         return result.scalar_one_or_none()
 
 

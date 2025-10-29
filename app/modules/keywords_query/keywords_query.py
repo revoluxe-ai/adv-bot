@@ -1,4 +1,5 @@
 import os
+from typing import cast
 
 import pandas as pd
 
@@ -21,7 +22,8 @@ min_query = list(queries_dict.values())[-1]
 def get_queries_of_keyword(keyword: str) -> int | str:
     # Попытка получить значение из словаря
     if keyword in queries_dict:
-        return queries_dict[keyword]
+        # Явно приводим тип, так как queries_dict может содержать int или str
+        return cast(int | str, queries_dict[keyword])
 
     # Возврат значения из последней строки, если ключевое слово отсутствует
     return f"<{min_query}"

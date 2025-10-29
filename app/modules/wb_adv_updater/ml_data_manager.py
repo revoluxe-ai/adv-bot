@@ -219,7 +219,7 @@ async def update_keywords_ctr_by_similary() -> None:
         try:
             adv_id, keyword_text = key.split(":")[1:]
         except Exception:
-            logger.error(f"Ошибка парсинга ключа {key}", exc_info=True)
+            logger.error(f"Ошибка парсинга ключа {key}", exc_info=True) # type: ignore[str-bytes-safe]
             continue
         if keyword_text in keywords:
             continue

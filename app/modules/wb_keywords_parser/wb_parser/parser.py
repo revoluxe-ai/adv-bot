@@ -256,7 +256,7 @@ async def _add_positions_from_page(
     page: int,
     need_nmids: set[int],
     total_pages: TotalPages,
-) -> (list[WBItemPosition],):
+) -> list[WBItemPosition]:
     if stop_event.is_set():
         return []
     try:

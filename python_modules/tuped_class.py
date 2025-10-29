@@ -1,5 +1,8 @@
+from typing import Any
+
+
 class TypedClass:
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         annotations = self.__annotations__
         for name, value in kwargs.items():
             if name not in annotations:

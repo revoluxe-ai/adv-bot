@@ -54,7 +54,7 @@ class Index:
         batch_size: int,
     ):
         index = getattr(faiss, index_type)(
-            len(getattr(objects[0], vector_property_name))
+            len(getattr(objects[0], vector_property_name)) # type: ignore[index]
         )
         index = faiss.IndexIDMap(index)
 

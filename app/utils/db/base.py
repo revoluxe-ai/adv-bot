@@ -1,8 +1,12 @@
 from sqlalchemy import Integer
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Mapped, declared_attr, mapped_column
+from sqlalchemy.orm import Mapped, declared_attr
+from sqlalchemy.orm import DeclarativeBase, mapped_column
+from typing import Any
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 class BaseTable(Base):
@@ -10,7 +14,7 @@ class BaseTable(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     @declared_attr
-    def __tablename__(self):
+    def __tablename__(self) -> Any:
         return self.__name__.lower()
 
     def __repr__(self) -> str:

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+import typing
 
 from pydantic import BaseModel, ConfigDict
 
@@ -19,21 +20,23 @@ class Adv(BaseModel, ABC):
 
     @property
     @abstractmethod
-    def cpm(self) -> int:
+    def cpm(self: typing.Any) -> int:
         pass
 
     @property
     @abstractmethod
-    def nmids(self) -> list[int]:
+    def nmids(self: typing.Any) -> list[int]:
         pass
 
     @property
-    def category_name(self) -> str:
-        return self.autoParams.subject.name
+    @abstractmethod
+    def category_name(self: typing.Any) -> str:
+        pass
 
     @property
-    def subject_id(self) -> int:
-        return self.autoParams.subject.id
+    @abstractmethod
+    def subject_id(self: typing.Any) -> int:
+        pass
 
     @property
     def status_native(self) -> str:

@@ -5,7 +5,7 @@ from aiogram import Bot
 from aiohttp import ClientSession
 from sqlalchemy import and_, or_, select
 
-from app.core.wb_api.data_classes.adv import Balances
+from app.core.wb_api.data_classes.advs.other_classes import Balances
 from app.core.wb_api.mixins.excs import (
     AdvNotFoundInWBError,
     CardNotFoundInWB,
@@ -138,7 +138,7 @@ class MainAdvManager:
             assert wb_cabinet is not None
             async with sm() as session:
                 await wb_db_manager.update_cards_in_db(
-                    [target_card],
+                    [target_card], # type: ignore[list-item]
                     wb_cabinet,
                 )
             name = target_card.name
@@ -301,7 +301,7 @@ class MainAdvManager:
             return True
         return False
 
-    def _get_balance_type(self, balances: Balances) -> (int, str):
+    def _get_balance_type(self, balances: Balances) -> tuple[int, str]:
         is_balance_enough: bool = self._check_enough_balance(balances)
 
         if not is_balance_enough:

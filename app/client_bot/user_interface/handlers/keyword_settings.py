@@ -758,7 +758,7 @@ async def check_position(
         adv_setting_original_id = callback_data.adv_original_id
         stmt = select(AdvSetting.nmids).where(AdvSetting.id == adv_setting_original_id)
         result = await session.execute(stmt)
-        nmids: AdvSetting = result.scalar()
+        nmids: list[int] = result.scalar()
         nmid = nmids[0]
     await parser.add_wb_positions(text, {nmid}, delay=1)
     await messages.KeywordSettingMessage(

@@ -196,6 +196,7 @@ class CoroutinesManager:
             adv_updater = AdvSettingAutoUpdater(adv, last_days_for_analyze)
             keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
             adv_update = adv_updater.update(keywords)
+            # TODO: Переделать на gather? или оставить так?
             adv_update_task = asyncio.create_task(adv_update)
             update_tasks.append(adv_update_task)
 

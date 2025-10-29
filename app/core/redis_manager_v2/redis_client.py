@@ -214,7 +214,7 @@ class RedisClient(ABC):
                 args = command[1:]
                 getattr(pipe, cmd)(*args)
             results = await pipe.execute()
-        return cast(list[Any], results)
+        return results
 
     async def execute_write_pipeline(self, commands: list[list[Any]]) -> list[Any]:
         """Выполняет список команд записи через pipeline"""
@@ -224,7 +224,7 @@ class RedisClient(ABC):
                 args = command[1:]
                 getattr(pipe, cmd)(*args)
             results = await pipe.execute()
-        return cast(list[Any], results)
+        return results
 
     async def execute_pipeline_batch(
         self,

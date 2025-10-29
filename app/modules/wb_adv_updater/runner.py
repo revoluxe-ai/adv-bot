@@ -82,7 +82,7 @@ async def process_payment_for_advs() -> None:
         while True:
             now = datetime.datetime.now()
             try:
-                await billing_process_payment_for_advs(global_ttl=900)
+                await billing_process_payment_for_advs()
                 logger.info("Обработка платежей завершена успешно")
             except Exception as e:
                 logger.critical(f"Ошибка обработки платежей: {e}", exc_info=True)

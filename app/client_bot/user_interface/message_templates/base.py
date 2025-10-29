@@ -18,7 +18,7 @@ class Base(ABC):
     def chat_id(self) -> int:
         return self._chat_id
 
-    async def __call__(self: "Base", *args: Any, **kwargs: Any) -> None:
+    async def __call__(self: "Base", *args: Any, **kwargs: Any) -> Any:
         parse_mode = getattr(self, "parse_mode", None)
         self.parse_mode = parse_mode
 

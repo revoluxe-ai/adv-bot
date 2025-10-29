@@ -74,7 +74,7 @@ class CommonAdvsStatDataManager:
         # Статистика для аукциона
         full_adv_stat_for_last_days_for_auction = (
             await full_wb_adv_stat.get_stats_by_last_days(
-                [adv_setting.search_adv_id], start_date, end_date
+                [adv_setting.search_adv_id], start_date, end_date # type: ignore[list-item]
             )
         )
 

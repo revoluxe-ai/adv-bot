@@ -1,9 +1,13 @@
+# mypy: ignore-errors
 import os
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+import dotenv
+dotenv.load_dotenv()
 
 # Подставляем заглушку для app.core.wb_api.http_request до реальных импортов
 import types

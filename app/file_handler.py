@@ -75,7 +75,7 @@ async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFil
                         )
         else:
             logger.debug(f"Загрузка изображения из локального файла: {image_path}")
-            async with aiofiles.open(image_path, "rb") as f:
+            async with aiofiles.open(image_path, "rb") as f: # type: ignore[call-overload]
                 content = await f.read()
                 logger.debug("Изображение успешно прочитано из файла")
                 buffered_image = io.BytesIO(content)

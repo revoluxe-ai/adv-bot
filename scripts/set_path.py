@@ -8,14 +8,14 @@ import sys
 from pathlib import Path
 
 
-def add_project_root_to_path():
+def add_project_root_to_path() -> Path:
     """
     Добавляет корень проекта в sys.path, что позволяет скриптам работать как из корня проекта.
     """
     # Получаем абсолютный путь к директории скрипта
-    script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+    script_dir: Path = Path(os.path.dirname(os.path.abspath(__file__)))
     # Получаем корень проекта (на один уровень выше, чем директория скриптов)
-    project_root = script_dir.parent
+    project_root: Path = script_dir.parent
 
     # Если корень проекта еще не в sys.path, добавляем его
     if str(project_root) not in sys.path:
@@ -29,7 +29,7 @@ def add_project_root_to_path():
     return project_root
 
 
-def get_project_path(relative_path):
+def get_project_path(relative_path: str) -> str:
     """
     Получает абсолютный путь к файлу относительно корня проекта.
 
@@ -39,6 +39,6 @@ def get_project_path(relative_path):
     Returns:
         str: Абсолютный путь к файлу
     """
-    script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-    project_root = script_dir.parent
-    return os.path.join(project_root, relative_path)
+    script_dir: Path = Path(os.path.dirname(os.path.abspath(__file__)))
+    project_root: Path = script_dir.parent
+    return os.path.join(str(project_root), relative_path)

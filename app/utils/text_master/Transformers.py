@@ -64,7 +64,7 @@ class Word2Vec:
         null_vectors = 0
         for word in words:
             if word in self._model:
-                vector = self._model[word]
+                vector = self._model[word] # type: ignore[index]
                 vectors.append(vector)
             else:
                 null_vectors += 1

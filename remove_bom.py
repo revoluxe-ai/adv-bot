@@ -16,7 +16,7 @@ def remove_bom_from_file(path: pathlib.Path) -> bool:
     return False
 
 
-def main():
+def main() -> None:
     args = sys.argv[1:]
     project_root = pathlib.Path(__file__).parent
     modified = []

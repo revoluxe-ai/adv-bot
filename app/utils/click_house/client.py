@@ -159,7 +159,7 @@ class get_clickhouse_client:
         global function_count_lock
         client = self.client
         if client is not None:
-            client.close()
+            client.close()  # type: ignore
 
         if (
                 system_name == "Linux"
