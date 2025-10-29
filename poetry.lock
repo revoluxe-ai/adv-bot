@@ -1622,6 +1622,17 @@ packaging = ">=20"
 platformdirs = ">=4.3.6"
 
 [[package]]
+name = "flake8-regex"
+version = "0.3"
+description = "Arbitrary regex checker, extension for flake8"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+files = [
+    {file = "flake8-regex-0.3.tar.gz", hash = "sha256:812e6f9cfc66f3b8ad2bbb93ec0dede2043a16b5f5d04dc1c8f8e3590c7e67bd"},
+]
+
+[[package]]
 name = "flatbuffers"
 version = "24.3.25"
 description = "The FlatBuffers serialization format for Python"
@@ -6238,4 +6249,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.12"
-content-hash = "eb467068c880308db7a8f46a21c4c806d0044f552239ce9a269ed8cb689879d6"
+content-hash = "54ed20338843dc833af69faa216c10d3b9d57c61fc4a0b54f99b829c0d51603a"
