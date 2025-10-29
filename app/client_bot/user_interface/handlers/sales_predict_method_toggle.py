@@ -35,7 +35,7 @@ async def toggle_sales_predict_method(
     assert callback_query.message
     chat_id = callback_query.message.chat.id
 
-    if new_method == FactMethods.DIRECT_SALES:
+    if FactMethods(new_method) == FactMethods.DIRECT_SALES:
         status_str = "Включен режим прямого прогноза продаж"
     else:
         status_str = "Включен режим прогноза по корзинам"

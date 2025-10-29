@@ -18,9 +18,10 @@ class FactData(BaseModel):
 
     @property
     def method_ru(self) -> str:
-        if self.fact_method == FactMethods.DIRECT_SALES:
+        # TODO: Сделать тест сюда - упало в проде
+        if FactMethods(self.fact_method) == FactMethods.DIRECT_SALES:
             return "По прямым продажам"
-        elif self.fact_method == FactMethods.BY_CARTS:
+        elif FactMethods(self.fact_method) == FactMethods.BY_CARTS:
             return "По корзинам"
         else:
             raise NotImplementedError(
