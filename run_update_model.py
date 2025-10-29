@@ -1,6 +1,7 @@
 import asyncio
 from time import sleep
 
+from app.core.di import DIManager, AppContainer
 from app.modules.wb_adv_updater.runner import run_update_model
 
 update_model_on_new_features = asyncio.Event()
@@ -16,10 +17,18 @@ async def run():
 
 logger = logging.getLogger(__name__)
 
+
+
+async def update_model() -> None:
+    # TODO: Сделать нормальный контекстый менеджер для DI
+    async with await DIManager.create(AppContainer):
+        await run()
+
 if __name__ == "__main__":
     while True:
         try:
-            asyncio.run(run())
+            asyncio.run(update_model())
         except Exception as e:
             logger.exception(e)
             sleep(70)
+
