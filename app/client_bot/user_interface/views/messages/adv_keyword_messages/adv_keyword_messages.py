@@ -236,9 +236,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             str(round(max_price_for_order)) if max_price_for_order else "Не задано"
         )
 
+        fact_method_ru = self._fact_data.method_ru
         text += (
-            f"\nВ среднем в день (срез за 2 дня):\n"
-            f"Прогноз средних заказов в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
+            f"\n Факт-продажи({fact_method_ru}):\n"
+            f"Прогноз заказов в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
             f"Себестоимость: {round(self._fact_data.pay_for_order, 2)} р."
             f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})"
         )
