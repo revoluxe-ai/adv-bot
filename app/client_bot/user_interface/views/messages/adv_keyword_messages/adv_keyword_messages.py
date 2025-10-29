@@ -67,7 +67,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self,
         state: FSMContext,
         sort_mode="by_adv",
-        auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_bid_manager],
+        auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_cpm_bid_manager],
     ) -> (LastMessage, str):
         self.sort_mode = sort_mode
         self._state = state

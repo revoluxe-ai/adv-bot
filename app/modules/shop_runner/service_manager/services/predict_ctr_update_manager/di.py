@@ -25,6 +25,7 @@ class PredictCTRManagerContainer(containers.DeclarativeContainer):
             "app.modules.wb_adv_updater.get_text_to_predict_ctr_dict",
             # функция get для получения словаря предсказаний CTR
             "app.client_bot.user_interface.views.messages.messages",  # views для взаимодействия с пользователем в боте
+            "app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager",  # MinCtrManager использует redis_manager
         ]
     )
 
