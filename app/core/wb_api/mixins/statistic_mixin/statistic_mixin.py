@@ -56,12 +56,11 @@ class CommonStatMinix(WBAPIProtocol):
                 stat = CommonStat(
                     nmid=data["nmID"],  # type: ignore[index]
                     date=date,
-                    open_card=history["openCardCount"],
-                    add_to_cart=history["addToCartCount"],
-                    orders=history["ordersCount"],
-                    orders_sum=history["ordersSumRub"],
-                    buy_outs=history["buyoutsCount"],
+                    open_card=history["openCardCount"],  # type: ignore[index]
                     add_to_cart=history["addToCartCount"],  # type: ignore[index]
+                    orders=history["ordersCount"],  # type: ignore[index]
+                    orders_sum=history["ordersSumRub"],  # type: ignore[index]
+                    buy_outs=history["buyoutsCount"],  # type: ignore[index]
                 )
                 stats.append(stat)
         return stats
