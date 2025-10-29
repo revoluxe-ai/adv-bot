@@ -182,7 +182,8 @@ class CommonAdvsStatDataManager:
     ) -> float:
         ch = clickhouse_manager
         ratio = await ch.get_cart_to_order_ratio_from_common_items_stat(adv, pass_days)
-        if ratio is None:
+        if not ratio:
+            # TODO: Ошибка в прод ушла = сделать тест
             ratio = 1.0
         return ratio
 
