@@ -66,7 +66,7 @@ class CommonStatMinix(WBAPIProtocol):
         return stats
 
     async def get_cards_stats_by_days(
-        self, nmIDs: list[int], pass_days: int
+            self, nmIDs: list[int], pass_days: int
     ) -> list[CommonStat]:
         """
         Разбивает запрос на несколько частей, если nmIDs больше 20, и вызывает _get_cards_stats_by_days.
@@ -81,7 +81,7 @@ class CommonStatMinix(WBAPIProtocol):
 
         # Разделение nmIDs на части по 20 товаров
         for i in range(0, len(nmIDs), part):
-            part_nmids = nmIDs[i : i + part]
+            part_nmids = nmIDs[i: i + part]
             result: list[CommonStat] | None = await self._get_cards_stats_by_days(
                 part_nmids, pass_days
             )

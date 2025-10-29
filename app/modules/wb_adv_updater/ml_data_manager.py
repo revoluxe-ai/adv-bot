@@ -284,8 +284,10 @@ async def update_keywords_ctr_by_similary() -> None:
                 predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
                 if predict_ctr:
                     logger.debug(
-                        f"Обновление CTR для ключевого слова {target_text} и объявления {adv_id} "
-                        f"на значение {predict_ctr}"
+                        "Обновление CTR для ключевого слова %s и объявления %s на значение %s",
+                        target_text,
+                        adv_id,
+                        predict_ctr,
                     )
                     await redis_manager.set_predict_ctr_with_pipeline(
                         redis_pipeline, adv_id, target_text, predict_ctr
