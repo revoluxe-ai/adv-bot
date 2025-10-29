@@ -551,7 +551,10 @@ async def get_clusters_and_presets(texts: list[str]) -> dict[str, tuple[str | No
             clusters_and_presets[text] = (cluster, preset)
         except Exception as e:
             logger.error(
-                f"Ошибка при парсинге значения {value} из Redis с ключом {key}: {e}"
+                "Ошибка при парсинге значения %s из Redis с ключом %s: %s",
+                value,
+                key,
+                e,
             )
             del e
             clusters_and_presets[text] = (None, None)
@@ -718,16 +721,6 @@ async def set_min_cpm_data(min_cpm_data: MinCPMData) -> None:
     result = redis_master_client.hset("min_cpm_data", mapping=mapping)
     if isinstance(result, typing.Awaitable):
         await result
-
-
-async def get_min_cpm_by_category_name(category_name: str) -> int | None:
-    result = redis_replica_client.hget("min_cpm_data", category_name)
-    if isinstance(result, typing.Awaitable):
-        result = await result
-    min_cpm_data = result
-    if min_cpm_data is None:
-        return 1
-    return int(min_cpm_data)
 
 
 def get_pipeline() -> Pipeline:
