@@ -28,7 +28,10 @@ from app.modules.common_slaves.wildberries.models import (
     WBToken,
     WBUserCabinet,
 )
-from app.modules.token_monitoring.services.token_info_service import TokenInfoService, TokenStatusReport
+from app.modules.token_monitoring.services.token_info_service import (
+    TokenInfoService,
+    TokenStatusReport,
+)
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
@@ -40,11 +43,11 @@ class ShopMenu(TextWithKeyboard):
     parse_mode = ParseMode.HTML
 
     def __init__(
-            self,
-            bot: Bot,
-            chat_id: int,
-            state: FSMContext,
-            wb_user_cabinet_original_id: int,
+        self,
+        bot: Bot,
+        chat_id: int,
+        state: FSMContext,
+        wb_user_cabinet_original_id: int,
     ):
         self._user_telegram_id = chat_id
         self._state = state
@@ -67,9 +70,11 @@ class ShopMenu(TextWithKeyboard):
             self._token_status = await token_service.get_shop_token_status(shop_id)
             self._token_status_loaded = True
             assert self._token_status is not None
-            logger.debug(f"Token status loaded for shop %s: %s",
-                         shop_id, self._token_status.status
-                         )
+            logger.debug(
+                f"Token status loaded for shop %s: %s",
+                shop_id,
+                self._token_status.status,
+            )
         except Exception as e:
             logger.error(f"Failed to load token status: {e}", exc_info=True)
             self._token_status = None
@@ -80,7 +85,7 @@ class ShopMenu(TextWithKeyboard):
         start_time = datetime.now()
         logger.debug(
             "Начало оптимизированной загрузки данных для кабинета %s",
-            self._wb_user_cabinet_original_id
+            self._wb_user_cabinet_original_id,
         )
 
         # Сохраняем ID в состояние
@@ -118,9 +123,7 @@ class ShopMenu(TextWithKeyboard):
             # 3. Расчет метрик кабинета
             self._now = datetime.now()
             self._expiration_time = self._wb_cabinet.expiration_time
-            self._expiration_time_str = self._expiration_time.strftime(
-                "%d-%m-%Y-%H:%M"
-            )
+            self._expiration_time_str = self._expiration_time.strftime("%d-%m-%Y-%H:%M")
             self.days_left = (self._expiration_time - self._now).days + 1
             self.bonus_days = self.days_left * 2
 
@@ -143,12 +146,17 @@ class ShopMenu(TextWithKeyboard):
         shop_id = self._wb_cabinet.shop_id
         pricer = Pricer()
         async with sm() as session:
-            self._total_active_advs_count: int = await pricer.get_active_complex_advs_count(session, shop_id)
-            self._base_tariff: int | float = \
-                pricer.get_price_for_count_advs_in_cabinet_for_month(self._total_active_advs_count)
-            self._automatic_tariff: int = await pricer.get_automactic_tariff(session,
-                                                                             shop_id,
-                                                                             self._total_active_advs_count)
+            self._total_active_advs_count: int = (
+                await pricer.get_active_complex_advs_count(session, shop_id)
+            )
+            self._base_tariff: int | float = (
+                pricer.get_price_for_count_advs_in_cabinet_for_month(
+                    self._total_active_advs_count
+                )
+            )
+            self._automatic_tariff: int = await pricer.get_automactic_tariff(
+                session, shop_id, self._total_active_advs_count
+            )
             self._total_tariff_for_month = self._base_tariff + self._automatic_tariff
 
         return True
@@ -160,7 +168,8 @@ class ShopMenu(TextWithKeyboard):
         shop_id = self._wb_cabinet.shop_id
         logger.debug(
             f"Обработка токенов для пользователя %s, магазин %s",
-            user.user_telegram_id, shop_id
+            user.user_telegram_id,
+            shop_id,
         )
 
         # Оптимизированная загрузка токенов - фильтруем сразу на уровне SQL
@@ -224,8 +233,8 @@ class ShopMenu(TextWithKeyboard):
 
         # Проверка на истечение срока действия
         if (
-                expiration_time < datetime.now()
-                and user.user_telegram_id not in const.ADMINS
+            expiration_time < datetime.now()
+            and user.user_telegram_id not in const.ADMINS
         ):
             await self.bot.send_message(
                 self.chat_id,
@@ -245,7 +254,7 @@ class ShopMenu(TextWithKeyboard):
 
         logger.debug(
             f"Обработка токенов успешно завершена, установлен срок действия %s дней",
-            self.last_days_for_token
+            self.last_days_for_token,
         )
         return True
 
@@ -272,9 +281,8 @@ class ShopMenu(TextWithKeyboard):
         # Вызываем родительский метод __call__, который отвечает за отправку сообщения
 
         logger.debug(
-            "Меню магазина отображено"
-            " за %s сек" ,
-            round((datetime.now() - display_start_time).total_seconds(), 2)
+            "Меню магазина отображено" " за %s сек",
+            round((datetime.now() - display_start_time).total_seconds(), 2),
         )
         total_time = (datetime.now() - start_time).total_seconds()
         logger.debug(
@@ -294,7 +302,7 @@ class ShopMenu(TextWithKeyboard):
         # 💰 MONEY SECTION - All financial information grouped together
         text = (
             f"📊 <b>Кампаний на автоуправлении</b>: {count_active_advs}\n"
-            f' Базовый тариф: {self._base_tariff:.2f} р. в месяц\n'
+            f" Базовый тариф: {self._base_tariff:.2f} р. в месяц\n"
             f" Доплата за автонастройку РК: {self._automatic_tariff:.2f} р. в месяц\n"
             f"""Итоговая плата: {self._total_tariff_for_month:.2f} в месяц"""
             f"(больше РК -> ниже цена, тарифы -> {const.SUPPORT_LINK})\n"
@@ -302,9 +310,9 @@ class ShopMenu(TextWithKeyboard):
         )
 
         if self._total_tariff_for_month == 0:
-            last_for_days = 'ထ'
+            last_for_days = "ထ"
         else:
-            last_for_days = int(total_money/self._total_tariff_for_month*30)
+            last_for_days = int(total_money / self._total_tariff_for_month * 30)
 
         # Money status with appropriate warnings
         if isinstance(last_for_days, int):
@@ -350,8 +358,10 @@ class ShopMenu(TextWithKeyboard):
                         if days_until_break <= 3:
                             text += f"🚨 <b>Сервис перестанет работать {date_str} (через {days_until_break} дн.)!</b>\n"
                         elif days_until_break <= 7:
-                            text += (f"⚠️ <b>Внимание:</b> Сервис перестанет работать {date_str} "
-                                     f"(через {days_until_break} дн.)\n")
+                            text += (
+                                f"⚠️ <b>Внимание:</b> Сервис перестанет работать {date_str} "
+                                f"(через {days_until_break} дн.)\n"
+                            )
                         elif days_until_break <= 30:
                             text += f"⏰ Сервис перестанет работать {date_str} (через {days_until_break} дн.)\n"
                         else:
@@ -398,7 +408,9 @@ class ShopMenu(TextWithKeyboard):
 
         button = InlineKeyboardButton(
             text="➕ Добавить токен/Обновить токены",
-            callback_data=AddNewToken(wb_user_cabinet_original_id=wb_user_cabinet.id).pack(),
+            callback_data=AddNewToken(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
         )
         builder.row(button)
 

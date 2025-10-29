@@ -1,7 +1,9 @@
 from app.utils.click_house.client import get_clickhouse_client
 
 
-async def get_clicks_to_orders_ration_on_phrases(adv_ids: list[int], days: int) -> float:
+async def get_clicks_to_orders_ration_on_phrases(
+    adv_ids: list[int], days: int
+) -> float:
     """Получает соотношение кликов к заказам по фразам из ClickHouse"""
     query = """
             SELECT 
@@ -24,11 +26,5 @@ async def get_clicks_to_orders_ration_on_phrases(adv_ids: list[int], days: int) 
     """
 
     async with get_clickhouse_client() as client:
-        result = await client.query(
-            query,
-            {
-                "adv_ids": adv_ids,
-                "days": days
-            }
-        )
-    return float(list(result.named_results())[0]['ratio'])
+        result = await client.query(query, {"adv_ids": adv_ids, "days": days})
+    return float(list(result.named_results())[0]["ratio"])

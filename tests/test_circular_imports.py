@@ -95,7 +95,9 @@ def test_no_circular_imports(entry_point):
     manual_check_needed = returncode != 0 and not success_message
 
     # Основной assert
-    assert success_message or manual_check_needed, f"""
+    assert (
+        success_message or manual_check_needed
+    ), f"""
     В точке входа {entry_point} найдены циклические импорты:
 
     {stdout}

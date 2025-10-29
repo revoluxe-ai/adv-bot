@@ -65,7 +65,9 @@ class Keyword(Base):
     __tablename__ = "keywords"
     id = Column(Integer, primary_key=True)
     text = Column(String, unique=True)
-    images = relationship("Image", secondary=image_keyword_association, back_populates="keywords")
+    images = relationship(
+        "Image", secondary=image_keyword_association, back_populates="keywords"
+    )
     word2vec = Column("word2vec", ARRAY(Float), nullable=True)
 
 
@@ -87,7 +89,9 @@ class Item(Base):
         String(),
     )
     __table_args__ = (
-        UniqueConstraint("dhash", "material", "wb_category_name", name="dont_item_copy"),
+        UniqueConstraint(
+            "dhash", "material", "wb_category_name", name="dont_item_copy"
+        ),
         UniqueConstraint("offer_id", name="unique_offer_id"),
         UniqueConstraint("barcode", name="unique_barcode"),
     )
@@ -171,7 +175,9 @@ class Image(Base):
     #                         secondary=image_keyword_association,
     #                         back_populates="images",
     #                         primaryjoin="Image.id==image_keyword_association.c.image_id")
-    keywords = relationship("Keyword", secondary=image_keyword_association, back_populates="images")
+    keywords = relationship(
+        "Keyword", secondary=image_keyword_association, back_populates="images"
+    )
     __table_args__ = (UniqueConstraint("dhash"),)
 
     def show(self):

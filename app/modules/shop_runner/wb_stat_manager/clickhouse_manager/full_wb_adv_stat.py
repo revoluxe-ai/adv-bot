@@ -284,9 +284,14 @@ async def get_keywords_spend(
             res = await client.query(query)
             result = res.first_item
 
-            return float(result["total_spend"]) if result and result["total_spend"] else 0.0
+            return (
+                float(result["total_spend"])
+                if result and result["total_spend"]
+                else 0.0
+            )
 
     except Exception:
-        logger.error("Ошибка получения суммы трат по ключам из ClickHouse", exc_info=True)
+        logger.error(
+            "Ошибка получения суммы трат по ключам из ClickHouse", exc_info=True
+        )
         return 0.0
-

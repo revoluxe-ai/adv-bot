@@ -75,16 +75,16 @@ async def process_product_data(wbcard: WBCard):
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
             continue
-        characteristics_words[char_name]: tuple[
-            str, list[float]
-        ] = await get_words_from_char_value(char_value)
-    characteristics_words["name"]: tuple[
-        str, list[float]
-    ] = await get_words_from_char_value(wbcard.name)
+        characteristics_words[char_name]: tuple[str, list[float]] = (
+            await get_words_from_char_value(char_value)
+        )
+    characteristics_words["name"]: tuple[str, list[float]] = (
+        await get_words_from_char_value(wbcard.name)
+    )
     if "description" in characteristics_words:
-        characteristics_words["description"]: tuple[
-            str, list[float]
-        ] = await get_words_from_char_value(wbcard.description)
+        characteristics_words["description"]: tuple[str, list[float]] = (
+            await get_words_from_char_value(wbcard.description)
+        )
     return characteristics_words
 
 
@@ -219,7 +219,7 @@ async def update_keywords_ctr_by_similary() -> None:
         try:
             adv_id, keyword_text = key.split(":")[1:]
         except Exception:
-            logger.error(f"Ошибка парсинга ключа {key}", exc_info=True)
+            logger.error(f"Ошибка парсинга ключа {key}", exc_info=True)  # type: ignore[str-bytes-safe]
             continue
         if keyword_text in keywords:
             continue

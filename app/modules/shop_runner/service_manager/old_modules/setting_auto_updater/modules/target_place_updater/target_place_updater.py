@@ -1,8 +1,9 @@
 from sqlalchemy import update
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.target_place_updater.excs import \
-    TargetPlaceNotSetError
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.target_place_updater.excs import (
+    TargetPlaceNotSetError,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.target_place_updater.redis_cache import (
     LastSetDownTargetPlace,
     LastSetUpTargetPlace,
@@ -18,7 +19,7 @@ class TargetPlaceUpdater:
 
     async def _refresh_adv(self):
         async with sm() as session:
-            await session.refresh(self._adv, attribute_names=[AdvSetting.max_place]) # type: ignore[list-item]
+            await session.refresh(self._adv, attribute_names=[AdvSetting.max_place])  # type: ignore[list-item]
 
     async def set_up(self) -> tuple[bool, bool]:
         pass_time = 15 * 60

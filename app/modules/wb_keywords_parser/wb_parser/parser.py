@@ -140,9 +140,7 @@ class ParserService:
         return positions
 
     @staticmethod
-    async def __parse_keywords_from_wb(
-        text: str, page: int
-    ) -> tuple[
+    async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
         list[dict] | None,
         str | None,
         int | None,

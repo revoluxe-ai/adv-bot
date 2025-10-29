@@ -19,12 +19,16 @@ class TestSQLAlchemyModelsInitialization:
 
     def test_all_models_can_be_imported(self) -> None:
         """Test that all model modules can be imported without errors"""
-        pytest.skip(reason="Failing due to Failed to import models: cannot import name 'models' from 'app.modules.wb_adv_updater'")
+        pytest.skip(
+            reason="Failing due to Failed to import models: cannot import name 'models' from 'app.modules.wb_adv_updater'"
+        )
         # Import all model modules to trigger class definitions
         try:
             from app.modules.billing import models as billing_models
             from app.modules.common_slaves.wildberries.models import models as wb_models
-            from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+            from app.modules.common_slaves.wildberries.models.wb_cabinet import (
+                WBCabinet,
+            )
             from app.utils.db import models as db_models
             from app.modules.token_monitoring import models as token_models
             from app.core.wb_api import models as wb_api_models
@@ -75,25 +79,31 @@ class TestSQLAlchemyModelsInitialization:
         adv_setting_mapper = inspect(AdvSetting)
         assert adv_setting_mapper is not None
         relationships = adv_setting_mapper.relationships
-        assert 'payments' in relationships.keys(), "AdvSetting should have 'payments' relationship"
+        assert (
+            "payments" in relationships.keys()
+        ), "AdvSetting should have 'payments' relationship"
 
         # Check AdvPayment -> AdvSetting relationship
         adv_payment_mapper = inspect(AdvPayment)
         assert adv_payment_mapper is not None
         relationships = adv_payment_mapper.relationships
-        assert 'adv_setting' in relationships.keys(), "AdvPayment should have 'adv_setting' relationship"
+        assert (
+            "adv_setting" in relationships.keys()
+        ), "AdvPayment should have 'adv_setting' relationship"
 
         # Check WBCabinet -> AdvSetting relationship
         wb_cabinet_mapper = inspect(WBCabinet)
         assert wb_cabinet_mapper is not None
         relationships = wb_cabinet_mapper.relationships
-        assert 'adv_settings' in relationships.keys(), "WBCabinet should have 'adv_settings' relationship"
+        assert (
+            "adv_settings" in relationships.keys()
+        ), "WBCabinet should have 'adv_settings' relationship"
 
         # Check AdvSetting -> WBCard relationship
-        assert 'wb_cards' in inspect(AdvSetting).relationships.keys()
+        assert "wb_cards" in inspect(AdvSetting).relationships.keys()
 
         # Check KeywordSetting -> AdvSetting relationship
-        assert 'adv_setting' in inspect(KeywordSetting).relationships.keys()
+        assert "adv_setting" in inspect(KeywordSetting).relationships.keys()
 
     def test_model_instantiation_basic(self) -> None:
         """Test that models can be instantiated without database"""
@@ -135,7 +145,9 @@ class TestSQLAlchemyModelsInitialization:
             from app.modules.common_slaves.wildberries.models.models import AdvSetting
 
             # Re-import in different order (should not cause issues)
-            from app.modules.common_slaves.wildberries.models.models import AdvSetting as AS2
+            from app.modules.common_slaves.wildberries.models.models import (
+                AdvSetting as AS2,
+            )
             from app.modules.billing.models import AdvPayment as AP2
 
             # Both should reference the same classes
@@ -161,14 +173,14 @@ class TestSQLAlchemyModelsInitialization:
         configure_mappers()
 
         models_to_check = [
-            (AdvPayment, 'advpayment'),
-            (AdvSetting, 'advsetting'),
-            (WBCard, 'wbcard'),
-            (WBToken, 'wbtoken'),
-            (AdvKeyword, 'advkeyword'),
-            (KeywordSetting, 'keywordsetting'),
-            (WBCabinet, 'wbcabinet'),
-            (User, 'user'),
+            (AdvPayment, "advpayment"),
+            (AdvSetting, "advsetting"),
+            (WBCard, "wbcard"),
+            (WBToken, "wbtoken"),
+            (AdvKeyword, "advkeyword"),
+            (KeywordSetting, "keywordsetting"),
+            (WBCabinet, "wbcabinet"),
+            (User, "user"),
         ]
 
         for model, expected_tablename in models_to_check:
@@ -187,16 +199,16 @@ class TestSQLAlchemyModelsInitialization:
         configure_mappers()
 
         # Check AdvSetting.payments relationship
-        adv_setting_payments_rel = inspect(AdvSetting).relationships['payments']
-        assert adv_setting_payments_rel.back_populates == 'adv_setting', (
-            "AdvSetting.payments should back_populate to 'adv_setting'"
-        )
+        adv_setting_payments_rel = inspect(AdvSetting).relationships["payments"]
+        assert (
+            adv_setting_payments_rel.back_populates == "adv_setting"
+        ), "AdvSetting.payments should back_populate to 'adv_setting'"
 
         # Check AdvPayment.adv_setting relationship
-        adv_payment_rel = inspect(AdvPayment).relationships['adv_setting']
-        assert adv_payment_rel.back_populates == 'payments', (
-            "AdvPayment.adv_setting should back_populate to 'payments'"
-        )
+        adv_payment_rel = inspect(AdvPayment).relationships["adv_setting"]
+        assert (
+            adv_payment_rel.back_populates == "payments"
+        ), "AdvPayment.adv_setting should back_populate to 'payments'"
 
     def test_no_mapper_initialization_errors(self) -> None:
         """
@@ -217,7 +229,9 @@ class TestSQLAlchemyModelsInitialization:
                 WBBalancePayment,
                 WBBonusPayment,
             )
-            from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+            from app.modules.common_slaves.wildberries.models.wb_cabinet import (
+                WBCabinet,
+            )
             from app.utils.db.models import User
             from app.modules.token_monitoring.models import TokenNotificationTracker
 
@@ -266,18 +280,30 @@ def test_import_ml_data_manager_smoke() -> None:
     - В противном случае, если падает из-за тяжёлых зависимостей окружения (faiss/PIL/torch и т.п.) — скипаем.
     """
     import pytest, importlib
+
     try:
-        md = importlib.import_module('app.modules.wb_adv_updater.ml_data_manager')
+        md = importlib.import_module("app.modules.wb_adv_updater.ml_data_manager")
         # Минимальная проверка наличия ключевой корутины
-        assert hasattr(md, 'update_cards_in_graph_small_cycle')
+        assert hasattr(md, "update_cards_in_graph_small_cycle")
     except ImportError as e:
         msg = str(e)
-        cycle_markers = ('partially initialized module', 'circular import', 'cannot import name')
+        cycle_markers = (
+            "partially initialized module",
+            "circular import",
+            "cannot import name",
+        )
         # Если явные признаки цикла — фейлим
-        if any(m in msg for m in cycle_markers) and 'app.modules.common_slaves.wildberries.models' in msg:
+        if (
+            any(m in msg for m in cycle_markers)
+            and "app.modules.common_slaves.wildberries.models" in msg
+        ):
             pytest.fail(f"Circular import regression detected: {e}")
         # Иначе — вероятно, отсутствуют тяжёлые зависимости/test env, скипаем
-        pytest.skip(f"Skipped ml_data_manager import due to non-circular ImportError: {e}")
+        pytest.skip(
+            f"Skipped ml_data_manager import due to non-circular ImportError: {e}"
+        )
     except Exception as e:
         # Неизвестные ошибки считаем некритичными для этого smoke — скипаем, чтобы не флакать CI
-        pytest.skip(f"Skipped ml_data_manager import due to environment-specific error: {e}")
+        pytest.skip(
+            f"Skipped ml_data_manager import due to environment-specific error: {e}"
+        )

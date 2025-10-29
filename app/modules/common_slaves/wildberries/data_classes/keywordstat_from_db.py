@@ -28,6 +28,7 @@ class KeywordStatus:
     MAX_CPM = "max_cpm"
     MAX_CPC = "max_cpc"
 
+
 class CalculatedKeyword(BaseModel):
     text: str
     clicks: int
@@ -167,4 +168,3 @@ class CalculatedKeyword(BaseModel):
     @property
     def is_in_white_list(self) -> bool:
         return self.hard_status == 2
-

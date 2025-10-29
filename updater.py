@@ -12,7 +12,8 @@ from typing import NoReturn, Callable, Never, Coroutine, Any
 from app.core.di.di_manager import DIManager
 from app.core.di.app_container import AppContainer
 from app.modules.wb_adv_updater.runner import (
-    run_main_coroutines, run_update_all_keywords_on_wb,
+    run_main_coroutines,
+    run_update_all_keywords_on_wb,
 )
 from python_modules.logger import setup_logging
 
@@ -25,12 +26,15 @@ async def update_keywords_ctr_by_similary_run() -> NoReturn:
     from app.modules.wb_adv_updater import (
         hard_ml_data_updater_process as hard_data_manager,
     )
+
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         while True:
             try:
                 await hard_data_manager.update_keywords_ctr_by_similary()
             except Exception:
-                logger.error("Ошибка обновления по похожему CTR процессов", exc_info=True)
+                logger.error(
+                    "Ошибка обновления по похожему CTR процессов", exc_info=True
+                )
             await asyncio.sleep(60)
 
 
@@ -58,6 +62,7 @@ def process_controller(process_pids: list[int], process_names: list[str]) -> Non
 
 # Обновлена типизация: принимаем обычную async-функцию без аргументов
 # (а не DI-провайдер)
+
 
 def run_coroutines(coroutine_func: Callable[..., Coroutine[Any, Any, Never]]) -> None:
     asyncio.run(coroutine_func())

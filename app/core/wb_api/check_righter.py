@@ -50,7 +50,7 @@ class CheckRighter:
             session, "GET", url=url, headers=self.headers.standart
         )
         response = json.loads(response)
-        status = response["Status"] # type: ignore[index]
+        status = response["Status"]  # type: ignore[index]
         if status == "OK":
             return "OK"
         else:

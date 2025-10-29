@@ -9,5 +9,4 @@ __all__ = [
     "WBUserCabinet",
     "KeywordStat",
     "WBCabinet",
-
 ]

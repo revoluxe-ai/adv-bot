@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBToken, WBUserCabinet
+from app.modules.common_slaves.wildberries.models import (
+    WBCabinet,
+    WBToken,
+    WBUserCabinet,
+)
 from app.utils.db.session_maker import get_async_session_maker
 
 # Required rights for the bot to function properly
@@ -22,6 +26,7 @@ REQUIRED_RIGHTS = {
 # TODO: Подписать РК где Авто, где Аукцион
 
 # --- Time helpers (ensure timezone-aware UTC) ---
+
 
 def utcnow() -> datetime.datetime:
     """Return current time as timezone-aware UTC datetime."""
@@ -138,7 +143,7 @@ class TokenStatusReport:
     @property
     def service_expiration_date(self) -> datetime.datetime | None:
         """Calculate when the service will break due to missing required permissions.
-        
+
         Returns the earliest date when we'll lose a required permission,
         making the service non-functional.
         """
@@ -150,7 +155,10 @@ class TokenStatusReport:
                 # Check if this token provides any required permissions
                 token_required_perms = token.categories & REQUIRED_RIGHTS
                 if token_required_perms:
-                    if earliest_expiration is None or token.expires < earliest_expiration:
+                    if (
+                        earliest_expiration is None
+                        or token.expires < earliest_expiration
+                    ):
                         earliest_expiration = token.expires
 
             return earliest_expiration
@@ -161,7 +169,7 @@ class TokenStatusReport:
     @property
     def days_until_service_breaks(self) -> int | None:
         """Calculate days until service becomes non-functional.
-        
+
         Returns None if service is already broken or no valid tokens.
         """
         expiration_date = self.service_expiration_date
@@ -180,10 +188,10 @@ class TokenInfoService:
     async def get_shop_token_status(self, shop_id: str) -> TokenStatusReport:
         """
         Get comprehensive token status report for a shop.
-        
+
         Args:
             shop_id: The shop ID to analyze
-            
+
         Returns:
             TokenStatusReport with complete status analysis
         """
@@ -196,7 +204,11 @@ class TokenInfoService:
 
             # Analyze tokens
             token_infos = [TokenInfo.from_wb_token(token) for token in all_tokens]
-            valid_tokens = [t for t in token_infos if t.is_valid and not t.is_expired and not t.is_read_only]
+            valid_tokens = [
+                t
+                for t in token_infos
+                if t.is_valid and not t.is_expired and not t.is_read_only
+            ]
             expired_tokens = [t for t in token_infos if t.is_expired]
 
             # Aggregate permissions from valid tokens
@@ -212,7 +224,9 @@ class TokenInfoService:
             status = "Complete" if has_all_required and valid_tokens else "Insufficient"
 
             # Find expiring tokens
-            expiring_tokens = await self._get_expiring_tokens(session, shop_id, shop_name)
+            expiring_tokens = await self._get_expiring_tokens(
+                session, shop_id, shop_name
+            )
 
             return TokenStatusReport(
                 shop_id=shop_id,
@@ -227,14 +241,16 @@ class TokenInfoService:
                 expiring_tokens=expiring_tokens,
             )
 
-    async def validate_permissions(self, shop_id: str, required_rights: set[str]) -> PermissionValidation:
+    async def validate_permissions(
+        self, shop_id: str, required_rights: set[str]
+    ) -> PermissionValidation:
         """
         Validate if shop has specific permissions available.
-        
+
         Args:
             shop_id: The shop ID to check
             required_rights: Set of required permission names
-            
+
         Returns:
             PermissionValidation with access status and details
         """
@@ -242,14 +258,18 @@ class TokenInfoService:
             # Get valid tokens for this shop
             tokens = await self._get_shop_tokens(session, shop_id)
             token_infos = [TokenInfo.from_wb_token(token) for token in tokens]
-            valid_tokens = [t for t in token_infos if t.is_valid and not t.is_expired and not t.is_read_only]
+            valid_tokens = [
+                t
+                for t in token_infos
+                if t.is_valid and not t.is_expired and not t.is_read_only
+            ]
 
             if not valid_tokens:
                 return PermissionValidation(
                     has_access=False,
                     missing_permissions=required_rights,
                     available_permissions=set(),
-                    error_message="Нет действующих токенов для магазина"
+                    error_message="Нет действующих токенов для магазина",
                 )
 
             # Aggregate available permissions
@@ -269,25 +289,31 @@ class TokenInfoService:
                 has_access=has_access,
                 missing_permissions=missing_permissions,
                 available_permissions=available_permissions,
-                error_message=error_message
+                error_message=error_message,
             )
 
-    async def get_expiring_tokens(self, shop_id: str, days_ahead: int = 14) -> list[ExpiringToken]:
+    async def get_expiring_tokens(
+        self, shop_id: str, days_ahead: int = 14
+    ) -> list[ExpiringToken]:
         """
         Get tokens that are expiring within specified number of days.
-        
+
         Args:
             shop_id: The shop ID to check
             days_ahead: Number of days to look ahead (default: 14)
-            
+
         Returns:
             List of ExpiringToken objects
         """
         async with self.session_maker() as session:
             shop_name = await self._get_shop_name(session, shop_id)
-            return await self._get_expiring_tokens(session, shop_id, shop_name, days_ahead)
+            return await self._get_expiring_tokens(
+                session, shop_id, shop_name, days_ahead
+            )
 
-    async def _get_shop_tokens(self, session: AsyncSession, shop_id: str) -> list[WBToken]:
+    async def _get_shop_tokens(
+        self, session: AsyncSession, shop_id: str
+    ) -> list[WBToken]:
         """Get all tokens for a shop."""
         stmt = select(WBToken).where(WBToken.shop_id == shop_id)
         result = await session.execute(stmt)
@@ -306,21 +332,14 @@ class TokenInfoService:
         return shop_name or f"Магазин {shop_id}"
 
     async def _get_expiring_tokens(
-            self,
-            session: AsyncSession,
-            shop_id: str,
-            shop_name: str,
-            days_ahead: int = 14
+        self, session: AsyncSession, shop_id: str, shop_name: str, days_ahead: int = 14
     ) -> list[ExpiringToken]:
         """Get tokens expiring within specified days."""
         cutoff_date = utcnow() + datetime.timedelta(days=days_ahead)
         now = utcnow()
 
         # Query all tokens for the shop (can't use .expires in WHERE clause since it's a property)
-        stmt = (
-            select(WBToken)
-            .where(WBToken.shop_id == shop_id)
-        )
+        stmt = select(WBToken).where(WBToken.shop_id == shop_id)
         result = await session.execute(stmt)
         tokens = list(result.scalars().all())
 
@@ -340,13 +359,15 @@ class TokenInfoService:
                         expiring_token = ExpiringToken(
                             token_info=token_info,
                             days_until_expiry=days_until_expiry,
-                            shop_name=shop_name
+                            shop_name=shop_name,
                         )
                         expiring_tokens.append(expiring_token)
             except Exception as e:
                 # Skip tokens with invalid JWT or other issues
                 # This handles cases where token.expires property fails (invalid JWT, etc.)
-                logging.warning(f"Skipping token {token.id} due to error accessing expires property: {e}")
+                logging.warning(
+                    f"Skipping token {token.id} due to error accessing expires property: {e}"
+                )
                 continue
 
         return expiring_tokens
@@ -359,7 +380,9 @@ async def get_shop_token_status(shop_id: str) -> TokenStatusReport:
     return await service.get_shop_token_status(shop_id)
 
 
-async def validate_shop_permissions(shop_id: str, required_rights: set[str] | None = None) -> PermissionValidation:
+async def validate_shop_permissions(
+    shop_id: str, required_rights: set[str] | None = None
+) -> PermissionValidation:
     """Validate shop permissions."""
     if required_rights is None:
         required_rights = REQUIRED_RIGHTS
@@ -368,7 +391,9 @@ async def validate_shop_permissions(shop_id: str, required_rights: set[str] | No
     return await service.validate_permissions(shop_id, required_rights)
 
 
-async def get_expiring_tokens_for_shop(shop_id: str, days_ahead: int = 14) -> list[ExpiringToken]:
+async def get_expiring_tokens_for_shop(
+    shop_id: str, days_ahead: int = 14
+) -> list[ExpiringToken]:
     """Get expiring tokens for a shop."""
     service = TokenInfoService()
     return await service.get_expiring_tokens(shop_id, days_ahead)

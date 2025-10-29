@@ -10,7 +10,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton
 
 from app.modules.shop_menu.message import ShopMenu
-from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet, AdvSetting
+from app.modules.common_slaves.wildberries.models import (
+    WBCabinet,
+    WBUserCabinet,
+    AdvSetting,
+)
 from app.utils.db.models import User
 from app.client_bot.user_interface.views.callbacks import AddNewToken
 
@@ -52,11 +56,12 @@ def mock_wb_cabinet():
     cabinet.calculated_bonus = 100.0
     cabinet.adv_settings = []
     cabinet.white_list_update_active = False
-    
+
     # Mock expiration time
     from datetime import datetime, timedelta
+
     cabinet.expiration_time = datetime.now() + timedelta(days=30)
-    
+
     return cabinet
 
 
@@ -73,43 +78,47 @@ def mock_wb_user_cabinet(mock_wb_cabinet, mock_user):
 
 class TestShopMenuAddTokenButton:
     """Test suite for Add New Token button in ShopMenu"""
-    
+
     @pytest.mark.asyncio
     async def test_add_token_button_exists_in_keyboard(
         self, mock_bot, mock_state, mock_wb_user_cabinet
     ):
         """Test that Add New Token button is present in the keyboard"""
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
             # Mock database session
             mock_session = MagicMock()
             mock_result = MagicMock()
             mock_result.scalar_one.return_value = mock_wb_user_cabinet
             mock_session.execute = AsyncMock(return_value=mock_result)
-            
+
             mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_sm.return_value.__aexit__ = AsyncMock()
-            
+
             # Mock Pricer (use patch.object with create=True to avoid AttributeError if attribute isn't present)
-            with patch.object(ShopMenu, '_pricer', create=True) as mock_pricer:
-                with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service:
+            with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
+                with patch(
+                    "app.modules.shop_menu.message.TokenInfoService"
+                ) as mock_token_service:
                     mock_token_service_instance = MagicMock()
-                    mock_token_service_instance.get_shop_token_status = AsyncMock(return_value=None)
+                    mock_token_service_instance.get_shop_token_status = AsyncMock(
+                        return_value=None
+                    )
                     mock_token_service.return_value = mock_token_service_instance
-                    
+
                     # Create ShopMenu instance
                     shop_menu = ShopMenu(
                         bot=mock_bot,
                         chat_id=12345,
                         state=mock_state,
-                        wb_user_cabinet_original_id=1
+                        wb_user_cabinet_original_id=1,
                     )
-                    
+
                     # Load data
                     await shop_menu._load_all_data()
-                    
+
                     # Get keyboard
                     keyboard = shop_menu.keyboard
-                    
+
                     # Find Add New Token button by callback_data (more stable than text)
                     add_token_button_found = False
                     for row in keyboard.inline_keyboard:
@@ -123,28 +132,34 @@ class TestShopMenuAddTokenButton:
                             assert callback_data.wb_user_cabinet_original_id == 1
                             break
 
-                    assert add_token_button_found, "Add New Token button not found in keyboard"
+                    assert (
+                        add_token_button_found
+                    ), "Add New Token button not found in keyboard"
 
     @pytest.mark.asyncio
     async def test_add_token_button_positioned_after_balance(
         self, mock_bot, mock_state, mock_wb_user_cabinet
     ):
         """Test that Add New Token button is positioned after Add Balance button"""
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
             # Mock database session
             mock_session = MagicMock()
             mock_result = MagicMock()
             mock_result.scalar_one.return_value = mock_wb_user_cabinet
             mock_session.execute = AsyncMock(return_value=mock_result)
-            
+
             mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_sm.return_value.__aexit__ = AsyncMock()
-            
+
             # Mock Pricer
-            with patch.object(ShopMenu, '_pricer', create=True) as mock_pricer:
-                with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service:
+            with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
+                with patch(
+                    "app.modules.shop_menu.message.TokenInfoService"
+                ) as mock_token_service:
                     mock_token_service_instance = MagicMock()
-                    mock_token_service_instance.get_shop_token_status = AsyncMock(return_value=None)
+                    mock_token_service_instance.get_shop_token_status = AsyncMock(
+                        return_value=None
+                    )
                     mock_token_service.return_value = mock_token_service_instance
 
                     # Create ShopMenu instance
@@ -152,7 +167,7 @@ class TestShopMenuAddTokenButton:
                         bot=mock_bot,
                         chat_id=12345,
                         state=mock_state,
-                        wb_user_cabinet_original_id=1
+                        wb_user_cabinet_original_id=1,
                     )
 
                     # Load data
@@ -176,31 +191,38 @@ class TestShopMenuAddTokenButton:
                                 pass
 
                 assert balance_button_position is not None, "Balance button not found"
-                assert add_token_button_position is not None, "Add Token button not found"
+                assert (
+                    add_token_button_position is not None
+                ), "Add Token button not found"
                 # В текущей реализации кнопка добавления токена располагается перед кнопкой пополнения баланса
-                assert add_token_button_position < balance_button_position, \
-                    "Add Token button should be positioned before Balance button"
+                assert (
+                    add_token_button_position < balance_button_position
+                ), "Add Token button should be positioned before Balance button"
 
     @pytest.mark.asyncio
     async def test_add_token_button_callback_data_format(
         self, mock_bot, mock_state, mock_wb_user_cabinet
     ):
         """Test that Add New Token button has correctly formatted callback data"""
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
             # Mock database session
             mock_session = MagicMock()
             mock_result = MagicMock()
             mock_result.scalar_one.return_value = mock_wb_user_cabinet
             mock_session.execute = AsyncMock(return_value=mock_result)
-            
+
             mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_sm.return_value.__aexit__ = AsyncMock()
-            
+
             # Mock TokenInfoService
-            with patch.object(ShopMenu, '_pricer', create=True) as mock_pricer:
-                with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service:
+            with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
+                with patch(
+                    "app.modules.shop_menu.message.TokenInfoService"
+                ) as mock_token_service:
                     mock_token_service_instance = MagicMock()
-                    mock_token_service_instance.get_shop_token_status = AsyncMock(return_value=None)
+                    mock_token_service_instance.get_shop_token_status = AsyncMock(
+                        return_value=None
+                    )
                     mock_token_service.return_value = mock_token_service_instance
 
                     # Create ShopMenu instance
@@ -208,7 +230,7 @@ class TestShopMenuAddTokenButton:
                         bot=mock_bot,
                         chat_id=12345,
                         state=mock_state,
-                        wb_user_cabinet_original_id=42  # Use specific ID
+                        wb_user_cabinet_original_id=42,  # Use specific ID
                     )
 
                     # Load data
@@ -239,23 +261,27 @@ class TestShopMenuAddTokenButton:
         """Test that Add New Token button is visible for admin users"""
         # Set user as admin
         mock_wb_user_cabinet.user.user_telegram_id = 12345
-        
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.client_bot.const.ADMINS', [12345]):
+
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
+            with patch("app.client_bot.const.ADMINS", [12345]):
                 # Mock database session
                 mock_session = MagicMock()
                 mock_result = MagicMock()
                 mock_result.scalar_one.return_value = mock_wb_user_cabinet
                 mock_session.execute = AsyncMock(return_value=mock_result)
-                
+
                 mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
                 mock_sm.return_value.__aexit__ = AsyncMock()
-                
+
                 # Mock TokenInfoService
-                with patch.object(ShopMenu, '_pricer', create=True) as mock_pricer:
-                    with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service:
+                with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
+                    with patch(
+                        "app.modules.shop_menu.message.TokenInfoService"
+                    ) as mock_token_service:
                         mock_token_service_instance = MagicMock()
-                        mock_token_service_instance.get_shop_token_status = AsyncMock(return_value=None)
+                        mock_token_service_instance.get_shop_token_status = AsyncMock(
+                            return_value=None
+                        )
                         mock_token_service.return_value = mock_token_service_instance
 
                         # Create ShopMenu instance
@@ -263,7 +289,7 @@ class TestShopMenuAddTokenButton:
                             bot=mock_bot,
                             chat_id=12345,
                             state=mock_state,
-                            wb_user_cabinet_original_id=1
+                            wb_user_cabinet_original_id=1,
                         )
 
                         # Load data
@@ -283,7 +309,9 @@ class TestShopMenuAddTokenButton:
                                 add_token_button_found = True
                                 break
 
-                    assert add_token_button_found, "Add New Token button should be visible for admins"
+                    assert (
+                        add_token_button_found
+                    ), "Add New Token button should be visible for admins"
 
     @pytest.mark.asyncio
     async def test_add_token_button_for_regular_user(
@@ -292,23 +320,27 @@ class TestShopMenuAddTokenButton:
         """Test that Add New Token button is visible for regular users"""
         # Set user as regular (not admin)
         mock_wb_user_cabinet.user.user_telegram_id = 99999
-        
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
-            with patch('app.client_bot.const.ADMINS', [12345]):  # Different admin
+
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
+            with patch("app.client_bot.const.ADMINS", [12345]):  # Different admin
                 # Mock database session
                 mock_session = MagicMock()
                 mock_result = MagicMock()
                 mock_result.scalar_one.return_value = mock_wb_user_cabinet
                 mock_session.execute = AsyncMock(return_value=mock_result)
-                
+
                 mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
                 mock_sm.return_value.__aexit__ = AsyncMock()
-                
+
                 # Mock TokenInfoService
-                with patch.object(ShopMenu, '_pricer', create=True) as mock_pricer:
-                    with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service:
+                with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
+                    with patch(
+                        "app.modules.shop_menu.message.TokenInfoService"
+                    ) as mock_token_service:
                         mock_token_service_instance = MagicMock()
-                        mock_token_service_instance.get_shop_token_status = AsyncMock(return_value=None)
+                        mock_token_service_instance.get_shop_token_status = AsyncMock(
+                            return_value=None
+                        )
                         mock_token_service.return_value = mock_token_service_instance
 
                         # Create ShopMenu instance (using user's telegram id as chat_id)
@@ -316,7 +348,7 @@ class TestShopMenuAddTokenButton:
                             bot=mock_bot,
                             chat_id=99999,
                             state=mock_state,
-                            wb_user_cabinet_original_id=1
+                            wb_user_cabinet_original_id=1,
                         )
 
                         # Load data
@@ -336,28 +368,34 @@ class TestShopMenuAddTokenButton:
                                 add_token_button_found = True
                                 break
 
-                    assert add_token_button_found, "Add New Token button should be visible for regular users"
+                    assert (
+                        add_token_button_found
+                    ), "Add New Token button should be visible for regular users"
 
     @pytest.mark.asyncio
     async def test_keyboard_structure_integrity(
         self, mock_bot, mock_state, mock_wb_user_cabinet
     ):
         """Test that adding the new button doesn't break keyboard structure"""
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
             # Mock database session
             mock_session = MagicMock()
             mock_result = MagicMock()
             mock_result.scalar_one.return_value = mock_wb_user_cabinet
             mock_session.execute = AsyncMock(return_value=mock_result)
-            
+
             mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_sm.return_value.__aexit__ = AsyncMock()
-            
+
             # Mock TokenInfoService
-            with patch.object(ShopMenu, '_pricer', create=True) as mock_pricer:
-                with patch('app.modules.shop_menu.message.TokenInfoService') as mock_token_service:
+            with patch.object(ShopMenu, "_pricer", create=True) as mock_pricer:
+                with patch(
+                    "app.modules.shop_menu.message.TokenInfoService"
+                ) as mock_token_service:
                     mock_token_service_instance = MagicMock()
-                    mock_token_service_instance.get_shop_token_status = AsyncMock(return_value=None)
+                    mock_token_service_instance.get_shop_token_status = AsyncMock(
+                        return_value=None
+                    )
                     mock_token_service.return_value = mock_token_service_instance
 
                     # Create ShopMenu instance
@@ -365,7 +403,7 @@ class TestShopMenuAddTokenButton:
                         bot=mock_bot,
                         chat_id=12345,
                         state=mock_state,
-                        wb_user_cabinet_original_id=1
+                        wb_user_cabinet_original_id=1,
                     )
 
                     # Load data
@@ -388,4 +426,3 @@ class TestShopMenuAddTokenButton:
                         for button in row:
                             assert button.text is not None
                             assert button.callback_data is not None
-

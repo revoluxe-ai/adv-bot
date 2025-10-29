@@ -14,7 +14,10 @@ from app.settings import settings
 from python_modules.logger import setup_logging
 
 # Import token monitoring system
-from app.modules.token_monitoring import initialize_token_monitoring, shutdown_token_monitoring
+from app.modules.token_monitoring import (
+    initialize_token_monitoring,
+    shutdown_token_monitoring,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +41,11 @@ async def lifespan(app_fast_api: FastAPI):
     try:
         # TODO Надо с этим разобраться к чему это все
         await initialize_token_monitoring(
-            enable_decorator_monitoring=True,
-            enable_expiration_scheduler=True
+            enable_decorator_monitoring=True, enable_expiration_scheduler=True
         )
         logger.info("✅ Token monitoring system initialized")
     except Exception as e:
-        logger.error("❌ Failed to initialize token monitoring: %s",
-                     e)
+        logger.error("❌ Failed to initialize token monitoring: %s", e)
         # Continue without token monitoring if it fails
 
     async with ClientSession() as client_session:

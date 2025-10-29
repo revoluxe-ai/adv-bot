@@ -11,7 +11,12 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.billing.di import BillingContainer
 from app.modules.billing.pricer import Pricer
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBBalancePayment, WBBonusPayment, WBCabinet
+from app.modules.common_slaves.wildberries.models import (
+    AdvSetting,
+    WBBalancePayment,
+    WBBonusPayment,
+    WBCabinet,
+)
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .models import AdvPayment
 from .redis_lock import RedisLock
@@ -24,15 +29,20 @@ async def _fetch_active_cabinet_ids(session: AsyncSession) -> list[int]:
     """Вернуть id кабинетов, у которых есть активные кампании.
     Используем только id чтобы потом загружать свежие данные в отдельных коротких транзакциях.
     """
-    stmt = (
-        select(WBCabinet.id)
-        .where(exists(select(1).where(AdvSetting.wb_cabinet_id == WBCabinet.id, AdvSetting.bot_active)))
+    stmt = select(WBCabinet.id).where(
+        exists(
+            select(1).where(
+                AdvSetting.wb_cabinet_id == WBCabinet.id, AdvSetting.bot_active
+            )
+        )
     )
     result = await session.execute(stmt)
     return [row[0] for row in result.all()]
 
 
-async def _load_cabinet_with_relations(session: AsyncSession, cabinet_id: int) -> WBCabinet | None:
+async def _load_cabinet_with_relations(
+    session: AsyncSession, cabinet_id: int
+) -> WBCabinet | None:
     """Подгрузить кабинет со связанными выплатами/кампаниями (актуальные данные)."""
     stmt = (
         select(WBCabinet)
@@ -47,8 +57,11 @@ async def _load_cabinet_with_relations(session: AsyncSession, cabinet_id: int) -
     return result.unique().scalar_one_or_none()
 
 
-async def _safe_commit(session: AsyncSession, result: dict[str, int | bool | str | float | None],
-                       cabinet_id: int) -> bool:
+async def _safe_commit(
+    session: AsyncSession,
+    result: dict[str, int | bool | str | float | None],
+    cabinet_id: int,
+) -> bool:
     """Безопасный commit: при ошибке логирует, делает rollback и проставляет reason.
     Возвращает True при успехе, False при ошибке (result['reason'] уже задан).
     """
@@ -62,12 +75,11 @@ async def _safe_commit(session: AsyncSession, result: dict[str, int | bool | str
         return False
 
 
-
 async def _process_single_cabinet(
-        cabinet_id: int,
-        current_dt: datetime,
-        pricer: Pricer,
-        redis_manager: RedisManager,
+    cabinet_id: int,
+    current_dt: datetime,
+    pricer: Pricer,
+    redis_manager: RedisManager,
 ) -> dict[str, int | bool | str | float | None]:
     async with sm() as session:
         return await __process_single_cabinet(
@@ -79,13 +91,12 @@ async def _process_single_cabinet(
         )
 
 
-
 async def __process_single_cabinet(
-        session: AsyncSession,
-        cabinet_id: int,
-        current_dt: datetime,
-        pricer: Pricer,
-        redis_manager: RedisManager,
+    session: AsyncSession,
+    cabinet_id: int,
+    current_dt: datetime,
+    pricer: Pricer,
+    redis_manager: RedisManager,
 ) -> dict[str, int | bool | str | float | None]:
     """Обработать один кабинет в отдельной короткой транзакции.
 
@@ -123,7 +134,9 @@ async def __process_single_cabinet(
             await session.rollback()
             return result
 
-        cabinet_campaigns: list[AdvSetting] = [adv for adv in wb_cabinet.adv_settings if adv.bot_active]
+        cabinet_campaigns: list[AdvSetting] = [
+            adv for adv in wb_cabinet.adv_settings if adv.bot_active
+        ]
         result["campaigns"] = len(cabinet_campaigns)
         if not cabinet_campaigns:
             # Помечаем, чтобы не гонять лишний раз сегодня
@@ -131,7 +144,7 @@ async def __process_single_cabinet(
             try:
                 await redis_manager.set_billing_process_for_day(cabinet_id, current_dt)
             except Exception as exc:
-                logger.error(f'Ошибка отметки в Redis: {exc}')  # noqa: BLE001
+                logger.error(f"Ошибка отметки в Redis: {exc}")  # noqa: BLE001
                 pass
             result["reason"] = "no_active_campaigns"
             return result
@@ -142,41 +155,49 @@ async def __process_single_cabinet(
 
         # Проверка уже существующих списаний
         bonus_count = (
-                          await session.scalar(
-                              select(func.count(WBBonusPayment.id)).where(and_(
-                                  WBBonusPayment.wb_cabinet_id == cabinet_id,
-                                  WBBonusPayment.transaction_date_time >= day_start,
-                                  WBBonusPayment.transaction_date_time < next_day,
-                                  WBBonusPayment.operation_type == "auto_subtract",
-                                  WBBonusPayment.amount < 0,
-                              ))
-                          )
-                      ) or 0
+            await session.scalar(
+                select(func.count(WBBonusPayment.id)).where(
+                    and_(
+                        WBBonusPayment.wb_cabinet_id == cabinet_id,
+                        WBBonusPayment.transaction_date_time >= day_start,
+                        WBBonusPayment.transaction_date_time < next_day,
+                        WBBonusPayment.operation_type == "auto_subtract",
+                        WBBonusPayment.amount < 0,
+                    )
+                )
+            )
+        ) or 0
         balance_count = (
-                            await session.scalar(
-                                select(func.count(WBBalancePayment.id)).where(and_(
-                                    WBBalancePayment.wb_cabinet_id == cabinet_id,
-                                    WBBalancePayment.transaction_date_time >= day_start,
-                                    WBBalancePayment.transaction_date_time < next_day,
-                                    WBBalancePayment.operation_type == "auto_subtract",
-                                    WBBalancePayment.amount < 0,
-                                ))
-                            )
-                        ) or 0
+            await session.scalar(
+                select(func.count(WBBalancePayment.id)).where(
+                    and_(
+                        WBBalancePayment.wb_cabinet_id == cabinet_id,
+                        WBBalancePayment.transaction_date_time >= day_start,
+                        WBBalancePayment.transaction_date_time < next_day,
+                        WBBalancePayment.operation_type == "auto_subtract",
+                        WBBalancePayment.amount < 0,
+                    )
+                )
+            )
+        ) or 0
         if bonus_count > 0 or balance_count > 0:
             await session.commit()
             try:
                 await redis_manager.set_billing_process_for_day(cabinet_id, current_dt)
             except Exception as exc:
-                logger.error(f'Ошибка устанвоки значения в Redis {exc}')  # noqa: BLE001
+                logger.error(f"Ошибка устанвоки значения в Redis {exc}")  # noqa: BLE001
                 pass
             result["reason"] = "already_processed_db"
             return result
 
         try:
-            price_for_shop_for_day = await pricer.get_price_for_day_for_shop(session, wb_cabinet.shop_id)
+            price_for_shop_for_day = await pricer.get_price_for_day_for_shop(
+                session, wb_cabinet.shop_id
+            )
         except Exception as exc:
-            logger.error('Cabinet %s: ошибка получения цены: %s', cabinet_id, exc, exc_info=True)
+            logger.error(
+                "Cabinet %s: ошибка получения цены: %s", cabinet_id, exc, exc_info=True
+            )
             raise exc
 
         result["price_for_day"] = price_for_shop_for_day
@@ -184,13 +205,17 @@ async def __process_single_cabinet(
             try:
                 await redis_manager.set_billing_process_for_day(cabinet_id, current_dt)
             except Exception as exc:
-                logger.warning('Cabinet %s: zero price but Redis-флаг не установлен: %s', cabinet_id, exc)
+                logger.warning(
+                    "Cabinet %s: zero price but Redis-флаг не установлен: %s",
+                    cabinet_id,
+                    exc,
+                )
                 pass
             result["reason"] = "zero_price"
             return result
 
-        calculated_bonus = float(wb_cabinet.calculated_bonus or 0) # type: ignore[truthy-function]
-        calculated_balance = float(wb_cabinet.calculated_balance or 0) # type: ignore[truthy-function]
+        calculated_bonus = float(wb_cabinet.calculated_bonus or 0)  # type: ignore[truthy-function]
+        calculated_balance = float(wb_cabinet.calculated_balance or 0)  # type: ignore[truthy-function]
         payment_successful = False
 
         def add_bonus(amt: float) -> None:
@@ -243,10 +268,12 @@ async def __process_single_cabinet(
             price_per_campaign = price_for_shop_for_day / len(cabinet_campaigns)
             for campaign in cabinet_campaigns:
                 exists_payment = await session.scalar(
-                    select(func.count()).where(and_(
-                        AdvPayment.adv_setting_id == campaign.id,
-                        AdvPayment.date == day,
-                    ))
+                    select(func.count()).where(
+                        and_(
+                            AdvPayment.adv_setting_id == campaign.id,
+                            AdvPayment.date == day,
+                        )
+                    )
                 )
                 if not exists_payment:
                     session.add(
@@ -272,11 +299,16 @@ async def __process_single_cabinet(
 
         result["processed"] = True
         result["payment_successful"] = payment_successful
-        result[
-            "reason"] = "success" \
-            if payment_successful else "deactivated" if not payment_successful \
-                                                        and calculated_bonus + calculated_balance \
-                                                        < price_for_shop_for_day else "no_payment"
+        result["reason"] = (
+            "success"
+            if payment_successful
+            else (
+                "deactivated"
+                if not payment_successful
+                and calculated_bonus + calculated_balance < price_for_shop_for_day
+                else "no_payment"
+            )
+        )
         return result
 
     except Exception as e:  # noqa: BLE001
@@ -287,10 +319,9 @@ async def __process_single_cabinet(
 
 @inject
 async def process_payment_for_advs(
-        redis_manager: RedisManager = Provide[BillingContainer.redis_manager],
-        redis_lock: RedisLock = Provide[BillingContainer.redis_lock],
-        global_ttl: int = 3600,  # увеличен TTL до 1 часа
-
+    redis_manager: RedisManager = Provide[BillingContainer.redis_manager],
+    redis_lock: RedisLock = Provide[BillingContainer.redis_lock],
+    global_ttl: int = 3600,  # увеличен TTL до 1 часа
 ) -> None:
     """Глобальная точка входа: один глобальный Redis-лок (без даты), без авто-продления.
 
@@ -322,9 +353,9 @@ async def process_payment_for_advs(
 
 
 async def _process_payment_for_advs(
-        current_date_time: datetime,
-        pricer: Pricer,
-        redis_manager: RedisManager,
+    current_date_time: datetime,
+    pricer: Pricer,
+    redis_manager: RedisManager,
 ) -> None:
     """Внутренний цикл обработки всех кабинетов (без глобального лока).
 

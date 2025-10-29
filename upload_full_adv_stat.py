@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-import aiofiles # type: ignore
+import aiofiles  # type: ignore
 from aiohttp import ClientSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload

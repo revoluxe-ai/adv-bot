@@ -41,7 +41,7 @@ def result_mock():
     "plan_for_sales_for_day,"
     "current_target_place,"
     "new_target_place,"
-    'predict_method',
+    "predict_method",
     [
         (
             200,  # факт цена заказа
@@ -83,8 +83,7 @@ def result_mock():
             10,  # план продаж в день
             1,  # начальная целевая позиция
             1,  # новая целевая позиция,
-FactMethods.BY_CARTS.value,
-
+            FactMethods.BY_CARTS.value,
         ),
         (
             50,  # факт цена заказа
@@ -98,8 +97,7 @@ FactMethods.BY_CARTS.value,
             10,  # план продаж в день
             5,  # начальная целевая позиция
             5,  # новая целевая позиция,
-FactMethods.BY_CARTS.value,
-
+            FactMethods.BY_CARTS.value,
         ),
         (
             10,  # факт цена заказа
@@ -113,8 +111,7 @@ FactMethods.BY_CARTS.value,
             10,  # план продаж в день
             5,  # начальная целевая позиция
             5,  # новая целевая позиция,
-FactMethods.BY_CARTS.value,
-
+            FactMethods.BY_CARTS.value,
         ),
         (
             60,  # факт цена заказа
@@ -128,8 +125,7 @@ FactMethods.BY_CARTS.value,
             10,  # план продаж в день
             5,  # начальная целевая позиция
             5,  # новая целевая позиция,
-FactMethods.BY_CARTS.value,
-
+            FactMethods.BY_CARTS.value,
         ),
         (
             60,  # факт цена заказа
@@ -143,10 +139,10 @@ FactMethods.BY_CARTS.value,
             10,  # план продаж в день
             5,  # начальная целевая позиция
             6,  # новая целевая позиция,
-FactMethods.BY_CARTS.value,
+            FactMethods.BY_CARTS.value,
         ),
         #################
-(
+        (
             200,  # факт цена заказа
             1,  # факт количество заказов
             (
@@ -186,8 +182,7 @@ FactMethods.BY_CARTS.value,
             10,  # план продаж в день
             1,  # начальная целевая позиция
             1,  # новая целевая позиция,
-FactMethods.DIRECT_SALES.value,
-
+            FactMethods.DIRECT_SALES.value,
         ),
         (
             50,  # факт цена заказа
@@ -201,8 +196,7 @@ FactMethods.DIRECT_SALES.value,
             10,  # план продаж в день
             5,  # начальная целевая позиция
             5,  # новая целевая позиция,
-FactMethods.DIRECT_SALES.value,
-
+            FactMethods.DIRECT_SALES.value,
         ),
         (
             10,  # факт цена заказа
@@ -216,8 +210,7 @@ FactMethods.DIRECT_SALES.value,
             10,  # план продаж в день
             5,  # начальная целевая позиция
             5,  # новая целевая позиция,
-FactMethods.DIRECT_SALES.value,
-
+            FactMethods.DIRECT_SALES.value,
         ),
         (
             60,  # факт цена заказа
@@ -231,8 +224,7 @@ FactMethods.DIRECT_SALES.value,
             10,  # план продаж в день
             5,  # начальная целевая позиция
             5,  # новая целевая позиция,
-FactMethods.DIRECT_SALES.value,
-
+            FactMethods.DIRECT_SALES.value,
         ),
         (
             60,  # факт цена заказа
@@ -246,9 +238,8 @@ FactMethods.DIRECT_SALES.value,
             10,  # план продаж в день
             5,  # начальная целевая позиция
             6,  # новая целевая позиция,
-FactMethods.DIRECT_SALES.value,
+            FactMethods.DIRECT_SALES.value,
         ),
-
     ],
 )
 @pytest.mark.asyncio
@@ -265,7 +256,7 @@ async def test_update_target_place(
     keywords_mocks: list[CalculatedKeyword],
     get_async_session_mock,
     session_mock,
-    predict_method: FactMethods
+    predict_method: FactMethods,
 ) -> None:
     """Verify target place update logic across scenarios."""
     adv_setting_mock.max_price_for_order = max_price_for_order
@@ -291,7 +282,7 @@ async def test_update_target_place(
         predict_orders=fact_mean_orders_for_last_two_days,
         pay_for_order=fact_mean_price_for_order_for_last_two_days,
         original_orders=fact_mean_orders_for_last_two_days,
-        fact_method=predict_method
+        fact_method=predict_method,
     )
 
     with (

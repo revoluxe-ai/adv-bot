@@ -7,6 +7,7 @@ from app.modules.common_slaves.wildberries.models import WBToken
 from app.utils.db.models import User
 from app.client_bot import const
 
+
 class TestProcessTokens:
     @pytest.fixture
     def mock_bot(self):
@@ -46,7 +47,7 @@ class TestProcessTokens:
             bot=mock_bot,
             chat_id=sample_wb_user_cabinet.user.user_telegram_id,
             state=mock_state,
-            wb_user_cabinet_original_id=sample_wb_user_cabinet.id
+            wb_user_cabinet_original_id=sample_wb_user_cabinet.id,
         )
         shop_menu._wb_user_cabinet = sample_wb_user_cabinet
         shop_menu._wb_cabinet = sample_wb_user_cabinet.wb_cabinet
@@ -56,12 +57,14 @@ class TestProcessTokens:
     async def test_process_tokens_success(self, sample_shop_menu):
         """Test successful token processing for a shop."""
         mock_token = MagicMock(spec=WBToken)
-        mock_token.expires = datetime.datetime.now() + datetime.timedelta(days=10, hours=1)
+        mock_token.expires = datetime.datetime.now() + datetime.timedelta(
+            days=10, hours=1
+        )
 
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
             mock_session = AsyncMock()
             mock_sm.return_value.__aenter__.return_value = mock_session
-            
+
             mock_result = MagicMock()
             mock_result.scalars.return_value.all.return_value = [mock_token]
             mock_session.execute.return_value = mock_result
@@ -75,37 +78,44 @@ class TestProcessTokens:
     @pytest.mark.asyncio
     async def test_process_tokens_no_tokens_not_admin(self, sample_shop_menu):
         """Test token processing when no tokens are found for a non-admin user."""
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
             mock_session = AsyncMock()
             mock_sm.return_value.__aenter__.return_value = mock_session
-            
+
             mock_result = MagicMock()
-            mock_result.scalars.return_value.all.return_value = [] # No tokens
+            mock_result.scalars.return_value.all.return_value = []  # No tokens
             mock_session.execute.return_value = mock_result
 
             # Ensure user is not an admin
-            with patch('app.client_bot.const.ADMINS', new=[]):
+            with patch("app.client_bot.const.ADMINS", new=[]):
                 result = await sample_shop_menu._process_tokens()
 
                 assert result is False
                 sample_shop_menu.bot.send_message.assert_called_once()
-                assert "Не найдены токены для этого магазина." in sample_shop_menu.bot.send_message.call_args[0][1]
+                assert (
+                    "Не найдены токены для этого магазина."
+                    in sample_shop_menu.bot.send_message.call_args[0][1]
+                )
 
     @pytest.mark.asyncio
     async def test_process_tokens_no_tokens_admin(self, sample_shop_menu):
         """Test token processing when no tokens are found for an admin user."""
-        with patch('app.modules.shop_menu.message.sm') as mock_sm:
+        with patch("app.modules.shop_menu.message.sm") as mock_sm:
             mock_session = AsyncMock()
             mock_sm.return_value.__aenter__.return_value = mock_session
-            
+
             mock_result = MagicMock()
-            mock_result.scalars.return_value.all.return_value = [] # No tokens
+            mock_result.scalars.return_value.all.return_value = []  # No tokens
             mock_session.execute.return_value = mock_result
 
             # Ensure user is an admin
-            with patch('app.client_bot.const.ADMINS', new=[sample_shop_menu._user_telegram_id]):
+            with patch(
+                "app.client_bot.const.ADMINS", new=[sample_shop_menu._user_telegram_id]
+            ):
                 result = await sample_shop_menu._process_tokens()
 
                 assert result is True
-                assert sample_shop_menu.last_days_for_token == 30 # Admin gets temporary token
+                assert (
+                    sample_shop_menu.last_days_for_token == 30
+                )  # Admin gets temporary token
                 sample_shop_menu.bot.send_message.assert_not_called()

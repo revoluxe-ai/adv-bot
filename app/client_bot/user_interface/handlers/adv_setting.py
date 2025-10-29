@@ -237,7 +237,9 @@ async def turn_adv_on(
         adv: AdvSetting = result.scalar()
         assert adv
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-        tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(session, wb_cabinet.shop_id)
+        tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
+            session, wb_cabinet.shop_id
+        )
         price_for_adv_for_day = pricer.get_tariff_for_day(int(tariff_for_month))
         balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
             wb_cabinet.id

@@ -1,7 +1,7 @@
 from app.client_bot import const
 
 
-def get_main_text(user_telegram_id: int):
+def get_main_text(user_telegram_id: int) -> str:
     text = f"""
 Я бот-партнер в автоматизации рекламы на Wildberries: для агентств и крупных селлеров. 
 

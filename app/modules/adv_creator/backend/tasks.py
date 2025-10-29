@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 async def create_complex_advs(
-        ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
+    ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
     async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         try:
@@ -41,7 +41,7 @@ async def create_complex_advs(
 
 
 async def _create_complex_advs(
-        ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
+    ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
     bot = ctx["bot"]
     client_session = ctx["client_session"]

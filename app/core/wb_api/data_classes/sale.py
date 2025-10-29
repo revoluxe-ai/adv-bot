@@ -1,5 +1,6 @@
 from typing import Any
 
+
 class Sale:
     def __init__(self, data: dict[str, Any]):
         self._data = data

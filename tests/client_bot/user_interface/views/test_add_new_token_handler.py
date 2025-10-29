@@ -11,7 +11,11 @@ from sqlalchemy import select
 
 from app.client_bot.user_interface.handlers.start.start import process_add_new_token
 from app.client_bot.user_interface import states
-from app.modules.common_slaves.wildberries.models import WBToken, WBUserCabinet, WBCabinet
+from app.modules.common_slaves.wildberries.models import (
+    WBToken,
+    WBUserCabinet,
+    WBCabinet,
+)
 from app.utils.db.models import User
 from app.core.wb_api.exceptions import NotValidTokenError
 from app.modules.shop_menu import message as shop_menu_messages
@@ -26,12 +30,12 @@ def mock_message():
     chat_mock = MagicMock()
     chat_mock.id = 12345
     message.chat = chat_mock
-    
+
     # Mock from_user
     user = MagicMock(spec=TelegramUser)
     user.id = 67890
     message.from_user = user
-    
+
     return message
 
 
@@ -47,9 +51,7 @@ def mock_bot():
 def mock_state():
     """Create a mock FSMContext"""
     state = MagicMock(spec=FSMContext)
-    state.get_data = AsyncMock(return_value={
-        "wb_user_cabinet_original_id": 1
-    })
+    state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 1})
     state.clear = AsyncMock()
     return state
 
@@ -70,33 +72,36 @@ def mock_wb_user_cabinet():
 
 class TestProcessAddNewToken:
     """Test suite for process_add_new_token handler"""
-    
+
     @pytest.mark.asyncio
     async def test_empty_message_text(self, mock_message, mock_bot, mock_state):
         """Test handler with empty message text - should return early"""
         mock_message.text = None
-        
+
         result = await process_add_new_token(mock_message, mock_bot, mock_state)
-        
+
         assert result is None
         mock_bot.send_message.assert_not_called()
-        
+
     @pytest.mark.asyncio
-    async def test_start_command_triggers_restart(self, mock_message, mock_bot, mock_state):
+    async def test_start_command_triggers_restart(
+        self, mock_message, mock_bot, mock_state
+    ):
         """Test /start command in message triggers registration restart"""
         mock_message.text = "/start"
-        
-        with patch('app.client_bot.user_interface.handlers.start.start.start_registration') as mock_start_reg:
-            mock_start_reg.return_value = AsyncMock()
-            
-            await process_add_new_token(mock_message, mock_bot, mock_state)
-            
-            mock_start_reg.assert_called_once_with(mock_message, mock_bot, mock_state)
 
+        with patch(
+            "app.client_bot.user_interface.handlers.start.start.start_registration"
+        ) as mock_start_reg:
+            mock_start_reg.return_value = AsyncMock()
+
+            await process_add_new_token(mock_message, mock_bot, mock_state)
+
+            mock_start_reg.assert_called_once_with(mock_message, mock_bot, mock_state)
 
     @pytest.mark.asyncio
     async def test_duplicate_token_same_user(self, mock_bot, mock_state):
-        good_token = 'eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjEsImVudCI6MSwiZXhwIjoxNzc2OTk4Mjg4LCJpZCI6IjAxOWExMTgxLTc3ZjctNzA0Ni05ZmVkLTBkYWZiMTEzYjA5NSIsImlpZCI6NTQyNTkzMjQsIm9pZCI6NDA3OTM0OSwicyI6NzAsInNpZCI6IjI0YTk4OWVlLTM5Y2ItNDZjOC1hYzNmLWE4MzM3MGQ5NTg1ZiIsInQiOmZhbHNlLCJ1aWQiOjU0MjU5MzI0fQ.jFYQHctVOvRKSVz67O0WiLO7TrF-Z1YfYGcxbBmll8VQAEBjP-LsmigOk74HQfuvWSdDCNqcaQ0DizT-vXSkHA'
+        good_token = "eyJhbGciOiJFUzI1NiIsImtpZCI6IjIwMjUwOTA0djEiLCJ0eXAiOiJKV1QifQ.eyJhY2MiOjEsImVudCI6MSwiZXhwIjoxNzc2OTk4Mjg4LCJpZCI6IjAxOWExMTgxLTc3ZjctNzA0Ni05ZmVkLTBkYWZiMTEzYjA5NSIsImlpZCI6NTQyNTkzMjQsIm9pZCI6NDA3OTM0OSwicyI6NzAsInNpZCI6IjI0YTk4OWVlLTM5Y2ItNDZjOC1hYzNmLWE4MzM3MGQ5NTg1ZiIsInQiOmZhbHNlLCJ1aWQiOjU0MjU5MzI0fQ.jFYQHctVOvRKSVz67O0WiLO7TrF-Z1YfYGcxbBmll8VQAEBjP-LsmigOk74HQfuvWSdDCNqcaQ0DizT-vXSkHA"
         shop_id = WBToken(api_key=good_token).get_shop_id_from_token()
         # Mock WBToken instance instead of creating a real one
         mock_token_instance = MagicMock(spec=WBToken)
@@ -118,12 +123,18 @@ class TestProcessAddNewToken:
 
         mock_message.text = good_token
         """Test handler when token already exists for the same user"""
-        with patch('app.client_bot.user_interface.handlers.start.start.wb_models.WBToken') as mock_token_class:
-            mock_token_class.return_value = mock_token_instance # Return the mocked instance
-            
-            with patch('app.client_bot.user_interface.handlers.start.start.sm') as mock_sm:
+        with patch(
+            "app.client_bot.user_interface.handlers.start.start.wb_models.WBToken"
+        ) as mock_token_class:
+            mock_token_class.return_value = (
+                mock_token_instance  # Return the mocked instance
+            )
+
+            with patch(
+                "app.client_bot.user_interface.handlers.start.start.sm"
+            ) as mock_sm:
                 mock_session = MagicMock()
-                
+
                 # First query - user found
                 mock_user_result = MagicMock()
                 mock_user_result.scalar.return_value = 1
@@ -135,7 +146,7 @@ class TestProcessAddNewToken:
                 # Second query - cabinet found
                 mock_cabinet_result = MagicMock()
                 mock_cabinet_result.scalar.return_value = mock_wb_user_cabinet
-                
+
                 # Third query - existing token found for same user
                 mock_existing_token = MagicMock(spec=WBToken)
                 mock_existing_token.user_id = 1
@@ -144,18 +155,23 @@ class TestProcessAddNewToken:
                 mock_existing_token.get_shop_id_from_token.return_value = shop_id
                 mock_token_result = MagicMock()
                 mock_token_result.scalar.return_value = mock_existing_token
-                
-                mock_session.execute = AsyncMock(side_effect=[
-                    mock_user_result,
-                    mock_cabinet_result,
-                    mock_token_result
-                ])
-                
+
+                mock_session.execute = AsyncMock(
+                    side_effect=[
+                        mock_user_result,
+                        mock_cabinet_result,
+                        mock_token_result,
+                    ]
+                )
+
                 mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
                 mock_sm.return_value.__aexit__ = AsyncMock()
-                
+
                 await process_add_new_token(mock_message, mock_bot, mock_state)
-                
+
                 assert mock_bot.send_message.call_count == 1
                 call_args = mock_bot.send_message.call_args
-                assert "Ошибка: токен принадлежит другому магазину. Попробуйте еще раз:" in call_args[0][1]
+                assert (
+                    "Ошибка: токен принадлежит другому магазину. Попробуйте еще раз:"
+                    in call_args[0][1]
+                )

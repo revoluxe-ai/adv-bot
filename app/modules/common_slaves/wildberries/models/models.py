@@ -428,7 +428,9 @@ class AdvSetting(BaseTable):
         Boolean, default=False, nullable=True
     )
     max_cpm = mapped_column(Integer, nullable=True)
-    auto_max_cpm_mode = mapped_column(Boolean, nullable=True, default=False, server_default=text("false"))
+    auto_max_cpm_mode = mapped_column(
+        Boolean, nullable=True, default=False, server_default=text("false")
+    )
     max_place = mapped_column(Integer, nullable=True)
     use_incremental_stats = mapped_column(
         Boolean,
@@ -505,9 +507,8 @@ class AdvSetting(BaseTable):
         SAEnum(FactMethods),
         nullable=True,
         default=FactMethods.DIRECT_SALES,  # экземпляр Enum
-        server_default=FactMethods.DIRECT_SALES.name, ) # строка
-
-
+        server_default=FactMethods.DIRECT_SALES.name,
+    )  # строка
 
     __table_args__ = (
         # Составной индекс для основного запроса

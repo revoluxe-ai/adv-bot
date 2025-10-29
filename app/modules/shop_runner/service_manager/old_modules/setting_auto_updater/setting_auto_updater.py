@@ -33,19 +33,25 @@ class AdvSettingAutoUpdater:
 
         self._max_last_period = max_last_period
 
-    async def __get_stat_data(self, keywords: list[CalculatedKeyword]) -> CommonAdvsStatData:
+    async def __get_stat_data(
+        self, keywords: list[CalculatedKeyword]
+    ) -> CommonAdvsStatData:
         common_stat_manager = CommonAdvsStatDataManager()
         stat: CommonAdvsStatData = await common_stat_manager.get_data(
             self._adv, keywords, last_days=self._max_last_period
         )
         return stat
 
-    async def get_fact_data_and_stat(self, keywords: list[CalculatedKeyword]) -> tuple[FactData, CommonAdvsStatData]:
+    async def get_fact_data_and_stat(
+        self, keywords: list[CalculatedKeyword]
+    ) -> tuple[FactData, CommonAdvsStatData]:
         stat = await self.__get_stat_data(keywords)
         fact = self._get_fact_data_from_stat(stat)
         return fact, stat
 
-    def _get_fact_data_from_stat(self, common_stat_data: CommonAdvsStatData) -> FactData:
+    def _get_fact_data_from_stat(
+        self, common_stat_data: CommonAdvsStatData
+    ) -> FactData:
         fact_data = self.__get_fact_data_from_stats(common_stat_data)
         return fact_data
 
@@ -55,7 +61,7 @@ class AdvSettingAutoUpdater:
         return fact
 
     async def update(
-            self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]
+        self, keywords_coroutine: Awaitable[list[CalculatedKeyword]]
     ) -> None:
         keywords = await keywords_coroutine
         plan = self.get_plan_data(self._adv)
@@ -71,8 +77,8 @@ class AdvSettingAutoUpdater:
         return None
 
     def __get_fact_data_from_stats(
-            self,
-            common_stat_data: CommonAdvsStatData,
+        self,
+        common_stat_data: CommonAdvsStatData,
     ) -> FactData:
         assert common_stat_data.mean_orders_for_last_days is not None
         assert common_stat_data.mean_price_for_order is not None
@@ -109,13 +115,13 @@ class AdvSettingAutoUpdater:
         return plan
 
     @staticmethod
-    async def add_top_keyword_to_white_list(
-            keywords: list[CalculatedKeyword]
-    ) -> None:
+    async def add_top_keyword_to_white_list(keywords: list[CalculatedKeyword]) -> None:
         if not keywords:
             return None
         assert keywords
-        keywords.sort(key=lambda kw: kw.predict_ctr, reverse=True)  # ignore: type: ignore # predict_ctr не может быть
+        keywords.sort(
+            key=lambda kw: kw.predict_ctr, reverse=True
+        )  # ignore: type: ignore # predict_ctr не может быть
         # None здесь. Надо переделать CalculatedKeyword, чтобы у него не было полей с None, как минимум для predict_ctr
         first_kw = keywords[0]
 
@@ -132,7 +138,7 @@ class AdvSettingAutoUpdater:
 
     @staticmethod
     def __get_mean_orders(
-            stat_data: list[SmallFullAdvStatPerDay],
+        stat_data: list[SmallFullAdvStatPerDay],
     ) -> float:
         assert len(stat_data) > 1, "Должно быть данных больше, чем за 2 дня"
         stat_data = stat_data[:2]
@@ -154,7 +160,7 @@ class AdvSettingAutoUpdater:
 
     @staticmethod
     def __get_mean_pay_for_order(
-            stat_data: list[SmallFullAdvStatPerDay],
+        stat_data: list[SmallFullAdvStatPerDay],
     ) -> float:
         stat_data.sort(key=lambda st: st.date, reverse=True)
         for n, stat in enumerate(stat_data):

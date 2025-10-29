@@ -4,6 +4,7 @@
 """
 
 import pytest
+
 pytest.skip("Этот файл не должен выполняться", allow_module_level=True)
 
 import asyncio
@@ -22,7 +23,6 @@ from app.modules.grpcs.predict_ctr_service.grpc_service.predict_ctr_service_pb2_
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 
 async def test_predict_service():

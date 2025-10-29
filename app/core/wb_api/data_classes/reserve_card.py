@@ -1,5 +1,6 @@
 from typing import Any
 
+
 class ReserveCard:
     _wb_barcode: Any
     _offer_id: Any

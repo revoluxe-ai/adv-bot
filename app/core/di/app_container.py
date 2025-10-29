@@ -9,7 +9,8 @@ from redis.asyncio import Redis
 from app.core.redis_manager_v2.redis_client import RedisClient
 from . import databases
 from .module_resources import ModuleResources
-from app.configs.app_config import AppConfig # Добавляем импорт AppConfig здесь
+from app.configs.app_config import AppConfig  # Добавляем импорт AppConfig здесь
+
 
 def create_redis_client(redis_config: AppConfig) -> Redis:
     redis = databases.create_redis_client(redis_config)

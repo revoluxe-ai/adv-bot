@@ -8,8 +8,11 @@ from aiohttp import ClientSession
 
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
+
 # Import token monitoring for expiration checks
-from app.modules.token_monitoring.services.token_expiration_service import run_token_expiration_check
+from app.modules.token_monitoring.services.token_expiration_service import (
+    run_token_expiration_check,
+)
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
 from . import wb_manager
@@ -24,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: добавить статус -1 в кампании, что значит "кампания на стадии удаления"
+
 
 async def run_update_predict_ctr() -> None:
     await wb_manager.update_predict_ctr()
@@ -62,7 +66,9 @@ async def process_token_expiration_check() -> None:
 
         # Спим до 9:00
         sleep_seconds = (next_run - now).total_seconds()
-        logger.info(f"Следующая проверка токенов: {next_run} (через {sleep_seconds / 3600:.1f} часов)")
+        logger.info(
+            f"Следующая проверка токенов: {next_run} (через {sleep_seconds / 3600:.1f} часов)"
+        )
         await asyncio.sleep(sleep_seconds)
 
         # Выполняем проверку токенов
@@ -77,6 +83,7 @@ async def process_payment_for_advs() -> None:
     from app.modules.billing import (
         process_payment_for_advs as billing_process_payment_for_advs,
     )
+
     async with await DIManager.create(AppContainer):
         """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
         while True:

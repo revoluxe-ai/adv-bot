@@ -140,6 +140,7 @@ def get_ssl_context(insecure: bool) -> ssl.SSLContext:
 
     # Безопасный путь: используем системные корни или указанный CA
     from app.settings import settings
+
     ca = getattr(settings, "POSTGRES_SSL_CA", None)
     if ca:
         return ssl.create_default_context(cafile=ca)
@@ -184,7 +185,7 @@ read_write_session_maker = async_sessionmaker(
 
 @asynccontextmanager
 async def get_async_session_maker(
-        read_only: bool = False,
+    read_only: bool = False,
 ) -> AsyncGenerator[AsyncSession, None]:
     session_start = time()
     current_task = asyncio.current_task()

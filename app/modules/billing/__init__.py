@@ -6,6 +6,7 @@ __all__ = ["process_payment_for_advs", "AdvPayment"]
 # TODO: убрать эту обёртку, когда решится проблема циклического импорта между Pricer и wildberries.models
 # пока это быстрый костыль.
 
+
 def process_payment_for_advs(*args, **kwargs):
     """Ленивая обёртка для избежания циклического импорта.
 

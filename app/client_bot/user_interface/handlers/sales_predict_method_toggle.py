@@ -41,6 +41,3 @@ async def toggle_sales_predict_method(
         status_str = "Включен режим прогноза по корзинам"
 
     await bot.send_message(chat_id, status_str)
-
-
-

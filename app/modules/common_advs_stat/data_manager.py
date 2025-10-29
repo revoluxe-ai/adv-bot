@@ -9,7 +9,9 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import FactMethods
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
+    FactMethods,
+)
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
@@ -44,9 +46,9 @@ class CommonAdvsStatData:
 
 class CommonAdvsStatDataManager:
     """Менеджер для получения данных о ключевых словах рекламной кампании"""
+
     async def get_data(
-        self,
-        adv_setting: AdvSetting, keywords: list[CalculatedKeyword], last_days: int
+        self, adv_setting: AdvSetting, keywords: list[CalculatedKeyword], last_days: int
     ) -> CommonAdvsStatData:
         """Получает все необходимые данные для отображения информации о ключевых словах"""
 
@@ -73,10 +75,8 @@ class CommonAdvsStatDataManager:
         )
 
         # Статистика для аукциона
-        full_adv_stat_for_last_days_for_auction = (
-            await full_wb_adv_stat.get_stats_by_last_days(
-                [adv_setting.search_adv_id], start_date, end_date
-            )
+        full_adv_stat_for_last_days_for_auction = await full_wb_adv_stat.get_stats_by_last_days(
+            [adv_setting.search_adv_id], start_date, end_date  # type: ignore[list-item]
         )
 
         # Общий расход
@@ -86,10 +86,10 @@ class CommonAdvsStatDataManager:
         )
 
         # Общая статистика
-        common_stat: (
-            CommonCardStat | None
-        ) = await common_stat_manager.get_stats_for_last_period(
-            int(adv_setting.nmids[0]), pass_days
+        common_stat: CommonCardStat | None = (
+            await common_stat_manager.get_stats_for_last_period(
+                int(adv_setting.nmids[0]), pass_days
+            )
         )
 
         # Рассчитываем дополнительные метрики
@@ -103,7 +103,10 @@ class CommonAdvsStatDataManager:
             # Используем только заказы из рекламы (Авто + Аукцион)
             base_common_orders = all_orders_from_advs
             spend_for_inner_advs_for_days = full_spend_for_all_advs
-        elif adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
+        elif (
+            adv_setting.orders_source_for_auto_mode
+            == OrdersSourceForAutoMode.COMMON_STATISTIC
+        ):
             # Используем общую статистику (по умолчанию)
             base_common_orders = common_stat.orders
             if base_common_orders < all_orders_from_advs:
@@ -116,13 +119,16 @@ class CommonAdvsStatDataManager:
         if base_common_orders == 0:
             base_common_orders = 1
         base_common_carts = common_stat.add_to_cart
-        predict_orders_for_days  = await self._get_predict_orders_for_day(adv_setting,
-                                                                   base_common_orders,
-                                                                   base_common_carts,
-                                                                   pass_days)
-        predict_orders_for_fraction_day = self._get_predict_order_for_fractation_day(predict_orders_for_days, pass_days)
+        predict_orders_for_days = await self._get_predict_orders_for_day(
+            adv_setting, base_common_orders, base_common_carts, pass_days
+        )
+        predict_orders_for_fraction_day = self._get_predict_order_for_fractation_day(
+            predict_orders_for_days, pass_days
+        )
 
-        mean_price_for_order = spend_for_inner_advs_for_days / predict_orders_for_fraction_day
+        mean_price_for_order = (
+            spend_for_inner_advs_for_days / predict_orders_for_fraction_day
+        )
 
         # Получаем расходы на ключевые слова
         spend_for_keywords_in_auto_adv = await full_wb_adv_stat.get_keywords_spend(
@@ -152,15 +158,17 @@ class CommonAdvsStatDataManager:
             sales_predict_method=adv_setting.sales_predict_method,
         )
 
-    async def _get_predict_orders_for_day(self,
-                                          adv: AdvSetting,
-                                          base_common_orders: int,
-                                          base_common_carts: int,
-                                          pass_days: int) -> float:
+    async def _get_predict_orders_for_day(
+        self,
+        adv: AdvSetting,
+        base_common_orders: int,
+        base_common_carts: int,
+        pass_days: int,
+    ) -> float:
 
         if adv.sales_predict_method == FactMethods.DIRECT_SALES:
             return base_common_orders
-        elif adv.sales_predict_method  == FactMethods.BY_CARTS:
+        elif adv.sales_predict_method == FactMethods.BY_CARTS:
             basket_to_order_ratio: float = await self._get_cart_to_order_ratio(adv)
             base_predict_orders = base_common_carts / basket_to_order_ratio
             return base_predict_orders
@@ -169,20 +177,20 @@ class CommonAdvsStatDataManager:
                 f"Неизвестный метод прогноза заказов: {adv.sales_predict_method}"
             )
 
-
-
-    async def _get_cart_to_order_ratio(self, adv: AdvSetting, pass_days: int = 7) -> float:
+    async def _get_cart_to_order_ratio(
+        self, adv: AdvSetting, pass_days: int = 7
+    ) -> float:
         ch = clickhouse_manager
         ratio = await ch.get_cart_to_order_ratio_from_common_items_stat(adv, pass_days)
         if ratio is None:
             ratio = 1.0
         return ratio
 
-    def _get_predict_order_for_fractation_day(self, base_predict_orders: float, pass_days: int) -> float:
+    def _get_predict_order_for_fractation_day(
+        self, base_predict_orders: float, pass_days: int
+    ) -> float:
         now = datetime.now()
         hours_passed = now.hour + now.minute / 60 + now.second / 3600
         fraction_of_day = hours_passed / 24 + pass_days
         predict_orders_for_days = base_predict_orders / fraction_of_day
         return predict_orders_for_days
-
-

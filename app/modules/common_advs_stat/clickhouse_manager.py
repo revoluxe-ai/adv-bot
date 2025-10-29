@@ -3,8 +3,7 @@ from app.core.clikhouse_client_manager import get_client
 
 
 async def get_cart_to_order_ratio_from_common_items_stat(
-        adv: "AdvSetting",
-        pass_days: int
+    adv: "AdvSetting", pass_days: int
 ) -> float | None:
     nmids = adv.nmids
     query = """

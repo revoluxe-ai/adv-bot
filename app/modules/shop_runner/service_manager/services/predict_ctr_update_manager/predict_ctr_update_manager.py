@@ -23,7 +23,7 @@ class PredictCTRUpdateManager:
     """Менеджер для обновления прогнозов CTR"""
 
     def __init__(
-            self,
+        self,
     ) -> None:
         self._grpc_client: Optional[PredictCTRClient] = None
 
@@ -38,7 +38,7 @@ class PredictCTRUpdateManager:
         return self._grpc_client
 
     async def update_predict_ctr(
-            self, adv: AdvSetting, keywords_coro: Awaitable[list[CalculatedKeyword]]
+        self, adv: AdvSetting, keywords_coro: Awaitable[list[CalculatedKeyword]]
     ) -> None:
         keywords = await keywords_coro
 
@@ -82,7 +82,7 @@ class PredictCTRUpdateManager:
             )
 
     async def _make_grpc_request(
-            self, grpc_client: PredictCTRClient, nmids: list[int], phrases: list[str]
+        self, grpc_client: PredictCTRClient, nmids: list[int], phrases: list[str]
     ) -> dict[str, float] | None:
         """Выполнить gRPC запрос для получения прогнозов"""
         try:
@@ -96,12 +96,12 @@ class PredictCTRUpdateManager:
 
     @inject
     async def _save_predictions_to_redis(
-            self,
-            adv: AdvSetting,
-            predictions: dict[str, float],
-            redis_manager: PredictCTRRedisManager = Provide[
-                PredictCTRManagerContainer.redis_manager
-            ],
+        self,
+        adv: AdvSetting,
+        predictions: dict[str, float],
+        redis_manager: PredictCTRRedisManager = Provide[
+            PredictCTRManagerContainer.redis_manager
+        ],
     ) -> None:
         """Сохранить прогнозы в Redis через pipeline"""
         try:

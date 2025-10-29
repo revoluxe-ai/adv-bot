@@ -19,9 +19,9 @@ from app.utils.graphic_positions_creator.classes import CommonKeyword
 
 
 async def get_common_keywords_with_positions(nmid) -> list[CommonKeyword] | None:
-    positions: list[
-        WBItemPosition
-    ] = await data_manager.get_keyword_positions_from_click_house(nmid)
+    positions: list[WBItemPosition] = (
+        await data_manager.get_keyword_positions_from_click_house(nmid)
+    )
     common_keywords = []
     if positions:
         text_to_positions = defaultdict(list)

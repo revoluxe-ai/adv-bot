@@ -17,11 +17,11 @@ class ParsingQueueManager:
         self.redis_manager = ParsingFoundRedisManager()
 
     async def add_found_not_found_page(
-            self,
-            text: str,
-            positions: list[WBItemPosition],
-            need_nmids: set[int],
-            page: int,
+        self,
+        text: str,
+        positions: list[WBItemPosition],
+        need_nmids: set[int],
+        page: int,
     ) -> None:
         my_positions_dict: dict[int, WBItemPosition] = {
             pos.nmid: pos for pos in positions if pos.nmid in need_nmids
@@ -48,12 +48,12 @@ class ParsingQueueManager:
         if settings.PARSING_QUEUE_MODE == ParsingQueueMode.SIMPLE_QUEUE:
             return list(range(1, max_pages + 1))
         for nmid in need_nmids:
-            found_pages: list[
-                int
-            ] = await self.redis_manager.get_found_pages_for_text_nmid(text, nmid)
-            not_found_pages: list[
-                int
-            ] = await self.redis_manager.get_not_found_pages_for_text_nmid(text, nmid)
+            found_pages: list[int] = (
+                await self.redis_manager.get_found_pages_for_text_nmid(text, nmid)
+            )
+            not_found_pages: list[int] = (
+                await self.redis_manager.get_not_found_pages_for_text_nmid(text, nmid)
+            )
 
             found_pages_all.extend(found_pages)
             not_found_pages_all.extend(not_found_pages)

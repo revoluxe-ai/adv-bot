@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 import dotenv
+
 dotenv.load_dotenv()
 import pytest
 # Подставляем заглушку для app.core.wb_api.http_request до реальных импортов

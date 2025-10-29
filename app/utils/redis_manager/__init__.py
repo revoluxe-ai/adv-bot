@@ -194,13 +194,15 @@ async def get_keyword_position(keyword: str, nmid: int) -> WBItemPosition | None
     return position
 
 
-async def get_keywords_positions(adv_setting: AdvSetting, texts: list[str]) -> list[WBItemPosition]:
+async def get_keywords_positions(
+    adv_setting: AdvSetting, texts: list[str]
+) -> list[WBItemPosition]:
     keys = ["adv_positions:" + text + ":" + str(adv_setting.nmids[0]) for text in texts]
     results = await redis_replica_client.mget(keys)
     positions = []
     missing_texts = []
 
-    for text, json_data in zip(texts, results, strict=False): # type: ignore
+    for text, json_data in zip(texts, results, strict=False):  # type: ignore
         if json_data:
             position = WBItemPosition.from_dict(json.loads(json_data))
             position.keyword_text = text
@@ -225,7 +227,7 @@ async def get_keywords_positions(adv_setting: AdvSetting, texts: list[str]) -> l
         if cluster_keys:
             cluster_results = await redis_replica_client.mget(cluster_keys)
 
-            for key, json_data in zip(cluster_keys, cluster_results, strict=False): # type: ignore
+            for key, json_data in zip(cluster_keys, cluster_results, strict=False):  # type: ignore
                 if json_data:
                     position = WBItemPosition.from_dict(json.loads(json_data))
                     position.keyword_text = cluster_map[key]
@@ -434,7 +436,7 @@ async def get_keys(pattern: str) -> list[bytes]:
     keys: list[bytes] = []
 
     while cursor != b"0":  # Ожидаем, пока курсор не вернется к начальной позиции
-        cursor, batch = await redis_replica_client.scan(cursor, match=pattern) # type: ignore
+        cursor, batch = await redis_replica_client.scan(cursor, match=pattern)  # type: ignore
         keys.extend(batch)
 
     return keys
@@ -469,7 +471,9 @@ async def get(key: str) -> bytes | None:
     return cast(bytes | None, value)
 
 
-async def set_cluster_and_preset(text: str, cluster: str | None, preset: int | None) -> None:
+async def set_cluster_and_preset(
+    text: str, cluster: str | None, preset: int | None
+) -> None:
     key = "cluster_and_preset:" + encode_key(text)
     if cluster is None or preset is None:
         await redis_master_client.delete(key)
@@ -531,13 +535,15 @@ async def get_last_views(adv_id: int, text: str) -> int | None:
     return int(total_views)
 
 
-async def get_clusters_and_presets(texts: list[str]) -> dict[str, tuple[str | None, int | None]]:
+async def get_clusters_and_presets(
+    texts: list[str],
+) -> dict[str, tuple[str | None, int | None]]:
     keys = [f"cluster_and_preset:{encode_key(text)}" for text in texts]
     values = await redis_replica_client.mget(keys)
 
     clusters_and_presets: dict[str, tuple[str | None, int | None]] = {}
 
-    for text, value in zip(texts, values, strict=False): # type: ignore
+    for text, value in zip(texts, values, strict=False):  # type: ignore
         key = f"cluster_and_preset:{encode_key(text)}"
 
         if value is None:
@@ -568,7 +574,7 @@ async def get_keywords_positions_by_nmid(
     keys = [f"adv_positions:{text}:{nmid}" for text in texts]
     results = await redis_replica_client.mget(keys)
     positions = []
-    for text, json_data in zip(texts, results, strict=False): # type: ignore
+    for text, json_data in zip(texts, results, strict=False):  # type: ignore
         if json_data:
             position = WBItemPosition.from_dict(json.loads(json_data))
             position.keyword_text = text
