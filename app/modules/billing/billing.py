@@ -189,8 +189,8 @@ async def __process_single_cabinet(
             result["reason"] = "zero_price"
             return result
 
-        calculated_bonus = float(wb_cabinet.calculated_bonus or 0)
-        calculated_balance = float(wb_cabinet.calculated_balance or 0)
+        calculated_bonus = float(wb_cabinet.calculated_bonus or 0) # type: ignore[truthy-function]
+        calculated_balance = float(wb_cabinet.calculated_balance or 0) # type: ignore[truthy-function]
         payment_successful = False
 
         def add_bonus(amt: float) -> None:

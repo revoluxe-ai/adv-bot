@@ -50,17 +50,18 @@ class CommonStatMinix(WBAPIProtocol):
 
         response = json.loads(response)
         stats = []
-        for data in response["data"]:
-            for history in data["history"]:
-                date = datetime.strptime(history["dt"], "%Y-%m-%d")
+        for data in response["data"]:  # type: ignore[index]
+            for history in data["history"]:  # type: ignore[index]
+                date = datetime.strptime(history["dt"], "%Y-%m-%d")  # type: ignore[index]
                 stat = CommonStat(
-                    nmid=data["nmID"],
+                    nmid=data["nmID"],  # type: ignore[index]
                     date=date,
                     open_card=history["openCardCount"],
                     add_to_cart=history["addToCartCount"],
                     orders=history["ordersCount"],
                     orders_sum=history["ordersSumRub"],
                     buy_outs=history["buyoutsCount"],
+                    add_to_cart=history["addToCartCount"],  # type: ignore[index]
                 )
                 stats.append(stat)
         return stats
