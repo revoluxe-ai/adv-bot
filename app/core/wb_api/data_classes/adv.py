@@ -211,8 +211,6 @@ class Statistic:
         return cast(list[dict[str, Any]], self._data["days"])
 
     @property
-    def views(self):
-        return self._data["views"]
     def views(self) -> int:
         return int(self._data["views"])
 

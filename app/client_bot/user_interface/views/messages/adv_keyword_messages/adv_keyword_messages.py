@@ -4,8 +4,8 @@ from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 
+from app.client_bot.message_manager import LastMessage
 from app.client_bot.user_interface.message_templates import (
-    LastMessage,
     TextWithKeyboardAndImage,
 )
 
@@ -68,7 +68,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         state: FSMContext,
         sort_mode="by_adv",
         auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_cpm_bid_manager],
-    ) -> (LastMessage, str):
+    ):
         self.sort_mode = sort_mode
         self._state = state
         data = await state.get_data()
