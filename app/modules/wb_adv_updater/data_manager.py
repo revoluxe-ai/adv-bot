@@ -461,10 +461,10 @@ def __set_predict_ctr(
         added_clicks = keyword_stat.added_clicks
         if added_clicks:
             clicks += added_clicks
-        
+
         # Логика расчета predict_ctr зависит от режима
         predict_mode = adv_setting.predict_ctr_mode
-        
+
         # V1 или None (по умолчанию) - старая логика с усреднением прогноза и факта
         if predict_mode is None or predict_mode == PredictCTRMode.V1:
             if original_predict_ctr:
@@ -480,7 +480,7 @@ def __set_predict_ctr(
             keyword_stat.baes_predict_ctr = baes_predict_ctr
             keyword_stat.calculated_clicks = clicks
             keyword_stat.calculated_views = views
-        
+
         # V2 - новая логика: используем только прогноз, если его нет - факт
         elif predict_mode == PredictCTRMode.V2:
             if original_predict_ctr:
@@ -489,7 +489,7 @@ def __set_predict_ctr(
             else:
                 # Если прогноза нет - используем фактический CTR
                 keyword_stat.predict_ctr = original_baes_ctr
-            
+
             keyword_stat.baes_predict_ctr = keyword_stat.predict_ctr
             keyword_stat.calculated_clicks = clicks
             keyword_stat.calculated_views = views

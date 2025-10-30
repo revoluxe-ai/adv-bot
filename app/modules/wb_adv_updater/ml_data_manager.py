@@ -270,7 +270,7 @@ async def update_keywords_ctr_by_similary() -> None:
 
         # Поиск ближайших векторов
         # noinspection PyArgumentList
-        D, I = index.search(vector, index.ntotal) # noqa: E741
+        D, I = index.search(vector, index.ntotal)  # noqa: E741
         redis_base_manager = BaseRedis()
         async with redis_base_manager.client.pipeline() as redis_pipeline:
             for idx in I[0]:

@@ -173,7 +173,9 @@ class FaissManager:
         file_name = "keyword.index"
         file_path = self.__get_file_path(file_name)
         s = self._session_maker()
-        keywords = s.query(Keyword).filter(getattr(Keyword, vector_property) is not None)
+        keywords = s.query(Keyword).filter(
+            getattr(Keyword, vector_property) is not None
+        )
         index = Index(
             keywords,
             vector_property,

@@ -74,7 +74,6 @@ class Keyword(Base):
 WB_CARD_MEDIA_FOLDER = "wb_cards_media"
 
 
-
 class Image(Base):
     __tablename__ = "images"
     id = Column(Integer, primary_key=True)

@@ -173,7 +173,9 @@ async def main_async(keyword: str, nmids: Iterable[int], max_pages: int) -> None
     if not placements:
         unique_nmids = sorted(set(nmids))
         print(
-            "Товары {} не найдены в выдаче по заданному ключу".format(", ".join(str(nmid) for nmid in unique_nmids))
+            "Товары {} не найдены в выдаче по заданному ключу".format(
+                ", ".join(str(nmid) for nmid in unique_nmids)
+            )
         )
         return
 
@@ -187,7 +189,9 @@ async def main_async(keyword: str, nmids: Iterable[int], max_pages: int) -> None
     missing = set(nmids) - found_nmid
     if missing:
         print(
-            "Не найдены в выдаче: {}".format(", ".join(str(nmid) for nmid in sorted(missing)))
+            "Не найдены в выдаче: {}".format(
+                ", ".join(str(nmid) for nmid in sorted(missing))
+            )
         )
 
 

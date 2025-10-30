@@ -20,6 +20,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from typing import cast
+
 logger = logging.getLogger(__name__)
 
 redis_host_master = settings.REDIS_MASTER_HOST
@@ -62,17 +63,17 @@ class RedisEvent(asyncio.Event):
             return redis_master_client
         raise ValueError("Invalid redis client type")
 
-    async def set(self) -> None: # type: ignore[override]
+    async def set(self) -> None:  # type: ignore[override]
         redis_ = await self._get_redis("white")
         await redis_.set(self.key, 1)
         super().set()
 
-    async def clear(self) -> None: # type: ignore[override]
+    async def clear(self) -> None:  # type: ignore[override]
         redis_ = await self._get_redis("white")
         await redis_.delete(self.key)
         super().clear()
 
-    async def wait(self) -> typing.Literal[True]: # type: ignore[override]
+    async def wait(self) -> typing.Literal[True]:  # type: ignore[override]
         redis_ = await self._get_redis("read")
         while True:
             result = await redis_.get(self.key)
@@ -82,7 +83,7 @@ class RedisEvent(asyncio.Event):
         await super().wait()
         return True
 
-    async def is_set(self) -> bool: # type: ignore[override]
+    async def is_set(self) -> bool:  # type: ignore[override]
         redis_ = await self._get_redis("read")
         result = await redis_.get(self.key)
         return result is not None
@@ -594,6 +595,7 @@ async def set_full_stat_adv(adv_stats: typing.Iterable[FullAdvStat]) -> None:
     await redis_master_client.mset(data)
 
     return None
+
 
 async def get_full_stat_adv(adv_id: int) -> str:
     key = f"full_stat_adv:{adv_id}"

@@ -85,7 +85,6 @@ class AdvertApi(ABC_WB_API):
     live_company_status = [4, 9, 11]
     auto_adv_types = [8, 9]
 
-
     @try_except_decorator(1, 1)
     async def set_search_cpm(self, search_adv_id: int, cpm: int):
         url = "https://advert-api.wildberries.ru/adv/v0/cpm"

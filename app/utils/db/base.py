@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 Base = declarative_base()
 
 
-class BaseTable(Base): # type: ignore[valid-type]
+class BaseTable(Base):  # type: ignore[valid-type]
     __abstract__ = True
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 

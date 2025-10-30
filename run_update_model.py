@@ -18,11 +18,11 @@ async def run():
 logger = logging.getLogger(__name__)
 
 
-
 async def update_model() -> None:
     # TODO: Сделать нормальный контекстый менеджер для DI
     async with await DIManager.create(AppContainer):
         await run()
+
 
 if __name__ == "__main__":
     while True:
@@ -31,4 +31,3 @@ if __name__ == "__main__":
         except Exception as e:
             logger.exception(e)
             sleep(70)
-

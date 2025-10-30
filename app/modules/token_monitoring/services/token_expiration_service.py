@@ -242,7 +242,7 @@ class TokenExpirationService:
                         "earliest_expiry": token.expires,
                     }
 
-                summary["by_shop"][shop_id]["tokens"].append( # type: ignore[index]
+                summary["by_shop"][shop_id]["tokens"].append(  # type: ignore[index]
                     {  # type: ignore[index]
                         "token_id": token.id,
                         "expires": token.expires,

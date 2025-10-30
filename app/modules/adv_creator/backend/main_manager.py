@@ -123,9 +123,12 @@ class MainAdvManager:
                 break
 
     async def create_complex_advs(
-            #TODO: Бот не видит, что РК завершены и не дает создать новую РК по тому же артикулу
-
-        self, bot: Bot, user_telegram_id, nmid: int, hard_mode
+        # TODO: Бот не видит, что РК завершены и не дает создать новую РК по тому же артикулу
+        self,
+        bot: Bot,
+        user_telegram_id,
+        nmid: int,
+        hard_mode,
     ) -> tuple[int, int]:
         exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
         if (
