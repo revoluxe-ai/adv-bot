@@ -349,6 +349,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         if predict_ctr_mode == PredictCTRMode.V1:
             predict_ctr_mode_text = "v1 (по ID кампании)"
         else:
+        # TODO: Добавить отображение фото в ключах
             predict_ctr_mode_text = "v2 (по артикулам товара)"
         # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = (
