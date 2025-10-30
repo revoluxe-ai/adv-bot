@@ -260,6 +260,6 @@ class ImageMaster:
 
     def delete_background_image(self):
         s = self._alchemy_session_maker()
-        images = s.query(Image).filter(Image.is_background == True)
+        images = s.query(Image).filter(Image.is_background.is_(True))
         images.delete(synchronize_session=False)
         s.commit()

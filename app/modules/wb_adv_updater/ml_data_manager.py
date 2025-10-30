@@ -156,7 +156,7 @@ async def update_cards_in_graph_for_shops_big_cycle() -> None:
 async def update_cards_in_graph_small_cycle() -> None:
     async with sm() as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.bot_active == True,
+            AdvSetting.bot_active.is_(True),
         )
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
@@ -201,7 +201,7 @@ async def update_keywords_ctr_by_similary() -> None:
         stmt = (
             select(KeywordSetting.text, AdvSetting.adv_id)
             .join(AdvSetting, KeywordSetting.adv_setting_id == AdvSetting.id)
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active.is_(True))
         )
         result = await session.execute(stmt)
         keyword_texts_adv_ids: Sequence[Row[tuple[str, int]]] = result.all()

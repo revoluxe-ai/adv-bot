@@ -33,8 +33,8 @@ def get_adv_spend_by_user():
             .where(
                 and_(
                     # User.wb_tokens.any(WBToken.active == True),
-                    AdvSetting.bot_active == True,
-                    WBCabinet.active == True,
+                    AdvSetting.bot_active.is_(True),
+                    WBCabinet.active.is_(True),
                     AdvSetting.active_status == "started",
                     AdvKeyword.date == datetime.datetime.now().date(),
                 )

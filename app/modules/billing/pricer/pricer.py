@@ -37,7 +37,7 @@ class Pricer:
             .join(AdvSetting.wb_cabinet)
             .where(
                 WBCabinet.shop_id == shop_id,
-                AdvSetting.bot_active == True,
+                AdvSetting.bot_active.is_(True),
             )
         )
 
@@ -129,7 +129,7 @@ class Pricer:
             .join(WBCabinet)
             .where(
                 WBCabinet.shop_id == shop_id,
-                AdvSetting.auto_update_white_list == True,
+                AdvSetting.auto_update_white_list.is_(True),
             )
         )
         result = await session.execute(stmt)
@@ -148,7 +148,7 @@ class Pricer:
             .join(WBCabinet)
             .where(
                 WBCabinet.shop_id == shop_id,
-                AdvSetting.auto_update_target_place == True,
+                AdvSetting.auto_update_target_place.is_(True),
             )
         )
         result = await session.execute(stmt)

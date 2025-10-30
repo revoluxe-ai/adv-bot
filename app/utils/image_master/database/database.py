@@ -21,7 +21,7 @@ class DataBase:
     def get_count_background_images(self):
         s = self.Session()
         try:
-            result = s.query(Image).where(Image.is_background == True).count()
+            result = s.query(Image).where(Image.is_background.is_(True)).count()
         except SQLAlchemyError:
             raise SQLAlchemyError
         finally:
@@ -42,7 +42,7 @@ class DataBase:
         session = self.Session()
         images = (
             session.query(Image)
-            .where(Image.is_background == True)
+            .where(Image.is_background.is_(True))
             .order_by(Image.id)
             .yield_per(50)
         )

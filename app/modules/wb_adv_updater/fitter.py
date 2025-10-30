@@ -92,7 +92,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
     logger.info("Начало получения данных для обучения")
 
     async with sm() as session:
-        stmt = select(AdvSetting).filter(AdvSetting.bot_active == True)
+        stmt = select(AdvSetting).filter(AdvSetting.bot_active.is_(True))
         result = await session.execute(stmt)
         adv_settings = result.scalars().all()
         nmids_in_active_adv = set([nmid for adv in adv_settings for nmid in adv.nmids])
@@ -103,7 +103,7 @@ async def _get_df_for_fit() -> pd.DataFrame:
         stmt = (
             select(AdvSetting)
             .options(selectinload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active.is_(True))
         )
         result = await session.execute(stmt)
         adv_settings = result.scalars()

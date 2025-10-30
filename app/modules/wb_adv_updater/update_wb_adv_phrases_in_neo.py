@@ -49,7 +49,7 @@ async def update_wb_adv_phrases_in_neo():
             .options(
                 load_only(AdvSetting.name, AdvSetting._search_adv_id, AdvSetting.adv_id)
             )
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active.is_(True))
         )
         result_for_advs = await session.execute(stmt)
         advs: Sequence[AdvSetting] = result_for_advs.scalars().all()

@@ -110,7 +110,7 @@ class Predictor:
                     selectinload(AdvSetting.adv_keywords),
                     selectinload(AdvSetting.keyword_settings),
                 )
-                .where(AdvSetting.bot_active == True)
+                .where(AdvSetting.bot_active.is_(True))
             )
             result = await session.execute(stmt)
             all_adv_settings = result.scalars().unique().all()
@@ -147,7 +147,7 @@ class Predictor:
                 .join(KeywordSetting.adv_setting)
                 .options(selectinload(KeywordSetting.adv_setting))
                 .where(
-                    AdvSetting.bot_active == True,
+                    AdvSetting.bot_active.is_(True),
                 )
             )
             result = await session.execute(stmt)
