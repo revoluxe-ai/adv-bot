@@ -73,15 +73,15 @@ class TestTokenInfoService:
         assert token_info.expires == sample_wb_token.expires
         assert token_info.categories == sample_wb_token.categories
         assert token_info.is_read_only == sample_wb_token.read_only
-        assert token_info.is_valid == True
-        assert token_info.is_expired == False
+        assert token_info.is_valid
+        assert not token_info.is_expired
 
     def test_token_info_expired_token(self, expired_wb_token):
         """Test TokenInfo creation from expired WBToken."""
         token_info = TokenInfo.from_wb_token(expired_wb_token)
 
-        assert token_info.is_expired == True
-        assert token_info.is_valid == False
+        assert token_info.is_expired
+        assert not token_info.is_valid
 
     @pytest.mark.asyncio
     async def test_get_shop_token_status_complete(
@@ -101,7 +101,7 @@ class TestTokenInfoService:
         assert result.shop_id == "test_shop_123"
         assert result.shop_name == "Test Shop"
         assert result.status == "Complete"
-        assert result.has_all_required_permissions == True
+        assert result.has_all_required_permissions
         assert len(result.valid_tokens) == 1
         assert len(result.missing_permissions) == 0
         assert result.available_permissions == sample_wb_token.categories
@@ -135,7 +135,7 @@ class TestTokenInfoService:
         result = await token_info_service.get_shop_token_status("test_shop_123")
 
         assert result.status == "Insufficient"
-        assert result.has_all_required_permissions == False
+        assert not result.has_all_required_permissions
         assert "Аналитика" in result.missing_permissions
         assert "Продвижение" in result.missing_permissions
         assert len(result.missing_permissions) == 2
@@ -155,7 +155,7 @@ class TestTokenInfoService:
             "test_shop_123", required_rights
         )
 
-        assert result.has_access == True
+        assert result.has_access
         assert len(result.missing_permissions) == 0
         assert result.error_message is None
         assert result.available_permissions == sample_wb_token.categories
@@ -183,7 +183,7 @@ class TestTokenInfoService:
             "test_shop_123", required_rights
         )
 
-        assert result.has_access == False
+        assert not result.has_access
         assert "Статистика" in result.missing_permissions
         assert "Продвижение" in result.missing_permissions
         assert result.error_message is not None
@@ -204,7 +204,7 @@ class TestTokenInfoService:
             "test_shop_123", required_rights
         )
 
-        assert result.has_access == False
+        assert not result.has_access
         assert result.missing_permissions == required_rights
         assert "Нет действующих токенов" in result.error_message
 
@@ -289,7 +289,7 @@ class TestTokenInfoService:
 
         assert report.total_tokens == 2
         assert report.valid_token_count == 1
-        assert report.has_valid_tokens == True
+        assert report.has_valid_tokens
         assert "Отсутствуют права" in report.status_description
 
     def test_required_rights_constant(self):

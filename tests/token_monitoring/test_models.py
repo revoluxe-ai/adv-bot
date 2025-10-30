@@ -28,7 +28,7 @@ class TestTokenNotificationTracker:
         )
         assert notification.token_expiry_date is None
         assert notification.resolved_at is None
-        assert notification.is_resolved == False
+        assert not notification.is_resolved
 
     def test_token_notification_tracker_with_expiry_date(self):
         """Test creating a TokenNotificationTracker with expiry date."""
@@ -57,11 +57,11 @@ class TestTokenNotificationTracker:
             sent_at=datetime.datetime.utcnow(),
         )
 
-        assert notification.is_resolved == False
+        assert not notification.is_resolved
 
         notification.mark_resolved()
 
-        assert notification.is_resolved == True
+        assert notification.is_resolved
         assert notification.resolved_at is not None
         assert isinstance(notification.resolved_at, datetime.datetime)
 

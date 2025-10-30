@@ -74,7 +74,7 @@ class FaissManager:
     def _get_all_images_index(self) -> faiss.IndexFlatL2:
         file_name = "all_images.index"
         file_path = self.__get_file_path(file_name)
-        criteria = Image.is_background != True
+        criteria = not Image.is_background
         index = self.__get_index_by_criteria(file_path, criteria)
         self._index_save_list.append([file_path, index])
         faiss.write_index(index, file_path)
@@ -100,7 +100,7 @@ class FaissManager:
     def _get_background_images_index(self):
         file_name = "background_images.index"
         file_path = self.__get_file_path(file_name)
-        criteria = Image.is_background == True
+        criteria = Image.is_background
         index = self.__get_index_by_criteria(file_path, criteria)
         self._index_save_list.append([file_path, index])
         return index
@@ -173,7 +173,7 @@ class FaissManager:
         file_name = "keyword.index"
         file_path = self.__get_file_path(file_name)
         s = self._session_maker()
-        keywords = s.query(Keyword).filter(getattr(Keyword, vector_property) != None)
+        keywords = s.query(Keyword).filter(getattr(Keyword, vector_property) is not None)
         index = Index(
             keywords,
             vector_property,

@@ -64,7 +64,7 @@ async def test_update_white_list_threshold_triggered(
     stat_mock.spend = spend_in_stat
     stat_mock.orders = orders
 
-    get_daily_stats_by_last_days_mock = AsyncMock(return_value=[stat_mock])
+    AsyncMock(return_value=[stat_mock])
 
     redis_cache_mock = MagicMock()
     redis_cache_mock.last_auto_delete_white_list = MagicMock()

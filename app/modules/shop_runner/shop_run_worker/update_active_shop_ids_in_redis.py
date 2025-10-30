@@ -16,7 +16,7 @@ async def update_active_shop_ids(redis_manager: RedisShopManager) -> None:
         .distinct()
         .join(WBCabinet.adv_settings)
         .filter(
-            WBCabinet.adv_settings.any(AdvSetting.bot_active == True),
+            WBCabinet.adv_settings.any(AdvSetting.bot_active),
         )
     )
 

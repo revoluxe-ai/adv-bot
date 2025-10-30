@@ -369,7 +369,7 @@ class TestTokenExpirationService:
             session, "test_shop", NotificationType.TOKEN_EXPIRING_14_DAYS.value
         )
 
-        assert result == True
+        assert result
 
     @pytest.mark.asyncio
     async def test_notification_already_sent_false(
@@ -387,7 +387,7 @@ class TestTokenExpirationService:
             session, "test_shop", NotificationType.TOKEN_EXPIRING_14_DAYS.value
         )
 
-        assert result == False
+        assert not result
 
     @pytest.mark.asyncio
     async def test_error_handling_in_check_single_token(

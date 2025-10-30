@@ -23,7 +23,7 @@ class TestTokenMonitoringIntegration:
     def test_integration_initialization(self, integration):
         """Test integration initialization."""
         assert integration.monitoring_service is not None
-        assert integration.is_installed == False
+        assert not integration.is_installed
         assert integration._original_decorator is None
 
     def test_install_integration(self, integration):
@@ -41,7 +41,7 @@ class TestTokenMonitoringIntegration:
             integration.install()
 
             # Verify installation
-            assert integration.is_installed == True
+            assert integration.is_installed
             assert integration._original_decorator == mock_original_decorator
             assert mock_http_module.try_except_decorator == mock_enhanced_decorator
 
@@ -96,13 +96,13 @@ class TestTokenMonitoringIntegration:
             integration.uninstall()
 
             # Verify uninstallation
-            assert integration.is_installed == False
+            assert not integration.is_installed
             assert integration._original_decorator is None
             assert mock_http_module.try_except_decorator == mock_original_decorator
 
     def test_uninstall_not_installed_warning(self, integration):
         """Test warning when uninstalling not installed integration."""
-        assert integration.is_installed == False
+        assert not integration.is_installed
 
         with patch("app.modules.token_monitoring.integration.logger") as mock_logger:
             integration.uninstall()
@@ -155,13 +155,13 @@ class TestTokenMonitoringIntegration:
 
     def test_is_installed_property(self, integration):
         """Test is_installed property."""
-        assert integration.is_installed == False
+        assert not integration.is_installed
 
         integration._is_installed = True
-        assert integration.is_installed == True
+        assert integration.is_installed
 
         integration._is_installed = False
-        assert integration.is_installed == False
+        assert not integration.is_installed
 
 
 class TestIntegrationGlobalFunctions:
@@ -210,7 +210,7 @@ class TestIntegrationGlobalFunctions:
 
             result = is_token_monitoring_installed()
 
-            assert result == True
+            assert result
 
     def test_is_token_monitoring_installed_false(self):
         """Test checking if token monitoring is installed when it's not."""
@@ -223,7 +223,7 @@ class TestIntegrationGlobalFunctions:
 
             result = is_token_monitoring_installed()
 
-            assert result == False
+            assert not result
 
 
 class TestTokenMonitoringServiceWrapping:

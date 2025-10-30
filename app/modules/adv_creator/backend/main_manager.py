@@ -282,7 +282,7 @@ class MainAdvManager:
                         # Дополнительно можно вернуть этот блок, если нужно
                         and_(
                             AdvSetting.nmids == [nmid],
-                            AdvSetting._search_adv_id != None,
+                            AdvSetting._search_adv_id is not None,
                         ),
                     ),
                 )

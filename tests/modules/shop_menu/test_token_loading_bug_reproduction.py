@@ -112,7 +112,7 @@ class TestTokenLoadingBugReproduction:
         shop_menu._token_status_loaded = True
 
         # This test would pass even with the bug because we manually set the values!
-        assert shop_menu._token_status_loaded == True
+        assert shop_menu._token_status_loaded
         assert shop_menu._token_status is not None
 
         # This approach doesn't test whether _load_all_data() actually loads token status
@@ -201,7 +201,7 @@ class TestTokenLoadingBugReproduction:
 
                         # Check initial state
                         assert (
-                            shop_menu._token_status_loaded == False
+                            not shop_menu._token_status_loaded
                         ), "Initially should not be loaded"
                         assert (
                             shop_menu._token_status is None
@@ -212,7 +212,7 @@ class TestTokenLoadingBugReproduction:
 
                         # Verify that token status was loaded
                         assert (
-                            shop_menu._token_status_loaded == True
+                            shop_menu._token_status_loaded
                         ), "Should be loaded after _load_all_data()"
                         assert (
                             shop_menu._token_status is not None
@@ -297,7 +297,7 @@ class TestTokenLoadingBugReproduction:
                         # With the fix, token status should now be loaded
                         # (Before the fix, this would have remained False)
                         assert (
-                            shop_menu._token_status_loaded == True
+                            shop_menu._token_status_loaded
                         ), "After fix: should be loaded"
 
                         # Check that the text doesn't show the error message

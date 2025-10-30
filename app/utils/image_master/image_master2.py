@@ -81,7 +81,7 @@ class ImageMaster:
         min_level: float = None,
         keywords: list = None,
     ) -> Image:
-        if min_level == None:
+        if min_level is None:
             min_level = 0
         if not dhash:
             dhash = self._im_tools.dhash(img)
@@ -97,7 +97,7 @@ class ImageMaster:
             else self._indexes.all_images
         )
 
-        if min_level > 0 and is_background == False:
+        if min_level > 0 and not is_background:
             if target_index.ntotal > 0:
                 distances, ids = target_index.search(vector_matrix, k=1)
                 distance = distances[0][0] ** 1 / 2

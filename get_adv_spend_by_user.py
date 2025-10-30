@@ -48,7 +48,7 @@ def get_adv_spend_by_user():
             stmt = (
                 select(WBToken)
                 .join(WBToken.user)
-                .where(and_(User.username == row.username, WBToken.active == True))
+                .where(and_(User.username == row.username, WBToken.active.is_(True)))
             )
             result = session.execute(stmt)
             tokens = result.scalar()

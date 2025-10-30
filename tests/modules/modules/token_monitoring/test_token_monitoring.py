@@ -416,7 +416,7 @@ class TestShopMenuTokenIntegration:
 
                         # Initially, token status should not be loaded
                         assert (
-                            shop_menu._token_status_loaded == False
+                            not shop_menu._token_status_loaded
                         ), "Initially should not be loaded"
                         assert (
                             shop_menu._token_status is None
@@ -427,7 +427,7 @@ class TestShopMenuTokenIntegration:
 
                         # Verify that token status was loaded
                         assert (
-                            shop_menu._token_status_loaded == True
+                            shop_menu._token_status_loaded
                         ), "Should be loaded after _load_all_data()"
                         assert (
                             shop_menu._token_status == sample_token_status_complete

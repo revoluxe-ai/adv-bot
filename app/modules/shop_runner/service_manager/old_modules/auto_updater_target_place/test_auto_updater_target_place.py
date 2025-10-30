@@ -270,7 +270,8 @@ async def test_update_target_place(
     redis_manager_instance.get_last_target_place_update = AsyncMock(return_value=result)
     redis_manager_instance.set_last_target_place_update = AsyncMock()
     # Factory used to replace the class in the module; calling it returns the instance
-    redis_manager_factory = lambda adv: redis_manager_instance
+    def redis_manager_factory(adv):
+        return redis_manager_instance
 
     plan_data = PlanData(
         orders=plan_for_sales_for_day,

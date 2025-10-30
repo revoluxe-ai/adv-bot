@@ -169,7 +169,7 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
     async with get_clickhouse_client() as client:
         await client.query(query, external_data=ext_data)
 
-    logger.debug("Inserted/updated %s rows into advkeyword_new" % len(keyword_stats))
+    logger.debug(f"Inserted/updated {len(keyword_stats)} rows into advkeyword_new")
 
 
 async def update_keywords_stat_in_click_house(

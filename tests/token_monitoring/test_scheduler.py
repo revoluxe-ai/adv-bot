@@ -54,7 +54,7 @@ class TestTokenMonitoringScheduler:
         """Test scheduler initialization."""
         assert scheduler.expiration_service is not None
         assert scheduler.notification_manager is not None
-        assert scheduler.is_running == False
+        assert not scheduler.is_running
         assert scheduler._task is None
 
     @pytest.mark.asyncio
@@ -68,7 +68,7 @@ class TestTokenMonitoringScheduler:
 
             await scheduler.start_daily_expiration_check(check_time)
 
-            assert scheduler.is_running == True
+            assert scheduler.is_running
             assert scheduler._task == mock_task
             mock_create_task.assert_called_once()
 
@@ -102,18 +102,18 @@ class TestTokenMonitoringScheduler:
 
         await scheduler.stop()
 
-        assert scheduler.is_running == False
+        assert not scheduler.is_running
         assert scheduler._task is None
         assert mock_task.cancelled()
 
     @pytest.mark.asyncio
     async def test_stop_not_running(self, scheduler):
         """Test stopping scheduler when not running."""
-        assert scheduler.is_running == False
+        assert not scheduler.is_running
 
         await scheduler.stop()  # Should not raise error
 
-        assert scheduler.is_running == False
+        assert not scheduler.is_running
 
     @pytest.mark.asyncio
     async def test_daily_check_loop_timing_calculation(self, scheduler):

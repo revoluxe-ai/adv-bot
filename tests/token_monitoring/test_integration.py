@@ -239,7 +239,7 @@ class TestTokenMonitoringIntegration:
         assert status_report.total_tokens == 2
         assert status_report.valid_token_count == 1
         assert len(status_report.expired_tokens) == 1
-        assert status_report.has_all_required_permissions == True
+        assert status_report.has_all_required_permissions
 
     @pytest.mark.asyncio
     async def test_scheduler_integration(self, mock_session_maker, mock_bot):
@@ -289,7 +289,7 @@ class TestTokenMonitoringIntegration:
             # Test installation
             integration.install()
 
-            assert integration.is_installed == True
+            assert integration.is_installed
             assert integration._original_decorator == mock_original_decorator
             # Verify decorator was replaced
             assert mock_http_module.try_except_decorator != mock_original_decorator
@@ -297,7 +297,7 @@ class TestTokenMonitoringIntegration:
             # Test uninstallation
             integration.uninstall()
 
-            assert integration.is_installed == False
+            assert not integration.is_installed
             assert mock_http_module.try_except_decorator == mock_original_decorator
 
     @pytest.mark.asyncio

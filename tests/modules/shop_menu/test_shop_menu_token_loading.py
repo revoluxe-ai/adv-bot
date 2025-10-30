@@ -150,7 +150,7 @@ class TestShopMenuTokenLoading:
                         )
 
                         # Initially, token status should not be loaded
-                        assert shop_menu._token_status_loaded == False
+                        assert not shop_menu._token_status_loaded
                         assert shop_menu._token_status is None
 
                         # Call _load_all_data which should load token status
@@ -158,7 +158,7 @@ class TestShopMenuTokenLoading:
 
                         # After loading, token status should be populated
                         assert (
-                            shop_menu._token_status_loaded == True
+                            shop_menu._token_status_loaded
                         ), "Token status should be marked as loaded"
                         assert (
                             shop_menu._token_status is not None
@@ -233,7 +233,7 @@ class TestShopMenuTokenLoading:
 
                         # After error, token status should be marked as failed to load
                         assert (
-                            shop_menu._token_status_loaded == False
+                            not shop_menu._token_status_loaded
                         ), "Token status should be marked as not loaded"
                         assert (
                             shop_menu._token_status is None
@@ -445,7 +445,7 @@ class TestShopMenuTokenLoading:
 
                         # With the fix, this should now pass
                         assert (
-                            shop_menu._token_status_loaded == True
+                            shop_menu._token_status_loaded
                         ), "After fix: Token status should be loaded"
                         assert (
                             shop_menu._token_status is not None
