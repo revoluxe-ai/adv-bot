@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from datetime import datetime, time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.modules.token_monitoring.services.token_expiration_service import (
     TokenExpirationService,

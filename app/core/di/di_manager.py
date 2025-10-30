@@ -1,6 +1,6 @@
 import logging
 from contextlib import AbstractAsyncContextManager
-from typing import Type, TypeVar, Generic, Any, Optional, Never
+from typing import TypeVar, Generic, Any, Never
 from collections.abc import Awaitable
 
 from dependency_injector import providers, containers

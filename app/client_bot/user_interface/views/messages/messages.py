@@ -284,14 +284,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         self.full_stat_update_time = full_stat_update_time_str
 
-        try:
-            nmids = self.adv.nmids
-            images = await data_manager.get_main_photos(nmids[:1])
-            image = images[0]
-            self.image = image
-        except:
-            await NoMainPhotos(self._bot, self._chat_id)(self.adv)
-            return
+        nmids = self.adv.nmids
+        images = await data_manager.get_main_photos(nmids[:1])
+        image = images[0]
+        self.image = image
 
         last_update_keyword_stat: datetime | None = (
             await self._get_last_update_keyword_stat(self.adv.adv_id)

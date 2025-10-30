@@ -2,12 +2,12 @@
 
 """Token expiration monitoring service for proactive expiration notifications."""
 
-import asyncio
+
 import datetime
 import logging
-from typing import List, Dict, Any
+from typing import Any
 
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import WBToken

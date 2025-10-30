@@ -6,6 +6,7 @@ from aiohttp import ClientSession
 
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.http_request import requests
+from app.modules.common_slaves.wildberries.ABC_WB_API import Headers
 from app.modules.common_slaves.wildberries.models import WBToken
 
 __all__ = ["CheckRighter"]

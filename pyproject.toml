@@ -189,6 +189,8 @@ exclude = [
   "app/core/mp/wb/_api_client/clients/promotion/generated/*",
   "alembic/versions",
   "alembic/versions/*",
+  'k8s/*',
+    'tests/*'
 ]
 line-length = 88
 target-version = "py311"

@@ -1,6 +1,6 @@
 import json
 import sys
-from typing import Dict, Any, List, Set
+from typing import Any
 
 
 def parse_resource_string(resource_string: str, resource_type: str) -> float:

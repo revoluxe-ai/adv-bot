@@ -38,7 +38,7 @@ class Index:
                     )
             except RuntimeError as exc:
                 logger.error(exc)
-                del e
+                del exc
                 index = self.__create_new_index(
                     objects, vector_property_name, file_path, index_type, batch_size
                 )
