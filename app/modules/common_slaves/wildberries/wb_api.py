@@ -85,19 +85,7 @@ class AdvertApi(ABC_WB_API):
     live_company_status = [4, 9, 11]
     auto_adv_types = [8, 9]
 
-    @try_except_decorator(1, 1)
-    # метод не используется
-    async def get_search_keywords_stat(self, adv_id):
-        url = f"https://advert-api.wildberries.ru/adv/v1/stat/words?id={adv_id}"
-        response_text = await requests(
-            self.session, "GET", url, headers=self.headers.standart
-        )
-        answer = json.loads(response_text)
-        keywords = []
-        update_timestamp = datetime.datetime.now()
-        ...  # нет правильной обработки ответа
-        return keywords
-
+    
     @try_except_decorator(1, 1)
     async def set_search_cpm(self, search_adv_id: int, cpm: int):
         url = "https://advert-api.wildberries.ru/adv/v0/cpm"
