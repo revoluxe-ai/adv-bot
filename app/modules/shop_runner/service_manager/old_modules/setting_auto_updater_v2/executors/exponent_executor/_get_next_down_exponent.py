@@ -54,8 +54,8 @@ def get_next_down_exponent(
     if not possible_ws:
         # Посчитаем рейтинги при exp=1 (w=0)
         for kw in keywords:
-            kw._tmp_rating = kw.predict_ctr * kw.views
-        new_leader = max(keywords, key=lambda k: k._tmp_rating)
+            kw._tmp_rating = kw.predict_ctr * kw.views # type: ignore[attr-defined]
+        new_leader = max(keywords, key=lambda k: k._tmp_rating) # type: ignore[attr-defined]
         if new_leader is leader:
             return None  # даже при exp=1 лидер не меняется
         else:

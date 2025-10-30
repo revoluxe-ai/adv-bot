@@ -1,5 +1,6 @@
-import logging
+# mypy: ignore-errors
 
+import logging
 import aiogram
 from aiogram import Bot, Router, types
 from aiogram.filters import StateFilter

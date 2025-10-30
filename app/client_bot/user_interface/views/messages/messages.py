@@ -1,6 +1,5 @@
 # mypy: ignore-errors
-
-import io
+# TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
 import re
 from datetime import datetime

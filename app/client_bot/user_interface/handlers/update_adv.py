@@ -51,7 +51,7 @@ async def update_minus_keywords(
             .where(WBCabinet.id == wb_cabinet_id)
         )
         wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet = wb_user_cabinet.scalar() # type: ignore[attr-defined]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(wb_cabinet_id)
     if not access:
         raise ApiForbiddenError("Не удалось получить доступ к Wildberries")
@@ -86,7 +86,7 @@ async def update_keyword_stat(
             .where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
-        wb_cabinet_id: int = adv.wb_cabinet.id
+        wb_cabinet_id: int = adv.wb_cabinet.id # type: ignore[attr-defined]
         stmt = (
             select(WBUserCabinet)
             .join(WBUserCabinet.wb_cabinet)

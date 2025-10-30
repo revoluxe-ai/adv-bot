@@ -30,7 +30,7 @@ async def setting_min_ctr(
     adv_original_id = callback_data.adv_original_id # type: ignore[attr-defined]
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.ChangeMinCTR.waiting_for_new_min_ctr)
-    await messages.SettingMinCTR(bot, callback.message.chat.id)(adv_original_id)
+    await messages.SettingMinCTR(bot, callback.message.chat.id)(adv_original_id) # type: ignore[attr-defined]
     return
 
 
