@@ -31,6 +31,7 @@ from app.settings import settings
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
+from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .wb_shop_data_manager import WBShopDataManager
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
@@ -183,6 +184,41 @@ class CoroutinesManager:
                     logger.info(
                         f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
                     )
+
+
+    @while_coroutine_decorator(5 * 60)
+    async def adv_settings_auto_update_v2(self):
+        active_advs = await self._wb_shop_data_manager.get_active_advs()
+
+        control_system = AdvControlSystem(max_last_period=2)
+
+        process_coroutines = []
+        for adv in active_advs:
+            # Проверяем, включены ли новые режимы автообновления
+            if not (adv.auto_update_white_list or adv.auto_update_target_place):
+                continue
+
+            keywords_coroutine = self._wb_shop_data_manager.get_calculated_keywords(adv)
+            process_coroutines.append(control_system.process_adv(adv, keywords_coroutine))
+
+        if not process_coroutines:
+            logger.debug(f"[shop_id={self.shop_id}] Нет кампаний для обработки AdvControlSystem v2")
+            return
+
+        try:
+            await asyncio.gather(*process_coroutines)
+        except Exception as exc:
+            logger.error(
+                f"Критическая ошибка автообновления настроек РК v2 {exc}",
+                exc_info=True,
+            )
+            # Не перебрасываем исключение, чтобы не останавливать весь менеджер
+
+
+
+
+
+
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
