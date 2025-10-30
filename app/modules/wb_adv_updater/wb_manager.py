@@ -213,7 +213,10 @@ async def update_all_keyword_data(
 
         return
     except Exception as exc:
-        logger.error("Ошибка обновления статистики ключевых слов", exc_info=True)
+        logger.error(
+            "Ошибка обновления статистики ключевых слов для магазина: %s, кампании: %s",
+            shop_id, adv_setting.id, exc_info=True
+        )
         raise exc
     try:
         keywords = await data_manager.get_good_bad_phrases(adv_setting)
@@ -258,8 +261,8 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                 if update_tasks[adv_setting.id].done():
                     if update_tasks[adv_setting.id].exception():
                         logger.error(
-                            "Ошибка обновления ключей: %s",
-                            update_tasks[adv_setting.id].exception(),
+                            "Ошибка обновления ключей для магазина: %s, кампании: %s: %s",
+                            wb_cabinet.shop_id, adv_setting.id, update_tasks[adv_setting.id].exception(),
                         )
                     del update_tasks[adv_setting.id]
             await asyncio.sleep(0)

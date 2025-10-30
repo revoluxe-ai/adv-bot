@@ -263,7 +263,12 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += f"""(Биддер для Авто: {" Включен" if self._adv_setting.bidder_for_auto else " Выключен"})\n"""
         text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
-        text += f"Максимальная ставка: {self._adv_setting.max_cpm}\n"
+        max_cpm_str = (
+            str(self._adv_setting.max_cpm)
+            if self._adv_setting.max_cpm is not None
+            else "Не задана"
+        )
+        text += f"Максимальная ставка: {max_cpm_str}\n"
 
         if not self._auto_max_cpm_mode:
             text += "Авто-Максимальная ставка: не активна\n"

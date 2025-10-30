@@ -22,14 +22,21 @@ class AutoMaxBidManager:
         self,
         adv: AdvSetting,
         keywords: list[CalculatedKeyword],
-        user_max_cpm: int,
+        user_max_cpm: int | None,
         period_days: int = 2,
     ) -> int:
         max_cpm = await self._get_max_cpm(adv, keywords, period_days)
-        if max_cpm is None:
-            result_max_cpm = user_max_cpm
+        if user_max_cpm is None:
+            if max_cpm is None:
+                # Нет пользовательского лимита и не удалось рассчитать — используем безопасное значение
+                result_max_cpm = 0
+            else:
+                result_max_cpm = int(max_cpm)
         else:
-            result_max_cpm = min(int(max_cpm), user_max_cpm)
+            if max_cpm is None:
+                result_max_cpm = user_max_cpm
+            else:
+                result_max_cpm = min(int(max_cpm), user_max_cpm)
         await self._max_cpm_status_manager.set(adv, result_max_cpm)
         return result_max_cpm
 
