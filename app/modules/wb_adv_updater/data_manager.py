@@ -38,6 +38,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBItemPosition,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.keywords_query import keywords_query
 from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
@@ -460,19 +461,38 @@ def __set_predict_ctr(
         added_clicks = keyword_stat.added_clicks
         if added_clicks:
             clicks += added_clicks
-        if original_predict_ctr:
-            predicted_views = int(clicks + 1 / original_predict_ctr)
-            predicted_clicks = int(predicted_views * original_predict_ctr)
-            views += predicted_views
-            clicks += predicted_clicks + 1
-        # TODO: тут вылетает ошибка деления  на ноль временно делаю views = 1 если 0
-        if views == 0:
-            views = 1
-        baes_predict_ctr = clicks / views
-        keyword_stat.predict_ctr = baes_predict_ctr
-        keyword_stat.baes_predict_ctr = baes_predict_ctr
-        keyword_stat.calculated_clicks = clicks
-        keyword_stat.calculated_views = views
+        
+        # Логика расчета predict_ctr зависит от режима
+        predict_mode = adv_setting.predict_ctr_mode
+        
+        # V1 или None (по умолчанию) - старая логика с усреднением прогноза и факта
+        if predict_mode is None or predict_mode == PredictCTRMode.V1:
+            if original_predict_ctr:
+                predicted_views = int(clicks + 1 / original_predict_ctr)
+                predicted_clicks = int(predicted_views * original_predict_ctr)
+                views += predicted_views
+                clicks += predicted_clicks + 1
+            # TODO: тут вылетает ошибка деления  на ноль временно делаю views = 1 если 0
+            if views == 0:
+                views = 1
+            baes_predict_ctr = clicks / views
+            keyword_stat.predict_ctr = baes_predict_ctr
+            keyword_stat.baes_predict_ctr = baes_predict_ctr
+            keyword_stat.calculated_clicks = clicks
+            keyword_stat.calculated_views = views
+        
+        # V2 - новая логика: используем только прогноз, если его нет - факт
+        elif predict_mode == PredictCTRMode.V2:
+            if original_predict_ctr:
+                # Если есть прогноз - используем его без изменений
+                keyword_stat.predict_ctr = original_predict_ctr
+            else:
+                # Если прогноза нет - используем фактический CTR
+                keyword_stat.predict_ctr = original_baes_ctr
+            
+            keyword_stat.baes_predict_ctr = keyword_stat.predict_ctr
+            keyword_stat.calculated_clicks = clicks
+            keyword_stat.calculated_views = views
     return keyword_stats
 
 
