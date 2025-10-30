@@ -222,7 +222,7 @@ async def turn_adv_on(
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar() # type: ignore[attr-defined]
         assert wb_user_cabinet
         stmt = (
             select(AdvSetting)
@@ -258,7 +258,7 @@ async def turn_adv_on(
             WBUserCabinet.id == wb_user_cabinet_original_id
         )
         wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet = wb_user_cabinet.scalar() # type: ignore[attr-defined]
         chat_id = callback.message.chat.id
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
