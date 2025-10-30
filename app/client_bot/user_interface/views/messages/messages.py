@@ -350,12 +350,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             predict_ctr_mode_text = "v1 (по ID кампании)"
         else:
             predict_ctr_mode_text = "v2 (по артикулам товара)"
-
+        # TODO: Добавить когда была обновлена модель и когда обновлялся прогноз CTR
         text = (
             f"📢 Кампания: {self.adv.name}\n"
             f"🆔 ID кампании: {self.adv.adv_id}\n"
             f"📌 Статус Авто: {self.adv.active_status}\n"
             f"📌 Статус Аукциона: {self._status_auction}\n"
+            # TODO: Попала ошибка в код, пытался сделать .2f строке
             f"🎯 Минимальный CTR для кампании: {self._min_ctr}\n"
             f"🔢 Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n"
             f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
