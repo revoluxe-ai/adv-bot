@@ -1,5 +1,5 @@
 import os
-from typing import Any, Type
+from typing import Any
 from types import TracebackType
 
 

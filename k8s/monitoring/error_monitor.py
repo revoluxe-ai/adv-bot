@@ -9,13 +9,11 @@
 - Интеграция с Prometheus
 """
 
-import os
-import sys
 import json
 import subprocess
 import argparse
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from datetime import datetime
+from typing import Any
 from dataclasses import dataclass, asdict
 from enum import Enum
 from collections import defaultdict
