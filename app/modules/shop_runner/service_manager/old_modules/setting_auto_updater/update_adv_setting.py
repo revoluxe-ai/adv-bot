@@ -19,6 +19,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+#TODO: Ограничить парсер 3 страницами
+# Включить проверку всех позиций парсрером, особенно если стоит отключение позиций > целевой
+
 
 async def update_adv_setting(
     adv: AdvSetting,
