@@ -356,7 +356,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"🆔 ID кампании: {self.adv.adv_id}\n"
             f"📌 Статус Авто: {self.adv.active_status}\n"
             f"📌 Статус Аукциона: {self._status_auction}\n"
-            f"🎯 Минимальный CTR для кампании: {self._min_ctr:.2f} \n"
+            f"🎯 Минимальный CTR для кампании: {self._min_ctr}\n"
             f"🔢 Минимальное количество показов для прогноза CTR: {self.adv.min_views_for_ml_predict}\n"
             f"🤖 Режим прогноза CTR: {predict_ctr_mode_text}\n"
             f"Последнее обновление обобщенной статистики ключевых слов в базе: {self.last_update_keyword_stat_str}\n"
