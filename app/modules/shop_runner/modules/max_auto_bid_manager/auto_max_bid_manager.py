@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     )
 
 
+# TODO: Сделать, чтобы падали в ошибки бота (в телегу) shop id, РК, хотя бы
+
+
 class AutoMaxBidManager:
 
     def __init__(self, max_cpm_status_manager: "MaxCpmRedisStatusManager") -> None:

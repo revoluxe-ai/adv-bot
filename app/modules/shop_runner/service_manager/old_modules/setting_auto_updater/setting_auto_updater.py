@@ -110,6 +110,7 @@ class AdvSettingAutoUpdater:
             orders=plan_orders,
             target_pay_for_order=target_pay_for_order,
             max_pay_for_order=max_pay_for_order,
+
         )
 
         return plan

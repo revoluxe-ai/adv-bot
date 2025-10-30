@@ -1,3 +1,11 @@
+"""
+Модуль дальше не поддерживается, новый модуль
+
+ - app/modules/shop_runner/service_manager/old_modules/setting_auto_updater_v2
+
+"""
+
+
 __all__ = [
     "AdvSettingAutoUpdater",
     "SettingAutoUpdaterCriticalError",
