@@ -69,7 +69,7 @@ class AutoMaxBidManager:
         max_cpm = max_pay_for_view * 1000
         return max_cpm
 
-    async def _get_clicks_to_orders_ratio(
+    async def _get_clicks_to_orders_ratio_for_keywords(
         self, adv: AdvSetting, period_days: int
     ) -> float | None:
         from . import clickhouse_manager
