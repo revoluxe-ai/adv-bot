@@ -77,7 +77,7 @@ async def run_bidder_process_for_adv(
     except CpmNotFoundError:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не найдена")
         return
-    except Exception:
+    except Exception: # noqa
         logger.error(
             f"[{shop_id}] [{adv_id}] Ошибка при получении максимальной ставки",
             exc_info=True,
