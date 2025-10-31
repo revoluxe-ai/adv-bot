@@ -51,7 +51,7 @@ async def _update_and_get_advs_from_wb(
         assert wb_api.access.wb_cabinet is not None
         wb_cabinet_original_id: int = int(wb_api.access.wb_cabinet.id)
         await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id)
-    except Exception:
+    except Exception: # noqa
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
 
@@ -120,7 +120,7 @@ async def run_bidder_process_for_adv(
             logger.debug(f"[{shop_id}] [{adv_id}] Получение ставок для биддера")
             try:
                 cpms: set[int] | None = await get_cpms_from_wb(
-                    advs_from_wb_with_active_company
+                    advs_from_wb_with_active_company # noqa
                 )
                 cmp_now = max(cpms) if cpms else None
             except Exception as exc:
@@ -130,12 +130,13 @@ async def run_bidder_process_for_adv(
                 raise exc
         except ApiForbiddenError as e:
             raise e
-        except Exception:
+        except Exception: # noqa
             logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
             continue
 
         if not cpms:
-            logger.error(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
+            # TODO: Поубирать f-строки везде из логгеров
+            logger.warning(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
             return
 
         try:
@@ -143,7 +144,7 @@ async def run_bidder_process_for_adv(
             wb_position: WBItemPosition = await redis_manager.get_keyword_position(
                 text, nmid
             )
-        except Exception:
+        except Exception: # noqa
             logger.error(
                 f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
             )
