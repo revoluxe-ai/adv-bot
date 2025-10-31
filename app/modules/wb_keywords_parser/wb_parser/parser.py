@@ -10,6 +10,7 @@ from sqlalchemy.orm import load_only
 from app.modules.common_slaves.wildberries.models import WBItemPosition, WBCard
 from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager
+from .excs import TooManyRequestsInParserError
 
 logger = logging.getLogger(__name__)
 
@@ -140,8 +141,7 @@ class ParserService:
 
         return positions
 
-    @staticmethod
-    async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
+    async def __parse_keywords_from_wb(self, text: str, page: int) -> tuple[
         list[dict] | None,
         str | None,
         int | None,
@@ -156,8 +156,13 @@ class ParserService:
         if not response_text:
             raise DataError("Пустой ответ от сервера", text)
 
-        data = json.loads(response_text)
+        self._raise_too_many_requests_error(response_text)
 
+        try:
+            data = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            logger.error(f"Ошибка JSONDecode при парсинге данных: {e}", exc_info=True)
+            raise DataError(f"Ошибка JSONDecode: {e}", text) from e
         if data == {}:
             logger.warning(
                 f"Получены пустые данные для ключа {text} на странице {page}"
@@ -192,6 +197,9 @@ class ParserService:
         assert isinstance(products, list)
         return products, cluster, preset, total_items
 
+    def _raise_too_many_requests_error(self, response_text: str) -> None:
+        if "Too many requests" in response_text:
+            raise TooManyRequestsInParserError("Слишком много запросов к серверу WB")
 
 parser = ParserService()
 
