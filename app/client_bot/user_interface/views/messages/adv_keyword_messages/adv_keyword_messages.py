@@ -200,7 +200,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"Cтат. за 2 дня:\n"
             f"Мин. CRT: {self.min_ctr * 100:.2f}%\n"
             f"Стр.: {self._page}/{total_page + 1}\n"
-            f"Экс. прог.CTR: {self._adv_setting.exponent_predict_ctr}\n"
+            f"Экс. прог.CTR: {self._adv_setting.exponent_predict_ctr:.2f}\n"
             f"Общий расход: {self.total_spend:.2f}\n"
             f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
             f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
