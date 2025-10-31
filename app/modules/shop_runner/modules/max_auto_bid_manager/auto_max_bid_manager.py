@@ -49,9 +49,11 @@ class AutoMaxBidManager:
         ratio_views_to_clicks_for_active_keywords = self._get_ratio_for_active_keywords(
             keywords
         )
-        clicks_to_orders_ratio = await self._get_clicks_to_orders_ratio(
+        clicks_to_orders_ratio = await self._get_clicks_to_orders_ratio_for_keywords(
             adv, period_days
         )
+        if not clicks_to_orders_ratio:
+            return None
         return self.__get_max_cpm(
             pay_for_order,
             ratio_views_to_clicks_for_active_keywords,
@@ -60,7 +62,7 @@ class AutoMaxBidManager:
 
     @staticmethod
     def __get_max_cpm(
-        pay_for_order: float, ratio_views_to_clicks: float, clicks_to_orders_ratio
+        pay_for_order: float, ratio_views_to_clicks: float, clicks_to_orders_ratio: float
     ) -> float:
         views_for_order = ratio_views_to_clicks * clicks_to_orders_ratio
         max_pay_for_view = pay_for_order / views_for_order
