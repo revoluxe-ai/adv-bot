@@ -211,6 +211,7 @@ async def process_cabinet_api(
         )
         return True
     async with sm() as session:
+        # TODO: Тут попала ошибка в код с проверкой существования токена.
         # Получаем ID пользователя
         stmt_for_select_user_id: Select = select(User.id).where(
             User.user_telegram_id == user_telegram_id
