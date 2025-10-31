@@ -45,7 +45,7 @@ async def _update_and_get_advs_from_wb(
     if search_adv_id := auto_adv.search_adv_id:
         adv_ids.add(search_adv_id)
     if not adv_ids:
-        return None
+        return []
     advs: list[AuctionAdv] = await wb_api.get_advs(list(adv_ids))
     try:
         assert wb_api.access.wb_cabinet is not None
