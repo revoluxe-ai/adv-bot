@@ -450,31 +450,6 @@ def get_advs_keyboard_with_paginator(
     return keyboard
 
 
-def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
-    wb_user_cabinet_original_id = wb_user_cabinet.id
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text="Добавить новый токен",
-                callback_data=callbacks.AddNewToken(
-                    wb_user_cabinet_original_id=wb_user_cabinet_original_id
-                ).pack(),
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="Удалить магазин",
-                callback_data=callbacks.DeleteWbUserCabinet(
-                    wb_user_cabinet_original_id=wb_user_cabinet_original_id
-                ).pack(),
-            )
-        ],
-    ]
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    return keyboard
-
-
 def get_keywords_setting_keyboard(
     keywords: list[CalculatedKeyword],
     adv_setting: AdvSetting,
