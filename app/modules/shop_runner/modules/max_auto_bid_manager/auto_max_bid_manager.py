@@ -78,7 +78,7 @@ class AutoMaxBidManager:
         # Смотрим только по одной РК, чтобы точно узнать конверсию из показов ключей в заказы
         # TODO: Ошибка в проде: смотрели Автокампанию для определения конверсии в ключах
         adv_ids = [
-            adv.adv_id,
+            adv.search_adv_id,
         ]
         clicks_to_order_ratio: float = (
             await clickhouse_manager.get_clicks_to_orders_ration_on_phrases(
