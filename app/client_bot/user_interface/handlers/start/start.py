@@ -231,7 +231,6 @@ async def process_cabinet_api(
     cabinet_name = data_state["cabinet_name"].strip()
 
     async with sm() as session:
-        session.add(wb_token)
         # Проверка, что токен не используется другим поль��ователем
         stmt_for_wb_token = (
             select(WBToken)
@@ -266,7 +265,9 @@ async def process_cabinet_api(
                     chat_id, "Ошибка: этот токен используется другим пользователем."
                 )
                 return True
-
+        session.add(wb_token)
+        await session.flush()
+        await session.commit()
         # Проверка существования кабинета по shop_id
         stmt_for_cabinet = select(WBCabinet).where(
             WBCabinet.shop_id == wb_token.shop_id
