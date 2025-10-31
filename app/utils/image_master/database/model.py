@@ -86,7 +86,6 @@ class Image(Base):
     good_for_poster = Column(Boolean, default=None)
     owner = Column(String())
     dhash = Column(String(), unique=True)
-    items = relationship("Item", back_populates="image", uselist=True)
     old_keywords = Column(ARRAY(String))
     # keywords = relationship("Keyword",
     #                         secondary=image_keyword_association,

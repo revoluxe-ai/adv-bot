@@ -17,7 +17,6 @@ class FaissManager:
         self,
         batch_size=300,
         load_keywords=False,
-        load_images=False,
         load_keyword_phrase=False,
     ):
         self._batch_size = batch_size
@@ -28,9 +27,6 @@ class FaissManager:
         # if background_images:
         #     self._background_images = self._get_background_images_index()
         #     print('Индекс background_images загружен')
-        if load_images:
-            self._images_in_items = self._get_images_in_items_index("IndexFlatL2")
-            print("Индекс images_in_items загружен")
         if load_keywords:
             self._keywords = self._get_keywords_index("word2vec")
             print("Индекс keywords загружен")
@@ -49,16 +45,8 @@ class FaissManager:
         self.save_indexes()
 
     @property
-    def all_images(self):
-        return self._all_images
-
-    @property
     def background_images(self):
         return self._background_images
-
-    @property
-    def images_in_items(self):
-        return self._images_in_items
 
     @property
     def keyword_phrases(self):
@@ -143,31 +131,6 @@ class FaissManager:
             except:
                 images = self.__get_new_objects(objects, pickle_file_path)
                 return images
-
-    def _get_images_in_items_index(self, index_type):
-        index_name = "images_in_items"
-        index_file_name = index_name + ".index"
-        # object_pickle_name = index_name + '.pickle'
-        index_file_path = self.__get_file_path(index_file_name)
-        # pickle_file_path = self.__get_file_path(object_pickle_name)
-        s = self._session_maker()
-        images = (
-            s.query(Image)
-            .join(Image.items)
-            .filter(Image.items.any())
-            .distinct(Image.id)
-        )
-        # images = self._get_objects(images, pickle_file_path)
-        index = Index(
-            images,
-            "vector",
-            index_file_path,
-            index_type,
-            self._batch_size,
-        )
-        self._index_save_list.append([index_file_path, index])
-        s.close()
-        return index
 
     def _get_keywords_index(self, vector_property):
         file_name = "keyword.index"
