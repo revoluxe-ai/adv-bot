@@ -5,7 +5,7 @@ from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactM
 
 class FactData(BaseModel):
     predict_orders: float
-    original_orders: int
+    original_orders: float
     pay_for_order: float
     fact_method: FactMethods
     # Настройки для автоматического преобразования типов

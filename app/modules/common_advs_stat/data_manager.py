@@ -116,9 +116,15 @@ class CommonAdvsStatDataManager:
             raise NotImplementedError(
                 f"Неизвестный источник заказов для автоуправления: {adv_setting.orders_source_for_auto_mode}"
             )
+        # TODO: Тут надо изменить логику получения данных для прогноза, пока делаю заглушку: небольшое число,
+        #  показывающее что корзин или заказов мало,
+        #  хотя их нет вообще. Варианты как решить задачу тут docks/forecast_strategy.md
         if base_common_orders == 0:
-            base_common_orders = 1
+            base_common_orders = 0.06
         base_common_carts = common_stat.add_to_cart
+        # TODO: Здесь ошибка ушла в прод, нужно сделать тест, сделал HOT-FIX, проверить логику
+        if base_common_carts == 0:
+            base_common_carts = 0.2
         predict_orders_for_days = await self._get_predict_orders_for_day(
             adv_setting, base_common_orders, base_common_carts, pass_days
         )
