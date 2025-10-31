@@ -35,7 +35,7 @@ class FirstKeyUpdater:
         clear_keywords = [
             kw
             for kw in keywords
-            if kw.hard_status not in [0, 3] and kw.position and kw.position > 0
+            if kw.hard_status not in [0, 3]
         ]
         if not clear_keywords:
             return None
