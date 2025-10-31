@@ -259,7 +259,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         text += "\n"
 
-        text += f"\nСтавка из Авто: {self.auto_cpm} р. "
+        text += f"\nСтавка из Авто: {self.auto_cpm if self.auto_cpm else 'Не получена'} р. "
         text += f"""(Биддер для Авто: {" Включен" if self._adv_setting.bidder_for_auto else " Выключен"})\n"""
         text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
