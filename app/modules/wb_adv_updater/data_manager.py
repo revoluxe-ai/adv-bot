@@ -902,12 +902,9 @@ async def get_min_ctr(adv: AdvSetting) -> float:
 def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | None:
     if not keywords:
         return None
-    best_keyword_with_boost = [kw for kw in keywords if kw.position != 0]
-    if not best_keyword_with_boost:
-        return None
 
     best_keyword = sorted(
-        best_keyword_with_boost, key=lambda x: x.rating_by_predict_ctr, reverse=True
+        keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True
     )[0]
 
     return best_keyword
