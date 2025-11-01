@@ -72,21 +72,6 @@ class AnalyticAsyncSession(AsyncSession):
             raise e
 
 
-# def log_checkout(dbapi_con, con_record, con_proxy):
-#     logger.debug("Соединение взято из пула")
-#     global conn_counter
-#     with lock_counter:
-#         conn_counter += 1
-#     logger.debug(f"Количество соединений: {conn_counter}")
-#
-# def log_checkin(dbapi_con, con_record):
-#     logger.debug("Соединение возвращено в пул")
-#     global conn_counter
-#     with lock_counter:
-#         conn_counter -= 1
-#     logger.debug(f"Количество соединений: {conn_counter}")
-
-
 def get_alchemy_row(read_only: bool) -> str:
     port = settings.postgres_port
     postgres_dbname = settings.postgres_dbname
@@ -125,13 +110,18 @@ read_write_db_connector = get_alchemy_row(read_only=False).replace(
 )
 
 
-def get_ssl_context(insecure: bool) -> ssl.SSLContext:
-    """Возвращает SSLContext.
+def get_ssl_context(insecure: bool, ssl_mode: str | None = None) -> ssl.SSLContext | None:
+    """Возвращает SSLContext или None (если SSL отключен).
 
+    Если ssl_mode='disable' — возвращаем None (SSL полностью отключен).
     Если insecure=True — отключаем проверку (только для отладки).
     В противном случае используем системные корни и, при наличии,
     передаём путь к CA из настроек.
     """
+    # Полное отключение SSL
+    if ssl_mode and ssl_mode.lower() == "disable":
+        return None
+        
     if insecure:
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
@@ -147,7 +137,10 @@ def get_ssl_context(insecure: bool) -> ssl.SSLContext:
     return ssl.create_default_context()
 
 
-ssl_ctx = get_ssl_context(getattr(settings, "POSTGRES_SSL_INSECURE", False))
+ssl_ctx = get_ssl_context(
+    getattr(settings, "POSTGRES_SSL_INSECURE", False),
+    getattr(settings, "ssl_mode", None)
+)
 
 read_only_engine = create_async_engine(
     read_only_db_connector,
