@@ -119,6 +119,7 @@ class MainAdvManager:
             new_adv.auto_update_white_list = False
             new_adv.auto_update_target_place = False
             new_adv.active_status = "created_by_bot"
+            # TODO: Тут вроде должна быть 9, но не трогаю пока, чтобы не сломать отображение в боте
             new_adv.type = 8
             new_adv.nmids = [nmid]
             new_adv.hard_min_ctr = 0.1
