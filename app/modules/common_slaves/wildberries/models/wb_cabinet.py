@@ -35,7 +35,7 @@ class WBCabinet(BaseTable):
     )
     active: Mapped[bool | None] = mapped_column(Boolean, default=True, nullable=True)
     expiration_time: Mapped[datetime.datetime] = mapped_column(
-        DateTime, nullable=False, server_default=text('datetime("now", "+7 days")')
+        DateTime, nullable=False, server_default=text("now() + interval '7 days'")
     )
     expiration_alarm_days_pass: Mapped[int | None] = mapped_column(
         Integer, default=None
