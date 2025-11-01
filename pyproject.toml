@@ -191,7 +191,9 @@ exclude = [
   "alembic/versions",
   "alembic/versions/*",
   'k8s/*',
-    'tests/*'
+    'tests/*',
+    'alembic_/versions/*',
+    '*test*'
 ]
 line-length = 88
 target-version = "py311"
