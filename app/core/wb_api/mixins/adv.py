@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import json
 import logging
+from json import JSONDecodeError
 from typing import Any, TypeVar
 
 from app.core.wb_api.protocols import WBAPIProtocol
@@ -106,38 +107,59 @@ class AdvMixin(WBAPIProtocol):
                 all_advs.extend(advs)
         return all_advs
 
-    @try_except_decorator(5, 60)
-    async def create_search_adv(self, nmids: list[int], adv_name: str) -> int:
-        assert len(nmids) <= 50
-
-        url = "https://advert-api.wildberries.ru/adv/v2/seacat/save-ad"
-
-        data = {"campaignName": adv_name, "nms": nmids}
-
-        response_text = await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
+    async def create_auto_adv(self, nmids: list[int], adv_name: str) -> int:
+        bid_type = "unified"
+        placement_types = None
+        adv_id = await self.__create_adv(
+            name=adv_name,
+            nmids=nmids,
+            bid_type=bid_type,
+            placement_types=placement_types,
         )
-        answer = json.loads(response_text)
-        return int(answer)
+        return adv_id
+
+    async def create_search_adv(self, nmids: list[int], adv_name: str) -> int:
+
+        bid_type = "manual"
+        placement_types = ["search"]
+        adv_id = await self.__create_adv(
+            name=adv_name,
+            nmids=nmids,
+            bid_type=bid_type,
+            placement_types=placement_types,
+        )
+        return adv_id
 
     @try_except_decorator(1, 60)
-    async def create_auto_adv(
-        self, name: str, SubjectID: int, balance_type: int, start_status: bool
+    async def __create_adv(
+        self,
+        name: str,
+        nmids: list[int],
+        bid_type: str,
+        placement_types: list[str] | None,
     ) -> int:
-        url = "https://advert-api.wildberries.ru/adv/v1/save-ad"
+
+        url = "https://advert-api.wildberries.ru/adv/v2/seacat/save-ad"
         data = {
-            "type": 8,
-            "name": name[:128],
-            "subjectId": SubjectID,
-            "sum": 1000,
-            "btype": balance_type,
-            "on_pause": False if start_status else True,
+            "name": name,
+            "nms": nmids,
+            "bid_type": bid_type,
+            "placement_types": placement_types,
         }
 
         response_text = await requests(
             self.session, "POST", url, json_data=data, headers=self.headers.standart
         )
-        answer = json.loads(response_text)
+        try:
+            answer = json.loads(response_text)
+        except JSONDecodeError as e:
+            logger.error(
+                "Ошибка декодирования JSON при создании РК: %s",
+                response_text,
+                exc_info=True,
+            )
+            raise e
+
         if isinstance(answer, int):
             return answer
         else:
