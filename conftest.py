@@ -251,7 +251,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = Path(__file__).parent.absolute()
@@ -283,6 +283,7 @@ def wb_cabinet_mock() -> MagicMock():
 
 @pytest.fixture
 def access_mock(tokens_mock, wb_cabinet_mock):
+    from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
     access_mock = MagicMock(spec=WBCabinetAccess)
     access_mock.tokens = tokens_mock
     access_mock.wb_cabinet = wb_cabinet_mock
