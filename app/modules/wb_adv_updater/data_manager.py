@@ -48,6 +48,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
 from . import get_text_to_predict_ctr_dict
+from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
 logger = logging.getLogger(__name__)
 
@@ -1344,3 +1345,8 @@ async def get_cpm(auto_adv: AdvSetting) -> float | None:
         return None
 
     return max(cpm_values)
+
+
+async def update_advs_data_from_wb_to_pg(wb_api):
+    shop_data_updater = ShopDataUpdater(wb_api)
+    await shop_data_updater.update_advs_data()
