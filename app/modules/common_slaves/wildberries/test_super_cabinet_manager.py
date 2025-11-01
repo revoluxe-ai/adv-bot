@@ -72,7 +72,9 @@ async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
         session2.execute = AsyncMock(return_value=exec2)
 
         # Pass the mock config explicitly to avoid DI issues
-        access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id, wb_config=mock_wb_config)
+        access = await super_cabinet_manager.get_access_for_wb_cabinet(
+            shop_id, wb_config=mock_wb_config
+        )
         assert isinstance(access, WBCabinetAccess)
 
         # Ensure no pending tasks remain after test (cancel them)

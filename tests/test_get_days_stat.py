@@ -5,8 +5,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import \
-    CommonStatDataManager
+from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
+    CommonStatDataManager,
+)
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStatPerDay
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,

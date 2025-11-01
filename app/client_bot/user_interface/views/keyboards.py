@@ -11,6 +11,7 @@ from app.client_bot.user_interface.views.callbacks import (
     TurnBot,
     OrdersSourceToggle,
     PredictCTRModeToggle,
+    SalesPredictMethodToggle,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -24,6 +25,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
@@ -47,7 +49,7 @@ sm = get_async_session_maker
 
 
 def get_adv_setting_keyboard(
-        chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
+    chat_id, wb_user_cabinet: WBUserCabinet, adv_setting: AdvSetting, in_favorites: bool
 ):
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -82,7 +84,6 @@ def get_adv_setting_keyboard(
                 ).pack(),
             )
         )
-
 
     if adv_setting.auto_update_white_list:
         text = "$ Выключить автообновление белого списка"
@@ -126,13 +127,27 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     builder.row(button)
 
+    # Кнопка переключения метода прогноза продаж (сразу под источником заказов)
+    if adv_setting.sales_predict_method == FactMethods.DIRECT_SALES:
+        text = "Переключить на прогноз продаж по корзинам"
+        new_method = FactMethods.BY_CARTS
+    else:
+        text = "Переключить на прямой прогноз продаж"
+        new_method = FactMethods.DIRECT_SALES
+
+    callback = SalesPredictMethodToggle(
+        new_method=new_method, adv_setting_original_id=adv_setting.id
+    ).pack()
+    button = InlineKeyboardButton(text=text, callback_data=callback)
+    builder.row(button)
+
     # Добавляем кнопку переключения режима прогноза CTR
     if adv_setting.predict_ctr_mode == PredictCTRMode.V1:
         text = "Переключить на режим прогноза CTR v2 (по артикулам)"
-        new_mode = PredictCTRMode.V2.value
+        new_mode = PredictCTRMode.V2
     else:
         text = "Переключить на режим прогноза CTR v1 (по ID кампании)"
-        new_mode = PredictCTRMode.V1.value
+        new_mode = PredictCTRMode.V1
 
     callback = PredictCTRModeToggle(
         new_mode=new_mode, adv_setting_original_id=adv_setting.id
@@ -146,8 +161,6 @@ def get_adv_setting_keyboard(
     )
 
     builder.row(button)
-
-
 
     button = InlineKeyboardButton(
         text="Управление ставкой",
@@ -327,19 +340,26 @@ def get_adv_setting_keyboard(
 
 
 def get_advs_keyboard_with_paginator(
-        wb_user_cabinet_original_id: int,
-        adv_settings: list[AdvSetting],
-        page: int,
-        on_page: int,
-        keyword_filter,
+    wb_user_cabinet_original_id: int,
+    adv_settings: list[AdvSetting],
+    page: int,
+    on_page: int,
+    keyword_filter,
 ):
-    adv_setting_without_auctions = [adv for adv in adv_settings if adv.auction_adv_id is not None]
+    adv_setting_without_auctions = [
+        adv for adv in adv_settings if adv.auction_adv_id is not None
+    ]
 
     active_part_advs = list(
-        filter(lambda adv_local: adv_local.bot_active is True, adv_setting_without_auctions)
+        filter(
+            lambda adv_local: adv_local.bot_active is True, adv_setting_without_auctions
+        )
     )
     not_active_part_advs = list(
-        filter(lambda adv_locale: adv_locale.bot_active is not True, adv_setting_without_auctions)
+        filter(
+            lambda adv_locale: adv_locale.bot_active is not True,
+            adv_setting_without_auctions,
+        )
     )
     adv_settings = active_part_advs + not_active_part_advs
 
@@ -417,7 +437,7 @@ def get_advs_keyboard_with_paginator(
         ).pack(),
     )
 
-    keyboard_buttons.append([button])
+    keyboard_buttons.append([button])  # type: ignore[list-item]
     button = InlineKeyboardButton(
         text="Полностью обновить мета-данные от WB",
         callback_data=callbacks.UpdateCompanyFromWB(
@@ -425,48 +445,23 @@ def get_advs_keyboard_with_paginator(
         ).pack(),
     )
 
-    keyboard_buttons.append([button])
+    keyboard_buttons.append([button])  # type: ignore[list-item]
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
     return keyboard
 
 
-def add_app_token_or_delete_wb_user_cabinet(wb_user_cabinet: WBUserCabinet):
-    wb_user_cabinet_original_id = wb_user_cabinet.id
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text="Добавить новый токен",
-                callback_data=callbacks.AddNewToken(
-                    wb_user_cabinet_original_id=wb_user_cabinet_original_id
-                ).pack(),
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="Удалить магазин",
-                callback_data=callbacks.DeleteWbUserCabinet(
-                    wb_user_cabinet_original_id=wb_user_cabinet_original_id
-                ).pack(),
-            )
-        ],
-    ]
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    return keyboard
-
-
 def get_keywords_setting_keyboard(
-        keywords: list[CalculatedKeyword],
-        adv_setting: AdvSetting,
-        adv_choice_last_page,
-        wb_user_cabinet_original_id: int,
-        page,
-        return_from_filter_bottom: bool,
-        on_page,
-        min_ctr,
-        hide_keywords_is_not_relevant,
-        sort_mode="default",
-        image_mode="graphic",
+    keywords: list[CalculatedKeyword],
+    adv_setting: AdvSetting,
+    adv_choice_last_page,
+    wb_user_cabinet_original_id: int,
+    page,
+    return_from_filter_bottom: bool,
+    on_page,
+    min_ctr,
+    hide_keywords_is_not_relevant,
+    sort_mode="default",
+    image_mode="graphic",
 ):
     def sorting_keywords(keywords, sort_mode):
         if sort_mode in ["by_adv", "only_out_index"]:
@@ -505,7 +500,7 @@ def get_keywords_setting_keyboard(
             keyword
             for keyword in keywords
             if isinstance(keyword.query, int)
-               and keyword.query >= adv_setting.hide_small_query_keywords
+            and keyword.query >= adv_setting.hide_small_query_keywords
         ]
 
     bottoms = []
@@ -699,8 +694,7 @@ def get_keywords_setting_keyboard(
         InlineKeyboardButton(
             text="Изменить экспоненту прог. ctr",
             callback_data=ChangeExponentSettinginAdvSettingCallback(
-                adv_id=adv_id,
-                wb_user_cabinet_original_id=wb_user_cabinet_original_id
+                adv_id=adv_id, wb_user_cabinet_original_id=wb_user_cabinet_original_id
             ).pack(),
         )
     ]
@@ -776,11 +770,11 @@ def get_keywords_setting_keyboard(
 
 
 def get_keyword_setting_keyboard(
-        chat_id: int,
-        keyword: KeywordSetting,
-        calculated_keyword: CalculatedKeyword,
-        adv_setting: AdvSetting,
-        page,
+    chat_id: int,
+    keyword: KeywordSetting,
+    calculated_keyword: CalculatedKeyword,
+    adv_setting: AdvSetting,
+    page,
 ) -> InlineKeyboardMarkup:
     adv_setting_original_id = adv_setting.id
     keyword_setting_original_id = keyword.id
@@ -793,9 +787,9 @@ def get_keyword_setting_keyboard(
         reason = None
 
     if (
-            calculated_keyword.hard_status == 1
-            and calculated_keyword.status == KeywordStatus.BAD
-            and calculated_keyword.reason != "max_position"
+        calculated_keyword.hard_status == 1
+        and calculated_keyword.status == KeywordStatus.BAD
+        and calculated_keyword.reason != "max_position"
     ):
         button = [
             InlineKeyboardButton(
@@ -854,8 +848,8 @@ def get_keyword_setting_keyboard(
     buttons.append(buttons_row)
 
     if (
-            keyword.hard_status in [AUTO_MODE, WHITE_LIST]
-            or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH
+        keyword.hard_status in [AUTO_MODE, WHITE_LIST]
+        or reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH
     ):
         bottom = [
             InlineKeyboardButton(
@@ -952,7 +946,7 @@ def get_return_for_your_ref_links():
 
 
 def get_shop_menu_keyboard(
-        wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True
+    wb_user_cabinet: WBUserCabinet, wb_cabinet_original_id: int, is_active_adv: True  # type: ignore[valid-type]
 ):
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     expiration_time: datetime.datetime = wb_cabinet.expiration_time
@@ -1136,8 +1130,8 @@ def get_payment_keyboard_for_shops(wb_user_cabinets: list[WBUserCabinet]):
 
         button = InlineKeyboardButton(
             text="Пополнить "
-                 + wb_user_cabinet.name
-                 + f" Текущий общий баланс({total_money})",
+            + wb_user_cabinet.name
+            + f" Текущий общий баланс({total_money})",
             callback_data=callbacks.AddBalance(
                 wb_cabinet_original_id=wb_user_cabinet.id
             ).pack(),

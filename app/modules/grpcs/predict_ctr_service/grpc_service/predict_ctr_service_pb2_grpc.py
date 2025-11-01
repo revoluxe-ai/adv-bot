@@ -28,7 +28,7 @@ if _version_not_supported:
     )
 
 
-class CtrServiceStub(object):
+class CtrServiceStub:
     """Сервис для прогноза CTR"""
 
     def __init__(self, channel):
@@ -45,7 +45,7 @@ class CtrServiceStub(object):
         )
 
 
-class CtrServiceServicer(object):
+class CtrServiceServicer:
     """Сервис для прогноза CTR"""
 
     def PredictCtr(self, request, context):
@@ -71,7 +71,7 @@ def add_CtrServiceServicer_to_server(servicer, server):
 
 
 # This class is part of an EXPERIMENTAL API.
-class CtrService(object):
+class CtrService:
     """Сервис для прогноза CTR"""
 
     @staticmethod

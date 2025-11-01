@@ -1,7 +1,7 @@
 """
 Менеджер инкрементальной статистики.
 
-Вместо хранения дневных агрегатов, сохраняет изменения (дельты) 
+Вместо хранения дневных агрегатов, сохраняет изменения (дельты)
 статистики с точным timestamp, что позволяет:
 - Отслеживать продажи за любой период (час, 2 часа, день)
 - Видеть реальные тренды в течение дня
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class BaseIncrementalManager(ABC):
     """
     Базовый менеджер для инкрементальной статистики (DRY).
-    
+
     Общая логика для IncrementalCommonStatManager и IncrementalAdvStatManager.
     """
 
@@ -210,7 +210,11 @@ class IncrementalCommonStatManager(BaseIncrementalManager):
                 incremental = IncrementalCommonStat(
                     nmid=nmid,
                     timestamp=current_timestamp,  # Момент фиксации данных WB (WB не отдаёт время события)
-                    date=date if isinstance(date, datetime) else datetime.combine(date, datetime.min.time()),
+                    date=(
+                        date
+                        if isinstance(date, datetime)
+                        else datetime.combine(date, datetime.min.time())
+                    ),
                     orders_delta=orders_delta,
                     orders_sum_delta=orders_sum_delta,
                     open_card_delta=open_card_delta,
@@ -305,7 +309,7 @@ class IncrementalCommonStatManager(BaseIncrementalManager):
     ) -> None:
         """
         Батчевая вставка в ClickHouse.
-        
+
         При массовой записи (100+ записей) это ускоряет запись в 5-10 раз
         и снимает нагрузку с ClickHouse при частых апдейтах.
         """
@@ -469,7 +473,11 @@ class IncrementalAdvStatManager(BaseIncrementalManager):
                     incremental = IncrementalAdvStat(
                         adv_id=adv_id,
                         timestamp=current_timestamp,  # Момент фиксации данных WB
-                        date=date if isinstance(date, datetime) else datetime.combine(date, datetime.min.time()),
+                        date=(
+                            date
+                            if isinstance(date, datetime)
+                            else datetime.combine(date, datetime.min.time())
+                        ),
                         orders_delta=orders_delta,
                         spend_delta=spend_delta,
                         sum_price_delta=sum_price_delta,
@@ -536,9 +544,7 @@ class IncrementalAdvStatManager(BaseIncrementalManager):
             logger.error(f"Ошибка получения предыдущих значений рекламы: {exc}")
             return None
 
-    async def _get_previous_totals(
-        self, keys: list, dates: list
-    ) -> dict:
+    async def _get_previous_totals(self, keys: list, dates: list) -> dict:
         """Заглушка для соответствия ABC"""
         return {}
 
@@ -595,5 +601,3 @@ class IncrementalAdvStatManager(BaseIncrementalManager):
                     "version",
                 ],
             )
-
-

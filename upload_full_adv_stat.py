@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-import aiofiles
+import aiofiles  # type: ignore
 from aiohttp import ClientSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -18,7 +18,7 @@ async def upload_full_adv_stat(wb_cabinet_id: int, client_session):
     wb_api = WBApi(access, client_session)
 
     stmt = select(AdvSetting.adv_id).where(
-        AdvSetting.wb_cabinet_id == wb_cabinet_id, AdvSetting.bidder_active == True
+        AdvSetting.wb_cabinet_id == wb_cabinet_id, AdvSetting.bidder_active.is_(True)
     )
     async with sm() as session:
         result = await session.execute(stmt)

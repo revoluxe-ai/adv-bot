@@ -15,6 +15,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
+from app.modules.common_slaves.wildberries.models import WBCabinet
+
 # Создаем базу тестов
 Base = declarative_base()
 DB_PATH = "simple_test_db.sqlite"

@@ -32,7 +32,11 @@ class FirstKeyUpdater:
     ) -> None:
         if not keywords:
             return None
-        clear_keywords = [kw for kw in keywords if kw.hard_status not in [0, 3] and kw.position and kw.position > 0]
+        clear_keywords = [
+            kw
+            for kw in keywords
+            if kw.hard_status not in [0, 3]
+        ]
         if not clear_keywords:
             return None
         clear_keywords = sorted(
@@ -41,7 +45,7 @@ class FirstKeyUpdater:
         top_key = clear_keywords[0]
         if top_key.hard_status == 2:
             return None
-
+        # TODO: Сделать кнопку добавления не только релевантных фраз
         if self._adv.auto_add_only_relevant_phrase:
             relevant_phrases = [kw for kw in clear_keywords if kw.relevant]
         else:

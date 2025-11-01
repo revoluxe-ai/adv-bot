@@ -5,4 +5,5 @@ from .setting_auto_updater.modules import last_auto_update_phrases_to_white_list
 
 
 __all__ = [
-    "LastTargetPlaceUpdateRedisManager",]
+    "LastTargetPlaceUpdateRedisManager",
+]

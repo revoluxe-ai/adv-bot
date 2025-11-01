@@ -70,11 +70,22 @@ class CalculatedKeyword(BaseModel):
         assert self.baes_ctr is not None
         return (self.predict_ctr + self.baes_ctr) / 2
 
+    # TODO: Была ошибка в проде: с ростом экспоненты рейтинг падал. Исправлено. Сделать тесты
     @property
     def rating_by_predict_ctr(self) -> float:
+        """Линейный баланс между CTR×views и CTR по экспоненте (1–20)."""
         if self.predict_ctr is None or self.predict_ctr_exponent is None:
             return 0.0
-        rating = self.predict_ctr**self.predict_ctr_exponent * self.views
+        ctr = min(max(self.predict_ctr, 0.0), 1.0)
+        views = max(self.views or 0.0, 0.0)
+        w = (self.predict_ctr_exponent - 1) / 19
+        w = min(max(w, 0.0), 1.0)
+
+        # линейный переход от CTR×views → CTR
+        traffic_component = ctr * views
+        rating = (1 - w) * traffic_component + w * ctr
+        return rating
+
         return rating
 
     @property
@@ -168,4 +179,3 @@ class CalculatedKeyword(BaseModel):
     @property
     def is_in_white_list(self) -> bool:
         return self.hard_status == 2
-

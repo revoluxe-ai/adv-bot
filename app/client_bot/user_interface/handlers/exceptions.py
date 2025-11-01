@@ -137,7 +137,6 @@ async def api_forbidden_error_handler(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
 ):
     message = error_event.update.message
-    exception = error_event.exception
 
     if message is None:
         chat_id = error_event.update.callback_query.message.chat.id
@@ -224,4 +223,4 @@ async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram
             admin_telegram_id, "Строки с названием пакета 'app' в трейсе не найдены."
         )
 
-    await bot.send_message(admin_telegram_id, "Ник пользователя: %s" % user_name)
+    await bot.send_message(admin_telegram_id, f"Ник пользователя: {user_name}")

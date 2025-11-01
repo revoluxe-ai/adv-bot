@@ -20,7 +20,9 @@ def ensure_used_with_with(func):
     """Декоратор для проверки использования объекта с оператором `with`"""
 
     def wrapper(instance, *args, **kwargs):
-        assert instance._used_with_with, "Объект должен быть использован с оператором `with`"
+        assert (
+            instance._used_with_with
+        ), "Объект должен быть использован с оператором `with`"
         return func(instance, *args, **kwargs)
 
     return wrapper
@@ -57,7 +59,6 @@ class ImageMaster:
         if img.mode != "RGB":
             img = img.convert("RGB")
 
-
         # Ensure the tensor has three channels
         img = img.resize((224, 224))
         x = img_to_array(img)
@@ -80,7 +81,7 @@ class ImageMaster:
         min_level: float = None,
         keywords: list = None,
     ) -> Image:
-        if min_level == None:
+        if min_level is None:
             min_level = 0
         if not dhash:
             dhash = self._im_tools.dhash(img)
@@ -91,10 +92,12 @@ class ImageMaster:
         vector = self.get_vector(img)
         vector_matrix = np.expand_dims(vector, axis=0)
         target_index = (
-            self._indexes.background_images if is_background else self._indexes.all_images
+            self._indexes.background_images
+            if is_background
+            else self._indexes.all_images
         )
 
-        if min_level > 0 and is_background == False:
+        if min_level > 0 and not is_background:
             if target_index.ntotal > 0:
                 distances, ids = target_index.search(vector_matrix, k=1)
                 distance = distances[0][0] ** 1 / 2
@@ -137,8 +140,12 @@ class ImageMaster:
     def add_background_image(self, img: PilImg):
         self._add_image_common(img, is_background=True)
 
-    def add_main_image(self, img: PilImg, dhash, min_level=0.24, keywords=None) -> Image:
-        return self._add_image_common(img, dhash, min_level=min_level, keywords=keywords)
+    def add_main_image(
+        self, img: PilImg, dhash, min_level=0.24, keywords=None
+    ) -> Image:
+        return self._add_image_common(
+            img, dhash, min_level=min_level, keywords=keywords
+        )
 
     def check_as_background(self, vector: np.ndarray):
         """
@@ -253,6 +260,6 @@ class ImageMaster:
 
     def delete_background_image(self):
         s = self._alchemy_session_maker()
-        images = s.query(Image).filter(Image.is_background == True)
+        images = s.query(Image).filter(Image.is_background.is_(True))
         images.delete(synchronize_session=False)
         s.commit()

@@ -33,8 +33,8 @@ def get_adv_spend_by_user():
             .where(
                 and_(
                     # User.wb_tokens.any(WBToken.active == True),
-                    AdvSetting.bot_active == True,
-                    WBCabinet.active == True,
+                    AdvSetting.bot_active.is_(True),
+                    WBCabinet.active.is_(True),
                     AdvSetting.active_status == "started",
                     AdvKeyword.date == datetime.datetime.now().date(),
                 )
@@ -48,7 +48,7 @@ def get_adv_spend_by_user():
             stmt = (
                 select(WBToken)
                 .join(WBToken.user)
-                .where(and_(User.username == row.username, WBToken.active == True))
+                .where(and_(User.username == row.username, WBToken.active.is_(True)))
             )
             result = session.execute(stmt)
             tokens = result.scalar()

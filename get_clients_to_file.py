@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+
 import dotenv
 
 dotenv.load_dotenv()

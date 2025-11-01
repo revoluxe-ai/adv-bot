@@ -5,7 +5,7 @@ from aiogram import Bot
 from aiohttp import ClientSession
 from sqlalchemy import and_, or_, select
 
-from app.core.wb_api.data_classes.adv import Balances
+from app.core.wb_api.data_classes.advs.other_classes import Balances
 from app.core.wb_api.mixins.excs import (
     AdvNotFoundInWBError,
     CardNotFoundInWB,
@@ -39,20 +39,24 @@ class MainAdvManager:
         adv_id: int = await self.wb_api.create_search_adv([nmid], adv_name)
         await self.wb_api.rename_adv(adv_id, new_name=adv_name)
         try:
-            await self._upcast_target_placement(adv_id, search=True, recommendations=False)
+            await self._upcast_target_placement(
+                adv_id, search=True, recommendations=False
+            )
         except Exception as exc:
-            logger.error(f"Ошибка при настройке таргетинга РК {adv_id}: {exc}", exc_info=True)
+            logger.error(
+                f"Ошибка при настройке таргетинга РК {adv_id}: {exc}", exc_info=True
+            )
         return adv_id
 
     async def _create_auto_adv(
-            self, name: str, SubjectID: int, balance_type: int, start_status: bool
+        self, name: str, SubjectID: int, balance_type: int, start_status: bool
     ) -> int:
         return await self.wb_api.create_auto_adv(
             name, SubjectID, balance_type, start_status
         )
 
     async def upcast_auto_adv(
-            self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot
+        self, nmid: int, auto_adv_id: int, user_telegram_id: int, bot: Bot
     ):
         await bot.send_message(
             user_telegram_id, f"Пытаюсь найти и настроить Авто-РК для артикула {nmid}"
@@ -119,13 +123,18 @@ class MainAdvManager:
                 break
 
     async def create_complex_advs(
-            self, bot: Bot, user_telegram_id, nmid: int, hard_mode
+        # TODO: Бот не видит, что РК завершены и не дает создать новую РК по тому же артикулу
+        self,
+        bot: Bot,
+        user_telegram_id,
+        nmid: int,
+        hard_mode,
     ) -> tuple[int, int]:
         exist_adv: AdvSetting = await self.get_adv_setting_by_nmid(nmid)
         if (
-                not exist_adv
-                or hard_mode is True
-                or exist_adv.active_status in ["refused", "done"]
+            not exist_adv
+            or hard_mode is True
+            or exist_adv.active_status in ["refused", "done"]
         ):
             balances = await self.wb_api.get_adv_balances()
             try:
@@ -138,7 +147,7 @@ class MainAdvManager:
             assert wb_cabinet is not None
             async with sm() as session:
                 await wb_db_manager.update_cards_in_db(
-                    [target_card],
+                    [target_card],  # type: ignore[list-item]
                     wb_cabinet,
                 )
             name = target_card.name
@@ -276,7 +285,7 @@ class MainAdvManager:
                         # Дополнительно можно вернуть этот блок, если нужно
                         and_(
                             AdvSetting.nmids == [nmid],
-                            AdvSetting._search_adv_id != None,
+                            AdvSetting._search_adv_id is not None,
                         ),
                     ),
                 )
@@ -295,13 +304,13 @@ class MainAdvManager:
         full_balance: list[int] = [balance, net, bonus]
         logger.debug(f"Балансы: {full_balance}")
         if (
-                sum(full_balance) >= 2000
-                or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2
+            sum(full_balance) >= 2000
+            or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2
         ):
             return True
         return False
 
-    def _get_balance_type(self, balances: Balances) -> (int, str):
+    def _get_balance_type(self, balances: Balances) -> tuple[int, str]:
         is_balance_enough: bool = self._check_enough_balance(balances)
 
         if not is_balance_enough:

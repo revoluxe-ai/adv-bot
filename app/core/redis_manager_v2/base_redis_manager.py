@@ -9,11 +9,11 @@ if typing.TYPE_CHECKING:
 
 class BaseRedisManager(ABC):
     prefix: str
-    default_ttl: Optional[int] = None
+    default_ttl: int | None = None
 
-    def __init__(self, redis_client: "RedisClient", ttl: Optional[int] = None) -> None:
+    def __init__(self, redis_client: "RedisClient", ttl: int | None = None) -> None:
         self.__client = redis_client
-        self._ttl: Optional[int] = ttl if ttl is not None else self.default_ttl
+        self._ttl: int | None = ttl if ttl is not None else self.default_ttl
 
     @abstractmethod
     def _get_key(self, *args: Any, **kwargs: Any) -> str: ...

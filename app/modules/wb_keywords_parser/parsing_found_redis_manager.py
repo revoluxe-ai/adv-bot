@@ -8,13 +8,15 @@ class ParsingFoundRedisManager(BaseRedis):
         self, text: str, nmid: int, page: int
     ) -> None:
         key = f"found_pages:{text}:{nmid}"
-        score: int = int(time())
-        await self._client.zadd(key, {page: score})
+        score: float = float(time())
+        await self._client.zadd(key, {str(page): score})
 
-    async def add_last_not_found_page_for_text_nmid(self, text, nmid, page) -> None:
+    async def add_last_not_found_page_for_text_nmid(
+        self, text: str, nmid: int, page: int
+    ) -> None:
         key = f"not_found_pages:{text}:{nmid}"
-        score: int = int(time())
-        await self._client.zadd(key, {page: score})
+        score: float = float(time())
+        await self._client.zadd(key, {str(page): score})
 
     async def get_found_pages_for_text_nmid(self, text: str, nmid: int) -> list[int]:
         key = f"found_pages:{text}:{nmid}"

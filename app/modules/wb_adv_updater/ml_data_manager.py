@@ -75,16 +75,16 @@ async def process_product_data(wbcard: WBCard):
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
             continue
-        characteristics_words[char_name]: tuple[
-            str, list[float]
-        ] = await get_words_from_char_value(char_value)
-    characteristics_words["name"]: tuple[
-        str, list[float]
-    ] = await get_words_from_char_value(wbcard.name)
+        characteristics_words[char_name]: tuple[str, list[float]] = (
+            await get_words_from_char_value(char_value)
+        )
+    characteristics_words["name"]: tuple[str, list[float]] = (
+        await get_words_from_char_value(wbcard.name)
+    )
     if "description" in characteristics_words:
-        characteristics_words["description"]: tuple[
-            str, list[float]
-        ] = await get_words_from_char_value(wbcard.description)
+        characteristics_words["description"]: tuple[str, list[float]] = (
+            await get_words_from_char_value(wbcard.description)
+        )
     return characteristics_words
 
 
@@ -156,7 +156,7 @@ async def update_cards_in_graph_for_shops_big_cycle() -> None:
 async def update_cards_in_graph_small_cycle() -> None:
     async with sm() as session:
         stmt = select(AdvSetting).where(
-            AdvSetting.bot_active == True,
+            AdvSetting.bot_active.is_(True),
         )
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = result.scalars().all()
@@ -201,7 +201,7 @@ async def update_keywords_ctr_by_similary() -> None:
         stmt = (
             select(KeywordSetting.text, AdvSetting.adv_id)
             .join(AdvSetting, KeywordSetting.adv_setting_id == AdvSetting.id)
-            .where(AdvSetting.bot_active == True)
+            .where(AdvSetting.bot_active.is_(True))
         )
         result = await session.execute(stmt)
         keyword_texts_adv_ids: Sequence[Row[tuple[str, int]]] = result.all()
@@ -219,7 +219,7 @@ async def update_keywords_ctr_by_similary() -> None:
         try:
             adv_id, keyword_text = key.split(":")[1:]
         except Exception:
-            logger.error(f"Ошибка парсинга ключа {key}", exc_info=True)
+            logger.error(f"Ошибка парсинга ключа {key}", exc_info=True)  # type: ignore[str-bytes-safe]
             continue
         if keyword_text in keywords:
             continue
@@ -269,7 +269,8 @@ async def update_keywords_ctr_by_similary() -> None:
         vector = vector.reshape(1, -1)  # Преобразование в форму (1, d) для поиска
 
         # Поиск ближайших векторов
-        D, I = index.search(vector, index.ntotal)
+        # noinspection PyArgumentList
+        D, I = index.search(vector, index.ntotal)  # noqa: E741
         redis_base_manager = BaseRedis()
         async with redis_base_manager.client.pipeline() as redis_pipeline:
             for idx in I[0]:
@@ -284,8 +285,10 @@ async def update_keywords_ctr_by_similary() -> None:
                 predict_ctr = await redis_manager.get_predict_ctr(adv_id, text)
                 if predict_ctr:
                     logger.debug(
-                        f"Обновление CTR для ключевого слова {target_text} и объявления {adv_id} "
-                        f"на значение {predict_ctr}"
+                        "Обновление CTR для ключевого слова %s и объявления %s на значение %s",
+                        target_text,
+                        adv_id,
+                        predict_ctr,
                     )
                     await redis_manager.set_predict_ctr_with_pipeline(
                         redis_pipeline, adv_id, target_text, predict_ctr

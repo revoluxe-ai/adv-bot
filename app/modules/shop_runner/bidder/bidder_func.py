@@ -36,7 +36,9 @@ async def get_cpms_from_wb(advs: list[AdvSetting]) -> set[int] | None:
     return {adv.cpm for adv in advs}
 
 
-async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> list[AuctionAdv]:
+async def _update_and_get_advs_from_wb(
+    auto_adv: AdvSetting, wb_api: WBApi
+) -> list[AuctionAdv]:
     adv_ids = set()
     if auto_adv.bidder_for_auto:
         adv_ids.add(auto_adv.adv_id)
@@ -53,16 +55,22 @@ async def _update_and_get_advs_from_wb(auto_adv: AdvSetting, wb_api: WBApi) -> l
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
 
+
 @inject
 async def run_bidder_process_for_adv(
-    adv_setting: AdvSetting, wb_api: WBApi,
+    adv_setting: AdvSetting,
+    wb_api: WBApi,
     keywords: list[CalculatedKeyword],
-    auto_max_bid_manager: "AutoMaxBidManager" = Provide[AutoMaxCpmContainer.auto_max_cpm_bid_manager],
+    auto_max_bid_manager: "AutoMaxBidManager" = Provide[
+        AutoMaxCpmContainer.auto_max_cpm_bid_manager
+    ],
 ) -> None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
     advs: list[AuctionAdv] = await _update_and_get_advs_from_wb(adv_setting, wb_api)
-    advs_from_wb_with_active_company: list[AuctionAdv] = [adv for adv in advs if adv.status_native == 'started']
+    advs_from_wb_with_active_company: list[AuctionAdv] = [
+        adv for adv in advs if adv.status_native == "started"
+    ]
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение максимальной ставки")
         max_cpm = await data_manager.get_max_adv_bid(adv_setting)
@@ -80,7 +88,9 @@ async def run_bidder_process_for_adv(
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не задана!")
         return
     if adv_setting.auto_max_cpm_mode:
-        auto_max_cpm = await auto_max_bid_manager.get_max_cpm(adv_setting, keywords, max_cpm)
+        auto_max_cpm = await auto_max_bid_manager.get_max_cpm(
+            adv_setting, keywords, max_cpm
+        )
         if auto_max_cpm and auto_max_cpm < max_cpm:
             max_cpm = auto_max_cpm
 
@@ -112,9 +122,13 @@ async def run_bidder_process_for_adv(
     try:
         logger.debug(f"[{shop_id}] [{adv_id}] Получение ставок для биддера")
         try:
-            cpms: set[int] | None = await get_cpms_from_wb(advs_from_wb_with_active_company)
+            cpms: set[int] | None = await get_cpms_from_wb(
+                advs_from_wb_with_active_company
+            )
         except Exception as exc:
-            logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
+            logger.error(
+                f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True
+            )
             raise exc
     except ApiForbiddenError as e:
         raise e

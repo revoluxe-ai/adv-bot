@@ -30,7 +30,9 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
-    op.add_column("advsetting", sa.Column("auto_adv_target_status", sa.Boolean(), nullable=True))
+    op.add_column(
+        "advsetting", sa.Column("auto_adv_target_status", sa.Boolean(), nullable=True)
+    )
     op.add_column(
         "advsetting",
         sa.Column("auction_adv_target_status", sa.Boolean(), nullable=True),

@@ -22,14 +22,14 @@ if typing.TYPE_CHECKING:
 
 class WBCabinet(BaseTable):
     shop_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    wb_cards: Mapped[list["WBCard"]] = relationship(
+    wb_cards: Mapped[list[WBCard]] = relationship(
         "WBCard", back_populates="wb_cabinet", uselist=True
     )
-    wb_categories: Mapped[list["WBCategory"]] = relationship("WBCategory", uselist=True)
-    adv_settings: Mapped[list["AdvSetting"]] = relationship(
+    wb_categories: Mapped[list[WBCategory]] = relationship("WBCategory", uselist=True)
+    adv_settings: Mapped[list[AdvSetting]] = relationship(
         "AdvSetting", back_populates="wb_cabinet", uselist=True
     )
-    wb_user_cabinets: Mapped[list["WBUserCabinet"]] = relationship(
+    wb_user_cabinets: Mapped[list[WBUserCabinet]] = relationship(
         "WBUserCabinet",
         back_populates="wb_cabinet",
     )
@@ -50,10 +50,10 @@ class WBCabinet(BaseTable):
     white_list_update_active: Mapped[bool | None] = mapped_column(
         Boolean, default=False, nullable=True
     )
-    balance_payments: Mapped[list["WBBalancePayment"]] = relationship(
+    balance_payments: Mapped[list[WBBalancePayment]] = relationship(
         "WBBalancePayment", back_populates="wb_cabinet", uselist=True
     )
-    bonus_payments: Mapped[list["WBBonusPayment"]] = relationship(
+    bonus_payments: Mapped[list[WBBonusPayment]] = relationship(
         "WBBonusPayment", back_populates="wb_cabinet", uselist=True
     )
     __table_args__ = (

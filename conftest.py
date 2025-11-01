@@ -1,5 +1,7 @@
+# mypy: ignore-errors
 import dotenv
-dotenv.load_dotenv() # TODO: Переделать для загрузки тестовых настроек
+
+dotenv.load_dotenv()  # TODO: Переделать для загрузки тестовых настроек
 import os
 import sys
 from pathlib import Path

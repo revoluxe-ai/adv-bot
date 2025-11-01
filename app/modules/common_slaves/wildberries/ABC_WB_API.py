@@ -26,8 +26,8 @@ class WbRequestApiMixin(ABC):
 
 
 class Headers:
-    def __init__(self, token: 'WBToken'):
-        self.current_token: 'WBToken' = token
+    def __init__(self, token: "WBToken"):
+        self.current_token: WBToken = token
 
     @property
     def standart(self) -> dict[str, str]:
@@ -49,7 +49,7 @@ class ABC_WB_API(WbRequestApiMixin):
     def __init__(self, wb_access: "WBCabinetAccess", session: ClientSession) -> None:
         tokens: list[WBToken] = wb_access.tokens
         self.access = wb_access
-        wb_cabinet: Optional['WBCabinet'] = wb_access.wb_cabinet
+        wb_cabinet: WBCabinet | None = wb_access.wb_cabinet
         self.wb_cabinet = wb_cabinet
         assert wb_cabinet
         if not tokens:
@@ -71,7 +71,7 @@ class ABC_WB_API(WbRequestApiMixin):
     @staticmethod
     def chunks(lst, n):
         for i in range(0, len(lst), n):
-            yield lst[i: i + n]
+            yield lst[i : i + n]
 
     async def set_next_token(self, method_name: str) -> None:
         current_token_original_id = self._current_token.id

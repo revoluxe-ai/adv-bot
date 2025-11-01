@@ -29,5 +29,10 @@ TOKENS = [
 def test_token_validity_simple(token: str, expected: bool) -> None:
     t = WBToken(api_key=token)
     # Критерий валидности: корректный JWT, не read_only, не просрочен, и есть право "Статистика"
-    is_valid = t.check_valid() and (not t.read_only) and (not t.is_expired) and ("Статистика" in t.categories)
+    is_valid = (
+        t.check_valid()
+        and (not t.read_only)
+        and (not t.is_expired)
+        and ("Статистика" in t.categories)
+    )
     assert is_valid == expected

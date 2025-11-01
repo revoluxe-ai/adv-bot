@@ -40,7 +40,7 @@ class WBCabinetAccess:
 
 
 async def get_access_for_wb_cabinet(
-    wb_cabinet_id_or_shop_id: typing.Union[int, str],
+    wb_cabinet_id_or_shop_id: int | str,
     wb_config: WBConfig = Provide[AppContainer.settings.provided.infrastructure.wb],
 ) -> WBCabinetAccess:
 

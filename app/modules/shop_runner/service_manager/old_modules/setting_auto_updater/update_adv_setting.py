@@ -9,12 +9,20 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.target_place_updater import (
     TargetPlaceUpdater,
 )
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.target_place_updater.excs import (
+    TargetPlaceNotSetError,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater import (
     WhiteListUpdateManager,
 )
+import logging
+
+logger = logging.getLogger(__name__)
+
+# TODO: Ограничить парсер 3 страницами
+# Включить проверку всех позиций парсрером, особенно если стоит отключение позиций > целевой
 
 
-# TODO: Legacy code, нигде не используется, удалить после проверки
 async def update_adv_setting(
     adv: AdvSetting,
     keywords: list[CalculatedKeyword],
@@ -43,10 +51,15 @@ async def update_adv_setting(
     if fact_data.predict_orders >= plan_data.orders:
         any_change = False
         if fact_data.pay_for_order > plan_data.target_pay_for_order:
-            (
-                change_success_target_place,
-                touch_setting_limit_success_target_place,
-            ) = await target_place_update_manager.set_down()
+            try:
+                (
+                    change_success_target_place,
+                    touch_setting_limit_success_target_place,
+                ) = await target_place_update_manager.set_down()
+            except TargetPlaceNotSetError:
+                logger.warning("Target place not set for adv_id %s", adv.adv_id)
+                change_success_target_place = False
+                touch_setting_limit_success_target_place = False
             if change_success_target_place:
                 any_change = True
             if touch_setting_limit_success_target_place:
@@ -63,5 +76,11 @@ async def update_adv_setting(
         change_success_add_white_list,
         _,
     ) = await white_list_update_manager.add_phrase_to_white_list(keywords)
-    change_success_change_target_place, _ = await target_place_update_manager.set_up()
+    try:
+        change_success_change_target_place, _ = (
+            await target_place_update_manager.set_up()
+        )
+    except TargetPlaceNotSetError:
+        logger.warning("Target place not set for adv_id %s", adv.adv_id)
+        change_success_change_target_place = False
     return change_success_add_white_list or change_success_change_target_place

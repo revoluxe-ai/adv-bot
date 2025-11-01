@@ -77,3 +77,4 @@ app/modules/predict_ctr_service/model/model/model.json
 .coverage
 !k8s/*
 model/model.json
+.mypy_cache/

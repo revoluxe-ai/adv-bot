@@ -34,13 +34,13 @@ T = TypeVar("T")
 class BaseAPI:
     HOST = "wildberries.ru"
 
-    def __init__(self,
-                 wb_access: 'WBCabinetAccess',
-                 client_session: ClientSession) -> None:
+    def __init__(
+        self, wb_access: "WBCabinetAccess", client_session: ClientSession
+    ) -> None:
         from ...modules.common_slaves.wildberries.ABC_WB_API import Headers
 
-        tokens: list['WBToken'] = wb_access.tokens
-        self.access: "WBCabinetAccess" = wb_access
+        tokens: list[WBToken] = wb_access.tokens
+        self.access: WBCabinetAccess = wb_access
         if not tokens:
             raise ApiForbiddenError(
                 "Нет токенов для доступа к API",
@@ -85,7 +85,9 @@ class BaseAPI:
         ]
 
         free_tokens = [
-            token for token in self._free_tokens if token.id not in all_bad_token_original_ids
+            token
+            for token in self._free_tokens
+            if token.id not in all_bad_token_original_ids
         ]
 
         if free_tokens:

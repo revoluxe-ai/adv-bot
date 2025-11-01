@@ -24,7 +24,6 @@ class ApiErrorWithCode(Exception):
         )
 
 
-
 class TokenExpiredError(Exception):
     def __init__(self, text: str) -> None:
         self.text = text
@@ -37,7 +36,9 @@ class TokensFromDifferentShopsError(BaseException):
 
 
 class ApiForbiddenError(Exception):
-    def __init__(self, text: str, wb_user_cabinet: typing.Optional['WBUserCabinet'] = None):
+    def __init__(
+        self, text: str, wb_user_cabinet: typing.Optional["WBUserCabinet"] = None
+    ):
         self.text = text
         self.wb_user_cabinet = wb_user_cabinet
         m = "API доступ запрещён"
@@ -66,6 +67,7 @@ class MinAdvBidWBApiError(Exception):
         m = "Минимальная ставка изменена"
         super().__init__(f"{m} new_min_bid: {self.new_min_bid}")
 
+
 class BadRequestError(Exception):
     """Ошибка плохого запроса (для совместимости)."""
 
@@ -73,6 +75,7 @@ class BadRequestError(Exception):
         self, message: str = "Bad request", response_text: str | None = None
     ) -> None:
         super().__init__(message, 400, response_text)
+
 
 class NotValidTokenError(Exception):
     pass

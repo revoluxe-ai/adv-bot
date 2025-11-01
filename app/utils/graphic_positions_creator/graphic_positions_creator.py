@@ -19,9 +19,9 @@ from app.utils.graphic_positions_creator.classes import CommonKeyword
 
 
 async def get_common_keywords_with_positions(nmid) -> list[CommonKeyword] | None:
-    positions: list[
-        WBItemPosition
-    ] = await data_manager.get_keyword_positions_from_click_house(nmid)
+    positions: list[WBItemPosition] = (
+        await data_manager.get_keyword_positions_from_click_house(nmid)
+    )
     common_keywords = []
     if positions:
         text_to_positions = defaultdict(list)
@@ -43,7 +43,7 @@ async def get_keyword_history_graphic(
         stmt = select(AdvSetting.nmids).filter(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
         nmids = result.scalar()
-        nmid = nmids[0]
+        nmid = nmids[0]  # type: ignore[index]
         common_keywords: list[CommonKeyword] = await get_common_keywords_with_positions(
             nmid
         )
@@ -60,7 +60,7 @@ async def get_keyword_history_graphic(
         if not common_keywords:
             return
         common_keywords.sort(
-            key=lambda x: min([pos.position for pos in x.wb_item_positions])
+            key=lambda x: min([pos.position for pos in x.wb_item_positions])  # type: ignore[type-var]
         )
         common_keywords = common_keywords[:5]
         end_date = datetime.datetime.now()

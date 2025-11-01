@@ -29,6 +29,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from .fact_methods_enum import FactMethods
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.base import BaseTable
@@ -214,7 +215,7 @@ class WBToken(BaseTable):
         exp = self.__payload.get("exp")
         if isinstance(exp, (int, float, str)):
             # Make the datetime timezone-aware (UTC)
-            return datetime.datetime.fromtimestamp(int(exp), tz=datetime.timezone.utc)
+            return datetime.datetime.fromtimestamp(int(exp), tz=datetime.UTC)
         raise NotValidTokenError
 
     @property
@@ -257,7 +258,7 @@ class WBToken(BaseTable):
         """Проверяет, истёк ли токен"""
         try:
             # Compare using timezone-aware UTC now
-            return datetime.datetime.now(datetime.timezone.utc) >= self.__expires
+            return datetime.datetime.now(datetime.UTC) >= self.__expires
         except Exception:
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным
@@ -427,7 +428,9 @@ class AdvSetting(BaseTable):
         Boolean, default=False, nullable=True
     )
     max_cpm = mapped_column(Integer, nullable=True)
-    auto_max_cpm_mode = mapped_column(Boolean, nullable=True, default=False, server_default=text("false"))
+    auto_max_cpm_mode = mapped_column(
+        Boolean, nullable=True, default=False, server_default=text("false")
+    )
     max_place = mapped_column(Integer, nullable=True)
     use_incremental_stats = mapped_column(
         Boolean,
@@ -499,6 +502,13 @@ class AdvSetting(BaseTable):
         default=PredictCTRMode.V2,  # экземпляр Enum
         server_default=PredictCTRMode.V2.name,  # строка
     )
+
+    sales_predict_method: Mapped[FactMethods] = mapped_column(
+        SAEnum(FactMethods),
+        nullable=True,
+        default=FactMethods.DIRECT_SALES,  # экземпляр Enum
+        server_default=FactMethods.DIRECT_SALES.name,
+    )  # строка
 
     __table_args__ = (
         # Составной индекс для основного запроса

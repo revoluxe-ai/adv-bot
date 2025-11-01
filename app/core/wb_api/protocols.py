@@ -18,7 +18,7 @@ class WBAPIProtocol(Protocol):
     """Протокол для работы с WB API для миксинов"""
 
     PREFIX: str
-    headers: "Headers"
+    headers: Headers
     HOST: str
     api_call_state: dict[str, dict[str, Any]]
     shop_id: str

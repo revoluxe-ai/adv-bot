@@ -4,11 +4,14 @@ from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 import typing
 
-from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import PredictCTRManagerContainer
+from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
+    PredictCTRManagerContainer,
+)
 
 if typing.TYPE_CHECKING:
-    from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.redis_manager import \
-        PredictCTRRedisManager
+    from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.redis_manager import (
+        PredictCTRRedisManager,
+    )
 
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.settings import settings
@@ -20,9 +23,13 @@ logger = logging.getLogger(__name__)
 
 class MinCtrManager:
     @inject
-    def __init__(self, adv: AdvSetting, redis_manager: 'PredictCTRRedisManager' = Provide[
-        PredictCTRManagerContainer.redis_manager
-    ]):
+    def __init__(
+        self,
+        adv: AdvSetting,
+        redis_manager: "PredictCTRRedisManager" = Provide[
+            PredictCTRManagerContainer.redis_manager
+        ],
+    ):
         self._adv = adv
         self._redis_manager = redis_manager
 
@@ -111,7 +118,9 @@ class MinCtrManager:
 
         ctrs = set()
         for text in texts:
-            ctr: float | None = text_to_predict_ctr.get(text, text_to_real_ctr.get(text))
+            ctr: float | None = text_to_predict_ctr.get(
+                text, text_to_real_ctr.get(text)
+            )
             if ctr:
                 ctrs.add(ctr)
         if ctrs:

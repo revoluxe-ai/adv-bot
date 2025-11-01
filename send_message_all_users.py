@@ -62,13 +62,13 @@ async def get_users():
 
                 total_advs += len(advs)
                 active_advs_with_bot += len([adv for adv in advs if adv.bot_active])
-            shop_ids = "; ".join(
+            "; ".join(
                 [
                     wb_user_cabinet.wb_cabinet.shop_id
                     for wb_user_cabinet in wb_user_cabinets
                 ]
             )
-            total_money = total_bonus + total_balance
+            total_bonus + total_balance
             # if  not  wb_user_cabinets:
             yield user
             # continue
@@ -112,7 +112,6 @@ async def send_message_to_users():
                 continue
 
         try:
-            wb_user_cabinets = user.wb_user_cabinets
             await message(bot, user_id)()
             await redis_manager.set_message_send(hash, user_id)
             send_count += 1
