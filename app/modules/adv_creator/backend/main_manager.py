@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Literal, get_args
 from aiogram import Bot
 from aiohttp import ClientSession
 from sqlalchemy import and_, or_, select, update
+from sqlalchemy.dialects.postgresql import insert # Добавляем импорт insert
 from sqlalchemy.orm import load_only
 
 from app.client_bot import const
@@ -104,26 +105,36 @@ class MainAdvManager:
             wb_cabinet_original_id: int = self.access.wb_cabinet.id
             stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
             wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
-            new_adv = AdvSetting()
-            new_adv.adv_id = auto_adv_id
-            new_adv.search_adv_id = search_adv_id
-            new_adv.max_place = 1
-            new_adv.max_cpm = 250
-            new_adv.reset_place = True
-            new_adv.name = complex_adv_name
-            new_adv.bidder_active = False
-            new_adv.wb_cabinet = wb_cabinet
-            new_adv.parsing_active = False
-            new_adv.bot_active = True
-            new_adv.auto_adv_target_status = False
-            new_adv.auto_update_white_list = False
-            new_adv.auto_update_target_place = False
-            new_adv.active_status = "created_by_bot"
-            # TODO: Тут вроде должна быть 9, но не трогаю пока, чтобы не сломать отображение в боте
-            new_adv.type = 8
-            new_adv.nmids = [nmid]
-            new_adv.hard_min_ctr = 0.1
-            session.add(new_adv)
+            
+            # Подготавливаем данные для upsert
+            adv_data = {
+                "adv_id": auto_adv_id,
+                "_search_adv_id": search_adv_id, # Исправлено на _search_adv_id
+                "max_place": 1,
+                "max_cpm": 250,
+                "reset_place": True,
+                "name": complex_adv_name,
+                "bidder_active": False,
+                "wb_cabinet_id": wb_cabinet.id,
+                "parsing_active": False,
+                "bot_active": True,
+                "auto_adv_target_status": False,
+                "auto_update_white_list": False,
+                "auto_update_target_place": False,
+                "active_status": "created_by_bot",
+                "type": 8,
+                "nmids": [nmid],
+                "hard_min_ctr": 0.1,
+            }
+            
+            # Используем INSERT ... ON CONFLICT DO UPDATE
+            insert_stmt = insert(AdvSetting).values(adv_data)
+            on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                index_elements=["adv_id"],  # Уникальный индекс, по которому определяется конфликт
+                set_={k: v for k, v in adv_data.items() if k != "adv_id"}  # Обновляем все поля, КРОМЕ adv_id
+            )
+            
+            await session.execute(on_conflict_stmt)
             await session.commit()
 
         task_update_cpm_auto = self.wb_api.update_cpm(
@@ -304,6 +315,6 @@ class MainAdvManager:
             type_name = ''
         else:
             type_name = 'НеизвестныйТипРК'
-        full_name = f'{nmid} {type_name} {base_name}'[:128]
+        full_name = f"{nmid}{' ' + type_name if type_name else ''} {base_name}"[:128]
         return full_name
 
