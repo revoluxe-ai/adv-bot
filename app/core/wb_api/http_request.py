@@ -10,6 +10,7 @@ import logging
 import re
 import time
 from collections.abc import Awaitable, Callable
+from json import JSONDecodeError
 from typing import (
     Any,
     TypeVar,
@@ -127,7 +128,7 @@ def try_except_decorator(
                     )
                 except Exception as e:
                     raise e
-
+        
         return cast(F, wrapper)
 
     return decorator
@@ -184,8 +185,11 @@ def get_error_from_response(response_text: str) -> Exception:
     """
     Извлекает ошибку из ответа API Wildberries.
     """
-    response_json = json.loads(response_text)
-
+    try:
+        response_json = json.loads(response_text)
+    except JSONDecodeError as e:
+        logger.error('Ошибка декодирования JSON из ответа API Wildberries: "%s"', response_text[:500])
+        raise NotValidDataError("Ответ не является валидным JSON") from e
     match response_json:
         case {
             "errors": [{"detail": detail, "field": field}],
