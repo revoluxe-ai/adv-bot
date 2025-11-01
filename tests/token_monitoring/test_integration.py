@@ -25,7 +25,10 @@ class TestTokenMonitoringIntegration:
     @pytest.fixture
     def mock_session_maker(self):
         """Mock session maker for database operations."""
-        session = AsyncMock()
+        session = AsyncMock(return_value=None)
+        session.execute = AsyncMock(return_value=None)
+        session.add = AsyncMock(return_value=None)
+        session.commit = AsyncMock(return_value=None)
         session_maker = MagicMock()
         session_maker.return_value.__aenter__.return_value = session
         session_maker.return_value.__aexit__.return_value = None
@@ -34,8 +37,8 @@ class TestTokenMonitoringIntegration:
     @pytest.fixture
     def mock_bot(self):
         """Mock Telegram bot."""
-        bot = AsyncMock()
-        bot.send_message = AsyncMock()
+        bot = AsyncMock(return_value=None)
+        bot.send_message = AsyncMock(return_value=None)
         return bot
 
     @pytest.mark.asyncio

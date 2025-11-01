@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiogram import Bot
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.wb_api.data_classes.advs.base_adv import Adv
 from app.core.wb_api.data_classes.advs.other_classes import Balances
@@ -17,9 +18,11 @@ def bot_mock():
 
 
 @pytest.fixture
-def client_session_mock():
-    session = AsyncMock()
-    session.close = MagicMock()
+async def client_session_mock():
+    session = AsyncMock(return_value=None)
+    session.close = AsyncMock(return_value=None)
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=None)
     return session
 
 @pytest.mark.parametrize(
@@ -35,7 +38,7 @@ def client_session_mock():
 )
 @pytest.mark.asyncio
 async def test_create_complex_advs(
-    access_mock, bot_mock, client_session_mock, hard_mode: bool, exist_adv_ids_rows, should_raise: bool
+    access_mock, bot_mock, client_session_mock, hard_mode: bool, exist_adv_ids_rows, should_raise: bool, async_session: AsyncSession
 ):
     user_telegram_id = 122334
     nmid = 112333
@@ -44,9 +47,9 @@ async def test_create_complex_advs(
          patch("app.modules.adv_creator.backend.main_manager.wb_db_manager") as wb_db_manager_mock, \
          patch("app.modules.adv_creator.backend.main_manager.sm") as sm_mock, \
          patch("app.modules.adv_creator.backend.main_manager.asyncio") as asyncio_mock:
-        WBAPI_mock_instance = AsyncMock()
+        WBAPI_mock_instance = AsyncMock(return_value=None)
         WBAPI_mock_class.return_value = WBAPI_mock_instance
-        wb_db_manager_mock.update_cards_in_db = AsyncMock()
+        wb_db_manager_mock.update_cards_in_db = AsyncMock(return_value=None)
         
         # Mock asyncio.gather to simulate successful execution
         asyncio_mock.gather = AsyncMock(return_value=None)
@@ -70,7 +73,7 @@ async def test_create_complex_advs(
         MainAdvManager.get_adv_ids_rows_by_nmid = AsyncMock(
             return_value=exist_adv_ids_rows
         )
-        MainAdvManager.__turn_off_advs = AsyncMock()
+        MainAdvManager.__turn_off_advs = AsyncMock(return_value=None)
         manager = MainAdvManager(access_mock, client_session_mock)
 
         # Mock the WBApi instance methods with AsyncMock
@@ -111,7 +114,7 @@ async def test_create_complex_advs(
 
 @pytest.mark.asyncio
 async def test_create_complex_advs_when_exists(
-    access_mock, adv_setting_mock, bot_mock, client_session_mock
+    access_mock, adv_setting_mock, bot_mock, client_session_mock, async_session: AsyncSession
 ):
     """Тест проверяет, что при существующей РК выбрасывается AdvExistsForNmidError"""
     nmid = 112333
@@ -119,10 +122,14 @@ async def test_create_complex_advs_when_exists(
     adv_setting_mock.active_status = "started"  # РК активна
     adv_setting_mock.adv_id = 25040169
     adv_setting_mock.search_adv_id = 25040170
-    
-    manager = MainAdvManager(access_mock, client_session_mock)
-    manager.get_adv_ids_rows_by_nmid = AsyncMock(return_value=[(25040169, 25040170)])
-    
-    with pytest.raises(AdvExistsForNmidError):
-        await manager.create_complex_advs(bot_mock, user_telegram_id, nmid, hard_mode=False)
+
+    with patch("app.modules.adv_creator.backend.main_manager.WBApi") as WBAPI_mock_class:
+        WBAPI_mock_instance = AsyncMock(return_value=None)
+        WBAPI_mock_class.return_value = WBAPI_mock_instance
+
+        manager = MainAdvManager(access_mock, client_session_mock)
+        manager.get_adv_ids_rows_by_nmid = AsyncMock(return_value=[(25040169, 25040170)])
+
+        with pytest.raises(AdvExistsForNmidError):
+            await manager.create_complex_advs(bot_mock, user_telegram_id, nmid, hard_mode=False)
 

@@ -32,10 +32,10 @@ async def test_create_complex_advs_upsert_logic(
     with patch("app.modules.adv_creator.backend.main_manager.WBApi") as WBAPI_mock_class, \
          patch("app.modules.adv_creator.backend.main_manager.wb_db_manager") as wb_db_manager_mock:
         
-        WBAPI_mock_instance = AsyncMock(retun_value=None)
+        WBAPI_mock_instance = AsyncMock()
         WBAPI_mock_class.return_value = WBAPI_mock_instance
         
-        wb_db_manager_mock.update_cards_in_db = AsyncMock(retun_value=None)
+        wb_db_manager_mock.update_cards_in_db = AsyncMock()
 
         # Mock WBApi calls
         WBAPI_mock_instance.get_adv_balances = AsyncMock(
@@ -45,20 +45,20 @@ async def test_create_complex_advs_upsert_logic(
         mock_card.name = "Тестовая карточка"
         WBAPI_mock_instance.get_card_by_text = AsyncMock(return_value=mock_card)
         WBAPI_mock_instance.add_to_balance = AsyncMock(return_value=1000)
-        WBAPI_mock_instance.update_cpm = AsyncMock(retun_value=None)
+        WBAPI_mock_instance.update_cpm = AsyncMock()
 
         # Сначала имитируем создание auto-кампании
         WBAPI_mock_instance.create_auto_adv = AsyncMock(return_value=auto_adv_id_from_wb)
         WBAPI_mock_instance.create_search_adv = AsyncMock(return_value=search_adv_id_from_wb)
 
         # Создаем мок для асинхронного контекстного менеджера сессии
-        mock_session_context_manager = AsyncMock(retun_value=None)
+        mock_session_context_manager = AsyncMock()
         mock_session_context_manager.__aenter__.return_value = async_session
         mock_session_context_manager.__aexit__.return_value = None
 
         # Мокаем sm, чтобы он возвращал объект, имитирующий асинхронный контекстный менеджер
         def mock_get_async_session_maker(read_only: bool):
-            mock_session_context_manager = AsyncMock(retun_value=None)
+            mock_session_context_manager = AsyncMock()
             mock_session_context_manager.__aenter__.return_value = async_session
             mock_session_context_manager.__aexit__.return_value = None
             return mock_session_context_manager

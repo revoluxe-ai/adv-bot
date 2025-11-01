@@ -23,14 +23,14 @@ class TestTokenExpirationService:
     @pytest.fixture
     def mock_notification_manager(self):
         """Mock notification manager."""
-        manager = AsyncMock()
-        manager.notify_token_issue = AsyncMock()
+        manager = AsyncMock(return_value=None)
+        manager.notify_token_issue = AsyncMock(return_value=None)
         return manager
 
     @pytest.fixture
     def mock_session_maker(self):
         """Mock session maker."""
-        session = AsyncMock()
+        session = AsyncMock(return_value=None)
         session_maker = MagicMock()
         session_maker.return_value.__aenter__.return_value = session
         session_maker.return_value.__aexit__.return_value = None

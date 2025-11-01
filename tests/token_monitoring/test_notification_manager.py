@@ -25,14 +25,14 @@ class TestNotificationManager:
     @pytest.fixture
     def mock_bot(self):
         """Mock Telegram bot."""
-        bot = AsyncMock()
-        bot.send_message = AsyncMock()
+        bot = AsyncMock(return_value=None)
+        bot.send_message = AsyncMock(return_value=None)
         return bot
 
     @pytest.fixture
     def mock_session_maker(self):
         """Mock session maker."""
-        session = AsyncMock()
+        session = AsyncMock(return_value=None)
         session_maker = MagicMock()
         session_maker.return_value.__aenter__.return_value = session
         session_maker.return_value.__aexit__.return_value = None
@@ -314,7 +314,7 @@ class TestNotificationManager:
         with patch(
             "app.modules.token_monitoring.services.notification_manager.NotificationManager"
         ) as mock_manager_class:
-            mock_manager = AsyncMock()
+            mock_manager = AsyncMock(return_value=None)
             mock_manager_class.return_value = mock_manager
 
             await notify_token_deactivation("test_shop_123", context={"test": "data"})
@@ -331,7 +331,7 @@ class TestNotificationManager:
         with patch(
             "app.modules.token_monitoring.services.notification_manager.NotificationManager"
         ) as mock_manager_class:
-            mock_manager = AsyncMock()
+            mock_manager = AsyncMock(return_value=None)
             mock_manager_class.return_value = mock_manager
 
             expiry_date = datetime.datetime.now() + datetime.timedelta(days=3)
@@ -350,7 +350,7 @@ class TestNotificationManager:
         with patch(
             "app.modules.token_monitoring.services.notification_manager.NotificationManager"
         ) as mock_manager_class:
-            mock_manager = AsyncMock()
+            mock_manager = AsyncMock(return_value=None)
             mock_manager_class.return_value = mock_manager
 
             expiry_date = datetime.datetime.now() + datetime.timedelta(days=5)
