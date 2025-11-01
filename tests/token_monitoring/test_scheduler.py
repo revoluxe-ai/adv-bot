@@ -22,7 +22,7 @@ class TestTokenMonitoringScheduler:
     @pytest.fixture
     def mock_expiration_service(self):
         """Mock token expiration service."""
-        service = AsyncMock()
+        service = AsyncMock(return_value=None)
         service.check_token_expiration = AsyncMock(
             return_value={
                 "total_tokens_checked": 10,
@@ -39,7 +39,7 @@ class TestTokenMonitoringScheduler:
     @pytest.fixture
     def mock_notification_manager(self):
         """Mock notification manager."""
-        return AsyncMock()
+        return AsyncMock(return_value=None)
 
     @pytest.fixture
     def scheduler(self, mock_expiration_service, mock_notification_manager):
@@ -63,7 +63,7 @@ class TestTokenMonitoringScheduler:
         check_time = time(10, 30)
 
         with patch("asyncio.create_task") as mock_create_task:
-            mock_task = AsyncMock()
+            mock_task = AsyncMock(return_value=None)
             mock_create_task.return_value = mock_task
 
             await scheduler.start_daily_expiration_check(check_time)
@@ -343,7 +343,7 @@ class TestSchedulerGlobalFunctions:
         with patch(
             "app.modules.token_monitoring.scheduler.get_token_monitoring_scheduler"
         ) as mock_get:
-            mock_scheduler = AsyncMock()
+            mock_scheduler = AsyncMock(return_value=None)
             mock_get.return_value = mock_scheduler
 
             check_time = time(11, 0)
@@ -359,7 +359,7 @@ class TestSchedulerGlobalFunctions:
         with patch(
             "app.modules.token_monitoring.scheduler.get_token_monitoring_scheduler"
         ) as mock_get:
-            mock_scheduler = AsyncMock()
+            mock_scheduler = AsyncMock(return_value=None)
             mock_get.return_value = mock_scheduler
 
             await start_token_monitoring_scheduler()
@@ -374,7 +374,7 @@ class TestSchedulerGlobalFunctions:
         with patch(
             "app.modules.token_monitoring.scheduler.get_token_monitoring_scheduler"
         ) as mock_get:
-            mock_scheduler = AsyncMock()
+            mock_scheduler = AsyncMock(return_value=None)
             mock_get.return_value = mock_scheduler
 
             await stop_token_monitoring_scheduler()
@@ -387,7 +387,7 @@ class TestSchedulerGlobalFunctions:
         with patch(
             "app.modules.token_monitoring.scheduler.get_token_monitoring_scheduler"
         ) as mock_get:
-            mock_scheduler = AsyncMock()
+            mock_scheduler = AsyncMock(return_value=None)
             expected_result = {"checked": 10, "notified": 2}
             mock_scheduler.run_manual_check.return_value = expected_result
             mock_get.return_value = mock_scheduler
@@ -403,7 +403,7 @@ class TestSchedulerGlobalFunctions:
         with patch(
             "app.modules.token_monitoring.scheduler.get_token_monitoring_scheduler"
         ) as mock_get:
-            mock_scheduler = AsyncMock()
+            mock_scheduler = AsyncMock(return_value=None)
             expected_report = {"expiring": 5, "total": 20}
             mock_scheduler.get_expiring_tokens_report.return_value = expected_report
             mock_get.return_value = mock_scheduler
@@ -419,7 +419,7 @@ class TestSchedulerGlobalFunctions:
         with patch(
             "app.modules.token_monitoring.scheduler.get_token_monitoring_scheduler"
         ) as mock_get:
-            mock_scheduler = AsyncMock()
+            mock_scheduler = AsyncMock(return_value=None)
             mock_get.return_value = mock_scheduler
 
             await get_token_expiration_report()
