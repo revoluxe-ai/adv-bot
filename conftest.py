@@ -93,6 +93,7 @@ def adv_setting_mock():
     adv_setting_mock = MagicMock(spec=AdvSetting)
     adv_setting_mock.adv_id = 25040169
     adv_setting_mock.nmids = [222811118]
+    adv_setting_mock.active_status = "started"
     return adv_setting_mock
 
 

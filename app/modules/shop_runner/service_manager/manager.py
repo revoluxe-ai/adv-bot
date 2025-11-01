@@ -125,9 +125,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1 * 60)
     async def update_advs_data_from_wb_to_pg(self) -> None:
-        wb_api = self._wb_api
-        shop_data_updater = ShopDataUpdater(wb_api)
-        await shop_data_updater.update_advs_data()
+        await data_manager.update_advs_data_from_wb_to_pg(self._wb_api)
 
     @staticmethod
     async def _async_zip_longest(
