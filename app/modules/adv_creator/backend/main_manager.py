@@ -204,8 +204,8 @@ class MainAdvManager:
                             AdvSetting._search_adv_id is not None, # noqa E1101
                         ),
                     ),
-
-                    AdvSetting.type in [8, 9]  # Без устаревших типов РК
+                    # TODOД не правильныый синтаксис условий in, ошибка попала в прод
+                    AdvSetting.type.in_([8, 9])  # Без устаревших типов РК
 
                 )
             )
