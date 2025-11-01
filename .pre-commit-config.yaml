@@ -1,23 +1,40 @@
-## Auto-generated minimal pre-commit exclude to skip generated promotion clients
-# This file only adds a global exclude so existing hooks are not modified.
-
-# Regex that matches the directory and its contents
-exclude: '^(?:app/core/mp/wb/_api_client/clients/promotion/generated/|app/core/mp/wb/_api_client/clients/promotion/generated|alembic/versions)(?:/|$)'
-
 repos:
-  - repo: local
+  # ------------------ BLACK ------------------
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
     hooks:
-      - id: mypy
-        name: mypy (poetry)
-        entry: poetry run mypy
-        language: system
-        types: [python]
-        pass_filenames: true
-        args: [--config-file=mypy.ini]
+      - id: black
+        name: black (format)
+        language_version: python3.11
+        args: []
+        stages: [pre-commit]
 
+  # ------------------ RUFF ------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.0
+    rev: v0.6.3
     hooks:
       - id: ruff
-        args: [--fix]
-      - id: ruff-format
+        name: ruff (lint)
+        args: ["--fix", "--exit-non-zero-on-fix"]
+        stages: [pre-commit]
+
+  # ------------------ MYPY ------------------
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        name: mypy (type check)
+        args: ["--strict"]
+        additional_dependencies: ["pydantic"]
+        stages: [pre-commit]
+
+  # ------------------ PYTEST ------------------
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (unit tests)
+        entry: pytest -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
