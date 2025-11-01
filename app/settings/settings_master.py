@@ -222,10 +222,10 @@ class Settings:
         return os.environ.get("POSTGRES_PASSWORD")
 
     @property
-    def ssl_mode(self) -> str | None:
+    def ssl_mode(self) -> str:
         value = os.environ.get("POSTGRES_SSL_MODE")
         if value is None:
-            raise ValueError("POSTGRES_SSL_MODE is not set")
+            return 'disable'
         return value
 
     @property
