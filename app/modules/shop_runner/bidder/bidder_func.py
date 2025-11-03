@@ -176,7 +176,6 @@ async def run_bidder_process_for_adv(
                     raise Exception("Настройки РК не найдены")
                 adv_setting_for_update.max_place = promo_position + 1
                 await session.commit()
-                break
         if new_cpm > max_cpm:
             new_cpm = max_cpm
 
