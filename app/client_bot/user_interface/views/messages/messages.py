@@ -631,11 +631,19 @@ class KeywordSettingMessage(TextWithKeyboard):
             predict_ctr_text = "Не просчитан"
 
         text += f"Прогнозируемый CTR: {predict_ctr_text}\n"
-
-        if self.position:
-            text += f"📈 *Позиция:* {self.position.position}\n"
+        if not self.position:
+            text += "📉 *Позиция не определена*\n"
         else:
-            text += "📉 *Позиция не определена *\n"
+            match self.position.position:
+                case pos if pos > 0:
+                    text += f"📈 *Позиция:* {pos}\n"
+                case 0:
+                    text += "📈 *Позиция:* В индексе, нет на сайте\n"
+                case -1:
+                    text += "📈 *Позиция:* Не индексируется\n"
+                case _:
+                    text += "📉 *Позиция не определена*\n"
+
 
         text += f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n"""
         return text
