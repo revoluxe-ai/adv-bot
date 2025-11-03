@@ -5,8 +5,9 @@ import logging
 import re
 
 from aiogram.client.session import aiohttp
+from sqlalchemy.orm import load_only
 
-from app.modules.common_slaves.wildberries.models import WBItemPosition
+from app.modules.common_slaves.wildberries.models import WBItemPosition, WBCard
 from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager
 
@@ -256,15 +257,15 @@ async def _add_positions_from_page(
     total_pages: TotalPages,
 ) -> tuple[list[WBItemPosition]]:
     if stop_event.is_set():
-        return []
+        return [] # type: ignore
     try:
         positions = await parser.parse_keywords_from_wb(text, page, total_pages)
     except Exception:
         logger.error(f"Ошибка при парсинге страницы {page} ключа {text}", exc_info=True)
         logger.debug(f"{get_parse_url(text, page)}")
-        return []
+        return [] # type: ignore
     if not positions:
-        return []
+        return [] # type: ignore
     catch_any_position.set()
     logger.debug(f"Найдено {len(positions)}")
     if positions:
@@ -280,13 +281,43 @@ async def _add_positions_from_page(
             if not need_nmids:
                 stop_event.set()
                 break
-    return positions
+    return positions # type: ignore
 
 
 async def add_wb_positions(
     text: str, need_nmids: set[int], delay, page_limit=60
 ) -> None:
     await _add_wb_positions(text, set(need_nmids), delay, page_limit)
+
+
+async def __check_index(text, need_nmids: set[int]) -> dict[int, bool]:
+    from sqlalchemy import select
+    from app.utils.db.session_maker import get_async_session_maker as sm
+    stmt = select(WBCard).options(
+        load_only(WBCard.nmid, WBCard.json)
+    ).where(
+        WBCard.nmid.in_(need_nmids),
+    )
+
+    async with sm(read_only=True) as session:
+        result = await session.execute(stmt)
+        wb_cards = result.scalars().all()
+    nmids_to_index: dict[int, bool] = {}
+    for card in  wb_cards:
+        nmid = card.nmid
+        brand = card.brand
+        query = f'{brand} {text}'
+        positions = await parser.parse_keywords_from_wb(
+            query,
+            1,
+            TotalPages()
+        )
+        if positions:
+            nmids_to_index[nmid] = True
+        else:
+            nmids_to_index[nmid] = False
+    return nmids_to_index
+
 
 
 async def _add_wb_positions(
@@ -299,6 +330,20 @@ async def _add_wb_positions(
     parsing_pages_queue: list[int] = await parsing_queue_manager.get_parsing_queue(
         text, need_nmids, 60
     )
+
+    in_indexes: dict[int, bool] = await __check_index(text, need_nmids)
+    not_found_positions = []
+    for nmid, in_index in in_indexes.items():
+        if not in_index:
+            position = WBItemPosition(
+                position=-1,
+                keyword_text=text,
+                timestamp=datetime.datetime.now(),
+                nmid=nmid,
+            )
+            not_found_positions.append(position)
+            need_nmids.discard(nmid)
+
     for page in parsing_pages_queue:
         if page not in total_pages.all_pages_list:
             continue
@@ -326,15 +371,15 @@ async def _add_wb_positions(
         checked_pages.add(page)
         await asyncio.sleep(delay)
 
-    not_found_positions = [
-        WBItemPosition(
+    for nmid in need_nmids:
+        position = WBItemPosition(
             position=0,
             keyword_text=text,
             timestamp=datetime.datetime.now(),
             nmid=nmid,
         )
-        for nmid in need_nmids
-    ]
+        not_found_positions.append(position)
+
     if not_found_positions:
         await add_wb_positions_to_redis(not_found_positions)
     return

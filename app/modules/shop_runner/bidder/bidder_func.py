@@ -101,97 +101,102 @@ async def run_bidder_process_for_adv(
         return
 
     white_keywords = [kw for kw in keywords if kw.hard_status == 2]
-    best_keyword = data_manager.get_best_keyword(white_keywords)
-
-    if not (adv_setting.nmids and best_keyword):
-        logger.error(f"[{shop_id}] [{adv_id}] Нет ключа в белом списке или артикулов")
-        return
-
-    text = best_keyword.text
-    nmid = int(adv_setting.nmids[0])
-
-    try:
-        logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
-        await parser.add_wb_positions(text, {nmid}, delay=0.1)
-    except Exception:
-        logger.error(
-            f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
-        )
-        return
-
-    try:
-        logger.debug(f"[{shop_id}] [{adv_id}] Получение ставок для биддера")
+    if not white_keywords:
+        logger.warning("[%s] [%s ] Нет ключей в белом списке", shop_id, adv_id)
+        return None
+    for keyword in keywords:
+        text = keyword.text
+        nmid = int(adv_setting.nmids[0])
         try:
-            cpms: set[int] | None = await get_cpms_from_wb(
-                advs_from_wb_with_active_company
-            )
-        except Exception as exc:
+            logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
+            await parser.add_wb_positions(text, {nmid}, delay=1)
+        except Exception:
             logger.error(
-                f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True
+                f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
             )
-            raise exc
-    except ApiForbiddenError as e:
-        raise e
-    except Exception:
-        logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
-        return
+            continue
 
-    if not cpms:
-        logger.error(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
-        return
+        try:
+            logger.debug(f"[{shop_id}] [{adv_id}] Получение ставок для биддера")
+            try:
+                cpms: set[int] | None = await get_cpms_from_wb(
+                    advs_from_wb_with_active_company
+                )
+                cmp_now = max(cpms) if cpms else None
+            except Exception as exc:
+                logger.error(
+                    f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True
+                )
+                raise exc
+        except ApiForbiddenError as e:
+            raise e
+        except Exception:
+            logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
+            continue
 
-    try:
-        logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
-        wb_position: WBItemPosition = await redis_manager.get_keyword_position(
-            text, nmid
-        )
-    except Exception:
-        logger.error(
-            f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
-        )
-        return
+        if not cpms:
+            logger.error(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
+            return
 
-    if not wb_position or wb_position.position is None:
-        logger.error(
-            f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции"
-        )
-        return
-
-    promo_position = wb_position.position
-    if promo_position <= max_position or promo_position == 1:
-        new_cpm: int = min(cpms) - step
-    else:
-        new_cpm = max(cpms) + step
-    adv_param_manager = AdvParameterManager()
-    min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
-    new_cpm = max(min(new_cpm, max_cpm), min_cpm)
-
-    if new_cpm >= max_cpm and adv_setting.reset_place:
-        async with sm(read_only=False) as session:
-            assert adv_setting
-            adv_setting_for_update: AdvSetting | None = await session.get(
-                AdvSetting, adv_setting.id
+        try:
+            logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
+            wb_position: WBItemPosition = await redis_manager.get_keyword_position(
+                text, nmid
             )
-            if adv_setting_for_update is None:
-                logger.error(f"[{shop_id}] [{adv_id}] Настройки РК не найдены")
-                raise Exception("Настройки РК не найдены")
-            adv_setting_for_update.max_place = promo_position + 1
-            await session.commit()
+        except Exception:
+            logger.error(
+                f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
+            )
+            continue
 
-    if adv_setting.bidder_for_auto:
-        auto_adv_id = int(adv_setting.adv_id)
-        assert auto_adv_id is not None
-        await wb_api.update_cpm(
-            auto_adv_id,
-            nmid,
-            new_cpm,
-        )
+        if not wb_position or wb_position.position is None:
+            logger.error(
+                f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции"
+            )
+            continue
+        promo_position: int = wb_position.position
+        if promo_position == -1:
+            continue
+        if 0 < promo_position <= max_position:
+            new_cpm: int = min(cpms) - step
+        else:
+            new_cpm = max(cpms) + step
+        adv_param_manager = AdvParameterManager()
+        min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
+        new_cpm = max(min(new_cpm, max_cpm), min_cpm)
 
-    if adv_setting.search_adv_id:
-        await wb_api.update_cpm(
-            adv_setting.search_adv_id,
-            nmid,
-            new_cpm,
-        )
+        if new_cpm >= max_cpm and adv_setting.reset_place:
+            async with sm(read_only=False) as session:
+                assert adv_setting
+                adv_setting_for_update: AdvSetting | None = await session.get(
+                    AdvSetting, adv_setting.id
+                )
+                if adv_setting_for_update is None:
+                    logger.error(f"[{shop_id}] [{adv_id}] Настройки РК не найдены")
+                    raise Exception("Настройки РК не найдены")
+                adv_setting_for_update.max_place = promo_position + 1
+                await session.commit()
+                break
+        if new_cpm > max_cpm:
+            new_cpm = max_cpm
 
-    logger.debug(f"[{shop_id}] [{adv_id}] Ставки обновлены")
+        if new_cpm != cmp_now:
+            if adv_setting.bidder_for_auto:
+                auto_adv_id = int(adv_setting.adv_id)
+                assert auto_adv_id is not None
+                await wb_api.update_cpm(
+                    auto_adv_id,
+                    nmid,
+                    new_cpm,
+                )
+
+            if adv_setting.search_adv_id:
+                await wb_api.update_cpm(
+                    adv_setting.search_adv_id,
+                    nmid,
+                    new_cpm,
+                )
+
+        logger.debug(f"[{shop_id}] [{adv_id}] Ставки обновлены")
+        break
+    return None
