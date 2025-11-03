@@ -534,7 +534,7 @@ def get_keywords_setting_keyboard(
             text += "🟢"
         text += f"""{clicks}/{views}/{round(ctr * 100, 2)}%"""
         text += "|"
-        if keyword.position:
+        if keyword.position and keyword.position != -1:
             text += f"{keyword.position}"
         elif keyword.position == 0:
             text += ">>>"
