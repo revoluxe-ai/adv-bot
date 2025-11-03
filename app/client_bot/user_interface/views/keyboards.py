@@ -537,6 +537,8 @@ def get_keywords_setting_keyboard(
         if keyword.position:
             text += f"{keyword.position}"
         elif keyword.position == 0:
+            text += ">>>"
+        elif keyword.position == -1:
             text += ">i"
         else:
             text += "?"  # TODO: Проверить логику: кажется позиция не может быть None
