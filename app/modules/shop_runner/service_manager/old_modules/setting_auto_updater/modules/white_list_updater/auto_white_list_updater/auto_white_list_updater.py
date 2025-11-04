@@ -37,6 +37,8 @@ class WhiteListUpdateManager:
         self,
         keywords: list[CalculatedKeyword],
     ) -> tuple[bool, bool]:
+        if not self._adv.auto_update_white_list:
+            return False, False
         redis_cache = self.redis_cache
         pass_time = 60 * 15
         if not await redis_cache.last_auto_delete_white_list.check_pass_time(pass_time):
@@ -68,6 +70,8 @@ class WhiteListUpdateManager:
     async def add_phrase_to_white_list(
         self, keywords: list[CalculatedKeyword]
     ) -> tuple[bool, bool]:
+        if not self._adv.auto_update_white_list:
+            return False, False
         redis_cache = self.redis_cache
         pass_time = 60 * 15
         if not await redis_cache.last_auto_adding_phrase_to_white_list.check_pass_time(

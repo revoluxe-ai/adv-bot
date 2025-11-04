@@ -22,6 +22,8 @@ class TargetPlaceUpdater:
             await session.refresh(self._adv, attribute_names=[AdvSetting.max_place])  # type: ignore[list-item]
 
     async def set_up(self) -> tuple[bool, bool]:
+        if not self._adv.auto_update_target_place:
+            return False, False
         pass_time = 15 * 60
         last_set_up_target_place = LastSetUpTargetPlace(self._adv)
         if not await last_set_up_target_place.check_pass_time(pass_time):
@@ -51,6 +53,8 @@ class TargetPlaceUpdater:
         return False, True
 
     async def set_down(self) -> tuple[bool, bool]:
+        if not self._adv.auto_update_target_place:
+            return False, False
         pass_time = 15 * 60
         last_set_down_target_place = LastSetDownTargetPlace(self._adv)
         if not await last_set_down_target_place.check_pass_time(pass_time):
