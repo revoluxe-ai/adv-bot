@@ -138,7 +138,6 @@ async def get_keywords_statistic_clickhouse(
             )
             keywords.append(keyword)
 
-    keywords = await redis_manager.set_predict_ctrs(adv_setting.adv_id, keywords)
     return keywords
 
 
