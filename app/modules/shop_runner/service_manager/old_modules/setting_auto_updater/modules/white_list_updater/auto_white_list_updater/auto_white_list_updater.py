@@ -17,38 +17,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# def raise_exception() -> (
-#     Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[T]]]
-# ):
-#     def decorator(
-#         func: Callable[..., Awaitable[T]],
-#     ) -> Callable[..., Awaitable[T]]:
-#         @wraps(func)
-#         async def wrapper(*args: Any, **kwargs: Any) -> T:
-#             try:
-#                 return await func(*args, **kwargs)
-#             except Exception as e:
-#                 logger.error(
-#                     f"Ошибка корутины: {func.__name__}. Ошибка: {e}", exc_info=True
-#                 )
-#                 raise AutoUpdateWhiteListFatalError from e
-#
-#         return wrapper
-#
-#     return decorator
-
-
-#
-# def _get_max_spend_diff(adv: AdvSetting) -> float:
-#     max_pay_for_order: int = adv.max_price_for_order
-#     if not max_pay_for_order:
-#         raise AutoUpdateWhiteListFatalError(
-#             "Не установлена максимальная стоимость заказа"
-#         )
-#     return max_pay_for_order * 0.1
-#
-
-
 class WhiteListUpdateManager:
     """
     Класс отвечает за последовательное удаление ключей из белого списка при перерасходе.
