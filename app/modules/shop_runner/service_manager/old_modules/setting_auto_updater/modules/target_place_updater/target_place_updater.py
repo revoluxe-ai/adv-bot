@@ -35,8 +35,7 @@ class TargetPlaceUpdater:
         new_target_place = target_place - 1
         if new_target_place < 1:
             new_target_place = 1
-        if new_target_place < 1:
-            new_target_place = 1
+
         elif new_target_place > 30:
             new_target_place = 30
         if new_target_place != target_place:
