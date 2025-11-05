@@ -19,10 +19,6 @@ def client_session_mock() -> AsyncMock:
     return session
 
 
-class TestWBApi(BaseAPI, ContentMixin):
-    PREFIX = PREFIX
-
-
 @pytest.mark.skip(reason="Какая-то проблема с получением мока TestWBApi")
 @pytest.mark.asyncio
 async def test_get_card_by_text_success(access_mock, client_session_mock) -> None:
