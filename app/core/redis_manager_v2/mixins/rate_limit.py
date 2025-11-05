@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         def _get_key(self, ip: str) -> str: ... # Add _get_key to the protocol
     
     # Use TypeAlias for better readability and to combine types for self
-    _SelfType: TypeAlias = type[BaseRedisManager | _RateLimitProto]
+    _SelfType: TypeAlias = BaseRedisManager | _RateLimitProto
 
 else:
     _SelfType = "BaseRedisManager"
