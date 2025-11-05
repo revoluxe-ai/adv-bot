@@ -54,10 +54,12 @@ async def parsing_keywords_for_adv_generator(
     def get_parsing_limit() -> int:
         """Лимит на количество ключевых слов для парсинга за один заход."""
         positions_in_index = []
-        for ps in keywords_result:
-            base = ps.position
-            if base != -1:
-                positions_in_index.append(base)
+        for ps in keywords_with_positions:
+            if ps.position is None:
+                raise  RuntimeError("position не может быть None здесь")
+            position_ = ps.position
+            if position_ != -1:
+                positions_in_index.append(position_)
         limit = max([len(positions_in_index), 1])
         return limit
 
@@ -65,26 +67,23 @@ async def parsing_keywords_for_adv_generator(
     for keyword in sorted_keywords[:parsing_limit]:
         text = keyword.text
         views_now = keyword.views
-
         last_position = last_positions.get(text)
         last_views = await redis_manager.get_last_views(adv_id, text)
-
         should_parse = False
-
         if last_views is None:
             last_views = views_now
         if not last_position:
             await redis_manager.set_last_views(adv_id, text, views_now)
-            should_parse = True
+            should_parse = True          
         elif views_now == 0:
             continue
         elif views_now - last_views > settings.MIN_DIFF_VIEWS_FOR_PARSING_KEYWORDS:
             should_parse = True
         elif last_position.position == 0 and (views_now != last_views):
             should_parse = True
-        elif last_position.timestamp < now - timedelta(hours=max_hours_period):
+        elif last_position and last_position.timestamp \
+            and last_position.timestamp < now - timedelta(hours=max_hours_period):
             should_parse = True
-
         if should_parse:
             await redis_manager.set_last_views(adv_id, text, views_now)
             yield text, nmid
