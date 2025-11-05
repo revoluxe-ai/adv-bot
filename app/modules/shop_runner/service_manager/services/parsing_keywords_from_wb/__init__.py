@@ -57,7 +57,7 @@ async def parsing_keywords_for_adv_generator(
         positions_in_index = []
         for ps in keywords_with_positions:
             base = ps.position
-            if base:
+            if base != -1:
                 positions_in_index.append(base)
         limit = max([len(positions_in_index), 1])
         return limit
