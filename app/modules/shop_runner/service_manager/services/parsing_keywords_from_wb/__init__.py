@@ -39,9 +39,8 @@ async def parsing_keywords_for_adv_generator(
     keywords_without_positions: list[CalculatedKeyword] = []
 
     for keyword in keywords_result:
-        last_position = await redis_manager.get_keyword_position(keyword.text, nmid)
-        if last_position:
-            last_positions[keyword.text] = last_position
+        position = keyword.position
+        if position is not None:
             keywords_with_positions.append(keyword)
         else:
             keywords_without_positions.append(keyword)
@@ -55,7 +54,7 @@ async def parsing_keywords_for_adv_generator(
     def get_parsing_limit() -> int:
         """Лимит на количество ключевых слов для парсинга за один заход."""
         positions_in_index = []
-        for ps in keywords_with_positions:
+        for ps in keywords_result:
             base = ps.position
             if base != -1:
                 positions_in_index.append(base)
