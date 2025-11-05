@@ -1,0 +1,13 @@
+{
+  "typeCheckingMode": "strict",
+  "include": ["app"],
+  "exclude": ["tests", ".venv", "migrations"],
+  "reportUnusedCallResult": "error",
+  "reportMissingTypeStubs": "none",
+  "reportUnknownVariableType": "warning",
+  "reportUnknownParameterType": "warning",
+  "reportUnknownMemberType": "warning",
+  "pythonVersion": "3.11",
+  "venvPath": ".",
+  "venv": ".venv"
+}
