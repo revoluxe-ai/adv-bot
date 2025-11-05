@@ -21,6 +21,7 @@ T = TypeVar("T")
 
 
 #  TODO Сделать отправку ошибок  из кубера в телегу
+# TODO: Инспектор Pycharm пишет, что cast-ы здесь не нужны, пока просто отключил инспецию, оставил только синтаксис
 
 def ensure_awaitable(obj: Awaitable[T] | T) -> Awaitable[T]:
     if hasattr(obj, "__await__"):
