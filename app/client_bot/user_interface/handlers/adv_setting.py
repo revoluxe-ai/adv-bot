@@ -232,7 +232,7 @@ async def turn_adv_on(
         result = await session.execute(stmt)
         adv: AdvSetting = result.scalar()
         assert adv
-        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
+        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet # type: ignore[attr-defined]
         tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
             session, wb_cabinet.shop_id
         )
