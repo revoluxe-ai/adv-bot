@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 async def get_cpms_from_wb(advs: list[AuctionAdv]) -> set[int] | None:
-    return {adv.cpm for adv in advs if adv.cpm}
+    cpms = {adv.cpm for adv in advs if adv.cpm is not None}
+    return cpms if cpms else None
 
 
 async def _update_and_get_advs_from_wb(
