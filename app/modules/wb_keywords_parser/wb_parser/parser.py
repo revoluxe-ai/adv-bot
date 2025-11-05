@@ -70,12 +70,11 @@ class ParserService:
 
                  ):
         self._rate_limit_manager = rate_limit_manager
-        self._parse_with_rate_limit = None
-        if rate_limit_manager is not None:
+
             # Применяем декоратор rate limiting к методу парсинга
-            self._parse_with_rate_limit = rate_limited_request(rate_limit_manager)(
-                self._parse_keywords_from_wb_impl
-            )
+        self._parse_with_rate_limit = rate_limited_request(rate_limit_manager)(
+            self._parse_keywords_from_wb_impl
+        )
 
     async def parse_keywords_from_wb(
         self, text: str, page: int, total_pages: TotalPages
