@@ -53,7 +53,7 @@ async def parsing_keywords_for_adv_generator(
         positions_in_index = []
         for ps in keywords_with_positions:
             if ps.position is None:
-                raise  RuntimeError("position не может быть None здесь")
+                raise RuntimeError("position не может быть None здесь")
             position_ = ps.position
             if position_ != -1:
                 positions_in_index.append(position_)
