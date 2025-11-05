@@ -25,14 +25,14 @@ This is a Python-based advertising bot application built with FastAPI, aiogram (
 poetry install
 
 # Activate virtual environment
-poetry shell
+poetry env activate
 ```
 
 ### Running Linters and Type Checkers
 
 ```bash
-# Run ruff linter (with auto-fix)
-poetry run ruff check --fix .
+# Run ruff linter
+poetry run ruff check .
 
 # Run ruff formatter
 poetry run ruff format .
@@ -239,7 +239,7 @@ Do not modify files in these directories (they are auto-generated):
 
 ## Before Submitting Changes
 
-1. Run linters: `poetry run ruff check --fix .`
+1. Run linters: `poetry run ruff check .`
 2. Run type checker: `poetry run mypy --config-file=mypy.ini .`
 3. Run tests: `poetry run pytest`
 4. Verify pre-commit hooks pass: `poetry run pre-commit run --all-files`
