@@ -2,6 +2,8 @@ import logging
 import random
 from collections import OrderedDict
 
+
+# TODO Более тщательно продумать логику задержек при парсинге
 from app.modules.common_slaves.wildberries.models import WBItemPosition
 from app.modules.wb_keywords_parser.parsing_found_redis_manager import (
     ParsingFoundRedisManager,
@@ -83,3 +85,5 @@ class ParsingQueueManager:
             final_queue.extend(missing_pages)
 
         return final_queue
+
+

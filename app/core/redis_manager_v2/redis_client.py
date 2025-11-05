@@ -155,6 +155,24 @@ class RedisClient(ABC):
             bool, await ensure_awaitable(self._replica_write_client.expire(key, time))
         )
 
+    async def pexpire(self, key: str, time_ms: int) -> bool | None:
+        result =  await ensure_awaitable(self._replica_write_client.pexpire(key, time_ms))
+        if isinstance(result, int):
+            if result == 1:
+                return True
+            else:
+                return False
+        else:
+            return None
+
+
+
+    async def ttl(self, key: str) -> int:
+        return cast(int, await ensure_awaitable(self._replica_read_client.ttl(key)))
+
+    async def pttl(self, key: str) -> int:
+        return cast(int, await ensure_awaitable(self._replica_read_client.pttl(key)))
+
     async def hset(self, name: str, key: str, value: str | bytes) -> int:
         if isinstance(value, bytes):
             safe_val: str = value.decode("utf-8", "ignore")

@@ -10,7 +10,7 @@ from app.modules.shop_runner.modules.max_auto_bid_manager.di import AutoMaxCpmCo
 from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
     PredictCTRManagerContainer,
 )
-
+from app.modules.wb_keywords_parser.di import WBKeywordsParserContainer
 
 class ModuleResources(containers.DeclarativeContainer):
     """Содержит DI-контейнеры всех модулей приложения."""
@@ -29,6 +29,11 @@ class ModuleResources(containers.DeclarativeContainer):
             PredictCTRManagerContainer,
             redis_client_wrapper=redis_client_wrapper,
         )
+    )
+
+    wb_keywords_parser = providers.Container(
+        WBKeywordsParserContainer,
+        redis_client_wrapper=redis_client_wrapper,
     )
 
     auto_max_cpm_manager = providers.Container(
