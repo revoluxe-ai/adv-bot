@@ -2,7 +2,9 @@
 
 import os
 from collections.abc import AsyncGenerator
-
+import asyncio
+from unittest.mock import MagicMock, AsyncMock
+from app.core.di import AppContainer
 import aiofiles
 from dependency_injector import containers
 
@@ -457,9 +459,7 @@ async def front_too_many_requests_str() -> AsyncGenerator[str]:
         yield content
 
 
-import asyncio
-from unittest.mock import MagicMock, AsyncMock
-from app.core.di import AppContainer
+
 
 
 
