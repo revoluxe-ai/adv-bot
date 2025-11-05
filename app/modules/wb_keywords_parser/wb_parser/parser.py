@@ -385,11 +385,18 @@ async def add_wb_positions(
     return positions
 
 @inject
-async def __check_index(text,
-                        need_nmids: set[int],
-                        ) -> dict[int, bool]:
+async def __check_index(
+    text: str,
+    need_nmids: set[int],
+    parser: ParserService = Provide['module_resources.wb_keywords_parser.parser_service']
+) -> dict[int, bool]:
+    """
+    Проверяет, находятся ли товары в индексе по запросу "бренд + текст".
+    Использует только первую страницу результатов для эффективности.
+    """
     from sqlalchemy import select
     from app.utils.db.session_maker import get_async_session_maker as sm
+
     stmt = select(WBCard).options(
         load_only(WBCard.nmid, WBCard.json)
     ).where(
