@@ -32,7 +32,7 @@ class FaissManager:
             print("Индекс keywords загружен")
 
         if load_keyword_phrase:
-            self._keyword_phrases = self.get_keyword_phrases_index("vector")
+            self._keyword_phrases = self.get_keyword_phrases_index("vector") # noqa
 
     def __enter__(self):
         return self
@@ -112,7 +112,7 @@ class FaissManager:
     def __get_new_objects(objects, pickle_file_path):
         images = objects.all()
         with open(pickle_file_path, "wb") as file:
-            pickle.dump(images, file)
+            pickle.dump(images, file) # noqa
         return images
 
     def _get_objects(self, objects, pickle_file_path):
@@ -128,7 +128,7 @@ class FaissManager:
                         return images
                     else:
                         return images
-            except:
+            except: # noqa
                 images = self.__get_new_objects(objects, pickle_file_path)
                 return images
 

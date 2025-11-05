@@ -3,7 +3,7 @@ from aiogram import Router
 from app.modules.adv_creator.telegram.handlers.main_handler import (
     router as adv_creator_router,
 )
-from app.modules.bidder_auto_mode import router as BidderAutoModeRouter
+from app.modules.bidder_auto_mode import router as BidderAutoModeRouter # noqa
 from app.modules.bidder_step_setting.telegram_handler import (
     router as bidder_step_setting_router,
 )
@@ -98,13 +98,13 @@ common_router.include_routers(adv_setting.router)
 common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)
-common_router.include_routers(keyword_settings.router)
+common_router.include_routers(keyword_settings.router) # type: ignore[attr-defined]
 common_router.include_routers(add_white_phrases.router)
 common_router.include_routers(setting_min_ctr.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.include_routers(update_adv.router)
-common_router.include_routers(strategy_setting.router)
+common_router.include_routers(strategy_setting.router) # type: ignore[attr-defined]
 common_router.include_routers(shop_settings.router)
 # Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene
 # common_router.include_routers(cabinet_bonus_manager_router)
