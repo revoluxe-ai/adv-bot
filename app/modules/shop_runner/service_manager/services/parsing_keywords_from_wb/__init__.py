@@ -27,7 +27,7 @@ async def parsing_keywords_for_adv_generator(
 
     """
     keywords_result = await keywords
-    if not keywords:
+    if not keywords_result:
         logger.error(f"Нет ключевых для кампании {adv.adv_id}")
         return
     nmid = int(adv.nmids[0])
