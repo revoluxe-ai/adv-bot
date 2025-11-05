@@ -11,6 +11,16 @@ from redis.asyncio.client import Pipeline
 
 T = TypeVar("T")
 
+# TODO: Внедрить проверку на циклические импорты
+
+
+# TODO: Сделать, чтобы парсер обновлял только РК, где started и включена Аукцион
+
+
+# TODO Сделать HELM-chart
+
+
+#  TODO Сделать отправку ошибок  из кубера в телегу
 
 def ensure_awaitable(obj: Awaitable[T] | T) -> Awaitable[T]:
     if hasattr(obj, "__await__"):
