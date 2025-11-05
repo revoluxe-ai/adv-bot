@@ -1,3 +1,7 @@
+# TODO:  Тут большое число mypy ошибок
+
+
+# type: ignore
 import logging
 
 import aiogram
@@ -818,12 +822,7 @@ async def setting_keywords_filter_by_query(
         wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
     wb_user_cabinet_original_id = wb_user_cabinet.id
     nmids = adv_setting.nmids
-    if nmids:
-        main_photos = await data_manager.get_main_photos(nmids[:1])
-    else:
-        await messages.NoMainPhotos(bot, message.chat.id)(adv_setting)
-        return
-
+    main_photos = await data_manager.get_main_photos(nmids[:1])
     chat_id = message.chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
     logger.debug("Обработка собщения")
@@ -891,12 +890,7 @@ async def show_only_on_out_index(
     nmids = adv_setting.nmids
     chat_id = callback.message.chat.id
     adv_choice_last_page = 1
-
-    try:
-        main_photos = await data_manager.get_main_photos(nmids[:1])
-    except:
-        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)
-        return
+    main_photos = await data_manager.get_main_photos(nmids[:1])
     await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(
         bot,

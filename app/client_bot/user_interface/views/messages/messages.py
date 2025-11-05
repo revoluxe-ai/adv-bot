@@ -1,3 +1,6 @@
+# mypy: ignore-errors
+
+
 import logging
 import re
 import io

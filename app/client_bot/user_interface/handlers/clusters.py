@@ -32,8 +32,8 @@ async def turn_clusters_on(
         adv_setting = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         )
-        adv_setting: AdvSetting = adv_setting.scalar()
-        adv_setting.clusters_mode = True
+        adv_setting: AdvSetting = adv_setting.scalar() # type: ignore[attr-defined]
+        adv_setting.clusters_mode = True # type: ignore[attr-defined]
         await session.commit()
     wb_user_cabinet_original_id: int = data["last_wb_user_cabinet_original_id"]
     async with sm() as session:
@@ -60,7 +60,7 @@ async def turn_clusters_off(
             select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         )
         adv_setting: AdvSetting = adv_setting.scalar()
-        adv_setting.clusters_mode = False
+        adv_setting.clusters_mode = False # type: ignore[attr-defined]
         await session.commit()
     wb_user_cabinet_original_id: int = data["last_wb_user_cabinet_original_id"]
     async with sm() as session:

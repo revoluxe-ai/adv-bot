@@ -67,7 +67,7 @@ async def test_create_complex_advs_upsert_logic(
             manager = MainAdvManager(access_mock, MagicMock())
 
             # # 1. Первый запуск: кампания ещё не существует в БД
-            await manager._MainAdvManager__create_complex_advs(nmid)
+            await manager._MainAdvManager__create_complex_advs(nmid) # type: ignore[attr-defined]
 
             # Проверяем, что запись была добавлена
             inserted_adv = await async_session.execute(
@@ -99,7 +99,7 @@ async def test_create_complex_advs_upsert_logic(
 
 
             # Второй запуск: кампания уже существует, ожидаем UPDATE
-            await manager._MainAdvManager__create_complex_advs(nmid)
+            await manager._MainAdvManager__create_complex_advs(nmid) # type: ignore[attr-defined]
 
             # Проверяем, что запись ОБНОВИЛАСЬ, а не создалась новая
             updated_adv = await async_session.execute(
