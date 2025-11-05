@@ -99,7 +99,7 @@ python create_adv.py
 ### Ruff Configuration
 
 The project uses ruff for linting with these key rules:
-- Excludes: `alembic/versions`, `k8s/*`, `tests/*`, and generated promotion clients
+- Excludes: `app/core/mp/wb/_api_client/clients/promotion/generated/`, `alembic/versions`, `k8s/*`, `tests/*`
 - Ignores: F821 (undefined name), F401 (unused imports in `__init__.py`)
 - Per-file ignores: E722, F841 in test files
 
@@ -156,8 +156,8 @@ async def test_example_async_function():
 ### Circular Import Testing
 
 - All entry points must be tested for circular imports
-- Entry points listed in `app/docks/entry_points.md`
-- Add new entry points to `tests/test_circular_imports.py`
+- Entry points listed in `docs/entry_points.md` and in the `ENTRY_POINTS` list in `tests/test_circular_imports.py`
+- Add new entry points to both `docs/entry_points.md` and `tests/test_circular_imports.py`
 
 ## Dependency Management
 
@@ -206,7 +206,7 @@ The project uses `dependency-injector` for DI patterns. Follow existing containe
 ## Documentation
 
 - Update `README.md` for user-facing changes
-- Update relevant docs in `app/docks/` for internal documentation
+- Update relevant docs in `docs/` and `docks/` directories for internal documentation
 - Use docstrings for all public functions and classes
 - Follow Google-style docstrings
 
