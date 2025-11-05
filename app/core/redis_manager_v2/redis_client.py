@@ -114,10 +114,18 @@ class RedisClient:
         )
 
     # Методы для записи (через мастер)
-    async def set(self, key: str, value: str | bytes, ex: int | None = None) -> bool:
+    async def set(
+        self,
+        key: str,
+        value: str | bytes,
+        ex: int | None = None,
+        px: int | None = None,
+    ) -> bool:
         return cast(
             bool,
-            await ensure_awaitable(self._replica_write_client.set(key, value, ex=ex)),
+            await ensure_awaitable(
+                self._replica_write_client.set(key, value, ex=ex, px=px)
+            ),
         )
 
     async def set_if_not_exists(
