@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 # TODO: включить проверку РК: обновлять только если РК активна и не приостановлена
 
 
-async def get_cpms_from_wb(advs: list[AdvSetting]) -> set[int] | None:
-    return {adv.cpm for adv in advs}
+async def get_cpms_from_wb(advs: list[AuctionAdv]) -> set[int] | None:
+    return {adv.cpm for adv in advs if adv.cpm}
 
 
 async def _update_and_get_advs_from_wb(
