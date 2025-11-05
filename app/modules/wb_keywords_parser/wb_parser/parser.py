@@ -380,7 +380,7 @@ async def __check_index(
 ) -> dict[int, bool]:
     """
     Проверяет, находятся ли товары в индексе по запросу "бренд + текст".
-    Использует только первую страницу результатов для эффективности.
+    Проверяет до 60 страниц, прерывая поиск при нахождении нужного артикула.
     """
     from sqlalchemy import select
     from app.utils.db.session_maker import get_async_session_maker as sm
@@ -396,18 +396,25 @@ async def __check_index(
         wb_cards = result.scalars().all()
     
     nmids_to_index: dict[int, bool] = {}
-    total_pages = TotalPages()
     
     for card in wb_cards:
         nmid = card.nmid
         brand = card.brand
         query = f'{brand} {text}'
+        found = False
         
-        # Проверяем только первую страницу для определения наличия в индексе
+        # Проверяем до 60 страниц, прерывая при нахождении артикула
         try:
-            positions = await parser.parse_keywords_from_wb(query, 1, total_pages)
-            # Проверяем, найден ли наш nmid в результатах
-            found = any(pos.nmid == nmid for pos in positions)
+            total_pages = TotalPages()
+            for page in range(1, 61):
+                positions = await parser.parse_keywords_from_wb(query, page, total_pages)
+                # Проверяем, найден ли наш nmid в результатах
+                if any(pos.nmid == nmid for pos in positions):
+                    found = True
+                    break
+                # Прерываем, если достигли максимальной страницы
+                if page >= total_pages.total_pages:
+                    break
             nmids_to_index[nmid] = found
         except Exception as e:
             logger.warning(f"Ошибка при проверке индекса для nmid {nmid}, query '{query}': {e}")
