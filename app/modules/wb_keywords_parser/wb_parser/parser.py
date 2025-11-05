@@ -65,10 +65,7 @@ def get_parse_url(text: str, page: int) -> str:
 
 class ParserService:
 
-    def __init__(self, rate_limit_manager = Provide['module_resources.wb_keywords_parser.rate_limit_manager'],
-
-
-                 ):
+    def __init__(self, rate_limit_manager=Provide['module_resources.wb_keywords_parser.rate_limit_manager']):
         self._rate_limit_manager = rate_limit_manager
         self._parse_with_rate_limit = None
         if rate_limit_manager is not None:
