@@ -373,11 +373,18 @@ async def add_wb_positions(
     return positions
 
 @inject
-async def __check_index(text,
-                        need_nmids: set[int],
-                        ) -> dict[int, bool]:
+async def __check_index(
+    text: str,
+    need_nmids: set[int],
+    parser: ParserService = Provide['module_resources.wb_keywords_parser.parser_service']
+) -> dict[int, bool]:
+    """
+    Проверяет, находятся ли товары в индексе по запросу "бренд + текст".
+    Использует только первую страницу результатов для эффективности.
+    """
     from sqlalchemy import select
     from app.utils.db.session_maker import get_async_session_maker as sm
+    
     stmt = select(WBCard).options(
         load_only(WBCard.nmid, WBCard.json)
     ).where(
@@ -387,20 +394,26 @@ async def __check_index(text,
     async with sm(read_only=True) as session:
         result = await session.execute(stmt)
         wb_cards = result.scalars().all()
+    
     nmids_to_index: dict[int, bool] = {}
-    for card in  wb_cards:
+    total_pages = TotalPages()
+    
+    for card in wb_cards:
         nmid = card.nmid
         brand = card.brand
         query = f'{brand} {text}'
-        positions = await _get_wb_positions(
-            query,
-            {nmid},
-            0.1,
-      60)
-        if positions:
-            nmids_to_index[nmid] = True
-        else:
+        
+        # Проверяем только первую страницу для определения наличия в индексе
+        try:
+            positions = await parser.parse_keywords_from_wb(query, 1, total_pages)
+            # Проверяем, найден ли наш nmid в результатах
+            found = any(pos.nmid == nmid for pos in positions)
+            nmids_to_index[nmid] = found
+        except Exception as e:
+            logger.warning(f"Ошибка при проверке индекса для nmid {nmid}, query '{query}': {e}")
+            # В случае ошибки считаем, что товар не в индексе
             nmids_to_index[nmid] = False
+    
     return nmids_to_index
 
 
