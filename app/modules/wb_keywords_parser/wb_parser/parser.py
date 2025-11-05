@@ -415,6 +415,8 @@ async def __check_index(
                 # Прерываем, если достигли максимальной страницы
                 if page >= total_pages.total_pages:
                     break
+                # Небольшая задержка между запросами для избежания rate limiting
+                await asyncio.sleep(0.1)
             nmids_to_index[nmid] = found
         except Exception as e:
             logger.warning(f"Ошибка при проверке индекса для nmid {nmid}, query '{query}': {e}")
