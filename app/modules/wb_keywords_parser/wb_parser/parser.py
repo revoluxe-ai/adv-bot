@@ -247,12 +247,7 @@ class ParserService:
 
 
 def _create_rate_limit_manager():
-    """Создать rate_limit_manager если лимитер активен."""
-    if not settings.PARSE_LIMITER_ACTIVE:
-        return None
-
     try:
-        # Создаём rate_limit_manager напрямую, используя глобальный Redis
         from app.core.redis_manager_v2.redis_client import RedisClient
         from .rate_limit_manager import ParserRateLimitRedisManager
         from app.utils.redis_manager import redis_master_client
@@ -261,8 +256,7 @@ def _create_rate_limit_manager():
         return ParserRateLimitRedisManager(redis_client=redis_wrapper)
     except Exception as e:
         logger.warning(f"Не удалось создать rate_limit_manager: {e}. Rate limiting отключен.")
-        return None
-
+        raise e
 
 
 
