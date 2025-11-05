@@ -160,7 +160,7 @@ class TokenMonitoringService:
 
             # Store reference to original for potential rollback
             if not hasattr(http_request_module, "_original_try_except_decorator"):
-                http_request_module._original_try_except_decorator = (
+                http_request_module._original_try_except_decorator = ( # type: ignore[attr-defined]
                     try_except_decorator
                 )
 

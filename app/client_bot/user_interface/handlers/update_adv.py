@@ -44,7 +44,7 @@ async def update_minus_keywords(
             .where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
-        wb_cabinet_id: int = adv.wb_cabinet.id
+        wb_cabinet_id: int = adv.wb_cabinet.id # type: ignore[attr-defined]
         stmt = (
             select(WBUserCabinet)
             .join(WBUserCabinet.wb_cabinet)
@@ -59,7 +59,7 @@ async def update_minus_keywords(
 
     wb_api = WBApi(access, client_session)
     data_setter = DataSetter(wb_api)
-    wb_cabinet = adv.wb_cabinet
+    wb_cabinet = adv.wb_cabinet # type: ignore[attr-defined]
     await data_setter.update_minus_keywords_in_adv(adv, wb_cabinet)
     chat_id = callback.message.chat.id
     await messages.MinusKeywordsUpdated(bot, chat_id)()

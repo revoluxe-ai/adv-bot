@@ -70,7 +70,7 @@ async def process_product_data(wbcard: WBCard):
     except KeyError:
         logger.error(f"Карточка {wbcard.nmid} не содержит характеристик")
         characteristics = []
-    for characteristic in characteristics:
+    for characteristic in characteristics: # type: ignore[attr-defined]
         char_name = characteristic["name"].lower()
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
@@ -248,7 +248,7 @@ async def update_keywords_ctr_by_similary() -> None:
 
     # Поиск и обновление данных
 
-    for keyword_text_adv_id in keyword_texts_adv_ids:
+    for keyword_text_adv_id in keyword_texts_adv_ids: # type: ignore[attr-defined]
         target_text = keyword_text_adv_id[0]
         target_text = text_cleaner.clear(target_text)
         if not target_text:
