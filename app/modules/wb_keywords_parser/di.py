@@ -41,11 +41,6 @@ class WBKeywordsParserContainer(containers.DeclarativeContainer):
         rate_limit_manager=rate_limit_manager,
     )
 
-    parser = providers.Singleton(
-        ParserService,
-        rate_limit_manager=rate_limit_manager,
-    )
-
 
 
 

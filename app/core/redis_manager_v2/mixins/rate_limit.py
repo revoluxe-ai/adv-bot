@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         def _get_key(self, ip: str) -> str: ... # Add _get_key to the protocol
     
     # Use TypeAlias for better readability and to combine types for self
-    _SelfType: TypeAlias = type[BaseRedisManager | _RateLimitProto]
+    _SelfType: TypeAlias = BaseRedisManager | _RateLimitProto
 
 else:
     _SelfType = "BaseRedisManager"
@@ -68,22 +68,32 @@ class RateLimitMixin:
     ) -> int:
         """Увеличить счётчик последовательных успехов, вернуть новое значение."""
         key = f"{self.rate_limit_prefix}:success:{ip}"
-        count = await self._client.incr(key, 1)
-        await self._client.expire(key, 3600)  # TTL 1 час
+        # Use Lua script for atomic incr + expire
+        lua_script = """
+        local count = redis.call('INCR', KEYS[1])
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+        return count
+        """
+        count = await self._client.eval(lua_script, 1, key, 3600)
         # Сбрасываем счётчик ошибок
         await self._reset_error_counter(ip)
-        return count
+        return int(count)
 
     async def increment_error_counter(
         self: _SelfType, ip: str
     ) -> int:
         """Увеличить счётчик последовательных ошибок, вернуть новое значение."""
         key = f"{self.rate_limit_prefix}:errors:{ip}"
-        count = await self._client.incr(key, 1)
-        await self._client.expire(key, 3600)  # TTL 1 час
+        # Use Lua script for atomic incr + expire
+        lua_script = """
+        local count = redis.call('INCR', KEYS[1])
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+        return count
+        """
+        count = await self._client.eval(lua_script, 1, key, 3600)
         # Сбрасываем счётчик успехов
         await self._reset_success_counter(ip)
-        return count
+        return int(count)
 
     async def _reset_success_counter(self: _SelfType, ip: str) -> None:
         """Сбросить счётчик последовательных успехов."""

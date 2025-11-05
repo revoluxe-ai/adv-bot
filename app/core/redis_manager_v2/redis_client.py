@@ -269,3 +269,14 @@ class RedisClient:
             results["write"] = await self.execute_write_pipeline(write_commands)
 
         return results
+
+    async def eval(
+        self,
+        script: str,
+        numkeys: int,
+        *keys_and_args: str | bytes | int,
+    ) -> Any:
+        """Execute a Lua script on the Redis server"""
+        return await ensure_awaitable(
+            self._replica_write_client.eval(script, numkeys, *keys_and_args)
+        )
