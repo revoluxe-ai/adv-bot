@@ -200,11 +200,7 @@ async def adv_handler(
         wb_user_cabinet = wb_user_cabinet.scalar()
 
     chat_id = callback.message.chat.id
-    try:
-        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
-    except NotItemsInAdvSetting:
-        await messages.NoMainPhotos(bot, chat_id)(adv)
-
+    await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
 
