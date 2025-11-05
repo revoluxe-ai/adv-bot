@@ -392,7 +392,7 @@ async def __check_index(
 ) -> dict[int, bool]:
     """
     Проверяет, находятся ли товары в индексе по запросу "бренд + текст".
-    Использует только первую страницу результатов для эффективности.
+    Проверяет до 60 страниц, прерывая поиск при нахождении нужного артикула.
     """
     from sqlalchemy import select
     from app.utils.db.session_maker import get_async_session_maker as sm
