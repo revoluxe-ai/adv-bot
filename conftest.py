@@ -302,7 +302,7 @@ def adv_setting_mock():
 def session_mock(result_mock):
     session_mock = MagicMock()
     session_mock.execute = AsyncMock(return_value=result_mock)
-    session_mock.commit = AsyncMock(retun_value=None)
+    session_mock.commit = AsyncMock(return_value=None)
     return session_mock
 
 
