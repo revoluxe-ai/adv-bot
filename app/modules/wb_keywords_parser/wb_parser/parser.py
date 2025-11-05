@@ -363,6 +363,7 @@ async def add_wb_positions(
     Returns:
 
     """
+    original_nmids = set(need_nmids)
     in_indexes: dict[int, bool] = await __check_index(text, need_nmids)
     not_found_positions = []
     for nmid, in_index in in_indexes.items():
@@ -379,7 +380,7 @@ async def add_wb_positions(
 
     positions = await _get_wb_positions(text, set(need_nmids), delay, page_limit)
     positions.extend(not_found_positions)
-    await add_wb_positions_to_all_bases(positions, need_nmids)
+    await add_wb_positions_to_all_bases(positions, original_nmids)
     logger.debug("Записали позиции в базы")
     return positions
 
