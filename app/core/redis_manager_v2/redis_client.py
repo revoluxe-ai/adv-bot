@@ -1,7 +1,6 @@
 __all__ = ("RedisClient",)
 
 import asyncio
-from abc import ABC
 from typing import Any, cast
 from collections.abc import Mapping
 from typing import TypeVar
@@ -28,8 +27,8 @@ def ensure_awaitable(obj: Awaitable[T] | T) -> Awaitable[T]:
         return obj
     return asyncio.sleep(0, result=obj)
 
-
-class RedisClient(ABC):
+# TODO: Чтобы быстрее закинуть в прод убрал ABC из класса RedisClient
+class RedisClient:
     def __init__(self, redis_client: Redis) -> None:
         self._replica_read_client = redis_client
         self._replica_write_client = redis_client
