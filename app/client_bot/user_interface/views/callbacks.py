@@ -46,7 +46,7 @@ class BotActive:
     action: bool
 
 
-class Min_ctr(CallbackData, prefix="min_ctr"):
+class Min_ctr(CallbackData, prefix="min_ctr"): # noqa
     action: str
     adv_original_id: int
     wb_user_cabinet_original_id: int

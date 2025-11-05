@@ -76,17 +76,17 @@ async def run_bidder_process_for_adv(
         max_cpm = await data_manager.get_max_adv_bid(adv_setting)
     except CpmNotFoundError:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не найдена")
-        return
+        return None
     except Exception: # noqa
         logger.error(
             f"[{shop_id}] [{adv_id}] Ошибка при получении максимальной ставки",
             exc_info=True,
         )
-        return
+        return None
 
     if not max_cpm:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не задана!")
-        return
+        return None
     if adv_setting.auto_max_cpm_mode:
         auto_max_cpm = await auto_max_bid_manager.get_max_cpm(
             adv_setting, keywords, max_cpm
@@ -98,7 +98,7 @@ async def run_bidder_process_for_adv(
     max_position = adv_setting.max_place
     if max_position is None:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная позиция не задана!")
-        return
+        return None
 
     white_keywords = [kw for kw in keywords if kw.hard_status == 2]
     if not white_keywords:
@@ -109,8 +109,8 @@ async def run_bidder_process_for_adv(
         nmid = int(adv_setting.nmids[0])
         try:
             logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
-            await parser.add_wb_positions(text, {nmid}, delay=1)
-        except Exception:
+            _: list[WBItemPosition] = await parser.add_wb_positions(text, {nmid}, delay=1)
+        except Exception: # noqa
             logger.error(
                 f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
             )
@@ -137,7 +137,7 @@ async def run_bidder_process_for_adv(
         if not cpms:
             # TODO: Поубирать f-строки везде из логгеров
             logger.warning(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
-            return
+            return None
 
         try:
             logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
