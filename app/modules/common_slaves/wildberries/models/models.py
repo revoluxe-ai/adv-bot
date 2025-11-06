@@ -206,14 +206,14 @@ class WBToken(BaseTable):
     def get_payload(self, key: str) -> str | int | None:
         payload = self.__payload
         value = payload.get(key)
-        if isinstance(value, (str | int)) or value is None:
+        if isinstance(value, (str, int)) or value is None:
             return value
         return None
 
     @property
     def __expires(self) -> datetime.datetime:
         exp = self.__payload.get("exp")
-        if isinstance(exp, (int | float | str)):
+        if isinstance(exp, (int, float, str)):
             # Make the datetime timezone-aware (UTC)
             return datetime.datetime.fromtimestamp(int(exp), tz=datetime.UTC)
         raise NotValidTokenError

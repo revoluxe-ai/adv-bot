@@ -363,6 +363,7 @@ async def add_wb_positions(
     Returns:
 
     """
+    original_nmids = set(need_nmids)
     in_indexes: dict[int, bool] = await __check_index(text, need_nmids)
     not_found_positions = []
     for nmid, in_index in in_indexes.items():
@@ -379,16 +380,23 @@ async def add_wb_positions(
 
     positions = await _get_wb_positions(text, set(need_nmids), delay, page_limit)
     positions.extend(not_found_positions)
-    await add_wb_positions_to_all_bases(positions, need_nmids)
+    await add_wb_positions_to_all_bases(positions, original_nmids)
     logger.debug("Записали позиции в базы")
     return positions
 
 @inject
-async def __check_index(text,
-                        need_nmids: set[int],
-                        ) -> dict[int, bool]:
+async def __check_index(
+    text: str,
+    need_nmids: set[int],
+    parser: ParserService = Provide['module_resources.wb_keywords_parser.parser_service']
+) -> dict[int, bool]:
+    """
+    Проверяет, находятся ли товары в индексе по запросу "бренд + текст".
+    Проверяет до 60 страниц, прерывая поиск при нахождении нужного артикула.
+    """
     from sqlalchemy import select
     from app.utils.db.session_maker import get_async_session_maker as sm
+
     stmt = select(WBCard).options(
         load_only(WBCard.nmid, WBCard.json)
     ).where(
@@ -407,13 +415,28 @@ async def __check_index(text,
         nmid = card.nmid
         brand = card.brand
         query = f'{brand} {text}'
-        positions = await _get_wb_positions(
-            query,
-            {nmid},
-            0.1,
-      60)
-        found_item_flag = any([pos.nmid == nmid and pos.position > 0 for pos in positions])
-        nmids_to_index[nmid] = found_item_flag
+        found = False
+
+        # Проверяем до 60 страниц, прерывая при нахождении артикула
+        try:
+            total_pages = TotalPages()
+            for page in range(1, 61):
+                positions = await parser.parse_keywords_from_wb(query, page, total_pages)
+                # Проверяем, найден ли наш nmid в результатах
+                if any(pos.nmid == nmid for pos in positions):
+                    found = True
+                    break
+                # Прерываем, если достигли максимальной страницы
+                if page >= total_pages.total_pages:
+                    break
+                # Небольшая задержка между запросами для избежания rate limiting
+                await asyncio.sleep(0.1)
+            nmids_to_index[nmid] = found
+        except Exception as e:
+            logger.error("Ошибка при проверке индекса для nmid %s, query '%s': %s",
+                           nmid, query, e, exc_info=True)
+            raise e
+
     return nmids_to_index
 
 
