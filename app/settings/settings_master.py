@@ -200,7 +200,7 @@ class Settings:
         elif value == "true":
             return True
         raise ValueError("Не верное значение в POSTGRES_SSL_INSECURE")
-
+# TODO: Внедрить STAGE- тесты бота
     @property
     def POSTGRES_MASTER_HOST(self) -> str | None:
         return os.environ.get("POSTGRES_MASTER_HOST")
