@@ -201,6 +201,8 @@ class Settings:
             return True
         raise ValueError("Не верное значение в POSTGRES_SSL_INSECURE")
 # TODO: Внедрить STAGE- тесты бота
+
+# Внедрить автообновление образов при коммитах
     @property
     def POSTGRES_MASTER_HOST(self) -> str | None:
         return os.environ.get("POSTGRES_MASTER_HOST")
