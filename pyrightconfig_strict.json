@@ -1,6 +1,8 @@
 {
   "typeCheckingMode": "strict",
   "include": [
-     "app/utils/rate_limit.py"
+     "app/client_bot/user_interface/handlers/keyword_settings.py",
+      "app/modules/wb_keywords_parser/wb_parser/parser.py",
+    "app/utils/rate_limit.py"
   ]
 }
