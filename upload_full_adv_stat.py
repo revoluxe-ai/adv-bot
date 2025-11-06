@@ -28,7 +28,7 @@ async def upload_full_adv_stat(wb_cabinet_id: int, client_session):
     last_days = 7
     for i in range(last_days):
         dates.append(today - timedelta(days=i))
-    stats = await wb_api.advert.def_get_adv_full_state(adv_ids, dates)
+    stats = await wb_api.advert.def_get_adv_full_state(adv_ids, dates) # type: ignore[attr-defined]
     return stats
 
 

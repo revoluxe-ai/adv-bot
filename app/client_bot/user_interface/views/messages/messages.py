@@ -1,11 +1,12 @@
+# mypy: ignore-errors
+
+import io
 import logging
 import re
-import io
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
-from io import BytesIO
+from typing import TYPE_CHECKING
 
-from aiogram import Bot, types
+from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (

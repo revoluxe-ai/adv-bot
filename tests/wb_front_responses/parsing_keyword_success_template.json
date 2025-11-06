@@ -1,0 +1,237 @@
+{
+  "state": 0,
+  "payload": {
+    "products": [
+      {
+        "id": {{PRODUCT_ID_1}},
+        "root": 32821273,
+        "kindId": 0,
+        "subjectId": 121,
+        "subjectParentId": 118,
+        "name": {{PRODUCT_NAME_1}},
+        "brand": {{BRAND_1}},
+        "brandId": 1133,
+        "siteBrandId": 1133,
+        "supplier": "МОНОЛИТ",
+        "supplierId": 46845,
+        "priceU": 1500000,
+        "salePriceU": 732000,
+        "logisticsCost": 0,
+        "sale": 51,
+        "extended": {
+          "basicPriceU": 1499900,
+          "basicSalePriceU": 731900
+        },
+        "rating": {{RATING_1}},
+        "feedbacks": {{FEEDBACKS_1}},
+        "promoTextCard": "",
+        "volume": 6,
+        "viewFlags": 0,
+        "colors": [
+          {
+            "name": "серый",
+            "id": 8421504
+          }
+        ],
+        "sizes": [
+          {
+            "name": "50-52",
+            "origName": "50-52",
+            "rank": 3,
+            "optionId": 222168128
+          },
+          {
+            "name": "48-50",
+            "origName": "48-50",
+            "rank": 2,
+            "optionId": 222168129
+          },
+          {
+            "name": "52-54",
+            "origName": "52-54",
+            "rank": 4,
+            "optionId": 222168130
+          },
+          {
+            "name": "54-56",
+            "origName": "54-56",
+            "rank": 5,
+            "optionId": 222168131
+          },
+          {
+            "name": "56-58",
+            "origName": "56-58",
+            "rank": 6,
+            "optionId": 222168132
+          },
+          {
+            "name": "46-48",
+            "origName": "46-48",
+            "rank": 1,
+            "optionId": 222168127
+          }
+        ],
+        "diffPrice": false,
+        "selectedColor": 8421504,
+        "panelPromoText": "",
+        "logistics": {
+          "warehouses": [
+            {
+              "id": 169992,
+              "name": "Электросталь",
+              "priority": 1
+            },
+            {
+              "id": 172906,
+              "name": "Крёкшино",
+              "priority": 2
+            }
+          ]
+        },
+        "volumeAll": 0,
+        "pics": 1
+      },
+      {
+        "id": {{PRODUCT_ID_2}},
+        "root": 208187962,
+        "kindId": 0,
+        "subjectId": 121,
+        "subjectParentId": 118,
+        "name": {{PRODUCT_NAME_2}},
+        "brand": {{BRAND_2}},
+        "brandId": 64320,
+        "siteBrandId": 64320,
+        "supplier": "OIBE",
+        "supplierId": 64320,
+        "priceU": 2500000,
+        "salePriceU": 732000,
+        "logisticsCost": 0,
+        "sale": 71,
+        "extended": {
+          "basicPriceU": 2500000,
+          "basicSalePriceU": 731900
+        },
+        "rating": {{RATING_2}},
+        "feedbacks": {{FEEDBACKS_2}},
+        "promoTextCard": "",
+        "volume": 2,
+        "viewFlags": 0,
+        "colors": [
+          {
+            "name": "белый",
+            "id": 16777215
+          },
+          {
+            "name": "серый",
+            "id": 8421504
+          },
+          {
+            "name": "синий",
+            "id": 255
+          }
+        ],
+        "sizes": [
+          {
+            "name": "52",
+            "origName": "52",
+            "rank": 3,
+            "optionId": 273614217
+          },
+          {
+            "name": "56",
+            "origName": "56",
+            "rank": 4,
+            "optionId": 273614218
+          },
+          {
+            "name": "58",
+            "origName": "58",
+            "rank": 5,
+            "optionId": 273614219
+          },
+          {
+            "name": "50",
+            "origName": "50",
+            "rank": 2,
+            "optionId": 273614216
+          }
+        ],
+        "diffPrice": false,
+        "selectedColor": 255,
+        "panelPromoText": "",
+        "logistics": {
+          "warehouses": [
+            {
+              "id": 169992,
+              "name": "Электросталь",
+              "priority": 1
+            },
+            {
+              "id": 172906,
+              "name": "Крёкшино",
+              "priority": 2
+            }
+          ]
+        },
+        "volumeAll": 0,
+        "pics": 1
+      }
+    ],
+    "sa": false,
+    "version": 1,
+    "nmId": 0,
+    "name": "рубашки мужской",
+    "stickers": [],
+    "query": "рубашки мужской",
+    "seo": {
+      "title": "Рубашки мужские - купить недорого с доставкой | Wildberries",
+      "description": "Большой выбор рубашек мужских в интернет-магазине Wildberries. Отзывы и низкие цены.",
+      "keywords": "рубашки мужские, рубашка мужская, купить рубашку мужскую"
+    },
+    "sort": "popular",
+    "layout": {
+      "widget": {
+        "title": "Рубашки мужские",
+        "layout": "default"
+      }
+    },
+    "deniedRoute": false,
+    "catalogRedirect": false,
+    "filters": [],
+    "totalItems": {{TOTAL_ITEMS}},
+    "minPrice": 200000,
+    "maxPrice": 10000000,
+    "basketEnabled": true,
+    "ssr": true,
+    "categories": [],
+    "promo": [],
+    "ad": {
+      "size": 0,
+      "cpm": 0,
+      "advertId": 0,
+      "appType": 0,
+      "type": 0,
+      "banner_id": 0,
+      "position": 0
+    },
+    "xinfo": {
+      "version": "v1.1.202410211116",
+      "sid": "1709425251694",
+      "timestamp": "2024-10-21T08:20:51.694Z",
+      "server": "api-search-master.wildberries.ru",
+      "latency": 32,
+      "page": 1,
+      "page_size": 20,
+      "request_id": "f5e7a9e7f7e7e7e7e7e7e7e7e7e7e7e7",
+      "cpm": 0,
+      "advert_id": 0,
+      "promo_id": 0,
+      "promo_price": 0,
+      "promo_cpm": 0
+    },
+    "merger": {
+      "uuid": "uuid",
+      "version": 1
+    }
+  }
+}

@@ -77,3 +77,4 @@ class ParserWorker:
             )
         except Exception as e:
             logger.error(f"Error processing task {task}: {e}", exc_info=True)
+            raise e

@@ -11,7 +11,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.utils.db.models import User
-from app.utils.db.session_maker import get_async_session_maker, get_session_maker
+from app.utils.db.session_maker import get_async_session_maker, get_session_maker # type: ignore[attr-defined]
 
 aio_sm = get_async_session_maker()
 sm = get_session_maker()

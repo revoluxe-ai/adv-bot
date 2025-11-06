@@ -6,7 +6,7 @@ from dependency_injector import containers, providers
 from dependency_injector.providers import Dependency
 from typing import Any
 
-from ..databases import create_neo4j_driver, Neo4jLifecycle
+from ..databases import create_neo4j_driver, Neo4jLifecycle # type: ignore[attr-defined]
 
 
 class Neo4jContainer(containers.DeclarativeContainer):

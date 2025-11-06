@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from . import databases
+from .http_sessions_container import HttSessionsContainer
 from .module_resources import ModuleResources
 from app.configs.app_config import AppConfig  # Добавляем импорт AppConfig здесь
 
@@ -29,6 +30,8 @@ class AppContainer(containers.DeclarativeContainer):
             "app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager",
             "app.client_bot",  # client_bot utils используют data_manager
             "app.modules.wb_adv_updater",  # wb_adv_updater использует min_ctr_manager
+            "app.modules.wb_keywords_parser.wb_parser",
+            "app.utils.net"
         ]
     )
 
@@ -53,3 +56,7 @@ class AppContainer(containers.DeclarativeContainer):
         databases.RedisLifecycle,
         client=redis_client,
     )
+
+    http_sessions = providers.Container(HttSessionsContainer)
+
+

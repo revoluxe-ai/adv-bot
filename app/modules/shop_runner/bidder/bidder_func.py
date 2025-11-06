@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 # TODO: включить проверку РК: обновлять только если РК активна и не приостановлена
 
 
-async def get_cpms_from_wb(advs: list[AdvSetting]) -> set[int] | None:
-    return {adv.cpm for adv in advs}
+async def get_cpms_from_wb(advs: list[AuctionAdv]) -> set[int] | None:
+    return {adv.cpm for adv in advs if adv.cpm}
 
 
 async def _update_and_get_advs_from_wb(
@@ -45,13 +45,13 @@ async def _update_and_get_advs_from_wb(
     if search_adv_id := auto_adv.search_adv_id:
         adv_ids.add(search_adv_id)
     if not adv_ids:
-        return None
+        return []
     advs: list[AuctionAdv] = await wb_api.get_advs(list(adv_ids))
     try:
         assert wb_api.access.wb_cabinet is not None
         wb_cabinet_original_id: int = int(wb_api.access.wb_cabinet.id)
         await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id)
-    except Exception:
+    except Exception: # noqa
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
 
@@ -76,17 +76,17 @@ async def run_bidder_process_for_adv(
         max_cpm = await data_manager.get_max_adv_bid(adv_setting)
     except CpmNotFoundError:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не найдена")
-        return
-    except Exception:
+        return None
+    except Exception: # noqa
         logger.error(
             f"[{shop_id}] [{adv_id}] Ошибка при получении максимальной ставки",
             exc_info=True,
         )
-        return
+        return None
 
     if not max_cpm:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная ставка не задана!")
-        return
+        return None
     if adv_setting.auto_max_cpm_mode:
         auto_max_cpm = await auto_max_bid_manager.get_max_cpm(
             adv_setting, keywords, max_cpm
@@ -98,7 +98,7 @@ async def run_bidder_process_for_adv(
     max_position = adv_setting.max_place
     if max_position is None:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная позиция не задана!")
-        return
+        return None
 
     white_keywords = [kw for kw in keywords if kw.hard_status == 2]
     if not white_keywords:
@@ -109,8 +109,8 @@ async def run_bidder_process_for_adv(
         nmid = int(adv_setting.nmids[0])
         try:
             logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
-            await parser.add_wb_positions(text, {nmid}, delay=1)
-        except Exception:
+            _: list[WBItemPosition] = await parser.add_wb_positions(text, {nmid}, delay=1)
+        except Exception: # noqa
             logger.error(
                 f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
             )
@@ -120,7 +120,7 @@ async def run_bidder_process_for_adv(
             logger.debug(f"[{shop_id}] [{adv_id}] Получение ставок для биддера")
             try:
                 cpms: set[int] | None = await get_cpms_from_wb(
-                    advs_from_wb_with_active_company
+                    advs_from_wb_with_active_company # noqa
                 )
                 cmp_now = max(cpms) if cpms else None
             except Exception as exc:
@@ -130,20 +130,21 @@ async def run_bidder_process_for_adv(
                 raise exc
         except ApiForbiddenError as e:
             raise e
-        except Exception:
+        except Exception: # noqa
             logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
             continue
 
         if not cpms:
-            logger.error(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
-            return
+            # TODO: Поубирать f-строки везде из логгеров
+            logger.warning(f"[{shop_id}] [{adv_id}] Не удалось получить ставки")
+            return None
 
         try:
             logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
             wb_position: WBItemPosition = await redis_manager.get_keyword_position(
                 text, nmid
             )
-        except Exception:
+        except Exception: # noqa
             logger.error(
                 f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
             )

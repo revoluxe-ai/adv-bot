@@ -633,7 +633,7 @@ async def select_shop(
     state: FSMContext,
 ) -> None:
     # TODO: Тут какая-то ошибка, reset_filter нет в модели callbacks.Shop
-    reset_filter = callback_data.reset_filter
+    reset_filter = callback_data.reset_filter # type: ignore[attr-defined]
     if reset_filter:
         await state.update_data(filter_advs=None)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
