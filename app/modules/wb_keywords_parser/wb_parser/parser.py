@@ -419,7 +419,7 @@ async def __check_index(
                 await asyncio.sleep(0.1)
             nmids_to_index[nmid] = found
         except Exception as e:
-            logger.warning("Ошибка при проверке индекса для nmid %s, query '%s': %s",
+            logger.error("Ошибка при проверке индекса для nmid %s, query '%s': %s",
                            nmid, query, e, exc_info=True)
             raise e
     
