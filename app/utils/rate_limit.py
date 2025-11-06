@@ -61,7 +61,7 @@ def rate_limited_request(rate_limit_manager: Any, max_retries: int = 50) -> Call
                         result = await func(*args, **kwargs)  # pyright: ignore
                     except (TooManyRequestsInParserError, WBConnectionRateLimitError) as e:
                         if isinstance(e, WBConnectionRateLimitError):
-                            logger.error("WBConnectionRateLimitError: %s", e, exc_info=True)
+                            logger.warning("WBConnectionRateLimitError")
 
                         err_count = await rate_limit_manager.increment_error_counter(ip)
                         await rate_limit_manager.set_last_error_ts(ip)
