@@ -9,6 +9,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 from ..views import callbacks, messages
+from ... import const
 
 sm = get_async_session_maker
 
@@ -79,5 +80,6 @@ async def show_favorites(
 ):
     user_telegram_id = callback.from_user.id
     await messages.LongTimeOperation(bot, user_telegram_id)()
-    await messages.ShowFavoriteAdvs(bot, user_telegram_id)()
+    await bot.send_message(
+        callback.message.chat.id, f'Функция временно отключена, обратитесь в поддерржку -> {const.SUPPORT_LINK}' )
     return
