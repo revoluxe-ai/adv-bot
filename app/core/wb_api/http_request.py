@@ -80,7 +80,7 @@ def try_except_decorator(
 
             state = instance.api_call_state[method_name]
             shop_id = instance.shop_id
-            while state["_attempts"] < max_attempts:
+            while state["_attempts"] < max_attempts: # noqa
                 last_query_time: float | None = state["_last_query_time"]
                 if last_query_time:
                     current_time = time.time()

@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from PIL import Image  # type: ignore
-from sqlalchemy import and_, func, select, case, Float, distinct, cast
+from sqlalchemy import and_, func, select, case, Float, cast
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import NoResultFound
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, load_only
 from sqlalchemy.sql.functions import coalesce
@@ -49,7 +49,6 @@ from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
 from . import get_text_to_predict_ctr_dict
 from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
-
 logger = logging.getLogger(__name__)
 
 _sm = get_async_session_maker
@@ -77,8 +76,9 @@ async def get_keyword_statistic_clickhouse(
         start_date_clause = f"AND date >= '{start_date}'"
 
     adv_ids_str = ", ".join(map(str, adv_ids))
-
+    # TODO: Прикрутить к Pycharm ClickHouse плагин и проверить запрос
     query = f"""
+
         SELECT
             COALESCE(SUM(total_clicks), 0) AS total_clicks,
             COALESCE(SUM(total_views), 0)  AS total_views,
@@ -426,7 +426,7 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
 
 async def get_cached_keyword(adv: AdvSetting, text: str) -> CalculatedKeyword | None:
     """Получить закешированное ключевое слово"""
-    cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}"
+    cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}" # type: ignore
     cached_data = await redis_manager.get(cache_key)
 
     if cached_data and isinstance(cached_data, str):
@@ -646,7 +646,7 @@ async def get_good_bad_phrases_for_min_ctr(
                 if keyword_setting and keyword_setting.id:
                     if keyword_setting.id:
                         await redis_manager.set_auto_block_status(
-                            int(keyword_setting.id), True
+                            int(keyword_setting.id), True # type: ignore
                         )
                 continue
         if (
@@ -704,8 +704,8 @@ async def get_good_bad_phrases_for_min_ctr(
             raise e
 
     for keyword_stat in keyword_stats:
-        for property in keyword_stat.__dict__:
-            if property in [
+        for property_ in keyword_stat.__dict__:
+            if property_ in [
                 "position_update",
                 "k",
                 "k",
@@ -721,13 +721,14 @@ async def get_good_bad_phrases_for_min_ctr(
                 "position",
             ]:
                 continue
-            value = getattr(keyword_stat, property)
+            # TODO: Критичный код, не стал трогать, так то надо переделать, чтобы не было shadow  переменных  property
+            value = getattr(keyword_stat, property_) # type: ignore
             try:
                 assert value is not None
             except AssertionError:
                 # TODO: Удалить из всего проекта f-строки из логирования
                 logger.error(
-                    f"Ошибка в значении {property} для {keyword_stat.text}: {value}"
+                    f"Ошибка в значении {property_} для {keyword_stat.text}: {value}"
                 )
 
     logger.debug("Слова по assert проверены")
@@ -876,7 +877,7 @@ async def get_mean_ctr(adv: AdvSetting) -> float:
         stmt = (
             select(
                 case(
-                    (
+                    ( # noqa
                         func.sum(AdvKeyword.views) == 0,
                         0,
                     ),  # Условие, если показов нет, возвращаем 0
@@ -990,7 +991,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
                     views=0,
                     clicks=0,
                     spend=0,
-                    date=datetime.now().date(),
+                    date=datetime.now().date(), # noqa
                 )
 
                 keyword_setting = KeywordSetting(
@@ -1004,7 +1005,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
 
 
 async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None:
-    await redis_manager.set_black_phrases(adv_setting_id, keywords)
+    await redis_manager.set_black_phrases(adv_setting_id, keywords) # type: ignore[attr-defined]
     async with _sm(read_only=False) as session:
         stmt = (
             select(KeywordSetting)
@@ -1034,7 +1035,7 @@ async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None
 
 
 async def check_by_black_list_template(keyword_text: str, adv_setting_id: int) -> bool:
-    black_keywords = await redis_manager.get_black_phrases(adv_setting_id)
+    black_keywords = await redis_manager.get_black_phrases(adv_setting_id) # type: ignore[attr-defined]
     keyword_text_lower = keyword_text.lower().strip()
 
     for black_phrase in black_keywords:
@@ -1050,7 +1051,7 @@ async def check_by_black_list_template(keyword_text: str, adv_setting_id: int) -
 
 
 async def reset_black_phrases(adv_setting_id: int) -> None:
-    await redis_manager.set_black_phrases(adv_setting_id, [])
+    await redis_manager.set_black_phrases(adv_setting_id, []) # type: ignore[attr-defined]
 
 
 async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None:
@@ -1074,7 +1075,7 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                     views=0,
                     clicks=0,
                     spend=0,
-                    date=datetime.now().date(),
+                    date=datetime.now().date(), # noqa
                 )
 
                 keyword_setting = KeywordSetting(
@@ -1094,7 +1095,7 @@ async def get_active_search_advs() -> list[AdvSetting]:
     stmt = select(AdvSetting).where(
         # Проверяем, что name содержит паттерн <!-[цифры]-!>
         AdvSetting.name.op("~")(pattern),
-        AdvSetting.bot_activ.is_(True),
+        AdvSetting.bot_active.is_(True),
         AdvSetting.active_status == "started",
     )
     async with _sm() as session:
@@ -1130,7 +1131,7 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
         .join(AdvSetting.wb_cabinet)
         .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active.is_(True))
         .options(
-            load_only(AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id)
+            load_only(AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id) # noqa
         )
     )
     async with _sm() as session:
@@ -1223,7 +1224,7 @@ ORDER BY date, text
         result = result.result_rows
         return [
             WBItemPosition(nmid=nmid, position=row[1], timestamp=row[0])
-            for row in result
+            for row in result # type: ignore[attr-defined]
         ]
 
 

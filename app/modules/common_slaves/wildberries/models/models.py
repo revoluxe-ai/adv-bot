@@ -40,7 +40,7 @@ from app.utils.db.session_maker import get_async_session_maker
 try:
     # TODO: Надо разобраться что это за конструкция такая, и постараться ее убрать без рейса исключения
     from app.modules.billing import models as _billing_models  # noqa: F401
-except Exception:
+except Exception: # noqa
     # In minimal test contexts billing may be absent; relationship will fallback to string resolution
     pass
 
@@ -259,7 +259,7 @@ class WBToken(BaseTable):
         try:
             # Compare using timezone-aware UTC now
             return datetime.datetime.now(datetime.UTC) >= self.__expires
-        except Exception:
+        except Exception: # noqa
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным
             )
@@ -347,7 +347,7 @@ class WBCard(BaseTable):
         return urls
 
     @property
-    def SubjectId(self) -> int | None:
+    def SubjectId(self) -> int | None: # noqa
         subject_id = self.card_json.get("subjectID")
         if isinstance(subject_id, int) or subject_id is None:
             return subject_id
@@ -363,7 +363,7 @@ class AdvSetting(BaseTable):
         DONE = "done"
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs) # noqa
         self._worst_promo_position = None
 
     def __repr__(self):
@@ -551,7 +551,7 @@ class AdvSetting(BaseTable):
         if not self.name:
             return None
         name = self.name.replace(" ", "")
-        pattern = re.compile(r"<!-\[(\d+)\]-!>")
+        pattern = re.compile(r"<!-\[(\d+)\]-!>") # noqa
         match = re.search(pattern, name)
         if not match:
             return None
@@ -730,7 +730,7 @@ class WBItemPosition:
         if isinstance(raw_ts, str):
             try:
                 position.timestamp = datetime.datetime.fromisoformat(raw_ts)
-            except Exception:
+            except Exception: # noqa
                 position.timestamp = None
         else:
             position.timestamp = None

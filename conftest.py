@@ -1,6 +1,13 @@
 # mypy: ignore-errors
 
 import os
+from collections.abc import AsyncGenerator
+import asyncio
+from unittest.mock import MagicMock, AsyncMock
+from app.core.di import AppContainer
+import aiofiles
+from dependency_injector import containers
+
 
 # Устанавливаем переменные окружения для тестовой БД ДО любых импортов
 os.environ["POSTGRES_MASTER_HOST"] = "localhost"
@@ -38,7 +45,7 @@ import dotenv
 dotenv.load_dotenv(override=False)
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 
 # Подставляем заглушку для app.core.wb_api.http_request до реальных импортов
@@ -47,12 +54,11 @@ import types
 mod_name = "app.core.wb_api.http_request"
 import importlib
 
-import asyncio
-import os
-import time
-from unittest.mock import MagicMock
-from datetime import datetime, timedelta
 
+import subprocess
+import time
+import atexit
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -66,148 +72,224 @@ from app.modules.common_slaves.wildberries.models import WBCabinet
 TEST_DB_URL = "postgresql+asyncpg://test_user:test_password@localhost:5433/test_adv_bot_db"
 COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "tests", "docker-compose.test.yml")
 
-
-@pytest.fixture(scope="session")
-def docker_compose_file():
-    return COMPOSE_FILE
+# Глобальное хранилище для cleanup контейнеров
+_DOCKER_CLEANUP_STATE = {"compose_cmd": None, "container_id": None}
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Создаёт новый event loop и безопасно закрывает его после всех тестов."""
-    loop = asyncio.new_event_loop()
-    yield loop
+def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
+    """Синхронный запуск команды с таймаутом. Возвращает (returncode, stdout, stderr)."""
     try:
-        # Корректно завершаем асинхронные генераторы и таски
-        loop.run_until_complete(loop.shutdown_asyncgens())
-    finally:
-        loop.close()
+        result = subprocess.run(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            text=True,
+            errors="ignore",
+        )
+        return result.returncode, result.stdout, result.stderr
+    except FileNotFoundError:
+        return 127, "", f"command not found: {args[0]}"
+    except subprocess.TimeoutExpired:
+        return 124, "", f"timeout while running: {' '.join(args)}"
 
+
+def _detect_compose_cmd() -> list[str]:
+    """Определяет доступную форму запуска compose: ['docker', 'compose'] или ['docker-compose']."""
+    # Предпочитаем новый docker compose
+    rc, *_ = _sync_run("docker", "compose", "version", timeout=5)
+    if rc == 0:
+        return ["docker", "compose"]
+    # Фолбэк на старый docker-compose
+    rc, *_ = _sync_run("docker-compose", "version", timeout=5)
+    if rc == 0:
+        return ["docker-compose"]
+    return []
+
+
+def _emergency_cleanup():
+    """Аварийная очистка контейнеров при выходе из pytest (если нормальный teardown провалился)."""
+    cid = _DOCKER_CLEANUP_STATE.get("container_id")
+    cmd = _DOCKER_CLEANUP_STATE.get("compose_cmd")
+
+    if cid:
+        print(f"\n[EMERGENCY CLEANUP] Force removing container: {cid}")
+        _sync_run("docker", "stop", "-t", "1", cid, timeout=5)
+        _sync_run("docker", "rm", "-f", cid, timeout=5)
+
+    if cmd:
+        print(f"\n[EMERGENCY CLEANUP] Compose down: {COMPOSE_FILE}")
+        _sync_run(*cmd, "-f", COMPOSE_FILE, "down", "-v", "--timeout", "1", timeout=15)
+
+
+# Регистрируем emergency cleanup на случай краша pytest
+atexit.register(_emergency_cleanup)
+
+
+@pytest.fixture(scope="session")
+def docker_compose_cmd() -> list[str]:
+    """Определяет команду для запуска Docker Compose и скипает, если недоступна."""
+    cmd = _detect_compose_cmd()
+    if not cmd:
+        pytest.skip("Docker Compose не найден в системе — скипаем интеграционные тесты БД")
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = cmd
+    return cmd
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def setup_test_database(docker_compose_file):
-    print(f"Starting Docker Compose: {docker_compose_file}")
-    import subprocess
-    subprocess.run(["docker-compose", "-f", docker_compose_file, "up", "-d", "--build"], check=True)
+def setup_test_database(docker_compose_cmd):
+    """Синхронная фикстура для настройки тестовой базы данных с помощью Docker Compose и Alembic."""
+    print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
+
+    # --- Запуск Docker Compose ---
+    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", timeout=180)
+    if rc != 0:
+        raise RuntimeError(f"Failed to start Docker Compose services. rc={rc} stderr={err}")
 
     # --- Ожидание запуска контейнера ---
+    container_id: str = ""
     max_retries = 30
     for i in range(max_retries):
-        try:
-            result = subprocess.run(["docker-compose", "-f", docker_compose_file, "ps", "-q", "test_db"],
-                                    capture_output=True, text=True, check=True)
-            container_id = result.stdout.strip()
-
-            if container_id:
-                health_status_result = subprocess.run(
-                    ["docker", "inspect", "--format", '{{.State.Health.Status}}', container_id],
-                    capture_output=True, text=True, check=True)
-                health_status = health_status_result.stdout.strip()
-                if health_status == "healthy":
-                    print("[OK] Test database is healthy.")
-                    break
-            print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries}")
-        except subprocess.CalledProcessError as e:
-            print(f"Error checking Docker health: {e}")
-            print(e.stderr)
+        rc, cid_out, _ = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10)
+        container_id = cid_out.strip()
+        if container_id:
+            _DOCKER_CLEANUP_STATE["container_id"] = container_id  # Сохраняем для emergency cleanup
+            rc, health, _ = _sync_run(
+                "docker", "inspect", "--format", "{{.State.Health.Status}}", container_id, timeout=10
+            )
+            if rc == 0 and health.strip() == "healthy":
+                print("[OK] Test database is healthy.")
+                break
+        print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries}")
         time.sleep(2)
     else:
+        # Если так и не дождались health=healthy — покажем статус и логи для диагностики
+        _sync_run("docker", "ps", "-a", timeout=10)
+        if container_id:
+            _sync_run("docker", "logs", container_id, timeout=10)
         raise RuntimeError("Test database did not become healthy in time.")
 
     from app.utils.db.base import BaseTable as Base
     from sqlalchemy import create_engine
-    
+
     print("[MIGRATION] Creating PostgreSQL extensions...")
-    
-    # Создаем синхронный движок для создания расширений и таблиц
+
+    # Создаём синхронный движок для создания расширений и таблиц
     sync_engine = create_engine(TEST_DB_URL.replace("postgresql+asyncpg", "postgresql"))
-    
-    # Создаем необходимые расширения PostgreSQL ПЕРЕД созданием таблиц
+
+    # Создаём необходимые расширения PostgreSQL ПЕРЕД созданием таблиц
     with sync_engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
         conn.commit()
-    
+
     print("[MIGRATION] Creating tables from models metadata...")
-    
-    # Создаем все таблицы из метадаты моделей
     Base.metadata.create_all(sync_engine)
     sync_engine.dispose()
-    
     print("[OK] Tables created successfully from models metadata.")
-    
-    # Теперь применяем миграции (если есть изменения схемы)
+
+    # Проставляем миграции Alembic как применённые
     from alembic.config import Config
     from alembic import command
 
-    print("[MIGRATION] Running Alembic migrations for test database (Python API)...")
-
+    print("[MIGRATION] Stamping Alembic migrations for test database...")
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("script_location", "alembic_")
     alembic_cfg.set_main_option("sqlalchemy.url", TEST_DB_URL)
-
-    # Помечаем все миграции как применённые, так как мы создали таблицы из моделей
     command.stamp(alembic_cfg, "head")
-
     print("[OK] Alembic migrations stamped successfully.")
 
-    # --- Гарантируем наличие базовых данных ---
-    engine = create_async_engine(TEST_DB_URL)
-    async with engine.begin() as conn:
-        initial_wb_cabinet_data = {
-            "id": 1,
-            "shop_id": "test_shop_id",
-            "active": True,
-            "expiration_time": datetime.now() + timedelta(days=7),
-            "balance": 0.0,
-            "bonus": 0.0,
-            "demo": True,
-            "expiration_alarm_days_pass": None,
-            "white_list_update_active": False,
-        }
+    # --- Базовые данные (async) ---
+    # Создаём минимальный event loop только для этой задачи
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        async def insert_initial_data():
+            engine = create_async_engine(TEST_DB_URL)
+            async with engine.begin() as conn:
+                initial_wb_cabinet_data = {
+                    "id": 1,
+                    "shop_id": "test_shop_id",
+                    "active": True,
+                    "expiration_time": datetime.now() + timedelta(days=7),
+                    "balance": 0.0,
+                    "bonus": 0.0,
+                    "demo": True,
+                    "expiration_alarm_days_pass": None,
+                    "white_list_update_active": False,
+                }
+                insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
+                on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                    index_elements=["id"],
+                    set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
+                )
+                await conn.execute(on_conflict_stmt)
+                await conn.commit()
+            await engine.dispose()
 
-        insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
-        on_conflict_stmt = insert_stmt.on_conflict_do_update(
-            index_elements=["id"],
-            set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
-        )
-        await conn.execute(on_conflict_stmt)
-        await conn.commit()
+        loop.run_until_complete(insert_initial_data())
+    finally:
+        loop.close()
 
-    await engine.dispose()
+    print("[OK] Test database setup complete.")
 
     yield
 
-    print(f"[CLEANUP] Stopping Docker Compose: {docker_compose_file}")
-    subprocess.run(["docker-compose", "-f", docker_compose_file, "down", "-v"], check=True)
+    # --- TEARDOWN ---
+    print(f"\n[CLEANUP] Stopping Docker Compose: {COMPOSE_FILE}")
+
+    # Сначала пытаемся остановить контейнер gracefully
+    if container_id:
+        _sync_run("docker", "stop", "-t", "2", container_id, timeout=10)
+
+    # Затем compose down с очень коротким таймаутом
+    rc, _, err = _sync_run(
+        *docker_compose_cmd,
+        "-f",
+        COMPOSE_FILE,
+        "down",
+        "-v",
+        "--remove-orphans",
+        "--timeout",
+        "1",
+        timeout=20,
+    )
+    if rc != 0:
+        print(f"[WARNING] 'compose down' failed rc={rc}: {err.strip()}")
+
+    # Финальная зачистка
+    if container_id:
+        _sync_run("docker", "rm", "-f", container_id, timeout=10)
+        _DOCKER_CLEANUP_STATE["container_id"] = None
+
+    print("[OK] Cleanup complete.")
+
 
 
 @pytest.fixture(scope="session", name="async_engine")
-async def _async_engine():
-    """Создаёт движок для всей сессии."""
+def _async_engine():
+    """Создаёт async движок для всей сессии тестов."""
     engine = create_async_engine(TEST_DB_URL, echo=False)
     yield engine
-    # ⚠️ важно: не await здесь, а делаем безопасно через таск
-    try:
-        await engine.dispose()
-    except Exception:
-        pass
+    # Cleanup будет выполнен pytest-asyncio в своём event loop
 
 
 @pytest.fixture(name="async_session")
 async def _async_session(async_engine) -> AsyncSession:
-    """Создаёт сессию с безопасным откатом после теста."""
+    """Создаёт async сессию с откатом после теста."""
     async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
     async with async_session_maker() as session:
         trans = await session.begin()
-        yield session
-        if trans.is_active:  # ✅ rollback только если транзакция ещё открыта
-            await trans.rollback()
-        await session.close()
+        try:
+            yield session
+        finally:
+            if trans.is_active:
+                await trans.rollback()
+            await session.close()
 
 
-# Фикстура для доступа к mock access
-@pytest.fixture(name="access_mock")
+
+# Фикстура для доступа к mock access (простая версия)
+@pytest.fixture(name="access_mock_simple")
 def _access_mock():
     mock = MagicMock()
     mock.wb_cabinet = MagicMock(spec=WBCabinet)
@@ -251,7 +333,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = Path(__file__).parent.absolute()
@@ -277,12 +359,13 @@ def tokens_mock() -> list[MagicMock]:
 
 
 @pytest.fixture
-def wb_cabinet_mock() -> MagicMock():
+def wb_cabinet_mock() -> MagicMock:
     return MagicMock()
 
 
 @pytest.fixture
 def access_mock(tokens_mock, wb_cabinet_mock):
+    from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
     access_mock = MagicMock(spec=WBCabinetAccess)
     access_mock.tokens = tokens_mock
     access_mock.wb_cabinet = wb_cabinet_mock
@@ -314,14 +397,14 @@ def get_async_session_mock(session_mock) -> MagicMock:
     return get_session_maker_mock
 
 
-from unittest.mock import MagicMock
-
 from pytest import fixture
 
 
 @fixture
 def keywords_mocks() -> list[MagicMock]:
-    """Фикстура для генерации моков CalculatedKeyword с заданными параметрами"""
+    """
+    Фикстура для генерации моков CalculatedKeyword с заданными параметрами
+    """
     keyword_params = [
         {
             "best_keyword_status": True,
@@ -365,3 +448,28 @@ def keywords_mocks() -> list[MagicMock]:
         mocks.append(mock)
 
     return mocks
+
+
+@pytest.fixture(name='front_too_many_requests_str', scope='function')
+async def front_too_many_requests_str() -> AsyncGenerator[str]:
+    async with aiofiles.open('tests/wb_front_responses/too-many-requests.txt',
+                             mode='r',
+                             encoding='utf-8') as f:
+        content = await f.read()
+        yield content
+
+
+
+
+
+
+
+@pytest.fixture(name="di_container", scope="function")
+async def di_container() -> AsyncGenerator[AppContainer, None]:
+    from app.core.di import AppContainer
+
+    AppContainer.wiring_config = containers.WiringConfiguration()
+    container = AppContainer()
+
+    yield container
+

@@ -37,9 +37,9 @@ async def delete_wb_user_cabinet(
         wb_user_cabinets = wb_user_cabinets.scalars().all()
         await session.commit()
     await bot.send_message(
-        callback.message.chat.id, f"Кабинет {deleted_wb_user_cabinet.name} удален"
+        callback.message.chat.id, f"Кабинет {deleted_wb_user_cabinet.name} удален" # type: ignore[attr-defined]
     )
 
-    await messages.ShopChoice(bot, callback.message.chat.id, wb_user_cabinets)()
+    await messages.ShopChoice(bot, callback.message.chat.id, wb_user_cabinets)() # type: ignore[attr-defined]
 
     return

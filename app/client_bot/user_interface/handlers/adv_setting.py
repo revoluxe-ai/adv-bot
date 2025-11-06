@@ -200,11 +200,7 @@ async def adv_handler(
         wb_user_cabinet = wb_user_cabinet.scalar()
 
     chat_id = callback.message.chat.id
-    try:
-        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
-    except NotItemsInAdvSetting:
-        await messages.NoMainPhotos(bot, chat_id)(adv)
-
+    await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
 
@@ -236,7 +232,7 @@ async def turn_adv_on(
         result = await session.execute(stmt)
         adv: AdvSetting = result.scalar()
         assert adv
-        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
+        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet # type: ignore[attr-defined]
         tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
             session, wb_cabinet.shop_id
         )

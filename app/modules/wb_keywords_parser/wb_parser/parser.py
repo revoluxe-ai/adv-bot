@@ -4,12 +4,19 @@ import json
 import logging
 import re
 
-from aiogram.client.session import aiohttp
+import aiohttp
 from sqlalchemy.orm import load_only
+
+
+from aiohttp import ClientSession
+from dependency_injector.wiring import Provide, inject
 
 from app.modules.common_slaves.wildberries.models import WBItemPosition, WBCard
 from app.modules.wb_adv_updater import data_manager
+from app.settings import settings
 from app.utils import redis_manager
+from app.utils.rate_limit import rate_limited_request
+from .excs import TooManyRequestsInParserError, WBConnectionRateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +64,21 @@ def get_parse_url(text: str, page: int) -> str:
 
 
 class ParserService:
+
+    def __init__(self, rate_limit_manager=Provide['module_resources.wb_keywords_parser.rate_limit_manager']):
+        self._rate_limit_manager = rate_limit_manager
+
+            # Применяем декоратор rate limiting к методу парсинга
+        self._parse_with_rate_limit = rate_limited_request(rate_limit_manager)(
+            self._parse_keywords_from_wb_impl
+        )
+
     async def parse_keywords_from_wb(
         self, text: str, page: int, total_pages: TotalPages
     ) -> list[WBItemPosition]:
         first_place = page * 100 - 99
         try:
-            data = await self.__parse_keywords_from_wb(text, page)
+            data = await self._parse_with_rate_limit(text, page)
             if data:
                 products, cluster, preset, total_items = data
             else:
@@ -78,12 +94,18 @@ class ParserService:
                         text,
                     )
                     return []
+        except TooManyRequestsInParserError as e:
+            # Rate limiting ошибки должны пробраситься наверх
+            raise e
         except Exception as e:
-            logger.debug(
-                f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True
+            logger.error(
+                "Ошибка при парсинге страницы %s ключа %s %s",
+                page,
+                text,
+                e,
+                exc_info=True,
             )
-            del e
-            return []
+            raise e
         if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
         if not products:
@@ -140,8 +162,23 @@ class ParserService:
 
         return positions
 
-    @staticmethod
-    async def __parse_keywords_from_wb(text: str, page: int) -> tuple[
+    async def _parse_keywords_from_wb_impl(self,
+        text: str,
+        page: int):
+        # для проброса ошибок сети, интерпретируемых как слишком много запросов
+        try:
+            result = await self.__parse_keywords_from_wb_impl(text, page)
+            return result
+        except aiohttp.ClientError as e:
+            raise WBConnectionRateLimitError("Rate limit exceeded in ParserService") from e
+
+
+    @inject
+    async def __parse_keywords_from_wb_impl(self,
+                                           text: str,
+                                           page: int,
+                                           client: ClientSession = Provide['http_sessions.aiohttp_client_for_parser'],
+                                           ) -> tuple[
         list[dict] | None,
         str | None,
         int | None,
@@ -149,15 +186,22 @@ class ParserService:
     ]:
         url = get_parse_url(text, page)
         logger.debug(f"Запрос к URL: {url}")
-        async with aiohttp.ClientSession() as http_session:
-            async with http_session.get(url) as response:
-                response_text = await response.text()
+        async with client.get(url) as response:
+            response_text = await response.text()
 
         if not response_text:
             raise DataError("Пустой ответ от сервера", text)
 
-        data = json.loads(response_text)
+        if "Too Many Requests" in response_text:
+            raise TooManyRequestsInParserError(
+                "Слишком много запросов к серверу WB",
+            )
 
+        try:
+            data = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            logger.error(f"Ошибка JSONDecode при парсинге данных: {e}", exc_info=True)
+            raise DataError(f"Ошибка JSONDecode: {e}", text) from e
         if data == {}:
             logger.warning(
                 f"Получены пустые данные для ключа {text} на странице {page}"
@@ -192,8 +236,26 @@ class ParserService:
         assert isinstance(products, list)
         return products, cluster, preset, total_items
 
+    @staticmethod
+    def _raise_too_many_requests_error(response_text: str) -> None:
+        # Deprecated: оставлено для совместимости (не используется после inlined check)
+        if "Too Many Requests" in response_text:
+            raise TooManyRequestsInParserError("Слишком много запросов к серверу WB")
 
-parser = ParserService()
+
+def _create_rate_limit_manager():
+    try:
+        from app.core.redis_manager_v2.redis_client import RedisClient
+        from .rate_limit_manager import ParserRateLimitRedisManager
+        from app.utils.redis_manager import redis_master_client
+
+        redis_wrapper = RedisClient(redis_master_client)
+        return ParserRateLimitRedisManager(redis_client=redis_wrapper)
+    except Exception as e:
+        logger.warning(f"Не удалось создать rate_limit_manager: {e}. Rate limiting отключен.")
+        raise e
+
+
 
 from .parsing_page_queue_manager import ParsingQueueManager
 
@@ -212,9 +274,9 @@ async def add_positions_from_page(
     need_nmids: set[int],
     total_pages: TotalPages,
     checked_pages: set[int],
-) -> None:
+) -> list[WBItemPosition]:
     try:
-        await _add_positions_from_page(
+        positions = await _add_positions_from_page(
             stop_event,
             catch_any_position,
             text,
@@ -225,13 +287,14 @@ async def add_positions_from_page(
         logger.debug(f"Добавляем страницу {page} в проверенные")
         checked_pages.add(page)
         logger.debug("Проверенные позиции добавили")
-        logger.debug(f"Проверенные страницы: {checked_pages}")
+        logger.debug("Проверенные страницы для запроса: %s: %s", text, checked_pages)
+        return positions
     except Exception as e:
         logger.error(
             f"Ошибка при парсинге страницы {page} ключа {text} {e}", exc_info=True
         )
         logger.debug(f"{get_parse_url(text, page)}")
-        del e
+        raise e
 
 
 async def add_wb_positions_to_clickhouse(positions) -> None:
@@ -247,7 +310,7 @@ async def add_wb_positions_to_all_bases(
         add_wb_positions_to_clickhouse(my_positions),
     )
 
-
+@inject
 async def _add_positions_from_page(
     stop_event: asyncio.Event,
     catch_any_position: asyncio.Event,
@@ -255,25 +318,24 @@ async def _add_positions_from_page(
     page: int,
     need_nmids: set[int],
     total_pages: TotalPages,
-) -> tuple[list[WBItemPosition]]:
+    parser: ParserService = Provide['module_resources.wb_keywords_parser.parser_service']
+) -> list[WBItemPosition]:
     if stop_event.is_set():
-        return [] # type: ignore
+        return []
     try:
         positions = await parser.parse_keywords_from_wb(text, page, total_pages)
-    except Exception:
+    except Exception as e:
         logger.error(f"Ошибка при парсинге страницы {page} ключа {text}", exc_info=True)
-        logger.debug(f"{get_parse_url(text, page)}")
-        return [] # type: ignore
+        logger.error(f"{get_parse_url(text, page)}")
+        raise e
     if not positions:
-        return [] # type: ignore
+        return []
     catch_any_position.set()
     logger.debug(f"Найдено {len(positions)}")
     if positions:
         await parsing_queue_manager.add_found_not_found_page(
             text, positions, need_nmids, page
         )
-        await add_wb_positions_to_all_bases(positions, need_nmids)
-        logger.debug("Записали позиции в базы")
         # Ставка больше не доступна при парсинге, блок вычисления max_bet удален
         for position in positions:
             nmid: int = position.nmid
@@ -281,56 +343,27 @@ async def _add_positions_from_page(
             if not need_nmids:
                 stop_event.set()
                 break
-    return positions # type: ignore
+    return positions
 
+
+# TODO: Сделать проверку прав токенов check запросами к WB
 
 async def add_wb_positions(
     text: str, need_nmids: set[int], delay, page_limit=60
-) -> None:
-    await _add_wb_positions(text, set(need_nmids), delay, page_limit)
+) -> list[WBItemPosition]:
+    """
+    Функция подходит только для карточек, которые точно есть в базе. Если какой-то нет - логика сломается
 
+    Args:
+        text:
+        need_nmids:
+        delay:
+        page_limit:
 
-async def __check_index(text, need_nmids: set[int]) -> dict[int, bool]:
-    from sqlalchemy import select
-    from app.utils.db.session_maker import get_async_session_maker as sm
-    stmt = select(WBCard).options(
-        load_only(WBCard.nmid, WBCard.json)
-    ).where(
-        WBCard.nmid.in_(need_nmids),
-    )
+    Returns:
 
-    async with sm(read_only=True) as session:
-        result = await session.execute(stmt)
-        wb_cards = result.scalars().all()
-    nmids_to_index: dict[int, bool] = {}
-    for card in  wb_cards:
-        nmid = card.nmid
-        brand = card.brand
-        query = f'{brand} {text}'
-        positions = await parser.parse_keywords_from_wb(
-            query,
-            1,
-            TotalPages()
-        )
-        if positions:
-            nmids_to_index[nmid] = True
-        else:
-            nmids_to_index[nmid] = False
-    return nmids_to_index
-
-
-
-async def _add_wb_positions(
-    text: str, need_nmids: set[int], delay, page_limit=60
-) -> None:
-    total_pages = TotalPages()
-    stop_event = asyncio.Event()
-    catch_any_position = asyncio.Event()
-    checked_pages: set[int] = set()
-    parsing_pages_queue: list[int] = await parsing_queue_manager.get_parsing_queue(
-        text, need_nmids, 60
-    )
-
+    """
+    original_nmids = set(need_nmids)
     in_indexes: dict[int, bool] = await __check_index(text, need_nmids)
     not_found_positions = []
     for nmid, in_index in in_indexes.items():
@@ -344,6 +377,82 @@ async def _add_wb_positions(
             not_found_positions.append(position)
             need_nmids.discard(nmid)
 
+
+    positions = await _get_wb_positions(text, set(need_nmids), delay, page_limit)
+    positions.extend(not_found_positions)
+    await add_wb_positions_to_all_bases(positions, original_nmids)
+    logger.debug("Записали позиции в базы")
+    return positions
+
+@inject
+async def __check_index(
+    text: str,
+    need_nmids: set[int],
+    parser: ParserService = Provide['module_resources.wb_keywords_parser.parser_service']
+) -> dict[int, bool]:
+    """
+    Проверяет, находятся ли товары в индексе по запросу "бренд + текст".
+    Проверяет до 60 страниц, прерывая поиск при нахождении нужного артикула.
+    """
+    from sqlalchemy import select
+    from app.utils.db.session_maker import get_async_session_maker as sm
+
+    stmt = select(WBCard).options(
+        load_only(WBCard.nmid, WBCard.json)
+    ).where(
+        WBCard.nmid.in_(need_nmids),
+    )
+
+    async with sm(read_only=True) as session:
+        result = await session.execute(stmt)
+        wb_cards = result.scalars().all()
+    nmids_in_cards = {card.nmid for card in wb_cards}
+    if not nmids_in_cards == need_nmids:
+        missing_nmids = set(need_nmids) - set(nmids_in_cards)
+        raise RuntimeError(f"Некоторые nmids не найдены в базе WBCard при проверке индексации {missing_nmids}")
+    nmids_to_index: dict[int, bool | None] = {}
+    for card in  wb_cards:
+        nmid = card.nmid
+        brand = card.brand
+        query = f'{brand} {text}'
+        found = False
+
+        # Проверяем до 60 страниц, прерывая при нахождении артикула
+        try:
+            total_pages = TotalPages()
+            for page in range(1, 61):
+                positions = await parser.parse_keywords_from_wb(query, page, total_pages)
+                # Проверяем, найден ли наш nmid в результатах
+                if any(pos.nmid == nmid for pos in positions):
+                    found = True
+                    break
+                # Прерываем, если достигли максимальной страницы
+                if page >= total_pages.total_pages:
+                    break
+                # Небольшая задержка между запросами для избежания rate limiting
+                await asyncio.sleep(0.1)
+            nmids_to_index[nmid] = found
+        except Exception as e:
+            logger.error("Ошибка при проверке индекса для nmid %s, query '%s': %s",
+                           nmid, query, e, exc_info=True)
+            raise e
+
+    return nmids_to_index
+
+
+
+async def _get_wb_positions(
+    text: str, need_nmids: set[int], delay, page_limit=60
+) -> list[WBItemPosition]:
+    total_pages = TotalPages()
+    stop_event = asyncio.Event()
+    catch_any_position = asyncio.Event()
+    checked_pages: set[int] = set()
+    parsing_pages_queue: list[int] = await parsing_queue_manager.get_parsing_queue(
+        text, need_nmids, 60
+    )
+
+    positions: list[WBItemPosition] = []
     for page in parsing_pages_queue:
         if page not in total_pages.all_pages_list:
             continue
@@ -355,22 +464,21 @@ async def _add_wb_positions(
             break
         if len(need_nmids) == 0:
             break
-        try:
-            await add_positions_from_page(
-                stop_event,
-                catch_any_position,
-                text,
-                page,
-                need_nmids,
-                total_pages,
-                checked_pages,
-            )
-        except Exception as e:
-            logger.error(f"Ошибка при парсинге страницы {page}: {e}")
-            del e
+
+        pos: list[WBItemPosition] = await add_positions_from_page(
+            stop_event,
+            catch_any_position,
+            text,
+            page,
+            need_nmids,
+            total_pages,
+            checked_pages,
+        )
+        positions.extend(pos)
+
         checked_pages.add(page)
         await asyncio.sleep(delay)
-
+    not_found_positions = []
     for nmid in need_nmids:
         position = WBItemPosition(
             position=0,
@@ -379,10 +487,8 @@ async def _add_wb_positions(
             nmid=nmid,
         )
         not_found_positions.append(position)
-
-    if not_found_positions:
-        await add_wb_positions_to_redis(not_found_positions)
-    return
+    positions.extend(not_found_positions)
+    return positions
 
 
 async def add_wb_positions_to_redis(positions: list[WBItemPosition]):

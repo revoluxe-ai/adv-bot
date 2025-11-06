@@ -1,7 +1,6 @@
 __all__ = ("RedisClient",)
 
 import asyncio
-from abc import ABC
 from typing import Any, cast
 from collections.abc import Mapping
 from typing import TypeVar
@@ -11,14 +10,15 @@ from redis.asyncio.client import Pipeline
 
 T = TypeVar("T")
 
+# TODO: Инспектор Pycharm пишет, что cast-ы здесь не нужны, пока просто отключил инспецию, оставил только синтаксис
 
 def ensure_awaitable(obj: Awaitable[T] | T) -> Awaitable[T]:
     if hasattr(obj, "__await__"):
         return obj
     return asyncio.sleep(0, result=obj)
 
-
-class RedisClient(ABC):
+# TODO: Чтобы быстрее закинуть в прод убрал ABC из класса RedisClient
+class RedisClient:
     def __init__(self, redis_client: Redis) -> None:
         self._replica_read_client = redis_client
         self._replica_write_client = redis_client
@@ -114,10 +114,18 @@ class RedisClient(ABC):
         )
 
     # Методы для записи (через мастер)
-    async def set(self, key: str, value: str | bytes, ex: int | None = None) -> bool:
+    async def set(
+        self,
+        key: str,
+        value: str | bytes,
+        ex: int | None = None,
+        px: int | None = None,
+    ) -> bool:
         return cast(
             bool,
-            await ensure_awaitable(self._replica_write_client.set(key, value, ex=ex)),
+            await ensure_awaitable(
+                self._replica_write_client.set(key, value, ex=ex, px=px)
+            ),
         )
 
     async def set_if_not_exists(
@@ -144,6 +152,24 @@ class RedisClient(ABC):
         return cast(
             bool, await ensure_awaitable(self._replica_write_client.expire(key, time))
         )
+
+    async def pexpire(self, key: str, time_ms: int) -> bool | None:
+        result =  await ensure_awaitable(self._replica_write_client.pexpire(key, time_ms))
+        if isinstance(result, int):
+            if result == 1:
+                return True
+            else:
+                return False
+        else:
+            return None
+
+
+
+    async def ttl(self, key: str) -> int:
+        return cast(int, await ensure_awaitable(self._replica_read_client.ttl(key)))
+
+    async def pttl(self, key: str) -> int:
+        return cast(int, await ensure_awaitable(self._replica_read_client.pttl(key)))
 
     async def hset(self, name: str, key: str, value: str | bytes) -> int:
         if isinstance(value, bytes):
@@ -243,3 +269,14 @@ class RedisClient(ABC):
             results["write"] = await self.execute_write_pipeline(write_commands)
 
         return results
+
+    async def eval(
+        self,
+        script: str,
+        numkeys: int,
+        *keys_and_args: str | bytes | int,
+    ) -> Any:
+        """Execute a Lua script on the Redis server"""
+        return await ensure_awaitable(
+            self._replica_write_client.eval(script, numkeys, *keys_and_args)
+        )

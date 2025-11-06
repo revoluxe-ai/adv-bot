@@ -41,7 +41,7 @@ async def turn_white_list_update_off(
         )
         wb_cabinet = await session.execute(stmt)
         wb_cabinet = wb_cabinet.scalar()
-        wb_cabinet.white_list_update_active = False
+        wb_cabinet.white_list_update_active = False # type: ignore[attr-defined]
         await session.commit()
     chat_id = callback_query.message.chat.id
     await bot.send_message(

@@ -302,6 +302,43 @@ class Settings:
         return int(value)
 
     @property
+    def WB_RATE_LIMIT_BASE_DELAY_SEC(self) -> float:
+        value = os.getenv("WB_RATE_LIMIT_BASE_DELAY_SEC")
+        if not value:
+            return 0.1
+        return float(value)
+
+    @property
+    def WB_RATE_LIMIT_MAX_DELAY_SEC(self) -> float:
+        value = os.getenv("WB_RATE_LIMIT_MAX_DELAY_SEC")
+        if not value:
+            return 300.0
+        return float(value)
+
+    @property
+    def WB_RATE_LIMIT_MULTIPLIER(self) -> float:
+        value = os.getenv("WB_RATE_LIMIT_MULTIPLIER")
+        if not value:
+            return 2.0
+        return float(value)
+
+    @property
+    def WB_RATE_LIMIT_SUCCESS_THRESHOLD(self) -> int:
+        """Количество успехов подряд для уменьшения задержки."""
+        value = os.getenv("WB_RATE_LIMIT_SUCCESS_THRESHOLD")
+        if not value:
+            return 5
+        return int(value)
+
+    @property
+    def WB_RATE_LIMIT_DECREASE_FACTOR(self) -> float:
+        """Фактор уменьшения задержки при успехах (аддитивное уменьшение)."""
+        value = os.getenv("WB_RATE_LIMIT_DECREASE_FACTOR")
+        if not value:
+            return 0.05  # Уменьшаем на 50ms
+        return float(value)
+
+    @property
     def MAX_PARSING_PARALLEL_JOBS(self) -> int:
         value = os.getenv("MAX_PARSING_PARALLEL_JOBS")
         if not value:
@@ -472,6 +509,19 @@ class Settings:
             return ParsingQueueMode.SMART_QUEUE
         else:
             raise ValueError("Не верное значение в PARSING_QUEUE_MODE")
+
+    @property
+    def PARSE_LIMITER_ACTIVE(self) -> bool:
+        value = os.environ.get("PARSE_LIMITER_ACTIVE")
+        if value is None:
+            return True
+        value = value.lower()
+        if value == "false":
+            return False
+        elif value == "true":
+            return True
+        raise ValueError("Не верное значение в PARSE_LIMITER_ACTIVE")
+
 
 
 settings = Settings()
