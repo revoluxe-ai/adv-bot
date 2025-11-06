@@ -56,7 +56,8 @@ async def test_rate_limit_single_underlying_call(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr("app.utils.rate_limit.get_public_ip", stub_get_public_ip)
 
-    @rate_limited_request(manager)
+    # Use small values for testing to avoid long delays
+    @rate_limited_request(manager, max_retries=3, delay=0.01)
     async def underlying(x):  # noqa: WPS430
         calls.append(x)
         await asyncio.sleep(0.01)
@@ -75,8 +76,14 @@ async def test_rate_limit_single_underlying_call(monkeypatch: pytest.MonkeyPatch
 
     await asyncio.gather(*(runner(i) for i in range(3)))
 
-    # underlying should be awaited 3 times despite lock but calls[0] will raise
-    assert len(calls) == 3
+    # underlying(0) will be called 3 times (max_retries=3) before failing
+    # underlying(1) will be called 1 time and succeed
+    # underlying(2) will be called 1 time and succeed
+    # Total: 3 + 1 + 1 = 5 calls
+    assert len(calls) == 5, f"Expected 5 calls, got {len(calls)}: {calls}"
+    assert calls.count(0) == 3, "underlying(0) should be called 3 times (retries)"
+    assert calls.count(1) == 1, "underlying(1) should be called once"
+    assert calls.count(2) == 1, "underlying(2) should be called once"
 
     # After error first ip should be blocked
     assert manager.blocked is True

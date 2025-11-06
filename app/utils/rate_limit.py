@@ -12,6 +12,10 @@ from app.modules.wb_keywords_parser.wb_parser.excs import (
     TooManyRequestsInParserError,
     WBConnectionRateLimitError,
 )
+
+import typing
+if typing.TYPE_CHECKING:
+    from app.modules.wb_keywords_parser.wb_parser.rate_limit_manager import ParserRateLimitRedisManager
 from app.settings import settings
 from app.utils.net import get_public_ip
 
@@ -28,7 +32,10 @@ def _get_lock(ip: str) -> asyncio.Lock:
     return lock
 
 
-def rate_limited_request(rate_limit_manager: Any, max_retries: int = 50) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def rate_limited_request(rate_limit_manager: 'ParserRateLimitRedisManager',
+                         max_retries: int = 50,
+                         delay: float = settings.PARSING_LIMITER_DELAY)\
+                           -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Декоратор адаптивного rate-limit по IP.
 
     Сохраняет поведение: при 429 — увеличивает TTL экспоненциально, при успешных запросах
@@ -39,7 +46,7 @@ def rate_limited_request(rate_limit_manager: Any, max_retries: int = 50) -> Call
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             ip = await get_public_ip()
-            base = settings.WB_RATE_LIMIT_BASE_DELAY_SEC
+            base = delay
             mult = settings.WB_RATE_LIMIT_MULTIPLIER
             max_delay = settings.WB_RATE_LIMIT_MAX_DELAY_SEC
             success_threshold = 3
@@ -90,7 +97,7 @@ def rate_limited_request(rate_limit_manager: Any, max_retries: int = 50) -> Call
                             if time.time() - last_err >= cooldown:
                                 new_ttl = base
                             else:
-                                new_ttl = max(base, cur_ttl * 0.95)
+                                new_ttl = max([base, cur_ttl * 0.95])
 
                             if new_ttl <= base:
                                 await rate_limit_manager.delete_block(ip)

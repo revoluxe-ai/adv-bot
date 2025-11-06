@@ -3,7 +3,7 @@ import datetime
 import json
 import logging
 import re
-
+import typing
 import aiohttp
 from sqlalchemy.orm import load_only
 
@@ -11,12 +11,16 @@ from sqlalchemy.orm import load_only
 from aiohttp import ClientSession
 from dependency_injector.wiring import Provide, inject
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models import WBItemPosition, WBCard
 from app.modules.wb_adv_updater import data_manager
 from app.settings import settings
 from app.utils import redis_manager
 from app.utils.rate_limit import rate_limited_request
 from .excs import TooManyRequestsInParserError, WBConnectionRateLimitError
+
+if typing.TYPE_CHECKING:
+    from .rate_limit_manager import ParserRateLimitRedisManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +30,14 @@ class TotalPages:
         self._total_pages = 60
 
     @property
-    def total_pages(self):
+    def total_pages(self) -> int:
         return self._total_pages
 
     @total_pages.setter
-    def total_pages(self, value):
+    def total_pages(self, value: int) -> None:
         if value > 60:
             value = 60
-        self._total_pages = value
+        self._total_pages: int = value
 
     @property
     def all_pages_list(self):
@@ -65,19 +69,23 @@ def get_parse_url(text: str, page: int) -> str:
 
 class ParserService:
 
-    def __init__(self, rate_limit_manager=Provide['module_resources.wb_keywords_parser.rate_limit_manager']):
-        self._rate_limit_manager = rate_limit_manager
+    def __init__(self, rate_limit_manager: 'ParserRateLimitRedisManager' =Provide['module_resources.wb_keywords_parser.rate_limit_manager'],
+                 delay: float = settings.PARSING_LIMITER_DELAY):
+        self._rate_limit_manager: 'ParserRateLimitRedisManager' = rate_limit_manager
 
             # Применяем декоратор rate limiting к методу парсинга
-        self._parse_with_rate_limit = rate_limited_request(rate_limit_manager)(
-            self._parse_keywords_from_wb_impl
+        # TODO: Прошла ошибка на smoke test - из-за неаннотированости функции-обертки (декоратора) и отсутствия тестов
+
+        self._parse_with_rate_limit = rate_limited_request(rate_limit_manager, delay=delay)(
+            self._parse_keywords_from_wb_impl,
         )
 
     async def parse_keywords_from_wb(
-        self, text: str, page: int, total_pages: TotalPages
+        self, text: str, page: int, total_pages: TotalPages, delay: float = settings.PARSING_LIMITER_DELAY
     ) -> list[WBItemPosition]:
         first_place = page * 100 - 99
         try:
+            # TODO: Сделать тест на эту функцию, прошла ошибка на smoke test
             data = await self._parse_with_rate_limit(text, page)
             if data:
                 products, cluster, preset, total_items = data
@@ -147,7 +155,7 @@ class ParserService:
                 timestamp=datetime.datetime.now(),
                 adv_type=adv_type,
             )
-            positions.append(position)
+            positions.append(position) # pyright: ignore
 
             if cluster and cluster != text:
                 position = WBItemPosition(
@@ -158,28 +166,29 @@ class ParserService:
                     timestamp=datetime.datetime.now(),
                 )
 
-                positions.append(position)
+                positions.append(position) # pyright: ignore
 
-        return positions
+        return positions # pyright: ignore
 
     async def _parse_keywords_from_wb_impl(self,
         text: str,
-        page: int):
+        page: int,
+         ):
         # для проброса ошибок сети, интерпретируемых как слишком много запросов
         try:
             result = await self.__parse_keywords_from_wb_impl(text, page)
-            return result
+            return result # pyright: ignore
         except aiohttp.ClientError as e:
             raise WBConnectionRateLimitError("Rate limit exceeded in ParserService") from e
 
 
     @inject
-    async def __parse_keywords_from_wb_impl(self,
+    async def __parse_keywords_from_wb_impl(self, # pyright: ignore
                                            text: str,
                                            page: int,
                                            client: ClientSession = Provide['http_sessions.aiohttp_client_for_parser'],
                                            ) -> tuple[
-        list[dict] | None,
+        list[dict[typing.Any, typing.Any]] | None, # pyright: ignore
         str | None,
         int | None,
         int | None,
@@ -222,10 +231,10 @@ class ParserService:
             cluster = text
         else:
             catalog_value = metadata["catalog_value"]
-            preset = int(re.search(r"preset=(\d+)", catalog_value).group(1))
+            preset = int(re.search(r"preset=(\d+)", catalog_value).group(1)) # pyright: ignore
             cluster = metadata["normquery"]
         total_items = data["data"]["total"]
-        products = data["data"]["products"]
+        products: list[typing.Any] = data["data"]["products"]
 
         if not products:
             logger.info(f"Нет продуктов для ключа {text} на странице {page}")
@@ -243,14 +252,11 @@ class ParserService:
             raise TooManyRequestsInParserError("Слишком много запросов к серверу WB")
 
 
-def _create_rate_limit_manager():
+# TODO: Мертвый код, удалить после проверки
+@inject
+def _create_rate_limit_manager(client: RedisClient = Provide["redis_client"]) -> "ParserRateLimitRedisManager": # pyright: ignore
     try:
-        from app.core.redis_manager_v2.redis_client import RedisClient
-        from .rate_limit_manager import ParserRateLimitRedisManager
-        from app.utils.redis_manager import redis_master_client
-
-        redis_wrapper = RedisClient(redis_master_client)
-        return ParserRateLimitRedisManager(redis_client=redis_wrapper)
+        return ParserRateLimitRedisManager(redis_client=client)
     except Exception as e:
         logger.warning(f"Не удалось создать rate_limit_manager: {e}. Rate limiting отключен.")
         raise e
@@ -297,7 +303,7 @@ async def add_positions_from_page(
         raise e
 
 
-async def add_wb_positions_to_clickhouse(positions) -> None:
+async def add_wb_positions_to_clickhouse(positions: list[WBItemPosition]) -> None:
     await data_manager.add_positions_to_clickhouse(positions)
 
 
@@ -338,7 +344,9 @@ async def _add_positions_from_page(
         )
         # Ставка больше не доступна при парсинге, блок вычисления max_bet удален
         for position in positions:
-            nmid: int = position.nmid
+            nmid: int | None = position.nmid
+            if nmid is None:
+                raise RuntimeError("nmid не может быть None в позиции")
             need_nmids.discard(nmid)
             if not need_nmids:
                 stop_event.set()
@@ -349,7 +357,9 @@ async def _add_positions_from_page(
 # TODO: Сделать проверку прав токенов check запросами к WB
 
 async def add_wb_positions(
-    text: str, need_nmids: set[int], delay, page_limit=60
+    text: str, need_nmids: set[int],
+        delay: float = settings.PARSING_LIMITER_DELAY,
+        page_limit: int = 60
 ) -> list[WBItemPosition]:
     """
     Функция подходит только для карточек, которые точно есть в базе. Если какой-то нет - логика сломается
@@ -364,8 +374,8 @@ async def add_wb_positions(
 
     """
     original_nmids = set(need_nmids)
-    in_indexes: dict[int, bool] = await __check_index(text, need_nmids)
-    not_found_positions = []
+    in_indexes: dict[int, bool | None] = await __check_index(text, need_nmids, delay=delay)
+    not_found_positions: list[WBItemPosition] = []
     for nmid, in_index in in_indexes.items():
         if not in_index:
             position = WBItemPosition(
@@ -388,8 +398,9 @@ async def add_wb_positions(
 async def __check_index(
     text: str,
     need_nmids: set[int],
+    delay: float = settings.PARSING_LIMITER_DELAY,
     parser: ParserService = Provide['module_resources.wb_keywords_parser.parser_service']
-) -> dict[int, bool]:
+) -> dict[int, bool | None]:
     """
     Проверяет, находятся ли товары в индексе по запросу "бренд + текст".
     Проверяет до 60 страниц, прерывая поиск при нахождении нужного артикула.
@@ -415,19 +426,34 @@ async def __check_index(
         nmid = card.nmid
         brand = card.brand
         query = f'{brand} {text}'
-        positions = await _get_wb_positions(
-            query,
-            {nmid},
-            0.1,
-      60)
-        found_item_flag = any([pos.nmid == nmid and pos.position > 0 for pos in positions])
-        nmids_to_index[nmid] = found_item_flag
+        found = False
+
+        # Проверяем до 60 страниц, прерывая при нахождении артикула
+        try:
+            total_pages = TotalPages()
+            for page in range(1, 61):
+                positions = await parser.parse_keywords_from_wb(query, page, total_pages, delay)
+                # Проверяем, найден ли наш nmid в результатах
+                if any(pos.nmid == nmid for pos in positions):
+                    found = True
+                    break
+                # Прерываем, если достигли максимальной страницы
+                if page >= total_pages.total_pages:
+                    break
+                # Небольшая задержка между запросами для избежания rate limiting
+                await asyncio.sleep(0.1)
+            nmids_to_index[nmid] = found
+        except Exception as e:
+            logger.error("Ошибка при проверке индекса для nmid %s, query '%s': %s",
+                           nmid, query, e, exc_info=True)
+            raise e
+
     return nmids_to_index
 
 
 
 async def _get_wb_positions(
-    text: str, need_nmids: set[int], delay, page_limit=60
+    text: str, need_nmids: set[int], delay: float, page_limit: int =60
 ) -> list[WBItemPosition]:
     total_pages = TotalPages()
     stop_event = asyncio.Event()
@@ -463,7 +489,7 @@ async def _get_wb_positions(
 
         checked_pages.add(page)
         await asyncio.sleep(delay)
-    not_found_positions = []
+    not_found_positions: list[WBItemPosition] = []
     for nmid in need_nmids:
         position = WBItemPosition(
             position=0,

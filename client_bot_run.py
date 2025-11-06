@@ -126,6 +126,8 @@ async def telegram_webhook(request: Request):
     return {"status": "ok"}
 
 
+# TODO: Сделать полноценные Smoke Тесты, чтобы не гонять реальные магазины
+
 # Запуск в зависимости от режима
 if __name__ == "__main__":
     import uvicorn

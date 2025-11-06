@@ -510,18 +510,15 @@ class Settings:
         else:
             raise ValueError("Не верное значение в PARSING_QUEUE_MODE")
 
+
     @property
-    def PARSE_LIMITER_ACTIVE(self) -> bool:
-        value = os.environ.get("PARSE_LIMITER_ACTIVE")
-        if value is None:
-            return True
-        value = value.lower()
-        if value == "false":
-            return False
-        elif value == "true":
-            return True
-        raise ValueError("Не верное значение в PARSE_LIMITER_ACTIVE")
+    def PARSING_LIMITER_DELAY(self) -> float:
+        value = os.getenv("PARSING_LIMITER_DELAY")
+        if not value:
+            return 0.1
+        return float(value)
 
 
 
+# TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()
