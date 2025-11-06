@@ -63,7 +63,7 @@ async def parsing_keywords_for_adv_generator(
     parsing_limit: int = get_parsing_limit()
     for keyword in sorted_keywords[:parsing_limit]:
         text = keyword.text
-        nmid = keyword.nmid
+        nmid = adv.nmids[0]
         views_now = keyword.views or 0
         position = keyword.position  # позиция: int | None | 0 | -1
         last_update: datetime | None = keyword.position_update
