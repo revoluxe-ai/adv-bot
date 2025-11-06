@@ -419,9 +419,9 @@ async def __check_index(
                 await asyncio.sleep(0.1)
             nmids_to_index[nmid] = found
         except Exception as e:
-            logger.warning(f"Ошибка при проверке индекса для nmid {nmid}, query '{query}': {e}")
-            # В случае ошибки считаем, что товар не в индексе
-            nmids_to_index[nmid] = False
+            logger.warning("Ошибка при проверке индекса для nmid %s, query '%s': %s",
+                           nmid, query, e, exc_info=True)
+            raise e
     
     return nmids_to_index
 
