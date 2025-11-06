@@ -351,6 +351,18 @@ async def _add_positions_from_page(
 async def add_wb_positions(
     text: str, need_nmids: set[int], delay, page_limit=60
 ) -> list[WBItemPosition]:
+    """
+    Функция подходит только для карточек, которые точно есть в базе. Если какой-то нет - логика сломается
+
+    Args:
+        text:
+        need_nmids:
+        delay:
+        page_limit:
+
+    Returns:
+
+    """
     in_indexes: dict[int, bool] = await __check_index(text, need_nmids)
     not_found_positions = []
     for nmid, in_index in in_indexes.items():
@@ -386,7 +398,11 @@ async def __check_index(text,
     async with sm(read_only=True) as session:
         result = await session.execute(stmt)
         wb_cards = result.scalars().all()
-    nmids_to_index: dict[int, bool] = {}
+    nmids_in_cards = {card.nmid for card in wb_cards}
+    if not nmids_in_cards == need_nmids:
+        missing_nmids = set(need_nmids) - set(nmids_in_cards)
+        raise RuntimeError(f"Некоторые nmids не найдены в базе WBCard при проверке индексации {missing_nmids}")
+    nmids_to_index: dict[int, bool | None] = {}
     for card in  wb_cards:
         nmid = card.nmid
         brand = card.brand
@@ -396,10 +412,8 @@ async def __check_index(text,
             {nmid},
             0.1,
       60)
-        if positions:
-            nmids_to_index[nmid] = True
-        else:
-            nmids_to_index[nmid] = False
+        found_item_flag = any([pos.nmid == nmid and pos.position > 0 for pos in positions])
+        nmids_to_index[nmid] = found_item_flag
     return nmids_to_index
 
 
