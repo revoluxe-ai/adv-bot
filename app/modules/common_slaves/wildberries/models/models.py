@@ -2,10 +2,14 @@ import datetime
 import json
 import logging
 import re
+from sqlalchemy.orm.properties import MappedColumn
+from sqlalchemy.orm.properties import MappedColumn
+from sqlalchemy.orm.properties import MappedColumn
+from sqlalchemy.orm.properties import MappedColumn
 import typing
 from dataclasses import dataclass
 from enum import Enum
-from typing import cast
+from typing import Any, cast
 
 import jwt
 from jwt import DecodeError
@@ -206,14 +210,14 @@ class WBToken(BaseTable):
     def get_payload(self, key: str) -> str | int | None:
         payload = self.__payload
         value = payload.get(key)
-        if isinstance(value, (str, int)) or value is None:
+        if isinstance(value, (str | int)) or value is None:
             return value
         return None
 
     @property
     def __expires(self) -> datetime.datetime:
         exp = self.__payload.get("exp")
-        if isinstance(exp, (int, float, str)):
+        if isinstance(exp, (int | float | str)):
             # Make the datetime timezone-aware (UTC)
             return datetime.datetime.fromtimestamp(int(exp), tz=datetime.UTC)
         raise NotValidTokenError
@@ -431,7 +435,7 @@ class AdvSetting(BaseTable):
     auto_max_cpm_mode = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
-    max_place = mapped_column(Integer, nullable=True)
+    max_place: MappedColumn[int] = mapped_column(Integer, nullable=True)
     use_incremental_stats = mapped_column(
         Boolean,
         nullable=False,
@@ -454,7 +458,7 @@ class AdvSetting(BaseTable):
     )
     _search_adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=settings.BIDDER_STEP)
-    exponent_predict_ctr = mapped_column(
+    exponent_predict_ctr: Mapped[float]  = mapped_column(
         Float,
         nullable=False,
         default=settings.DEFAULT_CTR_EXPONENTA,
@@ -480,12 +484,16 @@ class AdvSetting(BaseTable):
     auto_update_target_place: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
+    auto_update_exponent: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=True, server_default="true"
+    )
+
     max_balance_adding_for_day: Mapped[int] = mapped_column(
         Integer, nullable=True, default=0, server_default="0"
     )
 
-    auto_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
-    auction_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
+    auto_adv_target_status: MappedColumn[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    auction_adv_target_status: MappedColumn[bool | None] = mapped_column(Boolean, nullable=True, default=None)
     auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=True, server_default=text("true")
     )
@@ -509,6 +517,12 @@ class AdvSetting(BaseTable):
         default=FactMethods.DIRECT_SALES,  # экземпляр Enum
         server_default=FactMethods.DIRECT_SALES.name,
     )  # строка
+
+    # TODO: Навести порядок в боте, со стороны клиента
+
+    automatic_version: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=1, server_default="1"
+    )
 
     __table_args__ = (
         # Составной индекс для основного запроса
@@ -561,6 +575,7 @@ class AdvSetting(BaseTable):
     def search_adv_id(self, value: int) -> None:
         self._search_adv_id = value
 
+    #
     @property
     def max_pay_for_order(self) -> int | None:
         pattern = re.compile(
@@ -570,7 +585,7 @@ class AdvSetting(BaseTable):
         if match:
             return int(match.group(1))
         return None
-
+    
     @property
     def auto_max_bid(self) -> bool:
         pattern = re.compile(

@@ -6,8 +6,9 @@ from ..mixins_protocol import RedisCacheMixinsProtocol
 
 
 class AdvSettingRedisCache(ABC, RedisCacheMixinsProtocol):
-    def __init__(self, adv: AdvSetting):
+    def __init__(self, adv: AdvSetting, decode_bytes: bool = True) -> None:
         self.__unique_id: str = str(adv.adv_id)
+        super().__init__(decode_bytes)
 
     @property
     def _unique_id(self) -> str:

@@ -1,31 +1,25 @@
 """Redis-кэширование для управления экспонентой."""
-
-from app.core.redis_cache.mixins.data_types.pass_time_redis_cache_base import (
-    PassTimeRedisCacheBase,
-)
-from app.core.redis_cache.mixins.main_objects_mixins.adv_setting_redis_cache import (
-    AdvSettingRedisCache,
-)
-from app.core.redis_cache.redis_cache_base import RedisCacheBase
+from app.core.redis_cache import  RedisCacheBase
+from app.core.redis_cache.mixins.data_types.pass_time_redis_cache_base import PassTimeRedisCacheBase
+from ..redis_cache_wrapper import RedisCacheAdvSettingsWrapper as AdvSettingRedisCache
 
 
-class LastExponentRaiseV2(
+PASS_TIME = 15 * 60  # 15 минут между изменениями
+
+
+class LastExponentRaiseV2( # pyright: ignore[reportIncompatibleVariableOverride]
     AdvSettingRedisCache,
     RedisCacheBase,
     PassTimeRedisCacheBase,
     prefix="LastExponentRaiseV2",
 ):
-    """Redis-кэш для отслеживания времени последнего повышения экспоненты."""
-
     pass
 
 
-class LastExponentDownV2(
+class LastExponentDownV2( # pyright: ignore[reportIncompatibleVariableOverride]
     AdvSettingRedisCache,
     RedisCacheBase,
     PassTimeRedisCacheBase,
     prefix="LastExponentDownV2",
 ):
-    """Redis-кэш для отслеживания времени последнего понижения экспоненты."""
-
     pass

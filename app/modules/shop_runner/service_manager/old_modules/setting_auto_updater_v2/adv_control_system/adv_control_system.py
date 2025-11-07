@@ -9,12 +9,7 @@
 # TODO: Настроить мощность исполнителям
 
 import logging
-from collections.abc import Awaitable
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
-from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
 )
@@ -49,15 +44,15 @@ class AdvControlSystem:
         self.max_last_period = max_last_period
         self.planner = ScenarioPlanner()
 
-    async def process_adv(self, complex_adv: ComplexAdv) -> None:
+    async def process_adv(self, complex_adv: ComplexAdv, force: float = 1) -> None:
 
-        keywords = await complex_adv.keywords_coro
+        keywords = await complex_adv.get_keywords()
         adv = complex_adv.adv_setting
         # 2. Получаем план
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
         if not plan:
             logger.debug(
-                f"[adv_id={adv.adv_id}] План не установлен, пропускаем обработку"
+                "[adv_id=%s] План не установлен, пропускаем обработку", adv.adv_id
             )
             return
 
@@ -66,10 +61,11 @@ class AdvControlSystem:
         fact = await updater.get_fact_data(keywords)
 
         # 3.1. Проверяем, изменились ли план и факт с прошлого раза
-        plan_fact_change = ChangePlanFact(adv)
+        plan_fact_change = ChangePlanFact(adv, decode_bytes=False)
         if await plan_fact_change.check_equal_in_cache(plan, fact):
             logger.debug(
-                f"[adv_id={adv.adv_id}] План и факт не изменились с прошлого раза, пропускаем"
+                "[adv_id=%s] План и факт не изменились с прошлого раза, пропускаем",
+                adv.adv_id,
             )
             return
 
@@ -78,39 +74,43 @@ class AdvControlSystem:
 
         if state is None:
             logger.info(
-                f"[adv_id={adv.adv_id}] Недостаточно данных для определения состояния"
+                "[adv_id=%s] Недостаточно данных для определения состояния", adv.adv_id
             )
             return
 
         if state == SalesStates.OPTIMAL:
             logger.info(
-                f"[adv_id={adv.adv_id}] Состояние OPTIMAL — действий не требуется"
+                "[adv_id=%s] Состояние OPTIMAL — действий не требуется", adv.adv_id
             )
             return
 
-        # 5. Устанавливаем силу реакции (на первом этапе всегда = 1)
-        force = ForceContext(value=3)
+
+        force_obj = ForceContext(value=force)
 
         logger.debug(
-            f"[adv_id={adv.adv_id}] Состояние: {state.name}, "
-            f"plan_orders={plan.orders}, fact_orders={fact.predict_orders:.1f}, "
-            f"target_pay={plan.target_pay_for_order}, max_pay={plan.max_pay_for_order}, "
-            f"fact_pay={fact.pay_for_order:.1f}"
+            "[adv_id=%s] Состояние: %s, plan_orders=%s, fact_orders=%.1f, target_pay=%s, max_pay=%s, fact_pay=%.1f",
+            adv.adv_id,
+            state.name,
+            plan.orders,
+            fact.predict_orders,
+            plan.target_pay_for_order,
+            plan.max_pay_for_order,
+            fact.pay_for_order,
         )
 
         # 6. Создаём контекст и запускаем сценарий
         async with sm() as session:
             ctx = PipelineContext(
-                adv=adv,
-                keywords=keywords,
+                complex_adv=complex_adv,
                 plan=plan,
                 fact=fact,
                 session=session,
                 state=state,
-                force=force,
+                force=force_obj,
             )
 
             await self.planner.run_for_state(ctx)
+            await session.commit()
 
         # 7. Сохраняем новое состояние план-факт
         await plan_fact_change.set_new_plan_fact(plan, fact)

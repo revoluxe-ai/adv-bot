@@ -192,7 +192,7 @@ class MainAdvManager:
 
 
     @staticmethod
-    async def get_adv_ids_rows_by_nmid(nmid: int) -> list[tuple[int, int]]:
+    async def get_adv_ids_rows_by_nmid(nmid: int) -> list[tuple[int, int | None]]:
         async with sm() as session:
             stmt = select(AdvSetting)\
                 .options(load_only(AdvSetting.adv_id,
@@ -241,7 +241,7 @@ class MainAdvManager:
         net = balances.net
         bonus = balances.bonus
         full_balance: list[int] = [balance, net, bonus]
-        logger.debug(f"Балансы: {full_balance}")
+        logger.debug("Балансы: %s", full_balance)
         if (
             sum(full_balance) >= 2000
             or len(list(filter(lambda x: x >= 1000, full_balance))) >= 2

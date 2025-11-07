@@ -46,7 +46,7 @@ class FaissManager:
 
     @property
     def background_images(self):
-        return self._background_images # type: ignore[attr-defined]
+        return self._background_images  # type: ignore[attr-defined]
 
     @property
     def keyword_phrases(self):
@@ -70,7 +70,7 @@ class FaissManager:
 
     def __get_index(self, images: Query | list[Image], file_path):
         if not os.path.exists(file_path):
-            index = self.__create_new_index(images, file_path) # type: ignore[attr-defined]
+            index = self.__create_new_index(images, file_path)  # type: ignore[attr-defined]
             return index
         else:
             try:
@@ -78,11 +78,11 @@ class FaissManager:
                 ntotal = index.ntotal
             except RuntimeError as exc:
                 logger.error(exc)
-                index = self.__create_new_index(images, file_path) # type: ignore[attr-defined]
+                index = self.__create_new_index(images, file_path)  # type: ignore[attr-defined]
                 ntotal = index.ntotal
 
             if ntotal != images.count():
-                index = self.__create_new_index(images, file_path) # type: ignore[attr-defined]
+                index = self.__create_new_index(images, file_path)  # type: ignore[attr-defined]
             return index
 
     def _get_background_images_index(self):
@@ -94,7 +94,7 @@ class FaissManager:
         return index
 
     def __get_index_by_criteria(self, file_path, query_condition=None):
-        s = self._db.Session() # type: ignore[attr-defined]
+        s = self._db.Session()  # type: ignore[attr-defined]
         # Создаем базовый запрос
         images = s.query(Image)
         # Применяем условие, если оно было передано
@@ -135,7 +135,7 @@ class FaissManager:
     def _get_keywords_index(self, vector_property):
         file_name = "keyword.index"
         file_path = self.__get_file_path(file_name)
-        s = self._session_maker() # type: ignore[attr-defined]
+        s = self._session_maker()  # type: ignore[attr-defined]
         keywords = s.query(Keyword).filter(
             getattr(Keyword, vector_property) is not None
         )
@@ -151,7 +151,7 @@ class FaissManager:
     def get_keyword_phrases_index(self):
         file_name = "keyword_phrase.index"
         file_path = self.__get_file_path(file_name)
-        keyword_phrase = self._neo4j.get_all_keyword_phrase() # type: ignore[attr-defined]
+        keyword_phrase = self._neo4j.get_all_keyword_phrase()  # type: ignore[attr-defined]
         index = Index(
             keyword_phrase,
             "vector",

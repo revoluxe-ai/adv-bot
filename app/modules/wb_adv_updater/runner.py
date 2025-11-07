@@ -34,7 +34,7 @@ async def run_update_predict_ctr() -> None:
 
 
 async def run_update_all_keywords_on_wb() -> None:
-    async with await DIManager.create(AppContainer): # type: ignore[attr-defined]
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         async with ClientSession() as client_session:
             while True:
                 try:
@@ -84,7 +84,7 @@ async def process_payment_for_advs() -> None:
         process_payment_for_advs as billing_process_payment_for_advs,
     )
 
-    async with await DIManager.create(AppContainer): # type: ignore[attr-defined]
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         """Запуск один раз в сутки в 3:00, с параллельной обработкой всех магазинов."""
         while True:
             now = datetime.datetime.now()
@@ -138,7 +138,7 @@ async def main_loop() -> None:
 async def run_main_coroutines() -> None:
     from app.core.di.app_container import AppContainer
 
-    async with await DIManager.create(AppContainer): # type: ignore[attr-defined]
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         await __run_main_coroutines()
 
 

@@ -41,7 +41,7 @@ async def run_process() -> None:
     # Запуск процесса без явного lifecycle-менеджмента, ресурсы не требуются
     # TODO: При необходимости добавить точечную инициализацию ресурсов (например, Redis)
     try:
-        async with await DIManager.create(AppContainer): # type: ignore[attr-defined]
+        async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
             await run_process_func.run()
     except ShopRunnerCriticalError as exc:
         logger.critical(f"Критическая ошибка в процессе: {exc}", exc_info=True)

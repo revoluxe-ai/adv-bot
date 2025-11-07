@@ -3,16 +3,20 @@ from abc import ABC, abstractmethod
 import typing
 
 import redis
+from dependency_injector.wiring import inject, Provide
+
+from app.core.redis_manager_v2.redis_client import RedisClient
 
 redis_host = os.environ.get("REDIS_HOST")
 assert redis_host is not None, "REDIS_HOST environment variable not set"
 
-redis_client = redis.asyncio.Redis(host=redis_host, port=6379, db=0)
-
 
 class RedisCacheBase(ABC):
     _prefix: str
-    _client: redis.asyncio.Redis = redis_client
+
+
+    def __init__(self, decode_bytes: bool = True) -> None:
+        self._decode_bytes = decode_bytes
 
     @property
     @abstractmethod
@@ -28,9 +32,18 @@ class RedisCacheBase(ABC):
     def _key(self) -> str:
         return f"{self._prefix}:{self._unique_id}"
 
+    @inject
+    def __get_client(self, client: RedisClient = Provide["redis_client_wrapper"]) -> RedisClient: # noqa
+        return client
+
+
     @property
-    def client(self) -> redis.asyncio.Redis:
-        return self._client
+    def client(self) -> RedisClient:
+        return self.__get_client()
+
+    @property
+    def _client(self) -> RedisClient:
+        return self.client
 
     @property
     def key(self) -> str:

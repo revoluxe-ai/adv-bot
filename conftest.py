@@ -1,13 +1,20 @@
 # mypy: ignore-errors
-
+from tests.factories import adv_factory
 import os
-from collections.abc import AsyncGenerator
+
 import asyncio
-from unittest.mock import MagicMock, AsyncMock
+
+from fakeredis import FakeRedis
+
 from app.core.di import AppContainer
 import aiofiles
 from dependency_injector import containers
 
+from typing import AsyncGenerator
+
+import fakeredis
+
+from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
 
 # Устанавливаем переменные окружения для тестовой БД ДО любых импортов
 os.environ["POSTGRES_MASTER_HOST"] = "localhost"
@@ -45,7 +52,7 @@ import dotenv
 dotenv.load_dotenv(override=False)
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 # Подставляем заглушку для app.core.wb_api.http_request до реальных импортов
@@ -65,6 +72,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.pool import NullPool
 
 from app.modules.common_slaves.wildberries.models import WBCabinet
 
@@ -265,16 +273,16 @@ def setup_test_database(docker_compose_cmd):
 
 
 
-@pytest.fixture(scope="session", name="async_engine")
-def _async_engine():
-    """Создаёт async движок для всей сессии тестов."""
-    engine = create_async_engine(TEST_DB_URL, echo=False)
+@pytest.fixture(scope="function", name="async_engine")
+async def _async_engine():
+    """Создаёт async движок для каждого теста."""
+    engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
     yield engine
-    # Cleanup будет выполнен pytest-asyncio в своём event loop
+    await engine.dispose()
 
 
 @pytest.fixture(name="async_session")
-async def _async_session(async_engine) -> AsyncSession:
+async def _async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     """Создаёт async сессию с откатом после теста."""
     async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
     async with async_session_maker() as session:
@@ -451,7 +459,7 @@ def keywords_mocks() -> list[MagicMock]:
 
 
 @pytest.fixture(name='front_too_many_requests_str', scope='function')
-async def front_too_many_requests_str() -> AsyncGenerator[str]:
+async def front_too_many_requests_str() -> AsyncGenerator[str, None]:
     async with aiofiles.open('tests/wb_front_responses/too-many-requests.txt',
                              mode='r',
                              encoding='utf-8') as f:
@@ -461,7 +469,7 @@ async def front_too_many_requests_str() -> AsyncGenerator[str]:
 
 
 
-
+# TODO: Разработать методологию оценки сроков разработки новых фич, багфиксов и рефакторингов, а также стратегии укладывания в сроки.
 
 
 @pytest.fixture(name="di_container", scope="function")
@@ -473,3 +481,122 @@ async def di_container() -> AsyncGenerator[AppContainer, None]:
 
     yield container
 
+
+
+@pytest.fixture(scope="function")
+async def postgres_session(async_engine):
+    async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
+    async with async_session_maker() as session:
+        yield session
+
+
+@pytest.fixture(scope='function')
+async def fake_redis():
+    """Создает фейковый Redis для тестов (асинхронная версия)."""
+    redis = await fakeredis.aioredis.FakeRedis()
+    yield redis
+    await redis.flushall()  # очищаем после теста
+    await redis.close()
+
+
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+
+
+
+
+
+# TODO: Внедрить исполнителя, который будет тормозить не эффективные РК и запускать потом их снова
+# TODO Сделать более информативно какие РК сколько жрут
+# TODO: Сделать исполнителя, который будет глушить слова сверху вниз и снизу вверх
+# TODO Сделать дашборд по эффективности работы платных клиентов и самому писать им - это будет про-активная поддержка. С сортировкой по эффективности
+
+@pytest.fixture(scope='function')
+async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexAdv, None]:
+    """Создает полностью связанную структуру ComplexAdv (реальные ORM-объекты)."""
+
+    await postgres_session.begin()
+    adv_setting = AdvSettingFactory.build()
+    search_adv_setting = AdvSettingFactory.build()
+    adv_setting._search_adv = search_adv_setting.adv_id
+    postgres_session.add(adv_setting)
+    await postgres_session.flush()
+    await postgres_session.refresh(adv_setting)
+    # 2️⃣ KeywordSettings
+    adv_factory.fake.unique.clear()
+    keyword_settings = [
+        KeywordSettingFactory.build(adv_setting_id=adv_setting.id,)
+        for _ in range(50)
+    ]
+    postgres_session.add_all(keyword_settings)
+    await postgres_session.flush()
+    for ks in keyword_settings:
+        await postgres_session.refresh(ks)
+
+    # 3️⃣ CalculatedKeywords
+    from tests.factories.keyword_pipeline import generate_calculated_keywords
+    calculated_keywords = generate_calculated_keywords(keyword_settings)
+
+    # 4️⃣ Асинхронный источник данных для ComplexAdv
+    async def get_keywords_func(_: AdvSetting) -> list[CalculatedKeyword]:
+        return calculated_keywords
+
+    # 5️⃣ Реальный ComplexAdv
+    complex_adv = ComplexAdv(
+        adv_setting=adv_setting,
+        get_keywords_func=get_keywords_func,
+        search_adv=search_adv_setting,
+    )
+
+    yield complex_adv
+    await postgres_session.rollback()
+
+
+
+@pytest.fixture(scope='function')
+def complex_adv_mock(complex_adv):
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+    return complex_adv
+
+
+
+
+@pytest.fixture(scope='function')
+async def sm_generator(postgres_session):
+    class _FakeSessionMaker:
+        def __call__(self, *args, **kwargs):
+            return self  # имитируем async context
+        async def __aenter__(self):
+            return postgres_session
+        async def __aexit__(self, exc_type, exc, tb):
+            pass
+
+    return _FakeSessionMaker()
+
+
+@pytest.fixture(autouse=True)
+async def clean_db(async_engine):
+    """Очищает таблицы перед каждым тестом."""
+    yield  # Сначала выполняем тест
+    # Очистка после теста
+    async with async_engine.begin() as conn:
+        await conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(scope='function')
+def main_di_container() -> AppContainer:
+    from app.core.di import AppContainer
+
+    container = AppContainer()
+    return container
+
+
+
+
+@pytest.fixture(scope='function')
+def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRedis) -> AppContainer:
+    main_di_container.wiring_config.modules = ['app.core.redis_cache',  # Отключаем автоматическое встраивание зависимостей
+                                       "old_modules.setting_auto_updater_v2.adv_control_system."
+                                       "executors.target_place_executor.utils",
+                                       ]
+    main_di_container.redis_client.override(fake_redis)
+    return main_di_container

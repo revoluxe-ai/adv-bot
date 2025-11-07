@@ -20,7 +20,7 @@ def create_redis_client(redis_config: AppConfig) -> Redis:
 
 class AppContainer(containers.DeclarativeContainer):
     """Главный DI-контейнер приложения. Содержит все основные сервисы и конфигурации."""
-
+    # TODO: Варить надо те контейенры, которые инжектим
     wiring_config = containers.WiringConfiguration(
         packages=[
             "app.core.redis_manager_v2",
@@ -31,9 +31,13 @@ class AppContainer(containers.DeclarativeContainer):
             "app.client_bot",  # client_bot utils используют data_manager
             "app.modules.wb_adv_updater",  # wb_adv_updater использует min_ctr_manager
             "app.modules.wb_keywords_parser.wb_parser",
-            "app.utils.net"
+            "app.utils.net",
+            "app.core.redis_cache",
+
         ]
     )
+
+    # TODO: Нужен еще тест, который проверяет не забыл ли я что приварить
 
     settings = providers.Singleton(AppConfig.create)
     redis_client = providers.Singleton(

@@ -17,7 +17,7 @@ class AddingMessageTaskMiddleWare(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        user_telegram_id = event.from_user.id # type: ignore[attr-defined]
+        user_telegram_id = event.from_user.id  # type: ignore[attr-defined]
         await redis_manager.set_last_user_use_time(user_telegram_id)
         await handler(event, data)
 

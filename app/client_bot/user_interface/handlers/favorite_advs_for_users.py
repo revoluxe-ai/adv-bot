@@ -38,7 +38,7 @@ async def add_to_favorites(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
-        user.favorites_advs.append(adv) # type: ignore[attr-defined]
+        user.favorites_advs.append(adv)  # type: ignore[attr-defined]
         await session.commit()
         await bot.send_message(callback.message.chat.id, "Кампания в избранное")
     return
@@ -63,7 +63,7 @@ async def remove_from_favorites(
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
         adv = await session.execute(stmt)
         adv = adv.scalar()
-        user.favorites_advs.remove(adv) # type: ignore[attr-defined]
+        user.favorites_advs.remove(adv)  # type: ignore[attr-defined]
         await session.commit()
         await bot.send_message(
             callback.message.chat.id, "Кампания удалена из избранного"
