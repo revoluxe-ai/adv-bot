@@ -102,4 +102,4 @@ class Index:
 
     @property
     def objects(self):
-        return self._objects # type: ignore[attr-defined]
+        return self._objects  # type: ignore[attr-defined]

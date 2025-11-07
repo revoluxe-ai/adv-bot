@@ -31,10 +31,10 @@ async def turn_on_min_ctr(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv: AdvSetting = adv.scalar()
-        adv.target_ctr_mode = False
+        adv.target_ctr_mode = False  # type: ignore[attr-defined]
         await session.commit()
 
-    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
+    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)  # type: ignore[attr-defined]
     return
 
 
@@ -51,9 +51,9 @@ async def on_target_ctr(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv: AdvSetting = adv.scalar()
-        adv.target_ctr_mode = True
+        adv.target_ctr_mode = True  # type: ignore[attr-defined]
         await session.commit()
-    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
+    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)  # type: ignore[attr-defined]
     return
 
 
@@ -72,9 +72,9 @@ async def turn_on_forward_mode(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv: AdvSetting = adv.scalar()
-        adv.target_ctr_mode_strategy = "forward"
+        adv.target_ctr_mode_strategy = "forward"  # type: ignore[attr-defined]
         await session.commit()
-    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
+    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)  # type: ignore[attr-defined]
     return
 
 
@@ -93,9 +93,9 @@ async def turn_on_keep_mode(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv: AdvSetting = adv.scalar()
-        adv.target_ctr_mode_strategy = "keep"
+        adv.target_ctr_mode_strategy = "keep"  # type: ignore[attr-defined]
         await session.commit()
-    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
+    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)  # type: ignore[attr-defined]
     return
 
 
@@ -107,5 +107,5 @@ async def strategy_setting(
     state: FSMContext,
 ):
     adv_original_id = callback_data.adv_setting_original_id
-    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)
+    await messages.StrategySetting(bot, callback.message.chat.id)(adv_original_id)  # type: ignore[attr-defined]
     return

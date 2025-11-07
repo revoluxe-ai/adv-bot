@@ -119,3 +119,4 @@ def rate_limited_request(rate_limit_manager: 'ParserRateLimitRedisManager',
         return wrapper
 
     return decorator
+

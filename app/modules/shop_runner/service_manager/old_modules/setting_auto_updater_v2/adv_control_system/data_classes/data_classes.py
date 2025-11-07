@@ -4,14 +4,11 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
-from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
     PlanData,
 )
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
 )
@@ -21,7 +18,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 class ForceContext:
     """Сила реакции adv-управления (на первом этапе всегда = 1)."""
 
-    value: int
+    value: float
 
     def weaken(self, efficiency: float) -> "ForceContext":
         """Ослабляет силу с учётом эффективности исполнителя.
@@ -32,7 +29,9 @@ class ForceContext:
         Returns:
             Новый ForceContext с ослабленной силой
         """
-        new_value = max(0, int(self.value * (1 - efficiency)))
+        new_value = self.value - efficiency
+        if new_value < 0:
+            new_value = 0
         return ForceContext(value=new_value)
 
 
@@ -49,10 +48,10 @@ class ExecutionResult:
 class PipelineContext:
     """Контекст исполнения каскада действий для одной кампании (adv)."""
 
-    adv: AdvSetting
-    keywords: list[CalculatedKeyword]
+    complex_adv: ComplexAdv
     plan: PlanData
     fact: FactData
     session: AsyncSession
     state: SalesStates
     force: ForceContext
+    

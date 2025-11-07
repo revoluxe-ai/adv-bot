@@ -1,3 +1,4 @@
+
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -20,15 +21,17 @@ def get_next_down_exponent(
     :return: новое значение экспоненты exp_new или None
     """
 
-    keywords = get_candidates_to_leader(keywords)
-    if not keywords:
+    # TODO: Переделать неизменяемые списки на Sequence
+
+    keywords_candidates = get_candidates_to_leader(keywords)
+    if not keywords_candidates:
         return None
 
     # 1️⃣ текущий вес
     w_now = (exponent_now - 1) / 19
 
     # 2️⃣ текущий лидер
-    leader = get_leader(keywords)
+    leader = get_leader(keywords_candidates)
     if not leader:
         return None
     ctr_L, views_L = leader.predict_ctr, leader.views
@@ -36,29 +39,29 @@ def get_next_down_exponent(
     possible_ws: list[float] = []
 
     # 3️⃣ считаем все точки пересечения
-    for cand in keywords:
+    for cand in keywords_candidates:
         if cand is leader:
             continue
 
         ctr_i, views_i = cand.predict_ctr, cand.views
-        numerator = ctr_L * views_L - ctr_i * views_i
-        denominator = ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L
+        numerator: float = ctr_L * views_L - ctr_i * views_i # pyright: ignore
+        denominator: float = ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L # pyright: ignore
 
         if denominator == 0:
             continue  # прямые параллельны
 
-        w_new = numerator / denominator
+        w_new: float = numerator / denominator # pyright: ignore
 
         # интересуют пересечения при снижении экспоненты
         if 0 <= w_new < w_now:
-            possible_ws.append(w_new)
+            possible_ws.append(w_new) # pyright: ignore
 
     # 4️⃣ если нет пересечений — проверим exp=1
     if not possible_ws:
         # Посчитаем рейтинги при exp=1 (w=0)
-        for kw in keywords:
+        for kw in keywords_candidates:
             kw._tmp_rating = kw.predict_ctr * kw.views  # type: ignore[attr-defined]
-        new_leader = max(keywords, key=lambda k: k._tmp_rating)  # type: ignore[attr-defined]
+        new_leader = max(keywords_candidates, key=lambda k: k._tmp_rating)  # type: ignore[attr-defined]
         if new_leader is leader:
             return None  # даже при exp=1 лидер не меняется
         else:

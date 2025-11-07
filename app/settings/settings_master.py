@@ -7,6 +7,20 @@ if TYPE_CHECKING:
         ParsingQueueMode,
     )
 
+# TODO: Доделать рассылку по боту, сделать оффер и разослать
+
+# TODO: Решить ошибку при ручном обновлении позиций:  сделать допнастройки, проверять более медленно, желательно через arq, как долгосрочную задачу, чтобы не терялась
+
+# TODO: Сделать встроенную в бот ИИ поддержку, и для моих чатов, и для юзеров
+
+# TODO Сделать CI с прогоном тестов и линтеров, поправить инструкции для Копилота в Git Hub
+
+# TODO: Придумать более надежный способ проверки ключей на индексацию, сейчас хромает, если по запросу бренд + ключ очень много предложений
+
+# TODO: Поменять ссылку на старый канал в боте на видео
+
+# TODO: Сделать уведомлятор об исправлении ошибок в боте
+
 dotenv.load_dotenv()
 import os
 
@@ -238,7 +252,8 @@ class Settings:
         return os.environ.get("POSTGRES_PASSWORD")
 
     @property
-    def ssl_mode(self) -> str:
+    def ssl_mode(self) -> str | None:
+        # TODO: Тут работало и с None, но Copilot ругался, что будет Рантайм эррор, Smoke-тест прошел
         value = os.environ.get("POSTGRES_SSL_MODE")
         if value is None:
             return 'disable'
@@ -434,18 +449,37 @@ class Settings:
             return int(value)
 
     @property
+    def FULL_AUTO_UPDATE_PRICE(self) -> int:
+        value = os.getenv("FULL_AUTO_UPDATE_PRICE")
+        if not value:
+            return 5000
+        else:
+            return int(value)
+
+
+    @property
     def WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF(self) -> int:
         value = os.getenv("WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF")
         if not value:
-            return 2500
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
         return int(value)
 
     @property
     def AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF(self) -> int:
         value = os.getenv("AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF")
         if not value:
-            return 2500
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
         return int(value)
+
+    @property
+    def AUTO_UPDATE_EXPONENT_MONTH_TARIFF(self) -> int:
+        value = os.getenv("AUTO_UPDATE_EXPONENT_MONTH_TARIFF")
+        if not value:
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
+        return int(value)
+
+
+
 
     @property
     def SHOP_UPDATE_TIMEOUT_MINUTES(self) -> int:

@@ -13,11 +13,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
     BaseExecutor,
 )
 from .redis_cache import LastExponentDownV2
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+
 from ..exponent_executor.utils.get_next_down_exponent import get_next_down_exponent
-from ..exponent_executor.utils import utils
+
 
 logger = logging.getLogger(__name__)
 
@@ -38,52 +36,64 @@ class ExponentDownExecutor(BaseExecutor):
         Returns:
             ExecutionResult с результатом операции
         """
-        redis_cache = LastExponentDownV2(ctx.adv)
+        if not ctx.complex_adv.is_exponent_control_enabled:
+            logger.debug(
+                "[adv_id=%s] ExponentDown: управление экспонентой выключено, пропускаем",
+                ctx.complex_adv.adv_id,
+            )
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
+
+        redis_cache = LastExponentDownV2(ctx.complex_adv.adv_setting)
 
         # Проверка rate-limiting
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
             logger.debug(
-                f"[adv_id={ctx.adv.adv_id}] ExponentDown: rate-limit не прошёл"
+                "[adv_id=%s] ExponentDown: rate-limit не прошёл", ctx.complex_adv.adv_id
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
-        current_exponent = ctx.adv.exponent_predict_ctr
+        current_exponent = ctx.complex_adv.exponent_predict_ctr
 
         # Проверка лимита
         if current_exponent <= self.MIN_EXPONENT:
             logger.debug(
-                f"[adv_id={ctx.adv.adv_id}] ExponentDown: достигнут минимум "
-                f"(current={current_exponent}, min={self.MIN_EXPONENT})"
+                "[adv_id=%s] ExponentDown: достигнут минимум (current=%.2f, min=%.2f)",
+                ctx.complex_adv.adv_id,
+                current_exponent,
+                self.MIN_EXPONENT,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
-
+        keywords = await ctx.complex_adv.get_keywords()
         # Понижаем экспоненту
-        new_exponent = get_next_down_exponent(current_exponent, ctx.keywords)
+        new_exponent = get_next_down_exponent(current_exponent, keywords)
 
         if new_exponent is None:
             logger.debug(
-                f"[adv_id={ctx.adv.adv_id}] ExponentDown: не удалось рассчитать новый шаг "
+                "[adv_id=%s] ExponentDown: не удалось рассчитать новый шаг",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         if new_exponent == current_exponent:
             logger.debug(
-                f"[adv_id={ctx.adv.adv_id}] ExponentDown: экспонента не изменится"
+                "[adv_id=%s] ExponentDown: экспонента не изменится", ctx.complex_adv.adv_id
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         # Обновляем в БД
         stmt = (
             update(AdvSetting)
-            .where(AdvSetting.id == ctx.adv.id)
+            .where(AdvSetting.id == ctx.complex_adv.db_id)
             .values({"exponent_predict_ctr": new_exponent})
         )
-        await ctx.session.execute(stmt)
+        _ = await ctx.session.execute(stmt)
         await redis_cache.set()
 
         logger.info(
-            f"[adv_id={ctx.adv.adv_id}] ExponentDown: "
-            f"{current_exponent:.2f} → {new_exponent:.2f}"
+            "[adv_id=%s] ExponentDown: %.2f -> %.2f",
+            ctx.complex_adv.adv_id,
+            current_exponent,
+            new_exponent,
         )
 
         # Efficiency зависит от величины изменения, на первом этапе просто 1

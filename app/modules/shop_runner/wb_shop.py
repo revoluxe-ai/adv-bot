@@ -21,6 +21,10 @@ class WBShop:
     async def run(self) -> None:
         wb_api = self._wb_api
         coroutines_manager = CoroutinesManager(wb_api)
+
+        # TODO: !!! Надо еще добавить проверку на что отключено что включено из автоматизации в новой верссии  и добавить кнопку управления
+        #  автоэкспонентой, и именить тарификацию за автоматизацию, т.к. теперь управляющих сущности три
+
         await asyncio.gather(
             self._alive_worker_run(),
             coroutines_manager.parsing_keywords_run(),

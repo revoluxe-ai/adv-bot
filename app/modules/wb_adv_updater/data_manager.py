@@ -900,10 +900,16 @@ async def get_min_ctr(adv: AdvSetting) -> float:
     return min_ctr
 
 
+# TODO: Улучшить автоуправление РК
+# TODO: Сделать более точным прогноз продаж и себеса
+
 def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | None:
+    # TODO: Функция упала бы на Smoke-тесте при пустом списке ключевых слов и упала на полной фильтрации
     if not keywords:
         return None
-
+    keywords = [kw for kw in keywords if kw.position is not None and kw.position >= 0]
+    if not keywords:
+        return None
     best_keyword = sorted(
         keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True
     )[0]
@@ -1005,7 +1011,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
 
 
 async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None:
-    await redis_manager.set_black_phrases(adv_setting_id, keywords) # type: ignore[attr-defined]
+    await redis_manager.set_black_phrases(adv_setting_id, keywords)  # type: ignore[attr-defined]
     async with _sm(read_only=False) as session:
         stmt = (
             select(KeywordSetting)
@@ -1035,7 +1041,7 @@ async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None
 
 
 async def check_by_black_list_template(keyword_text: str, adv_setting_id: int) -> bool:
-    black_keywords = await redis_manager.get_black_phrases(adv_setting_id) # type: ignore[attr-defined]
+    black_keywords = await redis_manager.get_black_phrases(adv_setting_id)  # type: ignore[attr-defined]
     keyword_text_lower = keyword_text.lower().strip()
 
     for black_phrase in black_keywords:
@@ -1051,7 +1057,7 @@ async def check_by_black_list_template(keyword_text: str, adv_setting_id: int) -
 
 
 async def reset_black_phrases(adv_setting_id: int) -> None:
-    await redis_manager.set_black_phrases(adv_setting_id, []) # type: ignore[attr-defined]
+    await redis_manager.set_black_phrases(adv_setting_id, [])  # type: ignore[attr-defined]
 
 
 async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None:
@@ -1224,7 +1230,7 @@ ORDER BY date, text
         result = result.result_rows
         return [
             WBItemPosition(nmid=nmid, position=row[1], timestamp=row[0])
-            for row in result # type: ignore[attr-defined]
+            for row in result  # type: ignore[attr-defined]
         ]
 
 

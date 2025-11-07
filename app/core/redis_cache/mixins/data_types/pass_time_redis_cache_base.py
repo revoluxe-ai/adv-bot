@@ -18,12 +18,15 @@ class PassTimeRedisCacheBase(ABC, RedisCacheMixinsProtocol):
     async def set(self) -> None:
         now = datetime.datetime.now()
         timestamp = now.isoformat()
-        await self._client.set(self._key, timestamp)
+        await self.client.set(self._key, timestamp)
 
     async def get(self) -> datetime.datetime | None:
-        value_bytes = await self._client.get(self._key)
+        value_bytes = await self.client.get(self._key)
         if not value_bytes:
             return None
-        value = value_bytes.decode()
+        if self._decode_bytes:
+            value = value_bytes.decode()
+        else:
+            value = value_bytes
         timestamp = datetime.datetime.fromisoformat(value)
         return timestamp

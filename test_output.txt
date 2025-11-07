@@ -1,0 +1,129 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.11.0, pytest-8.0.2, pluggy-1.4.0 -- C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\vkita\my_code\meta-repo\adv-bot
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-0.21.0, cov-7.0.0
+asyncio: mode=Mode.AUTO
+collecting ... collected 1 item
+
+pytest : INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+строка:1 знак:1
++ pytest tests\modules\wb_keywords_parser\test_rate_limited_parser.py:: ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO  [alembic....PostgresqlImpl.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running stamp_revision  -> 0748ab0202a6
+2025-11-02 19:28:22 - DEBUG - root:56 - ╦юушЁютрэшх эрёЄЁюхэю єёях°эю!
+2025-11-02 19:28:22 - DEBUG - root:56 - ╦юушЁютрэшх эрёЄЁюхэю єёях°эю!
+2025-11-02 19:28:23 - DEBUG - neo4j.pool:508 - [#0000]  _: <POOL> created, direct address IPv4Address(('10.244.173.214', 7687))
+2025-11-02 19:28:23 - DEBUG - neo4j.pool:508 - [#0000]  _: <POOL> created, direct address IPv4Address(('10.244.173.214', 7687))
+2025-11-02 19:28:23 - DEBUG - neo4j.pool:508 - [#0000]  _: <POOL> created, direct address IPv4Address(('10.244.173.214', 7687))
+2025-11-02 19:28:23 - DEBUG - neo4j.pool:508 - [#0000]  _: <POOL> created, direct address IPv4Address(('10.244.173.214', 7687))
+2025-11-02 19:28:23 - DEBUG - neo4j.pool:508 - [#0000]  _: <POOL> created, direct address IPv4Address(('10.244.173.214', 7687))
+2025-11-02 19:28:23 - DEBUG - neo4j.pool:508 - [#0000]  _: <POOL> created, direct address IPv4Address(('10.244.173.214', 7687))
+2025-11-02 19:28:23 - INFO - app.modules.cabinet_bonus_manager.bonus_scene:513 - ╤Ўхэр єяЁртыхэш  сюэєёрьш єёях°эю чрЁхушёЄЁшЁютрэр
+2025-11-02 19:28:23 - DEBUG - neo4j.pool:508 - [#0000]  _: <POOL> created, direct address IPv4Address(('10.244.173.214', 7687))
+2025-11-02 19:28:23 - DEBUG - faiss.loader:62 - Environment variable FAISS_OPT_LEVEL is not set, so let's pick the instruction set according to the current CPU
+2025-11-02 19:28:23 - INFO - faiss.loader:86 - Loading faiss with AVX2 support.
+2025-11-02 19:28:23 - INFO - faiss.loader:88 - Successfully loaded faiss with AVX2 support.
+2025-11-02 19:28:23.685135: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn
+ them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2025-11-02 19:28:25 - DEBUG - tensorflow:34 - Falling back to TensorFlow client; we recommended you install the Cloud TPU client directly with pip install cloud-tpu-client.
+2025-11-02 19:28:26 - DEBUG - h5py._conv:47 - Creating converter from 7 to 5
+2025-11-02 19:28:26 - DEBUG - h5py._conv:47 - Creating converter from 5 to 7
+2025-11-02 19:28:26 - DEBUG - h5py._conv:47 - Creating converter from 7 to 5
+2025-11-02 19:28:26 - DEBUG - h5py._conv:47 - Creating converter from 5 to 7
+2025-11-02 19:28:26.692208: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn
+ them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2025-11-02 19:28:27.802058: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2025-11-02 19:28:28 - DEBUG - aiocache.serializers.serializers:10 - ujson module not found, using json
+2025-11-02 19:28:28 - DEBUG - aiocache:26 - aiomcache not installed, Memcached unavailable
+tests/modules/wb_keywords_parser/test_rate_limited_parser.py::test_parser_blocks_ip_on_too_many_requests 
+[SETUP] Starting Docker Compose: C:\Users\vkita\my_code\meta-repo\adv-bot\tests\docker-compose.test.yml
+[WAIT] Waiting for test database... Attempt 1/30
+[WAIT] Waiting for test database... Attempt 2/30
+[WAIT] Waiting for test database... Attempt 3/30
+[WAIT] Waiting for test database... Attempt 4/30
+[WAIT] Waiting for test database... Attempt 5/30
+[OK] Test database is healthy.
+[MIGRATION] Creating PostgreSQL extensions...
+[MIGRATION] Creating tables from models metadata...
+[OK] Tables created successfully from models metadata.
+[MIGRATION] Stamping Alembic migrations for test database...
+[OK] Alembic migrations stamped successfully.
+[OK] Test database setup complete.
+DEBUG: _parse_with_rate_limit = <function rate_limited_request.<locals>.decorator.<locals>.wrapper at 0x0000020C91B132E0>
+DEBUG: mock_impl = <AsyncMock id='2253112600208'>
+DEBUG: mock_impl.side_effect = 429 Too Many Requests
+DEBUG: Result = [], NO EXCEPTION RAISED!
+DEBUG: mock_impl called: True, call_count: 1
+FAILED
+[CLEANUP] Stopping Docker Compose: C:\Users\vkita\my_code\meta-repo\adv-bot\tests\docker-compose.test.yml
+[OK] Cleanup complete.
+
+
+================================== FAILURES ===================================
+_________________ test_parser_blocks_ip_on_too_many_requests __________________
+tests\modules\wb_keywords_parser\test_rate_limited_parser.py:85: in test_parser_blocks_ip_on_too_many_requests
+    raise AssertionError("Expected TooManyRequestsInParserError but got no exception")
+E   AssertionError: Expected TooManyRequestsInParserError but got no exception
+============================== warnings summary ===============================
+app\utils\db\base.py:5
+  C:\Users\vkita\my_code\meta-repo\adv-bot\app\utils\db\base.py:5: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+..\..\..\..\..\python311\Lib\inspect.py:573: 10 warnings
+tests/modules/wb_keywords_parser/test_rate_limited_parser.py: 120 warnings
+  C:\python311\Lib\inspect.py:573: PydanticDeprecatedSince20: The `__fields__` attribute is deprecated, use `model_fields` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+    value = getter(object, key)
+
+.venv\Lib\site-packages\pydantic\_internal\_model_construction.py:248: 10 warnings
+tests/modules/wb_keywords_parser/test_rate_limited_parser.py: 120 warnings
+  C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\pydantic\_internal\_model_construction.py:248: PydanticDeprecatedSince20: The `__fields__` attribute is deprecated, use `model_fields` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+    warnings.warn('The `__fields__` attribute is deprecated, use `model_fields` instead.', DeprecationWarning)
+
+tests/modules/wb_keywords_parser/test_rate_limited_parser.py::test_parser_blocks_ip_on_too_many_requests
+  C:\Users\vkita\my_code\meta-repo\adv-bot\app\utils\image_master\database\model.py:25: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/modules/wb_keywords_parser/test_rate_limited_parser.py::test_parser_blocks_ip_on_too_many_requests
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+====================== 1 failed, 262 warnings in 28.12s =======================
+
+[EMERGENCY CLEANUP] Compose down: C:\Users\vkita\my_code\meta-repo\adv-bot\tests\docker-compose.test.yml
+C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\neo4j\_sync\driver.py:493: DeprecationWarning: Relying on Driver's destructor to close the session is deprecated. Please make sure to close the session. Use it as
+ a context (`with` statement) or make sure to call `.close()` explicitly. Future versions of the driver will not close drivers automatically.
+2025-11-02 19:28:34 - DEBUG - neo4j.pool:475 - [#0000]  _: <POOL> close
+C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\neo4j\_sync\driver.py:493: DeprecationWarning: Relying on Driver's destructor to close the session is deprecated. Please make sure to close the session. Use it as
+ a context (`with` statement) or make sure to call `.close()` explicitly. Future versions of the driver will not close drivers automatically.
+2025-11-02 19:28:34 - DEBUG - neo4j.pool:475 - [#0000]  _: <POOL> close
+C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\neo4j\_sync\driver.py:493: DeprecationWarning: Relying on Driver's destructor to close the session is deprecated. Please make sure to close the session. Use it as
+ a context (`with` statement) or make sure to call `.close()` explicitly. Future versions of the driver will not close drivers automatically.
+2025-11-02 19:28:34 - DEBUG - neo4j.pool:475 - [#0000]  _: <POOL> close
+C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\neo4j\_sync\driver.py:493: DeprecationWarning: Relying on Driver's destructor to close the session is deprecated. Please make sure to close the session. Use it as
+ a context (`with` statement) or make sure to call `.close()` explicitly. Future versions of the driver will not close drivers automatically.
+2025-11-02 19:28:34 - DEBUG - neo4j.pool:475 - [#0000]  _: <POOL> close
+C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\neo4j\_sync\driver.py:493: DeprecationWarning: Relying on Driver's destructor to close the session is deprecated. Please make sure to close the session. Use it as
+ a context (`with` statement) or make sure to call `.close()` explicitly. Future versions of the driver will not close drivers automatically.
+2025-11-02 19:28:34 - DEBUG - neo4j.pool:475 - [#0000]  _: <POOL> close
+C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\neo4j\_sync\driver.py:493: DeprecationWarning: Relying on Driver's destructor to close the session is deprecated. Please make sure to close the session. Use it as
+ a context (`with` statement) or make sure to call `.close()` explicitly. Future versions of the driver will not close drivers automatically.
+2025-11-02 19:28:34 - DEBUG - neo4j.pool:475 - [#0000]  _: <POOL> close
+C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\neo4j\_sync\driver.py:493: DeprecationWarning: Relying on Driver's destructor to close the session is deprecated. Please make sure to close the session. Use it as
+ a context (`with` statement) or make sure to call `.close()` explicitly. Future versions of the driver will not close drivers automatically.
+2025-11-02 19:28:34 - DEBUG - neo4j.pool:475 - [#0000]  _: <POOL> close
+Exception ignored in: <function AbstractConnection.__del__ at 0x0000020BEFB89E40>
+Traceback (most recent call last):
+  File "C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\redis\asyncio\connection.py", line 246, in __del__
+  File "C:\Users\vkita\my_code\meta-repo\adv-bot\.venv\Lib\site-packages\redis\asyncio\connection.py", line 253, in _close
+  File "C:\python311\Lib\asyncio\streams.py", line 344, in close
+  File "C:\python311\Lib\asyncio\proactor_events.py", line 108, in close
+  File "C:\python311\Lib\asyncio\base_events.py", line 758, in call_soon
+  File "C:\python311\Lib\asyncio\base_events.py", line 519, in _check_closed
+RuntimeError: Event loop is closed
