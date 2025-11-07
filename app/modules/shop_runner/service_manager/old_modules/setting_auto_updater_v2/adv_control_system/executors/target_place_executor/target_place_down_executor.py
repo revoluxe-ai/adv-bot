@@ -92,7 +92,7 @@ class TargetPlaceDownExecutor(BaseExecutor):
         current_position = best_keyword.position
         if current_position is None:
             raise RuntimeError('current_position не может быть None здесь т.к. такое отфильтровали в utils.get_best_keyword')
-        if current_position == 0 or current_position < new_place:  # если новое целевое место и так уже ниже текущей позиции
+        if current_position == 0 or current_position + 1 < new_place:  # логика в том, что если товар не спускается, то смысла нет дальше снижать ЦП
             logger.debug(
                 "[adv_id=%s] TargetPlaceDown: текущее место (%s) уже ниже или равно новому целевому месту (%s), понижение не имеет смысла",
                 adv_id,
