@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 async def update_model() -> None:
     # TODO: Сделать нормальный контекстый менеджер для DI
-    async with await DIManager.create(AppContainer): # type: ignore[attr-defined]
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         await run()
 
 

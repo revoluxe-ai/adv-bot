@@ -20,6 +20,9 @@ from app.modules.shop_runner.auction_boost_mode_settings import (
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
     auto_updater_target_place_setting_router,
 )
+from app.modules.shop_runner.service_manager.auto_updater_version_toggle import (
+    auto_updater_version_toggle_router,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater import (
     AutoWhiteListUpdaterRouter,
 )
@@ -52,6 +55,7 @@ from .user_interface.handlers import (
     orders_source_toggle,
     predict_ctr_mode_toggle,
     sales_predict_method_toggle,
+    auto_update_exponent_toggle,
     reset_place_setting,
     setting_min_ctr,
     shop_settings,
@@ -73,11 +77,13 @@ common_router.message.middleware.register(ReturnToStart())
 
 common_router.include_routers(manual_update_phrase_position_router)
 common_router.include_router(auto_updater_target_place_setting_router)
+common_router.include_routers(auto_updater_version_toggle_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(orders_source_toggle.router)
 common_router.include_routers(predict_ctr_mode_toggle.router)
 common_router.include_routers(sales_predict_method_toggle.router)
+common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_max_cpm_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)

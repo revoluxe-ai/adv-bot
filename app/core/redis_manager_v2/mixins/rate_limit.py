@@ -17,7 +17,7 @@ if TYPE_CHECKING:
         async def _reset_error_counter(self, ip: str) -> None: ...
         def _ts_key(self, ip: str) -> str: ...
         def _get_key(self, ip: str) -> str: ... # Add _get_key to the protocol
-    
+
     # Use TypeAlias for better readability and to combine types for self
     _SelfType: TypeAlias = BaseRedisManager | _RateLimitProto
 

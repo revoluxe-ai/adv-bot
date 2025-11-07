@@ -87,7 +87,7 @@ class ScenarioPlanner:
 
         if not executors:
             logger.info(
-                f"[adv_id={ctx.adv.adv_id}] Состояние {ctx.state.name}: "
+                f"[adv_id={ctx.complex_adv.adv_id}] Состояние {ctx.state.name}: "
                 "действий не требуется"
             )
             return

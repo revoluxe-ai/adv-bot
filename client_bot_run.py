@@ -169,7 +169,7 @@ if __name__ == "__main__":
                 from app.core.di.app_container import AppContainer
                 from app.core.di.di_manager import DIManager
 
-                async with await DIManager.create(AppContainer): # type: ignore[attr-defined]
+                async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
                     async with ClientSession() as client_session:
                         dp = Dispatcher(client_session=client_session)
                         dp.include_router(global_router)

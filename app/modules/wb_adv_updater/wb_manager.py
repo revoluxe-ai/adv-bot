@@ -116,9 +116,9 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
             )
             if not text_val:
                 continue
-
+# TODO: Решить проблему со спамом в чате
             date_val = kw.date
-            if isinstance(date_val, (datetime.datetime | datetime.date)):
+            if isinstance(date_val, (datetime.datetime, datetime.date)):
                 date_str = date_val.strftime("%Y-%m-%d")
             else:
                 continue
@@ -215,7 +215,9 @@ async def update_all_keyword_data(
     except Exception as exc:
         logger.error(
             "Ошибка обновления статистики ключевых слов для магазина: %s, кампании: %s",
-            shop_id, adv_setting.id, exc_info=True
+            shop_id,
+            adv_setting.id,
+            exc_info=True,
         )
         raise exc
     try:

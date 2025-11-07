@@ -31,52 +31,67 @@ class ExponentRaiseExecutor(BaseExecutor):
         Returns:
             ExecutionResult с результатом операции
         """
-        redis_cache = LastExponentRaiseV2(ctx.adv)
+        if not ctx.complex_adv.is_exponent_control_enabled:
+            logger.debug(
+                "[adv_id=%s] ExponentRaise: управление экспонентой выключено, пропускаем",
+                ctx.complex_adv.adv_id,
+            )
+            return ExecutionResult(success=False, efficiency=0.0, used_power=0)
+
+        redis_cache = LastExponentRaiseV2(ctx.complex_adv.adv_setting)
 
         # Проверка rate-limiting
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
             logger.debug(
-                f"[adv_id={ctx.adv.adv_id}] ExponentRaise: rate-limit не прошёл"
+                "[adv_id=%s] ExponentRaise: rate-limit не прошёл", ctx.complex_adv.adv_id
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
-        current_exponent = ctx.adv.exponent_predict_ctr
+        current_exponent = ctx.complex_adv.exponent_predict_ctr
 
         # Проверка лимита
         if current_exponent >= self.MAX_EXPONENT:
             logger.debug(
-                f"[adv_id={ctx.adv.adv_id}] ExponentRaise: достигнут максимум "
-                f"(current={current_exponent}, max={self.MAX_EXPONENT})"
+                "[adv_id=%s] ExponentRaise: достигнут максимум (current=%.2f, max=%.2f)",
+                ctx.complex_adv.adv_id,
+                current_exponent,
+                self.MAX_EXPONENT,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
+        
+        keywords = await ctx.complex_adv.get_keywords()
 
         # Повышаем экспоненту
-        new_exponent = get_next_raise_exponent(current_exponent, ctx.keywords)
+        new_exponent = get_next_raise_exponent(current_exponent, keywords)
 
         if new_exponent is None:
             logger.debug(
-                f"[adv_id={ctx.adv.adv_id}] ExponentRaise: не удалось рассчитать новый шаг "
+                "[adv_id=%s] ExponentRaise: не удалось рассчитать новый шаг",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         if new_exponent == current_exponent:
             logger.debug(
-                f"[adv_id={ctx.adv.adv_id}] ExponentRaise: экспонента не изменится"
+                "[adv_id=%s] ExponentRaise: экспонента не изменится", ctx.complex_adv.adv_id
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         # Обновляем в БД
         stmt = (
             update(AdvSetting)
-            .where(AdvSetting.id == ctx.adv.id)
+            .where(AdvSetting.id == ctx.complex_adv.db_id)
             .values({"exponent_predict_ctr": new_exponent})
         )
-        await ctx.session.execute(stmt)
+        _ = await ctx.session.execute(stmt)
+        await ctx.session.commit()
         await redis_cache.set()
 
         logger.info(
-            f"[adv_id={ctx.adv.adv_id}] ExponentRaise: "
-            f"{current_exponent:.2f} → {new_exponent:.2f}"
+            "[adv_id=%s] ExponentRaise: %.2f -> %.2f",
+            ctx.complex_adv.adv_id,
+            current_exponent,
+            new_exponent,
         )
 
         # Efficiency зависит от величины изменения, на первом этапе просто 1

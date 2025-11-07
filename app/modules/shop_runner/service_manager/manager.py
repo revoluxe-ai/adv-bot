@@ -33,6 +33,7 @@ from .old_modules.setting_auto_updater import (
 )
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .wb_shop_data_manager import WBShopDataManager
+from .wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 
@@ -65,7 +66,7 @@ class CoroutinesManager:
         adv_settings = [adv for adv in adv_settings if adv.bidder_active]
         if not adv_settings:
             return None
-        logger.debug(f"Обновляю ставки для магазина {self.shop_id}")
+        logger.debug("Обновляю ставки для магазина %s", self.shop_id)
         await asyncio.gather(
             *[
                 self.__run_bidder_process_for_adv(adv, self._wb_api)
@@ -182,69 +183,39 @@ class CoroutinesManager:
                         settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
                     )  # Добавляем небольшую задержку между задачами
                     logger.info(
-                        f"Добавлен ключ '{text}' для артикула {nmid} в очередь парсинга"
+                        "Добавлен ключ '%s' для артикула %s в очередь парсинга",
+                        text,
+                        nmid,
                     )
-
-
-    @while_coroutine_decorator(5 * 60)
-    async def adv_settings_auto_update_v2(self):
-        active_advs = await self._wb_shop_data_manager.get_active_advs()
-
-        control_system = AdvControlSystem(max_last_period=2)
-
-        process_coroutines = []
-        for adv in active_advs:
-            # Проверяем, включены ли новые режимы автообновления
-            if not (adv.auto_update_white_list or adv.auto_update_target_place):
-                continue
-
-            keywords_coroutine = self._wb_shop_data_manager.get_calculated_keywords(adv)
-            process_coroutines.append(control_system.process_adv(adv, keywords_coroutine))
-
-        if not process_coroutines:
-            logger.debug(f"[shop_id={self.shop_id}] Нет кампаний для обработки AdvControlSystem v2")
-            return
-
-        try:
-            await asyncio.gather(*process_coroutines)
-        except Exception as exc:
-            logger.error(
-                f"Критическая ошибка автообновления настроек РК v2 {exc}",
-                exc_info=True,
-            )
-            # Не перебрасываем исключение, чтобы не останавливать весь менеджер
-
-
-
-
-
-
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
-        active_advs = await self._wb_shop_data_manager.get_active_advs()
-
+        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         update_tasks = []
         last_days_for_analyze = 2
-        for adv in active_advs:
-            if not (adv.auto_update_white_list or adv.auto_update_target_place):
-                continue
-            adv_updater = AdvSettingAutoUpdater(adv, last_days_for_analyze)
-            keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
-            adv_update = adv_updater.update(keywords)
-            adv_update_task = asyncio.create_task(adv_update)
-            update_tasks.append(adv_update_task)
-
-        for task in update_tasks:
-            try:
-                await task
-            except Exception as exc:
+        control_system_v2 = AdvControlSystem(max_last_period=2)
+        # TODO: Внедрить в бот плату за оборот
+        for adv in advs:
+            if adv.auto_update_setting_version == 1:
+                adv_setting = adv.adv_setting
+                adv_updater = AdvSettingAutoUpdater(adv_setting, last_days_for_analyze)
+                keywords_coro = adv.get_keywords()
+                adv_update = adv_updater.update(keywords_coro)
+                adv_update_task = asyncio.create_task(adv_update)
+                update_tasks.append(adv_update_task)
+            elif adv.auto_update_setting_version == 2:
+                adv_update_task = control_system_v2.process_adv(adv)
+                update_tasks.append(adv_update_task)
+            else:
                 logger.error(
-                    f"Критическая ошибка автообновления настроек РК {exc}",
-                    exc_info=True,
+                    "[adv_id=%s] Неизвестная версия автообновления настроек: %s",
+                    adv.adv_setting.adv_id,
+                    adv.auto_update_setting_version,
                 )
-                exc.__traceback__ = None
-                del exc
+
+        await asyncio.gather(*update_tasks)
+        return None
 
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:
@@ -274,7 +245,7 @@ class CoroutinesManager:
             try:
                 await task
             except FirstKeyUpdaterError as exc:
-                logger.error(f"Ошибка обновления верхнего ключа: {exc}", exc_info=True)
+                logger.error("Ошибка обновления верхнего ключа: %s", exc, exc_info=True)
                 raise exc
 
     @while_coroutine_decorator(60, 10)
@@ -285,7 +256,7 @@ class CoroutinesManager:
         advs = await self._wb_shop_data_manager.get_active_advs()
 
         if not advs:
-            logger.debug(f"Нет активных кампаний для магазина {self.shop_id}")
+            logger.debug("Нет активных кампаний для магазина %s", self.shop_id)
             return
 
         predict_ctr_manager = PredictCTRUpdateManager()
@@ -294,7 +265,9 @@ class CoroutinesManager:
             all_coroutines = []
 
             logger.info(
-                f"Начинаем обновление прогнозов CTR для {len(advs)} кампаний магазина {self.shop_id}"
+                "Начинаем обновление прогнозов CTR для %s кампаний магазина %s",
+                len(advs),
+                self.shop_id,
             )
 
             # Собираем корутины для всех кампаний

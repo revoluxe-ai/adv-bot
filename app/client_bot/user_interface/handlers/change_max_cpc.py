@@ -27,7 +27,7 @@ async def to_page_for_cpc_setting(
     state: FSMContext,
 ):
     await state.set_state(states.ChangeMaxCPC.waiting_for_new_max_cpc)
-    adv_original_id = callback_data.adv_original_id # type: ignore[attr-defined]
+    adv_original_id = callback_data.adv_original_id  # type: ignore[attr-defined]
     await messages.MaxCPCSetting(bot, callback.message.chat.id)(adv_original_id)
 
 
@@ -55,7 +55,7 @@ async def set_max_cpc(message: types.Message, bot: aiogram.Bot, state: FSMContex
             adv = adv.scalar()
             if cpc == 0:
                 cpc = None
-            adv.max_cpc = cpc # type: ignore[attr-defined]
+            adv.max_cpc = cpc  # type: ignore[attr-defined]
             await session.commit()
             await messages.MaxCPCSetting(bot, chat_id)(adv_original_id)
     else:
@@ -70,13 +70,13 @@ async def turn_off_max_cpc(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-    adv_original_id = callback_data.adv_original_id # type: ignore[attr-defined]
+    adv_original_id = callback_data.adv_original_id  # type: ignore[attr-defined]
     async with sm(read_only=False) as session:
         adv = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
-        adv.max_cpc = None # type: ignore[attr-defined]
+        adv.max_cpc = None  # type: ignore[attr-defined]
         await session.commit()
         await messages.MaxCPCSetting(bot, callback.message.chat.id)(adv_original_id)
     return

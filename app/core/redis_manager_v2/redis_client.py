@@ -123,6 +123,9 @@ class RedisClient:
             await ensure_awaitable(self._replica_read_client.sismember(name, value)),
         )
 
+    async def ttl(self, key: str) -> int:
+        return await ensure_awaitable(self._replica_read_client.ttl(key))
+
     # Методы для записи (через мастер)
     async def set(
         self,

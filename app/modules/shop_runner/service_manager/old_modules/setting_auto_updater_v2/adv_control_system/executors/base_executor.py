@@ -7,7 +7,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
     PipelineContext,
 )
 
-
 class BaseExecutor(ABC):
     """Базовый интерфейс исполнителя adv."""
 
@@ -26,3 +25,4 @@ class BaseExecutor(ABC):
                 - used_power: сколько силы было использовано
         """
         ...
+

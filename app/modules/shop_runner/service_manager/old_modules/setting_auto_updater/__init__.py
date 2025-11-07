@@ -5,7 +5,6 @@
 
 """
 
-
 __all__ = [
     "AdvSettingAutoUpdater",
     "SettingAutoUpdaterCriticalError",

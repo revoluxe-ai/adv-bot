@@ -93,7 +93,7 @@ def try_except_decorator(
                 try:
                     state["_last_query_time"] = time.time()
                     result = await func(instance, *args, **kwargs)
-                    logger.debug(f"Запрос {method_name} выполнен успешно для {shop_id}")
+                    logger.debug("Запрос %s выполнен успешно для %s", method_name, shop_id)
                     next_pause = (
                         interval_seconds / requests_per_interval
                         + state["_current_pause"]
@@ -124,7 +124,9 @@ def try_except_decorator(
                         max(state["_current_pause"], 1) * 2, max_delay
                     )
                     logger.debug(
-                        f"Следующая пауза между запросами: {state['_current_pause']} секунд для shop_id: {shop_id}"
+                        "Следующая пауза между запросами: %s секунд для shop_id: %s",
+                        state["_current_pause"],
+                        shop_id,
                     )
                 except Exception as e:
                     raise e
@@ -149,14 +151,17 @@ async def requests(
         try:
             response_text = await response.text()
             logger.debug(
-                f"Запрос к {url} выполнен. Статус: {response.status}, ответ: {response_text[:500]}"
+                "Запрос к %s выполнен. Статус: %s, ответ: %s",
+                url,
+                response.status,
+                response_text[:500],
             )
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
                 raise ApiForbiddenError("Неверный API ключ") from e
             if e.status == 429:
-                logger.debug(f"Превышен лимит запросов к API: {url}")
+                logger.debug("Превышен лимит запросов к API: %s", url)
                 raise TooManyRequests(e) from e
             if e.status == 400:
                 exc = get_error_from_response(response_text)

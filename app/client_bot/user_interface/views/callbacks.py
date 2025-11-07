@@ -234,3 +234,14 @@ class PredictCTRModeToggle(CallbackData, prefix="predict_ctr_mode_toggle"):
 class SalesPredictMethodToggle(CallbackData, prefix="sales_predict_method_toggle"):
     new_method: FactMethods
     adv_setting_original_id: int
+
+
+class AutoUpdaterVersionToggle(CallbackData, prefix="auto_updater_version_toggle"):
+    new_version: int
+    adv_setting_original_id: int
+
+
+class ChangeAutoUpdateExponentStatus(CallbackData, prefix="change_auto_update_exponent"):
+    adv_id: int
+    wb_user_cabinet_original_id: int
+    new_status: bool
