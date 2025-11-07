@@ -29,7 +29,7 @@ class Pricer:
             .options(
                 load_only(
                     AdvSetting.adv_id,
-                    AdvSetting._search_adv_id,
+                    AdvSetting._search_adv_id, # noqa
                     AdvSetting.name,
                     AdvSetting.active_status,
                 )
@@ -115,9 +115,17 @@ class Pricer:
                 session, shop_id, max_count
             )
         )
+
+        month_tariff_for_autoupdate_exponent = (
+            await self._get_month_tariff_for_autoupdate_exponent(
+                session, shop_id, max_count
+            )
+        )
+
         return (
             month_tariff_for_white_list_auto_updater
             + month_tariff_for_autoupdate_target_place
+            + month_tariff_for_autoupdate_exponent
         )
 
     @staticmethod
@@ -156,3 +164,23 @@ class Pricer:
         count = int(count)
         count = min(count, max_count)
         return count * settings.AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF
+
+    @staticmethod
+    async def _get_month_tariff_for_autoupdate_exponent(
+        session: AsyncSession, shop_id: str, max_count: int
+    ) -> int:
+        stmt = (
+            select(func.count(AdvSetting.id))
+            .join(WBCabinet)
+            .where(
+                WBCabinet.shop_id == shop_id,
+                AdvSetting.auto_update_exponent.is_(True),
+            )
+        )
+        result = await session.execute(stmt)
+        count = result.scalar() or 0
+        count = int(count)
+        count = min(count, max_count)
+        return count * settings.AUTO_UPDATE_EXPONENT_MONTH_TARIFF
+
+

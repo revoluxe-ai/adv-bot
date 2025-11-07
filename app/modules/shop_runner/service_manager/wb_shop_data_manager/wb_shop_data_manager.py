@@ -90,7 +90,7 @@ class ComplexAdv:
         self,
         adv_setting: AdvSetting,
         search_adv: AdvSetting | None,
- get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
+        get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
     ):
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
@@ -109,10 +109,25 @@ class ComplexAdv:
     def is_exponent_control_enabled(self) -> bool:
         return self._adv_setting.auto_update_exponent
 
+
+    @property
+    def auto_updater_version(self) -> int:
+        return self._adv_setting.automatic_version
+
     @property
     def is_part_auto_setting_active(self) -> bool:
         adv = self._adv_setting
-        return adv.auto_update_white_list or adv.auto_update_target_place
+        if self.auto_updater_version == 1:
+            return adv.auto_update_white_list or adv.auto_update_target_place
+        elif self.auto_updater_version == 2:
+            return any([
+                adv.auto_update_white_list,
+                adv.auto_update_target_place,
+                adv.auto_update_exponent
+            ])
+        else:
+            raise RuntimeError('Not Implemented for this version')
+
 
     @property
     def adv_setting(self) -> AdvSetting:

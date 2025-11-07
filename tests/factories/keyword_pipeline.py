@@ -4,7 +4,6 @@ from typing import List
 from faker import Faker
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword, KeywordStatus
 from app.modules.common_slaves.wildberries.models import KeywordSetting
-from .adv_factory import KeywordSettingFactory, AdvSettingFactory
 
 fake = Faker("ru_RU")
 

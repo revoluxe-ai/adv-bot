@@ -4,13 +4,9 @@ from typing import cast
 import pytest
 from unittest.mock import  patch
 
-
-from fakeredis.aioredis import FakeRedis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-from app.core.di import AppContainer
 from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system import (
     AdvControlSystem,
@@ -140,10 +136,4 @@ async def test_process_adv(postgres_session: AsyncSession,
     updated_adv_setting = cast(AdvSetting, updated_adv_setting)
 
     after_white_list_size = len([kw for kw in updated_settings if kw.hard_status == 2])
-    try:
-       assert  condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, complex_adv)
-    except:
-        pass
-        raise
-    finally:
-        pass
+    assert condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, complex_adv)
