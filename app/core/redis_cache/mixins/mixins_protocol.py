@@ -2,8 +2,6 @@ from asyncio import Protocol
 
 import redis.asyncio
 
-from typing import TYPE_CHECKING
-
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 
