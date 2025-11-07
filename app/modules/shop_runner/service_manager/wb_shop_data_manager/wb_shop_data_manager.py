@@ -89,11 +89,11 @@ class ComplexAdv:
     def __init__(
         self,
         adv_setting: AdvSetting,
-        search_adv: AdvSetting,
+        search_adv: AdvSetting | None,
         get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
     ):
         self._adv_setting: AdvSetting = adv_setting
-        self._search_adv: AdvSetting = search_adv
+        self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
 
