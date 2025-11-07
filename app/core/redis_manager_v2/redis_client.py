@@ -177,10 +177,6 @@ class RedisClient:
             return None
 
 
-
-    async def ttl(self, key: str) -> int:
-        return cast(int, await ensure_awaitable(self._replica_read_client.ttl(key)))
-
     async def pttl(self, key: str) -> int:
         return cast(int, await ensure_awaitable(self._replica_read_client.pttl(key)))
 
