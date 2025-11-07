@@ -72,7 +72,8 @@ class AdvMixin(WBAPIProtocol):
 
         for advert in adverts:
             advert_type = advert.get("type")
-            if isinstance(advert_type, int) and advert_type == 9:
+            # TODO: Была проблема в том, что некоторые РК идут с типом 8, надо разобраться, а то не понятно опять что и как обновлять, сейчкс все работает
+            if isinstance(advert_type, int) and advert_type in [9, 8]:
                 advert_list: list[dict[str, Any]] = advert.get("advert_list", [])
                 for advert_item in advert_list:
                     advertId = advert_item["advertId"]
