@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from dependency_injector import providers
 
-from app.core.di import AppContainer
 from app.modules.wb_keywords_parser.wb_parser.parser import ParserService
 from app.modules.wb_keywords_parser.wb_parser.excs import TooManyRequestsInParserError
 
