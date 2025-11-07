@@ -9,8 +9,6 @@ from fakeredis.aioredis import FakeRedis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-from app.core.di import AppContainer
 from app.modules.common_slaves.wildberries.models import KeywordSetting, AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system import (
     AdvControlSystem,
