@@ -4,8 +4,6 @@ from typing import cast
 import pytest
 from unittest.mock import  patch
 
-
-from fakeredis.aioredis import FakeRedis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
