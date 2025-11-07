@@ -92,6 +92,7 @@ class TargetPlaceDownExecutor(BaseExecutor):
         current_position = best_keyword.position
         if current_position is None:
             raise RuntimeError('current_position не может быть None здесь т.к. такое отфильтровали в utils.get_best_keyword')
+        # TODO: Добавить проверку bid <= MIN_BID достигли физического лимита ставки
         if current_position == 0 or current_position + 1 < new_place:  # логика в том, что если товар не спускается, то смысла нет дальше снижать ЦП
             logger.debug(
                 "[adv_id=%s] TargetPlaceDown: текущее место (%s) уже ниже или равно новому целевому месту (%s), понижение не имеет смысла",
