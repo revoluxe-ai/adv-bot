@@ -140,10 +140,4 @@ async def test_process_adv(postgres_session: AsyncSession,
     updated_adv_setting = cast(AdvSetting, updated_adv_setting)
 
     after_white_list_size = len([kw for kw in updated_settings if kw.hard_status == 2])
-    try:
-       assert  condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, complex_adv)
-    except:
-        pass
-        raise
-    finally:
-        pass
+    assert condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, complex_adv)
