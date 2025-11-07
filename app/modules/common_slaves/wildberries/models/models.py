@@ -9,7 +9,7 @@ from sqlalchemy.orm.properties import MappedColumn
 import typing
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, cast
+from typing import cast
 
 import jwt
 from jwt import DecodeError
