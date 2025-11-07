@@ -449,18 +449,37 @@ class Settings:
             return int(value)
 
     @property
+    def FULL_AUTO_UPDATE_PRICE(self) -> int:
+        value = os.getenv("FULL_AUTO_UPDATE_PRICE")
+        if not value:
+            return 5000
+        else:
+            return int(value)
+
+
+    @property
     def WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF(self) -> int:
         value = os.getenv("WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF")
         if not value:
-            return 2500
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
         return int(value)
 
     @property
     def AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF(self) -> int:
         value = os.getenv("AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF")
         if not value:
-            return 2500
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
         return int(value)
+
+    @property
+    def AUTO_UPDATE_EXPONENT_MONTH_TARIFF(self) -> int:
+        value = os.getenv("AUTO_UPDATE_EXPONENT_MONTH_TARIFF")
+        if not value:
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
+        return int(value)
+
+
+
 
     @property
     def SHOP_UPDATE_TIMEOUT_MINUTES(self) -> int:
