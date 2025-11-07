@@ -90,7 +90,7 @@ class ComplexAdv:
         self,
         adv_setting: AdvSetting,
         search_adv: AdvSetting,
- get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
+        get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
     ):
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting = search_adv
