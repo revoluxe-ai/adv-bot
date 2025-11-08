@@ -33,6 +33,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from .bidder_mode import BidderMode
 from .fact_methods_enum import FactMethods
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
@@ -524,6 +525,15 @@ class AdvSetting(BaseTable):
         Integer, nullable=True, default=1, server_default="1"
     )
 
+    bidder_mode: Mapped[BidderMode]  = mapped_column(
+        SAEnum(BidderMode),
+        nullable=True,
+        default=BidderMode.BY_AUTO_MAX_CPM,
+        server_default=BidderMode.BY_AUTO_MAX_CPM.name,
+    )
+
+
+
     __table_args__ = (
         # Составной индекс для основного запроса
         Index(
@@ -588,6 +598,7 @@ class AdvSetting(BaseTable):
     
     @property
     def auto_max_bid(self) -> bool:
+        # TODO: DEPRICATED - удалить!!!!
         pattern = re.compile(
             r"<MAX_PAY>(\d+)!?</MAX_PAY>"
         )  # Используем тот же паттерн, чтобы найти!
