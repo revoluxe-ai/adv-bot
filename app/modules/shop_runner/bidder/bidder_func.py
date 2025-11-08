@@ -166,7 +166,7 @@ async def run_bidder_process_for_adv(
     cpm_now = max(cpms) if cpms else None
     if not cpm_now:
         logger.error('Не удалось определить текущую ставку для shop_id: %s, adv_id: %s',
-                     wb_api.access.shop_id, adv_setting.adv_id)
+                     wb_api.shop_id, adv_setting.adv_id)
         return None
 
 
