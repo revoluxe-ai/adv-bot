@@ -164,7 +164,8 @@ class Pricer:
         count = int(count)
         count = min(count, max_count)
         return count * settings.AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF
-
+    # TODO: Добавить - удалить кнопку Автоуправления экспонентой
+    # TODO: Оповестить пользователей об изменении тарификации за автоуправление
     @staticmethod
     async def _get_month_tariff_for_autoupdate_exponent(
         session: AsyncSession, shop_id: str, max_count: int
