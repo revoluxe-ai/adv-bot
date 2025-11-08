@@ -148,7 +148,7 @@ async def __get_new_cpm_by_position(
 
 @inject
 async def run_bidder_process_for_adv(
- adv_setting: AdvSetting,
+    adv_setting: AdvSetting,
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
     auto_max_bid_manager: "AutoMaxBidManager" = Provide
