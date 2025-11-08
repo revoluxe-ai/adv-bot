@@ -181,6 +181,8 @@ async def run_bidder_process_for_adv(
         if not adv_setting.auto_max_cpm_mode:
             return None
         max_cpm = await auto_max_bid_manager.get_max_cpm(adv_setting, keywords, user_max_cpm)
+        if not max_cpm:
+            return None
         new_cpm = max_cpm
     else:
         raise RuntimeError('Неверный режим биддера')
