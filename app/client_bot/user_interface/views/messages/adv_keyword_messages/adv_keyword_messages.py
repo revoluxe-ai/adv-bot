@@ -189,6 +189,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         result = await super().__call__()
         return result
 # TODO: Почистить stash и ветки
+# TODO: Сделать управление ставкой по кластерам
     @property
     def text(self) -> str:
         total_page = len(self._keywords) // self._on_page
