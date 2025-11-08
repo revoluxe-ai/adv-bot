@@ -49,6 +49,7 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
+from app.modules.common_slaves.wildberries.models.bidder_mode import BidderMode
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
@@ -1113,6 +1114,8 @@ class CPMSetting(TextWithKeyboard):
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
             result = await session.execute(stmt)
             adv_setting = result.scalars().first()
+        if adv_setting is None:
+            raise RuntimeError(f"AdvSetting с id {adv_setting_id} не найден")
         self.adv_setting = adv_setting
         await super().__call__()
 
@@ -1183,7 +1186,22 @@ class CPMSetting(TextWithKeyboard):
                     adv_original_id=self.adv_setting.id,
                 ).pack(),
             )
-        builder.row(bottom)
+        _ = builder.row(bottom)        # Bidder Mode toggle
+        bidder_mode: BidderMode = self.adv_setting.bidder_mode or BidderMode.BY_POSITIONS
+        if bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
+            button_text = "✅Вкл. работу  по позициям (устаревший режим)"
+            callback_action = "turn_on_bidder_positions"
+        else:
+            button_text = "⚠️Вкл. работу по АвтоМакс. ставке (новый режим)"
+            callback_action = "turn_on_bidder_auto_max"
+
+        bottom = InlineKeyboardButton(
+            text=button_text,
+            callback_data=callbacks.CPMSettingMenu(
+                action=callback_action, adv_original_id=self.adv_setting.id
+            ).pack(),
+        )
+        _ = builder.row(bottom)
 
         bottom = InlineKeyboardButton(
             text="Изменить ставку (Максимальную ставку)",
@@ -1192,7 +1210,8 @@ class CPMSetting(TextWithKeyboard):
             ).pack(),
         )
 
-        builder.row(bottom)
+        _ = builder.row(bottom)
+
         step = self.adv_setting.bidder_step
         step = step if step else DEFAULT_BIDDER_STEP
         bottom = InlineKeyboardButton(

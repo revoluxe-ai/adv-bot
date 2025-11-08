@@ -62,6 +62,7 @@ from .user_interface.handlers import (
     strategy_setting,
     update_adv,
 )
+from .user_interface.handlers.bidder_mode_toggle import bidder_mode_toggle
 
 common_router = Router()
 
@@ -112,6 +113,7 @@ common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.include_routers(update_adv.router)
 common_router.include_routers(strategy_setting.router) # type: ignore[attr-defined]
 common_router.include_routers(shop_settings.router)
+common_router.include_routers(bidder_mode_toggle.router)
 # Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene
 # common_router.include_routers(cabinet_bonus_manager_router)
 common_router.callback_query.middleware(
