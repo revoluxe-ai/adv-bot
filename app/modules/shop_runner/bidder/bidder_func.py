@@ -53,7 +53,7 @@ async def _update_and_get_advs_from_wb(
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
 
-
+@inject
 async def __get_new_cpm_by_position(
     adv_setting: AdvSetting,
     wb_api: WBApi,
