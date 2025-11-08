@@ -186,3 +186,6 @@ class Pricer:
         return count * settings.AUTO_UPDATE_EXPONENT_MONTH_TARIFF
 
 
+# TODO: Сделать уведомлялку по API
+# TODO: Сделать сайт с отзывами
+# TODO: Сделать инструкцию по скриншотам через Яндекс.Диск
