@@ -164,6 +164,11 @@ async def run_bidder_process_for_adv(
         advs_from_wb_with_active_company
     )
     cpm_now = max(cpms) if cpms else None
+    if not cpm_now:
+        logger.error('Не удалось определить текущую ставку для shop_id: %s, adv_id: %s',
+                     wb_api.access.shop_id, adv_setting.adv_id)
+        return None
+
 
     user_max_cpm = adv_setting.max_cpm
     if not user_max_cpm:
