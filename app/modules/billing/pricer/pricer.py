@@ -175,6 +175,7 @@ class Pricer:
             .where(
                 WBCabinet.shop_id == shop_id,
                 AdvSetting.auto_update_exponent.is_(True),
+                AdvSetting.automatic_version == 2
             )
         )
         result = await session.execute(stmt)
