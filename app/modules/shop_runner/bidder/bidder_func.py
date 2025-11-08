@@ -180,6 +180,8 @@ async def run_bidder_process_for_adv(
                                                   keywords,
                                                   cpm_now,
                                                   max_cpm)
+        if not new_cpm:
+            return None
     elif settings.UPDATE_CPM_MODE == 'BY_AUTO_MAX_CPM':
         if not adv_setting.auto_max_cpm_mode:
             return None
