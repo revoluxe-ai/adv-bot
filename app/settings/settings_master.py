@@ -568,19 +568,6 @@ class Settings:
             return 0.1
         return float(value)
 
-    @property
-    def UPDATE_CPM_MODE(self) -> str:
-        value = os.getenv("UPDATE_CPM_MODE")
-        allowed_modes = {'BY_AUTO_MAX_CPM', 'BY_POSITIONS'}
-        if value not in allowed_modes:
-            raise ValueError(f"Invalid value for UPDATE_CPM_MODE: {value}")
-        if not value:
-            return 'BY_AUTO_MAX_CPM'
-        return value
-
-
-
-
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли

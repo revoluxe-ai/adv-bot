@@ -14,6 +14,7 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from ..modules.max_auto_bid_manager.di import AutoMaxCpmContainer
+from ...common_slaves.wildberries.models.bidder_mode import BidderMode
 
 if typing.TYPE_CHECKING:
     from ..modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
@@ -173,7 +174,7 @@ async def run_bidder_process_for_adv(
     if not user_max_cpm:
         return None
 
-    if settings.UPDATE_CPM_MODE == 'BY_POSITIONS':
+    if adv_setting.bidder_mode == BidderMode.BY_POSITIONS:
         new_cpm = await __get_new_cpm_by_position(adv_setting,
                                                   wb_api,
                                                   keywords,
@@ -181,7 +182,7 @@ async def run_bidder_process_for_adv(
                                                 )
         if not new_cpm:
             return None
-    elif settings.UPDATE_CPM_MODE == 'BY_AUTO_MAX_CPM':
+    elif adv_setting.bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
         if not adv_setting.auto_max_cpm_mode:
             return None
         max_cpm = await auto_max_bid_manager.get_max_cpm(adv_setting, keywords, user_max_cpm)
