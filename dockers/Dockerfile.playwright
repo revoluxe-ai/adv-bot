@@ -1,0 +1,31 @@
+FROM mcr.microsoft.com/playwright/python:v1.55.0-jammy AS base
+
+ENV POETRY_VERSION=1.8.3 \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    PATH="/app/.venv/bin:$PATH"
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    logrotate \
+    cron \
+    rsyslog \
+    libsystemd-dev \
+    pkg-config \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
+
+COPY pyproject.toml poetry.lock ./
+
+RUN poetry install --no-interaction --no-root --without dev
+
+RUN poetry run python -m playwright install-deps chromium || true
+RUN poetry run python -m playwright install chromium
+
+COPY . .
+
+RUN echo "*/5 * * * * /usr/sbin/logrotate /etc/logrotate.conf" > /etc/cron.d/logrotate \
+    && chmod 0644 /etc/cron.d/logrotate

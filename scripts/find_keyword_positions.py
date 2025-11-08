@@ -22,6 +22,12 @@ from collections.abc import Iterable
 
 from aiogram.client.session import aiohttp
 
+from app.modules.wb_keywords_parser.wb_parser.playwright_fetch import (
+    fetch_wb_search,
+    resolve_profile_dir,
+)
+from app.settings import settings
+
 logger = logging.getLogger(__name__)
 
 MAX_WB_PAGES = 60
@@ -164,34 +170,97 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Включить подробный лог",
     )
+    parser.add_argument(
+        "--backend",
+        choices=("http", "playwright"),
+        default="playwright",
+        help="Бэкенд поиска: HTTP клиент или Playwright (по умолчанию Playwright)",
+    )
     return parser.parse_args()
 
 
-async def main_async(keyword: str, nmids: Iterable[int], max_pages: int) -> None:
-    placements = await iter_positions(keyword, nmids, max_pages)
+async def main_async(
+    keyword: str, nmids: Iterable[int], max_pages: int, backend: str
+) -> None:
+    if backend == "http":
+        placements = await iter_positions(keyword, nmids, max_pages)
 
-    if not placements:
-        unique_nmids = sorted(set(nmids))
+        if not placements:
+            unique_nmids = sorted(set(nmids))
+            print(
+                "Товары {} не найдены в выдаче по заданному ключу".format(
+                    ", ".join(str(nmid) for nmid in unique_nmids)
+                )
+            )
+            return
+
+        for placement in sorted(placements, key=lambda p: (p.page, p.index_on_page)):
+            product_title = f" ({placement.name})" if placement.name else ""
+            print(
+                f"Товар {placement.nmid}{product_title} найден на странице {placement.page}, позиция на странице {placement.index_on_page}, общая позиция {placement.absolute_position}"
+            )
+
+        found_nmid = {placement.nmid for placement in placements}
+        missing = set(nmids) - found_nmid
+        if missing:
+            print(
+                "Не найдены в выдаче: {}".format(
+                    ", ".join(str(nmid) for nmid in sorted(missing))
+                )
+            )
+        return
+
+    profile_dir = resolve_profile_dir(settings.WB_PLAYWRIGHT_PROFILE_ROOT, keyword)
+    products, cluster, preset, total_items = await fetch_wb_search(
+        keyword,
+        1,
+        timeout_sec=settings.WB_PLAYWRIGHT_TIMEOUT_SEC,
+        headless=settings.WB_PLAYWRIGHT_HEADLESS,
+        profile_dir=profile_dir,
+        proxy_url=settings.WB_PLAYWRIGHT_PROXY_URL,
+    )
+
+    print(
+        "Playwright backend: %s товаров, cluster=%s, preset=%s, total_items=%s"
+        % (len(products), cluster, preset, total_items)
+    )
+
+    target_nmids = set(nmids)
+
+    if not target_nmids:
+        return
+
+    found_positions: list[ProductPlacement] = []
+    for index, product in enumerate(products):
+        try:
+            nmid = int(product["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if nmid not in target_nmids:
+            continue
+        absolute_position = index + 1
+        found_positions.append(
+            ProductPlacement(
+                nmid=nmid,
+                page=1,
+                index_on_page=index + 1,
+                absolute_position=absolute_position,
+                name=product.get("name"),
+            )
+        )
+
+    if not found_positions:
         print(
-            "Товары {} не найдены в выдаче по заданному ключу".format(
-                ", ".join(str(nmid) for nmid in unique_nmids)
+            "Товары {} не найдены на первой странице".format(
+                ", ".join(str(nmid) for nmid in sorted(target_nmids))
             )
         )
         return
 
-    for placement in sorted(placements, key=lambda p: (p.page, p.index_on_page)):
+    for placement in found_positions:
         product_title = f" ({placement.name})" if placement.name else ""
         print(
             f"Товар {placement.nmid}{product_title} найден на странице {placement.page}, позиция на странице {placement.index_on_page}, общая позиция {placement.absolute_position}"
-        )
-
-    found_nmid = {placement.nmid for placement in placements}
-    missing = set(nmids) - found_nmid
-    if missing:
-        print(
-            "Не найдены в выдаче: {}".format(
-                ", ".join(str(nmid) for nmid in sorted(missing))
-            )
         )
 
 
@@ -212,7 +281,9 @@ def main() -> None:
                 MAX_WB_PAGES,
                 max_pages,
             )
-        asyncio.run(main_async(normalized_keyword, args.nmids, max_pages))
+        asyncio.run(
+            main_async(normalized_keyword, args.nmids, max_pages, args.backend)
+        )
     except KeyboardInterrupt:
         pass
 

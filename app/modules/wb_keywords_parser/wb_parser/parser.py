@@ -18,6 +18,7 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.rate_limit import rate_limited_request
 from .excs import TooManyRequestsInParserError, WBConnectionRateLimitError
+from .playwright_fetch import fetch_wb_search, resolve_profile_dir
 
 if typing.TYPE_CHECKING:
     from .rate_limit_manager import ParserRateLimitRedisManager
@@ -193,6 +194,24 @@ class ParserService:
         int | None,
         int | None,
     ]:
+        if settings.WB_PARSER_BACKEND == "playwright":
+            profile_dir = resolve_profile_dir(
+                settings.WB_PLAYWRIGHT_PROFILE_ROOT, text
+            )
+            try:
+                return await fetch_wb_search(
+                    text,
+                    page,
+                    timeout_sec=settings.WB_PLAYWRIGHT_TIMEOUT_SEC,
+                    headless=settings.WB_PLAYWRIGHT_HEADLESS,
+                    profile_dir=profile_dir,
+                    proxy_url=settings.WB_PLAYWRIGHT_PROXY_URL,
+                )
+            except Exception as exc:  # noqa: BLE001
+                raise WBConnectionRateLimitError(
+                    "Playwright backend failed to fetch WB search"
+                ) from exc
+
         url = get_parse_url(text, page)
         logger.debug(f"Запрос к URL: {url}")
         async with client.get(url) as response:

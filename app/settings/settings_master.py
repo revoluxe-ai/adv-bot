@@ -377,6 +377,54 @@ class Settings:
         return int(value)
 
     @property
+    def WB_PARSER_BACKEND(self) -> str:
+        value = os.getenv("WB_PARSER_BACKEND")
+        if not value:
+            return "playwright"
+        normalized = value.strip().lower()
+        if normalized not in {"playwright", "http"}:
+            raise ValueError(
+                "WB_PARSER_BACKEND must be either 'playwright' or 'http'"
+            )
+        return normalized
+
+    @property
+    def WB_PLAYWRIGHT_HEADLESS(self) -> bool:
+        value = os.getenv("WB_PLAYWRIGHT_HEADLESS")
+        if value is None:
+            return True
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+        raise ValueError("WB_PLAYWRIGHT_HEADLESS must be a boolean-like value")
+
+    @property
+    def WB_PLAYWRIGHT_PROFILE_ROOT(self) -> str | None:
+        value = os.getenv("WB_PLAYWRIGHT_PROFILE_ROOT")
+        if value is None:
+            return "/data/wb_profiles"
+        value = value.strip()
+        if not value:
+            return None
+        return value
+
+    @property
+    def WB_PLAYWRIGHT_TIMEOUT_SEC(self) -> float:
+        value = os.getenv("WB_PLAYWRIGHT_TIMEOUT_SEC")
+        if not value:
+            return 12.0
+        return float(value)
+
+    @property
+    def WB_PLAYWRIGHT_PROXY_URL(self) -> str | None:
+        value = os.getenv("WB_PLAYWRIGHT_PROXY_URL")
+        if not value:
+            return None
+        return value
+
+    @property
     def TELEGRAM_BOT_TOKEN(self) -> str:
         value = os.environ.get("TELEGRAM_BOT_TOKEN")
         if not value:
