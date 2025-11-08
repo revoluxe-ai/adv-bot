@@ -66,9 +66,10 @@ async def __get_new_cpm_by_position(
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
 
-
+    max_user_cpm = adv_setting.max_cpm
+    max_cpm = max_user_cpm
+    
     if adv_setting.auto_max_cpm_mode:
-        max_user_cpm = adv_setting.max_cpm
         auto_max_cpm = await auto_max_bid_manager.get_max_cpm(
             adv_setting, keywords, max_user_cpm
         )
