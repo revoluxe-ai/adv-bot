@@ -59,7 +59,6 @@ async def __get_new_cpm_by_position(
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
     cpm_now,
-    max_cpm,
     auto_max_bid_manager: "AutoMaxBidManager" = Provide
     [AutoMaxCpmContainer.auto_max_cpm_bid_manager],
 
@@ -69,10 +68,11 @@ async def __get_new_cpm_by_position(
 
 
     if adv_setting.auto_max_cpm_mode:
+        max_user_cpm = adv_setting.max_cpm
         auto_max_cpm = await auto_max_bid_manager.get_max_cpm(
-            adv_setting, keywords, max_cpm
+            adv_setting, keywords, max_user_cpm
         )
-        if auto_max_cpm and auto_max_cpm < max_cpm:
+        if auto_max_cpm and auto_max_cpm < max_user_cpm:
             max_cpm = auto_max_cpm
     
     step = adv_setting.bidder_step or settings.BIDDER_STEP
@@ -173,18 +173,18 @@ async def run_bidder_process_for_adv(
     if not user_max_cpm:
         return None
 
-    max_cpm = await auto_max_bid_manager.get_max_cpm(adv_setting, keywords, user_max_cpm)
     if settings.UPDATE_CPM_MODE == 'BY_POSITIONS':
         new_cpm = await __get_new_cpm_by_position(adv_setting,
                                                   wb_api,
                                                   keywords,
                                                   cpm_now,
-                                                  max_cpm)
+                                                )
         if not new_cpm:
             return None
     elif settings.UPDATE_CPM_MODE == 'BY_AUTO_MAX_CPM':
         if not adv_setting.auto_max_cpm_mode:
             return None
+        max_cpm = await auto_max_bid_manager.get_max_cpm(adv_setting, keywords, user_max_cpm)
         new_cpm = max_cpm
     else:
         raise RuntimeError('Неверный режим биддера')
