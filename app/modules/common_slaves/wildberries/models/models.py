@@ -525,11 +525,11 @@ class AdvSetting(BaseTable):
         Integer, nullable=True, default=1, server_default="1"
     )
 
-    bidder_mode: Mapped[BidderMode]  = mapped_column(
+    bidder_mode: Mapped[BidderMode | None]  = mapped_column(
         SAEnum(BidderMode),
         nullable=True,
-        default=BidderMode.BY_AUTO_MAX_CPM,
-        server_default=BidderMode.BY_AUTO_MAX_CPM.name,
+        default=BidderMode.BY_POSITIONS,
+        server_default=BidderMode.BY_POSITIONS.name,
     )
 
 
