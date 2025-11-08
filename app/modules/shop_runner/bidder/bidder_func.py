@@ -154,7 +154,7 @@ async def run_bidder_process_for_adv(
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
     auto_max_bid_manager: "AutoMaxBidManager" = Provide
-    (AutoMaxCpmContainer.auto_max_cpm_bid_manager)
+    [AutoMaxCpmContainer.auto_max_cpm_bid_manager]
 ) -> None:
     advs: list[AuctionAdv] = await _update_and_get_advs_from_wb(adv_setting, wb_api)
     advs_from_wb_with_active_company: list[AuctionAdv] = [
