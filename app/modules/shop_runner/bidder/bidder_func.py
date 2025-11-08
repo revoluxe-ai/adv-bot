@@ -99,11 +99,6 @@ async def __get_new_cpm_by_position(
             )
             continue
     
-        except Exception:  # noqa
-            logger.error(f"[{shop_id}] [{adv_id}] Ошибка получения ставок", exc_info=True)
-            continue
-
-    
         try:
             logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
             wb_position: WBItemPosition = await redis_manager.get_keyword_position(
