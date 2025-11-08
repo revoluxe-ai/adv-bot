@@ -24,7 +24,7 @@ class PassTimeRedisCacheBase(ABC, RedisCacheMixinsProtocol):
         value_bytes = await self.client.get(self._key)
         if not value_bytes:
             return None
-        if self._decode_bytes:
+        if isinstance(value_bytes, bytes):
             value = value_bytes.decode()
         else:
             value = value_bytes
