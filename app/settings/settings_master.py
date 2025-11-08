@@ -568,6 +568,27 @@ class Settings:
             return 0.1
         return float(value)
 
+    @property
+    def WB_PARSER_ALLOW_DIRECT_FALLBACK(self) -> bool:
+        value = os.getenv("WB_PARSER_ALLOW_DIRECT_FALLBACK")
+        if value is None:
+            return True
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+
+    @property
+    def WB_PARSER_PROXY_RATE_LIMIT_COOLDOWN_SEC(self) -> int:
+        value = os.getenv("WB_PARSER_PROXY_RATE_LIMIT_COOLDOWN_SEC")
+        if value is None:
+            return 300
+        return int(value)
+
+    @property
+    def WB_PARSER_PROXY_FAILURE_COOLDOWN_SEC(self) -> int:
+        value = os.getenv("WB_PARSER_PROXY_FAILURE_COOLDOWN_SEC")
+        if value is None:
+            return 120
+        return int(value)
+
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли

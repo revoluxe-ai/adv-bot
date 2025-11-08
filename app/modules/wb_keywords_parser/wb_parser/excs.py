@@ -8,8 +8,14 @@ class TooManyRequestsInParserError(Exception):
 class WBConnectionRateLimitError(TooManyRequestsInParserError):
     """
     SSL/Connection ошибка от WB, которая обычно означает мягкий rate-limiting.
-    
+
     WB разрывает SSL соединение вместо явного возврата HTTP 429.
     Это более мягкая форма ограничения, обрабатывается с меньшими паузами.
     """
+    pass
+
+
+class ParserProxyUnavailableError(Exception):
+    """Raised when parser proxies are required but none are available."""
+
     pass

@@ -4,6 +4,8 @@ import json
 import logging
 import re
 import typing
+from contextlib import asynccontextmanager
+
 import aiohttp
 from sqlalchemy.orm import load_only
 
@@ -17,12 +19,24 @@ from app.modules.wb_adv_updater import data_manager
 from app.settings import settings
 from app.utils import redis_manager
 from app.utils.rate_limit import rate_limited_request
-from .excs import TooManyRequestsInParserError, WBConnectionRateLimitError
+from ..proxy_manager import ParserProxyManager, ParserProxy
+from .excs import (
+    ParserProxyUnavailableError,
+    TooManyRequestsInParserError,
+    WBConnectionRateLimitError,
+)
 
 if typing.TYPE_CHECKING:
     from .rate_limit_manager import ParserRateLimitRedisManager
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def _direct_proxy_context() -> typing.AsyncIterator[None]:
+    """Async context manager that yields ``None`` to represent direct access."""
+
+    yield None
 
 
 class TotalPages:
@@ -69,51 +83,124 @@ def get_parse_url(text: str, page: int) -> str:
 
 class ParserService:
 
-    def __init__(self, rate_limit_manager: 'ParserRateLimitRedisManager' =Provide['module_resources.wb_keywords_parser.rate_limit_manager'],
-                 delay: float = settings.PARSING_LIMITER_DELAY):
-        self._rate_limit_manager: 'ParserRateLimitRedisManager' = rate_limit_manager
-
-            # Применяем декоратор rate limiting к методу парсинга
-        # TODO: Прошла ошибка на smoke test - из-за неаннотированости функции-обертки (декоратора) и отсутствия тестов
-
-        self._parse_with_rate_limit = rate_limited_request(rate_limit_manager, delay=delay)(
-            self._parse_keywords_from_wb_impl,
+    def __init__(
+        self,
+        rate_limit_manager: 'ParserRateLimitRedisManager' = Provide[
+            'module_resources.wb_keywords_parser.rate_limit_manager'
+        ],
+        *,
+        proxy_manager: ParserProxyManager | None = None,
+        delay: float = settings.PARSING_LIMITER_DELAY,
+        allow_direct_fallback: bool | None = None,
+    ):
+        self._rate_limit_manager: 'ParserRateLimitRedisManager' | None = rate_limit_manager
+        self._proxy_manager = proxy_manager
+        self._allow_direct_fallback = (
+            settings.WB_PARSER_ALLOW_DIRECT_FALLBACK
+            if allow_direct_fallback is None
+            else allow_direct_fallback
         )
+
+        if rate_limit_manager is None:
+            self._parse_with_rate_limit = self._parse_keywords_from_wb_impl
+        else:
+            # Применяем декоратор rate limiting к методу парсинга
+            self._parse_with_rate_limit = rate_limited_request(
+                rate_limit_manager,
+                delay=delay,
+            )(self._parse_keywords_from_wb_impl)
 
     async def parse_keywords_from_wb(
         self, text: str, page: int, total_pages: TotalPages, delay: float = settings.PARSING_LIMITER_DELAY
     ) -> list[WBItemPosition]:
         first_place = page * 100 - 99
-        try:
-            # TODO: Сделать тест на эту функцию, прошла ошибка на smoke test
-            data = await self._parse_with_rate_limit(text, page)
-            if data:
-                products, cluster, preset, total_items = data
-            else:
-                return []
-            if total_items is not None:
-                max_page = (total_items + 99) // 100 if total_items else 0
-                total_pages.total_pages = max_page
-                if max_page and page > max_page:
-                    logger.info(
-                        "Страница %s превышает максимальное количество страниц %s для ключа %s",
-                        page,
-                        max_page,
-                        text,
-                    )
-                    return []
-        except TooManyRequestsInParserError as e:
-            # Rate limiting ошибки должны пробраситься наверх
-            raise e
-        except Exception as e:
-            logger.error(
-                "Ошибка при парсинге страницы %s ключа %s %s",
-                page,
-                text,
-                e,
-                exc_info=True,
+        products: list[dict[str, typing.Any]] | None = None
+        cluster: str | None = None
+        preset: int | None = None
+        total_items: int | None = None
+
+        use_direct = self._proxy_manager is None
+        direct_fallback_available = self._allow_direct_fallback
+
+        while True:
+            proxy: ParserProxy | None = None
+            proxy_context = (
+                _direct_proxy_context()
+                if use_direct or self._proxy_manager is None
+                else self._proxy_manager.acquire()
             )
-            raise e
+
+            try:
+                # TODO: Сделать тест на эту функцию, прошла ошибка на smoke test
+                async with proxy_context as proxy:
+                    data = await self._parse_with_rate_limit(text, page, proxy=proxy)
+            except ParserProxyUnavailableError as exc:
+                if use_direct or self._proxy_manager is None:
+                    logger.error(
+                        "Нет доступных прокси для парсинга ключа %s на странице %s",
+                        text,
+                        page,
+                    )
+                    raise exc
+                if not direct_fallback_available:
+                    logger.error(
+                        "Прокси недоступны и fallback отключен для ключа %s на странице %s",
+                        text,
+                        page,
+                    )
+                    raise exc
+                logger.warning(
+                    "Прокси недоступны для ключа %s на странице %s. Переходим в прямой режим.",
+                    text,
+                    page,
+                )
+                use_direct = True
+                direct_fallback_available = False
+                continue
+            except (TooManyRequestsInParserError, WBConnectionRateLimitError) as exc:
+                if use_direct or proxy is None or self._proxy_manager is None:
+                    raise
+                logger.warning(
+                    "Прокси %s поймал rate limit при парсинге ключа %s на странице %s: %s",
+                    proxy.id,
+                    text,
+                    page,
+                    exc,
+                )
+                await self._proxy_manager.report_rate_limit(proxy)
+                continue
+            except Exception as exc:
+                if not use_direct and proxy is not None and self._proxy_manager is not None:
+                    await self._proxy_manager.report_failure(proxy)
+                logger.error(
+                    "Ошибка при парсинге страницы %s ключа %s %s",
+                    page,
+                    text,
+                    exc,
+                    exc_info=True,
+                )
+                raise
+            else:
+                if not use_direct and proxy is not None and self._proxy_manager is not None:
+                    await self._proxy_manager.report_success(proxy)
+
+                if not data:
+                    return []
+
+                products, cluster, preset, total_items = data
+                if total_items is not None:
+                    max_page = (total_items + 99) // 100 if total_items else 0
+                    total_pages.total_pages = max_page
+                    if max_page and page > max_page:
+                        logger.info(
+                            "Страница %s превышает максимальное количество страниц %s для ключа %s",
+                            page,
+                            max_page,
+                            text,
+                        )
+                        return []
+                break
+
         if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
         if not products:
@@ -170,24 +257,30 @@ class ParserService:
 
         return positions # pyright: ignore
 
-    async def _parse_keywords_from_wb_impl(self,
+    async def _parse_keywords_from_wb_impl(
+        self,
         text: str,
         page: int,
-         ):
+        *,
+        proxy: ParserProxy | None = None,
+    ):
         # для проброса ошибок сети, интерпретируемых как слишком много запросов
         try:
-            result = await self.__parse_keywords_from_wb_impl(text, page)
+            result = await self.__parse_keywords_from_wb_impl(text, page, proxy=proxy)
             return result # pyright: ignore
         except aiohttp.ClientError as e:
             raise WBConnectionRateLimitError("Rate limit exceeded in ParserService") from e
 
 
     @inject
-    async def __parse_keywords_from_wb_impl(self, # pyright: ignore
-                                           text: str,
-                                           page: int,
-                                           client: ClientSession = Provide['http_sessions.aiohttp_client_for_parser'],
-                                           ) -> tuple[
+    async def __parse_keywords_from_wb_impl(
+        self,  # pyright: ignore
+        text: str,
+        page: int,
+        client: ClientSession = Provide['http_sessions.aiohttp_client_for_parser'],
+        *,
+        proxy: ParserProxy | None = None,
+    ) -> tuple[
         list[dict[typing.Any, typing.Any]] | None, # pyright: ignore
         str | None,
         int | None,
@@ -195,7 +288,19 @@ class ParserService:
     ]:
         url = get_parse_url(text, page)
         logger.debug(f"Запрос к URL: {url}")
-        async with client.get(url) as response:
+        request_kwargs: dict[str, typing.Any] = {}
+        if proxy is not None:
+            request_kwargs["proxy"] = proxy.proxy_url
+            proxy_auth = proxy.build_proxy_auth()
+            if proxy_auth is not None:
+                request_kwargs["proxy_auth"] = proxy_auth
+
+        async with client.get(url, **request_kwargs) as response:
+            if response.status == 429:
+                raise TooManyRequestsInParserError(
+                    "Слишком много запросов к серверу WB",
+                )
+            response.raise_for_status()
             response_text = await response.text()
 
         if not response_text:
