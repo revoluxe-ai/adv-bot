@@ -47,17 +47,17 @@ class DummyManager:
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_single_underlying_call(monkeypatch: pytest.MonkeyPatch):
+async def test_rate_limit_single_underlying_call():
     manager = DummyManager()
     calls: list[int] = []
 
-    async def stub_get_public_ip():
-        return "127.0.0.1"
-
-    monkeypatch.setattr("app.utils.rate_limit.get_public_ip", stub_get_public_ip)
-
     # Use small values for testing to avoid long delays
-    @rate_limited_request(manager, max_retries=3, delay=0.01)
+    @rate_limited_request(
+        manager,
+        max_retries=3,
+        delay=0.01,
+        identity_getter=lambda *_args, **_kwargs: "127.0.0.1",
+    )
     async def underlying(x):  # noqa: WPS430
         calls.append(x)
         await asyncio.sleep(0.01)

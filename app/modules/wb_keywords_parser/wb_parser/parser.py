@@ -18,6 +18,7 @@ from app.settings import settings
 from app.utils import redis_manager
 from app.utils.rate_limit import rate_limited_request
 from .excs import TooManyRequestsInParserError, WBConnectionRateLimitError
+from .proxy_manager import ParserProxy, ProxyProxyManager
 
 if typing.TYPE_CHECKING:
     from .rate_limit_manager import ParserRateLimitRedisManager
@@ -69,24 +70,48 @@ def get_parse_url(text: str, page: int) -> str:
 
 class ParserService:
 
-    def __init__(self, rate_limit_manager: 'ParserRateLimitRedisManager' =Provide['module_resources.wb_keywords_parser.rate_limit_manager'],
-                 delay: float = settings.PARSING_LIMITER_DELAY):
-        self._rate_limit_manager: 'ParserRateLimitRedisManager' = rate_limit_manager
+    def __init__(
+        self,
+        rate_limit_manager: 'ParserRateLimitRedisManager' = Provide[
+            'module_resources.wb_keywords_parser.rate_limit_manager'
+        ],
+        delay: float = settings.PARSING_LIMITER_DELAY,
+        proxy_manager: ProxyProxyManager | None = None,
+    ):
+        self._rate_limit_manager: 'ParserRateLimitRedisManager' | None = rate_limit_manager
+        self._proxy_manager = proxy_manager
 
-            # Применяем декоратор rate limiting к методу парсинга
-        # TODO: Прошла ошибка на smoke test - из-за неаннотированости функции-обертки (декоратора) и отсутствия тестов
+        def _identity_getter(*_: typing.Any, **kwargs: typing.Any) -> str:
+            proxy: ParserProxy | None = kwargs.get("proxy")
+            if proxy is None:
+                raise ValueError("Proxy identity is required for rate limiting")
+            return proxy.rate_limit_key
 
-        self._parse_with_rate_limit = rate_limited_request(rate_limit_manager, delay=delay)(
-            self._parse_keywords_from_wb_impl,
-        )
+        identity_getter = _identity_getter if proxy_manager is not None else None
+
+        self._parse_with_rate_limit = rate_limited_request(
+            rate_limit_manager,
+            delay=delay,
+            identity_getter=identity_getter,
+        )(self._parse_keywords_from_wb_impl)
 
     async def parse_keywords_from_wb(
-        self, text: str, page: int, total_pages: TotalPages, delay: float = settings.PARSING_LIMITER_DELAY
+        self,
+        text: str,
+        page: int,
+        total_pages: TotalPages,
+        delay: float = settings.PARSING_LIMITER_DELAY,
     ) -> list[WBItemPosition]:
         first_place = page * 100 - 99
+        proxy: ParserProxy | None = None
+        cluster = None
+        products: list[typing.Any] | None = None
+        preset = None
+        total_items = None
         try:
-            # TODO: Сделать тест на эту функцию, прошла ошибка на smoke test
-            data = await self._parse_with_rate_limit(text, page)
+            proxy = self._proxy_manager.acquire_proxy() if self._proxy_manager else None
+
+            data = await self._parse_with_rate_limit(text, page, proxy=proxy)
             if data:
                 products, cluster, preset, total_items = data
             else:
@@ -102,10 +127,18 @@ class ParserService:
                         text,
                     )
                     return []
-        except TooManyRequestsInParserError as e:
-            # Rate limiting ошибки должны пробраситься наверх
+        except (TooManyRequestsInParserError, WBConnectionRateLimitError) as e:
+            if self._proxy_manager and proxy is not None:
+                ttl = 0.0
+                if self._rate_limit_manager is not None:
+                    blocked, ttl = await self._rate_limit_manager.is_ip_blocked(proxy.rate_limit_key)
+                    if not blocked:
+                        ttl = 0.0
+                self._proxy_manager.report_rate_limit(proxy, ttl)
             raise e
         except Exception as e:
+            if self._proxy_manager and proxy is not None:
+                self._proxy_manager.report_failure(proxy)
             logger.error(
                 "Ошибка при парсинге страницы %s ключа %s %s",
                 page,
@@ -114,6 +147,9 @@ class ParserService:
                 exc_info=True,
             )
             raise e
+        else:
+            if self._proxy_manager and proxy is not None:
+                self._proxy_manager.report_success(proxy)
         if cluster:
             await redis_manager.set_cluster_and_preset(text, cluster, preset)
         if not products:
@@ -170,10 +206,13 @@ class ParserService:
 
         return positions # pyright: ignore
 
-    async def _parse_keywords_from_wb_impl(self,
+    async def _parse_keywords_from_wb_impl(
+        self,
         text: str,
         page: int,
-         ):
+        *,
+        proxy: ParserProxy | None = None,
+    ):
         # для проброса ошибок сети, интерпретируемых как слишком много запросов
         try:
             result = await self.__parse_keywords_from_wb_impl(text, page)
