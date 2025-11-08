@@ -58,7 +58,7 @@ async def __get_new_cpm_by_position(
     adv_setting: AdvSetting,
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
-    cpm_now,
+    cpm_now: int,
     auto_max_bid_manager: "AutoMaxBidManager" = Provide
     [AutoMaxCpmContainer.auto_max_cpm_bid_manager],
 
