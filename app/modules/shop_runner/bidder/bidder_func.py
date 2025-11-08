@@ -62,7 +62,7 @@ async def __get_new_cpm_by_position(
     cpm_now,
     max_cpm,
     auto_max_bid_manager: "AutoMaxBidManager" = Provide
-    (AutoMaxCpmContainer.auto_max_cpm_bid_manager),
+    [AutoMaxCpmContainer.auto_max_cpm_bid_manager],
 
 ) -> int | None:
     adv_id = adv_setting.adv_id
