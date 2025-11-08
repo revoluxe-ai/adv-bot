@@ -193,6 +193,9 @@ async def run_bidder_process_for_adv(
     else:
         raise RuntimeError('Неверный режим биддера')
     
+    if not adv_setting.nmids:
+        raise RuntimeError('Пустой список nmids - это недопустимое состояние')
+    
     nmid = adv_setting.nmids[0]
     
     if new_cpm != cpm_now:
