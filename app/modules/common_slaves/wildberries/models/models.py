@@ -486,7 +486,7 @@ class AdvSetting(BaseTable):
         Boolean, nullable=True, default=False, server_default="false"
     )
     auto_update_exponent: Mapped[bool] = mapped_column(
-        Boolean, nullable=True, default=True, server_default="true"
+        Boolean, nullable=True, default=False, server_default="false"
     )
 
     max_balance_adding_for_day: Mapped[int] = mapped_column(
