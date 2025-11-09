@@ -6,7 +6,13 @@ class AutoAdv(Adv):
 
     @property
     def cpm(self) -> int:
-        return int(self.data["autoParams"]["cpm"])
+        match self.data:
+            case {"autoParams": {"cpm": cpm}}:
+                return int(cpm)
+            case {"autoParams": {"nmCPM": [{"cpm": cpm}]}}:
+                return int(cpm)
+            case _:
+                raise KeyError("Не найдено поле CPM в data")
 
 
 __all__ = ["AutoAdv"]
