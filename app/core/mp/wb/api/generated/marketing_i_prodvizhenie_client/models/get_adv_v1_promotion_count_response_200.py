@@ -62,7 +62,7 @@ class GetAdvV1PromotionCountResponse200:
         d = src_dict.copy()
 
         def _parse_adverts(
-            data: object,
+            data: object
         ) -> Union[List["GetAdvV1PromotionCountResponse200AdvertsType0Item"], None, Unset]:
             if data is None:
                 return data

@@ -54,7 +54,7 @@ def _parse_response(
     if response.status_code == HTTPStatus.OK:
 
         def _parse_response_200(
-            data: object,
+            data: object
         ) -> Union[List["ResponseWithIntervalItem"], Union[List["ResponseWithDateType0Item"], None]]:
             def _parse_response_200_type_0(data: object) -> Union[List["ResponseWithDateType0Item"], None]:
                 if data is None:

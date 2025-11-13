@@ -77,7 +77,7 @@ def _parse_response(
         for response_200_item_data in _response_200:
 
             def _parse_response_200_item(
-                data: object,
+                data: object
             ) -> Union["ResponseInfoAdvert", "ResponseInfoAdvertType8", "ResponseInfoAdvertType9"]:
                 try:
                     if not isinstance(data, dict):
