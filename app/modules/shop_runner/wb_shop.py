@@ -45,3 +45,6 @@ class WBShop:
         while True:
             await redis_manager.renew_shop_ttl(self._wb_api.shop_id)
             await asyncio.sleep(ping_timeout)
+
+
+    # TODO: Сделать, чтобы run-shop-update-worker равномерно распределяли между собою нагрузки
