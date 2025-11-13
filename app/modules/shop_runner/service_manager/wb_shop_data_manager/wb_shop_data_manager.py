@@ -97,6 +97,14 @@ class ComplexAdv:
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
 
+
+    @property
+    def search_adv_active_status(self) -> bool:
+        if self._search_adv.active_status == 'started':
+            return True
+        return False
+
+
     @property
     def is_target_position_control_enabled(self) -> bool:
         return self._adv_setting.auto_update_target_place

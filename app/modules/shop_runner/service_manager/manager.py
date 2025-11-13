@@ -192,6 +192,7 @@ class CoroutinesManager:
     async def adv_settings_auto_update(self):
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
+        advs = [adv for adv in advs if adv.search_adv_active_status]
         update_tasks = []
         last_days_for_analyze = 2
         control_system_v2 = AdvControlSystem(max_last_period=2)
