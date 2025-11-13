@@ -185,6 +185,7 @@ factory_boy = "^3.3.0"
 pytest-factoryboy = "^2.7.0"
 Faker = "^30.0.0"
 pydantic-factories = "^1.17.3"
+transliterate = "^1.10.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
