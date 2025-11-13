@@ -42,8 +42,12 @@ from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager i
 )
 from app.modules.shop_runner.modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 
+# TODO: Починить сохранение файла перед отправкой в ТГ
 
 logger = logging.getLogger(__name__)
+
+
+# TODO: Во все списки ключей нужно передавать полные списки ключей, в уже внутри фильтровать т.к. они нужны для расчета АвтоМаксимальной ставки
 
 
 class AdvKeywordsSetting(TextWithKeyboardAndImage):
@@ -184,7 +188,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         result = await super().__call__()
         return result
-
+# TODO: Почистить stash и ветки
+# TODO: Сделать управление ставкой по кластерам
     @property
     def text(self) -> str:
         total_page = len(self._keywords) // self._on_page
