@@ -243,11 +243,11 @@ async def insert(stats: Iterable[FullAdvStat]) -> None:
                     ]
                 )
 
-        try:
-            for row in values:
-                await client.query(query, parameters=row)
-        except Exception:
-            logger.error("Ошибка вставки в кликхаус", exc_info=True)
+        for row in values:
+            query_result = await client.query(query, parameters=row)
+            logger.debug(query_result)
+
+
 
 
 async def get_keywords_spend(
