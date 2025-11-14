@@ -58,7 +58,7 @@ class WhiteListAddExecutor(BaseExecutor):
                     keyword.relevant
                     and keyword.hard_status == 1
                     and keyword.status == KeywordStatus.BAD
-                    and (keyword.predict_ctr  > mean_auto_ctr if mean_auto_ctr else True)
+                    and (keyword.predict_ctr  > mean_auto_ctr if mean_auto_ctr is not None else True)
                 )
             else:
                 # Любые фразы со статусом BAD и hard_status=1
