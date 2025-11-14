@@ -102,7 +102,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
         # Определение позиции (единое поле)
         first_position: str | int = ""
         if adv_setting.parsing_active:
-            if keyword.position:
+            if keyword.position and keyword.position > 0:
                 first_position = keyword.position
             elif keyword.position == 0:
                 first_position = ">>>"
