@@ -13,7 +13,8 @@ async def delete_keywords_from_wl_by_mean_auto_ctr(complex_adv: 'ComplexAdv') ->
     mean_auto_ctr: float = await complex_adv.get_mean_auto_ctr()
 
     keyword_ids_in_wh_least_mean_ctr: Sequence[int] = \
-        [kw.keyword_setting_original_id for kw in keywords if kw.predict_ctr <= mean_auto_ctr and kw.hard_status == 2]
+        [kw.keyword_setting_original_id for kw in keywords if (kw.predict_ctr <= mean_auto_ctr
+                                                    if kw.predict_ctr else False) and kw.hard_status == 2]
     if not keyword_ids_in_wh_least_mean_ctr:
         return None
     async with sm(read_only=False) as session:
