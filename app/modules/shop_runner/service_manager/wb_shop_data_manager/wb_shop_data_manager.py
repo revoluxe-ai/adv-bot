@@ -105,7 +105,7 @@ class ComplexAdv:
 
     async def get_mean_auto_ctr(self) -> float | None:
         from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
-        if not self._mean_auto_ctr:
+        if self._mean_auto_ctr is None:
             min_ctr_manager = MinCtrManager(self._adv_setting)
             mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
             self._mean_auto_ctr = mean_auto_ctr
