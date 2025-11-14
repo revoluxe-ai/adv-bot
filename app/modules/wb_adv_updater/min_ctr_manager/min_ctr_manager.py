@@ -159,6 +159,13 @@ class MinCtrManager:
             [adv_id], start_date, end_date
         )
 
+
+        """
+        TODO: The calculation of additional_clicks and additional_views can produce negative values when keyword statistics exceed total campaign statistics. This happens when keywords_clicks > total_clicks or keywords_views > total_views, leading to negative values that will cause incorrect CTR calculations. The code should handle this edge case by ensuring non-negative values or returning early when the data is inconsistent.
+        
+        
+        """
+
         # Вычисляем дополнительные клики и показы
         additional_clicks = total_clicks - keywords_clicks
         additional_views = total_views - keywords_views
