@@ -599,7 +599,7 @@ class AdvSetting(BaseTable):
         if match:
             return int(match.group(1))
         return None
-    
+
     @property
     def auto_max_bid(self) -> bool:
         # TODO: DEPRICATED - удалить!!!!
