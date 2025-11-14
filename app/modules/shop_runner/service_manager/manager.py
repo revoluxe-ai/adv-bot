@@ -8,6 +8,8 @@ from typing import (
     TypeVar,
 )
 
+from jedi.inference.value.iterable import Sequence
+
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
@@ -285,3 +287,29 @@ class CoroutinesManager:
         finally:
             # Закрываем соединения
             await predict_ctr_manager.close()
+
+    @while_coroutine_decorator(15, 60)
+    async def delete_keywords_from_wl_by_mean_auto_ctr(self) -> None:
+        # TODO: Добавить функцию-фильтр для ComplexAdvs getter
+        from .services import delete_keywords_from_wl_by_mean_auto_ctr
+        complex_advs: Sequence[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs_with_white_list_by_mean_auto_ctr_active =\
+            [adv for adv in complex_advs if adv.rec_system_promotion_mode_active
+             and adv.auto_update_setting_version == 2
+             and adv.is_white_list_control_enabled]
+
+        tasks = []
+        for adv in complex_advs_with_white_list_by_mean_auto_ctr_active:
+            task = delete_keywords_from_wl_by_mean_auto_ctr(complex_adv=adv)
+            tasks.append(task)
+
+        results: Sequence[None | Exception] = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error('Ошибка удаления ключей из БС по сред.авто стр, shop_id: %s, adv_id: %s)',
+                             self.shop_id, complex_advs[i].adv_id)
+
+
+
+        return None

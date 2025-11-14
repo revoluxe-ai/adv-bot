@@ -16,6 +16,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
+
 from .redis_cache import LastAutoAddPhraseToWhiteListV2
 
 logger = logging.getLogger(__name__)
@@ -46,14 +47,18 @@ class WhiteListAddExecutor(BaseExecutor):
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
+        mean_auto_ctr: float = await ctx.complex_adv.get_mean_auto_ctr()
+
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
             if ctx.complex_adv.auto_add_only_relevant_phrase:
                 # Только релевантные фразы со статусом BAD и hard_status=1
+                assert keyword.predict_ctr is not None
                 return (
                     keyword.relevant
                     and keyword.hard_status == 1
                     and keyword.status == KeywordStatus.BAD
+                    and keyword.predict_ctr  > mean_auto_ctr
                 )
             else:
                 # Любые фразы со статусом BAD и hard_status=1

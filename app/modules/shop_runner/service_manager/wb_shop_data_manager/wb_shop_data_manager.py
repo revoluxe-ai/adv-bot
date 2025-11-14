@@ -12,7 +12,8 @@ from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdv
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
 )
-from app.modules.wb_adv_updater import data_manager
+
+
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 
@@ -24,10 +25,11 @@ class WBShopDataManager:
   
     @single_run()
     async def get_calculated_keywords(self, adv: AdvSetting) -> list[CalculatedKeyword]:
+        from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
         if not adv:
             raise RuntimeError("Сначала обновить модели")
         try:
-            keywords = await data_manager.get_good_bad_phrases(adv)
+            keywords = await get_good_bad_phrases(adv)
         except Exception as exc:
             raise exc
 
@@ -49,8 +51,8 @@ class WBShopDataManager:
             raise NotFoundActiveAdvCompany("Нет активных кампаний")
         return adv_settings_list
 
-
-    async def __get_adv_id_to_search_adv_map(self, search_id_ids: set[int]) -> dict[int, AdvSetting]:
+    @staticmethod
+    async def __get_adv_id_to_search_adv_map(search_id_ids: set[int]) -> dict[int, AdvSetting]:
         stmt = (
             select(AdvSetting)
             .where(AdvSetting.adv_id.in_(search_id_ids))
@@ -96,6 +98,19 @@ class ComplexAdv:
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
+        self._mean_auto_ctr: float | None = None
+
+    @property
+    def rec_system_promotion_mode_active(self) -> bool:
+        return self._adv_setting.rec_system_mode
+
+    async def get_mean_auto_ctr(self) -> float | None:
+        from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
+        if not self._mean_auto_ctr:
+            min_ctr_manager = MinCtrManager(self._adv_setting)
+            mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
+            self._mean_auto_ctr = mean_auto_ctr
+        return self._mean_auto_ctr
 
 
     @property
@@ -196,6 +211,7 @@ class ComplexAdv:
     @property
     def max_user_cpm(self) -> int:
         return self._adv_setting.max_cpm
+
 
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса

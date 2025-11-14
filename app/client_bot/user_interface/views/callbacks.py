@@ -245,3 +245,15 @@ class ChangeAutoUpdateExponentStatus(CallbackData, prefix="change_auto_update_ex
     adv_id: int
     wb_user_cabinet_original_id: int
     new_status: bool
+
+
+class ChangeRecSystemModeStatus(CallbackData, prefix="change_rec_system_mode"):
+    adv_id: int
+    wb_user_cabinet_original_id: int
+    new_status: bool
+
+
+class ChangeAuctionBidderActiveStatus(CallbackData, prefix="change_auction_bidder_active_status"):
+    adv_id: int
+    wb_user_cabinet_original_id: int
+    new_status: bool

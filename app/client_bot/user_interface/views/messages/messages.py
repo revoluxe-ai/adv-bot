@@ -59,6 +59,7 @@ from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager
     PredictCTRRedisManager,
 )
 from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.modules.wb_update_state_manager import (
     AdvActiveKeywordUpdateStateManager,
     KeywordStatUpdateState,
@@ -850,7 +851,7 @@ class SettingMinCTR(TextWithKeyboard):
         else:
             self._min_ctr_type = "direct"
 
-        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
+        keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv)
 
         keywords_with_rating = [kw for kw in keywords if kw.rating_by_predict_ctr > 0]
         keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
@@ -928,7 +929,7 @@ class MaxCPCSetting(TextWithKeyboard):
             adv = adv.scalar()
         self._adv = adv
 
-        keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(adv)
+        keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv)
         keywords = [
             kw
             for kw in keywords

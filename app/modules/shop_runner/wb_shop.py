@@ -35,6 +35,7 @@ class WBShop:
             coroutines_manager.adv_settings_auto_update(),
             coroutines_manager.update_top_key_in_advs(),
             coroutines_manager.update_predict_ctr(),
+            coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr()
         )
 
         # TODO: Перенести PV кликхаус на более маленький диск

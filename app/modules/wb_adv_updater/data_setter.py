@@ -8,6 +8,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.common_slaves.wildberries.wb_api import WBApi
 from app.modules.wb_adv_updater import data_manager, search_advs_manager
+from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.modules.white_list_updater.backend.white_list_updater import WhiteListUpdater
 from app.utils.db.session_maker import get_async_session_maker
@@ -67,7 +68,7 @@ class DataSetter:
         keywords: list[CalculatedKeyword] | None = None,
     ) -> None:
         if not keywords:
-            fresh_keywords = await data_manager.get_good_bad_phrases(adv_setting)
+            fresh_keywords = await get_good_bad_phrases(adv_setting)
             keywords = fresh_keywords
         if wb_cabinet.white_list_update_active:
             white_list_updater = WhiteListUpdater()
@@ -115,7 +116,7 @@ class DataSetter:
         logger.debug("Начинаю обновление минус слов")
         for adv_setting in adv_settings:
             logger.debug(f"Обновляю минус слова для {adv_setting.name}")
-            keywords: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(
+            keywords: list[CalculatedKeyword] = await get_good_bad_phrases(
                 adv_setting
             )
             logger.debug(f"Получил ключи для {adv_setting.name}")

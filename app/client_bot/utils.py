@@ -11,7 +11,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
-from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -33,7 +33,7 @@ class KeywordForKeyboard:
 
 
 async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-    all_phrases: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(
+    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(
         adv_setting
     )
     return all_phrases

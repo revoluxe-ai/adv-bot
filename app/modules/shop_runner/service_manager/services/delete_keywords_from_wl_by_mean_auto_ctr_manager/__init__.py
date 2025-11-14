@@ -1,0 +1,5 @@
+from .delete_keywords_from_wl_by_mean_auto_ctr_manager import delete_keywords_from_wl_by_mean_auto_ctr
+
+
+
+__all__ = ['delete_keywords_from_wl_by_mean_auto_ctr']

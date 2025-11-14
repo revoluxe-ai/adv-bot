@@ -295,3 +295,59 @@ async def get_keywords_spend(
             "Ошибка получения суммы трат по ключам из ClickHouse", exc_info=True
         )
         return 0.0
+
+
+
+# TODO: Внедрить отображение ключей из статистики API, попробовать вернуть управление ставкой по позициям
+
+
+# TODO:  Добавить в бот указатель, который показывает, что по настройкам достигнут максимум и дальше поможет только перестроойка плана продаж
+
+
+
+async def get_keywords_clicks_and_views(
+    adv_ids: list[int],
+    start_date: datetime,
+    end_date: datetime,
+    table_name: str = "advkeyword_new",
+) -> tuple[int, int]:
+    """
+    Возвращает общие клики и показы по ключевым словам за период [start_date, end_date]
+    из агрегирующей таблицы (AggregatingMergeTree) default_db.advkeyword_new.
+    """
+
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    adv_ids_str = ", ".join(map(str, adv_ids))
+
+    query = f"""
+        SELECT
+            COALESCE(SUM(total_clicks), 0) AS total_clicks,
+            COALESCE(SUM(total_views), 0) AS total_views
+        FROM (
+            SELECT
+                argMaxMerge(clicks_state) AS total_clicks,
+                argMaxMerge(views_state) AS total_views
+            FROM default_db.{table_name}
+            WHERE
+                adv_id IN ({adv_ids_str})
+                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
+            GROUP BY adv_id, text, date
+        ) AS merged
+    """
+
+    try:
+        async with get_clickhouse_client() as client:
+            res = await client.query(query)
+            result = res.first_item
+
+            if result and result["total_clicks"] is not None and result["total_views"] is not None:
+                return int(result["total_clicks"]), int(result["total_views"])
+            else:
+                return 0, 0
+
+    except Exception:
+        logger.error(
+            "Ошибка получения суммы кликов и показов по ключам из ClickHouse", exc_info=True
+        )
+        return 0, 0

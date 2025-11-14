@@ -8,7 +8,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     FactData,
     PlanData,
 )
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+import typing
+if typing.TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
 )
@@ -48,10 +50,16 @@ class ExecutionResult:
 class PipelineContext:
     """Контекст исполнения каскада действий для одной кампании (adv)."""
 
-    complex_adv: ComplexAdv
+    complex_adv: "ComplexAdv"
     plan: PlanData
     fact: FactData
     session: AsyncSession
     state: SalesStates
     force: ForceContext
     
+
+
+
+# TODO: Внедрить лимит обращений в поддержку
+# TODO: Вывести в боте информацию о Среднем  CTR Авто за два дня
+# TODO: Вывести в боте информацию о себестоимости заказов в Авто, Аукционе
