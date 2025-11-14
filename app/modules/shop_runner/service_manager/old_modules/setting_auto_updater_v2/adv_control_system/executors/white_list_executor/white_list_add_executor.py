@@ -47,7 +47,7 @@ class WhiteListAddExecutor(BaseExecutor):
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
-        mean_auto_ctr: float = await ctx.complex_adv.get_mean_auto_ctr()
+        mean_auto_ctr: float | None = await ctx.complex_adv.get_mean_auto_ctr()
 
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
@@ -58,7 +58,7 @@ class WhiteListAddExecutor(BaseExecutor):
                     keyword.relevant
                     and keyword.hard_status == 1
                     and keyword.status == KeywordStatus.BAD
-                    and keyword.predict_ctr  > mean_auto_ctr
+                    and (keyword.predict_ctr  > mean_auto_ctr if mean_auto_ctr else True)
                 )
             else:
                 # Любые фразы со статусом BAD и hard_status=1
