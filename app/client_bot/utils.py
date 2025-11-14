@@ -105,6 +105,8 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             if keyword.position:
                 first_position = keyword.position
             elif keyword.position == 0:
+                first_position = ">>>"
+            elif keyword.position == -1:
                 first_position = ">i"
             else:
                 first_position = "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
