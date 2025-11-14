@@ -207,8 +207,6 @@ async def _get_good_bad_phrases_for_min_ctr(
         keyword_stat.added_clicks = added_clicks
         keyword_stat.keyword_setting_original_id = keyword_setting.id
         keyword_stat.adv_id = adv_setting.adv_id
-        if not keyword_setting:
-            continue
         original_hard_status: int = int(keyword_setting.hard_status)
         keyword_stat.hard_status = original_hard_status
         original_predict_ctr: float | None = text_to_predict_ctr.get(text, None)
