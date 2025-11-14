@@ -232,7 +232,7 @@ async def process_cabinet_api(
     cabinet_name = data_state["cabinet_name"].strip()
 
     async with sm() as session:
-        # Проверка, что токен не используется другим поль��ователем
+        # Проверка, что токен не используется другим пользователем
         stmt_for_wb_token = (
             select(WBToken)
             .options(load_only(WBToken.user_id))
