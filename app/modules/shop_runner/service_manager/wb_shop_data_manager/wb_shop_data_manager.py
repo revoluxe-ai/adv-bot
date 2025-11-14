@@ -113,7 +113,7 @@ class ComplexAdv:
 
     @property
     def search_adv_active_status(self) -> bool:
-        if self._search_adv.active_status == 'started':
+        if self._search_adv and self._search_adv.active_status == 'started':
             return True
         return False
 
