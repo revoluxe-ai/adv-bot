@@ -156,3 +156,6 @@ async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink 
         session.add(ref_link)
         await session.commit()
         return ref_link
+
+
+# TODO: Выпилить из кода парсер позиций
