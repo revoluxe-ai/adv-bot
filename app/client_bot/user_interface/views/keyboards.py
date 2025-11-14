@@ -14,6 +14,7 @@ from app.client_bot.user_interface.views.callbacks import (
     SalesPredictMethodToggle,
     AutoUpdaterVersionToggle,
     ChangeAutoUpdateExponentStatus,
+    ChangeRecSystemModeStatus,
 )
 from app.modules.cabinet_bonus_manager.callbacks import AdminBonus
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -132,6 +133,22 @@ def get_adv_setting_keyboard(
         ).pack()
         exponent_button = InlineKeyboardButton(text=exponent_text, callback_data=exponent_callback)
         _ = builder.row(exponent_button)
+
+    # Новая кнопка для режима раскрутки РС (полок)
+    if adv_setting.rec_system_mode:
+        rec_text = "Выключить режим раскрутки РС (полок)"
+        rec_new_status = False
+    else:
+        rec_text = "Включить режим раскрутки РС (полок)"
+        rec_new_status = True
+
+    rec_callback = ChangeRecSystemModeStatus(
+        adv_id=adv_setting.adv_id,
+        wb_user_cabinet_original_id=wb_user_cabinet.id,
+        new_status=rec_new_status,
+    ).pack()
+    rec_button = InlineKeyboardButton(text=rec_text, callback_data=rec_callback)
+    _ = builder.row(rec_button)
 
     # Добавляем кнопку переключения источника заказов для автоуправления
     if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:

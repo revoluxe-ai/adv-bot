@@ -12,7 +12,8 @@ from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdv
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
 )
-from app.modules.wb_adv_updater import data_manager
+
+
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 
@@ -21,13 +22,14 @@ class WBShopDataManager:
         self._wb_cabinet: WBCabinet = wb_cabinet
         self.shop_id: str = wb_cabinet.shop_id
 
-  
+
     @single_run()
     async def get_calculated_keywords(self, adv: AdvSetting) -> list[CalculatedKeyword]:
+        from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
         if not adv:
             raise RuntimeError("Сначала обновить модели")
         try:
-            keywords = await data_manager.get_good_bad_phrases(adv)
+            keywords = await get_good_bad_phrases(adv)
         except Exception as exc:
             raise exc
 
@@ -49,8 +51,8 @@ class WBShopDataManager:
             raise NotFoundActiveAdvCompany("Нет активных кампаний")
         return adv_settings_list
 
-
-    async def __get_adv_id_to_search_adv_map(self, search_id_ids: set[int]) -> dict[int, AdvSetting]:
+    @staticmethod
+    async def __get_adv_id_to_search_adv_map(search_id_ids: set[int]) -> dict[int, AdvSetting]:
         stmt = (
             select(AdvSetting)
             .where(AdvSetting.adv_id.in_(search_id_ids))
@@ -77,7 +79,6 @@ class WBShopDataManager:
         return complex_advs
 
 
-
 class _CPMs:
     def __init__(self, adv_setting: AdvSetting,
                  search_adv: AdvSetting | None):
@@ -87,23 +88,34 @@ class _CPMs:
 
 class ComplexAdv:
     def __init__(
-        self,
-        adv_setting: AdvSetting,
-        search_adv: AdvSetting,
-        get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
+            self,
+            adv_setting: AdvSetting,
+            search_adv: AdvSetting | None,
+            get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
     ):
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
+        self._mean_auto_ctr: float | None = None
 
+    @property
+    def rec_system_promotion_mode_active(self) -> bool:
+        return self._adv_setting.rec_system_mode
+
+    async def get_mean_auto_ctr(self) -> float | None:
+        from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
+        if self._mean_auto_ctr is None:
+            min_ctr_manager = MinCtrManager(self._adv_setting)
+            mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
+            self._mean_auto_ctr = mean_auto_ctr
+        return self._mean_auto_ctr
 
     @property
     def search_adv_active_status(self) -> bool:
-        if self._search_adv.active_status == 'started':
+        if self._search_adv and self._search_adv.active_status == 'started':
             return True
         return False
-
 
     @property
     def is_target_position_control_enabled(self) -> bool:
@@ -116,7 +128,6 @@ class ComplexAdv:
     @property
     def is_exponent_control_enabled(self) -> bool:
         return self._adv_setting.auto_update_exponent
-
 
     @property
     def auto_updater_version(self) -> int:
@@ -136,7 +147,6 @@ class ComplexAdv:
         else:
             raise RuntimeError('Not Implemented for this version')
 
-
     @property
     def adv_setting(self) -> AdvSetting:
         return self._adv_setting
@@ -144,31 +154,27 @@ class ComplexAdv:
     @property
     def auto_update_setting_version(self) -> int:
         return self._adv_setting.automatic_version
-    
 
     async def get_keywords(self) -> list[CalculatedKeyword]:
         if not self._calculated_keywords:
             self._calculated_keywords = await self._get_keywords(self._adv_setting)
         return self._calculated_keywords
 
-
-    @property    
+    @property
     def exponet_predict_ctr(self) -> float:
         return self._adv_setting.exponent_predict_ctr
-
 
     @property
     def target_place(self) -> int:
         return self._adv_setting.max_place
 
-    @property 
+    @property
     def exponent_predict_ctr(self) -> float:
         return self._adv_setting.exponent_predict_ctr
-    
+
     @property
     def db_id(self) -> int:
         return self._adv_setting.id
-
 
     @property
     def adv_id(self) -> int:
@@ -188,7 +194,6 @@ class ComplexAdv:
     def is_bidder_for_auto_cpm_active(self) -> bool:
         return self._adv_setting.bidder_for_auto
 
-
     @property
     def is_bidder_for_search_adv_active(self) -> bool:
         return self._adv_setting.bidder_active
@@ -196,6 +201,9 @@ class ComplexAdv:
     @property
     def max_user_cpm(self) -> int:
         return self._adv_setting.max_cpm
+
+# TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса
+
 
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса

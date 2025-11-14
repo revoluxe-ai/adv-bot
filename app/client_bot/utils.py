@@ -11,7 +11,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
-from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.utils.db.models import RefLink, User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -33,7 +33,7 @@ class KeywordForKeyboard:
 
 
 async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-    all_phrases: list[CalculatedKeyword] = await data_manager.get_good_bad_phrases(
+    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(
         adv_setting
     )
     return all_phrases
@@ -98,13 +98,15 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             raise ValueError(f"Unknown hard_status: {keyword.hard_status}")
 
         turn_on = "✅Включен" if keyword.status == KeywordStatus.GOOD else "❌Выключен"
-
+        # TODO: Привести выгрузку к текущему формату, по уму - полностью переделать, убрать не а
         # Определение позиции (единое поле)
         first_position: str | int = ""
         if adv_setting.parsing_active:
-            if keyword.position:
+            if keyword.position and keyword.position > 0:
                 first_position = keyword.position
             elif keyword.position == 0:
+                first_position = ">>>"
+            elif keyword.position == -1:
                 first_position = ">i"
             else:
                 first_position = "?"  # TODO: Кажется тут ошибка, потому что если позиция не может быть None
@@ -154,3 +156,6 @@ async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink 
         session.add(ref_link)
         await session.commit()
         return ref_link
+
+
+# TODO: Выпилить из кода парсер позиций

@@ -87,7 +87,7 @@ async def __get_new_cpm_by_position(
     if max_position is None:
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная позиция не задана!")
         return None
-    
+
     white_keywords = [kw for kw in keywords if kw.hard_status == 2]
     if not white_keywords:
         logger.warning("[%s] [%s ] Нет ключей в белом списке", shop_id, adv_id)
@@ -103,7 +103,7 @@ async def __get_new_cpm_by_position(
                 f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
             )
             continue
-    
+
         try:
             logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
             wb_position: WBItemPosition = await redis_manager.get_keyword_position(
@@ -114,7 +114,7 @@ async def __get_new_cpm_by_position(
                 f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
             )
             continue
-    
+
         if not wb_position or wb_position.position is None:
             logger.error(
                 f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции"
@@ -130,7 +130,7 @@ async def __get_new_cpm_by_position(
         adv_param_manager = AdvParameterManager()
         min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
         new_cpm = max(min(new_cpm, max_cpm), min_cpm)
-    
+
         if new_cpm >= max_cpm and adv_setting.reset_place:
             async with sm(read_only=False) as session:
                 assert adv_setting
@@ -160,7 +160,7 @@ async def run_bidder_process_for_adv(
     advs_from_wb_with_active_company: list[AuctionAdv] = [
         adv for adv in advs if adv.status_native == "started"
     ]
- 
+
     cpms: set[int] | None = await get_cpms_from_wb(
         advs_from_wb_with_active_company
     )
@@ -192,12 +192,12 @@ async def run_bidder_process_for_adv(
         new_cpm = max_cpm
     else:
         raise RuntimeError('Неверный режим биддера')
-    
+
     if not adv_setting.nmids:
         raise RuntimeError('Пустой список nmids - это недопустимое состояние')
-    
+
     nmid = adv_setting.nmids[0]
-    
+
     if new_cpm != cpm_now:
         if adv_setting.bidder_for_auto:
             auto_adv_id = int(adv_setting.adv_id)

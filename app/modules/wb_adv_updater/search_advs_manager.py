@@ -11,7 +11,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     KeywordStatus,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ async def update_keyword_phrases_for_search_adv(
 async def _set_keyword_phrases_for_search_advs(adv_settinds, client_session) -> None:
     tasks = []
     for adv_setting in adv_settinds:
-        keywords = await data_manager.get_good_bad_phrases(adv_setting)
+        keywords = await get_good_bad_phrases(adv_setting)
         task = asyncio.create_task(
             update_keyword_phrases_for_search_adv(adv_setting, keywords, client_session)
         )
