@@ -1,14 +1,13 @@
 import asyncio
 import logging
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable
+from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable, Sequence
 from datetime import datetime
 from typing import (
     Any,
     TypeVar,
 )
 
-from jedi.inference.value.iterable import Sequence
 
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
