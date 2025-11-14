@@ -219,7 +219,7 @@ async def process_cabinet_api(
         result = await session.execute(stmt_for_select_user_id)
         user_id = result.scalar()
         if user_id is None:
-            await bot.send_message(chat_id, "Ошибка: пользователей не найден.")
+            await bot.send_message(chat_id, "Ошибка: пользователь не найден.")
             return True
 
     wb_token.shop_id = shop_id
