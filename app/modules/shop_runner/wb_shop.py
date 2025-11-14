@@ -21,9 +21,12 @@ class WBShop:
     async def run(self) -> None:
         wb_api = self._wb_api
         coroutines_manager = CoroutinesManager(wb_api)
+
+        # TODO: !!! Надо еще добавить проверку на что отключено что включено из автоматизации в новой верссии  и добавить кнопку управления
+        #  автоэкспонентой, и именить тарификацию за автоматизацию, т.к. теперь управляющих сущности три
+
         await asyncio.gather(
             self._alive_worker_run(),
-            coroutines_manager.parsing_keywords_run(),
             coroutines_manager.update_advs_data_from_wb_to_pg(),
             coroutines_manager.update_cards_data_from_wb_to_pg(),
             coroutines_manager.update_cpm_bid(),
@@ -32,6 +35,7 @@ class WBShop:
             coroutines_manager.adv_settings_auto_update(),
             coroutines_manager.update_top_key_in_advs(),
             coroutines_manager.update_predict_ctr(),
+            coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr()
         )
 
         # TODO: Перенести PV кликхаус на более маленький диск
@@ -42,3 +46,6 @@ class WBShop:
         while True:
             await redis_manager.renew_shop_ttl(self._wb_api.shop_id)
             await asyncio.sleep(ping_timeout)
+
+
+    # TODO: Сделать, чтобы run-shop-update-worker равномерно распределяли между собою нагрузки

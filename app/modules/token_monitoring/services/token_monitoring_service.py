@@ -82,8 +82,10 @@ class TokenMonitoringService:
 
                         if shop_id:
                             logger.warning(
-                                f"Token deactivation detected for shop {shop_id} "
-                                f"during {func.__name__} call: {e}"
+                                "Token deactivation detected for shop %s during %s call: %s",
+                                shop_id,
+                                func.__name__,
+                                e,
                             )
 
                             # Send notification asynchronously (don't block the main flow)
@@ -94,8 +96,9 @@ class TokenMonitoringService:
                             )
                         else:
                             logger.warning(
-                                f"Token deactivation detected but no shop_id available "
-                                f"during {func.__name__} call: {e}"
+                                "Token deactivation detected but no shop_id available during %s call: %s",
+                                func.__name__,
+                                e,
                             )
 
                         # Re-raise the exception to maintain existing behavior
@@ -119,7 +122,7 @@ class TokenMonitoringService:
             error_details: Details about the error
         """
         try:
-            logger.info(f"Handling token deactivation for shop {shop_id}")
+            logger.info("Handling token deactivation for shop %s", shop_id)
 
             # Send deactivation notification
             await self.notification_manager.notify_token_issue(
@@ -131,13 +134,14 @@ class TokenMonitoringService:
                 },
             )
 
-            logger.info(f"Token deactivation notification sent for shop {shop_id}")
+            logger.info("Token deactivation notification sent for shop %s", shop_id)
 
         except Exception as notification_error:
             # Log notification errors but don't propagate them
             logger.error(
-                f"Failed to send token deactivation notification for shop {shop_id}: "
-                f"{notification_error}",
+                "Failed to send token deactivation notification for shop %s: %s",
+                shop_id,
+                notification_error,
                 exc_info=True,
             )
 
@@ -160,7 +164,7 @@ class TokenMonitoringService:
 
             # Store reference to original for potential rollback
             if not hasattr(http_request_module, "_original_try_except_decorator"):
-                http_request_module._original_try_except_decorator = (
+                http_request_module._original_try_except_decorator = (  # type: ignore[attr-defined]
                     try_except_decorator
                 )
 
@@ -170,7 +174,7 @@ class TokenMonitoringService:
             logger.info("Token monitoring successfully installed")
 
         except Exception as e:
-            logger.error(f"Failed to install token monitoring: {e}", exc_info=True)
+            logger.error("Failed to install token monitoring: %s", e, exc_info=True)
             raise
 
     def uninstall_monitoring(self) -> None:
@@ -194,7 +198,7 @@ class TokenMonitoringService:
                 logger.warning("No original decorator found to restore")
 
         except Exception as e:
-            logger.error(f"Failed to uninstall token monitoring: {e}", exc_info=True)
+            logger.error("Failed to uninstall token monitoring: %s", e, exc_info=True)
             raise
 
 

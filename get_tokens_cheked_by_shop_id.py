@@ -2,7 +2,7 @@ import asyncio
 
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.api_rights import check_token
+from app.modules.common_slaves.wildberries.api_rights import check_token  # type: ignore[attr-defined]
 from app.modules.common_slaves.wildberries.models import WBToken
 from app.utils.db.session_maker import get_async_session_maker
 

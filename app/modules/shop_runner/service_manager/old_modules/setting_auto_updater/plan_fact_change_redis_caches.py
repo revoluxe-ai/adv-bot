@@ -17,10 +17,14 @@ logger = logging.getLogger(__name__)
 
 class ChangePlanFact(AdvSettingRedisCache, RedisCacheBase, prefix="ChangePlanFact"):
     async def check_equal_in_cache(self, plan: PlanData, fact: FactData) -> bool:
-        value_bytes: bytes = await self._client.get(self._key)
+        value_bytes: bytes | str | None = await self._client.get(self._key)
         if not value_bytes:
             return False
-        value: str = value_bytes.decode()
+        # TODO: Упало на Smoke тестах. Проблема в том. что новый Redis кэш возвращает не bytes, а str, старый - bytes\r
+        if isinstance(value_bytes, bytes): # pyright: ignore[reportUnnecessaryIsInstance]
+            value: str = value_bytes.decode()
+        else:
+            value = value_bytes
         try:
             old_plan_value, old_fact_value = value.split("|")
         except ValueError:

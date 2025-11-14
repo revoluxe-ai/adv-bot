@@ -6,11 +6,10 @@ from app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_m
     AdvParameterManager,
 )
 
-adv_param_manager = AdvParameterManager()
-
 
 @pytest.mark.asyncio
 async def test_get_min_cpm_from_redis(adv_setting_mock):
+    adv_param_manager = AdvParameterManager()
     result_mock = MagicMock()
     result_mock.scalar_one.return_value = "Юбки"
     session_mock = MagicMock()

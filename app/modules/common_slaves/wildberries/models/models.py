@@ -2,6 +2,10 @@ import datetime
 import json
 import logging
 import re
+from sqlalchemy.orm.properties import MappedColumn
+from sqlalchemy.orm.properties import MappedColumn
+from sqlalchemy.orm.properties import MappedColumn
+from sqlalchemy.orm.properties import MappedColumn
 import typing
 from dataclasses import dataclass
 from enum import Enum
@@ -29,6 +33,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.modules.common_slaves.wildberries.exceptions import NotValidTokenError
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from .bidder_mode import BidderMode
 from .fact_methods_enum import FactMethods
 from app.settings import settings
 from app.utils.db.assoc_tables import favorite_advs_association
@@ -40,7 +45,7 @@ from app.utils.db.session_maker import get_async_session_maker
 try:
     # TODO: Надо разобраться что это за конструкция такая, и постараться ее убрать без рейса исключения
     from app.modules.billing import models as _billing_models  # noqa: F401
-except Exception:
+except Exception: # noqa
     # In minimal test contexts billing may be absent; relationship will fallback to string resolution
     pass
 
@@ -206,14 +211,14 @@ class WBToken(BaseTable):
     def get_payload(self, key: str) -> str | int | None:
         payload = self.__payload
         value = payload.get(key)
-        if isinstance(value, (str, int)) or value is None:
+        if isinstance(value, (str | int)) or value is None:
             return value
         return None
 
     @property
     def __expires(self) -> datetime.datetime:
         exp = self.__payload.get("exp")
-        if isinstance(exp, (int, float, str)):
+        if isinstance(exp, (int | float | str)):
             # Make the datetime timezone-aware (UTC)
             return datetime.datetime.fromtimestamp(int(exp), tz=datetime.UTC)
         raise NotValidTokenError
@@ -259,7 +264,7 @@ class WBToken(BaseTable):
         try:
             # Compare using timezone-aware UTC now
             return datetime.datetime.now(datetime.UTC) >= self.__expires
-        except Exception:
+        except Exception: # noqa
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным
             )
@@ -347,7 +352,7 @@ class WBCard(BaseTable):
         return urls
 
     @property
-    def SubjectId(self) -> int | None:
+    def SubjectId(self) -> int | None: # noqa
         subject_id = self.card_json.get("subjectID")
         if isinstance(subject_id, int) or subject_id is None:
             return subject_id
@@ -363,7 +368,7 @@ class AdvSetting(BaseTable):
         DONE = "done"
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs) # noqa
         self._worst_promo_position = None
 
     def __repr__(self):
@@ -431,7 +436,7 @@ class AdvSetting(BaseTable):
     auto_max_cpm_mode = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
-    max_place = mapped_column(Integer, nullable=True)
+    max_place: MappedColumn[int] = mapped_column(Integer, nullable=True)
     use_incremental_stats = mapped_column(
         Boolean,
         nullable=False,
@@ -454,7 +459,7 @@ class AdvSetting(BaseTable):
     )
     _search_adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=settings.BIDDER_STEP)
-    exponent_predict_ctr = mapped_column(
+    exponent_predict_ctr: Mapped[float]  = mapped_column(
         Float,
         nullable=False,
         default=settings.DEFAULT_CTR_EXPONENTA,
@@ -480,12 +485,20 @@ class AdvSetting(BaseTable):
     auto_update_target_place: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
+    auto_update_exponent: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=True, server_default="true"
+    )
+
+    rec_system_mode: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=False, server_default="false"
+    )
+
     max_balance_adding_for_day: Mapped[int] = mapped_column(
         Integer, nullable=True, default=0, server_default="0"
     )
 
-    auto_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
-    auction_adv_target_status = mapped_column(Boolean, nullable=True, default=None)
+    auto_adv_target_status: MappedColumn[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    auction_adv_target_status: MappedColumn[bool | None] = mapped_column(Boolean, nullable=True, default=None)
     auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=True, server_default=text("true")
     )
@@ -509,6 +522,21 @@ class AdvSetting(BaseTable):
         default=FactMethods.DIRECT_SALES,  # экземпляр Enum
         server_default=FactMethods.DIRECT_SALES.name,
     )  # строка
+
+    # TODO: Навести порядок в боте, со стороны клиента
+
+    automatic_version: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=1, server_default="1"
+    )
+
+    bidder_mode: Mapped[BidderMode | None]  = mapped_column(
+        SAEnum(BidderMode),
+        nullable=True,
+        default=BidderMode.BY_POSITIONS,
+        server_default=BidderMode.BY_POSITIONS.name,
+    )
+
+
 
     __table_args__ = (
         # Составной индекс для основного запроса
@@ -551,7 +579,7 @@ class AdvSetting(BaseTable):
         if not self.name:
             return None
         name = self.name.replace(" ", "")
-        pattern = re.compile(r"<!-\[(\d+)\]-!>")
+        pattern = re.compile(r"<!-\[(\d+)\]-!>") # noqa
         match = re.search(pattern, name)
         if not match:
             return None
@@ -561,6 +589,7 @@ class AdvSetting(BaseTable):
     def search_adv_id(self, value: int) -> None:
         self._search_adv_id = value
 
+    #
     @property
     def max_pay_for_order(self) -> int | None:
         pattern = re.compile(
@@ -570,9 +599,10 @@ class AdvSetting(BaseTable):
         if match:
             return int(match.group(1))
         return None
-
+    
     @property
     def auto_max_bid(self) -> bool:
+        # TODO: DEPRICATED - удалить!!!!
         pattern = re.compile(
             r"<MAX_PAY>(\d+)!?</MAX_PAY>"
         )  # Используем тот же паттерн, чтобы найти!
@@ -730,7 +760,7 @@ class WBItemPosition:
         if isinstance(raw_ts, str):
             try:
                 position.timestamp = datetime.datetime.fromisoformat(raw_ts)
-            except Exception:
+            except Exception: # noqa
                 position.timestamp = None
         else:
             position.timestamp = None

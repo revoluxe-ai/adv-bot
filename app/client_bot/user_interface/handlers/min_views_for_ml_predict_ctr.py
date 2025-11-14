@@ -1,5 +1,6 @@
-import logging
+# mypy: ignore-errors
 
+import logging
 import aiogram
 from aiogram import Bot, Router, types
 from aiogram.filters import StateFilter
@@ -64,7 +65,7 @@ async def set_min_views_for_predict_ctr(
                 select(AdvSetting).where(AdvSetting.id == adv_original_id)
             )
             adv = adv.scalar()
-            adv.min_views_for_ml_predict = min_views
+            adv.min_views_for_ml_predict = min_views  # type: ignore[attr-defined]
             await session.commit()
             await messages.SettingMinViewsForPredictCTR(bot, chat_id)(adv_original_id)
             return

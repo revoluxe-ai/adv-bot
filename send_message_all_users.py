@@ -5,7 +5,7 @@ from hashlib import sha256
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.admin_bot.sender import redis_manager
+from app.admin_bot.sender import redis_manager  # type: ignore[attr-defined]
 from app.client_bot import single_messages
 from app.client_bot.bot import bot
 from app.modules.common_slaves.wildberries.models.models import (

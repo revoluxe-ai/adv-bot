@@ -7,6 +7,20 @@ if TYPE_CHECKING:
         ParsingQueueMode,
     )
 
+# TODO: Доделать рассылку по боту, сделать оффер и разослать
+
+# TODO: Решить ошибку при ручном обновлении позиций:  сделать допнастройки, проверять более медленно, желательно через arq, как долгосрочную задачу, чтобы не терялась
+
+# TODO: Сделать встроенную в бот ИИ поддержку, и для моих чатов, и для юзеров
+
+# TODO Сделать CI с прогоном тестов и линтеров, поправить инструкции для Копилота в Git Hub
+
+# TODO: Придумать более надежный способ проверки ключей на индексацию, сейчас хромает, если по запросу бренд + ключ очень много предложений
+
+# TODO: Поменять ссылку на старый канал в боте на видео
+
+# TODO: Сделать уведомлятор об исправлении ошибок в боте
+
 dotenv.load_dotenv()
 import os
 
@@ -200,7 +214,23 @@ class Settings:
         elif value == "true":
             return True
         raise ValueError("Не верное значение в POSTGRES_SSL_INSECURE")
+# TODO: Внедрить STAGE- тесты бота
 
+# TODO: Понаблюдать за ручным обновлением позиций в клиентской части
+
+# TODO: Внедрить получение и учет важных новостей от WB, а то теряю, многое случайно узнаю. Также можно внедрить автообработку новостей от блоггеров
+
+# TODO: Вот такая новость пришла https://seller.wildberries.ru/news-v2/news-details?id=9398
+
+# TODO Промониторить что там нового в API
+
+# TODO: Стать авторизованным партнером WB
+
+
+
+# Сделать собиралку телефонов пользователей  бота: для поддержки, для клиентской базы
+
+# Внедрить автообновление образов при коммитах
     @property
     def POSTGRES_MASTER_HOST(self) -> str | None:
         return os.environ.get("POSTGRES_MASTER_HOST")
@@ -223,9 +253,10 @@ class Settings:
 
     @property
     def ssl_mode(self) -> str | None:
+        # TODO: Тут работало и с None, но Copilot ругался, что будет Рантайм эррор, Smoke-тест прошел
         value = os.environ.get("POSTGRES_SSL_MODE")
         if value is None:
-            raise ValueError("POSTGRES_SSL_MODE is not set")
+            return 'disable'
         return value
 
     @property
@@ -300,6 +331,43 @@ class Settings:
         if not value:
             return 60 * 60 * 4
         return int(value)
+
+    @property
+    def WB_RATE_LIMIT_BASE_DELAY_SEC(self) -> float:
+        value = os.getenv("WB_RATE_LIMIT_BASE_DELAY_SEC")
+        if not value:
+            return 0.1
+        return float(value)
+
+    @property
+    def WB_RATE_LIMIT_MAX_DELAY_SEC(self) -> float:
+        value = os.getenv("WB_RATE_LIMIT_MAX_DELAY_SEC")
+        if not value:
+            return 300.0
+        return float(value)
+
+    @property
+    def WB_RATE_LIMIT_MULTIPLIER(self) -> float:
+        value = os.getenv("WB_RATE_LIMIT_MULTIPLIER")
+        if not value:
+            return 2.0
+        return float(value)
+
+    @property
+    def WB_RATE_LIMIT_SUCCESS_THRESHOLD(self) -> int:
+        """Количество успехов подряд для уменьшения задержки."""
+        value = os.getenv("WB_RATE_LIMIT_SUCCESS_THRESHOLD")
+        if not value:
+            return 5
+        return int(value)
+
+    @property
+    def WB_RATE_LIMIT_DECREASE_FACTOR(self) -> float:
+        """Фактор уменьшения задержки при успехах (аддитивное уменьшение)."""
+        value = os.getenv("WB_RATE_LIMIT_DECREASE_FACTOR")
+        if not value:
+            return 0.05  # Уменьшаем на 50ms
+        return float(value)
 
     @property
     def MAX_PARSING_PARALLEL_JOBS(self) -> int:
@@ -381,18 +449,37 @@ class Settings:
             return int(value)
 
     @property
+    def FULL_AUTO_UPDATE_PRICE(self) -> int:
+        value = os.getenv("FULL_AUTO_UPDATE_PRICE")
+        if not value:
+            return 5000
+        else:
+            return int(value)
+
+
+    @property
     def WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF(self) -> int:
         value = os.getenv("WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF")
         if not value:
-            return 2500
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
         return int(value)
 
     @property
     def AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF(self) -> int:
         value = os.getenv("AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF")
         if not value:
-            return 2500
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
         return int(value)
+
+    @property
+    def AUTO_UPDATE_EXPONENT_MONTH_TARIFF(self) -> int:
+        value = os.getenv("AUTO_UPDATE_EXPONENT_MONTH_TARIFF")
+        if not value:
+            return int(self.FULL_AUTO_UPDATE_PRICE/3)
+        return int(value)
+
+
+
 
     @property
     def SHOP_UPDATE_TIMEOUT_MINUTES(self) -> int:
@@ -474,4 +561,14 @@ class Settings:
             raise ValueError("Не верное значение в PARSING_QUEUE_MODE")
 
 
+    @property
+    def PARSING_LIMITER_DELAY(self) -> float:
+        value = os.getenv("PARSING_LIMITER_DELAY")
+        if not value:
+            return 0.1
+        return float(value)
+
+
+
+# TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 settings = Settings()

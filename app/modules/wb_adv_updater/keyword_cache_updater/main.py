@@ -11,4 +11,4 @@ async def calculate_keywords_for_keyboard(
 
 
 async def update_to_cache(adv_setting: AdvSetting, keywords: list[KeywordForKeyboard]):
-    await redis_manager.set_keywords_for_keyboard(adv_setting.id, keywords)
+    await redis_manager.set_keywords_for_keyboard(adv_setting.id, keywords)  # type: ignore[attr-defined]

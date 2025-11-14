@@ -108,8 +108,9 @@ class AdvSettingAutoUpdater:
 
         plan = PlanData(
             orders=plan_orders,
-            target_pay_for_order=target_pay_for_order,
-            max_pay_for_order=max_pay_for_order,
+            target_pay_for_order=target_pay_for_order, # noqa
+            max_pay_for_order=max_pay_for_order, # noqa
+
         )
 
         return plan

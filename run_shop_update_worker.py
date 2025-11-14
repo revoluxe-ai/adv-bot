@@ -17,7 +17,7 @@ async def run_shop_update_worker() -> None:
     """Запускает воркер для обновления магазинов."""
     from app.core.di.app_container import AppContainer
 
-    async with await DIManager.create(AppContainer):
+    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
         async with ClientSession() as session:
             worker = ShopWorker(session)
             await worker.update_active_shop_update_tasks_run()

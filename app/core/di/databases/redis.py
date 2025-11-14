@@ -28,9 +28,9 @@ class RedisLifecycle(resources.AsyncResource[Redis]):
         try:
             await client.ping()
         except Exception as exc:
-            await client.aclose()
+            await client.aclose()  # type: ignore[attr-defined]
             raise exc
 
     async def shutdown(self, client: Redis | None = None) -> None:
         if client:
-            await client.aclose()
+            await client.aclose()  # type: ignore[attr-defined]

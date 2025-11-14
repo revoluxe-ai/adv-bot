@@ -10,6 +10,7 @@ import logging
 import re
 import time
 from collections.abc import Awaitable, Callable
+from json import JSONDecodeError
 from typing import (
     Any,
     TypeVar,
@@ -79,7 +80,7 @@ def try_except_decorator(
 
             state = instance.api_call_state[method_name]
             shop_id = instance.shop_id
-            while state["_attempts"] < max_attempts:
+            while state["_attempts"] < max_attempts: # noqa
                 last_query_time: float | None = state["_last_query_time"]
                 if last_query_time:
                     current_time = time.time()
@@ -92,7 +93,7 @@ def try_except_decorator(
                 try:
                     state["_last_query_time"] = time.time()
                     result = await func(instance, *args, **kwargs)
-                    logger.debug(f"Запрос {method_name} выполнен успешно для {shop_id}")
+                    logger.debug("Запрос %s выполнен успешно для %s", method_name, shop_id)
                     next_pause = (
                         interval_seconds / requests_per_interval
                         + state["_current_pause"]
@@ -123,11 +124,13 @@ def try_except_decorator(
                         max(state["_current_pause"], 1) * 2, max_delay
                     )
                     logger.debug(
-                        f"Следующая пауза между запросами: {state['_current_pause']} секунд для shop_id: {shop_id}"
+                        "Следующая пауза между запросами: %s секунд для shop_id: %s",
+                        state["_current_pause"],
+                        shop_id,
                     )
                 except Exception as e:
                     raise e
-
+        
         return cast(F, wrapper)
 
     return decorator
@@ -148,14 +151,17 @@ async def requests(
         try:
             response_text = await response.text()
             logger.debug(
-                f"Запрос к {url} выполнен. Статус: {response.status}, ответ: {response_text[:500]}"
+                "Запрос к %s выполнен. Статус: %s, ответ: %s",
+                url,
+                response.status,
+                response_text[:500],
             )
             response.raise_for_status()
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
                 raise ApiForbiddenError("Неверный API ключ") from e
             if e.status == 429:
-                logger.debug(f"Превышен лимит запросов к API: {url}")
+                logger.debug("Превышен лимит запросов к API: %s", url)
                 raise TooManyRequests(e) from e
             if e.status == 400:
                 exc = get_error_from_response(response_text)
@@ -184,8 +190,11 @@ def get_error_from_response(response_text: str) -> Exception:
     """
     Извлекает ошибку из ответа API Wildberries.
     """
-    response_json = json.loads(response_text)
-
+    try:
+        response_json = json.loads(response_text)
+    except JSONDecodeError as e:
+        logger.error('Ошибка декодирования JSON из ответа API Wildberries: "%s"', response_text[:500])
+        raise NotValidDataError("Ответ не является валидным JSON") from e
     match response_json:
         case {
             "errors": [{"detail": detail, "field": field}],

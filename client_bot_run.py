@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import asyncio
 from contextlib import asynccontextmanager
@@ -21,8 +20,7 @@ from app.modules.token_monitoring import (
 
 logger = logging.getLogger(__name__)
 
-# TODO: Переделать кнопки в боте на более понятные, чтобы было видно какой режим сейчас включен, на какой пере
-# переключиться при нажатии
+# TODO: Переделать кнопки в боте на более понятные, чтобы было видно какой режим сейчас включен, на какой переключиться при нажатии
 
 setup_logging()
 
@@ -36,7 +34,7 @@ POLLING_MODE = settings.polling_mode
 
 
 @asynccontextmanager
-async def lifespan(app_fast_api: FastAPI):
+async def lifespan(app_fast_api: FastAPI): # noqa
     # Initialize token monitoring system
     try:
         # TODO Надо с этим разобраться к чему это все
@@ -127,6 +125,8 @@ async def telegram_webhook(request: Request):
     return {"status": "ok"}
 
 
+# TODO: Сделать полноценные Smoke Тесты, чтобы не гонять реальные магазины
+
 # Запуск в зависимости от режима
 if __name__ == "__main__":
     import uvicorn
@@ -140,7 +140,7 @@ if __name__ == "__main__":
             logger.info("🧹 Удаляем вебхук перед стартом POLLING...")
             try:
                 # Проверяем текущий статус вебхука
-                webhook_info = await bot.get_webhook_info()
+                webhook_info = await bot.get_webhook_info() # noqa
                 if webhook_info.url:
                     # Если вебхук установлен, удаляем его с таймаутом
                     try:
@@ -168,7 +168,7 @@ if __name__ == "__main__":
                 from app.core.di.app_container import AppContainer
                 from app.core.di.di_manager import DIManager
 
-                async with await DIManager.create(AppContainer):
+                async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
                     async with ClientSession() as client_session:
                         dp = Dispatcher(client_session=client_session)
                         dp.include_router(global_router)

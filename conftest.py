@@ -1,19 +1,310 @@
 # mypy: ignore-errors
+from tests.factories import adv_factory
+import os
+
+import asyncio
+
+from fakeredis import FakeRedis
+
+from app.core.di import AppContainer
+import aiofiles
+from dependency_injector import containers
+
+from typing import AsyncGenerator
+
+import fakeredis
+
+from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
+
+# Устанавливаем переменные окружения для тестовой БД ДО любых импортов
+os.environ["POSTGRES_MASTER_HOST"] = "localhost"
+os.environ["POSTGRES_REPLICA_HOST"] = "localhost"
+os.environ["POSTGRES_PORT"] = "5433"
+os.environ["POSTGRES_DBNAME"] = "test_adv_bot_db"
+os.environ["POSTGRES_USER"] = "test_user"
+os.environ["POSTGRES_PASSWORD"] = "test_password"
+os.environ["POSTGRES_SSL_MODE"] = "disable"
+os.environ["POSTGRES_SSL_INSECURE"] = "true"
+
+# Обязательные переменные для работы settings
+os.environ.setdefault("TELEGRAM_WEB_PORT", "8080")
+os.environ.setdefault("CH_MAX_THREAD", "10")
+os.environ.setdefault("BIDDER_STEP_RUB", "1")
+os.environ.setdefault("CLICKHOUSE_PORT", "9000")
+os.environ.setdefault("CLICK_HOUSE_HOST", "localhost")
+os.environ.setdefault("CLICK_HOUSE_USER", "default")
+os.environ.setdefault("CLICK_HOUSE_PASSWORD", "test")
+os.environ.setdefault("REDIS_MASTER_HOST", "localhost")
+os.environ.setdefault("REDIS_REPLICA_HOST", "localhost")
+os.environ.setdefault("REDIS_PORT", "6379")
+os.environ.setdefault("BOT_TOKEN", "test_token_123")
+os.environ.setdefault("WEBHOOK_SECRET", "test_secret")
+os.environ.setdefault("YOOKASSA_TOKEN", "test_yookassa")
+os.environ.setdefault("MIN_SUM", "0")
+
+TEST_DB_POSTGRES_URL = "postgresql://test_user:test_password@localhost:5433/test_adv_bot_db"
+os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL
+
+
 import dotenv
 
-dotenv.load_dotenv()  # TODO: Переделать для загрузки тестовых настроек
-import os
+# Загружаем .env, но НЕ перезаписываем уже установленные переменные окружения для тестов
+dotenv.load_dotenv(override=False)
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
 # Подставляем заглушку для app.core.wb_api.http_request до реальных импортов
 import types
 
 mod_name = "app.core.wb_api.http_request"
 import importlib
+
+
+import subprocess
+import time
+import atexit
+from datetime import datetime, timedelta
+
+import pytest
+
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.pool import NullPool
+
+from app.modules.common_slaves.wildberries.models import WBCabinet
+
+# Переменные окружения для тестовой БД
+TEST_DB_URL = "postgresql+asyncpg://test_user:test_password@localhost:5433/test_adv_bot_db"
+COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "tests", "docker-compose.test.yml")
+
+# Глобальное хранилище для cleanup контейнеров
+_DOCKER_CLEANUP_STATE = {"compose_cmd": None, "container_id": None}
+
+
+def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
+    """Синхронный запуск команды с таймаутом. Возвращает (returncode, stdout, stderr)."""
+    try:
+        result = subprocess.run(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            text=True,
+            errors="ignore",
+        )
+        return result.returncode, result.stdout, result.stderr
+    except FileNotFoundError:
+        return 127, "", f"command not found: {args[0]}"
+    except subprocess.TimeoutExpired:
+        return 124, "", f"timeout while running: {' '.join(args)}"
+
+
+def _detect_compose_cmd() -> list[str]:
+    """Определяет доступную форму запуска compose: ['docker', 'compose'] или ['docker-compose']."""
+    # Предпочитаем новый docker compose
+    rc, *_ = _sync_run("docker", "compose", "version", timeout=5)
+    if rc == 0:
+        return ["docker", "compose"]
+    # Фолбэк на старый docker-compose
+    rc, *_ = _sync_run("docker-compose", "version", timeout=5)
+    if rc == 0:
+        return ["docker-compose"]
+    return []
+
+
+def _emergency_cleanup():
+    """Аварийная очистка контейнеров при выходе из pytest (если нормальный teardown провалился)."""
+    cid = _DOCKER_CLEANUP_STATE.get("container_id")
+    cmd = _DOCKER_CLEANUP_STATE.get("compose_cmd")
+
+    if cid:
+        print(f"\n[EMERGENCY CLEANUP] Force removing container: {cid}")
+        _sync_run("docker", "stop", "-t", "1", cid, timeout=5)
+        _sync_run("docker", "rm", "-f", cid, timeout=5)
+
+    if cmd:
+        print(f"\n[EMERGENCY CLEANUP] Compose down: {COMPOSE_FILE}")
+        _sync_run(*cmd, "-f", COMPOSE_FILE, "down", "-v", "--timeout", "1", timeout=15)
+
+
+# Регистрируем emergency cleanup на случай краша pytest
+atexit.register(_emergency_cleanup)
+
+
+@pytest.fixture(scope="session")
+def docker_compose_cmd() -> list[str]:
+    """Определяет команду для запуска Docker Compose и скипает, если недоступна."""
+    cmd = _detect_compose_cmd()
+    if not cmd:
+        pytest.skip("Docker Compose не найден в системе — скипаем интеграционные тесты БД")
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = cmd
+    return cmd
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_database(docker_compose_cmd):
+    """Синхронная фикстура для настройки тестовой базы данных с помощью Docker Compose и Alembic."""
+    print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
+
+    # --- Запуск Docker Compose ---
+    rc, out, err = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "up", "-d", "--build", timeout=180)
+    if rc != 0:
+        raise RuntimeError(f"Failed to start Docker Compose services. rc={rc} stderr={err}")
+
+    # --- Ожидание запуска контейнера ---
+    container_id: str = ""
+    max_retries = 30
+    for i in range(max_retries):
+        rc, cid_out, _ = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10)
+        container_id = cid_out.strip()
+        if container_id:
+            _DOCKER_CLEANUP_STATE["container_id"] = container_id  # Сохраняем для emergency cleanup
+            rc, health, _ = _sync_run(
+                "docker", "inspect", "--format", "{{.State.Health.Status}}", container_id, timeout=10
+            )
+            if rc == 0 and health.strip() == "healthy":
+                print("[OK] Test database is healthy.")
+                break
+        print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries}")
+        time.sleep(2)
+    else:
+        # Если так и не дождались health=healthy — покажем статус и логи для диагностики
+        _sync_run("docker", "ps", "-a", timeout=10)
+        if container_id:
+            _sync_run("docker", "logs", container_id, timeout=10)
+        raise RuntimeError("Test database did not become healthy in time.")
+
+    from app.utils.db.base import BaseTable as Base
+    from sqlalchemy import create_engine
+
+    print("[MIGRATION] Creating PostgreSQL extensions...")
+
+    # Создаём синхронный движок для создания расширений и таблиц
+    sync_engine = create_engine(TEST_DB_URL.replace("postgresql+asyncpg", "postgresql"))
+
+    # Создаём необходимые расширения PostgreSQL ПЕРЕД созданием таблиц
+    with sync_engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+        conn.commit()
+
+    print("[MIGRATION] Creating tables from models metadata...")
+    Base.metadata.create_all(sync_engine)
+    sync_engine.dispose()
+    print("[OK] Tables created successfully from models metadata.")
+
+    # Проставляем миграции Alembic как применённые
+    from alembic.config import Config
+    from alembic import command
+
+    print("[MIGRATION] Stamping Alembic migrations for test database...")
+    alembic_cfg = Config("alembic.ini")
+    alembic_cfg.set_main_option("script_location", "alembic_")
+    alembic_cfg.set_main_option("sqlalchemy.url", TEST_DB_URL)
+    command.stamp(alembic_cfg, "head")
+    print("[OK] Alembic migrations stamped successfully.")
+
+    # --- Базовые данные (async) ---
+    # Создаём минимальный event loop только для этой задачи
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        async def insert_initial_data():
+            engine = create_async_engine(TEST_DB_URL)
+            async with engine.begin() as conn:
+                initial_wb_cabinet_data = {
+                    "id": 1,
+                    "shop_id": "test_shop_id",
+                    "active": True,
+                    "expiration_time": datetime.now() + timedelta(days=7),
+                    "balance": 0.0,
+                    "bonus": 0.0,
+                    "demo": True,
+                    "expiration_alarm_days_pass": None,
+                    "white_list_update_active": False,
+                }
+                insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
+                on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                    index_elements=["id"],
+                    set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
+                )
+                await conn.execute(on_conflict_stmt)
+                await conn.commit()
+            await engine.dispose()
+
+        loop.run_until_complete(insert_initial_data())
+    finally:
+        loop.close()
+
+    print("[OK] Test database setup complete.")
+
+    yield
+
+    # --- TEARDOWN ---
+    print(f"\n[CLEANUP] Stopping Docker Compose: {COMPOSE_FILE}")
+
+    # Сначала пытаемся остановить контейнер gracefully
+    if container_id:
+        _sync_run("docker", "stop", "-t", "2", container_id, timeout=10)
+
+    # Затем compose down с очень коротким таймаутом
+    rc, _, err = _sync_run(
+        *docker_compose_cmd,
+        "-f",
+        COMPOSE_FILE,
+        "down",
+        "-v",
+        "--remove-orphans",
+        "--timeout",
+        "1",
+        timeout=20,
+    )
+    if rc != 0:
+        print(f"[WARNING] 'compose down' failed rc={rc}: {err.strip()}")
+
+    # Финальная зачистка
+    if container_id:
+        _sync_run("docker", "rm", "-f", container_id, timeout=10)
+        _DOCKER_CLEANUP_STATE["container_id"] = None
+
+    print("[OK] Cleanup complete.")
+
+
+
+@pytest.fixture(scope="function", name="async_engine")
+async def _async_engine():
+    """Создаёт async движок для каждого теста."""
+    engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
+    yield engine
+    await engine.dispose()
+
+
+@pytest.fixture(name="async_session")
+async def _async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
+    """Создаёт async сессию с откатом после теста."""
+    async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
+    async with async_session_maker() as session:
+        trans = await session.begin()
+        try:
+            yield session
+        finally:
+            if trans.is_active:
+                await trans.rollback()
+            await session.close()
+
+
+
+# Фикстура для доступа к mock access (простая версия)
+@pytest.fixture(name="access_mock_simple")
+def _access_mock():
+    mock = MagicMock()
+    mock.wb_cabinet = MagicMock(spec=WBCabinet)
+    mock.wb_cabinet.id = 1
+    mock.wb_cabinet.shop_id = "test_shop_id"
+    return mock
+
 
 try:
     # If a previous stub without __file__ exists, remove it to allow real import
@@ -50,7 +341,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken
-from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
+
 
 # Добавляем корневую директорию проекта в PYTHONPATH
 project_root = Path(__file__).parent.absolute()
@@ -76,12 +367,13 @@ def tokens_mock() -> list[MagicMock]:
 
 
 @pytest.fixture
-def wb_cabinet_mock() -> MagicMock():
+def wb_cabinet_mock() -> MagicMock:
     return MagicMock()
 
 
 @pytest.fixture
 def access_mock(tokens_mock, wb_cabinet_mock):
+    from app.modules.common_slaves.wildberries.super_cabinet_manager import WBCabinetAccess
     access_mock = MagicMock(spec=WBCabinetAccess)
     access_mock.tokens = tokens_mock
     access_mock.wb_cabinet = wb_cabinet_mock
@@ -93,6 +385,7 @@ def adv_setting_mock():
     adv_setting_mock = MagicMock(spec=AdvSetting)
     adv_setting_mock.adv_id = 25040169
     adv_setting_mock.nmids = [222811118]
+    adv_setting_mock.active_status = "started"
     return adv_setting_mock
 
 
@@ -100,7 +393,7 @@ def adv_setting_mock():
 def session_mock(result_mock):
     session_mock = MagicMock()
     session_mock.execute = AsyncMock(return_value=result_mock)
-    session_mock.commit = AsyncMock()
+    session_mock.commit = AsyncMock(return_value=None)
     return session_mock
 
 
@@ -112,14 +405,14 @@ def get_async_session_mock(session_mock) -> MagicMock:
     return get_session_maker_mock
 
 
-from unittest.mock import MagicMock
-
 from pytest import fixture
 
 
 @fixture
 def keywords_mocks() -> list[MagicMock]:
-    """Фикстура для генерации моков CalculatedKeyword с заданными параметрами"""
+    """
+    Фикстура для генерации моков CalculatedKeyword с заданными параметрами
+    """
     keyword_params = [
         {
             "best_keyword_status": True,
@@ -163,3 +456,147 @@ def keywords_mocks() -> list[MagicMock]:
         mocks.append(mock)
 
     return mocks
+
+
+@pytest.fixture(name='front_too_many_requests_str', scope='function')
+async def front_too_many_requests_str() -> AsyncGenerator[str, None]:
+    async with aiofiles.open('tests/wb_front_responses/too-many-requests.txt',
+                             mode='r',
+                             encoding='utf-8') as f:
+        content = await f.read()
+        yield content
+
+
+
+
+# TODO: Разработать методологию оценки сроков разработки новых фич, багфиксов и рефакторингов, а также стратегии укладывания в сроки.
+
+
+@pytest.fixture(name="di_container", scope="function")
+async def di_container() -> AsyncGenerator[AppContainer, None]:
+    from app.core.di import AppContainer
+
+    AppContainer.wiring_config = containers.WiringConfiguration()
+    container = AppContainer()
+
+    yield container
+
+
+
+@pytest.fixture(scope="function")
+async def postgres_session(async_engine):
+    async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
+    async with async_session_maker() as session:
+        yield session
+
+
+@pytest.fixture(scope='function')
+async def fake_redis():
+    """Создает фейковый Redis для тестов (асинхронная версия)."""
+    redis = await fakeredis.aioredis.FakeRedis()
+    yield redis
+    await redis.flushall()  # очищаем после теста
+    await redis.close()
+
+
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+
+
+
+
+
+# TODO: Внедрить исполнителя, который будет тормозить не эффективные РК и запускать потом их снова
+# TODO Сделать более информативно какие РК сколько жрут
+# TODO: Сделать исполнителя, который будет глушить слова сверху вниз и снизу вверх
+# TODO Сделать дашборд по эффективности работы платных клиентов и самому писать им - это будет про-активная поддержка. С сортировкой по эффективности
+
+@pytest.fixture(scope='function')
+async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexAdv, None]:
+    """Создает полностью связанную структуру ComplexAdv (реальные ORM-объекты)."""
+
+    await postgres_session.begin()
+    adv_setting = AdvSettingFactory.build()
+    search_adv_setting = AdvSettingFactory.build()
+    adv_setting._search_adv = search_adv_setting.adv_id
+    postgres_session.add(adv_setting)
+    await postgres_session.flush()
+    await postgres_session.refresh(adv_setting)
+    # 2️⃣ KeywordSettings
+    adv_factory.fake.unique.clear()
+    keyword_settings = [
+        KeywordSettingFactory.build(adv_setting_id=adv_setting.id,)
+        for _ in range(50)
+    ]
+    postgres_session.add_all(keyword_settings)
+    await postgres_session.flush()
+    for ks in keyword_settings:
+        await postgres_session.refresh(ks)
+
+    # 3️⃣ CalculatedKeywords
+    from tests.factories.keyword_pipeline import generate_calculated_keywords
+    calculated_keywords = generate_calculated_keywords(keyword_settings)
+
+    # 4️⃣ Асинхронный источник данных для ComplexAdv
+    async def get_keywords_func(_: AdvSetting) -> list[CalculatedKeyword]:
+        return calculated_keywords
+
+    # 5️⃣ Реальный ComplexAdv
+    complex_adv = ComplexAdv(
+        adv_setting=adv_setting,
+        get_keywords_func=get_keywords_func,
+        search_adv=search_adv_setting,
+    )
+
+    yield complex_adv
+    await postgres_session.rollback()
+
+
+
+@pytest.fixture(scope='function')
+def complex_adv_mock(complex_adv):
+    complex_adv.get_keywords = AsyncMock(return_value=[])
+    return complex_adv
+
+
+
+
+@pytest.fixture(scope='function')
+async def sm_generator(postgres_session):
+    class _FakeSessionMaker:
+        def __call__(self, *args, **kwargs):
+            return self  # имитируем async context
+        async def __aenter__(self):
+            return postgres_session
+        async def __aexit__(self, exc_type, exc, tb):
+            pass
+
+    return _FakeSessionMaker()
+
+
+@pytest.fixture(autouse=True)
+async def clean_db(async_engine):
+    """Очищает таблицы перед каждым тестом."""
+    yield  # Сначала выполняем тест
+    # Очистка после теста
+    async with async_engine.begin() as conn:
+        await conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(scope='function')
+def main_di_container() -> AppContainer:
+    from app.core.di import AppContainer
+
+    container = AppContainer()
+    return container
+
+
+
+
+@pytest.fixture(scope='function')
+def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRedis) -> AppContainer:
+    main_di_container.wiring_config.modules = ['app.core.redis_cache',  # Отключаем автоматическое встраивание зависимостей
+                                       "old_modules.setting_auto_updater_v2.adv_control_system."
+                                       "executors.target_place_executor.utils",
+                                       ]
+    main_di_container.redis_client.override(fake_redis)
+    return main_di_container

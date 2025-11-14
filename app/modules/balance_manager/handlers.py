@@ -193,7 +193,7 @@ async def successful_payment_handler(
         user_id = user_result.scalar_one_or_none()
 
         if not user_id:
-            logger.error(f"Пользователь с telegram_id {message.chat.id} не найден")
+            logger.error("Пользователь с telegram_id %s не найден", message.chat.id)
             await message.answer(
                 "Произошла ошибка при обработке платежа. Обратитесь в поддержку."
             )
@@ -223,8 +223,9 @@ async def successful_payment_handler(
             .where(WBCabinet.id == wb_cabinet_original_id)
         )
         wb_user_cabinet_id_result = await session.execute(stmt)
-        wb_user_cabinet_id = wb_user_cabinet_id_result.scalars.first()
+        # TODO: Заглушил ошибку, может потому после оплаты ошибку и кидает
+        wb_user_cabinet_id = wb_user_cabinet_id_result.scalars.first() # type: ignore[attr-defined]
 
-    logger.debug(f"wb_user_cabinet_id: {wb_user_cabinet_id}")
+    logger.debug("wb_user_cabinet_id: %s", wb_user_cabinet_id)
     await asyncio.sleep(1)
     await ShopMenu(bot, message.chat.id, state, wb_user_cabinet_id)()

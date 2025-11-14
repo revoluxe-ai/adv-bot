@@ -70,19 +70,19 @@ async def process_product_data(wbcard: WBCard):
     except KeyError:
         logger.error(f"Карточка {wbcard.nmid} не содержит характеристик")
         characteristics = []
-    for characteristic in characteristics:
+    for characteristic in characteristics:  # type: ignore[attr-defined]
         char_name = characteristic["name"].lower()
         char_value = characteristic["value"]
         if not isinstance(char_value, list) or all(is_number(x) for x in char_value):
-            continue
-        characteristics_words[char_name]: tuple[str, list[float]] = (
+            continue  # type: ignore[attr-defined]
+        characteristics_words[char_name]: tuple[str, list[float]] = (  # type: ignore[attr-defined]
             await get_words_from_char_value(char_value)
         )
-    characteristics_words["name"]: tuple[str, list[float]] = (
+    characteristics_words["name"]: tuple[str, list[float]] = (  # type: ignore[attr-defined]
         await get_words_from_char_value(wbcard.name)
     )
     if "description" in characteristics_words:
-        characteristics_words["description"]: tuple[str, list[float]] = (
+        characteristics_words["description"]: tuple[str, list[float]] = (  # type: ignore[attr-defined]
             await get_words_from_char_value(wbcard.description)
         )
     return characteristics_words
@@ -248,7 +248,7 @@ async def update_keywords_ctr_by_similary() -> None:
 
     # Поиск и обновление данных
 
-    for keyword_text_adv_id in keyword_texts_adv_ids:
+    for keyword_text_adv_id in keyword_texts_adv_ids:  # type: ignore[attr-defined]
         target_text = keyword_text_adv_id[0]
         target_text = text_cleaner.clear(target_text)
         if not target_text:

@@ -31,11 +31,11 @@ class Adv(BaseModel, ABC):
 
     @property
     def category_name(self) -> str:
-        return self.autoParams.subject.name
+        return self.autoParams.subject.name  # type: ignore[attr-defined]
 
     @property
     def subject_id(self) -> int:
-        return self.autoParams.subject.id
+        return self.autoParams.subject.id  # type: ignore[attr-defined]
 
     @property
     def status_native(self) -> str:

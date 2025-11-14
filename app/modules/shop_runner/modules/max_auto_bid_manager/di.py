@@ -14,6 +14,9 @@ class AutoMaxCpmContainer(DeclarativeContainer):
         modules=[
             "app.modules.shop_runner.bidder.bidder_func",
             "app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages",
+            "app.modules.shop_runner.service_manager."
+            "old_modules.setting_auto_updater_v2.adv_control_system."
+            "executors.target_place_executor.utils",
         ]
     )
     redis_client_wrapper = Dependency(instance_of=RedisClient)

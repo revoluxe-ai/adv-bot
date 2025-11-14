@@ -13,7 +13,7 @@ from app.modules.balance_manager import balance_service
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-from ..into_callback import CreateNewAdvs as CreateNewAdvsCallbackData
+from ..into_callback import CreateNewAdvs as CreateNewAdvsCallbackData, ConfirmCreateComplexAdv
 from . import messages
 from .states import CreateCompamyStates as states
 
@@ -110,3 +110,41 @@ async def get_nmid(message: Message, state: FSMContext, bot: Bot):
     await bot.send_message(
         message.from_user.id, "Задачи на создание рекламы добавлены в очередь. Ждите."
     )
+
+
+@router.callback_query(ConfirmCreateComplexAdv.filter())
+async def confirm_create_complex_adv(
+    callback: CallbackQuery,
+    callback_data: ConfirmCreateComplexAdv,
+    bot: Bot,
+) -> None:
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)  # убрать клавиатуру
+
+    wb_cabinet_original_id = callback_data.wb_cabinet_original_id
+
+    stmt = select(WBCabinet.shop_id).where(
+        WBCabinet.id == wb_cabinet_original_id)
+    async with sm(read_only=True) as session:
+        result: str | None = await session.scalar(stmt)
+    shop_id = result
+    assert shop_id is not None, "shop_id не найден в базе"
+    if callback_data.action == "continue":
+        # Повторная постановка задачи с hard_mode=True
+        redis_task_pool = await create_pool(arq_redis_settings)
+        await redis_task_pool.enqueue_job(
+            "create_complex_advs", 
+            callback_data.nmid, 
+            shop_id,
+            True,  # hard_mode=True
+            callback.from_user.id
+        )
+        await bot.send_message(
+            callback.from_user.id,
+            f"Создание новой комплексной кампании для артикула {callback_data.nmid} начато..."
+        )
+    else:  # "cancel"
+        await bot.send_message(
+            callback.from_user.id,
+            f"Создание комплексной кампании для артикула {callback_data.nmid} отменено."
+        )

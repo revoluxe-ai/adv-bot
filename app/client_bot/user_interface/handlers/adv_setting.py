@@ -92,7 +92,7 @@ async def waiting_for_keywords_for_filter(
 
     page = 1
     check_data = await state.get_data()
-    logger.debug(f"check_data: {check_data}")
+    logger.debug("check_data: %s", check_data)
     await messages.AdvCompanyChoicing(
         bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page
     )()
@@ -114,7 +114,7 @@ async def choice_adv_paginator(
     )
     page = callback_data.page
     check_data = await state.get_data()
-    logger.debug(f"check_data: {check_data}")
+    logger.debug("check_data: %s", check_data)
     stmt = (
         select(AdvSetting)
         .join(AdvSetting.wb_cabinet)
@@ -200,11 +200,7 @@ async def adv_handler(
         wb_user_cabinet = wb_user_cabinet.scalar()
 
     chat_id = callback.message.chat.id
-    try:
-        await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
-    except NotItemsInAdvSetting:
-        await messages.NoMainPhotos(bot, chat_id)(adv)
-
+    await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
 
@@ -226,7 +222,7 @@ async def turn_adv_on(
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet: WBUserCabinet = wb_user_cabinet.scalar()  # type: ignore[attr-defined]
         assert wb_user_cabinet
         stmt = (
             select(AdvSetting)
@@ -236,7 +232,7 @@ async def turn_adv_on(
         result = await session.execute(stmt)
         adv: AdvSetting = result.scalar()
         assert adv
-        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
+        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet  # type: ignore[attr-defined]
         tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
             session, wb_cabinet.shop_id
         )
@@ -262,7 +258,7 @@ async def turn_adv_on(
             WBUserCabinet.id == wb_user_cabinet_original_id
         )
         wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
+        wb_user_cabinet = wb_user_cabinet.scalar()  # type: ignore[attr-defined]
         chat_id = callback.message.chat.id
         await messages.AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return

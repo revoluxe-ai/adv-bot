@@ -78,3 +78,5 @@ app/modules/predict_ctr_service/model/model/model.json
 !k8s/*
 model/model.json
 .mypy_cache/
+invited_users.txt
+invates/

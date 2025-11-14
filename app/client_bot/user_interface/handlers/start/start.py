@@ -219,7 +219,7 @@ async def process_cabinet_api(
         result = await session.execute(stmt_for_select_user_id)
         user_id = result.scalar()
         if user_id is None:
-            await bot.send_message(chat_id, "Ошибка: пользовате��ь не найден.")
+            await bot.send_message(chat_id, "Ошибка: пользователей не найден.")
             return True
 
     wb_token.shop_id = shop_id
@@ -578,7 +578,9 @@ async def process_add_new_token(
             return True
 
         logger.info(
-            f"Новый токен успешно добавлен для shop_id={shop_id}, " f"user_id={user_id}"
+            "Новый токен успешно добавлен для shop_id=%s, user_id=%s",
+            shop_id,
+            user_id,
         )
 
     # Резолв всех уведомлений для этого магазина
@@ -601,13 +603,14 @@ async def process_add_new_token(
 
         if total_resolved > 0:
             logger.info(
-                f"Зарезолвлено {total_resolved} уведомлений для shop_id={shop_id} "
-                f"после добавления нового токена"
+                "Зарезолвлено %s уведомлений для shop_id=%s после добавления нового токена",
+                total_resolved,
+                shop_id,
             )
     except Exception as e:
         # Не прерываем процесс, если не удалось зарезолвить уведомления
         logger.error(
-            f"Ошибка при резолве уведомлений для shop_id={shop_id}: {e}", exc_info=True
+            "Ошибка при резолве уведомлений для shop_id=%s: %s", shop_id, e, exc_info=True
         )
 
     # Отправка сообщений об успехе
@@ -633,7 +636,7 @@ async def select_shop(
     state: FSMContext,
 ) -> None:
     # TODO: Тут какая-то ошибка, reset_filter нет в модели callbacks.Shop
-    reset_filter = callback_data.reset_filter
+    reset_filter = callback_data.reset_filter  # type: ignore[attr-defined]
     if reset_filter:
         await state.update_data(filter_advs=None)
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
@@ -733,7 +736,7 @@ async def update_company_from_wb(
 
         await bot.send_message(
             chat_id,
-            "Загрузк�� кампаний завершена."
+            "Загрузка кампаний завершена."
             " Начинаю обновление карточек,"
             " процесс может занять длительное время.",
         )
@@ -760,7 +763,7 @@ async def update_company_from_wb(
             pass
         await bot.send_message(chat_id, "Загрузка карточек завершена завершена")
     except Exception as exc:
-        logger.error(f"Ошибка: {exc} при обновлении данных", exc_info=True)
+        logger.error("Ошибка: %s при обновлении данных", exc, exc_info=True)
         await bot.send_message(
             chat_id,
             f"Ошибка при обновлении данных, обратитесь в поддержку {const.SUPPORT_LINK}",

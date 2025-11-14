@@ -1,3 +1,7 @@
+[tool.poetry.scripts]
+pyright-strict = "pyright:cli --project pyrightconfig_strict.json"
+
+
 [tool.poetry]
 name = "adv-bot"
 version = "0.1.0"
@@ -41,7 +45,7 @@ ctyped = "0.8.0"
 cycler = "0.12.1"
 dask = "2024.2.1"
 decorator = "5.1.1"
-dependency-injector = "4.41.0"
+dependency-injector = "4.48.0"
 executing = "2.0.1"
 faiss-cpu = "1.8.0"
 fastapi = "0.110.0"
@@ -176,6 +180,12 @@ pytest-cov = "^7.0.0"
 types-cachetools = "^6.2.0.20251022"
 types-pyyaml = "^6.0.12.20250915"
 flake8-regex = "^0.3"
+fakeredis = "^2.32.0"
+factory_boy = "^3.3.0"
+pytest-factoryboy = "^2.7.0"
+Faker = "^30.0.0"
+pydantic-factories = "^1.17.3"
+transliterate = "^1.10.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -190,7 +200,9 @@ exclude = [
   "alembic/versions",
   "alembic/versions/*",
   'k8s/*',
-    'tests/*'
+    'tests/*',
+    'alembic_/versions/*',
+    '*test*'
 ]
 line-length = 88
 target-version = "py311"

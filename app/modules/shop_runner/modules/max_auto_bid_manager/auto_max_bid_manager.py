@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     )
 
 
+# TODO: Сделать, чтобы падали в ошибки бота (в телегу) shop id, РК, хотя бы
+
+
 class AutoMaxBidManager:
 
     def __init__(self, max_cpm_status_manager: "MaxCpmRedisStatusManager") -> None:
@@ -24,12 +27,12 @@ class AutoMaxBidManager:
         keywords: list[CalculatedKeyword],
         user_max_cpm: int | None,
         period_days: int = 2,
-    ) -> int:
+    ) -> int | None:
         max_cpm = await self._get_max_cpm(adv, keywords, period_days)
         if user_max_cpm is None:
             if max_cpm is None:
                 # Нет пользовательского лимита и не удалось рассчитать — используем безопасное значение
-                result_max_cpm = 0
+                result_max_cpm = None
             else:
                 result_max_cpm = int(max_cpm)
         else:

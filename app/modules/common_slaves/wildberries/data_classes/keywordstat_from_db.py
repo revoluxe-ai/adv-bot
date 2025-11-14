@@ -86,7 +86,6 @@ class CalculatedKeyword(BaseModel):
         rating = (1 - w) * traffic_component + w * ctr
         return rating
 
-        return rating
 
     @property
     def query(self) -> int | str:

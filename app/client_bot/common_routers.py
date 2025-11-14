@@ -3,7 +3,7 @@ from aiogram import Router
 from app.modules.adv_creator.telegram.handlers.main_handler import (
     router as adv_creator_router,
 )
-from app.modules.bidder_auto_mode import router as BidderAutoModeRouter
+from app.modules.bidder_auto_mode import router as BidderAutoModeRouter # noqa
 from app.modules.bidder_step_setting.telegram_handler import (
     router as bidder_step_setting_router,
 )
@@ -19,6 +19,9 @@ from app.modules.shop_runner.auction_boost_mode_settings import (
 )
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place import (
     auto_updater_target_place_setting_router,
+)
+from app.modules.shop_runner.service_manager.auto_updater_version_toggle import (
+    auto_updater_version_toggle_router,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater import (
     AutoWhiteListUpdaterRouter,
@@ -52,12 +55,15 @@ from .user_interface.handlers import (
     orders_source_toggle,
     predict_ctr_mode_toggle,
     sales_predict_method_toggle,
+    auto_update_exponent_toggle,
     reset_place_setting,
     setting_min_ctr,
     shop_settings,
     strategy_setting,
     update_adv,
+    rec_system_mode_toggle,
 )
+from .user_interface.handlers.bidder_mode_toggle import bidder_mode_toggle
 
 common_router = Router()
 
@@ -73,11 +79,13 @@ common_router.message.middleware.register(ReturnToStart())
 
 common_router.include_routers(manual_update_phrase_position_router)
 common_router.include_router(auto_updater_target_place_setting_router)
+common_router.include_routers(auto_updater_version_toggle_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(orders_source_toggle.router)
 common_router.include_routers(predict_ctr_mode_toggle.router)
 common_router.include_routers(sales_predict_method_toggle.router)
+common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_max_cpm_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
@@ -85,6 +93,7 @@ common_router.include_routers(AuctionBoostModeSettingsRouter)
 common_router.include_routers(ChangeExponentSettinginAdvSettingRouter)
 common_router.include_routers(bidder_step_setting_router)
 common_router.include_routers(adv_creator_router)
+common_router.include_routers(rec_system_mode_toggle.router)
 common_router.include_routers(white_list_updater_router)
 common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)
@@ -98,14 +107,15 @@ common_router.include_routers(adv_setting.router)
 common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(cpm_builder.router)
 common_router.include_routers(get_shop_for_admin.router)
-common_router.include_routers(keyword_settings.router)
+common_router.include_routers(keyword_settings.router) # type: ignore[attr-defined]
 common_router.include_routers(add_white_phrases.router)
 common_router.include_routers(setting_min_ctr.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
 common_router.include_routers(update_adv.router)
-common_router.include_routers(strategy_setting.router)
+common_router.include_routers(strategy_setting.router) # type: ignore[attr-defined]
 common_router.include_routers(shop_settings.router)
+common_router.include_routers(bidder_mode_toggle.router)
 # Закомментировано, т.к. роутер уже подключен в global_router.py через register_bonus_scene
 # common_router.include_routers(cabinet_bonus_manager_router)
 common_router.callback_query.middleware(

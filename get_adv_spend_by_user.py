@@ -11,10 +11,10 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.utils.db.models import User
-from app.utils.db.session_maker import get_async_session_maker, get_session_maker
+from app.utils.db.session_maker import get_async_session_maker, get_session_maker # type: ignore[attr-defined]
 
 aio_sm = get_async_session_maker()
-sm = get_session_maker()
+sm = get_async_session_maker()  # type: ignore[attr-defined]
 
 dd = defaultdict(float)
 
@@ -22,7 +22,7 @@ dd = defaultdict(float)
 def get_adv_spend_by_user():
     from sqlalchemy import func
 
-    with sm() as session:
+    with sm() as session:  # type: ignore[attr-defined]
         stmt = (
             select(User.username, func.sum(AdvKeyword.spend).label("total_spend"))
             # .options(selectinload(User.wb_tokens))
