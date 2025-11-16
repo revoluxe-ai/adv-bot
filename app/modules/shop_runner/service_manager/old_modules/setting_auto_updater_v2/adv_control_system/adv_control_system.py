@@ -61,7 +61,7 @@ class AdvControlSystem:
         fact = await updater.get_fact_data(keywords)
 
         # 3.1. Проверяем, изменились ли план и факт с прошлого раза
-        plan_fact_change = ChangePlanFact(adv, decode_bytes=False)
+        plan_fact_change = ChangePlanFact(adv)
         if await plan_fact_change.check_equal_in_cache(plan, fact):
             logger.debug(
                 "[adv_id=%s] План и факт не изменились с прошлого раза, пропускаем",
