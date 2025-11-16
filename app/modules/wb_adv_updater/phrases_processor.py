@@ -351,3 +351,4 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
     keywords = keywords_with_rating + keywords_without_rating
     return keywords
+

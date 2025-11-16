@@ -32,3 +32,4 @@ async def toggle_rec_system_mode(
     status_str = "Включен режим раскрутки РС (полок)" if new_status else "Выключен режим раскрутки РС (полок)"
 
     await bot.send_message(chat_id, status_str)
+

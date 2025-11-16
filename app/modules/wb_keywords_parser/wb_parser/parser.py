@@ -261,7 +261,7 @@ def _create_rate_limit_manager(client: RedisClient = Provide["redis_client"]) ->
         logger.warning(f"Не удалось создать rate_limit_manager: {e}. Rate limiting отключен.")
         raise e
 
-
+# TODO: Убрать добавление ключей в БС, если 0 показов
 
 from .parsing_page_queue_manager import ParsingQueueManager
 
