@@ -398,11 +398,7 @@ class ShopMenu(TextWithKeyboard):
         wb_cabinet_original_id = wb_cabinet.id
         builder = InlineKeyboardBuilder()
 
-        button = InlineKeyboardButton(
-            text="➕ Добавить токен/Обновить токены",
-            callback_data=AddNewToken(wb_user_cabinet_original_id=wb_user_cabinet.id).pack(),
-        )
-        builder.row(button)
+
 
         button = InlineKeyboardButton(
             text="Автоматические рекламные кампании",
