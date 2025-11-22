@@ -35,7 +35,7 @@ class AuthClientHandler:
         section = adapter.section
         token = await self.__get_actual_token(section)
         if token is None:
-            raise ApiForbiddenError("Нет доступных токенов")
+            raise ApiForbiddenError(f"Нет доступных токенов для {self.__shop_id}")
 
         httpx_client: httpx.AsyncClient = self.__httpx_client_handler.get_httpx_client(
             section
