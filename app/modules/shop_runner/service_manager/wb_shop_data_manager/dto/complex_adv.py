@@ -29,11 +29,35 @@ class ComplexAdv:
             search_adv: AdvSetting | None,
             get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
     ):
+
+        self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
+
+    @property
+    def rec_system_promotion_mode_active(self) -> bool:
+        return self._adv_setting.rec_system_mode
+
+
+
+    async def get_mean_auto_ctr(self) -> float | None:
+        from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
+        if self._mean_auto_ctr is None:
+            min_ctr_manager = MinCtrManager(self._adv_setting)
+            mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
+            self._mean_auto_ctr = mean_auto_ctr
+        return self._mean_auto_ctr
+
+
+    @property
+    def search_adv_active_status(self) -> bool:
+        if self._search_adv and self._search_adv.active_status == 'started':
+            return True
+        return False
+
 
     @property
     def shop_id(self) -> str:
