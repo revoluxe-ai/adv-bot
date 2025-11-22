@@ -12,11 +12,12 @@ logger = logging.getLogger(__name__)
 
 class _AuthAsyncProxy:
     """Тонкий прокси над общим httpx.AsyncClient: добавляет Authorization и НЕ закрывает клиент."""
+
     def __init__(self, httpx_client: httpx.AsyncClient, token: str) -> None:
         self._httpx_client = httpx_client
         self._token = token
-        self._header_name = 'Authorization'
-        self._prefix = 'Bearer'
+        self._header_name = "Authorization"
+        self._prefix = "Bearer"
 
     async def __aenter__(self):
         # Ничего не открываем: клиент управляется извне (singletons per section)
@@ -36,10 +37,11 @@ class _AuthAsyncProxy:
 @define
 class AuthenticatedCastClient:
     """Удовлетворяет ожиданиям сгенерённого кода, но подкидывает наш proxy вместо нового клиента."""
-    _base_url: str = field(alias='base_url')
-    _httpx_client: httpx.AsyncClient = field(alias='httpx_client')
-    _token: str = field(alias='token')
-    _section: SectionsEnum = field(alias='section')
+
+    _base_url: str = field(alias="base_url")
+    _httpx_client: httpx.AsyncClient = field(alias="httpx_client")
+    _token: str = field(alias="token")
+    _section: SectionsEnum = field(alias="section")
     # генератор часто читает этот флаг
     raise_on_unexpected_status: bool = field(default=False)
 
@@ -50,6 +52,7 @@ class AuthenticatedCastClient:
     @property
     def token_hash(self) -> str:
         from .token_hash import get_token_hash
+
         return get_token_hash(self._token)
 
     @staticmethod

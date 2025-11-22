@@ -21,7 +21,9 @@ class ChangePlanFact(AdvSettingRedisCache, RedisCacheBase, prefix="ChangePlanFac
         if not value_bytes:
             return False
         # TODO: Упало на Smoke тестах. Проблема в том. что новый Redis кэш возвращает не bytes, а str, старый - bytes\r
-        if isinstance(value_bytes, bytes): # pyright: ignore[reportUnnecessaryIsInstance]
+        if isinstance(
+            value_bytes, bytes
+        ):  # pyright: ignore[reportUnnecessaryIsInstance]
             value: str = value_bytes.decode()
         else:
             value = value_bytes

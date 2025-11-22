@@ -29,7 +29,7 @@ class Pricer:
             .options(
                 load_only(
                     AdvSetting.adv_id,
-                    AdvSetting._search_adv_id, # noqa
+                    AdvSetting._search_adv_id,  # noqa
                     AdvSetting.name,
                     AdvSetting.active_status,
                 )
@@ -164,6 +164,7 @@ class Pricer:
         count = int(count)
         count = min(count, max_count)
         return count * settings.AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF
+
     # TODO: Добавить - удалить кнопку Автоуправления экспонентой
     # TODO: Оповестить пользователей об изменении тарификации за автоуправление
     @staticmethod
@@ -176,7 +177,7 @@ class Pricer:
             .where(
                 WBCabinet.shop_id == shop_id,
                 AdvSetting.auto_update_exponent.is_(True),
-                AdvSetting.automatic_version == 2
+                AdvSetting.automatic_version == 2,
             )
         )
         result = await session.execute(stmt)

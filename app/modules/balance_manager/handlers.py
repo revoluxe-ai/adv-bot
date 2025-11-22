@@ -224,7 +224,7 @@ async def successful_payment_handler(
         )
         wb_user_cabinet_id_result = await session.execute(stmt)
         # TODO: Заглушил ошибку, может потому после оплаты ошибку и кидает
-        wb_user_cabinet_id = wb_user_cabinet_id_result.scalars.first() # type: ignore[attr-defined]
+        wb_user_cabinet_id = wb_user_cabinet_id_result.scalars.first()  # type: ignore[attr-defined]
 
     logger.debug("wb_user_cabinet_id: %s", wb_user_cabinet_id)
     await asyncio.sleep(1)

@@ -13,8 +13,11 @@ _IP_LOCK: Final[asyncio.Lock] = asyncio.Lock()
 _cached_ip: str | None = None
 _cache_expire_at: float = 0.0
 
+
 @inject
-async def get_public_ip(session: ClientSession = Provide['http_sessions.get_ip_session']) -> str:
+async def get_public_ip(
+    session: ClientSession = Provide["http_sessions.get_ip_session"],
+) -> str:
     env_ip = os.getenv("ADV_PUBLIC_IP")
     if env_ip:
         return env_ip
@@ -30,14 +33,12 @@ async def get_public_ip(session: ClientSession = Provide['http_sessions.get_ip_s
         if _cached_ip and now < _cache_expire_at:
             return _cached_ip
 
-        async with session.get("https://api.ipify.org", params={"format": "text"}) as response:
+        async with session.get(
+            "https://api.ipify.org", params={"format": "text"}
+        ) as response:
             response.raise_for_status()
             ip = (await response.text()).strip()
 
         _cached_ip = ip
         _cache_expire_at = time.monotonic() + _CACHE_TTL_SECONDS
         return ip
-
-
-
-

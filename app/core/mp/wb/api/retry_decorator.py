@@ -8,8 +8,14 @@ from app.core.mp.wb.api.request_limit_manager import ApiCallState
 from .adapter.abc_group_client import AbcAdapter
 import logging
 
-from .excs import ApiForbiddenError, TooManyRequests, BadRequestError, UnknownApiRequestError, MaxAttemptsError, \
-    HttpTimeOutError
+from .excs import (
+    ApiForbiddenError,
+    TooManyRequests,
+    BadRequestError,
+    UnknownApiRequestError,
+    MaxAttemptsError,
+    HttpTimeOutError,
+)
 
 logger = logging.getLogger(__name__)
 # TODO Реализовать систему всплесков
@@ -21,18 +27,16 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 
 def retry_decorator(
-        period: int,
-        limit: int | float,
-        max_attempts: int = 50,
-        max_delay: int = 120,
+    period: int,
+    limit: int | float,
+    max_attempts: int = 50,
+    max_delay: int = 120,
 ) -> Callable[[F], F]:
 
     def decorator(func: F) -> F:
 
         @wraps(func)
-        async def wrapper(
-            instance: AbcAdapter, *args: Any, **kwargs: Any
-        ) -> Any:
+        async def wrapper(instance: AbcAdapter, *args: Any, **kwargs: Any) -> Any:
 
             interval_seconds = float(period)
             requests_per_interval = float(limit)
@@ -66,9 +70,7 @@ def retry_decorator(
 
                 try:
                     state["_last_query_time"] = time.time()
-                    result = await func(
-                        instance, *args, **kwargs
-                    )
+                    result = await func(instance, *args, **kwargs)
 
                     next_pause = (
                         interval_seconds / requests_per_interval
@@ -86,9 +88,10 @@ def retry_decorator(
                         raise e
                     if state["_attempts"] >= max_attempts:
                         raise MaxAttemptsError() from e
-                    await instance.auth_client_handler.mark_current_token_invalided(token_hash)
+                    await instance.auth_client_handler.mark_current_token_invalided(
+                        token_hash
+                    )
                     state["_current_pause"] = 0
-
 
                 # TODO: Повторный код максимальных попыток - сделать рефакторинг
 
@@ -101,8 +104,7 @@ def retry_decorator(
                         state["_current_pause"] = next_pause
                     else:
                         state["_current_pause"] = min(
-                            max(state["_current_pause"], 1.0) * 2,
-                            float(max_delay)
+                            max(state["_current_pause"], 1.0) * 2, float(max_delay)
                         )
 
                 except (BadRequestError, UnknownApiRequestError, HttpTimeOutError) as e:
@@ -113,13 +115,12 @@ def retry_decorator(
                         ) from e
 
                     state["_current_pause"] = min(
-                        max(state["_current_pause"], 1.0) * 2,
-                        float(max_delay)
+                        max(state["_current_pause"], 1.0) * 2, float(max_delay)
                     )
 
                 except Exception as e:
                     raise e
+
         return cast(F, wrapper)
 
     return decorator
-

@@ -83,4 +83,5 @@ class NotValidTokenError(Exception):
 
 class TooManyRequests(Exception):
     """Ошибка превышения лимита запросов (для совместимости)."""
+
     pass

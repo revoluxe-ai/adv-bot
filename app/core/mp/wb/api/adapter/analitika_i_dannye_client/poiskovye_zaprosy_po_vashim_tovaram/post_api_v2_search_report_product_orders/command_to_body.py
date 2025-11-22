@@ -1,6 +1,8 @@
-from app.core.mp.wb.api.generated.analitika_i_dannye_client.models import ProductOrdersRequest, PeriodOrdersRequest
+from app.core.mp.wb.api.generated.analitika_i_dannye_client.models import (
+    ProductOrdersRequest,
+    PeriodOrdersRequest,
+)
 from .command import GetKeywordPositionsCommand
-
 
 
 def convert(command: GetKeywordPositionsCommand) -> ProductOrdersRequest:
@@ -15,4 +17,3 @@ def convert(command: GetKeywordPositionsCommand) -> ProductOrdersRequest:
         period=period,
     )
     return body
-

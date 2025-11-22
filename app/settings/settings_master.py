@@ -214,23 +214,22 @@ class Settings:
         elif value == "true":
             return True
         raise ValueError("Не верное значение в POSTGRES_SSL_INSECURE")
-# TODO: Внедрить STAGE- тесты бота
 
-# TODO: Понаблюдать за ручным обновлением позиций в клиентской части
+    # TODO: Внедрить STAGE- тесты бота
 
-# TODO: Внедрить получение и учет важных новостей от WB, а то теряю, многое случайно узнаю. Также можно внедрить автообработку новостей от блоггеров
+    # TODO: Понаблюдать за ручным обновлением позиций в клиентской части
 
-# TODO: Вот такая новость пришла https://seller.wildberries.ru/news-v2/news-details?id=9398
+    # TODO: Внедрить получение и учет важных новостей от WB, а то теряю, многое случайно узнаю. Также можно внедрить автообработку новостей от блоггеров
 
-# TODO Промониторить что там нового в API
+    # TODO: Вот такая новость пришла https://seller.wildberries.ru/news-v2/news-details?id=9398
 
-# TODO: Стать авторизованным партнером WB
+    # TODO Промониторить что там нового в API
 
+    # TODO: Стать авторизованным партнером WB
 
+    # Сделать собиралку телефонов пользователей  бота: для поддержки, для клиентской базы
 
-# Сделать собиралку телефонов пользователей  бота: для поддержки, для клиентской базы
-
-# Внедрить автообновление образов при коммитах
+    # Внедрить автообновление образов при коммитах
     @property
     def POSTGRES_MASTER_HOST(self) -> str | None:
         return os.environ.get("POSTGRES_MASTER_HOST")
@@ -256,7 +255,7 @@ class Settings:
         # TODO: Тут работало и с None, но Copilot ругался, что будет Рантайм эррор, Smoke-тест прошел
         value = os.environ.get("POSTGRES_SSL_MODE")
         if value is None:
-            return 'disable'
+            return "disable"
         return value
 
     @property
@@ -456,30 +455,26 @@ class Settings:
         else:
             return int(value)
 
-
     @property
     def WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF(self) -> int:
         value = os.getenv("WHITE_LIST_AUTO_UPDATER_MONTH_TARIFF")
         if not value:
-            return int(self.FULL_AUTO_UPDATE_PRICE/3)
+            return int(self.FULL_AUTO_UPDATE_PRICE / 3)
         return int(value)
 
     @property
     def AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF(self) -> int:
         value = os.getenv("AUTO_UPDATE_TARGET_PLACE_MONTH_TARIFF")
         if not value:
-            return int(self.FULL_AUTO_UPDATE_PRICE/3)
+            return int(self.FULL_AUTO_UPDATE_PRICE / 3)
         return int(value)
 
     @property
     def AUTO_UPDATE_EXPONENT_MONTH_TARIFF(self) -> int:
         value = os.getenv("AUTO_UPDATE_EXPONENT_MONTH_TARIFF")
         if not value:
-            return int(self.FULL_AUTO_UPDATE_PRICE/3)
+            return int(self.FULL_AUTO_UPDATE_PRICE / 3)
         return int(value)
-
-
-
 
     @property
     def SHOP_UPDATE_TIMEOUT_MINUTES(self) -> int:
@@ -560,14 +555,12 @@ class Settings:
         else:
             raise ValueError("Не верное значение в PARSING_QUEUE_MODE")
 
-
     @property
     def PARSING_LIMITER_DELAY(self) -> float:
         value = os.getenv("PARSING_LIMITER_DELAY")
         if not value:
             return 0.1
         return float(value)
-
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли

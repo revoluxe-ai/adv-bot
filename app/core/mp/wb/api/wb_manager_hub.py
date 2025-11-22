@@ -1,7 +1,7 @@
 import typing
+
 if typing.TYPE_CHECKING:
     from .managers import WBDataManager
-
 
 
 class WBManagerHub:
@@ -11,4 +11,3 @@ class WBManagerHub:
     @property
     def wb_data_manager(self) -> "WBDataManager":
         return self.__wb_data_manager
-

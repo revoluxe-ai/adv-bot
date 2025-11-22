@@ -9,6 +9,7 @@ from .wb_parser.rate_limit_manager import ParserRateLimitRedisManager
 from .wb_parser.parser import ParserService
 import aiohttp
 
+
 @asynccontextmanager
 async def init_aiohttp_client():
     session = aiohttp.ClientSession()
@@ -42,9 +43,4 @@ class WBKeywordsParserContainer(containers.DeclarativeContainer):
     )
 
 
-
-
 __all__ = ["WBKeywordsParserContainer"]
-
-
-

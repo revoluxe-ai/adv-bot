@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal, get_args
 from aiogram import Bot
 from aiohttp import ClientSession
 from sqlalchemy import and_, or_, select, update
-from sqlalchemy.dialects.postgresql import insert # Добавляем импорт insert
+from sqlalchemy.dialects.postgresql import insert  # Добавляем импорт insert
 from sqlalchemy.orm import load_only
 
 from app.client_bot import const
@@ -16,7 +16,8 @@ from app.modules.common_slaves.wildberries import wb_db_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exc import (
     CardsNotFoundForShopError,
-    NotEnoughBalanceOnShopError, AdvExistsForNmidError,
+    NotEnoughBalanceOnShopError,
+    AdvExistsForNmidError,
 )
 from .wb_api import WBApi
 from ...common_slaves.wildberries.models import AdvSetting, WBCabinet
@@ -28,7 +29,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-AdvType = Literal["auto", "auction", 'complex']
+AdvType = Literal["auto", "auction", "complex"]
+
 
 class MainAdvManager:
     def __init__(self, access: "WBCabinetAccess", client_session: ClientSession):
@@ -40,17 +42,10 @@ class MainAdvManager:
         adv_id: int = await self.wb_api.create_search_adv([nmid], adv_name)
         return adv_id
 
-    async def _create_auto_adv(
-        self, name: str, nmids: list[int]
-    ) -> int:
-        return await self.wb_api.create_auto_adv(
-            nmids,
-            name
-        )
+    async def _create_auto_adv(self, name: str, nmids: list[int]) -> int:
+        return await self.wb_api.create_auto_adv(nmids, name)
 
-    async def __create_complex_advs(           
-                self,
-                nmid: int) -> tuple[int, int, bool]:
+    async def __create_complex_advs(self, nmid: int) -> tuple[int, int, bool]:
 
         balances = await self.wb_api.get_adv_balances()
         try:
@@ -66,15 +61,11 @@ class MainAdvManager:
             wb_cabinet,
         )
         try:
-            balance_type_int, balance_property_str = self._get_balance_type(
-                balances
-            )
+            balance_type_int, balance_property_str = self._get_balance_type(balances)
         except NotEnoughBalanceOnShopError as exc:
             raise exc
         auto_name = self.__get_name_for_adv(nmid, target_card, adv_type="auto")
-        auto_adv_id: int = await self._create_auto_adv(
-            auto_name,  [nmid]
-        )
+        auto_adv_id: int = await self._create_auto_adv(auto_name, [nmid])
 
         result: int = await self.wb_api.add_to_balance(
             auto_adv_id, balance_type_int, 1000
@@ -98,18 +89,20 @@ class MainAdvManager:
             getattr(balances, balance_property_str) - 1000,
         )
 
-        complex_adv_name = self.__get_name_for_adv(nmid, target_card, adv_type="complex")
+        complex_adv_name = self.__get_name_for_adv(
+            nmid, target_card, adv_type="complex"
+        )
 
         async with sm(read_only=False) as session:
             assert self.access.wb_cabinet is not None
             wb_cabinet_original_id: int = self.access.wb_cabinet.id
             stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
             wb_cabinet: WBCabinet = (await session.execute(stmt)).scalar()
-            
+
             # Подготавливаем данные для upsert
             adv_data = {
                 "adv_id": auto_adv_id,
-                "_search_adv_id": search_adv_id, # Исправлено на _search_adv_id
+                "_search_adv_id": search_adv_id,  # Исправлено на _search_adv_id
                 "max_place": 1,
                 "max_cpm": 250,
                 "reset_place": True,
@@ -126,37 +119,41 @@ class MainAdvManager:
                 "nmids": [nmid],
                 "hard_min_ctr": 0.1,
             }
-            
+
             # Используем INSERT ... ON CONFLICT DO UPDATE
             insert_stmt = insert(AdvSetting).values(adv_data)
             on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                index_elements=["adv_id"],  # Уникальный индекс, по которому определяется конфликт
-                set_={k: v for k, v in adv_data.items() if k != "adv_id"}  # Обновляем все поля, КРОМЕ adv_id
+                index_elements=[
+                    "adv_id"
+                ],  # Уникальный индекс, по которому определяется конфликт
+                set_={
+                    k: v for k, v in adv_data.items() if k != "adv_id"
+                },  # Обновляем все поля, КРОМЕ adv_id
             )
-            
+
             await session.execute(on_conflict_stmt)
             await session.commit()
 
         task_update_cpm_auto = self.wb_api.update_cpm(
             auto_adv_id,
             nmid,
-            10,)
+            10,
+        )
 
         task_update_cpm_auction = self.wb_api.update_cpm(
             search_adv_id,
             nmid,
-            10, )
+            10,
+        )
 
         try:
-            await asyncio.gather(task_update_cpm_auto,
-                                 task_update_cpm_auction)
+            await asyncio.gather(task_update_cpm_auto, task_update_cpm_auction)
             update_cpm_status = True
         except Exception as exc:
             logger.error(exc, exc_info=True)
             update_cpm_status = False
 
         return auto_adv_id, search_adv_id, update_cpm_status
-    
 
     async def create_complex_advs(
         # TODO: Бот не видит, что РК завершены и не дает создать новую РК по тому же артикулу
@@ -166,17 +163,19 @@ class MainAdvManager:
         nmid: int,
         hard_mode: bool,
     ) -> tuple[int, int] | None:
-        exist_adv_ids_rows: list[tuple[int, int]] = await self.get_adv_ids_rows_by_nmid(nmid)
+        exist_adv_ids_rows: list[tuple[int, int]] = await self.get_adv_ids_rows_by_nmid(
+            nmid
+        )
         if not hard_mode and exist_adv_ids_rows:
-                raise AdvExistsForNmidError(exist_adv_ids_rows)
+            raise AdvExistsForNmidError(exist_adv_ids_rows)
 
         if exist_adv_ids_rows:
             complex_adv_ids = {row[0] for row in exist_adv_ids_rows}
             await self.__turn_off_advs(bot, user_telegram_id, complex_adv_ids)
 
         # Кампаний не найдено - создавать новую
-        auto_adv_id, search_adv_id, update_cpm_status = await self.__create_complex_advs(
-           nmid
+        auto_adv_id, search_adv_id, update_cpm_status = (
+            await self.__create_complex_advs(nmid)
         )
         if not update_cpm_status:
             await bot.send_message(
@@ -185,40 +184,44 @@ class MainAdvManager:
                 f"Пожалуйста, проверьте и установите ставки вручную. "
                 f"ID Авто-РК: {auto_adv_id},"
                 f" ID Поисковой РК: {search_adv_id}. "
-                f"Если проблема повторится, обратитесь в поддержку {const.SUPPORT_LINK}."
+                f"Если проблема повторится, обратитесь в поддержку {const.SUPPORT_LINK}.",
             )
 
         return auto_adv_id, search_adv_id
 
-
     @staticmethod
     async def get_adv_ids_rows_by_nmid(nmid: int) -> list[tuple[int, int | None]]:
         async with sm() as session:
-            stmt = select(AdvSetting)\
-                .options(load_only(AdvSetting.adv_id,
-                                   AdvSetting._search_adv_id, # noqa E1101
-                                   AdvSetting.name)
-                         ).where(
-                and_(
-                    AdvSetting.active_status.not_in(["refused", "done"]),
-                    or_(
-                        and_(
-                            AdvSetting.name.regexp_match(
-                                r".*<!-\[\d+]-!>.*"
-                            ),  # Проверяем первый паттерн
-                            AdvSetting.name.regexp_match(
-                                rf".*{nmid}.*"
-                            ),  # Проверяем второй паттерн
+            stmt = (
+                select(AdvSetting)
+                .options(
+                    load_only(
+                        AdvSetting.adv_id,
+                        AdvSetting._search_adv_id,  # noqa E1101
+                        AdvSetting.name,
+                    )
+                )
+                .where(
+                    and_(
+                        AdvSetting.active_status.not_in(["refused", "done"]),
+                        or_(
+                            and_(
+                                AdvSetting.name.regexp_match(
+                                    r".*<!-\[\d+]-!>.*"
+                                ),  # Проверяем первый паттерн
+                                AdvSetting.name.regexp_match(
+                                    rf".*{nmid}.*"
+                                ),  # Проверяем второй паттерн
+                            ),
+                            # Дополнительно можно вернуть этот блок, если нужно
+                            and_(
+                                AdvSetting.nmids == [nmid],
+                                AdvSetting._search_adv_id is not None,  # noqa E1101
+                            ),
                         ),
-                        # Дополнительно можно вернуть этот блок, если нужно
-                        and_(
-                            AdvSetting.nmids == [nmid],
-                            AdvSetting._search_adv_id is not None, # noqa E1101
-                        ),
-                    ),
-                    # TODOД не правильныый синтаксис условий in, ошибка попала в прод
-                    AdvSetting.type.in_([8, 9])  # Без устаревших типов РК
-
+                        # TODOД не правильныый синтаксис условий in, ошибка попала в прод
+                        AdvSetting.type.in_([8, 9]),  # Без устаревших типов РК
+                    )
                 )
             )
 
@@ -229,11 +232,15 @@ class MainAdvManager:
                 for adv in adv_settings:
                     auto_adv_id = adv.adv_id
                     search_adv_id = adv.search_adv_id
-                    adv_ids_rows.append((auto_adv_id, search_adv_id,))
+                    adv_ids_rows.append(
+                        (
+                            auto_adv_id,
+                            search_adv_id,
+                        )
+                    )
                 return adv_ids_rows
             else:
                 return []
-
 
     @staticmethod
     def _check_enough_balance(balances: Balances) -> bool:
@@ -279,24 +286,18 @@ class MainAdvManager:
         await self.wb_api.upcast_target_placement(adv_id, search, recommendations)
 
     @staticmethod
-    async def __turn_off_advs(
-                              bot,
-                              user_telegram_id,
-                              complex_adv_ids: set[int]):
+    async def __turn_off_advs(bot, user_telegram_id, complex_adv_ids: set[int]):
         # TODO: Добавить логику остановки РК в кабинете WB через wb_api
 
-        message = (
-            "Отключаю существующие для этого артикула кампании"
-        )
-        await bot.send_message(
-            user_telegram_id,
-            message)
+        message = "Отключаю существующие для этого артикула кампании"
+        await bot.send_message(user_telegram_id, message)
 
-
-        stmt = update(AdvSetting).where(
-            AdvSetting.adv_id.in_(complex_adv_ids)
-        ).values(
-            bidder_active=False,
+        stmt = (
+            update(AdvSetting)
+            .where(AdvSetting.adv_id.in_(complex_adv_ids))
+            .values(
+                bidder_active=False,
+            )
         )
         async with sm(read_only=False) as session:
             await session.execute(stmt)
@@ -308,13 +309,12 @@ class MainAdvManager:
             raise ValueError(f"adv_type must be one of {get_args(AdvType)}")
         base_name = target_card.name
         if adv_type == "auto":
-            type_name = 'Авто'
+            type_name = "Авто"
         elif adv_type == "auction":
-            type_name = 'Аукцион'
-        elif adv_type == 'complex':
-            type_name = ''
+            type_name = "Аукцион"
+        elif adv_type == "complex":
+            type_name = ""
         else:
-            type_name = 'НеизвестныйТипРК'
+            type_name = "НеизвестныйТипРК"
         full_name = f"{nmid}{' ' + type_name if type_name else ''} {base_name}"[:128]
         return full_name
-

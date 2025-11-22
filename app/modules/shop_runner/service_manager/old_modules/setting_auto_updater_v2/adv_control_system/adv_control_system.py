@@ -1,4 +1,5 @@
 """Главный оркестратор реактивной системы управления РК."""
+
 # TODO: перенести Harbor на нормальный домен
 # TODO: Подключить оплату через бот
 # TODO: Сделать сайт + воронка
@@ -83,7 +84,6 @@ class AdvControlSystem:
                 "[adv_id=%s] Состояние OPTIMAL — действий не требуется", adv.adv_id
             )
             return
-
 
         force_obj = ForceContext(value=force)
 

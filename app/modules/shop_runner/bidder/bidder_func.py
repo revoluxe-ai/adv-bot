@@ -51,9 +51,10 @@ async def _update_and_get_advs_from_wb(
         assert wb_api.access.wb_cabinet is not None
         wb_cabinet_original_id: int = int(wb_api.access.wb_cabinet.id)
         await wb_db_manager.update_advs_in_db(advs, wb_cabinet_original_id)
-    except Exception: # noqa
+    except Exception:  # noqa
         logger.error("Ошибка обновления РК в базе", exc_info=True)
     return advs
+
 
 @inject
 async def __get_new_cpm_by_position(
@@ -61,9 +62,9 @@ async def __get_new_cpm_by_position(
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
     cpm_now: int,
-    auto_max_bid_manager: "AutoMaxBidManager" = Provide
-    [AutoMaxCpmContainer.auto_max_cpm_bid_manager],
-
+    auto_max_bid_manager: "AutoMaxBidManager" = Provide[
+        AutoMaxCpmContainer.auto_max_cpm_bid_manager
+    ],
 ) -> int | None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
@@ -76,7 +77,7 @@ async def __get_new_cpm_by_position(
         if not auto_max_cpm:
             return None
 
-        if  auto_max_cpm < max_user_cpm:
+        if auto_max_cpm < max_user_cpm:
             max_cpm = auto_max_cpm
         else:
             max_cpm = max_user_cpm
@@ -97,7 +98,9 @@ async def __get_new_cpm_by_position(
         nmid = int(adv_setting.nmids[0])
         try:
             logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
-            _: list[WBItemPosition] = await parser.add_wb_positions(text, {nmid}, delay=1)
+            _: list[WBItemPosition] = await parser.add_wb_positions(
+                text, {nmid}, delay=1
+            )
         except Exception:  # noqa
             logger.error(
                 f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
@@ -153,48 +156,52 @@ async def run_bidder_process_for_adv(
     adv_setting: AdvSetting,
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
-    auto_max_bid_manager: "AutoMaxBidManager" = Provide
-    [AutoMaxCpmContainer.auto_max_cpm_bid_manager]
+    auto_max_bid_manager: "AutoMaxBidManager" = Provide[
+        AutoMaxCpmContainer.auto_max_cpm_bid_manager
+    ],
 ) -> None:
     advs: list[AuctionAdv] = await _update_and_get_advs_from_wb(adv_setting, wb_api)
     advs_from_wb_with_active_company: list[AuctionAdv] = [
         adv for adv in advs if adv.status_native == "started"
     ]
 
-    cpms: set[int] | None = await get_cpms_from_wb(
-        advs_from_wb_with_active_company
-    )
+    cpms: set[int] | None = await get_cpms_from_wb(advs_from_wb_with_active_company)
     cpm_now = max(cpms) if cpms else None
     if not cpm_now:
-        logger.error('Не удалось определить текущую ставку для shop_id: %s, adv_id: %s',
-                     wb_api.shop_id, adv_setting.adv_id)
+        logger.error(
+            "Не удалось определить текущую ставку для shop_id: %s, adv_id: %s",
+            wb_api.shop_id,
+            adv_setting.adv_id,
+        )
         return None
-
 
     user_max_cpm = adv_setting.max_cpm
     if not user_max_cpm:
         return None
 
     if adv_setting.bidder_mode == BidderMode.BY_POSITIONS:
-        new_cpm = await __get_new_cpm_by_position(adv_setting,
-                                                  wb_api,
-                                                  keywords,
-                                                  cpm_now,
-                                                )
+        new_cpm = await __get_new_cpm_by_position(
+            adv_setting,
+            wb_api,
+            keywords,
+            cpm_now,
+        )
         if not new_cpm:
             return None
     elif adv_setting.bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
         if not adv_setting.auto_max_cpm_mode:
             return None
-        max_cpm = await auto_max_bid_manager.get_max_cpm(adv_setting, keywords, user_max_cpm)
+        max_cpm = await auto_max_bid_manager.get_max_cpm(
+            adv_setting, keywords, user_max_cpm
+        )
         if not max_cpm:
             return None
         new_cpm = max_cpm
     else:
-        raise RuntimeError('Неверный режим биддера')
+        raise RuntimeError("Неверный режим биддера")
 
     if not adv_setting.nmids:
-        raise RuntimeError('Пустой список nmids - это недопустимое состояние')
+        raise RuntimeError("Пустой список nmids - это недопустимое состояние")
 
     nmid = adv_setting.nmids[0]
 

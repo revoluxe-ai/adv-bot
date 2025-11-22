@@ -45,7 +45,7 @@ from app.utils.db.session_maker import get_async_session_maker
 try:
     # TODO: Надо разобраться что это за конструкция такая, и постараться ее убрать без рейса исключения
     from app.modules.billing import models as _billing_models  # noqa: F401
-except Exception: # noqa
+except Exception:  # noqa
     # In minimal test contexts billing may be absent; relationship will fallback to string resolution
     pass
 
@@ -264,7 +264,7 @@ class WBToken(BaseTable):
         try:
             # Compare using timezone-aware UTC now
             return datetime.datetime.now(datetime.UTC) >= self.__expires
-        except Exception: # noqa
+        except Exception:  # noqa
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным
             )
@@ -352,7 +352,7 @@ class WBCard(BaseTable):
         return urls
 
     @property
-    def SubjectId(self) -> int | None: # noqa
+    def SubjectId(self) -> int | None:  # noqa
         subject_id = self.card_json.get("subjectID")
         if isinstance(subject_id, int) or subject_id is None:
             return subject_id
@@ -368,7 +368,7 @@ class AdvSetting(BaseTable):
         DONE = "done"
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs) # noqa
+        super().__init__(*args, **kwargs)  # noqa
         self._worst_promo_position = None
 
     def __repr__(self):
@@ -459,7 +459,7 @@ class AdvSetting(BaseTable):
     )
     _search_adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=settings.BIDDER_STEP)
-    exponent_predict_ctr: Mapped[float]  = mapped_column(
+    exponent_predict_ctr: Mapped[float] = mapped_column(
         Float,
         nullable=False,
         default=settings.DEFAULT_CTR_EXPONENTA,
@@ -497,8 +497,12 @@ class AdvSetting(BaseTable):
         Integer, nullable=True, default=0, server_default="0"
     )
 
-    auto_adv_target_status: MappedColumn[bool | None] = mapped_column(Boolean, nullable=True, default=None)
-    auction_adv_target_status: MappedColumn[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    auto_adv_target_status: MappedColumn[bool | None] = mapped_column(
+        Boolean, nullable=True, default=None
+    )
+    auction_adv_target_status: MappedColumn[bool | None] = mapped_column(
+        Boolean, nullable=True, default=None
+    )
     auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=True, server_default=text("true")
     )
@@ -529,14 +533,12 @@ class AdvSetting(BaseTable):
         Integer, nullable=True, default=1, server_default="1"
     )
 
-    bidder_mode: Mapped[BidderMode | None]  = mapped_column(
+    bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,
         default=BidderMode.BY_POSITIONS,
         server_default=BidderMode.BY_POSITIONS.name,
     )
-
-
 
     __table_args__ = (
         # Составной индекс для основного запроса
@@ -579,7 +581,7 @@ class AdvSetting(BaseTable):
         if not self.name:
             return None
         name = self.name.replace(" ", "")
-        pattern = re.compile(r"<!-\[(\d+)\]-!>") # noqa
+        pattern = re.compile(r"<!-\[(\d+)\]-!>")  # noqa
         match = re.search(pattern, name)
         if not match:
             return None
@@ -760,7 +762,7 @@ class WBItemPosition:
         if isinstance(raw_ts, str):
             try:
                 position.timestamp = datetime.datetime.fromisoformat(raw_ts)
-            except Exception: # noqa
+            except Exception:  # noqa
                 position.timestamp = None
         else:
             position.timestamp = None

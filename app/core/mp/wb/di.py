@@ -8,5 +8,6 @@ from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
 class WBManagerHubFactoryContainer(containers.DeclarativeContainer):
     _httpx_client_handler = providers.Resource(HttpxClientHandler)
 
-    wb_manager_hub_factory = providers.Singleton(WBManagerHubFactory,
-                                                 httpx_client_handler=_httpx_client_handler)
+    wb_manager_hub_factory = providers.Singleton(
+        WBManagerHubFactory, httpx_client_handler=_httpx_client_handler
+    )

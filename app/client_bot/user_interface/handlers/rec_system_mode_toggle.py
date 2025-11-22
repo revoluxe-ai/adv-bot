@@ -8,6 +8,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
 
+
 @router.callback_query(ChangeRecSystemModeStatus.filter())
 async def toggle_rec_system_mode(
     callback_query: CallbackQuery,
@@ -29,7 +30,10 @@ async def toggle_rec_system_mode(
     assert callback_query.message
     chat_id = callback_query.message.chat.id
 
-    status_str = "Включен режим раскрутки РС (полок)" if new_status else "Выключен режим раскрутки РС (полок)"
+    status_str = (
+        "Включен режим раскрутки РС (полок)"
+        if new_status
+        else "Выключен режим раскрутки РС (полок)"
+    )
 
     await bot.send_message(chat_id, status_str)
-

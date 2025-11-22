@@ -1,6 +1,8 @@
 from dependency_injector import containers, providers
 
-from app.core.mp.wb.api.adapter.analitika_i_dannye_client import poiskovye_zaprosy_po_vashim_tovaram
+from app.core.mp.wb.api.adapter.analitika_i_dannye_client import (
+    poiskovye_zaprosy_po_vashim_tovaram,
+)
 from app.core.mp.wb.api.adapter.analitika_i_dannye_client import AnalyticAndDataClient
 from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
 from app.core.mp.wb.api.domain_managers import AnalyticsManager

@@ -43,7 +43,8 @@ class ExponentRaiseExecutor(BaseExecutor):
         # Проверка rate-limiting
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
             logger.debug(
-                "[adv_id=%s] ExponentRaise: rate-limit не прошёл", ctx.complex_adv.adv_id
+                "[adv_id=%s] ExponentRaise: rate-limit не прошёл",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
@@ -58,7 +59,7 @@ class ExponentRaiseExecutor(BaseExecutor):
                 self.MAX_EXPONENT,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
-        
+
         keywords = await ctx.complex_adv.get_keywords()
 
         # Повышаем экспоненту
@@ -73,7 +74,8 @@ class ExponentRaiseExecutor(BaseExecutor):
 
         if new_exponent == current_exponent:
             logger.debug(
-                "[adv_id=%s] ExponentRaise: экспонента не изменится", ctx.complex_adv.adv_id
+                "[adv_id=%s] ExponentRaise: экспонента не изменится",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 

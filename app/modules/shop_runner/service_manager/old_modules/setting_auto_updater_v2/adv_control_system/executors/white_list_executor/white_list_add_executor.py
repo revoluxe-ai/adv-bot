@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Как промежуточный шаг сделать настройку мощности от 1 до 3 (по числу исполнителей)
 
+
 class WhiteListAddExecutor(BaseExecutor):
     """Добавляет наиболее эффективные релевантные ключевые слова в белый список."""
 
@@ -58,11 +59,16 @@ class WhiteListAddExecutor(BaseExecutor):
                     keyword.relevant
                     and keyword.hard_status == 1
                     and keyword.status == KeywordStatus.BAD
-                    and (keyword.predict_ctr  > mean_auto_ctr if mean_auto_ctr is not None else True)
+                    and (
+                        keyword.predict_ctr > mean_auto_ctr
+                        if mean_auto_ctr is not None
+                        else True
+                    )
                 )
             else:
                 # Любые фразы со статусом BAD и hard_status=1
                 return keyword.hard_status == 1 and keyword.status == KeywordStatus.BAD
+
         keywords = await ctx.complex_adv.get_keywords()
         candidates = list(filter(candidate_filter, keywords))
 

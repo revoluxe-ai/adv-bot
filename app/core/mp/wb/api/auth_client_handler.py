@@ -16,8 +16,6 @@ from app.core.mp.wb.api.adapter.sections_enum import SectionsEnum
 from app.core.mp.wb.api.api_client import AuthenticatedCastClient
 
 
-
-
 class AuthClientHandler:
     def __init__(self, shop_id: str, httpx_client_handler: HttpxClientHandler) -> None:
         self.__httpx_client_handler = httpx_client_handler
@@ -30,22 +28,26 @@ class AuthClientHandler:
     def shop_id(self) -> str:
         return self.__shop_id
 
-
-    async def get_proxy_client(self, adapter: 'AbcAdapter', ) -> AuthenticatedCastClient:
+    async def get_proxy_client(
+        self,
+        adapter: "AbcAdapter",
+    ) -> AuthenticatedCastClient:
         section = adapter.section
         token = await self.__get_actual_token(section)
         if token is None:
-            raise ApiForbiddenError('Нет доступных токенов')
+            raise ApiForbiddenError("Нет доступных токенов")
 
-        httpx_client: httpx.AsyncClient = self.__httpx_client_handler.get_httpx_client(section)
-        client = AuthenticatedCastClient(base_url=adapter.base_url,
-                                         httpx_client=httpx_client,
-                                         token=token,
-                                         section=section,
-                                         raise_on_unexpected_status=False,
-                                         )
+        httpx_client: httpx.AsyncClient = self.__httpx_client_handler.get_httpx_client(
+            section
+        )
+        client = AuthenticatedCastClient(
+            base_url=adapter.base_url,
+            httpx_client=httpx_client,
+            token=token,
+            section=section,
+            raise_on_unexpected_status=False,
+        )
         return client
-
 
     async def __get_actual_token(self, section: SectionsEnum) -> str | None:
         if self._access is None:
@@ -61,12 +63,12 @@ class AuthClientHandler:
         else:
             return filtered_tokens[0].api_key
 
-
-
-    def __get_token_filter_func(self, section: SectionsEnum) -> Callable[[WBToken], bool]:
+    def __get_token_filter_func(
+        self, section: SectionsEnum
+    ) -> Callable[[WBToken], bool]:
         sections_map = {
             SectionsEnum.PROMOTION: "Продвижение",
-            SectionsEnum.ANALYTIC_AND_DATA: 'Аналитика'
+            SectionsEnum.ANALYTIC_AND_DATA: "Аналитика",
         }
 
         def func(token: WBToken):
@@ -80,35 +82,21 @@ class AuthClientHandler:
             if ru_section_name in token.categories:
                 return True
             return False
+
         return func
 
     async def _update_access(self) -> None:
-        self._access = await super_cabinet_manager.get_access_for_wb_cabinet(self.__shop_id)
+        self._access = await super_cabinet_manager.get_access_for_wb_cabinet(
+            self.__shop_id
+        )
         return None
 
     @staticmethod
     def _get_token_hash(token: str) -> str:
         from .token_hash import get_token_hash
+
         # TODO: Тут была ошибка получения хеша, чуть не проскочила в прод
         return get_token_hash(token)
 
-
     async def mark_current_token_invalided(self, token_hash: str) -> None:
         self._not_working_tokens_hash.add(token_hash)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

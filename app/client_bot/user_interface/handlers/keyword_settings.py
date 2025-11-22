@@ -309,7 +309,7 @@ async def setting_keywords_white_list(
             AdvSetting.id == adv_original_id,
         )
         result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar() # type: ignore[attr-defined]
+        adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.hard_status == 2]
     keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
@@ -471,7 +471,7 @@ async def setting_keywords_hide_keywords_is_hard(
     try:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     except:
-        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting) # type: ignore[attr-defined]
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)  # type: ignore[attr-defined]
         return
     await redis_manager.set_check_last_24_hours(adv_original_id)
     await messages.AdvKeywordsSetting(
@@ -568,14 +568,14 @@ async def setting_keywords_by_adv(
             )
             .where(
                 and_(
-                    User.user_telegram_id == callback.from_user.id, # type: ignore[attr-defined]
+                    User.user_telegram_id == callback.from_user.id,  # type: ignore[attr-defined]
                     WBCabinet.id == adv_setting.wb_cabinet_id,
                 )
             )
         )
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
-    user_id: int = callback.from_user.id # type: ignore[attr-defined]
+    user_id: int = callback.from_user.id  # type: ignore[attr-defined]
     if wb_user_cabinet is None and user_id in const.ADMINS:
         stmt = select(User).where(User.user_telegram_id == user_id)
         admin_user = await session.execute(stmt)
@@ -586,15 +586,15 @@ async def setting_keywords_by_adv(
         wb_user_cabinet.name = "Автодобавлен"
         session.add(wb_user_cabinet)
         await session.commit()
-    wb_user_cabinet_original_id = wb_user_cabinet.id # type: ignore[attr-defined]
+    wb_user_cabinet_original_id = wb_user_cabinet.id  # type: ignore[attr-defined]
     nmids = adv_setting.nmids
     if nmids:
         main_photos = await data_manager.get_main_photos(nmids[:1])
     else:
-        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting) # type: ignore[attr-defined]
+        await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)  # type: ignore[attr-defined]
         return
 
-    chat_id = callback.message.chat.id # type: ignore[attr-defined]
+    chat_id = callback.message.chat.id  # type: ignore[attr-defined]
     await redis_manager.set_check_last_24_hours(adv_original_id)
     logger.debug("Обработка собщения")
     await messages.AdvKeywordsSetting(
@@ -667,13 +667,13 @@ async def change_keyword_hard_status(
             )
             keyword_setting: KeywordSetting | None = keyword_setting.scalar()
             assert keyword_setting
-            adv_setting: AdvSetting = keyword_setting.adv_setting # type: ignore[attr-defined]
+            adv_setting: AdvSetting = keyword_setting.adv_setting  # type: ignore[attr-defined]
             if new_hard_status >= 0:
-                keyword_setting.hard_status = new_hard_status # type: ignore[attr-defined]
+                keyword_setting.hard_status = new_hard_status  # type: ignore[attr-defined]
                 if new_hard_status == 2:
-                    keyword_setting.relevant = True # type: ignore[attr-defined]
+                    keyword_setting.relevant = True  # type: ignore[attr-defined]
                 elif new_hard_status == 0:
-                    keyword_setting.relevant = False # type: ignore[attr-defined]
+                    keyword_setting.relevant = False  # type: ignore[attr-defined]
             adv_ids = set()
             adv_ids.add(adv_setting.adv_id)
             if search_adv_id := adv_setting.search_adv_id:
@@ -686,12 +686,12 @@ async def change_keyword_hard_status(
                         views,
                         _,
                     ) = await data_manager.get_keyword_statistic_clickhouse(
-                        client, keyword_setting.text, adv_ids # type: ignore[attr-defined]
+                        client, keyword_setting.text, adv_ids  # type: ignore[attr-defined]
                     )
-                if keyword_setting.added_clicks: # type: ignore[attr-defined]
-                    clicks += keyword_setting.added_clicks # type: ignore[attr-defined]
-                if keyword_setting.added_views: # type: ignore[attr-defined]
-                    views += keyword_setting.added_views # type: ignore[attr-defined]
+                if keyword_setting.added_clicks:  # type: ignore[attr-defined]
+                    clicks += keyword_setting.added_clicks  # type: ignore[attr-defined]
+                if keyword_setting.added_views:  # type: ignore[attr-defined]
+                    views += keyword_setting.added_views  # type: ignore[attr-defined]
 
                 n = 10  # Процент увеличения CTR, который вы хотите достичь
 
@@ -702,9 +702,9 @@ async def change_keyword_hard_status(
                 add_clicks = max([int(round(new_ctr * views - clicks)), 1])
 
                 # Добавление кликов без изменения показов
-                if not keyword_setting.added_clicks: # type: ignore[attr-defined]
-                    keyword_setting.added_clicks = 0 # type: ignore[attr-defined]
-                keyword_setting.added_clicks += add_clicks # type: ignore[attr-defined]
+                if not keyword_setting.added_clicks:  # type: ignore[attr-defined]
+                    keyword_setting.added_clicks = 0  # type: ignore[attr-defined]
+                keyword_setting.added_clicks += add_clicks  # type: ignore[attr-defined]
 
                 await redis_manager.set_auto_block_status(
                     keyword_setting_original_id, False
@@ -740,7 +740,7 @@ async def check_position(
         adv_setting_original_id = callback_data.adv_original_id
         stmt = select(AdvSetting.nmids).where(AdvSetting.id == adv_setting_original_id)
         result = await session.execute(stmt)
-        nmids: AdvSetting = result.scalar() # type: ignore[attr-defined]
+        nmids: AdvSetting = result.scalar()  # type: ignore[attr-defined]
         nmid = nmids[0]
     await parser.add_wb_positions(text, {nmid}, delay=1)
     await messages.KeywordSettingMessage(
@@ -770,7 +770,7 @@ async def setting_keywords_filter_by_query(
     async with _sm(read_only=False) as session:
         stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
         result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar() # type: ignore[attr-defined]
+        adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
         adv_setting.hide_small_query_keywords = count_query
         await session.commit()
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
@@ -798,7 +798,7 @@ async def setting_keywords_filter_by_query(
         )
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
-    wb_user_cabinet_original_id = wb_user_cabinet.id # type: ignore[attr-defined]
+    wb_user_cabinet_original_id = wb_user_cabinet.id  # type: ignore[attr-defined]
     nmids = adv_setting.nmids
     main_photos = await data_manager.get_main_photos(nmids[:1])
     chat_id = message.chat.id
@@ -856,7 +856,7 @@ async def show_only_on_out_index(
             AdvSetting.id == adv_original_id,
         )
         result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar() # type: ignore[attr-defined]
+        adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.position == 0]
     keywords.sort(key=lambda x: x.predict_ctr, reverse=True)

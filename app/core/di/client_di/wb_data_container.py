@@ -3,7 +3,9 @@ from typing import cast
 from dependency_injector import containers, providers
 from dependency_injector.providers import Provider
 
-from app.core.di.client_di.domain_managers_containers.analitycs_container import AnalyticAndDataContainer
+from app.core.di.client_di.domain_managers_containers.analitycs_container import (
+    AnalyticAndDataContainer,
+)
 from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
 
 from app.core.mp.wb.api.domain_managers import AnalyticsManager

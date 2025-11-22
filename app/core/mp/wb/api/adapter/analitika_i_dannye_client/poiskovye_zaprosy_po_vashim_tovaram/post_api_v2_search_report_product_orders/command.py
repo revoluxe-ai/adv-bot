@@ -8,4 +8,3 @@ class GetKeywordPositionsCommand:
     start: date
     end: date
     texts: list[str]
-

@@ -9,5 +9,6 @@ class AdvMinNmidsBids:
         auto: Словарь {nmid: min_cpm} для автоматического размещения (COMBINED)
         search: Словарь {nmid: min_cpm} для поискового размещения
     """
+
     auto: dict[int, int]
     search: dict[int, int]

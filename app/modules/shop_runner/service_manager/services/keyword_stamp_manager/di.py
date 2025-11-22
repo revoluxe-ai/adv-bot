@@ -10,7 +10,8 @@ class KeywordStampManagerContainer(containers.DeclarativeContainer):
 
     _click_house_manager = providers.Singleton(ClickHouseKeywordStampManager)
 
-    keyword_stamp_manager = providers.Singleton(KeywordStampManager,
-                                                wb_api_manager_hub=_wb_api_manager_hub,
-                                                click_house_manager=_click_house_manager
-                                                )
+    keyword_stamp_manager = providers.Singleton(
+        KeywordStampManager,
+        wb_api_manager_hub=_wb_api_manager_hub,
+        click_house_manager=_click_house_manager,
+    )

@@ -13,7 +13,6 @@ class GetIpSessionResource(AsyncResource[aiohttp.ClientSession]):
         await session.close()
 
 
-
 class AiohttpClientForWBFrontParser(AsyncResource[aiohttp.ClientSession]):
     async def init(self) -> aiohttp.ClientSession:
         connector = aiohttp.TCPConnector(limit_per_host=1)
@@ -29,6 +28,3 @@ class HttSessionsContainer(containers.DeclarativeContainer):
 
     get_ip_session = providers.Resource(GetIpSessionResource)
     aiohttp_client_for_parser = providers.Resource(AiohttpClientForWBFrontParser)
-
-
-

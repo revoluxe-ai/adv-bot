@@ -9,15 +9,3 @@ class ParserRateLimitRedisManager(RateLimitMixin, BaseRedisManager):
 
     def _get_key(self, ip: str) -> str:  # type: ignore[override]
         return f"{self.prefix}:{ip}"
-
-
-
-
-
-
-
-
-
-
-
-

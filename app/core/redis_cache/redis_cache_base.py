@@ -14,7 +14,6 @@ assert redis_host is not None, "REDIS_HOST environment variable not set"
 class RedisCacheBase(ABC):
     _prefix: str
 
-
     def __init__(self, decode_bytes: bool = True) -> None:
         self._decode_bytes = decode_bytes
 
@@ -33,9 +32,10 @@ class RedisCacheBase(ABC):
         return f"{self._prefix}:{self._unique_id}"
 
     @inject
-    def __get_client(self, client: RedisClient = Provide["redis_client_wrapper"]) -> RedisClient: # noqa
+    def __get_client(
+        self, client: RedisClient = Provide["redis_client_wrapper"]
+    ) -> RedisClient:  # noqa
         return client
-
 
     @property
     def client(self) -> RedisClient:

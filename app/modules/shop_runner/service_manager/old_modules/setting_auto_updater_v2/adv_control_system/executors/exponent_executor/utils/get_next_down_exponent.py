@@ -22,7 +22,9 @@ def get_next_down_exponent(
 
     # TODO: Кажется эту функцию можно частично слить с get_next_up_exponent
 
-    keywords_candidates: list[CalculatedKeyword] | None = get_candidates_to_leader(keywords)
+    keywords_candidates: list[CalculatedKeyword] | None = get_candidates_to_leader(
+        keywords
+    )
     if not keywords_candidates:
         return None
 
@@ -43,17 +45,19 @@ def get_next_down_exponent(
             continue
 
         ctr_i, views_i = cand.predict_ctr, cand.views
-        numerator: float = ctr_L * views_L - ctr_i * views_i # pyright: ignore
-        denominator: float = ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L # pyright: ignore
+        numerator: float = ctr_L * views_L - ctr_i * views_i  # pyright: ignore
+        denominator: float = (
+            ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L
+        )  # pyright: ignore
 
         if denominator == 0:
             continue  # прямые параллельны
 
-        w_new: float = numerator / denominator # pyright: ignore
+        w_new: float = numerator / denominator  # pyright: ignore
 
         # интересуют пересечения при снижении экспоненты
         if 0 <= w_new < w_now:
-            possible_ws.append(w_new) # pyright: ignore
+            possible_ws.append(w_new)  # pyright: ignore
 
     # 4️⃣ если нет пересечений — проверим exp=1
     if not possible_ws:

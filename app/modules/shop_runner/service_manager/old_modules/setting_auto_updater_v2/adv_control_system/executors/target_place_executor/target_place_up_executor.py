@@ -25,6 +25,7 @@ class TargetPlaceUpExecutor(BaseExecutor):
     PASS_TIME_SECONDS = 15 * 60  # 15 минут между изменениями
     MIN_PLACE = 300  # Максимальное повышение
     MAX_PLACE = 1  # Минимальное повышение
+
     # TODO: Тут нужно получить максимальную ставку. Если текущая ставка равна максимальной, то смысла повышать позицию нет.
     async def execute(self, ctx: PipelineContext) -> ExecutionResult:
         """Повышает целевую позицию (decrease number).
@@ -39,7 +40,8 @@ class TargetPlaceUpExecutor(BaseExecutor):
         current_cpm = utils.get_current_cpm(ctx.complex_adv)
         if current_cpm is None:
             logger.debug(
-                "[adv_id=%s] TargetPlaceDown: текущая ставка не установлена", ctx.complex_adv.adv_id
+                "[adv_id=%s] TargetPlaceDown: текущая ставка не установлена",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
@@ -55,7 +57,8 @@ class TargetPlaceUpExecutor(BaseExecutor):
         # Проверка rate-limiting
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
             logger.debug(
-                "[adv_id=%s] TargetPlaceUp: rate-limit не прошёл", ctx.complex_adv.adv_id
+                "[adv_id=%s] TargetPlaceUp: rate-limit не прошёл",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
@@ -63,13 +66,13 @@ class TargetPlaceUpExecutor(BaseExecutor):
 
         if not current_place:
             logger.debug(
-                "[adv_id=%s] TargetPlaceUp: целевая позиция не установлена", ctx.complex_adv.adv_id
+                "[adv_id=%s] TargetPlaceUp: целевая позиция не установлена",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0, used_power=0)
 
-
         # Проверка лимита
-        if current_place <= self.MAX_PLACE: # маленькое число - выше позиция
+        if current_place <= self.MAX_PLACE:  # маленькое число - выше позиция
             logger.debug(
                 "[adv_id=%s] TargetPlaceUp: достигнут максимум (current=%s, min=%s)",
                 ctx.complex_adv.adv_id,

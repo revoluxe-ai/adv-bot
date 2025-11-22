@@ -33,9 +33,7 @@ class KeywordForKeyboard:
 
 
 async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(
-        adv_setting
-    )
+    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(adv_setting)
     return all_phrases
 
 

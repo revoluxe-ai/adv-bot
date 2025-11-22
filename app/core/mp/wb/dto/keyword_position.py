@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import date
 
+
 class KeywordPosition(BaseModel):
     nmid: int
     text: str
@@ -8,4 +9,3 @@ class KeywordPosition(BaseModel):
     average_position: float
     orders: int
     total_views_avr_for_day: int
-

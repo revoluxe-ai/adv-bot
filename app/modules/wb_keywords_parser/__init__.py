@@ -10,4 +10,8 @@ from .parsing_task import ParsingTask
 # TODO: Сделать документацию пользователя бота через Qoder
 
 
-__all__ = ["ParsingQueueManager", "ParsingFoundRedisManager", "ParsingTask",]
+__all__ = [
+    "ParsingQueueManager",
+    "ParsingFoundRedisManager",
+    "ParsingTask",
+]

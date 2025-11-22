@@ -14,7 +14,6 @@ from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager
 from app.modules.wb_keywords_parser.di import WBKeywordsParserContainer
 
 
-
 class ModuleResources(containers.DeclarativeContainer):
     """Содержит DI-контейнеры всех модулей приложения."""
 
@@ -45,7 +44,6 @@ class ModuleResources(containers.DeclarativeContainer):
     )
 
     wb_manager_hub_factory_container = providers.Container(WBManagerHubFactoryContainer)
-
 
     # Пример для будущих модулей:
     # analytics = providers.Container(AnalyticsContainer, redis_client_wrapper=redis_client_wrapper)

@@ -81,5 +81,7 @@ async def show_favorites(
     user_telegram_id = callback.from_user.id
     await messages.LongTimeOperation(bot, user_telegram_id)()
     await bot.send_message(
-        callback.message.chat.id, f'Функция временно отключена, обратитесь в поддерржку -> {const.SUPPORT_LINK}' )
+        callback.message.chat.id,
+        f"Функция временно отключена, обратитесь в поддерржку -> {const.SUPPORT_LINK}",
+    )
     return

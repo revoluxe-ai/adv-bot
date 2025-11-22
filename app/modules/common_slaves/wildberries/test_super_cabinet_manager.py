@@ -87,5 +87,5 @@ async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
             task.cancel()
             try:
                 await task
-            except Exception: # noqa
+            except Exception:  # noqa
                 pass

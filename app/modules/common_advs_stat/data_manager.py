@@ -25,6 +25,7 @@ _sm = get_async_session_maker
 
 # TODO: Переделать NEO4j Драйвер на DI с нормальным управлением ЖЦ
 
+
 @dataclass
 class CommonAdvsStatData:
     """Класс для хранения данных о ключевых словах рекламной кампании"""

@@ -18,11 +18,15 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
+
 @inject
 async def run_shop_task(
-    shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager,
-    wb_manager_hub_factory: WBManagerHubFactory = \
-            Provide['module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory'],
+    shop_id: str,
+    client_session: ClientSession,
+    redis_manager: RedisShopManager,
+    wb_manager_hub_factory: WBManagerHubFactory = Provide[
+        "module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory"
+    ],
 ) -> None:
     wb_manager_hub_factory.set_wb_manager_hub(shop_id)
     try:
@@ -37,7 +41,6 @@ async def run_shop_task(
         raise exc
     finally:
         wb_manager_hub_factory.reset_shop(shop_id)
-
 
 
 async def _update_tasks(

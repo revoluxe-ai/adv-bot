@@ -34,6 +34,3 @@ class WBManagerHubContainer(containers.DeclarativeContainer):
         WBManagerHub,
         wb_data_manager=_wb_data_manager,
     )
-
-
-

@@ -610,7 +610,10 @@ async def process_add_new_token(
     except Exception as e:
         # Не прерываем процесс, если не удалось зарезолвить уведомления
         logger.error(
-            "Ошибка при резолве уведомлений для shop_id=%s: %s", shop_id, e, exc_info=True
+            "Ошибка при резолве уведомлений для shop_id=%s: %s",
+            shop_id,
+            e,
+            exc_info=True,
         )
 
     # Отправка сообщений об успехе

@@ -398,8 +398,6 @@ class ShopMenu(TextWithKeyboard):
         wb_cabinet_original_id = wb_cabinet.id
         builder = InlineKeyboardBuilder()
 
-
-
         button = InlineKeyboardButton(
             text="Автоматические рекламные кампании",
             callback_data=ChoiceAdvPaginator(

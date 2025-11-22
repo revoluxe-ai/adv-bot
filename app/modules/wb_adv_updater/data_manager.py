@@ -43,6 +43,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
 from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
+
 logger = logging.getLogger(__name__)
 
 _sm = get_async_session_maker
@@ -398,12 +399,9 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> FullAdvStat | 
         return None
 
 
-
-
-
 async def get_cached_keyword(adv: AdvSetting, text: str) -> CalculatedKeyword | None:
     """Получить закешированное ключевое слово"""
-    cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}" # type: ignore
+    cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}"  # type: ignore
     cached_data = await redis_manager.get(cache_key)
 
     if cached_data and isinstance(cached_data, str):
@@ -553,6 +551,7 @@ async def get_min_ctr(adv: AdvSetting) -> float:
 # TODO: Улучшить автоуправление РК
 # TODO: Сделать более точным прогноз продаж и себеса
 
+
 def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | None:
     # TODO: Функция упала бы на Smoke-тесте при пустом списке ключевых слов и упала на полной фильтрации
     if not keywords:
@@ -647,7 +646,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
                     views=0,
                     clicks=0,
                     spend=0,
-                    date=datetime.now().date(), # noqa
+                    date=datetime.now().date(),  # noqa
                 )
 
                 keyword_setting = KeywordSetting(
@@ -731,7 +730,7 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                     views=0,
                     clicks=0,
                     spend=0,
-                    date=datetime.now().date(), # noqa
+                    date=datetime.now().date(),  # noqa
                 )
 
                 keyword_setting = KeywordSetting(
@@ -787,7 +786,9 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
         .join(AdvSetting.wb_cabinet)
         .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active.is_(True))
         .options(
-            load_only(AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id) # noqa
+            load_only(
+                AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id
+            )  # noqa
         )
     )
     async with _sm() as session:

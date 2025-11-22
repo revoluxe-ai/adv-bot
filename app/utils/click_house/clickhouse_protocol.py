@@ -6,14 +6,12 @@ class ClickHouseClientProtocol(Protocol):
         self,
         query: str,
         parameters: Mapping[str, Any] | None = None,
-    ) -> Any:
-        ...
-    
+    ) -> Any: ...
+
     async def insert(
         self,
         table: str,
         data: list[dict[str, Any]] | list[list[Any]],
         column_names: list[str] | None = None,
         database: str | None = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...

@@ -79,9 +79,10 @@ async def _get_good_bad_phrases_for_min_ctr(
     adv_setting: AdvSetting,
     max_cpc: int | None = None,
     pass_time: timedelta | None = timedelta(days=7),
-    min_ctr: float | None = None
+    min_ctr: float | None = None,
 ) -> list[CalculatedKeyword]:
     from . import get_text_to_predict_ctr_dict
+
     if min_ctr is None:
         min_ctr = await get_min_ctr(adv_setting)
     logger.debug("Минимальный ctr получен")
@@ -201,7 +202,7 @@ async def _get_good_bad_phrases_for_min_ctr(
         text = keyword_stat.text
         keyword_setting = text_to_keyword_setting[text]
         added_clicks = keyword_setting.added_clicks
-        if added_clicks is None: # Added check for None
+        if added_clicks is None:  # Added check for None
             added_clicks = 0
         keyword_stat.relevant = keyword_setting.relevant
         keyword_stat.added_clicks = added_clicks
@@ -244,7 +245,7 @@ async def _get_good_bad_phrases_for_min_ctr(
                 keyword_stat.reason = "max_cpc"
                 if keyword_setting and keyword_setting.id:
                     await redis_manager.set_auto_block_status(
-                        int(keyword_setting.id), True # type: ignore
+                        int(keyword_setting.id), True  # type: ignore
                     )
                 continue
         if (
@@ -320,18 +321,22 @@ async def _get_good_bad_phrases_for_min_ctr(
             ]:
                 continue
             # TODO: Критичный код, не стал трогать, так то надо переделать, чтобы не было shadow  переменных  property
-            value = getattr(keyword_stat, property_) # type: ignore
+            value = getattr(keyword_stat, property_)  # type: ignore
             try:
                 assert value is not None
             except AssertionError:
                 # TODO: Удалить из всего проекта f-строки из логирования
                 logger.error(
-                    "Ошибка в значении %s для %s: %s", property_, keyword_stat.text, value
+                    "Ошибка в значении %s для %s: %s",
+                    property_,
+                    keyword_stat.text,
+                    value,
                 )
 
     logger.debug("Слова по assert проверены")
     logger.debug("Возвращаю итоговую статистику")
     return keyword_stats
+
 
 async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords: list[CalculatedKeyword] = await _get_good_bad_phrases_for_min_ctr(
@@ -351,4 +356,3 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
     keywords = keywords_with_rating + keywords_without_rating
     return keywords
-

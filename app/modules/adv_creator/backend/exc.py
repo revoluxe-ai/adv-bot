@@ -22,4 +22,6 @@ class AdvExistsForNmidError(Exception):
     def __init__(self, exist_adv_ids_rows: list[tuple[int, int | None]]):
         message = "Существующие рекламные кампании найдены для данного артикула."
         super().__init__(message)
-        self.exist_adv_ids_rows = exist_adv_ids_rows  # Список кортежей (auto_id, search_id | None)
+        self.exist_adv_ids_rows = (
+            exist_adv_ids_rows  # Список кортежей (auto_id, search_id | None)
+        )

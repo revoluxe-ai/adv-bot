@@ -14,8 +14,11 @@ from app.modules.wb_keywords_parser.wb_parser.excs import (
 )
 
 import typing
+
 if typing.TYPE_CHECKING:
-    from app.modules.wb_keywords_parser.wb_parser.rate_limit_manager import ParserRateLimitRedisManager
+    from app.modules.wb_keywords_parser.wb_parser.rate_limit_manager import (
+        ParserRateLimitRedisManager,
+    )
 from app.settings import settings
 from app.utils.net import get_public_ip
 
@@ -32,10 +35,11 @@ def _get_lock(ip: str) -> asyncio.Lock:
     return lock
 
 
-def rate_limited_request(rate_limit_manager: 'ParserRateLimitRedisManager',
-                         max_retries: int = 50,
-                         delay: float = settings.PARSING_LIMITER_DELAY)\
-                           -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def rate_limited_request(
+    rate_limit_manager: "ParserRateLimitRedisManager",
+    max_retries: int = 50,
+    delay: float = settings.PARSING_LIMITER_DELAY,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Декоратор адаптивного rate-limit по IP.
 
     Сохраняет поведение: при 429 — увеличивает TTL экспоненциально, при успешных запросах
@@ -66,23 +70,32 @@ def rate_limited_request(rate_limit_manager: 'ParserRateLimitRedisManager',
 
                     try:
                         result = await func(*args, **kwargs)  # pyright: ignore
-                    except (TooManyRequestsInParserError, WBConnectionRateLimitError) as e:
+                    except (
+                        TooManyRequestsInParserError,
+                        WBConnectionRateLimitError,
+                    ) as e:
                         if isinstance(e, WBConnectionRateLimitError):
                             logger.warning("WBConnectionRateLimitError")
 
                         err_count = await rate_limit_manager.increment_error_counter(ip)
                         await rate_limit_manager.set_last_error_ts(ip)
 
-                        new_ttl = min(base * (mult ** err_count), max_delay)
+                        new_ttl = min(base * (mult**err_count), max_delay)
                         await rate_limit_manager.block_ip(ip, new_ttl)
 
                         logger.warning(
                             "IP %s rate-limited: errors=%s, TTL=%.2fs, attempt=%s/%s",
-                            ip, err_count, new_ttl, attempt, max_retries,
+                            ip,
+                            err_count,
+                            new_ttl,
+                            attempt,
+                            max_retries,
                         )
 
                         if attempt >= max_retries:
-                            logger.error("Exceeded attempts (%s) for IP %s", max_retries, ip)
+                            logger.error(
+                                "Exceeded attempts (%s) for IP %s", max_retries, ip
+                            )
                             raise e
 
                         continue
@@ -101,15 +114,25 @@ def rate_limited_request(rate_limit_manager: 'ParserRateLimitRedisManager',
 
                             if new_ttl <= base:
                                 await rate_limit_manager.delete_block(ip)
-                                logger.info("IP %s unblocked after %s successes", ip, succ)
+                                logger.info(
+                                    "IP %s unblocked after %s successes", ip, succ
+                                )
                             else:
                                 await rate_limit_manager.refresh_block(ip, new_ttl)
                                 logger.debug(
                                     "IP %s TTL decreased: %.2f -> %.2f (%s successes)",
-                                    ip, cur_ttl, new_ttl, succ,
+                                    ip,
+                                    cur_ttl,
+                                    new_ttl,
+                                    succ,
                                 )
                         elif blocked:
-                            logger.debug("IP %s success (%s/%s to decrease)", ip, succ, success_threshold)
+                            logger.debug(
+                                "IP %s success (%s/%s to decrease)",
+                                ip,
+                                succ,
+                                success_threshold,
+                            )
 
                         return result  # pyright: ignore
 
@@ -119,4 +142,3 @@ def rate_limited_request(rate_limit_manager: 'ParserRateLimitRedisManager',
         return wrapper
 
     return decorator
-

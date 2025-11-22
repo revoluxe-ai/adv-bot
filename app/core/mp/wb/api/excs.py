@@ -9,21 +9,22 @@ class WBApiError(Exception):
 
 
 class StandardError(WBApiError):
-    def __init__(self,
-                 title: str,
-                 detail: str,
-                 status: int,
-                 ) -> None:
+    def __init__(
+        self,
+        title: str,
+        detail: str,
+        status: int,
+    ) -> None:
         self.title = title
         self.message = detail
         self.status = status
         super().__init__(self.message)
 
     def __str__(self) -> str:
-        return f'{self.title}: {self.message}'
+        return f"{self.title}: {self.message}"
 
     def __repr__(self) -> str:
-        return f'{self.title}: {self.message}'
+        return f"{self.title}: {self.message}"
 
 
 class UnexpectedRequestError(WBApiError):
@@ -36,10 +37,11 @@ class BadRequestError(WBApiError):
 
 class ApiForbiddenError(WBApiError):
     def __init__(
-        self, text: str,
+        self,
+        text: str,
         wb_user_cabinet: WBUserCabinet | None = None,
         not_valid_token_hash: str | None = None,
-        section: SectionsEnum | None = None
+        section: SectionsEnum | None = None,
     ):
         self.__not_valid_token_hash = not_valid_token_hash
         self.__section = section
@@ -55,7 +57,6 @@ class ApiForbiddenError(WBApiError):
     @property
     def section(self) -> SectionsEnum | None:
         return self.__section
-
 
 
 class TooManyRequests(WBApiError):

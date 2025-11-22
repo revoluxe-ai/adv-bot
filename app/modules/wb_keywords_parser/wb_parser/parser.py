@@ -69,19 +69,30 @@ def get_parse_url(text: str, page: int) -> str:
 
 class ParserService:
 
-    def __init__(self, rate_limit_manager: 'ParserRateLimitRedisManager' =Provide['module_resources.wb_keywords_parser.rate_limit_manager'],
-                 delay: float = settings.PARSING_LIMITER_DELAY):
-        self._rate_limit_manager: 'ParserRateLimitRedisManager' = rate_limit_manager
+    def __init__(
+        self,
+        rate_limit_manager: "ParserRateLimitRedisManager" = Provide[
+            "module_resources.wb_keywords_parser.rate_limit_manager"
+        ],
+        delay: float = settings.PARSING_LIMITER_DELAY,
+    ):
+        self._rate_limit_manager: "ParserRateLimitRedisManager" = rate_limit_manager
 
-            # Применяем декоратор rate limiting к методу парсинга
+        # Применяем декоратор rate limiting к методу парсинга
         # TODO: Прошла ошибка на smoke test - из-за неаннотированости функции-обертки (декоратора) и отсутствия тестов
 
-        self._parse_with_rate_limit = rate_limited_request(rate_limit_manager, delay=delay)(
+        self._parse_with_rate_limit = rate_limited_request(
+            rate_limit_manager, delay=delay
+        )(
             self._parse_keywords_from_wb_impl,
         )
 
     async def parse_keywords_from_wb(
-        self, text: str, page: int, total_pages: TotalPages, delay: float = settings.PARSING_LIMITER_DELAY
+        self,
+        text: str,
+        page: int,
+        total_pages: TotalPages,
+        delay: float = settings.PARSING_LIMITER_DELAY,
     ) -> list[WBItemPosition]:
         first_place = page * 100 - 99
         try:
@@ -155,7 +166,7 @@ class ParserService:
                 timestamp=datetime.datetime.now(),
                 adv_type=adv_type,
             )
-            positions.append(position) # pyright: ignore
+            positions.append(position)  # pyright: ignore
 
             if cluster and cluster != text:
                 position = WBItemPosition(
@@ -166,29 +177,32 @@ class ParserService:
                     timestamp=datetime.datetime.now(),
                 )
 
-                positions.append(position) # pyright: ignore
+                positions.append(position)  # pyright: ignore
 
-        return positions # pyright: ignore
+        return positions  # pyright: ignore
 
-    async def _parse_keywords_from_wb_impl(self,
+    async def _parse_keywords_from_wb_impl(
+        self,
         text: str,
         page: int,
-         ):
+    ):
         # для проброса ошибок сети, интерпретируемых как слишком много запросов
         try:
             result = await self.__parse_keywords_from_wb_impl(text, page)
-            return result # pyright: ignore
+            return result  # pyright: ignore
         except aiohttp.ClientError as e:
-            raise WBConnectionRateLimitError("Rate limit exceeded in ParserService") from e
-
+            raise WBConnectionRateLimitError(
+                "Rate limit exceeded in ParserService"
+            ) from e
 
     @inject
-    async def __parse_keywords_from_wb_impl(self, # pyright: ignore
-                                           text: str,
-                                           page: int,
-                                           client: ClientSession = Provide['http_sessions.aiohttp_client_for_parser'],
-                                           ) -> tuple[
-        list[dict[typing.Any, typing.Any]] | None, # pyright: ignore
+    async def __parse_keywords_from_wb_impl(
+        self,  # pyright: ignore
+        text: str,
+        page: int,
+        client: ClientSession = Provide["http_sessions.aiohttp_client_for_parser"],
+    ) -> tuple[
+        list[dict[typing.Any, typing.Any]] | None,  # pyright: ignore
         str | None,
         int | None,
         int | None,
@@ -231,7 +245,9 @@ class ParserService:
             cluster = text
         else:
             catalog_value = metadata["catalog_value"]
-            preset = int(re.search(r"preset=(\d+)", catalog_value).group(1)) # pyright: ignore
+            preset = int(
+                re.search(r"preset=(\d+)", catalog_value).group(1)
+            )  # pyright: ignore
             cluster = metadata["normquery"]
         total_items = data["data"]["total"]
         products: list[typing.Any] = data["data"]["products"]
@@ -254,12 +270,17 @@ class ParserService:
 
 # TODO: Мертвый код, удалить после проверки
 @inject
-def _create_rate_limit_manager(client: RedisClient = Provide["redis_client"]) -> "ParserRateLimitRedisManager": # pyright: ignore
+def _create_rate_limit_manager(
+    client: RedisClient = Provide["redis_client"],
+) -> "ParserRateLimitRedisManager":  # pyright: ignore
     try:
         return ParserRateLimitRedisManager(redis_client=client)
     except Exception as e:
-        logger.warning(f"Не удалось создать rate_limit_manager: {e}. Rate limiting отключен.")
+        logger.warning(
+            f"Не удалось создать rate_limit_manager: {e}. Rate limiting отключен."
+        )
         raise e
+
 
 # TODO: Убрать добавление ключей в БС, если 0 показов
 
@@ -316,6 +337,7 @@ async def add_wb_positions_to_all_bases(
         add_wb_positions_to_clickhouse(my_positions),
     )
 
+
 @inject
 async def _add_positions_from_page(
     stop_event: asyncio.Event,
@@ -324,7 +346,9 @@ async def _add_positions_from_page(
     page: int,
     need_nmids: set[int],
     total_pages: TotalPages,
-    parser: ParserService = Provide['module_resources.wb_keywords_parser.parser_service']
+    parser: ParserService = Provide[
+        "module_resources.wb_keywords_parser.parser_service"
+    ],
 ) -> list[WBItemPosition]:
     if stop_event.is_set():
         return []
@@ -356,10 +380,12 @@ async def _add_positions_from_page(
 
 # TODO: Сделать проверку прав токенов check запросами к WB
 
+
 async def add_wb_positions(
-    text: str, need_nmids: set[int],
-        delay: float = settings.PARSING_LIMITER_DELAY,
-        page_limit: int = 60
+    text: str,
+    need_nmids: set[int],
+    delay: float = settings.PARSING_LIMITER_DELAY,
+    page_limit: int = 60,
 ) -> list[WBItemPosition]:
     """
     Функция подходит только для карточек, которые точно есть в базе. Если какой-то нет - логика сломается
@@ -374,7 +400,9 @@ async def add_wb_positions(
 
     """
     original_nmids = set(need_nmids)
-    in_indexes: dict[int, bool | None] = await __check_index(text, need_nmids, delay=delay)
+    in_indexes: dict[int, bool | None] = await __check_index(
+        text, need_nmids, delay=delay
+    )
     not_found_positions: list[WBItemPosition] = []
     for nmid, in_index in in_indexes.items():
         if not in_index:
@@ -387,19 +415,21 @@ async def add_wb_positions(
             not_found_positions.append(position)
             need_nmids.discard(nmid)
 
-
     positions = await _get_wb_positions(text, set(need_nmids), delay, page_limit)
     positions.extend(not_found_positions)
     await add_wb_positions_to_all_bases(positions, original_nmids)
     logger.debug("Записали позиции в базы")
     return positions
 
+
 @inject
 async def __check_index(
     text: str,
     need_nmids: set[int],
     delay: float = settings.PARSING_LIMITER_DELAY,
-    parser: ParserService = Provide['module_resources.wb_keywords_parser.parser_service']
+    parser: ParserService = Provide[
+        "module_resources.wb_keywords_parser.parser_service"
+    ],
 ) -> dict[int, bool | None]:
     """
     Проверяет, находятся ли товары в индексе по запросу "бренд + текст".
@@ -408,10 +438,12 @@ async def __check_index(
     from sqlalchemy import select
     from app.utils.db.session_maker import get_async_session_maker as sm
 
-    stmt = select(WBCard).options(
-        load_only(WBCard.nmid, WBCard.json)
-    ).where(
-        WBCard.nmid.in_(need_nmids),
+    stmt = (
+        select(WBCard)
+        .options(load_only(WBCard.nmid, WBCard.json))
+        .where(
+            WBCard.nmid.in_(need_nmids),
+        )
     )
 
     async with sm(read_only=True) as session:
@@ -420,19 +452,23 @@ async def __check_index(
     nmids_in_cards = {card.nmid for card in wb_cards}
     if not nmids_in_cards == need_nmids:
         missing_nmids = set(need_nmids) - set(nmids_in_cards)
-        raise RuntimeError(f"Некоторые nmids не найдены в базе WBCard при проверке индексации {missing_nmids}")
+        raise RuntimeError(
+            f"Некоторые nmids не найдены в базе WBCard при проверке индексации {missing_nmids}"
+        )
     nmids_to_index: dict[int, bool | None] = {}
-    for card in  wb_cards:
+    for card in wb_cards:
         nmid = card.nmid
         brand = card.brand
-        query = f'{brand} {text}'
+        query = f"{brand} {text}"
         found = False
 
         # Проверяем до 60 страниц, прерывая при нахождении артикула
         try:
             total_pages = TotalPages()
             for page in range(1, 61):
-                positions = await parser.parse_keywords_from_wb(query, page, total_pages, delay)
+                positions = await parser.parse_keywords_from_wb(
+                    query, page, total_pages, delay
+                )
                 # Проверяем, найден ли наш nmid в результатах
                 if any(pos.nmid == nmid for pos in positions):
                     found = True
@@ -444,16 +480,20 @@ async def __check_index(
                 await asyncio.sleep(0.1)
             nmids_to_index[nmid] = found
         except Exception as e:
-            logger.error("Ошибка при проверке индекса для nmid %s, query '%s': %s",
-                           nmid, query, e, exc_info=True)
+            logger.error(
+                "Ошибка при проверке индекса для nmid %s, query '%s': %s",
+                nmid,
+                query,
+                e,
+                exc_info=True,
+            )
             raise e
 
     return nmids_to_index
 
 
-
 async def _get_wb_positions(
-    text: str, need_nmids: set[int], delay: float, page_limit: int =60
+    text: str, need_nmids: set[int], delay: float, page_limit: int = 60
 ) -> list[WBItemPosition]:
     total_pages = TotalPages()
     stop_event = asyncio.Event()

@@ -20,7 +20,9 @@ def get_next_raise_exponent(
              либо None, если лидер с большим CTR невозможен
     """
 
-    keywords_candidates: list[CalculatedKeyword] | None = get_candidates_to_leader(keywords)
+    keywords_candidates: list[CalculatedKeyword] | None = get_candidates_to_leader(
+        keywords
+    )
     if not keywords_candidates:
         return None  # нет кандидатов
     # Текущий вес w (из диапазона [0, 1])
@@ -28,10 +30,14 @@ def get_next_raise_exponent(
 
     # Находим текущего лидера по рейтингу
     leader = get_leader(keywords_candidates)
-    ctr_L, views_L = leader.predict_ctr, leader.views # pyright: ignore
+    ctr_L, views_L = leader.predict_ctr, leader.views  # pyright: ignore
 
     # Отбираем кандидатов с CTR > CTR_лидера
-    candidates = [kw for kw in keywords_candidates if kw.predict_ctr is not None and kw.predict_ctr > ctr_L] # pyright: ignore
+    candidates = [
+        kw
+        for kw in keywords_candidates
+        if kw.predict_ctr is not None and kw.predict_ctr > ctr_L
+    ]  # pyright: ignore
     if not candidates:
         return None  # нет кандидатов с большим CTR
 
@@ -43,17 +49,19 @@ def get_next_raise_exponent(
         views: int = cand.views
         assert views is not None
         ctr_i, views_i = predict_ctr, views
-        numerator: float = ctr_L * views_L - ctr_i * views_i # pyright: ignore
-        denominator: float = ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L # pyright: ignore
+        numerator: float = ctr_L * views_L - ctr_i * views_i  # pyright: ignore
+        denominator: float = (
+            ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L
+        )  # pyright: ignore
 
         if denominator == 0:
             continue  # прямые параллельны, не пересекутся
 
-        w_new: float = numerator / denominator # pyright: ignore
+        w_new: float = numerator / denominator  # pyright: ignore
 
         # Нас Интересует только будущие пересечения (при увеличении экспоненты)
         if w_new > w_now:
-            possible_ws.append(w_new) # pyright: ignore
+            possible_ws.append(w_new)  # pyright: ignore
 
     if not possible_ws:
         return None  # ни один кандидат не сможет обогнать лидера

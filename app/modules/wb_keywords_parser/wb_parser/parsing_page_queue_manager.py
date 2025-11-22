@@ -85,5 +85,3 @@ class ParsingQueueManager:
             final_queue.extend(missing_pages)
 
         return final_queue
-
-

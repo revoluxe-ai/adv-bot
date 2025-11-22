@@ -291,33 +291,51 @@ class CoroutinesManager:
     async def delete_keywords_from_wl_by_mean_auto_ctr(self) -> None:
         # TODO: Добавить функцию-фильтр для ComplexAdvs getter
         from .services import delete_keywords_from_wl_by_mean_auto_ctr
-        complex_advs: Sequence[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
-        complex_advs_with_white_list_by_mean_auto_ctr_active =\
-            [adv for adv in complex_advs if adv.rec_system_promotion_mode_active
-             and adv.auto_update_setting_version == 2
-             and adv.is_white_list_control_enabled]
+
+        complex_advs: Sequence[ComplexAdv] = (
+            await self._wb_shop_data_manager.get_complex_advs()
+        )
+        complex_advs_with_white_list_by_mean_auto_ctr_active = [
+            adv
+            for adv in complex_advs
+            if adv.rec_system_promotion_mode_active
+            and adv.auto_update_setting_version == 2
+            and adv.is_white_list_control_enabled
+        ]
 
         tasks = []
         for adv in complex_advs_with_white_list_by_mean_auto_ctr_active:
             task = delete_keywords_from_wl_by_mean_auto_ctr(complex_adv=adv)
             tasks.append(task)
 
-        results: Sequence[None | Exception] = await asyncio.gather(*tasks, return_exceptions=True)
+        results: Sequence[None | Exception] = await asyncio.gather(
+            *tasks, return_exceptions=True
+        )
 
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error('Ошибка удаления ключей из БС по сред.авто стр, shop_id: %s, adv_id: %s)',
-                             self.shop_id, complex_advs[i].adv_id)
-
-
+                logger.error(
+                    "Ошибка удаления ключей из БС по сред.авто стр, shop_id: %s, adv_id: %s)",
+                    self.shop_id,
+                    complex_advs[i].adv_id,
+                )
 
         return None
+
     @while_coroutine_decorator(15 * 60, 60)
     async def update_keywords_stamp(self) -> None:
-        from .services.keyword_stamp_manager import KeywordStampManagerContainer, KeywordStampManager
+        from .services.keyword_stamp_manager import (
+            KeywordStampManagerContainer,
+            KeywordStampManager,
+        )
+
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
-        keyword_stamp_manager_container = KeywordStampManagerContainer(_wb_api_manager_hub=wb_manager_hub)
-        keyword_stamp_manager: KeywordStampManager = keyword_stamp_manager_container.keyword_stamp_manager()
+        keyword_stamp_manager_container = KeywordStampManagerContainer(
+            _wb_api_manager_hub=wb_manager_hub
+        )
+        keyword_stamp_manager: KeywordStampManager = (
+            keyword_stamp_manager_container.keyword_stamp_manager()
+        )
 
         advs = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
@@ -327,21 +345,32 @@ class CoroutinesManager:
             task = keyword_stamp_manager.update_keywords_position_stamp(adv)
             update_tasks.append(task)
 
-        results: list[Exception | None] = await asyncio.gather(*update_tasks, return_exceptions=True)
+        results: list[Exception | None] = await asyncio.gather(
+            *update_tasks, return_exceptions=True
+        )
 
         for result in results:
             if isinstance(result, Exception):
-                logger.error('Ошибка обновления позиций из Api: %s', result, exc_info=True)
-
+                logger.error(
+                    "Ошибка обновления позиций из Api: %s", result, exc_info=True
+                )
 
         return None
 
     @while_coroutine_decorator(24 * 60 * 60 * 60, 60)
     async def update_keywords_positions_history(self) -> None:
-        from .services.keyword_stamp_manager import KeywordStampManagerContainer, KeywordStampManager
+        from .services.keyword_stamp_manager import (
+            KeywordStampManagerContainer,
+            KeywordStampManager,
+        )
+
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
-        keyword_stamp_manager_container = KeywordStampManagerContainer(_wb_api_manager_hub=wb_manager_hub)
-        keyword_stamp_manager: KeywordStampManager = keyword_stamp_manager_container.keyword_stamp_manager()
+        keyword_stamp_manager_container = KeywordStampManagerContainer(
+            _wb_api_manager_hub=wb_manager_hub
+        )
+        keyword_stamp_manager: KeywordStampManager = (
+            keyword_stamp_manager_container.keyword_stamp_manager()
+        )
 
         advs = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
@@ -351,18 +380,17 @@ class CoroutinesManager:
             task = keyword_stamp_manager.update_keyword_history(adv)
             update_tasks.append(task)
 
-        results: list[Exception | None] = await asyncio.gather(*update_tasks, return_exceptions=True)
+        results: list[Exception | None] = await asyncio.gather(
+            *update_tasks, return_exceptions=True
+        )
 
         for result in results:
             if isinstance(result, Exception):
-                logger.error('Ошибка обновления позиций из Api: %s', result, exc_info=True)
+                logger.error(
+                    "Ошибка обновления позиций из Api: %s", result, exc_info=True
+                )
 
         return None
 
 
-
-
-
-
 # TODO: Частая ошибка - остановка РК в период раскрутки - сделать статью
-

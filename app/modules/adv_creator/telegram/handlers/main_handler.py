@@ -13,7 +13,10 @@ from app.modules.balance_manager import balance_service
 from app.modules.common_slaves.wildberries.models import WBCabinet, WBUserCabinet
 from app.utils.db.session_maker import get_async_session_maker as sm
 
-from ..into_callback import CreateNewAdvs as CreateNewAdvsCallbackData, ConfirmCreateComplexAdv
+from ..into_callback import (
+    CreateNewAdvs as CreateNewAdvsCallbackData,
+    ConfirmCreateComplexAdv,
+)
 from . import messages
 from .states import CreateCompamyStates as states
 
@@ -123,8 +126,7 @@ async def confirm_create_complex_adv(
 
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id
 
-    stmt = select(WBCabinet.shop_id).where(
-        WBCabinet.id == wb_cabinet_original_id)
+    stmt = select(WBCabinet.shop_id).where(WBCabinet.id == wb_cabinet_original_id)
     async with sm(read_only=True) as session:
         result: str | None = await session.scalar(stmt)
     shop_id = result
@@ -133,18 +135,18 @@ async def confirm_create_complex_adv(
         # Повторная постановка задачи с hard_mode=True
         redis_task_pool = await create_pool(arq_redis_settings)
         await redis_task_pool.enqueue_job(
-            "create_complex_advs", 
-            callback_data.nmid, 
+            "create_complex_advs",
+            callback_data.nmid,
             shop_id,
             True,  # hard_mode=True
-            callback.from_user.id
+            callback.from_user.id,
         )
         await bot.send_message(
             callback.from_user.id,
-            f"Создание новой комплексной кампании для артикула {callback_data.nmid} начато..."
+            f"Создание новой комплексной кампании для артикула {callback_data.nmid} начато...",
         )
     else:  # "cancel"
         await bot.send_message(
             callback.from_user.id,
-            f"Создание комплексной кампании для артикула {callback_data.nmid} отменено."
+            f"Создание комплексной кампании для артикула {callback_data.nmid} отменено.",
         )

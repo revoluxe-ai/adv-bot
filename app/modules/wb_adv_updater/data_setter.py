@@ -116,9 +116,7 @@ class DataSetter:
         logger.debug("Начинаю обновление минус слов")
         for adv_setting in adv_settings:
             logger.debug(f"Обновляю минус слова для {adv_setting.name}")
-            keywords: list[CalculatedKeyword] = await get_good_bad_phrases(
-                adv_setting
-            )
+            keywords: list[CalculatedKeyword] = await get_good_bad_phrases(adv_setting)
             logger.debug(f"Получил ключи для {adv_setting.name}")
             good_phrases = []
             bad_phrases = []

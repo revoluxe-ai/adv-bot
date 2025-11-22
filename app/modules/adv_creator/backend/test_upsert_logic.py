@@ -13,6 +13,7 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 
 # access_mock и async_session теперь предоставляются через conftest.py
 
+
 @pytest.fixture(name="access_mock")
 def _access_mock():
     mock = MagicMock()
@@ -20,6 +21,7 @@ def _access_mock():
     mock.wb_cabinet.id = 1
     mock.wb_cabinet.shop_id = "test_shop_id"
     return mock
+
 
 @pytest.mark.asyncio
 async def test_create_complex_advs_upsert_logic(
@@ -29,12 +31,15 @@ async def test_create_complex_advs_upsert_logic(
     auto_adv_id_from_wb = 29918589
     search_adv_id_from_wb = 29918598
 
-    with patch("app.modules.adv_creator.backend.main_manager.WBApi") as WBAPI_mock_class, \
-         patch("app.modules.adv_creator.backend.main_manager.wb_db_manager") as wb_db_manager_mock:
-        
+    with patch(
+        "app.modules.adv_creator.backend.main_manager.WBApi"
+    ) as WBAPI_mock_class, patch(
+        "app.modules.adv_creator.backend.main_manager.wb_db_manager"
+    ) as wb_db_manager_mock:
+
         WBAPI_mock_instance = AsyncMock()
         WBAPI_mock_class.return_value = WBAPI_mock_instance
-        
+
         wb_db_manager_mock.update_cards_in_db = AsyncMock()
 
         # Mock WBApi calls
@@ -48,8 +53,12 @@ async def test_create_complex_advs_upsert_logic(
         WBAPI_mock_instance.update_cpm = AsyncMock()
 
         # Сначала имитируем создание auto-кампании
-        WBAPI_mock_instance.create_auto_adv = AsyncMock(return_value=auto_adv_id_from_wb)
-        WBAPI_mock_instance.create_search_adv = AsyncMock(return_value=search_adv_id_from_wb)
+        WBAPI_mock_instance.create_auto_adv = AsyncMock(
+            return_value=auto_adv_id_from_wb
+        )
+        WBAPI_mock_instance.create_search_adv = AsyncMock(
+            return_value=search_adv_id_from_wb
+        )
 
         # Создаем мок для асинхронного контекстного менеджера сессии
         mock_session_context_manager = AsyncMock()
@@ -63,11 +72,14 @@ async def test_create_complex_advs_upsert_logic(
             mock_session_context_manager.__aexit__.return_value = None
             return mock_session_context_manager
 
-        with patch("app.modules.adv_creator.backend.main_manager.sm", new=mock_get_async_session_maker):
+        with patch(
+            "app.modules.adv_creator.backend.main_manager.sm",
+            new=mock_get_async_session_maker,
+        ):
             manager = MainAdvManager(access_mock, MagicMock())
 
             # # 1. Первый запуск: кампания ещё не существует в БД
-            await manager._MainAdvManager__create_complex_advs(nmid) # type: ignore[attr-defined]
+            await manager._MainAdvManager__create_complex_advs(nmid)  # type: ignore[attr-defined]
 
             # Проверяем, что запись была добавлена
             inserted_adv = await async_session.execute(
@@ -76,10 +88,11 @@ async def test_create_complex_advs_upsert_logic(
             adv_from_db = inserted_adv.scalar_one_or_none()
             assert adv_from_db is not None
             assert adv_from_db.search_adv_id == search_adv_id_from_wb
-            assert adv_from_db.name.startswith(f"{nmid} Тестовая карточка") # Имя может измениться, но должно быть на основе nmid и типа
+            assert adv_from_db.name.startswith(
+                f"{nmid} Тестовая карточка"
+            )  # Имя может измениться, но должно быть на основе nmid и типа
             assert adv_from_db.active_status == "created_by_bot"
             assert adv_from_db.wb_cabinet.id == access_mock.wb_cabinet.id
-
 
             # # 2. Имитируем ситуацию, когда фоновый процесс уже добавил запись
             # (что произойдет после первого вызова MainAdvManager.__create_complex_advs)
@@ -87,9 +100,13 @@ async def test_create_complex_advs_upsert_logic(
             # Теперь мы проверяем, что второй запуск обновит существующую.
 
             # Изменяем значения, которые должны обновиться
-            new_search_adv_id_from_wb = 30000000 # Допустим, WB выдал новый search_adv_id при повторном запросе
-            WBAPI_mock_instance.create_search_adv = AsyncMock(return_value=new_search_adv_id_from_wb)
-            
+            new_search_adv_id_from_wb = (
+                30000000  # Допустим, WB выдал новый search_adv_id при повторном запросе
+            )
+            WBAPI_mock_instance.create_search_adv = AsyncMock(
+                return_value=new_search_adv_id_from_wb
+            )
+
             # Сбрасываем мок для scalar_one_or_none, чтобы он теперь возвращал существующий объект
             # Это уже не нужно, так как в логике main_manager мы делаем upsert
             # sm_mock.return_value.__aenter__.return_value.execute.side_effect = [
@@ -97,25 +114,32 @@ async def test_create_complex_advs_upsert_logic(
             #     MagicMock(scalar_one_or_none=MagicMock(return_value=adv_from_db)), # Для AdvSetting (чтобы имитировать, что он уже есть)
             # ]
 
-
             # Второй запуск: кампания уже существует, ожидаем UPDATE
-            await manager._MainAdvManager__create_complex_advs(nmid) # type: ignore[attr-defined]
+            await manager._MainAdvManager__create_complex_advs(nmid)  # type: ignore[attr-defined]
 
             # Проверяем, что запись ОБНОВИЛАСЬ, а не создалась новая
             updated_adv = await async_session.execute(
                 select(AdvSetting).where(AdvSetting.adv_id == auto_adv_id_from_wb)
             )
             updated_adv_from_db = updated_adv.scalar_one_or_none()
-            
+
             assert updated_adv_from_db is not None
-            await async_session.refresh(updated_adv_from_db) # Обновляем состояние объекта из БД
-            assert updated_adv_from_db.id == adv_from_db.id # ID записи в БД должен остаться тем же
-            assert updated_adv_from_db.search_adv_id == new_search_adv_id_from_wb # Должен обновиться
-            
+            await async_session.refresh(
+                updated_adv_from_db
+            )  # Обновляем состояние объекта из БД
+            assert (
+                updated_adv_from_db.id == adv_from_db.id
+            )  # ID записи в БД должен остаться тем же
+            assert (
+                updated_adv_from_db.search_adv_id == new_search_adv_id_from_wb
+            )  # Должен обновиться
+
             # Убеждаемся, что не было второй попытки добавить AdvSetting (если upsert сработал как update)
             # Это может быть сложно проверить через мок session.add, т.к. session.add может быть вызван
             # даже при update, если объект был detached. Главное - что нет IntegrityError.
             # Вместо этого, проверяем, что количество записей AdvSetting == 1
-            count_stmt = select(func.count(AdvSetting.id)).filter(AdvSetting.adv_id == auto_adv_id_from_wb)
+            count_stmt = select(func.count(AdvSetting.id)).filter(
+                AdvSetting.adv_id == auto_adv_id_from_wb
+            )
             count_result = await async_session.execute(count_stmt)
             assert count_result.scalar_one() == 1

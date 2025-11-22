@@ -20,6 +20,7 @@ def create_redis_client(redis_config: AppConfig) -> Redis:
 
 class AppContainer(containers.DeclarativeContainer):
     """Главный DI-контейнер приложения. Содержит все основные сервисы и конфигурации."""
+
     # TODO: Варить надо те контейенры, которые инжектим
     wiring_config = containers.WiringConfiguration(
         packages=[
@@ -34,7 +35,6 @@ class AppContainer(containers.DeclarativeContainer):
             "app.utils.net",
             "app.core.redis_cache",
             "app.modules.shop_runner.run_process_func",
-
         ]
     )
 
@@ -63,5 +63,3 @@ class AppContainer(containers.DeclarativeContainer):
     )
 
     http_sessions = providers.Container(HttSessionsContainer)
-
-

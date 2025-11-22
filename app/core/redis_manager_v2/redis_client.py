@@ -22,10 +22,12 @@ T = TypeVar("T")
 
 #  TODO Сделать отправку ошибок  из кубера в телегу
 
+
 def ensure_awaitable(obj: Awaitable[T] | T) -> Awaitable[T]:
     if hasattr(obj, "__await__"):
         return obj
     return asyncio.sleep(0, result=obj)
+
 
 # TODO: Чтобы быстрее закинуть в прод убрал ABC из класса RedisClient
 class RedisClient:
@@ -167,7 +169,9 @@ class RedisClient:
         )
 
     async def pexpire(self, key: str, time_ms: int) -> bool | None:
-        result =  await ensure_awaitable(self._replica_write_client.pexpire(key, time_ms))
+        result = await ensure_awaitable(
+            self._replica_write_client.pexpire(key, time_ms)
+        )
         if isinstance(result, int):
             if result == 1:
                 return True
@@ -175,7 +179,6 @@ class RedisClient:
                 return False
         else:
             return None
-
 
     async def pttl(self, key: str) -> int:
         return cast(int, await ensure_awaitable(self._replica_read_client.pttl(key)))

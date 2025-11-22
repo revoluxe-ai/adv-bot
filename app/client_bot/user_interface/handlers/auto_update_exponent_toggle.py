@@ -30,10 +30,10 @@ async def toggle_auto_update_exponent(
     assert callback_query.message
     chat_id = callback_query.message.chat.id
 
-    status_str = "Включено автоматическое управление экспонентой" if new_status else "Выключено автоматическое управление экспонентой"
+    status_str = (
+        "Включено автоматическое управление экспонентой"
+        if new_status
+        else "Выключено автоматическое управление экспонентой"
+    )
 
     await bot.send_message(chat_id, status_str)
-
-
-
-

@@ -186,15 +186,19 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._auto_max_cpm_value = await auto_max_bid_manager.get_max_cpm(
                 self._adv_setting, self._keywords, user_max_cpm
             )
-        from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
+        from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import (
+            MinCtrManager,
+        )
+
         min_ctr_manager = MinCtrManager(self._adv_setting)
 
-        self._mean_auto_ctr  = await min_ctr_manager.get_mean_ctr_auto_adv()
+        self._mean_auto_ctr = await min_ctr_manager.get_mean_ctr_auto_adv()
 
         result = await super().__call__()
         return result
-# TODO: Почистить stash и ветки
-# TODO: Сделать управление ставкой по кластерам
+
+    # TODO: Почистить stash и ветки
+    # TODO: Сделать управление ставкой по кластерам
     @property
     def text(self) -> str:
         total_page = len(self._keywords) // self._on_page
@@ -270,7 +274,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
         text += "\n"
 
-        text += f"\nСтавка из Авто: {self.auto_cpm if self.auto_cpm else 'Не получена'} р. "
+        text += (
+            f"\nСтавка из Авто: {self.auto_cpm if self.auto_cpm else 'Не получена'} р. "
+        )
         text += f"""(Биддер для Авто: {" Включен" if self._adv_setting.bidder_for_auto else " Выключен"})\n"""
         text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Целевая позиция: {self._adv_setting.max_place}\n"
