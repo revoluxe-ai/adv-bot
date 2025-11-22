@@ -1,7 +1,7 @@
 from typing import Any
 
 
-def parse_too_many_request_error(raw_response: Any) -> int | None:
+def parse_too_many_requests_error(raw_response: Any) -> int | None:
     """
     Возвращает рекомендуемую паузу (в секундах) после ошибки 429 Too Many Requests.
 

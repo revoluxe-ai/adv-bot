@@ -12,7 +12,7 @@ from app.core.mp.wb.api.excs import (
     ApiForbiddenError,
     TooManyRequests,
 )
-from app.core.mp.wb.api.utils import parse_too_many_request_error
+from app.core.mp.wb.api.utils import parse_too_many_requests_error
 
 
 class ResponseProtocol(Protocol):
@@ -43,7 +43,7 @@ async def with_raise_errors(
                                 not_valid_token_hash=client.token_hash,
                                 section=client.section)
     elif status == 429:
-       next_pause: int | None = parse_too_many_request_error(result)
+       next_pause: int | None = parse_too_many_requests_error(result)
        raise TooManyRequests(next_pause=next_pause)
     elif status >= 500:
         raise UnknownApiRequestError()
