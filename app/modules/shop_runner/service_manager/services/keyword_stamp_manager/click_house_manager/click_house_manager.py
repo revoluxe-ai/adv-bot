@@ -49,7 +49,23 @@ class ClickHouseKeywordStampManager:
 
         async with get_clickhouse_client() as client:
             try:
-                await client.insert(table="default_db.keyword_stamp", data=rows)
+                await client.insert(
+                    table="default_db.keyword_stamp",
+                    data=rows,
+                    column_names=[
+                        "shop_id",
+                        "adv_id",
+                        "nmid",
+                        "text",
+                        "avr_position",
+                        "orders",
+                        "total_views",
+                        "current_cpm",
+                        "date",
+                        "timestamp",
+                        "version",
+                    ],
+                )
             except Exception as e:
                 logger.error('Ошибка вставки данных в clickhouse: %s', e, exc_info=True)
                 raise e
