@@ -20,9 +20,9 @@ services:
   test_clickhouse:
     image: clickhouse/clickhouse-server:latest
     environment:
-      CLICKHOUSE_DB: test_db
-      CLICKHOUSE_USER: test_user
-      CLICKHOUSE_PASSWORD: test_password
+      CLICKHOUSE_DB: default_db
+      CLICKHOUSE_USER: CLICK_HOUSE_USER
+      CLICKHOUSE_PASSWORD: password
     ports:
       - "8124:8123"  # HTTP порт
       - "9001:9000"  # Native протокол
