@@ -6,6 +6,5 @@ __all__ = [
     "Provide",
 ]
 
-from .di_manager import DIManager
 from dependency_injector.wiring import inject, Provide
 from .di_manager import DIManager
