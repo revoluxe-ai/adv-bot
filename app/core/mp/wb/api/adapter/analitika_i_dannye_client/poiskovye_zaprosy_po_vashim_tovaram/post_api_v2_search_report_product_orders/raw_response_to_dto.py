@@ -6,7 +6,7 @@ from app.core.mp.wb.api.generated.analitika_i_dannye_client.types import Respons
 from app.core.mp.wb.dto import KeywordPosition
 
 # TODO: Сделать упоминалки об окончании баланса
-#TODO: Проверить, кажется не работает уведомление об истечении работы токенов
+# TODO: Проверить, кажется не работает уведомление об истечении работы токенов
 
 
 def convert(nmid: int, raw_response: Response[Any]) -> list[KeywordPosition]:
