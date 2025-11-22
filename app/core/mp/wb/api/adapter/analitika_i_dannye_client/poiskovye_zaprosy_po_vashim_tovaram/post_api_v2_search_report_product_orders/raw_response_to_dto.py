@@ -31,9 +31,8 @@ def convert(nmid: int, raw_response: Response[Any]) -> list[KeywordPosition]:
             except KeyError as e:
                 raise e
             dt_date = datetime.strptime(dt, '%Y-%m-%d')
-
+            dt_date = dt_date.date()
             try:
-
                 avg_position = date_item['avgPosition']
             except KeyError as e:
                 raise e
