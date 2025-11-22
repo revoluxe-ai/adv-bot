@@ -81,10 +81,9 @@ def retry_decorator(
                     return result
 
                 except ApiForbiddenError as e:
-                    section = e.section
                     token_hash = e.not_valid_token_hash
-                    if section is None or token_hash is None:
-                        raise RuntimeError('Не переданы данные о не рабочем токене')
+                    if not token_hash:
+                        raise e
                     await instance.auth_client_handler.mark_current_token_invalided(token_hash)
                     state["_current_pause"] = 0
                 except TooManyRequests as e:
