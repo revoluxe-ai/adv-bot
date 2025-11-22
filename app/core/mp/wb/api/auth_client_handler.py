@@ -53,12 +53,12 @@ class AuthClientHandler:
         assert access is not None
         tokens = access.tokens
         filter_func = self.__get_token_filter_func(section)
-        filtred_tokens: list[WBToken] = list(filter(filter_func, tokens))
+        filtered_tokens: list[WBToken] = list(filter(filter_func, tokens))
 
-        if not filtred_tokens:
+        if not filtered_tokens:
             return None
         else:
-            return filtred_tokens[0].api_key
+            return filtered_tokens[0].api_key
 
 
 
