@@ -5,6 +5,7 @@ import logging
 import httpx
 from attrs import define, field
 
+from app.core.mp.wb.api.adapter.sections_enum import SectionsEnum
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +36,16 @@ class _AuthAsyncProxy:
 @define
 class AuthenticatedCastClient:
     """Удовлетворяет ожиданиям сгенерённого кода, но подкидывает наш proxy вместо нового клиента."""
-    _base_url: str
-    _httpx_client: httpx.AsyncClient
-    _token: str
-
-
+    _base_url: str = field(alias='base_url')
+    _httpx_client: httpx.AsyncClient = field(alias='httpx_client')
+    _token: str = field(alias='token')
+    _section: SectionsEnum = field(alias='section')
     # генератор часто читает этот флаг
     raise_on_unexpected_status: bool = field(default=False)
+
+    @property
+    def section(self) -> SectionsEnum:
+        return self._section
 
     @property
     def token_hash(self) -> str:

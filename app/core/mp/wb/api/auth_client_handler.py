@@ -38,10 +38,12 @@ class AuthClientHandler:
             raise ApiForbiddenError('Нет доступных токенов')
 
         httpx_client: httpx.AsyncClient = self.__httpx_client_handler.get_httpx_client(section)
-        client = AuthenticatedCastClient(adapter.base_url,
-                                         httpx_client,
-                                         token,
-                                         raise_on_unexpected_status=False)
+        client = AuthenticatedCastClient(base_url=adapter.base_url,
+                                         httpx_client=httpx_client,
+                                         token=token,
+                                         section=section,
+                                         raise_on_unexpected_status=False,
+                                         )
         return client
 
 
@@ -91,8 +93,7 @@ class AuthClientHandler:
         return get_token_hash(token)
 
 
-    async def mark_current_token_invalided(self, token_hash: str,
-                                           section: SectionsEnum) -> None:
+    async def mark_current_token_invalided(self, token_hash: str) -> None:
         self._not_working_tokens_hash.add(token_hash)
 
 
