@@ -1,6 +1,11 @@
+from typing import Self
+
 import httpx
 
 from app.core.mp.wb.api.adapter.sections_enum import SectionsEnum
+
+
+
 
 
 class HttpxClientHandler:
@@ -11,6 +16,10 @@ class HttpxClientHandler:
 
     def __init__(self):
         self._httpx_clients: dict[SectionsEnum, httpx.AsyncClient] = {}
+
+
+    async def init(self) -> Self:
+        return self
 
 
     def get_httpx_client(self, section: SectionsEnum) -> httpx.AsyncClient:
@@ -40,3 +49,11 @@ class HttpxClientHandler:
             self._httpx_clients[section] = client
 
         return self._httpx_clients[section]
+
+    async def aclose(self):
+        for client in self._httpx_clients.values():
+            await client.aclose()
+        self._httpx_clients.clear()
+
+    async def shutdown(self):
+       await self.aclose()
