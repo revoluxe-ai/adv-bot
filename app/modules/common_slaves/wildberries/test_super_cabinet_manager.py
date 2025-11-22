@@ -73,7 +73,7 @@ async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
 
         # Pass the mock config explicitly to avoid DI issues
         access = await super_cabinet_manager.get_access_for_wb_cabinet(
-            shop_id, wb_config=mock_wb_config
+            shop_id,
         )
         assert isinstance(access, WBCabinetAccess)
 
@@ -87,5 +87,5 @@ async def test_super_cabinet_manager_get_access_for_wb_cabinet(shop_id):
             task.cancel()
             try:
                 await task
-            except Exception:
+            except Exception: # noqa
                 pass

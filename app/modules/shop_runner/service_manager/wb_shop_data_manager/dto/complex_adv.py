@@ -7,21 +7,43 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 class _CPMs:
     def __init__(self, adv_setting: AdvSetting,
                  search_adv: AdvSetting | None):
-        self.auto_cpm = adv_setting.cpm
-        self.search_cpm = search_adv.cpm if search_adv else None
+        self._auto_cpm = adv_setting.cpm
+        self._search_cpm = search_adv.cpm if search_adv else None
+
+
+    @property
+    def auto_cpm(self) -> int:
+        return self._auto_cpm
+
+    @property
+    def search_cpm(self) -> int:
+        return self._search_cpm
+
 
 
 class ComplexAdv:
     def __init__(
             self,
+            shop_id: str,
             adv_setting: AdvSetting,
             search_adv: AdvSetting | None,
             get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
     ):
+        self._shop_id = shop_id
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
+
+    @property
+    def shop_id(self) -> str:
+        return self._shop_id
+
+
+    @property
+    def search_adv(self):
+        return self._search_adv
+
 
     @property
     def main_nmid(self) -> int:

@@ -4,7 +4,7 @@ from dependency_injector.wiring import inject, Provide
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
 from app.modules.shop_runner.modules.max_auto_bid_manager.di import AutoMaxCpmContainer
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+from app.modules.shop_runner.service_manager.wb_shop_data_manager  import ComplexAdv
 from app.modules.wb_adv_updater import data_manager
 
 

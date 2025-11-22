@@ -27,7 +27,6 @@ class WBShop:
 
         await asyncio.gather(
             self._alive_worker_run(),
-            coroutines_manager.parsing_keywords_run(),
             coroutines_manager.update_advs_data_from_wb_to_pg(),
             coroutines_manager.update_cards_data_from_wb_to_pg(),
             coroutines_manager.update_cpm_bid(),
@@ -36,6 +35,8 @@ class WBShop:
             coroutines_manager.adv_settings_auto_update(),
             coroutines_manager.update_top_key_in_advs(),
             coroutines_manager.update_predict_ctr(),
+            coroutines_manager.update_keywords_stamp(),
+            coroutines_manager.update_keywords_positions_history()
         )
 
         # TODO: Перенести PV кликхаус на более маленький диск

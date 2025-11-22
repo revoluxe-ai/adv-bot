@@ -17,6 +17,27 @@ services:
     #   - ./pg_data_test:/var/lib/postgresql/data
 
 
+  test_clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_DB: test_db
+      CLICKHOUSE_USER: test_user
+      CLICKHOUSE_PASSWORD: test_password
+    ports:
+      - "8124:8123"  # HTTP порт
+      - "9001:9000"  # Native протокол
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # Для тестов не сохраняем данные постоянно
+    # volumes:
+    #   - ./ch_data_test:/var/lib/clickhouse
+    volumes:
+      - .\tests\clickhouse-config:/etc/clickhouse-server/users.d/
+
+
 #  test_redis:
 #    image: redis:7-alpine
 #    container_name: tests-test_redis

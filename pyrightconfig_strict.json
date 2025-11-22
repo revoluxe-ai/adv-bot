@@ -5,7 +5,12 @@
       "app/modules/wb_keywords_parser/wb_parser/parser.py",
     "app/utils/rate_limit.py",
     "app/modules/shop_runner/service_manager/old_modules/setting_auto_updater_v2",
-    "app/core/mp/wb"
+    "app/core/mp/wb",
+    "app/modules/shop_runner/service_manager/services/keyword_stamp_manager"
 
+  ],
+
+  "exclude": [
+    "app/core/mp/wb/api/generated"
   ]
 }
