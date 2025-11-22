@@ -43,6 +43,11 @@ class AuthenticatedCastClient:
     # генератор часто читает этот флаг
     raise_on_unexpected_status: bool = field(default=False)
 
+    @property
+    def token_hash(self) -> str:
+        from .token_hash import get_token_hash
+        return get_token_hash(self._token)
+
     @staticmethod
     # иногда генератор спрашивает базовые заголовки
     def get_headers() -> dict[str, str]:

@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.core.mp.wb.api.adapter.sections_enum import SectionsEnum
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 
 
@@ -35,12 +36,26 @@ class BadRequestError(WBApiError):
 
 class ApiForbiddenError(Exception):
     def __init__(
-        self, text: str, wb_user_cabinet: WBUserCabinet | None = None
+        self, text: str,
+        wb_user_cabinet: WBUserCabinet | None = None,
+        not_valid_token_hash: str | None = None,
+        section: SectionsEnum | None = None
     ):
+        self.__not_valid_token_hash = not_valid_token_hash
+        self.__section = section
         self.text = text
         self.wb_user_cabinet = wb_user_cabinet
         m = "API доступ запрещён"
         super().__init__(f"{m} text: {self.text}")
+
+    @property
+    def not_valid_token_hash(self) -> str | None:
+        return self.__not_valid_token_hash
+
+    @property
+    def section(self) -> SectionsEnum | None:
+        return self.__section
+
 
 
 class TooManyRequests(WBApiError):

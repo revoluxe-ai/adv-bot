@@ -80,10 +80,13 @@ def retry_decorator(
                     state["_attempts"] = 0
                     return result
 
-                except ApiForbiddenError:
-                    instance.access_manager.mark_current_token_invalided(  # type: ignore[attr-defined]
-                        instance.section
-                    )
+                except ApiForbiddenError as e:
+                    section = e.section
+                    token_hash = e.not_valid_token_hash
+                    if section is None or token_hash is None:
+                        raise RuntimeError('Не переданы данные о не рабочем токене')
+                    await instance.auth_client_handler.mark_current_token_invalided(token_hash,
+                                                                                    section)
                     state["_current_pause"] = 0
                 except TooManyRequests as e:
                     next_pause = e.next_pause

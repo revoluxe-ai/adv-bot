@@ -39,7 +39,8 @@ async def with_raise_errors(
     elif status == 400:
         raise BadRequestError()
     elif status == 401:
-        raise ApiForbiddenError(text="Неверный токен")
+        raise ApiForbiddenError(text="Неверный токен",
+                                not_valid_token_hash=client.token_hash)
     elif status == 429:
        next_pause: int | None = parse_too_many_request_error(result)
        raise TooManyRequests(next_pause=next_pause)

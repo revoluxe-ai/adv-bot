@@ -1,7 +1,6 @@
 from collections.abc import Callable
 
 import httpx
-from hashlib import sha256
 
 import typing
 
@@ -66,11 +65,11 @@ class AuthClientHandler:
         sections_map = {
             SectionsEnum.PROMOTION: "Продвижение",
             SectionsEnum.ANALYTIC_AND_DATA: 'Аналитика'
-
         }
 
         def func(token: WBToken):
-            token_hash = self._get_token_hash(token)
+            token_str = token.api_key
+            token_hash = self._get_token_hash(token_str)
             if token_hash in self._not_working_tokens_hash:
                 return False
             ru_section_name = sections_map[section]
@@ -86,13 +85,15 @@ class AuthClientHandler:
         return None
 
     @staticmethod
-    def _get_token_hash(token: WBToken) -> str:
-        token_str = token.api_key
+    def _get_token_hash(token: str) -> str:
+        from .token_hash import get_token_hash
         # TODO: Тут была ошибка получения хеша, чуть не проскочила в прод
-        return sha256(token_str.encode("utf-8")).hexdigest()
+        return get_token_hash(token)
 
 
-
+    async def mark_current_token_invalided(self, token_hash: str,
+                                           section: SectionsEnum) -> None:
+        self._not_working_tokens_hash.add(token_hash)
 
 
 

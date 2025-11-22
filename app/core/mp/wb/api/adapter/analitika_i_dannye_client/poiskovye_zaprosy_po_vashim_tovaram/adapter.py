@@ -1,5 +1,4 @@
 from typing import Any, cast
-
 from app.core.mp.wb.api.generated.analitika_i_dannye_client.types import Response
 from ..base_section_adapter import BaseSectionAdapter
 from app.core.mp.wb.api.retry_decorator import retry_decorator
