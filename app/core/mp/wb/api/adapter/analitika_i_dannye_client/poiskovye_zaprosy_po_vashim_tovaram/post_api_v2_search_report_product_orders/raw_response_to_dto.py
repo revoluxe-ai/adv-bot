@@ -22,6 +22,8 @@ def convert(nmid: int, raw_response: Response[Any]) -> list[KeywordPosition]:
     for item in items:
         text = item['text']
         date_items: list[Any] = item['dateItems']
+        if not date_items:
+            continue
         total_views_avr_for_day = int(item['frequency'] / len(date_items))
         for date_item in date_items:
             try:
