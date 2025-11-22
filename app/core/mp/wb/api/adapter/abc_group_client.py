@@ -14,7 +14,7 @@ class AbcAdapter(ABC):
         self.__auth_client_handler = auth_client_handler
         self.__request_limit_manager = request_limit_manager
         self.__shop_id = self.__auth_client_handler.shop_id
-        self.api_call_state: dict[str, ApiCallState] = {}
+        self.api_call_state: dict[str, ApiCallState] = self.__request_limit_manager.api_call_state
 
     @property
     def auth_client_handler(self) -> "AuthClientHandler":
