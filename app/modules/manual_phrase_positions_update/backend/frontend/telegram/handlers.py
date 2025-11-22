@@ -8,6 +8,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -34,7 +35,7 @@ async def update_positions_for_active_phrase(
 
     assert adv_setting
 
-    keywords = await data_manager.get_good_bad_phrases(adv_setting)
+    keywords = await get_good_bad_phrases(adv_setting)
 
     target = callback_data.target
 

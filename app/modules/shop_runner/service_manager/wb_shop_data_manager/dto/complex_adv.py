@@ -1,4 +1,4 @@
-from collections.abc import Callable, Awaitable
+from collections.abc import Callable, Awaitable, Sequence
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -43,6 +43,10 @@ class ComplexAdv:
     @property
     def search_adv(self):
         return self._search_adv
+
+
+    def nmids(self) -> Sequence[int]:
+        return self._adv_setting.nmids
 
 
     @property
@@ -141,3 +145,7 @@ class ComplexAdv:
     @property
     def max_user_cpm(self) -> int:
         return self._adv_setting.max_cpm
+
+
+
+

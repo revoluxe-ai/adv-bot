@@ -10,6 +10,7 @@ from app.client_bot.user_interface.message_templates import (
     TextWithKeyboardAndImage,
 )
 
+
 if typing.TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
         FactData,
@@ -185,6 +186,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._auto_max_cpm_value = await auto_max_bid_manager.get_max_cpm(
                 self._adv_setting, self._keywords, user_max_cpm
             )
+        from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
+        min_ctr_manager = MinCtrManager(self._adv_setting)
+
+        self._mean_auto_ctr  = await min_ctr_manager.get_mean_ctr_auto_adv()
 
         result = await super().__call__()
         return result
@@ -257,7 +262,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"\n Факт-продажи({fact_method_ru}):\n"
             f"Прогноз заказов в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
             f"Себестоимость: {round(self._fact_data.pay_for_order, 2)} р."
-            f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})"
+            f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n"
+            f"Средний CTR Рек.системе: {self._mean_auto_ctr*100:.2f} "
         )
 
         text += self._common_stat_by_days

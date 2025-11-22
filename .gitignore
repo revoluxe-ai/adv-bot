@@ -80,3 +80,4 @@ model/model.json
 .mypy_cache/
 .wb_profile/
 invates/
+invited_users.txt

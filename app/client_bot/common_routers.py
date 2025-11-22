@@ -61,6 +61,7 @@ from .user_interface.handlers import (
     shop_settings,
     strategy_setting,
     update_adv,
+    rec_system_mode_toggle,
 )
 from .user_interface.handlers.bidder_mode_toggle import bidder_mode_toggle
 
@@ -92,6 +93,7 @@ common_router.include_routers(AuctionBoostModeSettingsRouter)
 common_router.include_routers(ChangeExponentSettinginAdvSettingRouter)
 common_router.include_routers(bidder_step_setting_router)
 common_router.include_routers(adv_creator_router)
+common_router.include_routers(rec_system_mode_toggle.router)
 common_router.include_routers(white_list_updater_router)
 common_router.include_routers(reset_place_setting.router)
 common_router.include_routers(bidder_router)

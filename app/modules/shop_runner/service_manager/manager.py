@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable
+from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable, Sequence
 from datetime import datetime
 from typing import (
     Any,
@@ -193,6 +193,7 @@ class CoroutinesManager:
     async def adv_settings_auto_update(self):
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
+        advs = [adv for adv in advs if adv.search_adv_active_status]
         update_tasks = []
         last_days_for_analyze = 2
         control_system_v2 = AdvControlSystem(max_last_period=2)
@@ -286,10 +287,35 @@ class CoroutinesManager:
             # Закрываем соединения
             await predict_ctr_manager.close()
 
+    @while_coroutine_decorator(15, 60)
+    async def delete_keywords_from_wl_by_mean_auto_ctr(self) -> None:
+        # TODO: Добавить функцию-фильтр для ComplexAdvs getter
+        from .services import delete_keywords_from_wl_by_mean_auto_ctr
+        complex_advs: Sequence[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
+        complex_advs_with_white_list_by_mean_auto_ctr_active =\
+            [adv for adv in complex_advs if adv.rec_system_promotion_mode_active
+             and adv.auto_update_setting_version == 2
+             and adv.is_white_list_control_enabled]
+
+        tasks = []
+        for adv in complex_advs_with_white_list_by_mean_auto_ctr_active:
+            task = delete_keywords_from_wl_by_mean_auto_ctr(complex_adv=adv)
+            tasks.append(task)
+
+        results: Sequence[None | Exception] = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error('Ошибка удаления ключей из БС по сред.авто стр, shop_id: %s, adv_id: %s)',
+                             self.shop_id, complex_advs[i].adv_id)
+
+
+
+        return None
     @while_coroutine_decorator(15 * 60, 60)
     async def update_keywords_stamp(self) -> None:
         from .services.keyword_stamp_manager import KeywordStampManagerContainer, KeywordStampManager
-        wb_manager_hub =   WBManagerHubFactory.get_wb_manager_from_context()
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         keyword_stamp_manager_container = KeywordStampManagerContainer(_wb_api_manager_hub=wb_manager_hub)
         keyword_stamp_manager: KeywordStampManager = keyword_stamp_manager_container.keyword_stamp_manager()
 

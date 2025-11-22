@@ -25,6 +25,7 @@ from app.utils.db.session_maker import get_async_session_maker
 from .ML import Predictor
 from .data_setter import DataSetter
 from .graph_vector_updater import GraphUpdater
+from .phrases_processor import get_good_bad_phrases
 from .wb_adv_api import WBAdvAPI
 from ..billing import AdvPayment
 from ..common_slaves.wildberries import super_cabinet_manager
@@ -221,7 +222,7 @@ async def update_all_keyword_data(
         )
         raise exc
     try:
-        keywords = await data_manager.get_good_bad_phrases(adv_setting)
+        keywords = await get_good_bad_phrases(adv_setting)
         data_setter = DataSetter(wb_api)
         await data_setter.update_minus_keywords_in_adv(
             adv_setting, wb_cabinet, keywords

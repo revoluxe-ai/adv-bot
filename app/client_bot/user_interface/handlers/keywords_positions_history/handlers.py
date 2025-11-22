@@ -14,6 +14,7 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
 from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.graphic_positions_creator import get_keyword_history_graphic
 
@@ -40,7 +41,7 @@ async def keyword_position_history(
     async with _sm() as session:
         result = await session.execute(stmt)
         adv: AdvSetting = result.scalar_one()
-    keywords = await data_manager.get_good_bad_phrases(adv)
+    keywords = await get_good_bad_phrases(adv)
 
     result = await get_keyword_history_graphic(adv_original_id, keywords)
     if not result:

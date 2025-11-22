@@ -13,7 +13,8 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
 )
-from app.modules.wb_adv_updater import data_manager
+
+
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 
@@ -22,13 +23,14 @@ class WBShopDataManager:
         self._wb_cabinet: WBCabinet = wb_cabinet
         self.shop_id: str = wb_cabinet.shop_id
 
-  
+
     @single_run()
     async def get_calculated_keywords(self, adv: AdvSetting) -> list[CalculatedKeyword]:
+        from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
         if not adv:
             raise RuntimeError("Сначала обновить модели")
         try:
-            keywords = await data_manager.get_good_bad_phrases(adv)
+            keywords = await get_good_bad_phrases(adv)
         except Exception as exc:
             raise exc
 
@@ -50,8 +52,8 @@ class WBShopDataManager:
             raise NotFoundActiveAdvCompany("Нет активных кампаний")
         return adv_settings_list
 
-
-    async def __get_adv_id_to_search_adv_map(self, search_id_ids: set[int]) -> dict[int, AdvSetting]:
+    @staticmethod
+    async def __get_adv_id_to_search_adv_map(search_id_ids: set[int]) -> dict[int, AdvSetting]:
         stmt = (
             select(AdvSetting)
             .where(AdvSetting.adv_id.in_(search_id_ids))

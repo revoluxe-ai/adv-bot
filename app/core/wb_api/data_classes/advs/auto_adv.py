@@ -5,10 +5,14 @@ from app.modules.common_slaves.wildberries.data_classes.adv import Adv
 class AutoAdv(Adv):
     # TODO: Тут ошибка в рантайме!
     @property
-    def cpm(self) -> int:
-        try:
-            return int(self.data["autoParams"]["cpm"])
-        except KeyError as e:
-            raise e
+    def cpm(self) -> int | None:
+        match self.data:
+            case {"autoParams": {"cpm": cpm}}:
+                return int(cpm)
+            case {"autoParams": {"nmCPM": [{"cpm": cpm}]}}:
+                return int(cpm)
+            case _:
+                return None
+
 
 __all__ = ["AutoAdv"]

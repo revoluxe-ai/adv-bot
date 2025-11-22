@@ -3,6 +3,7 @@ import logging
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 import typing
+from datetime import datetime, timedelta
 
 from app.modules.shop_runner.service_manager.services.predict_ctr_update_manager.di import (
     PredictCTRManagerContainer,
@@ -17,6 +18,7 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSett
 from app.settings import settings
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker as sm
+from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +125,58 @@ class MinCtrManager:
             )
             if ctr:
                 ctrs.add(ctr)
+            else:
+                real_ctr = text_to_real_ctr.get(text)
+                if real_ctr:
+                    ctrs.add(real_ctr)
+
+        mean_auto_ctr: float = await self.get_mean_ctr_auto_adv()
+        mean_auto_ctr += 0.01
         if ctrs:
-            min_ctr = min(ctrs)
+            min_ctr = max([min(ctrs), mean_auto_ctr])
             return min_ctr
         else:
-            return settings.DEFAULT_MIN_CTR
+            return max([settings.DEFAULT_MIN_CTR, mean_auto_ctr])
+
+
+    async def get_mean_ctr_auto_adv(self) -> float:
+        adv = self._adv
+        adv_id = adv.adv_id
+        days = 2  # Последние 2 дня
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days - 1)
+
+        # Получаем общую статистику по авто-кампании
+        full_adv_stat = await full_wb_adv_stat.get_stats_by_last_days(
+            [adv_id], start_date, end_date
+        )
+
+        total_clicks = full_adv_stat.clicks
+        total_views = full_adv_stat.views
+
+        # Получаем статистику по ключевым словам
+        keywords_clicks, keywords_views = await full_wb_adv_stat.get_keywords_clicks_and_views(
+            [adv_id], start_date, end_date
+        )
+
+
+        """
+        TODO: The calculation of additional_clicks and additional_views can produce negative values when keyword statistics exceed total campaign statistics. This happens when keywords_clicks > total_clicks or keywords_views > total_views, leading to negative values that will cause incorrect CTR calculations. The code should handle this edge case by ensuring non-negative values or returning early when the data is inconsistent.
+        
+        
+        """
+
+        # Вычисляем дополнительные клики и показы
+        additional_clicks = total_clicks - keywords_clicks
+        additional_views = total_views - keywords_views
+
+        if additional_views <= 0:
+            return 0.0
+
+        # Корректируем показы, если кликов больше (на случай некорректных данных)
+        if additional_clicks > additional_views:
+            additional_views = additional_clicks
+
+        ctr = additional_clicks / additional_views
+        return ctr
+
