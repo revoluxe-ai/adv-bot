@@ -28,7 +28,7 @@ def convert(nmid: int, raw_response: Response[Any]) -> list[KeywordPosition]:
                 dt = date_item['dt']
             except KeyError as e:
                 raise e
-            dt_date = datetime.strptime(dt, '%Y-%m-%d')
+            dt_date = datetime.strptime(dt, '%Y-%m-%d').date()
 
             try:
 
