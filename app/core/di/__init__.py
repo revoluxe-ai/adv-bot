@@ -4,7 +4,7 @@ __all__ = [
     "DIManager",
     "inject",
     "Provide",
-    "DIManager",
+
 ]
 
 from .di_manager import DIManager
