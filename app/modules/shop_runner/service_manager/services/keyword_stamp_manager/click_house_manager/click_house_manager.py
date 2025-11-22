@@ -48,7 +48,11 @@ class ClickHouseKeywordStampManager:
             )
 
         async with get_clickhouse_client() as client:
-            await client.insert(table="default_db.keyword_stamp", data=rows)
+            try:
+                await client.insert(table="default_db.keyword_stamp", data=rows)
+            except Exception as e:
+                logger.error('Ошибка вставки данных в clickhouse: %s', e, exc_info=True)
+                raise e
         return None
 
     @staticmethod
@@ -71,20 +75,23 @@ class ClickHouseKeywordStampManager:
                     version,
                 ]
             )
-
-        async with get_clickhouse_client() as client:
-            await client.insert(
-                table="default_db.keyword_position_from_api",
-                data=rows,
-                column_names=[
-                    "nmid",
-                    "text",
-                    "avr_position",
-                    "total_views",
-                    "orders",
-                    "date",
-                    "version",
-                ],
-            )
+        try:
+            async with get_clickhouse_client() as client:
+                await client.insert(
+                    table="default_db.keyword_position_from_api",
+                    data=rows,
+                    column_names=[
+                        "nmid",
+                        "text",
+                        "avr_position",
+                        "total_views",
+                        "orders",
+                        "date",
+                        "version",
+                    ],
+                )
+        except Exception as e:
+            logger.error('Ошибка вставки данных в clickhouse: %s', e, exc_info=True)
+            raise e
 
         return None
