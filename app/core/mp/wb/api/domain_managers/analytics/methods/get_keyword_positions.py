@@ -1,8 +1,6 @@
 import datetime
 from typing import Awaitable
-
 from typing import Callable
-
 from app.core.mp.wb.api.adapter.analitika_i_dannye_client.\
     poiskovye_zaprosy_po_vashim_tovaram.post_api_v2_search_report_product_orders import \
     GetKeywordPositionsCommand
