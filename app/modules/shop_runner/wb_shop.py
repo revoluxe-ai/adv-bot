@@ -36,7 +36,7 @@ class WBShop:
             coroutines_manager.update_top_key_in_advs(),
             coroutines_manager.update_predict_ctr(),
             coroutines_manager.update_keywords_stamp(),
-            coroutines_manager.update_keywords_positions_history()
+            coroutines_manager.update_keywords_positions_history(),
             coroutines_manager.delete_keywords_from_wl_by_mean_auto_ctr()
         )
 
