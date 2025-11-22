@@ -11,6 +11,15 @@ readme = "README.md"
 packages = [{ include = "app" }]  # если у тебя основная папка называется app
 
 
+[tool.black]
+exclude = '''
+(
+    app/core/mp/wb/api/generated/.*
+  | \.venv
+  | \.venv\..*      # если есть .env.dev, .env.local и т.д.
+)
+'''
+
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
 absl-py = "2.1.0"
