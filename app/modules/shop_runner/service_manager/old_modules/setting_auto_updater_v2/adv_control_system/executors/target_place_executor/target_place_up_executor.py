@@ -50,7 +50,7 @@ class TargetPlaceUpExecutor(BaseExecutor):
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
-        redis_cache = LastTargetPlaceUpV2(ctx.complex_adv.adv_setting, decode_bytes=False)
+        redis_cache = LastTargetPlaceUpV2(ctx.complex_adv.adv_setting)
 
         # Проверка rate-limiting
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
