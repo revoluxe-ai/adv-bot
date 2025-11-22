@@ -26,10 +26,7 @@ def convert(nmid: int, raw_response: Response[Any]) -> list[KeywordPosition]:
             continue
         total_views_avr_for_day = int(item['frequency'] / len(date_items))
         for date_item in date_items:
-            try:
-                dt = date_item['dt']
-            except KeyError as e:
-                raise e
+            dt = date_item['dt']
             dt_date = datetime.strptime(dt, '%Y-%m-%d')
             dt_date = dt_date.date()
             try:
