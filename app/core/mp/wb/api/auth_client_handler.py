@@ -88,7 +88,8 @@ class AuthClientHandler:
     @staticmethod
     def _get_token_hash(token: WBToken) -> str:
         token_str = token.api_key
-        return str(sha256(token_str.encode("utf-8")))
+        # TODO: Тут была ошибка получения хеша, чуть не проскочила в прод
+        return sha256(token_str.encode("utf-8")).hexdigest()
 
 
 
