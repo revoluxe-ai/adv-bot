@@ -34,7 +34,7 @@ class BadRequestError(WBApiError):
     pass
 
 
-class ApiForbiddenError(Exception):
+class ApiForbiddenError(WBApiError):
     def __init__(
         self, text: str,
         wb_user_cabinet: WBUserCabinet | None = None,
