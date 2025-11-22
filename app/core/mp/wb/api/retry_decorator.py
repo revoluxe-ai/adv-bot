@@ -54,8 +54,7 @@ def retry_decorator(
             state = api_call_state[method_name]
             shop_id = instance.shop_id
 
-            while state["_attempts"] < max_attempts:
-
+            while True:
                 last_query_time = state["_last_query_time"]
                 if last_query_time is not None:
                     current_time = time.time()
@@ -81,12 +80,22 @@ def retry_decorator(
                     return result
 
                 except ApiForbiddenError as e:
+                    state["_attempts"] += 1
                     token_hash = e.not_valid_token_hash
                     if not token_hash:
                         raise e
+                    if state["_attempts"] >= max_attempts:
+                        raise MaxAttemptsError() from e
                     await instance.auth_client_handler.mark_current_token_invalided(token_hash)
                     state["_current_pause"] = 0
+
+
+                # TODO: Повторный код максимальных попыток - сделать рефакторинг
+
                 except TooManyRequests as e:
+                    state["_attempts"] += 1
+                    if state["_attempts"] >= max_attempts:
+                        raise MaxAttemptsError() from e
                     next_pause = e.next_pause
                     if next_pause:
                         state["_current_pause"] = next_pause
@@ -97,12 +106,12 @@ def retry_decorator(
                         )
 
                 except (BadRequestError, UnknownApiRequestError, HttpTimeOutError) as e:
+                    state["_attempts"] += 1
                     if state["_attempts"] >= max_attempts:
                         raise MaxAttemptsError(
                             f"Не удалось выполнить {method_name} за {max_attempts} попыток для shop_id={shop_id}"
                         ) from e
 
-                    state["_attempts"] += 1
                     state["_current_pause"] = min(
                         max(state["_current_pause"], 1.0) * 2,
                         float(max_delay)
@@ -110,7 +119,6 @@ def retry_decorator(
 
                 except Exception as e:
                     raise e
-
         return cast(F, wrapper)
 
     return decorator
