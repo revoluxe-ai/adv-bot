@@ -51,7 +51,13 @@ class KeywordStampManager:
             )
         )
 
-        await self._click_house.update_positions(positions)
+        try:
+           await self._click_house.update_positions(positions)
+        except Exception:
+            logger.error('Ошибка обновления позиций в CH, shop_id: %s, adv_id: %s',
+                         complex_adv.shop_id, complex_adv.adv_id, exc_info=True
+                         )
+            raise
         return None
 
     async def update_keywords_position_stamp(self, complex_adv: ComplexAdv) -> None:
@@ -94,7 +100,14 @@ class KeywordStampManager:
             )
             stamps.append(kw_stamp)
 
-        await self._update_kw_stamp_in_clickhouse(stamps)
+        try:
+            await self._update_kw_stamp_in_clickhouse(stamps)
+        except Exception:
+            logger.error('Ошибка обновления stamps, shop_id: %s, adv_id: %s',
+                         complex_adv.shop_id,
+                         complex_adv.adv_id,
+                         exc_info=True)
+            raise
         return None
 
     @staticmethod
