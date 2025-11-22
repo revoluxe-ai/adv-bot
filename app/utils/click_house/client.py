@@ -13,7 +13,7 @@ from urllib3 import PoolManager
 from app.settings import settings
 
 system_name = platform.system()
-
+from .clickhouse_protocol import ClickHouseClientProtocol
 pool_mgr = PoolManager(num_pools=10, maxsize=100)  # Пример настройки пула соединений
 
 logger = logging.getLogger(__name__)
@@ -62,14 +62,14 @@ database = "default_db"
 max_connections = settings.CH_MAX_THREAD
 
 
-class get_clickhouse_client:
+class get_clickhouse_client: # noqa
     def __init__(self) -> None:
         self.client: AsyncClient | None = None
         self.func_name: str | None = None
         self.caller_func_name: str | None = None
         self.grand_caller_func_name: str | None = None
 
-    async def __aenter__(self) -> AsyncClient:
+    async def __aenter__(self) -> ClickHouseClientProtocol:
         global connection_count
         global connection_lock
         global function_connection_count

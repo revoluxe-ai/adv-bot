@@ -1,7 +1,8 @@
 """Тест для проверки инициализации DI контейнера."""
 
 import pytest
-from app.core.di import AppContainer
+
+from app.core.di.app_container import AppContainer
 
 
 @pytest.mark.asyncio

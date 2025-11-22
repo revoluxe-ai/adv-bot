@@ -17,7 +17,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 )
 
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
 
 

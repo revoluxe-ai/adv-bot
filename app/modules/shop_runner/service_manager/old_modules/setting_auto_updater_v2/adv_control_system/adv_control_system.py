@@ -16,7 +16,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.pl
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
     ComplexAdv,
 )
 from .data_classes.data_classes import ForceContext, PipelineContext

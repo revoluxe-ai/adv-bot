@@ -33,6 +33,7 @@ class AppContainer(containers.DeclarativeContainer):
             "app.modules.wb_keywords_parser.wb_parser",
             "app.utils.net",
             "app.core.redis_cache",
+            "app.modules.shop_runner.run_process_func",
 
         ]
     )

@@ -4,7 +4,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.di import AppContainer, DIManager
+from app.core.di import DIManager
+from app.core.di.app_container import AppContainer
 from app.modules.billing import process_payment_for_advs
 
 logging.disable()

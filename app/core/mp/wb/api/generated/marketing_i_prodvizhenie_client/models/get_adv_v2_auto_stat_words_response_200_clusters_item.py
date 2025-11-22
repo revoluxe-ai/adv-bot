@@ -1,0 +1,79 @@
+from typing import Any, Dict, List, Type, TypeVar, Union, cast
+
+from attrs import define as _attrs_define
+from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
+
+T = TypeVar("T", bound="GetAdvV2AutoStatWordsResponse200ClustersItem")
+
+
+@_attrs_define
+class GetAdvV2AutoStatWordsResponse200ClustersItem:
+    """
+    Attributes:
+        cluster (Union[Unset, str]): Klaster — nabor pohozhih kljuchevyh fraz Example: Telefon.
+        count (Union[Unset, int]): Skol'ko raz tovary pokazyvalis' po vsem frazam iz klastera Example: 100.
+        keywords (Union[Unset, List[str]]): Kljuchevye frazy iz klastera, po kotorym tovary pokazyvalis' hotja by odin
+            raz Example: ['Telefon', "Mobil'nyj telefon"].
+    """
+
+    cluster: Union[Unset, str] = UNSET
+    count: Union[Unset, int] = UNSET
+    keywords: Union[Unset, List[str]] = UNSET
+    additional_properties: Dict[str, Any] = _attrs_field(init=False, factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        cluster = self.cluster
+
+        count = self.count
+
+        keywords: Union[Unset, List[str]] = UNSET
+        if not isinstance(self.keywords, Unset):
+            keywords = self.keywords
+
+        field_dict: Dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
+        field_dict.update({})
+        if cluster is not UNSET:
+            field_dict["cluster"] = cluster
+        if count is not UNSET:
+            field_dict["count"] = count
+        if keywords is not UNSET:
+            field_dict["keywords"] = keywords
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls: Type[T], src_dict: Dict[str, Any]) -> T:
+        d = src_dict.copy()
+        cluster = d.pop("cluster", UNSET)
+
+        count = d.pop("count", UNSET)
+
+        keywords = cast(List[str], d.pop("keywords", UNSET))
+
+        get_adv_v2_auto_stat_words_response_200_clusters_item = cls(
+            cluster=cluster,
+            count=count,
+            keywords=keywords,
+        )
+
+        get_adv_v2_auto_stat_words_response_200_clusters_item.additional_properties = d
+        return get_adv_v2_auto_stat_words_response_200_clusters_item
+
+    @property
+    def additional_keys(self) -> List[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

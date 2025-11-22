@@ -8,7 +8,7 @@ from typing import (
     TypeVar,
 )
 
-
+from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
@@ -34,7 +34,7 @@ from .old_modules.setting_auto_updater import (
 )
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .wb_shop_data_manager import WBShopDataManager
-from .wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+from .wb_shop_data_manager import ComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 
@@ -312,3 +312,57 @@ class CoroutinesManager:
 
 
         return None
+    @while_coroutine_decorator(15 * 60, 60)
+    async def update_keywords_stamp(self) -> None:
+        from .services.keyword_stamp_manager import KeywordStampManagerContainer, KeywordStampManager
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        keyword_stamp_manager_container = KeywordStampManagerContainer(_wb_api_manager_hub=wb_manager_hub)
+        keyword_stamp_manager: KeywordStampManager = keyword_stamp_manager_container.keyword_stamp_manager()
+
+        advs = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
+            return None
+        update_tasks = []
+        for adv in advs:
+            task = keyword_stamp_manager.update_keywords_position_stamp(adv)
+            update_tasks.append(task)
+
+        results: list[Exception | None] = await asyncio.gather(*update_tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error('Ошибка обновления позиций из Api: %s', result, exc_info=True)
+
+
+        return None
+
+    @while_coroutine_decorator(24 * 60 * 60 * 60, 60)
+    async def update_keywords_positions_history(self) -> None:
+        from .services.keyword_stamp_manager import KeywordStampManagerContainer, KeywordStampManager
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        keyword_stamp_manager_container = KeywordStampManagerContainer(_wb_api_manager_hub=wb_manager_hub)
+        keyword_stamp_manager: KeywordStampManager = keyword_stamp_manager_container.keyword_stamp_manager()
+
+        advs = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
+            return None
+        update_tasks = []
+        for adv in advs:
+            task = keyword_stamp_manager.update_keyword_history(adv)
+            update_tasks.append(task)
+
+        results: list[Exception | None] = await asyncio.gather(*update_tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error('Ошибка обновления позиций из Api: %s', result, exc_info=True)
+
+        return None
+
+
+
+
+
+
+# TODO: Частая ошибка - остановка РК в период раскрутки - сделать статью
+
