@@ -91,6 +91,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
     coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
     coroutines_manager_mock.update_predict_ctr  = AsyncMock()
     coroutines_manager_mock.update_keywords_positions_history = AsyncMock()
+    coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -113,7 +114,7 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
 
             # Проверяем, что gather был вызван с 10 аргументами (9 корутин + _alive_worker_run)
             assert (
-                len(call_args) == 11
+                len(call_args) == 12
             ), f"asyncio.gather должен быть вызван с 10 аргументами, получено {len(call_args)}"
 
             # Проверяем, что все методы были вызваны по одному разу
@@ -126,3 +127,4 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
             coroutines_manager_mock.update_predict_ctr.assert_called_once()
             coroutines_manager_mock.update_keywords_positions_history.assert_called_once()
+            coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()
