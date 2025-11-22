@@ -610,10 +610,10 @@ async def clickhouse_client(setup_test_database):
     Создаёт async-клиент ClickHouse.
     Зависит от setup_test_database (который запускает docker-compose).
     """
-    host = os.environ.get("CLICK_HOUSE_HOST", "localhost")
-    port = int(os.environ.get("CLICKHOUSE_PORT", "9000"))
-    user = os.environ.get("CLICK_HOUSE_USER", "default")
-    password = os.environ.get("CLICK_HOUSE_PASSWORD", "test")
+    host =  "localhost"
+    port =  8124
+    user = "CLICK_HOUSE_USER"
+    password = "password"
 
     client = await get_async_client(
             host=host,
