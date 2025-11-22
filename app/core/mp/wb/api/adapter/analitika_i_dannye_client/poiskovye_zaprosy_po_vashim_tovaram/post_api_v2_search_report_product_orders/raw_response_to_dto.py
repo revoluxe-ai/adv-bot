@@ -15,8 +15,8 @@ def convert(nmid: int, raw_response: Response[Any]) -> list[KeywordPosition]:
     content = json.loads(content_str)
     try:
        items = content['data']['items']
-    except KeyError as e:
-        raise e
+    except KeyError:
+        raise
     positions: list[KeywordPosition] = []
 
     for item in items:
