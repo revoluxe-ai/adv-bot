@@ -25,4 +25,4 @@ class WBDataContainer(containers.DeclarativeContainer):
     wb_data_manager = providers.Singleton(
         WBDataManager,
         analytics_manager=_analytics_domain_manager,
-                                          )
+    )
