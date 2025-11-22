@@ -29,10 +29,7 @@ def convert(nmid: int, raw_response: Response[Any]) -> list[KeywordPosition]:
             dt = date_item['dt']
             dt_date = datetime.strptime(dt, '%Y-%m-%d')
             dt_date = dt_date.date()
-            try:
-                avg_position = date_item['avgPosition']
-            except KeyError as e:
-                raise e
+            avg_position = date_item['avgPosition']
             orders = date_item['orders']
             kw_position = KeywordPosition(nmid=nmid,
                                           text=text,
