@@ -7,7 +7,7 @@ class WBApiError(Exception):
     pass
 
 
-class StandartError(WBApiError):
+class StandardError(WBApiError):
     def __init__(self,
                  title: str,
                  detail: str,
