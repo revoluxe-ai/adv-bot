@@ -15,7 +15,7 @@ class WBManagerHubFactory:
         self.__object_collection: dict[str,  WBManagerHub] = {}
         self._tokens: dict[str, Token[WBManagerHub | None]] = {}
 
-    def get_wb_manager_hub(self, shop_id: str) -> WBManagerHub:
+    def set_wb_manager_hub(self, shop_id: str) -> None:
         if shop_id not in self.__object_collection:
             wb_manager_hub_container: WBManagerHubContainer = WBManagerHubContainer(
                 _shop_id=shop_id,
@@ -24,6 +24,10 @@ class WBManagerHubFactory:
             wb_manager_hub: WBManagerHub = wb_manager_hub_container.wb_manager_hub()
             self.__object_collection[shop_id] = wb_manager_hub
             self._set_manager_in_context(shop_id, wb_manager_hub)
+        return None
+
+    def get_wb_manager_hub(self, shop_id: str) -> WBManagerHub:
+        self.set_wb_manager_hub(shop_id)
         return self.__object_collection[shop_id]
 
     def _set_manager_in_context(self, shop_id: str, wb_manager_hub: WBManagerHub) -> None:

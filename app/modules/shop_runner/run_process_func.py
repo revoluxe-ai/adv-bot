@@ -24,7 +24,7 @@ async def run_shop_task(
     wb_manager_hub_factory: WBManagerHubFactory = \
             Provide['module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory'],
 ) -> None:
-    wb_manager_hub_factory.get_wb_manager_hub(shop_id)
+    wb_manager_hub_factory.set_wb_manager_hub(shop_id)
     try:
         access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
         wb_api = WBApi(access, client_session)
