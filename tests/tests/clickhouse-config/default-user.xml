@@ -5,14 +5,14 @@
     <default remove="remove">
     </default>
 
-    <test_user>
+    <CLICK_HOUSE_USER>
       <profile>default</profile>
       <networks>
         <ip>::/0</ip>
       </networks>
-      <password><![CDATA[test_password]]></password>
+      <password><![CDATA[password]]></password>
       <quota>default</quota>
       <access_management>0</access_management>
-    </test_user>
+    </CLICK_HOUSE_USER>
   </users>
 </clickhouse>
