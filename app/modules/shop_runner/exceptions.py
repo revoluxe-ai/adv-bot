@@ -12,3 +12,8 @@ class FullAdvStatUpdateCriticalError(Exception):
 
 class CommonCoroutineError(Exception):
     pass
+
+
+
+class UsersSettingsError(Exception):
+    pass
