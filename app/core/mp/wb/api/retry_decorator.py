@@ -97,6 +97,7 @@ def retry_decorator(
                     # TODO: Повторный код максимальных попыток - сделать рефакторинг
 
                     except TooManyRequests as e:
+                        state["_last_query_time"] = time.time()
                         state["_attempts"] += 1
                         if state["_attempts"] >= max_attempts:
                             raise MaxAttemptsError() from e
@@ -109,6 +110,7 @@ def retry_decorator(
                             )
 
                     except (BadRequestError, UnknownApiRequestError, HttpTimeOutError) as e:
+                        state["_last_query_time"] = time.time()
                         state["_attempts"] += 1
                         if state["_attempts"] >= max_attempts:
                             raise MaxAttemptsError(
