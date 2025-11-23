@@ -4,7 +4,8 @@
      "app/client_bot/user_interface/handlers/keyword_settings.py",
     "app/modules/shop_runner/service_manager/old_modules/setting_auto_updater_v2",
     "app/core/mp/wb",
-    "app/modules/shop_runner/service_manager/services/keyword_stamp_manager"
+    "app/modules/shop_runner/service_manager/services/keyword_stamp_manager",
+    "app/core/di"
 
   ],
 
