@@ -36,7 +36,7 @@ def get_next_raise_exponent(
     candidates = [
         kw
         for kw in keywords_candidates
-        if kw.predict_ctr is not None and kw.predict_ctr > ctr_L
+        if kw.predict_ctr is not None and kw.predict_ctr > ctr_L  # pyright: ignore
     ]  # pyright: ignore
     if not candidates:
         return None  # нет кандидатов с большим CTR
@@ -50,8 +50,8 @@ def get_next_raise_exponent(
         assert views is not None
         ctr_i, views_i = predict_ctr, views
         numerator: float = ctr_L * views_L - ctr_i * views_i  # pyright: ignore
-        denominator: float = (
-            ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L
+        denominator: float = ( # pyright: ignore
+            ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L # pyright: ignore
         )  # pyright: ignore
 
         if denominator == 0:
