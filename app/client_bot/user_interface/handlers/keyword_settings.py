@@ -30,7 +30,6 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User

@@ -1,10 +1,14 @@
 import logging
 import time
-from typing import Sequence, Any
+from datetime import datetime
+from typing import Sequence, Any, cast
 
-# from pathlib import Path
+from pathlib import Path
+
+from clickhouse_connect.driver.query import QueryResult
 
 from app.core.mp.wb.dto import KeywordPosition
+from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting
 from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.keyword_stamp import (
     KeywordStamp,
 )
@@ -113,3 +117,32 @@ class ClickHouseKeywordStampManager:
 
 
         return None
+
+    @staticmethod
+    async def get_last_positions(adv_setting: AdvSetting) -> list[WBItemPosition]:
+        sql_path = Path(__file__).parent / "sql/get_last_positions.sql"
+        query = sql_path.read_text()
+        nmid = adv_setting.nmids[0]
+        adv_id = adv_setting.adv_id
+        adv_type = adv_setting.type
+        async with get_clickhouse_client() as client:
+            result: QueryResult = await client.query(query, parameters={"nmid": nmid})
+            rows: Sequence[tuple[str, float, datetime]] = cast(Sequence[tuple[str, float, datetime]], result.result_rows)
+            positions: list[WBItemPosition] = []
+            for row in rows:
+                text = row[0]
+                # TODO: Сюда из рантайма дошла ошибка
+                p = int(row[1] + 0.5)
+                timestamp = row[2]
+                position = WBItemPosition(
+                    nmid=nmid,
+                    keyword_text=text,
+                    position=p,
+                    timestamp=timestamp,
+                    adv_id=adv_id,
+                    adv_type=adv_type,
+                )
+                positions.append(position)
+        return positions
+
+

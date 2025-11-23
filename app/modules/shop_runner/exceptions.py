@@ -12,3 +12,9 @@ class FullAdvStatUpdateCriticalError(Exception):
 
 class CommonCoroutineError(Exception):
     pass
+
+
+
+class UsersSettingsError(Exception):
+    """Raised when users settings fail."""
+    pass

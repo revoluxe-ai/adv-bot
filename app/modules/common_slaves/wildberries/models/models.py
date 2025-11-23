@@ -2,12 +2,10 @@ import datetime
 import json
 import logging
 import re
-from sqlalchemy.orm.properties import MappedColumn
-from sqlalchemy.orm.properties import MappedColumn
-from sqlalchemy.orm.properties import MappedColumn
+
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm.properties import MappedColumn
 import typing
-from dataclasses import dataclass
 from enum import Enum
 from typing import cast
 
@@ -532,12 +530,12 @@ class AdvSetting(BaseTable):
     automatic_version: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
-
+    # TODO: The default value for bidder_mode was changed from BY_POSITIONS to BY_AUTO_MAX_CPM, but the database migration only sets server_default without updating existing NULL records. Since the field is nullable and existing records may have NULL values, the logic in bidder_func.py line 82 treats NULL as equivalent to BY_AUTO_MAX_CPM. However, if users have auto_max_cpm_mode=False (which is the default), the bidder will silently return None instead of processing bids, breaking functionality for existing campaigns without explicit migration of their settings.
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,
-        default=BidderMode.BY_POSITIONS,
-        server_default=BidderMode.BY_POSITIONS.name,
+        default=BidderMode.BY_AUTO_MAX_CPM,
+        server_default=BidderMode.BY_AUTO_MAX_CPM.name,
     )
 
     __table_args__ = (
@@ -690,8 +688,10 @@ class KeywordSetting(BaseTable):
         )
 
 
-@dataclass
-class WBItemPosition:
+
+class WBItemPosition(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     nmid: int | None = None
     position: int | None = None
     timestamp: datetime.datetime | None = None
@@ -710,7 +710,6 @@ class WBItemPosition:
 
     def to_dict(self) -> dict[str, object]:
         timestamp = self.timestamp
-        str_timestamp = timestamp.isoformat() if timestamp else None
         return {
             "real_position": self.position,
             "promo_position": self.position,
@@ -719,20 +718,22 @@ class WBItemPosition:
             "keyword_text": self.keyword_text,
             "adv_id": self.adv_id,
             "nmid": self.nmid,
-            "timestamp": str_timestamp,
+            "timestamp": timestamp.isoformat() if timestamp else None,
             "adv_type": self.adv_type,
         }
 
     @staticmethod
     def from_dict(data: dict[str, object]) -> "WBItemPosition":
+        # создаём пустую модель (разрешено, так как все поля optional)
         position = WBItemPosition()
+
+        # position
         raw_position = data.get("position")
         if isinstance(raw_position, int):
             position.position = raw_position
         elif isinstance(raw_position, str) and raw_position.isdigit():
             position.position = int(raw_position)
         else:
-            # fallback старый ключ
             base_raw = data.get("base_position")
             if isinstance(base_raw, int):
                 position.position = base_raw
@@ -741,6 +742,7 @@ class WBItemPosition:
             else:
                 position.position = None
 
+        # adv_id
         raw_adv_id = data.get("adv_id")
         if isinstance(raw_adv_id, int):
             position.adv_id = raw_adv_id
@@ -749,6 +751,7 @@ class WBItemPosition:
         else:
             position.adv_id = None
 
+        # nmid
         raw_nmid = data.get("nmid")
         if isinstance(raw_nmid, int):
             position.nmid = raw_nmid
@@ -762,14 +765,16 @@ class WBItemPosition:
         if isinstance(raw_ts, str):
             try:
                 position.timestamp = datetime.datetime.fromisoformat(raw_ts)
-            except Exception:  # noqa
+            except Exception:
                 position.timestamp = None
         else:
             position.timestamp = None
 
+        # keyword
         raw_kw = data.get("keyword_text")
         position.keyword_text = raw_kw if isinstance(raw_kw, str) else None
 
+        # adv_type
         raw_adv_type = data.get("adv_type")
         if isinstance(raw_adv_type, int):
             position.adv_type = raw_adv_type
