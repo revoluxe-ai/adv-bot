@@ -66,12 +66,19 @@ class CoroutinesManager:
         if not adv_settings:
             return None
         logger.debug("Обновляю ставки для магазина %s", self.shop_id)
-        await asyncio.gather(
+        results = await asyncio.gather(
             *[
                 self.__run_bidder_process_for_adv(adv, self._wb_api)
                 for adv in adv_settings
-            ]
+            ],
+            return_exceptions=True
         )
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error("Ошибка обновления РК : %s", result)
+
+
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
         return None
 
