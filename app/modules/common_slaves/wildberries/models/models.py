@@ -2,12 +2,10 @@ import datetime
 import json
 import logging
 import re
-from sqlalchemy.orm.properties import MappedColumn
-from sqlalchemy.orm.properties import MappedColumn
-from sqlalchemy.orm.properties import MappedColumn
+
+from pydantic import BaseModel
 from sqlalchemy.orm.properties import MappedColumn
 import typing
-from dataclasses import dataclass
 from enum import Enum
 from typing import cast
 
@@ -690,8 +688,8 @@ class KeywordSetting(BaseTable):
         )
 
 
-@dataclass
-class WBItemPosition:
+
+class WBItemPosition(BaseModel):
     nmid: int | None = None
     position: int | None = None
     timestamp: datetime.datetime | None = None
