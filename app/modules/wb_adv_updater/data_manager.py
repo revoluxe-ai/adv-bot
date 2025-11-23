@@ -250,34 +250,17 @@ def __sort_by_update_keyword(keyword: WBItemPosition) -> datetime:
 async def set_positions(
     keyword_stats: list[CalculatedKeyword], adv_setting: AdvSetting
 ) -> list[CalculatedKeyword]:
-    texts = [keyword.text for keyword in keyword_stats]
-    positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    from ..shop_runner.service_manager.services.keyword_stamp_manager import ClickHouseKeywordStampManager
+    positions: list[WBItemPosition] = await ClickHouseKeywordStampManager.get_last_positions(adv_setting)
     if not positions:
         return keyword_stats
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
-        text = keyword_stat.text
-        data = await redis_manager.get_cluster_and_preset(text)
-        if not data:
-            continue
-        cluster, preset = data
-        keyword_stat.cluster_name = cluster
-        keyword_stat.preset = preset
-        if position := text_to_position.get(text):
-            # После изменений WB у нас одна позиция
+        position = text_to_position.get(keyword_stat.text)
+        if position:
             keyword_stat.position = position.position
         else:
-            keywords = keyword_stat.childs_keywords
-            if keywords:
-                texts = [kw.text for kw in keywords]
-                positions = await redis_manager.get_keywords_positions(
-                    adv_setting, texts
-                )  # type: ignore[no-untyped-call]
-                if positions:
-                    position = max(
-                        positions, key=lambda kw: __sort_by_update_keyword(kw)
-                    )
-                    keyword_stat.position = position.position
+            keyword_stat.position = None
 
     return keyword_stats
 
