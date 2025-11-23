@@ -72,14 +72,14 @@ class DIManager(AbstractAsyncContextManager[T], Generic[T]):
             self._wired = True
             return
         # Перебор только providers.Container
-        wired = []
-        skipped = []
+        wired: list[str] = []
+        skipped: list[str] = []
         for name, provider in getattr(module_resources, "providers", {}).items(): # pyright: ignore
             if isinstance(provider, providers.Container):
                 try:
                     sub_container = provider()  # экземпляр DeclarativeContainer модуля # pyright: ignore
                     if hasattr(sub_container, "wiring_config") and getattr( # pyright: ignore
-                        sub_container, "wiring_config" # pyright: ignore
+                        sub_container, "wiring_config"  # pyright: ignore
                     ):
                         sub_container.wire() # pyright: ignore
                         wired.append(name) # pyright: ignore
