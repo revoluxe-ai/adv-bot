@@ -66,22 +66,22 @@ class DIManager(AbstractAsyncContextManager[T], Generic[T]):
             self._wired = True
             return
         try:
-            module_resources = container.module_resources()
+            module_resources = container.module_resources() # pyright: ignore
         except Exception as e:  # noqa: BLE001
             logger.error(f"Не удалось получить module_resources: {e}")
             self._wired = True
             return
         # Перебор только providers.Container
-        wired = []
-        skipped = []
-        for name, provider in getattr(module_resources, "providers", {}).items():
+        wired: list[str] = []
+        skipped: list[str] = []
+        for name, provider in getattr(module_resources, "providers", {}).items(): # pyright: ignore
             if isinstance(provider, providers.Container):
                 try:
-                    sub_container = provider()  # экземпляр DeclarativeContainer модуля
-                    if hasattr(sub_container, "wiring_config") and getattr(
-                        sub_container, "wiring_config"
+                    sub_container = provider()  # экземпляр DeclarativeContainer модуля # pyright: ignore
+                    if hasattr(sub_container, "wiring_config") and getattr( # pyright: ignore
+                        sub_container, "wiring_config"  # pyright: ignore
                     ):
-                        sub_container.wire()
+                        sub_container.wire() # pyright: ignore
                         wired.append(name)
                     else:
                         skipped.append(name)
@@ -93,7 +93,7 @@ class DIManager(AbstractAsyncContextManager[T], Generic[T]):
                 # Инфраструктурный или dependency провайдер — пропускаем
                 skipped.append(name)
         logger.debug(
-            "Wiring модульных контейнеров завершён: wired=%s skipped=%s", wired, skipped
+            "Wiring модульных контейнеров завершён: wired=%s skipped=%s", wired, skipped # pyright: ignore
         )
         self._wired = True
 

@@ -25,9 +25,7 @@ from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager im
     WBCommonStatManager,
 )
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
-    GlobalParsingQueueManager,
-)
+
 from app.settings import settings
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
@@ -158,36 +156,6 @@ class CoroutinesManager:
         await self._update_cards_data_from_wb_to_pg(shop_data_updater)
         logger.debug("Обновление карточек завершено")
 
-    @while_coroutine_decorator(60, 1)
-    async def parsing_keywords_run(self) -> None:
-        from .services import parsing_keywords_from_wb
-
-        active_advs = await self._wb_shop_data_manager.get_active_advs()
-        generators = []
-        for adv in active_advs:
-            keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
-
-            generator: AsyncGenerator[tuple[str, int], None] = (
-                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
-                    adv, keywords
-                )
-            )
-            generators.append(generator)
-        zipped_generators = self._async_zip_longest(*generators)
-        parsing_queue = GlobalParsingQueueManager()
-        async for row in zipped_generators:
-            for item in row:
-                if item:  # Check if not fillvalue
-                    text, nmid = item
-                    await parsing_queue.add_or_update_task(text, {nmid})
-                    await asyncio.sleep(
-                        settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
-                    )  # Добавляем небольшую задержку между задачами
-                    logger.info(
-                        "Добавлен ключ '%s' для артикула %s в очередь парсинга",
-                        text,
-                        nmid,
-                    )
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
