@@ -110,6 +110,7 @@ class KeywordStampManager:
                          stamps,
                          exc_info=True)
             raise
+        # TODO: Сделать обновление сервисом по коммитам
         return None
 
     @staticmethod
