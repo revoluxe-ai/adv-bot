@@ -74,9 +74,14 @@ class CoroutinesManager:
             return_exceptions=True
         )
 
-        for result in results:
+        for index, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error("Ошибка обновления РК : %s", result)
+                adv_setting = adv_settings[index]
+                logger.error("Ошибка обновления РК : %s, adv_id: %s, shop_id: %s",
+                             result,
+                             adv_setting.adv_id,
+                             self.shop_id
+                             )
 
 
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
