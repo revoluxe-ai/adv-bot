@@ -3,7 +3,7 @@ import json
 import logging
 import re
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm.properties import MappedColumn
 import typing
 from enum import Enum
@@ -690,6 +690,8 @@ class KeywordSetting(BaseTable):
 
 
 class WBItemPosition(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     nmid: int | None = None
     position: int | None = None
     timestamp: datetime.datetime | None = None
@@ -708,7 +710,6 @@ class WBItemPosition(BaseModel):
 
     def to_dict(self) -> dict[str, object]:
         timestamp = self.timestamp
-        str_timestamp = timestamp.isoformat() if timestamp else None
         return {
             "real_position": self.position,
             "promo_position": self.position,
@@ -717,20 +718,22 @@ class WBItemPosition(BaseModel):
             "keyword_text": self.keyword_text,
             "adv_id": self.adv_id,
             "nmid": self.nmid,
-            "timestamp": str_timestamp,
+            "timestamp": timestamp.isoformat() if timestamp else None,
             "adv_type": self.adv_type,
         }
 
     @staticmethod
     def from_dict(data: dict[str, object]) -> "WBItemPosition":
+        # создаём пустую модель (разрешено, так как все поля optional)
         position = WBItemPosition()
+
+        # position
         raw_position = data.get("position")
         if isinstance(raw_position, int):
             position.position = raw_position
         elif isinstance(raw_position, str) and raw_position.isdigit():
             position.position = int(raw_position)
         else:
-            # fallback старый ключ
             base_raw = data.get("base_position")
             if isinstance(base_raw, int):
                 position.position = base_raw
@@ -739,6 +742,7 @@ class WBItemPosition(BaseModel):
             else:
                 position.position = None
 
+        # adv_id
         raw_adv_id = data.get("adv_id")
         if isinstance(raw_adv_id, int):
             position.adv_id = raw_adv_id
@@ -747,6 +751,7 @@ class WBItemPosition(BaseModel):
         else:
             position.adv_id = None
 
+        # nmid
         raw_nmid = data.get("nmid")
         if isinstance(raw_nmid, int):
             position.nmid = raw_nmid
@@ -760,14 +765,16 @@ class WBItemPosition(BaseModel):
         if isinstance(raw_ts, str):
             try:
                 position.timestamp = datetime.datetime.fromisoformat(raw_ts)
-            except Exception:  # noqa
+            except Exception:
                 position.timestamp = None
         else:
             position.timestamp = None
 
+        # keyword
         raw_kw = data.get("keyword_text")
         position.keyword_text = raw_kw if isinstance(raw_kw, str) else None
 
+        # adv_type
         raw_adv_type = data.get("adv_type")
         if isinstance(raw_adv_type, int):
             position.adv_type = raw_adv_type
