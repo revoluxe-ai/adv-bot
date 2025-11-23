@@ -530,7 +530,7 @@ class AdvSetting(BaseTable):
     automatic_version: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
-
+    # TODO: The default value for bidder_mode was changed from BY_POSITIONS to BY_AUTO_MAX_CPM, but the database migration only sets server_default without updating existing NULL records. Since the field is nullable and existing records may have NULL values, the logic in bidder_func.py line 82 treats NULL as equivalent to BY_AUTO_MAX_CPM. However, if users have auto_max_cpm_mode=False (which is the default), the bidder will silently return None instead of processing bids, breaking functionality for existing campaigns without explicit migration of their settings.
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,
