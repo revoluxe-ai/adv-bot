@@ -103,9 +103,11 @@ class KeywordStampManager:
         try:
             await self._update_kw_stamp_in_clickhouse(stamps)
         except Exception:
-            logger.error('Ошибка обновления stamps, shop_id: %s, adv_id: %s',
+            logger.error('Ошибка обновления stamps, shop_id: %s, adv_id: %s, '
+                         'stamps: %s',
                          complex_adv.shop_id,
                          complex_adv.adv_id,
+                         stamps,
                          exc_info=True)
             raise
         return None
