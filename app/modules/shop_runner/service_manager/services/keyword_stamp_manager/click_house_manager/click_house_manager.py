@@ -132,7 +132,7 @@ class ClickHouseKeywordStampManager:
             for row in rows:
                 text = row[0]
                 # TODO: Сюда из рантайма дошла ошибка
-                p = int(round(row[1], 0))
+                p = int(row[1] + 0.5)
                 timestamp = row[2]
                 position = WBItemPosition(
                     nmid=nmid,
