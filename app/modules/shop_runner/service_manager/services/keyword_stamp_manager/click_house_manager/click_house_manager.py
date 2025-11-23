@@ -29,42 +29,45 @@ class ClickHouseKeywordStampManager:
         version = int(time.time() * 1000)
 
         # Подготовка массива параметров
-        rows: list[dict[str, Any]] = []
+        rows: list[list[Any]] = []
         for s in stamps:
             rows.append(
-                {
-                    "shop_id": s.shop_id,
-                    "adv_id": s.adv_id,
-                    "nmid": s.nmid,
-                    "text": s.text,
-                    "avr_position": s.avr_position,
-                    "orders": s.orders,
-                    "total_views": s.total_views,
-                    "current_cpm": s.current_cpm,
-                    "date": s.date,
-                    "timestamp": s.timestamp,
-                    "version": version,
-                }
+                [
+                    s.shop_id,
+                    s.adv_id,
+                     s.nmid,
+                    s.text,
+                    s.avr_position,
+                    s.orders,
+                    s.total_views,
+                    s.current_cpm,
+                     s.date,
+                    s.timestamp,
+                    version,
+                ]
             )
-
-        async with get_clickhouse_client() as client:
-            await client.insert(
-                table="default_db.keyword_stamp",
-                data=rows,
-                column_names=[
-                    "shop_id",
-                    "adv_id",
-                    "nmid",
-                    "text",
-                    "avr_position",
-                    "orders",
-                    "total_views",
-                    "current_cpm",
-                    "date",
-                    "timestamp",
-                    "version",
-                ],
-            )
+        try:
+            async with get_clickhouse_client() as client:
+                await client.insert(
+                    table="default_db.keyword_stamp",
+                    data=rows,
+                    column_names=[
+                        "shop_id",
+                        "adv_id",
+                        "nmid",
+                        "text",
+                        "avr_position",
+                        "orders",
+                        "total_views",
+                        "current_cpm",
+                        "date",
+                        "timestamp",
+                        "version",
+                    ],
+                )
+        except Exception:
+            logger.error('update stamps error', exc_info=True)
+            raise
 
         return None
 
@@ -90,19 +93,23 @@ class ClickHouseKeywordStampManager:
             )
 
         async with get_clickhouse_client() as client:
-            await client.insert(
-                table="default_db.keyword_position_from_api",
-                data=rows,
-                column_names=[
-                    "nmid",
-                    "text",
-                    "avr_position",
-                    "total_views",
-                    "orders",
-                    "date",
-                    "version",
-                ],
-            )
+            try:
+                await client.insert(
+                    table="default_db.keyword_position_from_api",
+                    data=rows,
+                    column_names=[
+                        "nmid",
+                        "text",
+                        "avr_position",
+                        "total_views",
+                        "orders",
+                        "date",
+                        "version",
+                    ],
+                )
+            except Exception:
+                logger.error('update positions error', exc_info=True)
+                raise
 
 
         return None
