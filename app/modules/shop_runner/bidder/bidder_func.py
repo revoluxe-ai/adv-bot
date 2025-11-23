@@ -78,8 +78,8 @@ async def run_bidder_process_for_adv(
 
     if adv_setting.bidder_mode == BidderMode.BY_POSITIONS:
         from ..exceptions import UsersSettingsError
-        raise UsersSettingsError('Ошибка в пользовательских настройках: работа биддера по позициям не поддерживается в данный момент')
-    elif adv_setting.bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
+        raise UsersSettingsError('Error in user settings: bidder operation by positions is not supported at the moment')
+    elif not adv_setting.bidder_mode or adv_setting.bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
         if not adv_setting.auto_max_cpm_mode:
             return None
         max_cpm = await auto_max_bid_manager.get_max_cpm(
