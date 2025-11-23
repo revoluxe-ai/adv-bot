@@ -76,6 +76,8 @@ async def run_bidder_process_for_adv(
     if not user_max_cpm:
         return None
 
+    # TODO: Надо тут перепроверить логику выбора режима, включая что по умолчанию в модели и т.д.
+
     if adv_setting.bidder_mode == BidderMode.BY_POSITIONS:
         from ..exceptions import UsersSettingsError
         raise UsersSettingsError('Error in user settings: bidder operation by positions is not supported at the moment')
