@@ -16,13 +16,13 @@ class Neo4jContainer(containers.DeclarativeContainer):
     settings: Dependency[Any] = providers.Dependency()
 
     # Neo4j driver
-    neo4j_driver = providers.Singleton(
-        create_neo4j_driver,
+    neo4j_driver = providers.Singleton( # pyright: ignore
+        create_neo4j_driver, # pyright: ignore
         neo4j_config=settings.provided.infrastructure.neo4j,
     )
 
     # Neo4j lifecycle management
-    _neo4j_lifecycle = providers.Resource(
-        Neo4jLifecycle,
+    _neo4j_lifecycle = providers.Resource( # pyright: ignore
+        Neo4jLifecycle, # pyright: ignore
         driver=neo4j_driver,
     )
