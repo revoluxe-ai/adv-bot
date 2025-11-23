@@ -16,4 +16,5 @@ class CommonCoroutineError(Exception):
 
 
 class UsersSettingsError(Exception):
+    """Raised when users settings fail."""
     pass
