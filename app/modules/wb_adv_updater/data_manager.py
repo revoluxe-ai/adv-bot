@@ -263,6 +263,7 @@ async def set_positions(
             keyword_stat.total_views = position.total_views
         else:
             keyword_stat.position = None
+            keyword_stat.total_views = None
 
     return keyword_stats
 
