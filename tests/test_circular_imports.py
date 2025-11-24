@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+# TODO: Надо не забывать сюда точки входа добавлять
+
 # Маркировка всех тестов в этом файле
 pytestmark = pytest.mark.circular_imports
 
@@ -10,7 +12,6 @@ pytestmark = pytest.mark.circular_imports
 ENTRY_POINTS = [
     "app/arq_workers/workers.py",  # ARQ worker
     "updater.py",  # Старый модуль обновления данных
-    "run_keywords_parsing.py",  # Парсинг ключевых слов
     "run_update_model.py",  # Обновление модели
     "new_wb_shop_update_run.py",  # Новый модуль обновления магазинов Wildberries
     "run_update_predict_ctr.py",  # Обновление предсказаний CTR
