@@ -39,7 +39,7 @@ class CalculatedKeyword(BaseModel):
     status: str | None = None
     hard_status: int | None = None
     reason: str | None = None
-    position: int | None = None
+    _position: int | None = None
     position_update: DatetimeType | None = None
     childs_keywords: list["CalculatedKeyword"] | None = None
     _query_static: int | None = None
@@ -57,6 +57,28 @@ class CalculatedKeyword(BaseModel):
     keyword_setting_original_id: int | None = None
     adv_id: int | None = None
     relevant: bool | None = None
+    _total_views: int | None = None
+
+    @property
+    def position(self) -> int | None:
+        return self._position
+
+
+    @position.setter
+    def position(self, value: int | None) -> None:
+        assert isinstance(value, int | None)
+        self._position = value
+
+    @property
+    def total_views(self) -> int:
+        return self._total_views
+
+
+    @total_views.setter
+    def total_views(self, value: int) -> None:
+        assert isinstance(value, int)
+        self._total_views = value
+
 
     def clear_cache(self):
         """Очистка кэшированных свойств"""
