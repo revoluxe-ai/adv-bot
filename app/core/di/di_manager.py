@@ -66,7 +66,7 @@ class DIManager(AbstractAsyncContextManager[T], Generic[T]):
             self._wired = True
             return
         try:
-            module_resources = container.module_resources() # pyright: ignore
+            module_resources = container.module_resources()  # pyright: ignore
         except Exception as e:  # noqa: BLE001
             logger.error(f"Не удалось получить module_resources: {e}")
             self._wired = True
@@ -74,26 +74,34 @@ class DIManager(AbstractAsyncContextManager[T], Generic[T]):
         # Перебор только providers.Container
         wired: list[str] = []
         skipped: list[str] = []
-        for name, provider in getattr(module_resources, "providers", {}).items(): # pyright: ignore
+        for name, provider in getattr(
+            module_resources, "providers", {}
+        ).items():  # pyright: ignore
             if isinstance(provider, providers.Container):
                 try:
-                    sub_container = provider()  # экземпляр DeclarativeContainer модуля # pyright: ignore
-                    if hasattr(sub_container, "wiring_config") and getattr( # pyright: ignore
+                    sub_container = (
+                        provider()
+                    )  # экземпляр DeclarativeContainer модуля # pyright: ignore
+                    if hasattr(
+                        sub_container, "wiring_config"
+                    ) and getattr(  # pyright: ignore
                         sub_container, "wiring_config"  # pyright: ignore
                     ):
-                        sub_container.wire() # pyright: ignore
-                        wired.append(name) # pyright: ignore
+                        sub_container.wire()  # pyright: ignore
+                        wired.append(name)  # pyright: ignore
                     else:
-                        skipped.append(name) # pyright: ignore
+                        skipped.append(name)  # pyright: ignore
                 except Exception:  # noqa: BLE001
                     logger.exception(
                         f"Не удалось выполнить wiring под-контейнера '{name}'"
                     )
             else:
                 # Инфраструктурный или dependency провайдер — пропускаем
-                skipped.append(name) # pyright: ignore
+                skipped.append(name)  # pyright: ignore
         logger.debug(
-            "Wiring модульных контейнеров завершён: wired=%s skipped=%s", wired, skipped # pyright: ignore
+            "Wiring модульных контейнеров завершён: wired=%s skipped=%s",
+            wired,
+            skipped,  # pyright: ignore
         )
         self._wired = True
 

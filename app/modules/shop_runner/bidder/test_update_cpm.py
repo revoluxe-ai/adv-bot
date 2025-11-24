@@ -35,7 +35,7 @@ def get_test_response_for_min_bid_error(wrong_bid: int, min_bid: int) -> str:
 
 
 @pytest.mark.asyncio
-async def test_update_with_wrong_cpm_run(client_session_mock): # pyright: ignore
+async def test_update_with_wrong_cpm_run(client_session_mock):  # pyright: ignore
     access_mock = AsyncMock(spec=WBCabinetAccess)
 
     wb_token_mock = MagicMock(spec=WBToken)
@@ -46,7 +46,9 @@ async def test_update_with_wrong_cpm_run(client_session_mock): # pyright: ignore
     wb_cabinet_mock.shop_id = "test_shop_id"
     access_mock.wb_cabinet = wb_cabinet_mock
 
-    bidder_api = BidderAPI(wb_access=access_mock, client_session=client_session_mock) # pyright: ignore
+    bidder_api = BidderAPI(
+        wb_access=access_mock, client_session=client_session_mock
+    )  # pyright: ignore
 
     headers_mock = MagicMock(spec=Headers)
     # code expects headers.standart to be a dict of headers
@@ -84,16 +86,16 @@ async def test_update_with_wrong_cpm_run(client_session_mock): # pyright: ignore
     cm_ok.__aexit__.return_value = None
 
     # Настраиваем мок для request: сначала возвращаем ошибочный контекст, затем успешный
-    client_session_mock.request.side_effect = [cm_err, cm_ok] # pyright: ignore
+    client_session_mock.request.side_effect = [cm_err, cm_ok]  # pyright: ignore
 
     await bidder_api.update_cpm(adv_id=123456789, nmid=123456789, new_bid=150)
 
     # Проверяем, что request был вызван и проверяем параметры запроса (игнорируем дополнительные kwargs)
-    assert client_session_mock.request.call_count >= 1 # pyright: ignore
-    _args, _kwargs = client_session_mock.request.call_args # pyright: ignore
+    assert client_session_mock.request.call_count >= 1  # pyright: ignore
+    _args, _kwargs = client_session_mock.request.call_args  # pyright: ignore
     assert _args[0] == "PATCH"
     assert _args[1] == "https://advert-api.wildberries.ru/adv/v0/bids"
-    assert _kwargs.get("json") == { # pyright: ignore
+    assert _kwargs.get("json") == {  # pyright: ignore
         "bids": [
             {
                 "advert_id": 123456789,
@@ -101,4 +103,6 @@ async def test_update_with_wrong_cpm_run(client_session_mock): # pyright: ignore
             }
         ]
     }
-    assert _kwargs.get("headers") == {"Authorization": "test_api_key"} # pyright: ignore
+    assert _kwargs.get("headers") == {
+        "Authorization": "test_api_key"
+    }  # pyright: ignore

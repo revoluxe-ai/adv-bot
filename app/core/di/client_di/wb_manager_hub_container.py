@@ -20,7 +20,7 @@ class WBManagerHubContainer(containers.DeclarativeContainer):
         httpx_client_handler=_httpx_client_handler,
     )
 
-    _wb_data_container: WBDataContainer = providers.Container( # pyright: ignore
+    _wb_data_container: WBDataContainer = providers.Container(  # pyright: ignore
         WBDataContainer,
         _auth_client_handler=_auth_client_handler,
     )

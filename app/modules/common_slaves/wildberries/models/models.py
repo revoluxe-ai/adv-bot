@@ -688,7 +688,6 @@ class KeywordSetting(BaseTable):
         )
 
 
-
 class WBItemPosition(BaseModel):
     model_config = ConfigDict(validate_assignment=True)
 

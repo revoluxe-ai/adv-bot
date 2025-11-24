@@ -63,7 +63,6 @@ class CalculatedKeyword(BaseModel):
     def position(self) -> int | None:
         return self._position
 
-
     @position.setter
     def position(self, value: int | None) -> None:
         assert isinstance(value, int | None)
@@ -73,12 +72,10 @@ class CalculatedKeyword(BaseModel):
     def total_views(self) -> int | None:
         return self._total_views
 
-
     @total_views.setter
     def total_views(self, value: int | None) -> None:
         assert isinstance(value, int | None)
         self._total_views = value
-
 
     def clear_cache(self):
         """Очистка кэшированных свойств"""

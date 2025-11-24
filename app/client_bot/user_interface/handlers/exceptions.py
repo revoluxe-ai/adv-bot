@@ -22,7 +22,6 @@ admin_telegram_id = 373435337
 user_router = Router()
 
 
-
 admin_router = Router()
 
 
@@ -71,7 +70,6 @@ async def forbidden_error_handler(
 ):
     logger.error("Юзер заблокировал бота")
     return
-
 
 
 @admin_router.errors(ExceptionTypeFilter(ApiForbiddenError))

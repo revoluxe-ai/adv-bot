@@ -71,18 +71,18 @@ class CoroutinesManager:
                 self.__run_bidder_process_for_adv(adv, self._wb_api)
                 for adv in adv_settings
             ],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         for index, result in enumerate(results):
             if isinstance(result, Exception):
                 adv_setting = adv_settings[index]
-                logger.error("Ошибка обновления РК : %s, adv_id: %s, shop_id: %s",
-                             result,
-                             adv_setting.adv_id,
-                             self.shop_id
-                             )
-
+                logger.error(
+                    "Ошибка обновления РК : %s, adv_id: %s, shop_id: %s",
+                    result,
+                    adv_setting.adv_id,
+                    self.shop_id,
+                )
 
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
         return None
@@ -167,7 +167,6 @@ class CoroutinesManager:
         shop_data_updater = ShopDataUpdater(wb_api)
         await self._update_cards_data_from_wb_to_pg(shop_data_updater)
         logger.debug("Обновление карточек завершено")
-
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):

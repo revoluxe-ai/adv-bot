@@ -50,8 +50,8 @@ def get_next_raise_exponent(
         assert views is not None
         ctr_i, views_i = predict_ctr, views
         numerator: float = ctr_L * views_L - ctr_i * views_i  # pyright: ignore
-        denominator: float = ( # pyright: ignore
-            ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L # pyright: ignore
+        denominator: float = (  # pyright: ignore
+            ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L  # pyright: ignore
         )  # pyright: ignore
 
         if denominator == 0:

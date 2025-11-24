@@ -531,7 +531,6 @@ class Settings:
             return 50053
         return int(value)
 
-
     @property
     def PARSING_LIMITER_DELAY(self) -> float:
         value = os.getenv("PARSING_LIMITER_DELAY")

@@ -44,8 +44,8 @@ def get_next_down_exponent(
 
         ctr_i, views_i = cand.predict_ctr, cand.views
         numerator: float = ctr_L * views_L - ctr_i * views_i  # pyright: ignore
-        denominator: float = ( # pyright: ignore
-            ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L # pyright: ignore
+        denominator: float = (  # pyright: ignore
+            ctr_i - ctr_i * views_i - ctr_L + ctr_L * views_L  # pyright: ignore
         )  # pyright: ignore
 
         if denominator == 0:
