@@ -58,4 +58,4 @@ QUALIFY row_number() OVER (
         (pos_real IS NOT NULL) DESC,
         ts DESC
 ) = 1
-ORDER BY text;
+ORDER BY text
