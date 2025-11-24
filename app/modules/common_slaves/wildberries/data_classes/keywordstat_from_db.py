@@ -75,8 +75,8 @@ class CalculatedKeyword(BaseModel):
 
 
     @total_views.setter
-    def total_views(self, value: int) -> None:
-        assert isinstance(value, int)
+    def total_views(self, value: int | None) -> None:
+        assert isinstance(value, int | None)
         self._total_views = value
 
 
