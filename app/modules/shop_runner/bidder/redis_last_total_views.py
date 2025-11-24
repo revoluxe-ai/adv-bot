@@ -20,7 +20,8 @@ class RedisLastTotalViews(BaseRedisManager):
 
     async def set (self, keyword: CalculatedKeyword) -> int | None:
         key = self._get_key(keyword)
-        views = keyword.total_views
-        views_str = str(views)
-        await self._client.set(key, views_str)
+        views: int | None = keyword.total_views
+        if views:
+            views_str = str(views)
+            await self._client.set(key, views_str)
 
