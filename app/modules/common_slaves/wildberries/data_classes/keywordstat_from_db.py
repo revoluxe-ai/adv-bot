@@ -65,7 +65,7 @@ class CalculatedKeyword(BaseModel):
 
     @position.setter
     def position(self, value: int | None) -> None:
-        assert isinstance(value, int | None)
+        assert isinstance(value, (int, None))
         self._position = value
 
     @property
