@@ -155,7 +155,7 @@ async def run_bidder_process_for_adv(
 
     # TODO: Надо тут перепроверить логику выбора режима, включая что по умолчанию в модели и т.д.
 
-    if adv_setting.bidder_mode == BidderMode.BY_POSITIONS:
+    if adv_setting.bidder_mode in [BidderMode.BY_POSITIONS, None]:
         await redis_last_total_views.get(best_keyword)
         new_cpm = await __get_new_cpm_by_position(
             adv_setting,
