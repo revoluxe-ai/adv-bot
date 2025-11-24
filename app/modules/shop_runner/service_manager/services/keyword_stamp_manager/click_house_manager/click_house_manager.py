@@ -127,7 +127,8 @@ class ClickHouseKeywordStampManager:
         adv_type = adv_setting.type
         async with get_clickhouse_client() as client:
             result: QueryResult = await client.query(query, parameters={"nmid": nmid})
-            rows: Sequence[tuple[str, int, datetime]] = cast(Sequence[tuple[str, int, datetime]], result.result_rows)
+            rows: Sequence[tuple[str, int, datetime, int]] \
+                = cast(Sequence[tuple[str, int, datetime, int]], result.result_rows)
             positions: list[WBItemPosition] = []
             for row in rows:
                 text = row[0]
@@ -140,6 +141,7 @@ class ClickHouseKeywordStampManager:
                     timestamp=timestamp,
                     adv_id=adv_id,
                     adv_type=adv_type,
+                    total_views=row[3]
                 )
                 positions.append(position)
         return positions

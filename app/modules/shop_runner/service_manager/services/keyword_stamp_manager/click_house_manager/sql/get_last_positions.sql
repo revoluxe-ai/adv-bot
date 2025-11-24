@@ -12,8 +12,11 @@ WITH
             -- последний ts по ключу
             max(timestamp) OVER (PARTITION BY nmid, text) AS max_ts,
 
-            -- средняя позиция из последней строки (по max(timestamp))
-            argMax(avr_position, timestamp) OVER (PARTITION BY nmid, text) AS last_avg_pos
+            -- ср. позиция из последней строки
+            argMax(avr_position, timestamp) OVER (PARTITION BY nmid, text) AS last_avg_pos,
+
+            -- показы последней строки (то, что тебе нужно вернуть)
+            argMax(total_views, timestamp) OVER (PARTITION BY nmid, text) AS last_total_views
         FROM default_db.keyword_stamp
         WHERE nmid = {nmid: UInt32}
         WINDOW w AS (
@@ -37,24 +40,22 @@ WITH
     )
 SELECT
     text,
-    -- 1) если последняя строка (по времени) и там avr_position = 0 и показов 0 → возвращаем 0
-    -- 2) иначе, если pos_real есть → берём её
-    -- 3) иначе → берём avr_position из последней строки (last_avg_pos)
+    -- финальная позиция
     IF(
         ts = max_ts AND avr_position = 0 AND total_views = 0,
         0,
         IF(pos_real IS NULL, last_avg_pos, pos_real)
     ) AS real_position,
-    ts
+
+    -- ВОТ ЭТО: показы из последней строки (всегда самые свежие)
+    ts,
+    last_total_views AS total_views_last
 FROM calc
 QUALIFY row_number() OVER (
     PARTITION BY nmid, text
     ORDER BY
-        -- сначала приоритезируем кейс "последняя строка и она 0/0"
         (ts = max_ts AND avr_position = 0 AND total_views = 0) DESC,
-        -- затем строки, где удалось посчитать pos_real
         (pos_real IS NOT NULL) DESC,
-        -- внутри по времени (самая свежая)
         ts DESC
 ) = 1
-ORDER BY text
+ORDER BY text;

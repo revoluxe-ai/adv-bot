@@ -4,20 +4,23 @@ from dependency_injector.wiring import inject, Provide
 import typing
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries import wb_db_manager
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBItemPosition
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_manager.adv_parameter_manager import (
     AdvParameterManager,
 )
 
-from app.modules.wb_keywords_parser.wb_parser import parser
 from app.settings import settings
-from app.utils import redis_manager
+
 from app.utils.db.session_maker import get_async_session_maker as sm
+from .di import BidderContainer
+
 from ..modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 from ...common_slaves.wildberries.models.bidder_mode import BidderMode
+from ...wb_adv_updater import data_manager
 
 if typing.TYPE_CHECKING:
     from ..modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+    from .redis_last_total_views import RedisLastTotalViews
 
 
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -39,7 +42,7 @@ async def get_cpms_from_wb(advs: list[AuctionAdv]) -> set[int] | None:
 async def _update_and_get_advs_from_wb(
     auto_adv: AdvSetting, wb_api: WBApi
 ) -> list[AuctionAdv]:
-    adv_ids = set()
+    adv_ids: set[int] = set()
     if auto_adv.bidder_for_auto:
         adv_ids.add(auto_adv.adv_id)
     if search_adv_id := auto_adv.search_adv_id:
@@ -61,6 +64,7 @@ async def __get_new_cpm_by_position(
     adv_setting: AdvSetting,
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
+    best_keyword: CalculatedKeyword,
     cpm_now: int,
     auto_max_bid_manager: "AutoMaxBidManager" = Provide[
         AutoMaxCpmContainer.auto_max_cpm_bid_manager
@@ -89,66 +93,31 @@ async def __get_new_cpm_by_position(
         logger.error(f"[{shop_id}] [{adv_id}] Максимальная позиция не задана!")
         return None
 
-    white_keywords = [kw for kw in keywords if kw.hard_status == 2]
-    if not white_keywords:
-        logger.warning("[%s] [%s ] Нет ключей в белом списке", shop_id, adv_id)
+    promo_position: int | None = best_keyword.position
+    if promo_position is None:
         return None
-    for keyword in keywords:
-        text = keyword.text
-        nmid = int(adv_setting.nmids[0])
-        try:
-            logger.debug(f"[{shop_id}] [{adv_id}] Парсинг ключа '{text}'")
-            _: list[WBItemPosition] = await parser.add_wb_positions(
-                text, {nmid}, delay=1
-            )
-        except Exception:  # noqa
-            logger.error(
-                f"[{shop_id}] [{adv_id}] Ошибка парсинга ключа '{text}'", exc_info=True
-            )
-            continue
+    if 0 < promo_position <= max_position:
+        new_cpm: int = cpm_now - step
+    else:
+        new_cpm = cpm_now + step
+    adv_param_manager = AdvParameterManager()
+    min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
+    new_cpm = max(min(new_cpm, max_cpm), min_cpm)
 
-        try:
-            logger.debug(f"[{shop_id}] [{adv_id}] Получение позиции ключа")
-            wb_position: WBItemPosition = await redis_manager.get_keyword_position(
-                text, nmid
+    if new_cpm >= max_cpm and adv_setting.reset_place:
+        async with sm(read_only=False) as session:
+            assert adv_setting
+            adv_setting_for_update: AdvSetting | None = await session.get(
+                AdvSetting, adv_setting.id
             )
-        except Exception:  # noqa
-            logger.error(
-                f"[{shop_id}] [{adv_id}] Ошибка получения позиции ключа", exc_info=True
-            )
-            continue
+            if adv_setting_for_update is None:
+                logger.error(f"[{shop_id}] [{adv_id}] Настройки РК не найдены")
+                raise Exception("Настройки РК не найдены")
+            adv_setting_for_update.max_place = promo_position + 1
+            await session.commit()
 
-        if not wb_position or wb_position.position is None:
-            logger.error(
-                f"[{shop_id}] [{adv_id}] Позиция ключа не найдена или нет промопозиции"
-            )
-            continue
-        promo_position: int = wb_position.position
-        if promo_position == -1:
-            continue
-        if 0 < promo_position <= max_position:
-            new_cpm: int = cpm_now - step
-        else:
-            new_cpm = cpm_now + step
-        adv_param_manager = AdvParameterManager()
-        min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
-        new_cpm = max(min(new_cpm, max_cpm), min_cpm)
-
-        if new_cpm >= max_cpm and adv_setting.reset_place:
-            async with sm(read_only=False) as session:
-                assert adv_setting
-                adv_setting_for_update: AdvSetting | None = await session.get(
-                    AdvSetting, adv_setting.id
-                )
-                if adv_setting_for_update is None:
-                    logger.error(f"[{shop_id}] [{adv_id}] Настройки РК не найдены")
-                    raise Exception("Настройки РК не найдены")
-                adv_setting_for_update.max_place = promo_position + 1
-                await session.commit()
-
-        logger.debug(f"[{shop_id}] [{adv_id}] Ставки обновлены")
-        return new_cpm
-    return None
+    logger.debug(f"[{shop_id}] [{adv_id}] Ставки обновлены")
+    return new_cpm
 
 
 @inject
@@ -159,6 +128,7 @@ async def run_bidder_process_for_adv(
     auto_max_bid_manager: "AutoMaxBidManager" = Provide[
         AutoMaxCpmContainer.auto_max_cpm_bid_manager
     ],
+    redis_last_total_views: "RedisLastTotalViews" = Provide[BidderContainer.redis_last_total_views]
 ) -> None:
     advs: list[AuctionAdv] = await _update_and_get_advs_from_wb(adv_setting, wb_api)
     advs_from_wb_with_active_company: list[AuctionAdv] = [
@@ -179,11 +149,17 @@ async def run_bidder_process_for_adv(
     if not user_max_cpm:
         return None
 
+    best_keyword = data_manager.get_best_keyword(keywords)
+    if not best_keyword:
+        return None
+
     if adv_setting.bidder_mode == BidderMode.BY_POSITIONS:
+        await redis_last_total_views.get(best_keyword)
         new_cpm = await __get_new_cpm_by_position(
             adv_setting,
             wb_api,
             keywords,
+            best_keyword,
             cpm_now,
         )
         if not new_cpm:
@@ -221,4 +197,5 @@ async def run_bidder_process_for_adv(
                 nmid,
                 new_cpm,
             )
+        await redis_last_total_views.set(best_keyword)
     return None
