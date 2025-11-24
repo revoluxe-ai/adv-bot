@@ -2,14 +2,9 @@ from aiogram import Bot, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.wb_adv_updater import data_manager
 from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
-from app.modules.wb_keywords_parser.wb_parser import parser
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 from .buttons import UpdatePositionsForActivePhrase
@@ -37,32 +32,17 @@ async def update_positions_for_active_phrase(
 
     keywords = await get_good_bad_phrases(adv_setting)
 
-    target = callback_data.target
-
-    def filter_func(kw: CalculatedKeyword) -> bool:
-        if target == "white_list":
-            return kw.hard_status == 2
-        elif target == "active_phrases":
-            return kw.status == KeywordStatus.GOOD
-        else:
-            raise ValueError("Неизвестная цель проверки позиций")
-
-    active_keywords = filter(filter_func, keywords)
 
     await bot.send_message(
         chat_id,
         (
-            "Начинаю перепроверку позиций. По завершению перепроверки пришлю новую версию страницы с ключами."
-            " Вы можете продолжить работу с ботом, решая другие задачи"
+           "Данная функция больше не поддерживается со стороны Wildberries"
         ),
     )
 
     assert adv_setting.nmids
 
-    nmids = set(adv_setting.nmids[:1])
 
-    for kw in active_keywords:
-        await parser.add_wb_positions(kw.text, nmids, delay=1)
     adv_id = adv_setting.adv_id
     await bot.send_message(
         chat_id,
@@ -77,7 +57,7 @@ async def update_positions_for_active_phrase(
 
     from importlib import import_module
 
-    AdvKeywordsSetting = import_module(
+    AdvKeywordsSetting = import_module( # noqa
         "app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages"
     ).AdvKeywordsSetting
     await AdvKeywordsSetting(
