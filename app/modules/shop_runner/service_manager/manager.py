@@ -302,7 +302,7 @@ class CoroutinesManager:
 
         return None
 
-    @while_coroutine_decorator(15 * 60, 60)
+    @while_coroutine_decorator(1, 60)
     async def update_keywords_stamp(self) -> None:
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
