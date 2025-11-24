@@ -70,7 +70,7 @@ class CalculatedKeyword(BaseModel):
         self._position = value
 
     @property
-    def total_views(self) -> int:
+    def total_views(self) -> int | None:
         return self._total_views
 
 
