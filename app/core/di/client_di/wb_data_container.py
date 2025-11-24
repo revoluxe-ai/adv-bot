@@ -14,7 +14,7 @@ from app.core.mp.wb.api.managers import WBDataManager
 
 class WBDataContainer(containers.DeclarativeContainer):
     _auth_client_handler = providers.Dependency(instance_of=AuthClientHandler)
-    _analytics_and_data_container: AnalyticAndDataContainer = providers.Container(
+    _analytics_and_data_container: AnalyticAndDataContainer = providers.Container( # pyright: ignore
         AnalyticAndDataContainer,
         _auth_client_handler=_auth_client_handler,
     )
