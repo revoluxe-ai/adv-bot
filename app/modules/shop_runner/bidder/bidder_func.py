@@ -199,5 +199,7 @@ async def run_bidder_process_for_adv(
                 nmid,
                 new_cpm,
             )
-        await redis_last_total_views.set(best_keyword)
+        # TODO: Вынести в общий код проверку режима биддера
+        if adv_setting.bidder_for_auto in [BidderMode.BY_POSITIONS, None]:
+            await redis_last_total_views.set(best_keyword)
     return None
