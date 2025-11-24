@@ -38,7 +38,8 @@ class ModuleResources(containers.DeclarativeContainer):
         redis_client_wrapper=redis_client_wrapper,
     )
 
-    bidder_container = providers.Container(BidderContainer)
+    bidder_container = providers.Container(BidderContainer,
+                                           _redis_client=redis_client_wrapper)
 
 
     wb_manager_hub_factory_container = providers.Container(WBManagerHubFactoryContainer)
