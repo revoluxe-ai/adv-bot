@@ -243,7 +243,3 @@ async def test_run_bidder_process_for_adv_injects_redis_caches(monkeypatch):
             app_container.redis_client_wrapper.reset_override()
             app_container.redis_client.reset_override()
             app_container.settings.reset_override()
-
-
-
-
