@@ -36,14 +36,14 @@ class RedisClient:
         self._replica_write_client = redis_client
 
     # Методы для чтения (через реплику)
-    async def get(self, key: str) -> bytes | None:
+    async def get(self, key: str) -> str | None:
         return cast(
-            bytes | None, await ensure_awaitable(self._replica_read_client.get(key))
+            str | None, await ensure_awaitable(self._replica_read_client.get(key))
         )
 
-    async def mget(self, keys: list[str]) -> list[bytes | None]:
+    async def mget(self, keys: list[str]) -> list[str | None]:
         return cast(
-            list[bytes | None],
+            list[str | None],
             await ensure_awaitable(self._replica_read_client.mget(keys)),
         )
 
@@ -55,9 +55,9 @@ class RedisClient:
             list[str], await ensure_awaitable(self._replica_read_client.keys(pattern))
         )
 
-    async def hget(self, name: str, key: str) -> bytes | None:
+    async def hget(self, name: str, key: str) -> str | None:
         return cast(
-            bytes | None,
+            str | None,
             await ensure_awaitable(self._replica_read_client.hget(name, key)),
         )
 
@@ -67,9 +67,9 @@ class RedisClient:
             await ensure_awaitable(self._replica_read_client.hgetall(name)),
         )
 
-    async def hmget(self, name: str, keys: list[str]) -> list[bytes | None]:
+    async def hmget(self, name: str, keys: list[str]) -> list[str | None]:
         return cast(
-            list[bytes | None],
+            list[str | None],
             await ensure_awaitable(self._replica_read_client.hmget(name, keys)),
         )
 
@@ -94,24 +94,24 @@ class RedisClient:
     async def llen(self, name: str) -> int:
         return cast(int, await ensure_awaitable(self._replica_read_client.llen(name)))
 
-    async def lindex(self, name: str, index: int) -> bytes | None:
+    async def lindex(self, name: str, index: int) -> str | None:
         return cast(
-            bytes | None,
+            str | None,
             await ensure_awaitable(self._replica_read_client.lindex(name, index)),
         )
 
-    async def lrange(self, name: str, start: int, end: int) -> list[bytes]:
+    async def lrange(self, name: str, start: int, end: int) -> list[str]:
         return cast(
-            list[bytes],
+            list[str],
             await ensure_awaitable(self._replica_read_client.lrange(name, start, end)),
         )
 
-    async def smembers(self, name: str) -> set[bytes]:
+    async def smembers(self, name: str) -> set[str]:
         return cast(
-            set[bytes], await ensure_awaitable(self._replica_read_client.smembers(name))
+            set[str], await ensure_awaitable(self._replica_read_client.smembers(name))
         )
 
-    async def srem(self, name: str, *values: str | bytes) -> int:
+    async def srem(self, name: str, *values: str | str) -> int:
         return cast(
             int, await ensure_awaitable(self._replica_write_client.srem(name, *values))
         )
@@ -132,7 +132,7 @@ class RedisClient:
     async def set(
         self,
         key: str,
-        value: str | bytes,
+        value: str | str,
         ex: int | None = None,
         px: int | None = None,
     ) -> bool:
@@ -144,7 +144,7 @@ class RedisClient:
         )
 
     async def set_if_not_exists(
-        self, key: str, value: str | bytes, ex: int | None = None, px: int | None = None
+        self, key: str, value: str | str, ex: int | None = None, px: int | None = None
     ) -> bool:
         """Set key only if it does not exist (NX). Returns True if set, False otherwise."""
         return bool(
@@ -183,16 +183,10 @@ class RedisClient:
     async def pttl(self, key: str) -> int:
         return cast(int, await ensure_awaitable(self._replica_read_client.pttl(key)))
 
-    async def hset(self, name: str, key: str, value: str | bytes) -> int:
-        if isinstance(value, bytes):
-            safe_val: str = value.decode("utf-8", "ignore")
-        else:
-            safe_val = value
+    async def hset(self, name: str, key: str, value: str | str) -> int:
         return cast(
             int,
-            await ensure_awaitable(
-                self._replica_write_client.hset(name, key, safe_val)
-            ),
+            await ensure_awaitable(self._replica_write_client.hset(name, key, value)),
         )
 
     async def hdel(self, name: str, *keys: str) -> int:
@@ -200,27 +194,27 @@ class RedisClient:
             int, await ensure_awaitable(self._replica_write_client.hdel(name, *keys))
         )
 
-    async def lpush(self, name: str, *values: str | bytes) -> int:
+    async def lpush(self, name: str, *values: str | str) -> int:
         return cast(
             int, await ensure_awaitable(self._replica_write_client.lpush(name, *values))
         )
 
-    async def rpush(self, name: str, *values: str | bytes) -> int:
+    async def rpush(self, name: str, *values: str | str) -> int:
         return cast(
             int, await ensure_awaitable(self._replica_write_client.rpush(name, *values))
         )
 
-    async def lpop(self, name: str) -> bytes | None:
+    async def lpop(self, name: str) -> str | None:
         return cast(
-            bytes | None, await ensure_awaitable(self._replica_write_client.lpop(name))
+            str | None, await ensure_awaitable(self._replica_write_client.lpop(name))
         )
 
-    async def rpop(self, name: str) -> bytes | None:
+    async def rpop(self, name: str) -> str | None:
         return cast(
-            bytes | None, await ensure_awaitable(self._replica_write_client.rpop(name))
+            str | None, await ensure_awaitable(self._replica_write_client.rpop(name))
         )
 
-    async def sadd(self, name: str, *values: str | bytes) -> int:
+    async def sadd(self, name: str, *values: str | str) -> int:
         return cast(
             int, await ensure_awaitable(self._replica_write_client.sadd(name, *values))
         )
@@ -286,7 +280,7 @@ class RedisClient:
         self,
         script: str,
         numkeys: int,
-        *keys_and_args: str | bytes | int,
+        *keys_and_args: str | str | int,
     ) -> Any:
         """Execute a Lua script on the Redis server"""
         return await ensure_awaitable(

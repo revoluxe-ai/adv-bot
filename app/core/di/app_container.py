@@ -11,9 +11,9 @@ from .module_resources import ModuleResources
 from app.configs.app_config import AppConfig  # Добавляем импорт AppConfig здесь
 
 
-def create_redis_client(redis_config: AppConfig) -> Redis: # pyright: ignore
-    redis: Redis = databases.create_redis_client(redis_config) # pyright: ignore
-    return redis # pyright: ignore
+def create_redis_client(redis_config: AppConfig) -> Redis:  # pyright: ignore
+    redis: Redis = databases.create_redis_client(redis_config)  # pyright: ignore
+    return redis  # pyright: ignore
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -37,8 +37,8 @@ class AppContainer(containers.DeclarativeContainer):
     # TODO: Нужен еще тест, который проверяет не забыл ли я что приварить
 
     settings = providers.Singleton(AppConfig.create)
-    redis_client = providers.Singleton( # pyright: ignore
-        create_redis_client, # pyright: ignore
+    redis_client = providers.Singleton(  # pyright: ignore
+        create_redis_client,  # pyright: ignore
         redis_config=settings,
     )
 
@@ -53,8 +53,7 @@ class AppContainer(containers.DeclarativeContainer):
         redis_client_wrapper=redis_client_wrapper,
     )
 
-    _redis_lifecycle: providers.Resource[Redis] = providers.Resource( # pyright: ignore
+    _redis_lifecycle: providers.Resource[Redis] = providers.Resource(  # pyright: ignore
         databases.RedisLifecycle,
         client=redis_client,
     )
-

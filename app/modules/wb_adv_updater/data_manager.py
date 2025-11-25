@@ -251,17 +251,20 @@ async def set_positions(
     keyword_stats: list[CalculatedKeyword], adv_setting: AdvSetting
 ) -> list[CalculatedKeyword]:
     # TODO: Вынести локальный импорт, и вообще разобраться со всеми локальными импортами в проекте
-    from ..shop_runner.service_manager.services.keyword_stamp_manager import ClickHouseKeywordStampManager
-    positions: list[WBItemPosition] = await ClickHouseKeywordStampManager.get_last_positions(adv_setting)
+    from ..shop_runner.service_manager.services.keyword_stamp_manager import (
+        ClickHouseKeywordStampManager,
+    )
+
+    positions: list[WBItemPosition] = (
+        await ClickHouseKeywordStampManager.get_last_positions(adv_setting)
+    )
     if not positions:
         return keyword_stats
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
         position = text_to_position.get(keyword_stat.text)
         if position:
-            keyword_stat.position = position.position
-        else:
-            keyword_stat.position = None
+            keyword_stat.position = position
 
     return keyword_stats
 

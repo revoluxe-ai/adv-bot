@@ -15,9 +15,6 @@ async def update_positions_for_active_phrase(
     chat_id = callback_query.message.chat.id
     await bot.send_message(
         chat_id,
-        (
-           "Данная функция больше не поддерживается со стороны Wildberries"
-        ),
+        ("Данная функция больше не поддерживается со стороны Wildberries"),
     )
     return None
-

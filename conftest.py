@@ -190,8 +190,16 @@ def setup_test_database(docker_compose_cmd):
 
     # Создаём необходимые расширения PostgreSQL ПЕРЕД созданием таблиц
     with sync_engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-        conn.commit()
+        try:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+            conn.commit()
+        except Exception as e:
+            # Игнорируем ошибку если расширение уже существует (race condition в PostgreSQL)
+            if "already exists" in str(e):
+                print(f"[INFO] Extension pg_trgm already exists, skipping...")
+                conn.rollback()
+            else:
+                raise
 
     print("[MIGRATION] Creating tables from models metadata...")
     Base.metadata.create_all(sync_engine)
@@ -495,7 +503,7 @@ async def postgres_session(async_engine):
 @pytest.fixture(scope='function')
 async def fake_redis():
     """Создает фейковый Redis для тестов (асинхронная версия)."""
-    redis = await fakeredis.aioredis.FakeRedis()
+    redis = await fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield redis
     await redis.flushall()  # очищаем после теста
     await redis.close()
@@ -631,3 +639,9 @@ async def clickhouse_client(setup_test_database):
 
     client.close()
     print("[OK] ClickHouse client closed")
+
+
+@pytest.fixture(scope='function')
+def app_container():
+    container = AppContainer()
+    return container

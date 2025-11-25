@@ -39,13 +39,13 @@ class ClickHouseKeywordStampManager:
                 [
                     s.shop_id,
                     s.adv_id,
-                     s.nmid,
+                    s.nmid,
                     s.text,
                     s.avr_position,
                     s.orders,
                     s.total_views,
                     s.current_cpm,
-                     s.date,
+                    s.date,
                     s.timestamp,
                     version,
                 ]
@@ -70,7 +70,7 @@ class ClickHouseKeywordStampManager:
                     ],
                 )
         except Exception:
-            logger.error('update stamps error', exc_info=True)
+            logger.error("update stamps error", exc_info=True)
             raise
 
         return None
@@ -112,9 +112,8 @@ class ClickHouseKeywordStampManager:
                     ],
                 )
             except Exception:
-                logger.error('update positions error', exc_info=True)
+                logger.error("update positions error", exc_info=True)
                 raise
-
 
         return None
 
@@ -127,7 +126,9 @@ class ClickHouseKeywordStampManager:
         adv_type = adv_setting.type
         async with get_clickhouse_client() as client:
             result: QueryResult = await client.query(query, parameters={"nmid": nmid})
-            rows: Sequence[tuple[str, float, datetime]] = cast(Sequence[tuple[str, float, datetime]], result.result_rows)
+            rows: Sequence[tuple[str, int, datetime, int]] = cast(
+                Sequence[tuple[str, int, datetime, int]], result.result_rows
+            )
             positions: list[WBItemPosition] = []
             for row in rows:
                 text = row[0]
@@ -141,8 +142,7 @@ class ClickHouseKeywordStampManager:
                     timestamp=timestamp,
                     adv_id=adv_id,
                     adv_type=adv_type,
+                    total_views=row[3],
                 )
                 positions.append(position)
         return positions
-
-

@@ -22,19 +22,6 @@ admin_telegram_id = 373435337
 user_router = Router()
 
 
-#
-#
-# @user_router.errors(ExceptionTypeFilter(my_exc.ApiForbiddenError))
-# async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-#     await state.clear()
-#     logger.debug( 'Текущее состояние: %s', await state.get_state())
-#     chat_id = error_event.update.message.chat.id
-#
-#     wb_user_cabinet: app.my_types.WBUserCabinet = error_event.exception.__dict__['wb_user_cabinet']
-#     await errors_message.AddNewToken(bot, chat_id, wb_user_cabinet)()
-#     return
-#
-
 admin_router = Router()
 
 
@@ -83,19 +70,6 @@ async def forbidden_error_handler(
 ):
     logger.error("Юзер заблокировал бота")
     return
-
-
-# @admin_router.errors(ExceptionTypeFilter(aiogram.exceptions.TelegramBadRequest))
-# async def bad_request_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-#     message = error_event.update.message
-#     if message is None:
-#         chat_id = error_event.update.callback_query.message.chat.id
-#     else:
-#         chat_id = message.chat.id
-#     await bot.send_message(chat_id=chat_id,
-#                            text='Эта кнопка устарела. Нажмите на /start и начните сначала'
-#                            'Если ошибка повторяется, обратитесь к администратору бота @skyline360_1')
-#     return
 
 
 @admin_router.errors(ExceptionTypeFilter(ApiForbiddenError))
