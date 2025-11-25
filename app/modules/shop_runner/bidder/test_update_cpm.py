@@ -47,8 +47,8 @@ async def test_update_with_wrong_cpm_run(client_session_mock):  # pyright: ignor
     access_mock.wb_cabinet = wb_cabinet_mock
 
     bidder_api = BidderAPI(
-        wb_access=access_mock, client_session=client_session_mock
-    )  # pyright: ignore
+        wb_access=access_mock, client_session=client_session_mock  # pyright: ignore
+    )
 
     headers_mock = MagicMock(spec=Headers)
     # code expects headers.standart to be a dict of headers
@@ -103,6 +103,6 @@ async def test_update_with_wrong_cpm_run(client_session_mock):  # pyright: ignor
             }
         ]
     }
-    assert _kwargs.get("headers") == {
+    assert _kwargs.get("headers") == { # pyright: ignore
         "Authorization": "test_api_key"
     }  # pyright: ignore
