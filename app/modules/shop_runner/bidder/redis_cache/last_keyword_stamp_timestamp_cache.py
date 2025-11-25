@@ -11,10 +11,8 @@ class LastKeywordStampTimestampCache(BaseRedisManager):
 
     async def get(self, keyword: CalculatedKeyword):
         key = self._get_key(keyword)
-        value_bytes: bytes | str | None = await self._client.get(key)
-        if value_bytes is None:
-            return None
-        value = value_bytes.decode()
+        value = await self._client.get(key)
+        assert isinstance(value, str)
         value_dt = datetime.datetime.strptime(value, self.__strftime)
         return value_dt
 

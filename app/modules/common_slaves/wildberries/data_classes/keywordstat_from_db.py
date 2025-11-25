@@ -22,6 +22,24 @@ def validate_datetime(v: Any) -> datetime.datetime | None:
 DatetimeType = Annotated[datetime.datetime, PlainValidator(validate_datetime)]
 
 
+def _parse_position_value(value: Any) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if cleaned.isdigit():
+            return int(cleaned)
+        try:
+            return int(float(cleaned))
+        except ValueError:
+            return None
+    return None
+
+
 class KeywordStatus:
     GOOD = "good"
     BAD = "bad"
@@ -31,6 +49,7 @@ class KeywordStatus:
 
 
 class CalculatedKeyword(BaseModel):
+    # TODO: Разобраться с сериализацией-десериализацией
     text: str
     clicks: int
     views: int
@@ -177,26 +196,42 @@ class CalculatedKeyword(BaseModel):
     @classmethod
     def from_json(cls, json_str: str) -> "CalculatedKeyword":
         data = json.loads(json_str)
-        data["position_update"] = (
-            validate_datetime(data["position_update"])
-            if data["position_update"]
-            else None
+        raw_position = data.pop("position", None)
+        raw_position_update = data.pop("position_update", None)
+        position_update = (
+            validate_datetime(raw_position_update) if raw_position_update else None
         )
-        # Backward compatibility
-        # 1) Map real_position -> position if no position
-        if "position" not in data and "real_position" in data:
-            data["position"] = data.get("real_position")
-        # 2) If position is a dict (legacy WBItemPosition), extract integer
-        if isinstance(data.get("position"), dict):
-            legacy = data["position"]
-            data["position"] = (
-                legacy.get("position")
-                or legacy.get("real_position")
-                or legacy.get("base_position")
-                or legacy.get("promo_position")
-                or 0
-            )
-        return cls(**data)
+
+        if raw_position is None and "real_position" in data:
+            raw_position = data.get("real_position")
+        elif raw_position is None:
+            for fallback in ("base_position", "promo_position"):
+                if fallback in data:
+                    raw_position = data.get(fallback)
+                    break
+
+        position_model: WBItemPosition | None = None
+        if isinstance(raw_position, dict):
+            position_model = WBItemPosition.from_dict(raw_position)
+        else:
+            normalized_position = _parse_position_value(raw_position)
+            if normalized_position is not None:
+                position_model = WBItemPosition(position=normalized_position)
+
+        if position_model and position_update:
+            position_model.timestamp = position_update
+        elif position_model is None and position_update:
+            position_model = WBItemPosition(timestamp=position_update)
+
+        if position_model and not position_model.keyword_text:
+            keyword_text = data.get("text")
+            if isinstance(keyword_text, str):
+                position_model.keyword_text = keyword_text
+
+        instance = cls(**data)
+        if position_model:
+            instance.position = position_model
+        return instance
 
     @property
     def is_in_white_list(self) -> bool:
