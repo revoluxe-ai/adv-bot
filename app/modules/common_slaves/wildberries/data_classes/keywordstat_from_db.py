@@ -94,7 +94,6 @@ class CalculatedKeyword(BaseModel):
         assert isinstance(value, WBItemPosition)
         self._position = value
 
-
     @property
     def total_views(self) -> int | None:
         if not self._position:
@@ -212,7 +211,7 @@ class CalculatedKeyword(BaseModel):
         # TODO: не тестировалось, надо пересмотреть - перепроверить
         position_model: WBItemPosition | None = None
         if isinstance(raw_position, dict):
-            position_model = WBItemPosition.from_dict(raw_position) # pyright: ignore
+            position_model = WBItemPosition.from_dict(raw_position)  # pyright: ignore
         else:
             normalized_position = _parse_position_value(raw_position)
             if normalized_position is not None:

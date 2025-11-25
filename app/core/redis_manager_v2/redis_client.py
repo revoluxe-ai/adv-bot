@@ -186,9 +186,7 @@ class RedisClient:
     async def hset(self, name: str, key: str, value: str | str) -> int:
         return cast(
             int,
-            await ensure_awaitable(
-                self._replica_write_client.hset(name, key, value)
-            ),
+            await ensure_awaitable(self._replica_write_client.hset(name, key, value)),
         )
 
     async def hdel(self, name: str, *keys: str) -> int:

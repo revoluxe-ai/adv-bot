@@ -1,13 +1,16 @@
 import datetime
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import CalculatedKeyword
+from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
+    CalculatedKeyword,
+)
 
 
 class LastKeywordStampTimestampCache(BaseRedisManager):
-    prefix = 'last_keyword_stamp_timestamp_cache'
+    prefix = "last_keyword_stamp_timestamp_cache"
+
     def _get_key(self, keyword: CalculatedKeyword) -> str:
-        return self.prefix + ':' + str(keyword.keyword_setting_original_id)
+        return self.prefix + ":" + str(keyword.keyword_setting_original_id)
 
     async def get(self, keyword: CalculatedKeyword) -> datetime.datetime | None:
         key = self._get_key(keyword)
@@ -16,7 +19,6 @@ class LastKeywordStampTimestampCache(BaseRedisManager):
             return None
         value_dt = datetime.datetime.fromisoformat(value)
         return value_dt
-
 
     async def set(self, keyword: CalculatedKeyword) -> None:
         key = self._get_key(keyword)

@@ -103,6 +103,6 @@ async def test_update_with_wrong_cpm_run(client_session_mock):  # pyright: ignor
             }
         ]
     }
-    assert _kwargs.get("headers") == { # pyright: ignore
+    assert _kwargs.get("headers") == {  # pyright: ignore
         "Authorization": "test_api_key"
     }  # pyright: ignore

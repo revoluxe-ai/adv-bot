@@ -129,7 +129,7 @@ def try_except_decorator(
                         "Следующая пауза между запросами: %s секунд для shop_id: %s, ошибка: %s",
                         state["_current_pause"],
                         shop_id,
-                        e
+                        e,
                     )
                 except Exception as e:
                     raise e
