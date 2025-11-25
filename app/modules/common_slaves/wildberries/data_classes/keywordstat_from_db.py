@@ -91,6 +91,19 @@ class CalculatedKeyword(BaseModel):
 
     @position.setter
     def position(self, value: WBItemPosition) -> None:
+        """
+        TODO:
+        Bug: Position data lost during JSON deserialization
+
+       The position and position_update were changed from Pydantic model fields to computed properties backed by the private _position attribute. However, the existing from_json method still tries to set position and position_update through cls(**data). Since these are now properties rather than model fields, Pydantic will silently ignore them during construction, causing all position data to be lost when deserializing CalculatedKeyword objects from Redis cache.
+
+
+        Args:
+            value:
+
+        Returns:
+
+        """
         assert isinstance(value, WBItemPosition)
         self._position = value
 
