@@ -5,7 +5,9 @@
     "app/modules/shop_runner/service_manager/old_modules/setting_auto_updater_v2",
     "app/core/mp/wb",
     "app/modules/shop_runner/service_manager/services/keyword_stamp_manager",
-    "app/core/di"
+    "app/modules/shop_runner/bidder",
+    "app/core/di",
+    "app/modules/common_slaves/wildberries/data_classes/keywordstat_from_db.py"
 
   ],
 

@@ -5,11 +5,26 @@ import typing
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_manager.adv_parameter_manager import (
+    AdvParameterManager,
+)
+
+from app.settings import settings
+
+from app.utils.db.session_maker import get_async_session_maker as sm
+from .redis_cache.last_keyword_stamp_timestamp_cache import (
+    LastKeywordStampTimestampCache,
+)
+
 from ..modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 from ...common_slaves.wildberries.models.bidder_mode import BidderMode
+from ...wb_adv_updater import data_manager
 
 if typing.TYPE_CHECKING:
     from ..modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
+    from app.modules.shop_runner.bidder.redis_cache.redis_last_total_views import (
+        RedisLastTotalViews,
+    )
 
 
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -31,7 +46,7 @@ async def get_cpms_from_wb(advs: list[AuctionAdv]) -> set[int] | None:
 async def _update_and_get_advs_from_wb(
     auto_adv: AdvSetting, wb_api: WBApi
 ) -> list[AuctionAdv]:
-    adv_ids = set()
+    adv_ids: set[int] = set()
     if auto_adv.bidder_for_auto:
         adv_ids.add(auto_adv.adv_id)
     if search_adv_id := auto_adv.search_adv_id:
@@ -49,12 +64,79 @@ async def _update_and_get_advs_from_wb(
 
 
 @inject
+async def __get_new_cpm_by_position(
+    adv_setting: AdvSetting,
+    wb_api: WBApi,
+    keywords: list[CalculatedKeyword],
+    best_keyword: CalculatedKeyword,
+    cpm_now: int,
+    auto_max_bid_manager: "AutoMaxBidManager" = Provide[
+        AutoMaxCpmContainer.auto_max_cpm_bid_manager
+    ],
+) -> int | None:
+    adv_id = adv_setting.adv_id
+    shop_id = wb_api.shop_id
+
+    max_user_cpm = adv_setting.max_cpm
+    if adv_setting.auto_max_cpm_mode:
+        auto_max_cpm = await auto_max_bid_manager.get_max_cpm(
+            adv_setting, keywords, max_user_cpm
+        )
+        if not auto_max_cpm:
+            return None
+
+        if auto_max_cpm < max_user_cpm:
+            max_cpm = auto_max_cpm
+        else:
+            max_cpm = max_user_cpm
+    else:
+        max_cpm = max_user_cpm
+    step = adv_setting.bidder_step or settings.BIDDER_STEP
+    max_position = adv_setting.max_place
+    if max_position is None:
+        logger.error(f"[{shop_id}] [{adv_id}] Максимальная позиция не задана!")
+        return None
+
+    promo_position: int | None = best_keyword.position
+    if promo_position is None:
+        return None
+    if 0 < promo_position <= max_position:
+        new_cpm: int = cpm_now - step
+    else:
+        new_cpm = cpm_now + step
+    adv_param_manager = AdvParameterManager()
+    min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
+    new_cpm = max(min(new_cpm, max_cpm), min_cpm)
+
+    if new_cpm >= max_cpm and adv_setting.reset_place:
+        async with sm(read_only=False) as session:
+            assert adv_setting
+            adv_setting_for_update: AdvSetting | None = await session.get(
+                AdvSetting, adv_setting.id
+            )
+            if adv_setting_for_update is None:
+                logger.error(f"[{shop_id}] [{adv_id}] Настройки РК не найдены")
+                raise Exception("Настройки РК не найдены")
+            adv_setting_for_update.max_place = promo_position + 1
+            await session.commit()
+
+    logger.debug(f"[{shop_id}] [{adv_id}] Ставки обновлены")
+    return new_cpm
+
+
+@inject
 async def run_bidder_process_for_adv(
     adv_setting: AdvSetting,
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
     auto_max_bid_manager: "AutoMaxBidManager" = Provide[
         AutoMaxCpmContainer.auto_max_cpm_bid_manager
+    ],
+    redis_last_total_views: "RedisLastTotalViews" = Provide[
+        "module_resources.bidder_container.redis_last_total_views"
+    ],
+    last_keyword_stamp_timestamp_cache: LastKeywordStampTimestampCache = Provide[
+        "module_resources.bidder_container.last_keyword_stamp_timestamp_cache"
     ],
 ) -> None:
     advs: list[AuctionAdv] = await _update_and_get_advs_from_wb(adv_setting, wb_api)
@@ -75,13 +157,31 @@ async def run_bidder_process_for_adv(
     user_max_cpm = adv_setting.max_cpm
     if not user_max_cpm:
         return None
+    white_list = [kw for kw in keywords if kw.hard_status == 2]
+    best_keyword = data_manager.get_best_keyword(white_list)
+    if not best_keyword:
+        return None
 
     # TODO: Надо тут перепроверить логику выбора режима, включая что по умолчанию в модели и т.д.
 
-    if adv_setting.bidder_mode == BidderMode.BY_POSITIONS:
-        from ..exceptions import UsersSettingsError
-        raise UsersSettingsError('Error in user settings: bidder operation by positions is not supported at the moment')
-    elif not adv_setting.bidder_mode or adv_setting.bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
+    if adv_setting.bidder_mode in [BidderMode.BY_POSITIONS, None]:
+        last_views = await redis_last_total_views.get(best_keyword)
+        if last_views and last_views > 0 and last_views == best_keyword.total_views:
+            return None
+
+        last_time_stamp = await last_keyword_stamp_timestamp_cache.get(best_keyword)
+        if last_time_stamp and last_time_stamp == best_keyword.position_update:
+            return None
+        new_cpm = await __get_new_cpm_by_position(
+            adv_setting,
+            wb_api,
+            keywords,
+            best_keyword,
+            cpm_now,
+        )
+        if not new_cpm:
+            return None
+    elif adv_setting.bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
         if not adv_setting.auto_max_cpm_mode:
             return None
         max_cpm = await auto_max_bid_manager.get_max_cpm(
@@ -114,4 +214,8 @@ async def run_bidder_process_for_adv(
                 nmid,
                 new_cpm,
             )
+        # TODO: Вынести в общий код проверку режима биддера
+        if adv_setting.bidder_mode in [BidderMode.BY_POSITIONS, None]:
+            await redis_last_total_views.set(best_keyword)
+            await last_keyword_stamp_timestamp_cache.set(best_keyword)
     return None

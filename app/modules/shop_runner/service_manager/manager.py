@@ -57,7 +57,7 @@ class CoroutinesManager:
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
 
-    @while_coroutine_decorator(60, 60)
+    @while_coroutine_decorator(1, 60)
     async def update_cpm_bid(self) -> None:
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
@@ -71,18 +71,18 @@ class CoroutinesManager:
                 self.__run_bidder_process_for_adv(adv, self._wb_api)
                 for adv in adv_settings
             ],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         for index, result in enumerate(results):
             if isinstance(result, Exception):
                 adv_setting = adv_settings[index]
-                logger.error("Ошибка обновления РК : %s, adv_id: %s, shop_id: %s",
-                             result,
-                             adv_setting.adv_id,
-                             self.shop_id
-                             )
-
+                logger.error(
+                    "Ошибка обновления РК : %s, adv_id: %s, shop_id: %s",
+                    result,
+                    adv_setting.adv_id,
+                    self.shop_id,
+                )
 
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
         return None
@@ -167,7 +167,6 @@ class CoroutinesManager:
         shop_data_updater = ShopDataUpdater(wb_api)
         await self._update_cards_data_from_wb_to_pg(shop_data_updater)
         logger.debug("Обновление карточек завершено")
-
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
@@ -302,7 +301,7 @@ class CoroutinesManager:
 
         return None
 
-    @while_coroutine_decorator(15 * 60, 60)
+    @while_coroutine_decorator(1, 60)
     async def update_keywords_stamp(self) -> None:
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,

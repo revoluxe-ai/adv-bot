@@ -434,7 +434,7 @@ class AdvSetting(BaseTable):
     auto_max_cpm_mode = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
-    max_place: MappedColumn[int] = mapped_column(Integer, nullable=True)
+    max_place: MappedColumn[int | None] = mapped_column(Integer, nullable=True)
     use_incremental_stats = mapped_column(
         Boolean,
         nullable=False,
@@ -688,7 +688,6 @@ class KeywordSetting(BaseTable):
         )
 
 
-
 class WBItemPosition(BaseModel):
     model_config = ConfigDict(validate_assignment=True)
 
@@ -698,6 +697,7 @@ class WBItemPosition(BaseModel):
     adv_id: int | None = None
     keyword_text: str | None = None
     adv_type: int | None = None
+    total_views: int | None = None
 
     @property
     def type_native(self) -> str:

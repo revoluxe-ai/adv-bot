@@ -109,7 +109,11 @@ def retry_decorator(
                                 max(state["_current_pause"], 1.0) * 2, float(max_delay)
                             )
 
-                    except (BadRequestError, UnknownApiRequestError, HttpTimeOutError) as e:
+                    except (
+                        BadRequestError,
+                        UnknownApiRequestError,
+                        HttpTimeOutError,
+                    ) as e:
                         state["_last_query_time"] = time.time()
                         state["_attempts"] += 1
                         if state["_attempts"] >= max_attempts:

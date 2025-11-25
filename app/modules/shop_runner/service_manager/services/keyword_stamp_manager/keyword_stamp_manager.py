@@ -52,11 +52,14 @@ class KeywordStampManager:
         )
 
         try:
-           await self._click_house.update_positions(positions)
+            await self._click_house.update_positions(positions)
         except Exception:
-            logger.error('Ошибка обновления позиций в CH, shop_id: %s, adv_id: %s',
-                         complex_adv.shop_id, complex_adv.adv_id, exc_info=True
-                         )
+            logger.error(
+                "Ошибка обновления позиций в CH, shop_id: %s, adv_id: %s",
+                complex_adv.shop_id,
+                complex_adv.adv_id,
+                exc_info=True,
+            )
             raise
         return None
 
@@ -103,12 +106,13 @@ class KeywordStampManager:
         try:
             await self._update_kw_stamp_in_clickhouse(stamps)
         except Exception:
-            logger.error('Ошибка обновления stamps, shop_id: %s, adv_id: %s, '
-                         'stamps: %s',
-                         complex_adv.shop_id,
-                         complex_adv.adv_id,
-                         stamps,
-                         exc_info=True)
+            logger.error(
+                "Ошибка обновления stamps, shop_id: %s, adv_id: %s, stamps: %s",
+                complex_adv.shop_id,
+                complex_adv.adv_id,
+                stamps,
+                exc_info=True,
+            )
             raise
         # TODO: Сделать обновление сервисом по коммитам
         return None
