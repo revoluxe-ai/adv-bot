@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, PlainValidator
 
+from app.modules.common_slaves.wildberries.models import WBItemPosition
 from app.modules.keywords_query import keywords_query
 
 
@@ -39,8 +40,7 @@ class CalculatedKeyword(BaseModel):
     status: str | None = None
     hard_status: int | None = None
     reason: str | None = None
-    _position: int | None = None
-    position_update: DatetimeType | None = None
+    _position: WBItemPosition = None
     childs_keywords: list["CalculatedKeyword"] | None = None
     _query_static: int | None = None
     cluster_name: str | None = None
@@ -57,25 +57,30 @@ class CalculatedKeyword(BaseModel):
     keyword_setting_original_id: int | None = None
     adv_id: int | None = None
     relevant: bool | None = None
-    _total_views: int | None = None
+
+    @property
+    def position_update(self) -> datetime.datetime | None:
+        if self._position is None:
+            return None
+        return self._position.timestamp
 
     @property
     def position(self) -> int | None:
-        return self._position
+        if not self._position:
+            return None
+        return self._position.position
 
     @position.setter
-    def position(self, value: int | None) -> None:
-        assert isinstance(value, (int, None))
+    def position(self, value: WBItemPosition) -> None:
+        assert isinstance(value, WBItemPosition)
         self._position = value
+
 
     @property
     def total_views(self) -> int | None:
-        return self._total_views
-
-    @total_views.setter
-    def total_views(self, value: int | None) -> None:
-        assert isinstance(value, int | None)
-        self._total_views = value
+        if not self._position:
+            return None
+        return self._position.total_views
 
     def clear_cache(self):
         """Очистка кэшированных свойств"""
