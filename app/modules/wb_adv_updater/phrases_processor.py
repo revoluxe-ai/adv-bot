@@ -180,7 +180,6 @@ async def _get_good_bad_phrases_for_min_ctr(
             )
             if position:
                 keyword_new.position = position.position
-                keyword_new.position_update = position.timestamp
             keyword_new.query = keywords_query.get_queries_of_keyword(text)
             keyword_stats.append(keyword_new)
 
