@@ -9,7 +9,7 @@ class LastTargetPlaceUpV2(  # pyright: ignore[reportIncompatibleVariableOverride
     AdvSettingRedisCache,
     RedisCacheBase,
     PassTimeRedisCacheBase,
-    prefix="LastTargetPlaceUpV2",
+    prefix="last_set_up_target_place",
 ):
     pass
 
@@ -18,6 +18,6 @@ class LastTargetPlaceDownV2(  # pyright: ignore[reportIncompatibleVariableOverri
     AdvSettingRedisCache,
     RedisCacheBase,
     PassTimeRedisCacheBase,
-    prefix="LastTargetPlaceDownV2",
+    prefix="last_set_down_target_place",
 ):
     pass

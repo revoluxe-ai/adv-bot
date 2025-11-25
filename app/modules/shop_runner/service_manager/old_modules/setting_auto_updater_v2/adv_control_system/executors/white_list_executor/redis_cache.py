@@ -13,7 +13,7 @@ class LastAutoAddPhraseToWhiteListV2(  # pyright: ignore[reportIncompatibleVaria
     AdvSettingRedisCache,
     RedisCacheBase,
     PassTimeRedisCacheBase,
-    prefix="LastAutoAddPhraseToWhiteListV2",
+    prefix="LastAutoAddPhraseToWhiteList",
 ):
     """Redis-кэш для отслеживания времени последнего добавления фразы в белый список."""
 
@@ -24,7 +24,7 @@ class LastAutoDeleteFromWhiteListV2(  # pyright: ignore[reportIncompatibleVariab
     AdvSettingRedisCache,
     RedisCacheBase,
     PassTimeRedisCacheBase,
-    prefix="LastAutoDeleteFromWhiteListV2",
+    prefix="LastAutoDeleteFromWhiteList",
 ):
     """Redis-кэш для отслеживания времени последнего удаления фразы из белого списка."""
 
