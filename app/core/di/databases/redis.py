@@ -8,7 +8,7 @@ from redis.asyncio import Redis
 from app.configs import AppConfig
 
 
-def create_redis_client(app_config: AppConfig) -> Redis:
+def create_redis_client(app_config: AppConfig) -> Redis:  # pyright: ignore
     """Синхронно создаёт Redis asyncio-клиент.
     Проверка доступности и закрытие выполняются в приватном lifecycle-ресурсе.
     """
@@ -23,14 +23,14 @@ def create_redis_client(app_config: AppConfig) -> Redis:
     return client
 
 
-class RedisLifecycle(resources.AsyncResource[Redis]):
-    async def init(self, client: Redis) -> None:
+class RedisLifecycle(resources.AsyncResource[Redis]):  # pyright: ignore
+    async def init(self, client: Redis) -> None:  # pyright: ignore
         try:
             await client.ping()
         except Exception as exc:
             await client.aclose()  # type: ignore[attr-defined]
             raise exc
 
-    async def shutdown(self, client: Redis | None = None) -> None:
+    async def shutdown(self, client: Redis | None = None) -> None:  # pyright: ignore
         if client:
             await client.aclose()  # type: ignore[attr-defined]

@@ -76,7 +76,8 @@ class ExponentDownExecutor(BaseExecutor):
 
         if new_exponent == current_exponent:
             logger.debug(
-                "[adv_id=%s] ExponentDown: экспонента не изменится", ctx.complex_adv.adv_id
+                "[adv_id=%s] ExponentDown: экспонента не изменится",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 

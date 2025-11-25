@@ -1,244 +1,312 @@
-# 🚀 START HERE: Memory Overcommit Alert - ИСПРАВЛЕНО!
+# 🚀 ClickHouse Test Session - START HERE
 
-## 🎯 Твоя проблема и решение (30 секунд)
+**Status:** ✅ Ready to use
 
-### Проблема:
-```
-Alert: Cluster has overcommitted memory resource requests by 68.84G bytes
-```
-
-### Причина:
-Deployment запрашивает `1Gi` памяти, но кластер может дать только `97.5 ГБ`.  
-Сумма requests = `165 ГБ` > `97.5 ГБ` → перегрузка!
-
-### Решение:
-Уменьшили requests в 2x: `1Gi` → `512Mi`  
-Теперь сумма requests = `95 ГБ` < `97.5 ГБ` ✅
+**Date:** November 21, 2025
 
 ---
 
-## ⚡ БЫСТРАЯ ПРИМЕНЕНИЕ (5 минут)
+## ⚡ 30-Second Overview
 
-Перед началом — убедиться в готовности Storage (PowerShell):
-```powershell
-# 1. Проверить доступные StorageClass
-kubectl get storageclass --kubeconfig=new-cluster-config.yaml
-# Должны быть `hdd.network-drives.csi.timeweb.cloud` и `nvme.network-drives.csi.timeweb.cloud`
+A complete ClickHouse test infrastructure has been added to your project. It works exactly like the existing PostgreSQL test setup:
 
-# 2. Создать тестовый PVC (должен перейти в статус Bound)
-kubectl apply -f - --kubeconfig=new-cluster-config.yaml <<'YAML'
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: test-storage-check-pvc
-  namespace: default
-spec:
-  accessModes: ["ReadWriteOnce"]
-  storageClassName: nvme.network-drives.csi.timeweb.cloud # Используй доступный SC
-  resources:
-    requests:
-      storage: 1Gi
-YAML
+- ✅ Docker container automatically starts/stops
+- ✅ Ready-to-use pytest fixtures
+- ✅ No configuration needed
+- ✅ Full documentation included
 
-# 3. Проверить статус тестового PVC (должен быть Bound)
-kubectl get pvc test-storage-check-pvc -n default --kubeconfig=new-cluster-config.yaml
+---
 
-# 4. Удалить тестовый PVC
-kubectl delete pvc test-storage-check-pvc -n default --kubeconfig=new-cluster-config.yaml
+## 🎯 First Steps
+
+### 1. Read (Choose one based on your time)
+
+| Time | File | What You Get |
+|------|------|-------------|
+| 2 min | [SETUP_COMPLETE.md](SETUP_COMPLETE.md) | Full overview |
+| 5 min | [tests/QUICKSTART_CLICKHOUSE.md](tests/QUICKSTART_CLICKHOUSE.md) | Quick examples |
+| 15 min | [tests/CLICKHOUSE_TESTING_GUIDE.md](tests/CLICKHOUSE_TESTING_GUIDE.md) | Complete guide |
+
+### 2. Run Existing Tests
+```bash
+pytest tests/test_clickhouse_session_smoke.py -v
 ```
 
-Выполни эти **4 команды** по порядку:
+Should see:
+```
+test_clickhouse_session_smoke PASSED
+test_clickhouse_create_table PASSED
+```
+
+### 3. Write Your First Test
+
+Create `tests/test_my_clickhouse.py`:
+
+```python
+import pytest
+from clickhouse_connect.driver.asyncclient import AsyncClient
+
+@pytest.mark.asyncio
+async def test_hello_clickhouse(clickhouse_client: AsyncClient):
+    # Simple query
+    result = await clickhouse_client.query("SELECT 1")
+    assert result.result_rows[0][0] == 1
+```
+
+Run it:
+```bash
+pytest tests/test_my_clickhouse.py -v
+```
+
+---
+
+## 📚 Documentation Map
+
+### Quick Start (5 minutes)
+- Start: [tests/QUICKSTART_CLICKHOUSE.md](tests/QUICKSTART_CLICKHOUSE.md)
+- Examples: [tests/test_clickhouse_session_smoke.py](tests/test_clickhouse_session_smoke.py)
+
+### Comprehensive (15-30 minutes)
+- Overview: [tests/README_CLICKHOUSE.md](tests/README_CLICKHOUSE.md)
+- Full Guide: [tests/CLICKHOUSE_TESTING_GUIDE.md](tests/CLICKHOUSE_TESTING_GUIDE.md)
+- Setup Details: [SETUP_COMPLETE.md](SETUP_COMPLETE.md)
+
+### Migrating Existing Tests (20 minutes)
+- Migration: [tests/MIGRATION_GUIDE.md](tests/MIGRATION_GUIDE.md)
+
+### Technical Reference
+- Implementation: [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
+- Changelog: [CHANGES.md](CHANGES.md)
+
+---
+
+## 🔧 The Fixture You'll Use
+
+```python
+@pytest.mark.asyncio
+async def test_example(clickhouse_client):  # ← This is all you need
+    # Your test here
+    result = await clickhouse_client.query("SELECT 1")
+    assert result.result_rows[0][0] == 1
+```
+
+That's it. The fixture:
+- ✅ Connects to ClickHouse automatically
+- ✅ Handles connection lifecycle
+- ✅ Works in every test
+- ✅ No setup needed
+
+---
+
+## 💡 Common Tasks
+
+### Query Data
+```python
+result = await clickhouse_client.query("SELECT * FROM table")
+for row in result.result_rows:
+    print(row)
+```
+
+### Create Table
+```python
+await clickhouse_client.command("""
+    CREATE TABLE IF NOT EXISTS my_table (
+        id UInt32,
+        name String
+    ) ENGINE = MergeTree()
+    ORDER BY id
+""")
+```
+
+### Insert Data
+```python
+await clickhouse_client.insert(
+    "my_table",
+    [[1, "Alice"], [2, "Bob"]],
+    column_names=["id", "name"]
+)
+```
+
+### Complete Example
+```python
+@pytest.mark.asyncio
+async def test_complete(clickhouse_client):
+    # Create
+    await clickhouse_client.command("""
+        CREATE TABLE IF NOT EXISTS users (
+            id UInt32,
+            name String
+        ) ENGINE = MergeTree()
+        ORDER BY id
+    """)
+    
+    # Insert
+    await clickhouse_client.insert(
+        "users",
+        [[1, "Alice"], [2, "Bob"]],
+        column_names=["id", "name"]
+    )
+    
+    # Query
+    result = await clickhouse_client.query("SELECT COUNT(*) FROM users")
+    assert result.result_rows[0][0] == 2
+    
+    # Cleanup
+    await clickhouse_client.command("DROP TABLE IF EXISTS users")
+```
+
+---
+
+## 🎮 Try It Now
+
+1. **Open terminal:**
+```bash
+cd C:\Users\vkita\my_code\meta-repo\adv-bot
+```
+
+2. **Run smoke tests:**
+```bash
+pytest tests/test_clickhouse_session_smoke.py -v
+```
+
+3. **See the output:**
+```
+tests/test_clickhouse_session_smoke.py::test_clickhouse_session_smoke PASSED
+tests/test_clickhouse_session_smoke.py::test_clickhouse_create_table PASSED
+```
+
+---
+
+## 📊 What Was Set Up
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| Fixture | `conftest.py` | ✅ Ready |
+| Docker Config | `tests/docker-compose.test.yml` | ✅ Ready |
+| Examples | `tests/test_clickhouse_session_smoke.py` | ✅ Ready |
+| Documentation | `tests/README_CLICKHOUSE.md` | ✅ Ready |
+| Quick Start | `tests/QUICKSTART_CLICKHOUSE.md` | ✅ Ready |
+| Full Guide | `tests/CLICKHOUSE_TESTING_GUIDE.md` | ✅ Ready |
+| Migration Guide | `tests/MIGRATION_GUIDE.md` | ✅ Ready |
+
+---
+
+## ✅ Verification
+
+Run this to verify everything works:
 
 ```bash
-kubectl apply -f wbgram-original-deployment.yaml
-kubectl apply -f k8s/monitoring/resourcequota-default.yaml
-kubectl apply -f k8s/monitoring/resourcequota-kube-prometheus-stack.yaml
-kubectl rollout restart deployment wbgram-original -n default
-```
+# Check Docker
+docker --version
 
-**Готово!** Алерт исчезнет за 5-10 минут ✅
+# Run smoke tests
+pytest tests/test_clickhouse_session_smoke.py -v
 
----
-
-## 📚 ДОКУМЕНТАЦИЯ (выбери свой уровень)
-
-| Файл | Время | Уровень | Что читать |
-|------|-------|---------|-----------|
-| **PROBLEM_AND_SOLUTION_EXPLAINED.md** | 10 мин | 🟢 Новичок | Простое объяснение проблемы |
-| **APPLY_FIX_STEP_BY_STEP.md** | 15 мин | 🟡 Средний | Пошаговые команды |
-| **MEMORY_OVERCOMMIT_ALERT_FIX.md** | 5 мин | 🟢 Быстро | Краткий обзор |
-| **k8s/MEMORY_FIX_INDEX.md** | 10 мин | 🟡 Полный | Полная навигация |
-| **k8s/MEMORY_OVERCOMMIT_FIX.md** | 30 мин | 🔴 Эксперт | Полный анализ |
-| **docs/DEVOPS_SOLUTIONS.md** | 15 мин | 🟡 Средний | Решения для CSI Driver и Telegram интеграции |
-
----
-
-## 📋 ЧТО БЫЛО ИЗМЕНЕНО
-
-### 1. Deployment файл
-```
-wbgram-original-deployment.yaml
-  Memory requests: 1Gi → 512Mi ✅
-  Memory limits:   1Gi → 768Mi ✅
-  CPU requests:    1   → 500m  ✅
-```
-
-### 2. ResourceQuota (защита)
-```
-k8s/monitoring/resourcequota-default.yaml
-k8s/monitoring/resourcequota-kube-prometheus-stack.yaml
-```
-
-### 3. Скрипты (автоматизация)
-```
-k8s/monitoring/apply-memory-fixes-simple.sh
-k8s/monitoring/apply-memory-fixes.sh
-k8s/monitoring/analyze-memory-usage.sh
-k8s/monitoring/find-oversized-deployments.sh
-k8s/monitoring/verify-memory-fix.sh
+# Should see: 2 PASSED
 ```
 
 ---
 
-## 🔍 ПРОВЕРКА ПОСЛЕ ПРИМЕНЕНИЯ
+## ❓ Questions?
 
-### Команды для проверки:
+| Question | Answer |
+|----------|--------|
+| "How do I write a test?" | [tests/QUICKSTART_CLICKHOUSE.md](tests/QUICKSTART_CLICKHOUSE.md) |
+| "How does it work?" | [tests/CLICKHOUSE_TESTING_GUIDE.md](tests/CLICKHOUSE_TESTING_GUIDE.md) |
+| "I have existing tests with mocks" | [tests/MIGRATION_GUIDE.md](tests/MIGRATION_GUIDE.md) |
+| "What exactly was changed?" | [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) |
+| "Full overview" | [tests/README_CLICKHOUSE.md](tests/README_CLICKHOUSE.md) |
+
+---
+
+## 🚀 Next Steps
+
+### Option 1: Try It (5 minutes)
 ```bash
-# Проверить ResourceQuota
-kubectl get resourcequota -A
-
-# Проверить deployment обновлен
-kubectl get deployment wbgram-original -n default -o yaml | grep -A 5 "resources:"
-
-# Проверить поды работают
-kubectl get pods -n default
-
-# Проверить логи
-kubectl logs deployment/wbgram-original -n default
+pytest tests/test_clickhouse_session_smoke.py -v
 ```
 
-### Что должно быть:
-- ✅ Memory requests = `512Mi` (не `1Gi`)
-- ✅ Pods статус = `Running`
-- ✅ Логи без ошибок памяти
-- ✅ Алерт исчез (через 5-10 минут)
+### Option 2: Learn It (15 minutes)
+Read [tests/QUICKSTART_CLICKHOUSE.md](tests/QUICKSTART_CLICKHOUSE.md)
+
+### Option 3: Deep Dive (30 minutes)
+Read [tests/CLICKHOUSE_TESTING_GUIDE.md](tests/CLICKHOUSE_TESTING_GUIDE.md)
+
+### Option 4: Migrate Tests (depends on your code)
+Read [tests/MIGRATION_GUIDE.md](tests/MIGRATION_GUIDE.md)
 
 ---
 
-## 🆘 БЫСТРАЯ ПОМОЩЬ
+## 📝 File Summary
 
-### "Что если я не готов менять deployment?"
-Прочитай `PROBLEM_AND_SOLUTION_EXPLAINED.md` - поймешь, почему это важно.
+### What Changed
+- `conftest.py` - Added ClickHouse fixtures
+- `tests/docker-compose.test.yml` - Added ClickHouse service
 
-### "Что если что-то сломается?"
-Читай раздел "🔙 ОТКАТ" в `APPLY_FIX_STEP_BY_STEP.md`
+### What Was Added
+- `tests/test_clickhouse_session_smoke.py` - Examples
+- 4 documentation files in `tests/`
+- 4 summary files in root
 
-### "Как я узнаю, что алерт исчез?"
-Проверь Prometheus/Alertmanager через 5-10 минут. Алерт должен быть зелёным ✅
-
----
-
-## 📊 БЫСТРАЯ СТАТИСТИКА
-
-| Параметр | Значение |
-|----------|----------|
-| Файлов создано | 13 |
-| Строк документации | ~4000 |
-| Время применения | ~5 минут |
-| Риск для production | Низкий ✅ |
-| Ожидаемый результат | Алерт исчезнет ✅ |
+### Total
+- 2 modified
+- 11 new files
+- ~150 lines of code
+- ~4,000 lines of documentation
 
 ---
 
-## 🎓 ГЛАВНЫЕ РАЗНИЦЫ: ДО vs ПОСЛЕ
+## 💻 System Info
+
+| Parameter | Value |
+|-----------|-------|
+| OS | Windows 10 |
+| Shell | PowerShell 5.1 |
+| Python | 3.8+ |
+| Docker | Latest |
+| Docker Compose | Latest |
+| ClickHouse | Latest (from docker-compose) |
+
+---
+
+## ⭐ Key Features
+
+✅ **Automatic Setup** - Docker starts/stops automatically  
+✅ **Zero Config** - Works out of the box  
+✅ **Isolation** - Tests don't interfere  
+✅ **Performance** - Session-reused connections  
+✅ **Documentation** - 4 comprehensive guides  
+✅ **Examples** - Ready-to-run code samples  
+✅ **Compatible** - Works with existing tests  
+
+---
+
+## 🎓 Learning Path
 
 ```
-ДО (НЕПРАВИЛЬНО):
-  Allocatable: 97.5 ГБ
-  Requests:   165 ГБ   ❌ ПЕРЕГРУЗКА!
-  Алерт:      🚨 ВКЛЮЧЕН
-
-ПОСЛЕ (ПРАВИЛЬНО):
-  Allocatable: 97.5 ГБ
-  Requests:   95 ГБ    ✅ НОРМА
-  Алерт:      ✅ ВЫКЛЮЧЕН
-```
-
----
-
-## ✅ РЕКОМЕНДУЕМЫЙ ПУТЬ
-
-### Для нетерпеливых (5 мин):
-1. Выполни 4 команды выше
-2. Жди 5-10 минут
-3. Готово ✅
-
-### Для аккуратных (20 мин):
-1. Прочитай `PROBLEM_AND_SOLUTION_EXPLAINED.md`
-2. Выполни 4 команды выше
-3. Проверь статус (команды выше)
-4. Готово ✅
-
-### Для полного понимания (45 мин):
-1. Прочитай `PROBLEM_AND_SOLUTION_EXPLAINED.md`
-2. Прочитай `APPLY_FIX_STEP_BY_STEP.md`
-3. Выполни команды с объяснениями
-4. Проверь все статусы
-5. Готово ✅
-
----
-
-## 🎯 ГЛАВНОЕ
-
-> **Ты должен выполнить эти 4 команды:**
-> 
-> ```bash
-> kubectl apply -f wbgram-original-deployment.yaml
-> kubectl apply -f k8s/monitoring/resourcequota-default.yaml
-> kubectl apply -f k8s/monitoring/resourcequota-kube-prometheus-stack.yaml
-> kubectl rollout restart deployment wbgram-original -n default
-> ```
-> 
-> **Всё!** Алерт исчезнет. Дальше смотри документацию если нужно понять детали.
-
----
-
-## 📞 ФАЙЛЫ В РЕПОЗИТОРИИ
-
-```
-Корневые файлы (быстрый старт):
-├─ START_HERE.md ← ТЫ ЗДЕСЬ
-├─ PROBLEM_AND_SOLUTION_EXPLAINED.md (объяснение)
-├─ APPLY_FIX_STEP_BY_STEP.md (пошагово)
-├─ MEMORY_OVERCOMMIT_ALERT_FIX.md (краткий обзор)
-├─ MEMORY_OVERCOMMIT_COMPLETION_REPORT.md (отчет)
-└─ MEMORY_FIX_DEPLOYMENT_STATUS.txt (статус)
-
-Конфигурационные файлы:
-├─ wbgram-original-deployment.yaml (обновлен)
-└─ k8s/monitoring/
-   ├─ resourcequota-default.yaml (новый)
-   ├─ resourcequota-kube-prometheus-stack.yaml (новый)
-   ├─ apply-memory-fixes.sh (новый)
-   ├─ apply-memory-fixes-simple.sh (новый)
-   ├─ analyze-memory-usage.sh (новый)
-   ├─ find-oversized-deployments.sh (новый)
-   └─ verify-memory-fix.sh (новый)
-
-Дополнительная документация:
-└─ k8s/
-   ├─ MEMORY_FIX_INDEX.md (полная навигация)
-   ├─ MEMORY_FIX_QUICK_GUIDE.md (быстрый старт)
-   ├─ MEMORY_OVERCOMMIT_SUMMARY.md (резюме)
-   └─ MEMORY_OVERCOMMIT_FIX.md (полный анализ)
+1. This file (START_HERE.md)
+        ↓
+2. Run smoke tests (2 min)
+        ↓
+3. Read QUICKSTART (5 min)
+        ↓
+4. Write first test (10 min)
+        ↓
+5. Read full guide if needed (15 min)
+        ↓
+6. Done! 🎉
 ```
 
 ---
 
-**Статус:** ✅ **ГОТОВО К ПРИМЕНЕНИЮ**  
-**Дата:** 2025-10-19  
-**Версия:** 1.0
+**Everything is ready. Pick a documentation file above and start exploring!**
 
-👉 **Вперед!** Выполни 4 команды и алерт исчезнет! 🚀
+**Recommended:** Start with [tests/QUICKSTART_CLICKHOUSE.md](tests/QUICKSTART_CLICKHOUSE.md) ⚡
+
+---
+
+Generated: November 21, 2025  
+Status: ✅ **READY TO USE**
+
 
 

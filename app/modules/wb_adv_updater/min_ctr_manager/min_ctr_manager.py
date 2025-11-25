@@ -138,7 +138,6 @@ class MinCtrManager:
         else:
             return max([settings.DEFAULT_MIN_CTR, mean_auto_ctr])
 
-
     async def get_mean_ctr_auto_adv(self) -> float:
         adv = self._adv
         adv_id = adv.adv_id
@@ -155,9 +154,17 @@ class MinCtrManager:
         total_views = full_adv_stat.views
 
         # Получаем статистику по ключевым словам
-        keywords_clicks, keywords_views = await full_wb_adv_stat.get_keywords_clicks_and_views(
-            [adv_id], start_date, end_date
+        keywords_clicks, keywords_views = (
+            await full_wb_adv_stat.get_keywords_clicks_and_views(
+                [adv_id], start_date, end_date
+            )
         )
+
+        """
+        TODO: The calculation of additional_clicks and additional_views can produce negative values when keyword statistics exceed total campaign statistics. This happens when keywords_clicks > total_clicks or keywords_views > total_views, leading to negative values that will cause incorrect CTR calculations. The code should handle this edge case by ensuring non-negative values or returning early when the data is inconsistent.
+        
+        
+        """
 
         # Вычисляем дополнительные клики и показы
         additional_clicks = total_clicks - keywords_clicks
@@ -172,4 +179,3 @@ class MinCtrManager:
 
         ctr = additional_clicks / additional_views
         return ctr
-

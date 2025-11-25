@@ -1,7 +1,7 @@
 import asyncio
 from time import sleep
 
-from app.core.di import DIManager, AppContainer
+from app.core.di import DIManager
 from app.modules.wb_adv_updater.runner import run_update_model
 
 update_model_on_new_features = asyncio.Event()

@@ -9,8 +9,11 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
 )
 import typing
+
 if typing.TYPE_CHECKING:
-    from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+    from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
+        ComplexAdv,
+    )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
     SalesStates,
 )
@@ -56,8 +59,6 @@ class PipelineContext:
     session: AsyncSession
     state: SalesStates
     force: ForceContext
-    
-
 
 
 # TODO: Внедрить лимит обращений в поддержку

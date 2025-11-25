@@ -18,8 +18,11 @@ from app.core.redis_cache.mixins.data_types.pass_time_redis_cache_base import (
 from app.core.redis_cache.redis_cache_base import RedisCacheBase
 
 
-class LastAdvControlSystemUpdate( # pyright: ignore[reportIncompatibleVariableOverride]
-    AdvSettingRedisCache, RedisCacheBase, PassTimeRedisCacheBase, prefix="LastAdvControlSystemUpdate"
+class LastAdvControlSystemUpdate(  # pyright: ignore[reportIncompatibleVariableOverride]
+    AdvSettingRedisCache,
+    RedisCacheBase,
+    PassTimeRedisCacheBase,
+    prefix="LastAdvControlSystemUpdate",
 ):
     """Redis-кэш для отслеживания последнего обновления кампании AdvControlSystem."""
 
@@ -63,4 +66,4 @@ class ControlCascade:
 
         # Обновляем глобальный кэш последнего обновления кампании
         last_update_cache = LastAdvControlSystemUpdate(ctx.complex_adv.adv_setting)
-        await last_update_cache.set() # TODO: Закомментировано для отладки
+        await last_update_cache.set()  # TODO: Закомментировано для отладки

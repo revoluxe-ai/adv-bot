@@ -65,7 +65,9 @@ class AutoMaxBidManager:
 
     @staticmethod
     def __get_max_cpm(
-        pay_for_order: float, ratio_views_to_clicks: float, clicks_to_orders_ratio: float
+        pay_for_order: float,
+        ratio_views_to_clicks: float,
+        clicks_to_orders_ratio: float,
     ) -> float:
         views_for_order = ratio_views_to_clicks * clicks_to_orders_ratio
         max_pay_for_view = pay_for_order / views_for_order

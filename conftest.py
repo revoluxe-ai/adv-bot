@@ -1,4 +1,7 @@
 # mypy: ignore-errors
+from clickhouse_connect import get_async_client
+
+from app.core.di.app_container import AppContainer
 from tests.factories import adv_factory
 import os
 
@@ -6,7 +9,7 @@ import asyncio
 
 from fakeredis import FakeRedis
 
-from app.core.di import AppContainer
+
 import aiofiles
 from dependency_injector import containers
 
@@ -187,8 +190,16 @@ def setup_test_database(docker_compose_cmd):
 
     # Создаём необходимые расширения PostgreSQL ПЕРЕД созданием таблиц
     with sync_engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-        conn.commit()
+        try:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+            conn.commit()
+        except Exception as e:
+            # Игнорируем ошибку если расширение уже существует (race condition в PostgreSQL)
+            if "already exists" in str(e):
+                print(f"[INFO] Extension pg_trgm already exists, skipping...")
+                conn.rollback()
+            else:
+                raise
 
     print("[MIGRATION] Creating tables from models metadata...")
     Base.metadata.create_all(sync_engine)
@@ -390,9 +401,9 @@ def adv_setting_mock():
 
 
 @pytest.fixture
-def session_mock(result_mock):
+def session_mock(): # Удаляем result_mock из аргументов
     session_mock = MagicMock()
-    session_mock.execute = AsyncMock(return_value=result_mock)
+    session_mock.execute = AsyncMock(return_value=MagicMock(scalars=MagicMock(return_value=[]))) # Задаем подходящее значение
     session_mock.commit = AsyncMock(return_value=None)
     return session_mock
 
@@ -474,7 +485,6 @@ async def front_too_many_requests_str() -> AsyncGenerator[str, None]:
 
 @pytest.fixture(name="di_container", scope="function")
 async def di_container() -> AsyncGenerator[AppContainer, None]:
-    from app.core.di import AppContainer
 
     AppContainer.wiring_config = containers.WiringConfiguration()
     container = AppContainer()
@@ -493,7 +503,7 @@ async def postgres_session(async_engine):
 @pytest.fixture(scope='function')
 async def fake_redis():
     """Создает фейковый Redis для тестов (асинхронная версия)."""
-    redis = await fakeredis.aioredis.FakeRedis()
+    redis = await fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield redis
     await redis.flushall()  # очищаем после теста
     await redis.close()
@@ -542,6 +552,7 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
 
     # 5️⃣ Реальный ComplexAdv
     complex_adv = ComplexAdv(
+        shop_id='559785095jljiuilhkh',
         adv_setting=adv_setting,
         get_keywords_func=get_keywords_func,
         search_adv=search_adv_setting,
@@ -584,7 +595,6 @@ async def clean_db(async_engine):
 
 @pytest.fixture(scope='function')
 def main_di_container() -> AppContainer:
-    from app.core.di import AppContainer
 
     container = AppContainer()
     return container
@@ -600,3 +610,38 @@ def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRed
                                        ]
     main_di_container.redis_client.override(fake_redis)
     return main_di_container
+
+
+@pytest.fixture(scope="function")
+async def clickhouse_client(setup_test_database):
+    """
+    Создаёт async-клиент ClickHouse.
+    Зависит от setup_test_database (который запускает docker-compose).
+    """
+    host =  "localhost"
+    port =  8124
+    user = "CLICK_HOUSE_USER"
+    password = "password"
+
+    client = await get_async_client(
+            host=host,
+            port=port,
+            username=user,
+            password=password,
+            database="default_db",
+        )
+
+
+    print("[OK] ClickHouse async client created")
+
+    yield client
+
+
+    client.close()
+    print("[OK] ClickHouse client closed")
+
+
+@pytest.fixture(scope='function')
+def app_container():
+    container = AppContainer()
+    return container

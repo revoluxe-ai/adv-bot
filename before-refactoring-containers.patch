@@ -1,0 +1,451 @@
+Index: app/core/di/client_di/modules/modules_container.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/core/di/client_di/modules/modules_container.py b/app/core/di/client_di/modules/modules_container.py
+new file mode 100644
+--- /dev/null	(date 1763464002497)
++++ b/app/core/di/client_di/modules/modules_container.py	(date 1763464002497)
+@@ -0,0 +1,10 @@
++from dependency_injector import containers
++
++
++# TODO: Сделать короткий вводный гайд по боту
++
++
++class ModulesContainer(containers.DeclarativeContainer):
++
++    _shop_
++
+Index: app/core/di/client_di/wb_api_containers/__init__.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/core/di/client_di/wb_api_containers/__init__.py b/app/core/di/client_di/wb_api_containers/__init__.py
+new file mode 100644
+--- /dev/null	(date 1763460929843)
++++ b/app/core/di/client_di/wb_api_containers/__init__.py	(date 1763460929843)
+@@ -0,0 +1,1 @@
++from .wb_manager_hub_container import  WBManagerHubContainer
+\ No newline at end of file
+Index: app/core/di/client_di/wb_api_containers/wb_data_container.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/core/di/client_di/wb_api_containers/wb_data_container.py b/app/core/di/client_di/wb_api_containers/wb_data_container.py
+new file mode 100644
+--- /dev/null	(date 1763389240666)
++++ b/app/core/di/client_di/wb_api_containers/wb_data_container.py	(date 1763389240666)
+@@ -0,0 +1,31 @@
++from typing import cast
++
++from dependency_injector import containers, providers
++from dependency_injector.providers import Provider
++
++from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
++from app.core.mp.wb.api.di.domain_managers_containers.analitycs_container import (
++    AnalyticDomainContainer,
++)
++from app.core.mp.wb.api.domain_managers import AnalyticsManager
++from app.core.mp.wb.api.managers import WBDataManager
++
++
++class WBDataContainer(containers.DeclarativeContainer):
++    _base_url = providers.Object("https://seller-analytics-api.wildberries.ru")
++    _auth_client_handler = providers.Dependency(instance_of=AuthClientHandler)
++    _analytics_and_data_container: Provider[AnalyticDomainContainer] = providers.Container(
++        AnalyticDomainContainer,
++        _base_url=_base_url,
++        _auth_client_handler=_auth_client_handler,
++    )
++
++    _analytics_domain_manager: Provider[AnalyticsManager] = cast(
++        Provider[AnalyticsManager],
++        _analytics_and_data_container.analytics_domain_manager,
++    )
++
++    wb_data_manager = providers.Singleton(
++        WBDataManager,
++        analytics_manager=_analytics_domain_manager,
++                                          )
+Index: app/core/di/client_di/wb_api_containers/domain_managers_containers/analitycs_container.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/core/di/client_di/wb_api_containers/domain_managers_containers/analitycs_container.py b/app/core/di/client_di/wb_api_containers/domain_managers_containers/analitycs_container.py
+new file mode 100644
+--- /dev/null	(date 1763455860533)
++++ b/app/core/di/client_di/wb_api_containers/domain_managers_containers/analitycs_container.py	(date 1763455860533)
+@@ -0,0 +1,29 @@
++from dependency_injector import containers, providers
++
++from app.core.mp.wb.api.adapter.analitika_i_dannye_client import poiskovye_zaprosy_po_vashim_tovaram
++from app.core.mp.wb.api.adapter.analitika_i_dannye_client import AnalyticAndDataClient
++from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
++from app.core.mp.wb.api.domain_managers import AnalyticsManager
++from app.core.mp.wb.api.request_limit_manager import RequestLimitManager
++
++
++class AnalyticDomainContainer(containers.DeclarativeContainer):
++    _base_url = providers.Dependency(instance_of=str)
++    _auth_client_handler = providers.Dependency(instance_of=AuthClientHandler)
++    _request_limit_manager = providers.Singleton(RequestLimitManager)
++
++    _search_keywords_adapter = providers.Singleton(
++        poiskovye_zaprosy_po_vashim_tovaram.Adapter,
++        base_url=_base_url,
++        auth_client_handler=_auth_client_handler,
++        request_limit_manager=_request_limit_manager,
++    )
++
++    _analytics_and_data_adapter = providers.Singleton(
++        AnalyticAndDataClient,
++        search_keywords_adapter=_search_keywords_adapter,
++    )
++    analytics_domain_manager = providers.Singleton(
++        AnalyticsManager,
++        adapter=_analytics_and_data_adapter,
++    )
+Index: app/core/di/client_di/wb_api_containers/wb_manager_hub_container.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/core/di/client_di/wb_api_containers/wb_manager_hub_container.py b/app/core/di/client_di/wb_api_containers/wb_manager_hub_container.py
+new file mode 100644
+--- /dev/null	(date 1763459345948)
++++ b/app/core/di/client_di/wb_api_containers/wb_manager_hub_container.py	(date 1763459345948)
+@@ -0,0 +1,40 @@
++from typing import cast
++
++from dependency_injector import containers, providers
++from dependency_injector.providers import Provider
++
++from .wb_data_container import WBDataContainer
++from ..auth_client_handler import AuthClientHandler
++from ..httpx_client_handler import HttpxClientHandler
++from ..managers import WBDataManager
++from ..wb_manager_hub import WBManagerHub
++
++
++
++class WBManagerHubContainer(containers.DeclarativeContainer):
++    _shop_id = providers.Dependency(instance_of=str)
++    _httpx_client_handler = providers.Dependency(instance_of=HttpxClientHandler)
++
++    _auth_client_handler = providers.Singleton(
++        AuthClientHandler,
++        shop_id=_shop_id,
++        httpx_client_handler=_httpx_client_handler,
++    )
++
++    _wb_data_container: Provider[WBDataContainer] = providers.Container(
++        WBDataContainer,
++        _auth_client_handler=_auth_client_handler,
++    )
++
++    _wb_data_manager: Provider[WBDataManager] = cast(
++        Provider[WBDataManager],
++        _wb_data_container.wb_data_manager,
++    )
++
++    wb_manager_hub = providers.Singleton(
++        WBManagerHub,
++        wb_data_manager=_wb_data_manager,
++    )
++
++
++
+Index: app/core/di/client_di/client_container.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/core/di/client_di/client_container.py b/app/core/di/client_di/client_container.py
+new file mode 100644
+--- /dev/null	(date 1763460929829)
++++ b/app/core/di/client_di/client_container.py	(date 1763460929829)
+@@ -0,0 +1,8 @@
++from dependency_injector import containers, providers
++from .wb_api_containers import WBManagerHubContainer
++
++
++
++class ClientContainer(containers.DeclarativeContainer):
++    wb_container = providers.Container(WBManagerHubContainer)
++    modules = providers.Container(ModulesContainer)
+\ No newline at end of file
+Index: app/core/di/client_di/client_manager_hub_factory.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/core/di/client_di/client_manager_hub_factory.py b/app/core/di/client_di/client_manager_hub_factory.py
+new file mode 100644
+--- /dev/null	(date 1763322697444)
++++ b/app/core/di/client_di/client_manager_hub_factory.py	(date 1763322697444)
+@@ -0,0 +1,45 @@
++from contextvars import ContextVar, Token
++
++from .api.wb_manager_hub import WBManagerHub
++from .api.di.wb_manager_hub_container import WBManagerHubContainer
++from .api.httpx_client_handler import HttpxClientHandler
++
++
++
++class WBManagerHubFactory:
++    _wb_manager_hub_context_var: ContextVar[WBManagerHub] = ContextVar('wb_manager_hub_context')
++
++    def __init__(self, httpx_client_handler: HttpxClientHandler):
++
++        self.__httpx_client_handler = httpx_client_handler
++        self.__object_collection: dict[str,  WBManagerHub] = {}
++        self._tokens: dict[str, Token] = {}
++
++    def get_wb_manager_hub(self, shop_id: str) -> WBManagerHub:
++        if shop_id not in self.__object_collection:
++            wb_manager_hub_container: WBManagerHubContainer = WBManagerHubContainer(
++                _shop_id=shop_id,
++                _httpx_client_handler=self.__httpx_client_handler
++            )
++            wb_manager_hub: WBManagerHub = wb_manager_hub_container.wb_manager_hub()
++            self.__object_collection[shop_id] = wb_manager_hub
++            self._set_manager_in_context(shop_id, wb_manager_hub)
++        return self.__object_collection[shop_id]
++
++    def _set_manager_in_context(self, shop_id, wb_manager_hub) -> None:
++        token = self._wb_manager_hub_context_var.set(wb_manager_hub)
++        self._tokens[shop_id] = token
++
++    def reset_shop(self, shop_id: str) -> None:
++        self._wb_manager_hub_context_var.reset(self._tokens[shop_id])
++        del self.__object_collection[shop_id]
++
++
++    @classmethod
++    def get_wb_manager_from_context(cls) -> WBManagerHub:
++        return cls._wb_manager_hub_context_var.get()
++
++
++
++
++
+Index: app/core/di/client_di/wb_data_container.py
+===================================================================
+diff --git a/app/core/di/client_di/wb_data_container.py b/app/core/di/client_di/wb_data_container.py
+deleted file mode 100644
+--- a/app/core/di/client_di/wb_data_container.py
++++ /dev/null
+@@ -1,31 +0,0 @@
+-from typing import cast
+-
+-from dependency_injector import containers, providers
+-from dependency_injector.providers import Provider
+-
+-from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
+-from app.core.mp.wb.api.di.domain_managers_containers.analitycs_container import (
+-    AnalyticDomainContainer,
+-)
+-from app.core.mp.wb.api.domain_managers import AnalyticsManager
+-from app.core.mp.wb.api.managers import WBDataManager
+-
+-
+-class WBDataContainer(containers.DeclarativeContainer):
+-    _base_url = providers.Object("https://seller-analytics-api.wildberries.ru")
+-    _auth_client_handler = providers.Dependency(instance_of=AuthClientHandler)
+-    _analytics_and_data_container: Provider[AnalyticDomainContainer] = providers.Container(
+-        AnalyticDomainContainer,
+-        _base_url=_base_url,
+-        _auth_client_handler=_auth_client_handler,
+-    )
+-
+-    _analytics_domain_manager: Provider[AnalyticsManager] = cast(
+-        Provider[AnalyticsManager],
+-        _analytics_and_data_container.analytics_domain_manager,
+-    )
+-
+-    wb_data_manager = providers.Singleton(
+-        WBDataManager,
+-        analytics_manager=_analytics_domain_manager,
+-                                          )
+Index: app/core/di/client_di/wb_manager_hub_container.py
+===================================================================
+diff --git a/app/core/di/client_di/wb_manager_hub_container.py b/app/core/di/client_di/wb_manager_hub_container.py
+deleted file mode 100644
+--- a/app/core/di/client_di/wb_manager_hub_container.py
++++ /dev/null
+@@ -1,40 +0,0 @@
+-from typing import cast
+-
+-from dependency_injector import containers, providers
+-from dependency_injector.providers import Provider
+-
+-from .wb_data_container import WBDataContainer
+-from ..auth_client_handler import AuthClientHandler
+-from ..httpx_client_handler import HttpxClientHandler
+-from ..managers import WBDataManager
+-from ..wb_manager_hub import WBManagerHub
+-
+-
+-
+-class WBManagerHubContainer(containers.DeclarativeContainer):
+-    _shop_id = providers.Dependency(instance_of=str)
+-    _httpx_client_handler = providers.Dependency(instance_of=HttpxClientHandler)
+-
+-    _auth_client_handler = providers.Singleton(
+-        AuthClientHandler,
+-        shop_id=_shop_id,
+-        httpx_client_handler=_httpx_client_handler,
+-    )
+-
+-    _wb_data_container: Provider[WBDataContainer] = providers.Container(
+-        WBDataContainer,
+-        _auth_client_handler=_auth_client_handler,
+-    )
+-
+-    _wb_data_manager: Provider[WBDataManager] = cast(
+-        Provider[WBDataManager],
+-        _wb_data_container.wb_data_manager,
+-    )
+-
+-    wb_manager_hub = providers.Singleton(
+-        WBManagerHub,
+-        wb_data_manager=_wb_data_manager,
+-    )
+-
+-
+-
+Index: app/core/di/client_di/domain_managers_containers/analitycs_container.py
+===================================================================
+diff --git a/app/core/di/client_di/domain_managers_containers/analitycs_container.py b/app/core/di/client_di/domain_managers_containers/analitycs_container.py
+deleted file mode 100644
+--- a/app/core/di/client_di/domain_managers_containers/analitycs_container.py
++++ /dev/null
+@@ -1,29 +0,0 @@
+-from dependency_injector import containers, providers
+-
+-from app.core.mp.wb.api.adapter.analitika_i_dannye_client import poiskovye_zaprosy_po_vashim_tovaram
+-from app.core.mp.wb.api.adapter.analitika_i_dannye_client import AnalyticAndDataClient
+-from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
+-from app.core.mp.wb.api.domain_managers import AnalyticsManager
+-from app.core.mp.wb.api.request_limit_manager import RequestLimitManager
+-
+-
+-class AnalyticDomainContainer(containers.DeclarativeContainer):
+-    _base_url = providers.Dependency(instance_of=str)
+-    _auth_client_handler = providers.Dependency(instance_of=AuthClientHandler)
+-    _request_limit_manager = providers.Singleton(RequestLimitManager)
+-
+-    _search_keywords_adapter = providers.Singleton(
+-        poiskovye_zaprosy_po_vashim_tovaram.Adapter,
+-        base_url=_base_url,
+-        auth_client_handler=_auth_client_handler,
+-        request_limit_manager=_request_limit_manager,
+-    )
+-
+-    _analytics_and_data_adapter = providers.Singleton(
+-        AnalyticAndDataClient,
+-        search_keywords_adapter=_search_keywords_adapter,
+-    )
+-    analytics_domain_manager = providers.Singleton(
+-        AnalyticsManager,
+-        adapter=_analytics_and_data_adapter,
+-    )
+Index: app/core/mp/wb/api/wb_manager_hub_factory.py
+===================================================================
+diff --git a/app/core/mp/wb/api/wb_manager_hub_factory.py b/app/core/mp/wb/api/wb_manager_hub_factory.py
+deleted file mode 100644
+--- a/app/core/mp/wb/api/wb_manager_hub_factory.py
++++ /dev/null
+@@ -1,45 +0,0 @@
+-from contextvars import ContextVar, Token
+-
+-from .api.wb_manager_hub import WBManagerHub
+-from .api.di.wb_manager_hub_container import WBManagerHubContainer
+-from .api.httpx_client_handler import HttpxClientHandler
+-
+-
+-
+-class WBManagerHubFactory:
+-    _wb_manager_hub_context_var: ContextVar[WBManagerHub] = ContextVar('wb_manager_hub_context')
+-
+-    def __init__(self, httpx_client_handler: HttpxClientHandler):
+-
+-        self.__httpx_client_handler = httpx_client_handler
+-        self.__object_collection: dict[str,  WBManagerHub] = {}
+-        self._tokens: dict[str, Token] = {}
+-
+-    def get_wb_manager_hub(self, shop_id: str) -> WBManagerHub:
+-        if shop_id not in self.__object_collection:
+-            wb_manager_hub_container: WBManagerHubContainer = WBManagerHubContainer(
+-                _shop_id=shop_id,
+-                _httpx_client_handler=self.__httpx_client_handler
+-            )
+-            wb_manager_hub: WBManagerHub = wb_manager_hub_container.wb_manager_hub()
+-            self.__object_collection[shop_id] = wb_manager_hub
+-            self._set_manager_in_context(shop_id, wb_manager_hub)
+-        return self.__object_collection[shop_id]
+-
+-    def _set_manager_in_context(self, shop_id, wb_manager_hub) -> None:
+-        token = self._wb_manager_hub_context_var.set(wb_manager_hub)
+-        self._tokens[shop_id] = token
+-
+-    def reset_shop(self, shop_id: str) -> None:
+-        self._wb_manager_hub_context_var.reset(self._tokens[shop_id])
+-        del self.__object_collection[shop_id]
+-
+-
+-    @classmethod
+-    def get_wb_manager_from_context(cls) -> WBManagerHub:
+-        return cls._wb_manager_hub_context_var.get()
+-
+-
+-
+-
+-
+Index: app/modules/shop_runner/service_manager/services/keyword_stamp_manager/keyword_stamp_manager.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/modules/shop_runner/service_manager/services/keyword_stamp_manager/keyword_stamp_manager.py b/app/modules/shop_runner/service_manager/services/keyword_stamp_manager/keyword_stamp_manager.py
+--- a/app/modules/shop_runner/service_manager/services/keyword_stamp_manager/keyword_stamp_manager.py
++++ b/app/modules/shop_runner/service_manager/services/keyword_stamp_manager/keyword_stamp_manager.py	(date 1763459345979)
+@@ -4,18 +4,18 @@
+ 
+ 
+ class KeywordStampManager:
+-    
++
+     def __init__(self, click_house: ClickHouseKeywordStampManager):
+         self._click_house = click_house
+-    
+-    
++
++
+     async def update_keywords_position_stamp(self, complex_adv: ComplexAdv) -> None:
+         wb_manager_hub: WBManagerHub = WBManagerHubFactory.get_wb_manager_from_context()
+         keywords = await complex_adv.get_keywords()
+         keywords_with_views = [kw for kw in keywords if kw.views > 0]
+-    
+-        empty_dates = 
+-    
+-    
+-    
++
++        empty_dates =
++
++
++
+         positions = wb_manager_hub.wb_data_manager.get_keywords_positions_from_wb_api(keywords_with_views)
+\ No newline at end of file
+diff --git a/app/core/di/client_di/modules/__init__.py b/app/core/di/client_di/modules/__init__.py
+new file mode 100644
+diff --git a/app/core/di/client_di/wb_api_containers/domain_managers_containers/__init__.py b/app/core/di/client_di/wb_api_containers/domain_managers_containers/__init__.py
+new file mode 100644
+diff --git a/app/core/di/client_di/domain_managers_containers/__init__.py b/app/core/di/client_di/domain_managers_containers/__init__.py
+deleted file mode 100644

@@ -2,12 +2,10 @@ import datetime
 import json
 import logging
 import re
-from sqlalchemy.orm.properties import MappedColumn
-from sqlalchemy.orm.properties import MappedColumn
-from sqlalchemy.orm.properties import MappedColumn
+
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm.properties import MappedColumn
 import typing
-from dataclasses import dataclass
 from enum import Enum
 from typing import cast
 
@@ -45,7 +43,7 @@ from app.utils.db.session_maker import get_async_session_maker
 try:
     # TODO: Надо разобраться что это за конструкция такая, и постараться ее убрать без рейса исключения
     from app.modules.billing import models as _billing_models  # noqa: F401
-except Exception: # noqa
+except Exception:  # noqa
     # In minimal test contexts billing may be absent; relationship will fallback to string resolution
     pass
 
@@ -264,7 +262,7 @@ class WBToken(BaseTable):
         try:
             # Compare using timezone-aware UTC now
             return datetime.datetime.now(datetime.UTC) >= self.__expires
-        except Exception: # noqa
+        except Exception:  # noqa
             return (
                 True  # Если нет exp в payload или ошибка — считаем токен просроченным
             )
@@ -352,7 +350,7 @@ class WBCard(BaseTable):
         return urls
 
     @property
-    def SubjectId(self) -> int | None: # noqa
+    def SubjectId(self) -> int | None:  # noqa
         subject_id = self.card_json.get("subjectID")
         if isinstance(subject_id, int) or subject_id is None:
             return subject_id
@@ -368,7 +366,7 @@ class AdvSetting(BaseTable):
         DONE = "done"
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs) # noqa
+        super().__init__(*args, **kwargs)  # noqa
         self._worst_promo_position = None
 
     def __repr__(self):
@@ -436,7 +434,7 @@ class AdvSetting(BaseTable):
     auto_max_cpm_mode = mapped_column(
         Boolean, nullable=True, default=False, server_default=text("false")
     )
-    max_place: MappedColumn[int] = mapped_column(Integer, nullable=True)
+    max_place: MappedColumn[int | None] = mapped_column(Integer, nullable=True)
     use_incremental_stats = mapped_column(
         Boolean,
         nullable=False,
@@ -459,7 +457,7 @@ class AdvSetting(BaseTable):
     )
     _search_adv_id: Mapped[int] = mapped_column(Integer, nullable=True)
     bidder_step = mapped_column(Integer, nullable=True, default=settings.BIDDER_STEP)
-    exponent_predict_ctr: Mapped[float]  = mapped_column(
+    exponent_predict_ctr: Mapped[float] = mapped_column(
         Float,
         nullable=False,
         default=settings.DEFAULT_CTR_EXPONENTA,
@@ -497,8 +495,12 @@ class AdvSetting(BaseTable):
         Integer, nullable=True, default=0, server_default="0"
     )
 
-    auto_adv_target_status: MappedColumn[bool | None] = mapped_column(Boolean, nullable=True, default=None)
-    auction_adv_target_status: MappedColumn[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    auto_adv_target_status: MappedColumn[bool | None] = mapped_column(
+        Boolean, nullable=True, default=None
+    )
+    auction_adv_target_status: MappedColumn[bool | None] = mapped_column(
+        Boolean, nullable=True, default=None
+    )
     auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=True, server_default=text("true")
     )
@@ -528,15 +530,13 @@ class AdvSetting(BaseTable):
     automatic_version: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
-
-    bidder_mode: Mapped[BidderMode | None]  = mapped_column(
+    # TODO: The default value for bidder_mode was changed from BY_POSITIONS to BY_AUTO_MAX_CPM, but the database migration only sets server_default without updating existing NULL records. Since the field is nullable and existing records may have NULL values, the logic in bidder_func.py line 82 treats NULL as equivalent to BY_AUTO_MAX_CPM. However, if users have auto_max_cpm_mode=False (which is the default), the bidder will silently return None instead of processing bids, breaking functionality for existing campaigns without explicit migration of their settings.
+    bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,
-        default=BidderMode.BY_POSITIONS,
-        server_default=BidderMode.BY_POSITIONS.name,
+        default=BidderMode.BY_AUTO_MAX_CPM,
+        server_default=BidderMode.BY_AUTO_MAX_CPM.name,
     )
-
-
 
     __table_args__ = (
         # Составной индекс для основного запроса
@@ -579,7 +579,7 @@ class AdvSetting(BaseTable):
         if not self.name:
             return None
         name = self.name.replace(" ", "")
-        pattern = re.compile(r"<!-\[(\d+)\]-!>") # noqa
+        pattern = re.compile(r"<!-\[(\d+)\]-!>")  # noqa
         match = re.search(pattern, name)
         if not match:
             return None
@@ -599,7 +599,7 @@ class AdvSetting(BaseTable):
         if match:
             return int(match.group(1))
         return None
-    
+
     @property
     def auto_max_bid(self) -> bool:
         # TODO: DEPRICATED - удалить!!!!
@@ -688,14 +688,16 @@ class KeywordSetting(BaseTable):
         )
 
 
-@dataclass
-class WBItemPosition:
+class WBItemPosition(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     nmid: int | None = None
     position: int | None = None
     timestamp: datetime.datetime | None = None
     adv_id: int | None = None
     keyword_text: str | None = None
     adv_type: int | None = None
+    total_views: int | None = None
 
     @property
     def type_native(self) -> str:
@@ -708,7 +710,6 @@ class WBItemPosition:
 
     def to_dict(self) -> dict[str, object]:
         timestamp = self.timestamp
-        str_timestamp = timestamp.isoformat() if timestamp else None
         return {
             "real_position": self.position,
             "promo_position": self.position,
@@ -717,20 +718,22 @@ class WBItemPosition:
             "keyword_text": self.keyword_text,
             "adv_id": self.adv_id,
             "nmid": self.nmid,
-            "timestamp": str_timestamp,
+            "timestamp": timestamp.isoformat() if timestamp else None,
             "adv_type": self.adv_type,
         }
 
     @staticmethod
     def from_dict(data: dict[str, object]) -> "WBItemPosition":
+        # создаём пустую модель (разрешено, так как все поля optional)
         position = WBItemPosition()
+
+        # position
         raw_position = data.get("position")
         if isinstance(raw_position, int):
             position.position = raw_position
         elif isinstance(raw_position, str) and raw_position.isdigit():
             position.position = int(raw_position)
         else:
-            # fallback старый ключ
             base_raw = data.get("base_position")
             if isinstance(base_raw, int):
                 position.position = base_raw
@@ -739,6 +742,7 @@ class WBItemPosition:
             else:
                 position.position = None
 
+        # adv_id
         raw_adv_id = data.get("adv_id")
         if isinstance(raw_adv_id, int):
             position.adv_id = raw_adv_id
@@ -747,6 +751,7 @@ class WBItemPosition:
         else:
             position.adv_id = None
 
+        # nmid
         raw_nmid = data.get("nmid")
         if isinstance(raw_nmid, int):
             position.nmid = raw_nmid
@@ -760,14 +765,16 @@ class WBItemPosition:
         if isinstance(raw_ts, str):
             try:
                 position.timestamp = datetime.datetime.fromisoformat(raw_ts)
-            except Exception: # noqa
+            except Exception:
                 position.timestamp = None
         else:
             position.timestamp = None
 
+        # keyword
         raw_kw = data.get("keyword_text")
         position.keyword_text = raw_kw if isinstance(raw_kw, str) else None
 
+        # adv_type
         raw_adv_type = data.get("adv_type")
         if isinstance(raw_adv_type, int):
             position.adv_type = raw_adv_type

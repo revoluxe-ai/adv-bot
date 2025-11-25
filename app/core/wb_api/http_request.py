@@ -80,7 +80,7 @@ def try_except_decorator(
 
             state = instance.api_call_state[method_name]
             shop_id = instance.shop_id
-            while state["_attempts"] < max_attempts: # noqa
+            while state["_attempts"] < max_attempts:  # noqa
                 last_query_time: float | None = state["_last_query_time"]
                 if last_query_time:
                     current_time = time.time()
@@ -93,7 +93,9 @@ def try_except_decorator(
                 try:
                     state["_last_query_time"] = time.time()
                     result = await func(instance, *args, **kwargs)
-                    logger.debug("Запрос %s выполнен успешно для %s", method_name, shop_id)
+                    logger.debug(
+                        "Запрос %s выполнен успешно для %s", method_name, shop_id
+                    )
                     next_pause = (
                         interval_seconds / requests_per_interval
                         + state["_current_pause"]
@@ -124,13 +126,14 @@ def try_except_decorator(
                         max(state["_current_pause"], 1) * 2, max_delay
                     )
                     logger.debug(
-                        "Следующая пауза между запросами: %s секунд для shop_id: %s",
+                        "Следующая пауза между запросами: %s секунд для shop_id: %s, ошибка: %s",
                         state["_current_pause"],
                         shop_id,
+                        e,
                     )
                 except Exception as e:
                     raise e
-        
+
         return cast(F, wrapper)
 
     return decorator
@@ -193,7 +196,10 @@ def get_error_from_response(response_text: str) -> Exception:
     try:
         response_json = json.loads(response_text)
     except JSONDecodeError as e:
-        logger.error('Ошибка декодирования JSON из ответа API Wildberries: "%s"', response_text[:500])
+        logger.error(
+            'Ошибка декодирования JSON из ответа API Wildberries: "%s"',
+            response_text[:500],
+        )
         raise NotValidDataError("Ответ не является валидным JSON") from e
     match response_json:
         case {

@@ -47,20 +47,20 @@ class WhiteListRemoveExecutor(BaseExecutor):
         # Проверка rate-limiting
         if not await redis_cache.check_pass_time(self.PASS_TIME_SECONDS):
             logger.debug(
-                "[adv_id=%s] WhiteListRemove: rate-limit не прошёл", ctx.complex_adv.adv_id
+                "[adv_id=%s] WhiteListRemove: rate-limit не прошёл",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
         keywords: list[CalculatedKeyword] = await ctx.complex_adv.get_keywords()
         # Фильтруем ключи в белом списке (hard_status=2), кроме best_keyword
         white_keywords: list[CalculatedKeyword] = [
-            kw
-            for kw in keywords
-            if kw.hard_status == 2 and not kw.best_keyword_status
-        ]    
+            kw for kw in keywords if kw.hard_status == 2 and not kw.best_keyword_status
+        ]
 
         if not white_keywords:
             logger.debug(
-                "[adv_id=%s] WhiteListRemove: нет ключей для удаления", ctx.complex_adv.adv_id
+                "[adv_id=%s] WhiteListRemove: нет ключей для удаления",
+                ctx.complex_adv.adv_id,
             )
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
@@ -68,7 +68,9 @@ class WhiteListRemoveExecutor(BaseExecutor):
             return kw.predict_ctr or 0
 
         # Сортируем по базовому CTR и оставляем всех кроме лучшего
-        white_keywords.sort(key=sort_func, reverse=True) # тут было по баесу, заменил на predict_ctr
+        white_keywords.sort(
+            key=sort_func, reverse=True
+        )  # тут было по баесу, заменил на predict_ctr
         white_keywords = white_keywords[1:]  # Убираем лучший ключ из кандидатов
 
         if not white_keywords:
@@ -100,4 +102,3 @@ class WhiteListRemoveExecutor(BaseExecutor):
 
         # Efficiency = 1 ключ удалён (на первом этапе всегда 1 действие)
         return ExecutionResult(success=True, efficiency=1.0, used_power=1)
-        

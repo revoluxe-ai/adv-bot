@@ -46,7 +46,7 @@ class BotActive:
     action: bool
 
 
-class Min_ctr(CallbackData, prefix="min_ctr"): # noqa
+class Min_ctr(CallbackData, prefix="min_ctr"):  # noqa
     action: str
     adv_original_id: int
     wb_user_cabinet_original_id: int
@@ -241,7 +241,9 @@ class AutoUpdaterVersionToggle(CallbackData, prefix="auto_updater_version_toggle
     adv_setting_original_id: int
 
 
-class ChangeAutoUpdateExponentStatus(CallbackData, prefix="change_auto_update_exponent"):
+class ChangeAutoUpdateExponentStatus(
+    CallbackData, prefix="change_auto_update_exponent"
+):
     adv_id: int
     wb_user_cabinet_original_id: int
     new_status: bool
@@ -253,7 +255,9 @@ class ChangeRecSystemModeStatus(CallbackData, prefix="change_rec_system_mode"):
     new_status: bool
 
 
-class ChangeAuctionBidderActiveStatus(CallbackData, prefix="change_auction_bidder_active_status"):
+class ChangeAuctionBidderActiveStatus(
+    CallbackData, prefix="change_auction_bidder_active_status"
+):
     adv_id: int
     wb_user_cabinet_original_id: int
     new_status: bool

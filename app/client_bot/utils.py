@@ -33,9 +33,7 @@ class KeywordForKeyboard:
 
 
 async def get_keywords_for_keyboard(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(
-        adv_setting
-    )
+    all_phrases: list[CalculatedKeyword] = await get_good_bad_phrases(adv_setting)
     return all_phrases
 
 
@@ -102,7 +100,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
         # Определение позиции (единое поле)
         first_position: str | int = ""
         if adv_setting.parsing_active:
-            if keyword.position:
+            if keyword.position and keyword.position > 0:
                 first_position = keyword.position
             elif keyword.position == 0:
                 first_position = ">>>"
@@ -156,3 +154,6 @@ async def create_ref_link(ref_link_name: str, user_telegram_id: int) -> RefLink 
         session.add(ref_link)
         await session.commit()
         return ref_link
+
+
+# TODO: Выпилить из кода парсер позиций

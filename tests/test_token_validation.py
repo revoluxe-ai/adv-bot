@@ -7,7 +7,7 @@ from app.modules.common_slaves.wildberries.models import WBToken
 TOKENS = [
     # (token, is_expected_valid)
     (
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjkwODNmNDU2LWJiZGEtNDczOS1hMGYxLTMwMzRiZDhjMDczNCIsInMiOjEwMiwic2lkIjoiOTRhM2YwY2QtOGFjMS00Mjk2LTliNmUtYmE4NmNiNTQ2NGNiIiwiZXhwIjoxNzYzODQxNzk5LCJhY2MiOjEsInQiOmZhbHNlfQ.EQ2oDvzowClG8mGhX_DnCYSgUljILVCnfNXhA8HjpUs",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjkwODNmNDU2LWJiZGEtNDczOS1hMGYxLTMwMzRiZDhjMDczNCIsInMiOjEwMiwic2lkIjoiOTRhM2YwY2QtOGFjMS00Mjk2LTliNmUtYmE4NmNiNTQ2NGNiIiwiZXhwIjoyMDExODMwMzIwLCJhY2MiOjEsInQiOmZhbHNlfQ.QeUqgoxsjJEWrJpdsFxLOsqa15EBfGkNZwf690qlUko",
         True,
     ),
     (

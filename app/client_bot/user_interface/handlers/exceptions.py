@@ -8,15 +8,11 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters.exception import ExceptionTypeFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types.error_event import ErrorEvent
-from sqlalchemy import select
 
 from app import client_bot as tb
 from app.client_bot import const
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.exc import CardNotFoundInDB
-from app.modules.wb_keywords_parser.wb_parser.parser import ErrorParsingPositions
-from app.utils.db.models import User
-from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
@@ -25,19 +21,6 @@ admin_telegram_id = 373435337
 
 user_router = Router()
 
-
-#
-#
-# @user_router.errors(ExceptionTypeFilter(my_exc.ApiForbiddenError))
-# async def error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-#     await state.clear()
-#     logger.debug( 'Текущее состояние: %s', await state.get_state())
-#     chat_id = error_event.update.message.chat.id
-#
-#     wb_user_cabinet: app.my_types.WBUserCabinet = error_event.exception.__dict__['wb_user_cabinet']
-#     await errors_message.AddNewToken(bot, chat_id, wb_user_cabinet)()
-#     return
-#
 
 admin_router = Router()
 
@@ -86,49 +69,6 @@ async def forbidden_error_handler(
     error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
 ):
     logger.error("Юзер заблокировал бота")
-    return
-
-
-# @admin_router.errors(ExceptionTypeFilter(aiogram.exceptions.TelegramBadRequest))
-# async def bad_request_error_handler(error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot):
-#     message = error_event.update.message
-#     if message is None:
-#         chat_id = error_event.update.callback_query.message.chat.id
-#     else:
-#         chat_id = message.chat.id
-#     await bot.send_message(chat_id=chat_id,
-#                            text='Эта кнопка устарела. Нажмите на /start и начните сначала'
-#                            'Если ошибка повторяется, обратитесь к администратору бота @skyline360_1')
-#     return
-
-
-@admin_router.errors(ExceptionTypeFilter(ErrorParsingPositions))
-async def error_parsing_positions_handler(
-    error_event: ErrorEvent, state: FSMContext, bot: aiogram.Bot
-):
-    message = error_event.update.message
-    exception = error_event.exception
-
-    if message is None:
-        chat_id = error_event.update.callback_query.message.chat.id
-    else:
-        chat_id = message.chat.id
-    await bot.send_message(
-        chat_id=chat_id,
-        text="Ошибка парсинга позиций. Попробуйте через время еще раз. "
-        "Если ошибка будет повторяться, то обратитесь в поддержку -> ",
-    )
-    await bot.send_message(admin_telegram_id, str(exception))
-
-    async with sm() as session:
-        stmt = select(User.username).where(User.user_telegram_id == chat_id)
-        user_name = await session.execute(stmt)
-        user_name = user_name.scalar_one_or_none()
-
-    await bot.send_message(
-        admin_telegram_id, f"Ошибка парсинга у пользователя {user_name}"
-    )
-
     return
 
 

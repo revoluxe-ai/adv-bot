@@ -89,10 +89,7 @@ async def parsing_keywords_for_adv_generator(
             should_parse = True
 
         # если давно не обновлялась позиция — парсим
-        elif (
-                last_update
-                and last_update < now - timedelta(hours=max_hours_period)
-        ):
+        elif last_update and last_update < now - timedelta(hours=max_hours_period):
             should_parse = True
 
         # сохраняем новые просмотры, если решено парсить

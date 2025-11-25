@@ -27,12 +27,9 @@ async def toggle_auto_updater_version(
         )
         await session.execute(stmt)
         await session.commit()
-    
+
     assert callback_query.message
     chat_id = callback_query.message.chat.id
 
     version_str: str = "V2" if new_version == 2 else "V1"
-    await bot.send_message(
-        chat_id, f"АвтоАпдейтер переключен на версию {version_str}"
-    )
-
+    await bot.send_message(chat_id, f"АвтоАпдейтер переключен на версию {version_str}")

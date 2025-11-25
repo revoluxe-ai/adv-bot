@@ -117,7 +117,7 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
             )
             if not text_val:
                 continue
-# TODO: Решить проблему со спамом в чате
+            # TODO: Решить проблему со спамом в чате
             date_val = kw.date
             if isinstance(date_val, (datetime.datetime, datetime.date)):
                 date_str = date_val.strftime("%Y-%m-%d")
@@ -265,7 +265,9 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                     if update_tasks[adv_setting.id].exception():
                         logger.error(
                             "Ошибка обновления ключей для магазина: %s, кампании: %s: %s",
-                            wb_cabinet.shop_id, adv_setting.id, update_tasks[adv_setting.id].exception(), # noqa
+                            wb_cabinet.shop_id,
+                            adv_setting.id,
+                            update_tasks[adv_setting.id].exception(),  # noqa
                         )
                     del update_tasks[adv_setting.id]
             await asyncio.sleep(0)
@@ -358,7 +360,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     for text_for_adv in texts_for_adv_setting:
         try:
             cluster_name, _ = await redis_manager.get_cluster_and_preset(text_for_adv)
-        except: # noqa
+        except:  # noqa
             logger.error("Не удалось получить кластер")
             cluster_name = None
 
@@ -413,7 +415,7 @@ class MessageCounter:
         now = datetime.datetime.now()
         if self._last_time_send is None:
             return True
-        if now - self._last_time_send > self._period: # noqa
+        if now - self._last_time_send > self._period:  # noqa
             return True
 
 

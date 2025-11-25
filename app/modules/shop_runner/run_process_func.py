@@ -1,11 +1,12 @@
 import asyncio
 import logging
 from asyncio import Task
-
 import redis
 from aiohttp import ClientSession
+from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
 
+from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import WBCabinet, AdvSetting
 from app.modules.shop_runner.modules.wb_api import WBApi
@@ -18,20 +19,28 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 logger = logging.getLogger(__name__)
 
 
+@inject
 async def run_shop_task(
-    shop_id: str, client_session: ClientSession, redis_manager: RedisShopManager
+    shop_id: str,
+    client_session: ClientSession,
+    redis_manager: RedisShopManager,
+    wb_manager_hub_factory: WBManagerHubFactory = Provide[
+        "module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory"
+    ],
 ) -> None:
-    while True:
-        try:
-            access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
-            wb_api = WBApi(access, client_session)
-            wb_shop = WBShop(wb_api, redis_manager)
-            await wb_shop.run()
-        except StopShopUpdateException:
-            return None
-        except Exception as exc:
-            logger.error(f"Ошибка обработки магазина {shop_id}, {exc}", exc_info=True)
-            raise exc
+    wb_manager_hub_factory.set_wb_manager_hub(shop_id)
+    try:
+        access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
+        wb_api = WBApi(access, client_session)
+        wb_shop = WBShop(wb_api, redis_manager)
+        await wb_shop.run()
+    except StopShopUpdateException:
+        return None
+    except Exception as exc:
+        logger.error(f"Ошибка обработки магазина {shop_id}, {exc}", exc_info=True)
+        raise exc
+    finally:
+        wb_manager_hub_factory.reset_shop(shop_id)
 
 
 async def _update_tasks(

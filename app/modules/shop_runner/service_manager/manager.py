@@ -1,15 +1,14 @@
 import asyncio
 import logging
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable
+from collections.abc import AsyncGenerator, Awaitable, Coroutine, Iterable, Sequence
 from datetime import datetime
 from typing import (
     Any,
     TypeVar,
 )
 
-from jedi.inference.value.iterable import Sequence
-
+from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
@@ -26,16 +25,14 @@ from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager im
     WBCommonStatManager,
 )
 from app.modules.wb_adv_updater import data_manager
-from app.modules.wb_keywords_parser.global_parsing_queue_manager import (
-    GlobalParsingQueueManager,
-)
+
 from app.settings import settings
 from .old_modules.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .wb_shop_data_manager import WBShopDataManager
-from .wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+from .wb_shop_data_manager import ComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
 
@@ -60,7 +57,7 @@ class CoroutinesManager:
         self._adv_settings_list: list[AdvSetting] | None = None
         self._session = wb_api.session
 
-    @while_coroutine_decorator(60, 60)
+    @while_coroutine_decorator(1, 60)
     async def update_cpm_bid(self) -> None:
         adv_settings = await self._wb_shop_data_manager.get_active_advs()
         if not adv_settings:
@@ -69,12 +66,24 @@ class CoroutinesManager:
         if not adv_settings:
             return None
         logger.debug("Обновляю ставки для магазина %s", self.shop_id)
-        await asyncio.gather(
+        results = await asyncio.gather(
             *[
                 self.__run_bidder_process_for_adv(adv, self._wb_api)
                 for adv in adv_settings
-            ]
+            ],
+            return_exceptions=True,
         )
+
+        for index, result in enumerate(results):
+            if isinstance(result, Exception):
+                adv_setting = adv_settings[index]
+                logger.error(
+                    "Ошибка обновления РК : %s, adv_id: %s, shop_id: %s",
+                    result,
+                    adv_setting.adv_id,
+                    self.shop_id,
+                )
+
         logger.debug(f"Все ставки обновлены для магазина {self.shop_id}")
         return None
 
@@ -158,37 +167,6 @@ class CoroutinesManager:
         shop_data_updater = ShopDataUpdater(wb_api)
         await self._update_cards_data_from_wb_to_pg(shop_data_updater)
         logger.debug("Обновление карточек завершено")
-
-    @while_coroutine_decorator(60, 1)
-    async def parsing_keywords_run(self) -> None:
-        from .services import parsing_keywords_from_wb
-
-        active_advs = await self._wb_shop_data_manager.get_active_advs()
-        generators = []
-        for adv in active_advs:
-            keywords = self._wb_shop_data_manager.get_calculated_keywords(adv)
-
-            generator: AsyncGenerator[tuple[str, int], None] = (
-                parsing_keywords_from_wb.parsing_keywords_for_adv_generator(
-                    adv, keywords
-                )
-            )
-            generators.append(generator)
-        zipped_generators = self._async_zip_longest(*generators)
-        parsing_queue = GlobalParsingQueueManager()
-        async for row in zipped_generators:
-            for item in row:
-                if item:  # Check if not fillvalue
-                    text, nmid = item
-                    await parsing_queue.add_or_update_task(text, {nmid})
-                    await asyncio.sleep(
-                        settings.PARSING_KEYWORDS_DELAY_BETWEEN_TASKS
-                    )  # Добавляем небольшую задержку между задачами
-                    logger.info(
-                        "Добавлен ключ '%s' для артикула %s в очередь парсинга",
-                        text,
-                        nmid,
-                    )
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
@@ -292,24 +270,106 @@ class CoroutinesManager:
     async def delete_keywords_from_wl_by_mean_auto_ctr(self) -> None:
         # TODO: Добавить функцию-фильтр для ComplexAdvs getter
         from .services import delete_keywords_from_wl_by_mean_auto_ctr
-        complex_advs: Sequence[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
-        complex_advs_with_white_list_by_mean_auto_ctr_active =\
-            [adv for adv in complex_advs if adv.rec_system_promotion_mode_active
-             and adv.auto_update_setting_version == 2
-             and adv.is_white_list_control_enabled]
+
+        complex_advs: Sequence[ComplexAdv] = (
+            await self._wb_shop_data_manager.get_complex_advs()
+        )
+        complex_advs_with_white_list_by_mean_auto_ctr_active = [
+            adv
+            for adv in complex_advs
+            if adv.rec_system_promotion_mode_active
+            and adv.auto_update_setting_version == 2
+            and adv.is_white_list_control_enabled
+        ]
 
         tasks = []
         for adv in complex_advs_with_white_list_by_mean_auto_ctr_active:
             task = delete_keywords_from_wl_by_mean_auto_ctr(complex_adv=adv)
             tasks.append(task)
 
-        results: Sequence[None | Exception] = await asyncio.gather(*tasks, return_exceptions=True)
+        results: Sequence[None | Exception] = await asyncio.gather(
+            *tasks, return_exceptions=True
+        )
 
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error('Ошибка удаления ключей из БС по сред.авто стр, shop_id: %s, adv_id: %s)',
-                             self.shop_id, complex_advs[i].adv_id)
-
-
+                logger.error(
+                    "Ошибка удаления ключей из БС по сред.авто стр, shop_id: %s, adv_id: %s)",
+                    self.shop_id,
+                    complex_advs[i].adv_id,
+                )
 
         return None
+
+    @while_coroutine_decorator(1, 60)
+    async def update_keywords_stamp(self) -> None:
+        from .services.keyword_stamp_manager import (
+            KeywordStampManagerContainer,
+            KeywordStampManager,
+        )
+
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        keyword_stamp_manager_container = KeywordStampManagerContainer(
+            _wb_api_manager_hub=wb_manager_hub
+        )
+        keyword_stamp_manager: KeywordStampManager = (
+            keyword_stamp_manager_container.keyword_stamp_manager()
+        )
+
+        advs = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
+            return None
+        update_tasks = []
+        for adv in advs:
+            task = keyword_stamp_manager.update_keywords_position_stamp(adv)
+            update_tasks.append(task)
+
+        results: list[Exception | None] = await asyncio.gather(
+            *update_tasks, return_exceptions=True
+        )
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(
+                    "Ошибка обновления позиций из Api: %s", result, exc_info=True
+                )
+
+        return None
+
+    @while_coroutine_decorator(24 * 60 * 60 * 60, 60)
+    async def update_keywords_positions_history(self) -> None:
+        from .services.keyword_stamp_manager import (
+            KeywordStampManagerContainer,
+            KeywordStampManager,
+        )
+
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        keyword_stamp_manager_container = KeywordStampManagerContainer(
+            _wb_api_manager_hub=wb_manager_hub
+        )
+        keyword_stamp_manager: KeywordStampManager = (
+            keyword_stamp_manager_container.keyword_stamp_manager()
+        )
+
+        advs = await self._wb_shop_data_manager.get_complex_advs()
+        if not advs:
+            return None
+        update_tasks = []
+        for adv in advs:
+            task = keyword_stamp_manager.update_keyword_history(adv)
+            update_tasks.append(task)
+
+        results: list[Exception | None] = await asyncio.gather(
+            *update_tasks, return_exceptions=True
+        )
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(
+                    "Ошибка обновления позиций из Api: %s", result, exc_info=True
+                )
+
+        return None
+
+
+# TODO: Частая ошибка - остановка РК в период раскрутки - сделать статью

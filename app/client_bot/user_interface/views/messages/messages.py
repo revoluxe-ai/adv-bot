@@ -647,7 +647,6 @@ class KeywordSettingMessage(TextWithKeyboard):
                 case _:
                     text += "📉 *Позиция не определена*\n"
 
-
         text += f"""🕒 *Последнее обновление позиций:* {self.last_full_update if self.last_full_update else "Нет"}\n"""
         return text
 
@@ -1187,13 +1186,15 @@ class CPMSetting(TextWithKeyboard):
                     adv_original_id=self.adv_setting.id,
                 ).pack(),
             )
-        _ = builder.row(bottom)        # Bidder Mode toggle
-        bidder_mode: BidderMode = self.adv_setting.bidder_mode or BidderMode.BY_POSITIONS
+        _ = builder.row(bottom)  # Bidder Mode toggle
+        bidder_mode: BidderMode = (
+            self.adv_setting.bidder_mode or BidderMode.BY_POSITIONS
+        )
         if bidder_mode == BidderMode.BY_AUTO_MAX_CPM:
-            button_text = "✅Вкл. работу  по позициям (устаревший режим)"
+            button_text = "⚠️Вкл. работу  по позициям (новый режим)"
             callback_action = "turn_on_bidder_positions"
         else:
-            button_text = "⚠️Вкл. работу по АвтоМакс. ставке (новый режим)"
+            button_text = "✅Вкл. работу по АвтоМакс. ставке (устаревший режим) "
             callback_action = "turn_on_bidder_auto_max"
 
         bottom = InlineKeyboardButton(

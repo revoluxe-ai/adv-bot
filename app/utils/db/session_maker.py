@@ -110,7 +110,9 @@ read_write_db_connector = get_alchemy_row(read_only=False).replace(
 )
 
 
-def get_ssl_context(insecure: bool, ssl_mode: str | None = None) -> ssl.SSLContext | None:
+def get_ssl_context(
+    insecure: bool, ssl_mode: str | None = None
+) -> ssl.SSLContext | None:
     """Возвращает SSLContext или None (если SSL отключен).
 
     Если ssl_mode='disable' — возвращаем None (SSL полностью отключен).
@@ -121,7 +123,7 @@ def get_ssl_context(insecure: bool, ssl_mode: str | None = None) -> ssl.SSLConte
     # Полное отключение SSL
     if ssl_mode and ssl_mode.lower() == "disable":
         return None
-        
+
     if insecure:
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
@@ -139,7 +141,7 @@ def get_ssl_context(insecure: bool, ssl_mode: str | None = None) -> ssl.SSLConte
 
 ssl_ctx = get_ssl_context(
     getattr(settings, "POSTGRES_SSL_INSECURE", False),
-    getattr(settings, "ssl_mode", None)
+    getattr(settings, "ssl_mode", None),
 )
 
 read_only_engine = create_async_engine(

@@ -43,6 +43,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
 from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
+
 logger = logging.getLogger(__name__)
 
 _sm = get_async_session_maker
@@ -249,34 +250,21 @@ def __sort_by_update_keyword(keyword: WBItemPosition) -> datetime:
 async def set_positions(
     keyword_stats: list[CalculatedKeyword], adv_setting: AdvSetting
 ) -> list[CalculatedKeyword]:
-    texts = [keyword.text for keyword in keyword_stats]
-    positions = await redis_manager.get_keywords_positions(adv_setting, texts)
+    # TODO: Вынести локальный импорт, и вообще разобраться со всеми локальными импортами в проекте
+    from ..shop_runner.service_manager.services.keyword_stamp_manager import (
+        ClickHouseKeywordStampManager,
+    )
+
+    positions: list[WBItemPosition] = (
+        await ClickHouseKeywordStampManager.get_last_positions(adv_setting)
+    )
     if not positions:
         return keyword_stats
     text_to_position = {position.keyword_text: position for position in positions}
     for keyword_stat in keyword_stats:
-        text = keyword_stat.text
-        data = await redis_manager.get_cluster_and_preset(text)
-        if not data:
-            continue
-        cluster, preset = data
-        keyword_stat.cluster_name = cluster
-        keyword_stat.preset = preset
-        if position := text_to_position.get(text):
-            # После изменений WB у нас одна позиция
-            keyword_stat.position = position.position
-        else:
-            keywords = keyword_stat.childs_keywords
-            if keywords:
-                texts = [kw.text for kw in keywords]
-                positions = await redis_manager.get_keywords_positions(
-                    adv_setting, texts
-                )  # type: ignore[no-untyped-call]
-                if positions:
-                    position = max(
-                        positions, key=lambda kw: __sort_by_update_keyword(kw)
-                    )
-                    keyword_stat.position = position.position
+        position = text_to_position.get(keyword_stat.text)
+        if position:
+            keyword_stat.position = position
 
     return keyword_stats
 
@@ -398,12 +386,9 @@ async def get_full_adv_stat_for_adv_id_from_redis(adv_id: int) -> FullAdvStat | 
         return None
 
 
-
-
-
 async def get_cached_keyword(adv: AdvSetting, text: str) -> CalculatedKeyword | None:
     """Получить закешированное ключевое слово"""
-    cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}" # type: ignore
+    cache_key = f"good_bad_phrases:{adv.id}:{adv.updated_at.timestamp()}:{text}"  # type: ignore
     cached_data = await redis_manager.get(cache_key)
 
     if cached_data and isinstance(cached_data, str):
@@ -553,6 +538,7 @@ async def get_min_ctr(adv: AdvSetting) -> float:
 # TODO: Улучшить автоуправление РК
 # TODO: Сделать более точным прогноз продаж и себеса
 
+
 def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | None:
     # TODO: Функция упала бы на Smoke-тесте при пустом списке ключевых слов и упала на полной фильтрации
     if not keywords:
@@ -647,7 +633,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
                     views=0,
                     clicks=0,
                     spend=0,
-                    date=datetime.now().date(), # noqa
+                    date=datetime.now().date(),  # noqa
                 )
 
                 keyword_setting = KeywordSetting(
@@ -731,7 +717,7 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                     views=0,
                     clicks=0,
                     spend=0,
-                    date=datetime.now().date(), # noqa
+                    date=datetime.now().date(),  # noqa
                 )
 
                 keyword_setting = KeywordSetting(
@@ -787,7 +773,9 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
         .join(AdvSetting.wb_cabinet)
         .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active.is_(True))
         .options(
-            load_only(AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id) # noqa
+            load_only(
+                AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id
+            )  # noqa
         )
     )
     async with _sm() as session:

@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, PlainValidator
 
+from app.modules.common_slaves.wildberries.models import WBItemPosition
 from app.modules.keywords_query import keywords_query
 
 
@@ -21,6 +22,24 @@ def validate_datetime(v: Any) -> datetime.datetime | None:
 DatetimeType = Annotated[datetime.datetime, PlainValidator(validate_datetime)]
 
 
+def _parse_position_value(value: Any) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if cleaned.isdigit():
+            return int(cleaned)
+        try:
+            return int(float(cleaned))
+        except ValueError:
+            return None
+    return None
+
+
 class KeywordStatus:
     GOOD = "good"
     BAD = "bad"
@@ -30,6 +49,7 @@ class KeywordStatus:
 
 
 class CalculatedKeyword(BaseModel):
+    # TODO: Разобраться с сериализацией-десериализацией
     text: str
     clicks: int
     views: int
@@ -39,10 +59,9 @@ class CalculatedKeyword(BaseModel):
     status: str | None = None
     hard_status: int | None = None
     reason: str | None = None
-    position: int | None = None
-    position_update: DatetimeType | None = None
+    _position: WBItemPosition | None = None
     childs_keywords: list["CalculatedKeyword"] | None = None
-    _query_static: int | None = None
+    _query_static: int | str | None = None
     cluster_name: str | None = None
     preset: int | None = None
     original_predict_ctr: float | None = None
@@ -57,6 +76,42 @@ class CalculatedKeyword(BaseModel):
     keyword_setting_original_id: int | None = None
     adv_id: int | None = None
     relevant: bool | None = None
+
+    @property
+    def position_update(self) -> datetime.datetime | None:
+        if self._position is None:
+            return None
+        return self._position.timestamp
+
+    @property
+    def position(self) -> int | None:
+        if not self._position:
+            return None
+        return self._position.position
+
+    @position.setter
+    def position(self, value: WBItemPosition) -> None:
+        """
+        TODO:
+        Bug: Position data lost during JSON deserialization
+
+       The position and position_update were changed from Pydantic model fields to computed properties backed by the private _position attribute. However, the existing from_json method still tries to set position and position_update through cls(**data). Since these are now properties rather than model fields, Pydantic will silently ignore them during construction, causing all position data to be lost when deserializing CalculatedKeyword objects from Redis cache.
+
+
+        Args:
+            value:
+
+        Returns:
+
+        """
+        assert isinstance(value, WBItemPosition)
+        self._position = value
+
+    @property
+    def total_views(self) -> int | None:
+        if not self._position:
+            return None
+        return self._position.total_views
 
     def clear_cache(self):
         """Очистка кэшированных свойств"""
@@ -85,7 +140,6 @@ class CalculatedKeyword(BaseModel):
         traffic_component = ctr * views
         rating = (1 - w) * traffic_component + w * ctr
         return rating
-
 
     @property
     def query(self) -> int | str:
@@ -154,26 +208,42 @@ class CalculatedKeyword(BaseModel):
     @classmethod
     def from_json(cls, json_str: str) -> "CalculatedKeyword":
         data = json.loads(json_str)
-        data["position_update"] = (
-            validate_datetime(data["position_update"])
-            if data["position_update"]
-            else None
+        raw_position: Any = data.pop("position", None)
+        raw_position_update = data.pop("position_update", None)
+        position_update = (
+            validate_datetime(raw_position_update) if raw_position_update else None
         )
-        # Backward compatibility
-        # 1) Map real_position -> position if no position
-        if "position" not in data and "real_position" in data:
-            data["position"] = data.get("real_position")
-        # 2) If position is a dict (legacy WBItemPosition), extract integer
-        if isinstance(data.get("position"), dict):
-            legacy = data["position"]
-            data["position"] = (
-                legacy.get("position")
-                or legacy.get("real_position")
-                or legacy.get("base_position")
-                or legacy.get("promo_position")
-                or 0
-            )
-        return cls(**data)
+
+        if raw_position is None and "real_position" in data:
+            raw_position = data.get("real_position")
+        elif raw_position is None:
+            for fallback in ("base_position", "promo_position"):
+                if fallback in data:
+                    raw_position = data.get(fallback)
+                    break
+        # TODO: не тестировалось, надо пересмотреть - перепроверить
+        position_model: WBItemPosition | None = None
+        if isinstance(raw_position, dict):
+            position_model = WBItemPosition.from_dict(raw_position)  # pyright: ignore
+        else:
+            normalized_position = _parse_position_value(raw_position)
+            if normalized_position is not None:
+                position_model = WBItemPosition(position=normalized_position)
+
+        if position_model and position_update:
+            position_model.timestamp = position_update
+        elif position_model is None and position_update:
+            position_model = WBItemPosition(timestamp=position_update)
+
+        if position_model and not position_model.keyword_text:
+            keyword_text = data.get("text")
+            if isinstance(keyword_text, str):
+                position_model.keyword_text = keyword_text
+
+        instance = cls(**data)
+        if position_model:
+            instance.position = position_model
+        return instance
 
     @property
     def is_in_white_list(self) -> bool:

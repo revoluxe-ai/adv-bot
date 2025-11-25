@@ -248,8 +248,6 @@ async def insert(stats: Iterable[FullAdvStat]) -> None:
             logger.debug(query_result)
 
 
-
-
 async def get_keywords_spend(
     adv_ids: list[int],
     start_date: datetime,
@@ -297,12 +295,10 @@ async def get_keywords_spend(
         return 0.0
 
 
-
 # TODO: Внедрить отображение ключей из статистики API, попробовать вернуть управление ставкой по позициям
 
 
 # TODO:  Добавить в бот указатель, который показывает, что по настройкам достигнут максимум и дальше поможет только перестроойка плана продаж
-
 
 
 async def get_keywords_clicks_and_views(
@@ -341,13 +337,18 @@ async def get_keywords_clicks_and_views(
             res = await client.query(query)
             result = res.first_item
 
-            if result and result["total_clicks"] is not None and result["total_views"] is not None:
+            if (
+                result
+                and result["total_clicks"] is not None
+                and result["total_views"] is not None
+            ):
                 return int(result["total_clicks"]), int(result["total_views"])
             else:
                 return 0, 0
 
     except Exception:
         logger.error(
-            "Ошибка получения суммы кликов и показов по ключам из ClickHouse", exc_info=True
+            "Ошибка получения суммы кликов и показов по ключам из ClickHouse",
+            exc_info=True,
         )
         return 0, 0

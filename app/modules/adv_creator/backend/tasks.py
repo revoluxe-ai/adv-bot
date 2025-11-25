@@ -5,12 +5,13 @@ import aiohttp
 
 from app.client_bot import const
 from app.client_bot.bot import get_bot
-from app.core.di import AppContainer, DIManager
+from app.core.di import DIManager
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.excs import AdvNotFoundInWBError
 from app.modules.adv_creator.backend import CardsNotFoundForShopError, MainAdvManager
 from app.modules.adv_creator.backend.exc import (
-    NotEnoughBalanceOnShopError, AdvExistsForNmidError,
+    NotEnoughBalanceOnShopError,
+    AdvExistsForNmidError,
 )
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.wb_adv_updater import data_manager
@@ -44,6 +45,7 @@ async def _create_complex_advs(
     ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
     from app.modules.shop_runner.modules.wb_api import WBApi
+
     bot = ctx["bot"]
     client_session = ctx["client_session"]
     access = await super_cabinet_manager.get_access_for_wb_cabinet(shop_id)
@@ -104,21 +106,29 @@ async def _create_complex_advs(
         )
         del exc
 
-    except AdvExistsForNmidError  as exc:
+    except AdvExistsForNmidError as exc:
         # Отправить сообщение с кнопками выбора
         from aiogram.utils.keyboard import InlineKeyboardBuilder
         from aiogram.types import InlineKeyboardButton
         from ..telegram.into_callback import ConfirmCreateComplexAdv
-        exist_adv_ids_rows = exc.exist_adv_ids_rows  # Список кортежей (auto_id, search_id | None)
-        message = "Найдены существующие кампании для этого артикула:\n"
-        message += "".join(
-            f"- Авто-РК: {auto_id}, Поисковая РК: {search_id if search_id else 'не указана'}\n"
-            for auto_id, search_id in exist_adv_ids_rows
-        ) + "\n"
 
-        message += ("Если вы уверены, что эти кампании не активны, то вы можете продолжить создание новой кампании,"
-                    " нажав на кнопку '✅ Продолжить создание'. В случае продолжения уже существующие кампании "
-                    " будут деактивированы в боте во избежание конфликтов и излишних расходов.\n\n")
+        exist_adv_ids_rows = (
+            exc.exist_adv_ids_rows
+        )  # Список кортежей (auto_id, search_id | None)
+        message = "Найдены существующие кампании для этого артикула:\n"
+        message += (
+            "".join(
+                f"- Авто-РК: {auto_id}, Поисковая РК: {search_id if search_id else 'не указана'}\n"
+                for auto_id, search_id in exist_adv_ids_rows
+            )
+            + "\n"
+        )
+
+        message += (
+            "Если вы уверены, что эти кампании не активны, то вы можете продолжить создание новой кампании,"
+            " нажав на кнопку '✅ Продолжить создание'. В случае продолжения уже существующие кампании "
+            " будут деактивированы в боте во избежание конфликтов и излишних расходов.\n\n"
+        )
 
         builder = InlineKeyboardBuilder()
         wb_original_cabinet_id = access.wb_cabinet.id
@@ -130,7 +140,7 @@ async def _create_complex_advs(
                     action="continue",
                     nmid=nmid,
                     wb_cabinet_original_id=wb_original_cabinet_id,
-                ).pack()
+                ).pack(),
             ),
             InlineKeyboardButton(
                 text="❌ Отменить",
@@ -138,14 +148,11 @@ async def _create_complex_advs(
                     action="cancel",
                     nmid=nmid,
                     wb_cabinet_original_id=wb_original_cabinet_id,
-                ).pack()
-            )
+                ).pack(),
+            ),
         )
 
         await bot.send_message(
-            user_telegram_id,
-            message,
-            reply_markup=builder.as_markup()
+            user_telegram_id, message, reply_markup=builder.as_markup()
         )
         return None
-

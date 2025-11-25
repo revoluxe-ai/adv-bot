@@ -25,7 +25,6 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.parsing_keywords_run = AsyncMock()
     coroutines_manager_mock.update_advs_data_from_wb_to_pg = AsyncMock()
     coroutines_manager_mock.update_cards_data_from_wb_to_pg = AsyncMock()
     coroutines_manager_mock.update_cpm_bid = AsyncMock()
@@ -33,6 +32,10 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
     coroutines_manager_mock.update_full_adv_stat = AsyncMock()
     coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
     coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
+    coroutines_manager_mock.update_predict_ctr = AsyncMock()
+    coroutines_manager_mock.update_keywords_stamp = AsyncMock()
+    coroutines_manager_mock.update_keywords_positions_history = AsyncMock()
+
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -49,8 +52,7 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
             # Вызываем тестируемый метод
             await wb_shop.run()
 
-            # Проверяем, что все ожидаемые корутины были вызваны
-            coroutines_manager_mock.parsing_keywords_run.assert_called_once()
+            # Проверяем, что все ожидаемые корутины были вызваныaad
             coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
             coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
             coroutines_manager_mock.update_cpm_bid.assert_called_once()
@@ -58,7 +60,9 @@ async def test_wb_shop_run_calls_all_coroutines() -> None:
             coroutines_manager_mock.update_full_adv_stat.assert_called_once()
             coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
-
+            coroutines_manager_mock.update_predict_ctr.assert_called_once()
+            coroutines_manager_mock.update_keywords_stamp.assert_called_once()
+            coroutines_manager_mock.update_keywords_positions_history.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
@@ -78,7 +82,6 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
 
     # Создаем мок для CoroutinesManager
     coroutines_manager_mock = MagicMock()
-    coroutines_manager_mock.parsing_keywords_run = AsyncMock()
     coroutines_manager_mock.update_advs_data_from_wb_to_pg = AsyncMock()
     coroutines_manager_mock.update_cards_data_from_wb_to_pg = AsyncMock()
     coroutines_manager_mock.update_cpm_bid = AsyncMock()
@@ -86,6 +89,9 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
     coroutines_manager_mock.update_full_adv_stat = AsyncMock()
     coroutines_manager_mock.adv_settings_auto_update = AsyncMock()
     coroutines_manager_mock.update_top_key_in_advs = AsyncMock()
+    coroutines_manager_mock.update_predict_ctr  = AsyncMock()
+    coroutines_manager_mock.update_keywords_positions_history = AsyncMock()
+    coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr = AsyncMock()
 
     # Подменяем создание CoroutinesManager
     with patch(
@@ -108,11 +114,10 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
 
             # Проверяем, что gather был вызван с 10 аргументами (9 корутин + _alive_worker_run)
             assert (
-                len(call_args) == 10
+                len(call_args) == 12
             ), f"asyncio.gather должен быть вызван с 10 аргументами, получено {len(call_args)}"
 
             # Проверяем, что все методы были вызваны по одному разу
-            coroutines_manager_mock.parsing_keywords_run.assert_called_once()
             coroutines_manager_mock.update_advs_data_from_wb_to_pg.assert_called_once()
             coroutines_manager_mock.update_cards_data_from_wb_to_pg.assert_called_once()
             coroutines_manager_mock.update_cpm_bid.assert_called_once()
@@ -120,3 +125,6 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines() -> None:
             coroutines_manager_mock.update_full_adv_stat.assert_called_once()
             coroutines_manager_mock.adv_settings_auto_update.assert_called_once()
             coroutines_manager_mock.update_top_key_in_advs.assert_called_once()
+            coroutines_manager_mock.update_predict_ctr.assert_called_once()
+            coroutines_manager_mock.update_keywords_positions_history.assert_called_once()
+            coroutines_manager_mock.delete_keywords_from_wl_by_mean_auto_ctr.assert_called_once()

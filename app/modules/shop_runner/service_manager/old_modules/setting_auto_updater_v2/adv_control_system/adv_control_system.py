@@ -1,4 +1,5 @@
 """Главный оркестратор реактивной системы управления РК."""
+
 # TODO: перенести Harbor на нормальный домен
 # TODO: Подключить оплату через бот
 # TODO: Сделать сайт + воронка
@@ -16,7 +17,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.pl
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater import (
     AdvSettingAutoUpdater,
 )
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
     ComplexAdv,
 )
 from .data_classes.data_classes import ForceContext, PipelineContext
@@ -61,7 +62,7 @@ class AdvControlSystem:
         fact = await updater.get_fact_data(keywords)
 
         # 3.1. Проверяем, изменились ли план и факт с прошлого раза
-        plan_fact_change = ChangePlanFact(adv, decode_bytes=False)
+        plan_fact_change = ChangePlanFact(adv)
         if await plan_fact_change.check_equal_in_cache(plan, fact):
             logger.debug(
                 "[adv_id=%s] План и факт не изменились с прошлого раза, пропускаем",
@@ -83,7 +84,6 @@ class AdvControlSystem:
                 "[adv_id=%s] Состояние OPTIMAL — действий не требуется", adv.adv_id
             )
             return
-
 
         force_obj = ForceContext(value=force)
 
