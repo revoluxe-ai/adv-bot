@@ -20,7 +20,7 @@ class RedisLastTotalViews(BaseRedisManager):
             value = value.decode()
         return int(value)
 
-    async def set(self, keyword: CalculatedKeyword) -> int | None:
+    async def set(self, keyword: CalculatedKeyword) -> None:
         key = self._get_key(keyword)
         views: int | None = keyword.total_views
         if views:
