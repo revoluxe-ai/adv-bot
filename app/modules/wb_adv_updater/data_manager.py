@@ -264,11 +264,7 @@ async def set_positions(
     for keyword_stat in keyword_stats:
         position = text_to_position.get(keyword_stat.text)
         if position:
-            keyword_stat.position = position.position
-            keyword_stat.total_views = int(position.total_views + 0.5)
-        else:
-            keyword_stat.position = None
-            keyword_stat.total_views = None
+            keyword_stat.position = position
 
     return keyword_stats
 
