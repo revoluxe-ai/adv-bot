@@ -12,8 +12,9 @@ class LastKeywordStampTimestampCache(BaseRedisManager):
     async def get(self, keyword: CalculatedKeyword):
         key = self._get_key(keyword)
         value = await self._client.get(key)
-        assert isinstance(value, str)
-        value_dt = datetime.datetime.strptime(value, self.__strftime)
+        if value is None:
+            return None
+        value_dt = datetime.datetime.fromisoformat(value)
         return value_dt
 
 
@@ -22,10 +23,6 @@ class LastKeywordStampTimestampCache(BaseRedisManager):
         value: datetime.datetime | None = keyword.position_update
         if value is None:
             return None
-        value_str = value.strftime(self.__strftime)
-        await self._client.set(key, value_str)
+        value_str = value.astimezone(datetime.timezone.utc).isoformat()
+        _ = await self._client.set(key, value_str)
         return None
-
-    @property
-    def __strftime(self) -> str:
-        return '%Y-%m-%d %H:%M:%S'
