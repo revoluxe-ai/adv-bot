@@ -135,6 +135,15 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                 ):
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
+
+        hide_zero_views = self._adv_setting.hide_zero_views_keywords
+        if hide_zero_views:
+            clear_keywords = []
+            for keyword in self._keywords:
+                if keyword.views != 0:
+                    clear_keywords.append(keyword)
+            self._keywords = clear_keywords
+
         auto_update_manager = AdvSettingAutoUpdater(self._adv_setting)
 
         fact_data, stat_data = await auto_update_manager.get_fact_data_and_stat(

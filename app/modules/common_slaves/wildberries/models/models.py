@@ -491,6 +491,10 @@ class AdvSetting(BaseTable):
         Boolean, nullable=True, default=False, server_default="false"
     )
 
+    hide_zero_views_keywords: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=False, server_default="false"
+    )
+
     max_balance_adding_for_day: Mapped[int] = mapped_column(
         Integer, nullable=True, default=0, server_default="0"
     )

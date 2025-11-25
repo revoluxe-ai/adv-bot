@@ -33,6 +33,7 @@ from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
+from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 from app.modules.sales_plan_settings.telegram.main_callback import (
     SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
 )
@@ -810,6 +811,26 @@ def get_keywords_setting_keyboard(
                 adv_setting_original_id=adv_setting.id,
                 wb_user_cabinet_original_id=wb_user_cabinet_original_id,
                 target="active_phrases",
+            ).pack(),
+        )
+    ]
+
+    bottoms.append(button)
+
+    # Кнопка для переключения скрытия ключей без рекламных просмотров
+    if adv_setting.hide_zero_views_keywords:
+        hide_views_text = "Показать ключи без рекламных просмотров"
+        hide_views_new_status = False
+    else:
+        hide_views_text = "Скрыть ключи без рекламных просмотров"
+        hide_views_new_status = True
+
+    button = [
+        InlineKeyboardButton(
+            text=hide_views_text,
+            callback_data=ChangeHideZeroViewsStatus(
+                adv_id=adv_id, wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                new_status=hide_views_new_status
             ).pack(),
         )
     ]
