@@ -12,7 +12,7 @@ from app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_m
 from app.settings import settings
 
 from app.utils.db.session_maker import get_async_session_maker as sm
-from .di import BidderContainer
+from .redis_cache.last_keyword_stamp_timestamp_cache import LastKeywordStampTimestampCache
 
 from ..modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 from ...common_slaves.wildberries.models.bidder_mode import BidderMode
@@ -20,7 +20,7 @@ from ...wb_adv_updater import data_manager
 
 if typing.TYPE_CHECKING:
     from ..modules.max_auto_bid_manager.auto_max_bid_manager import AutoMaxBidManager
-    from .redis_last_total_views import RedisLastTotalViews
+    from app.modules.shop_runner.bidder.redis_cache.redis_last_total_views import RedisLastTotalViews
 
 
 from ...common_slaves.wildberries.data_classes.keywordstat_from_db import (
@@ -131,6 +131,11 @@ async def run_bidder_process_for_adv(
     redis_last_total_views: "RedisLastTotalViews" = Provide[
         "module_resources.bidder_container.redis_last_total_views"
     ],
+      last_keyword_stamp_timestamp_cache: LastKeywordStampTimestampCache = Provide[
+          "module_resources.bidder_container.last_keyword_stamp_timestamp_cache"
+      ]
+
+
 ) -> None:
     advs: list[AuctionAdv] = await _update_and_get_advs_from_wb(adv_setting, wb_api)
     advs_from_wb_with_active_company: list[AuctionAdv] = [
@@ -160,6 +165,10 @@ async def run_bidder_process_for_adv(
     if adv_setting.bidder_mode in [BidderMode.BY_POSITIONS, None]:
         last_views = await redis_last_total_views.get(best_keyword)
         if last_views and last_views > 0 and last_views == best_keyword.total_views:
+            return None
+
+        last_time_stamp = await last_keyword_stamp_timestamp_cache.get(best_keyword)
+        if last_time_stamp and last_time_stamp == best_keyword.position_update:
             return None
         new_cpm = await __get_new_cpm_by_position(
             adv_setting,
@@ -206,4 +215,5 @@ async def run_bidder_process_for_adv(
         # TODO: Вынести в общий код проверку режима биддера
         if adv_setting.bidder_mode in [BidderMode.BY_POSITIONS, None]:
             await redis_last_total_views.set(best_keyword)
+            await  last_keyword_stamp_timestamp_cache.set(best_keyword)
     return None

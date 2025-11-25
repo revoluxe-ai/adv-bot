@@ -1,7 +1,8 @@
 from dependency_injector import containers, providers
 
 from app.core.redis_manager_v2.redis_client import RedisClient
-from .redis_last_total_views import RedisLastTotalViews
+from app.modules.shop_runner.bidder.redis_cache.last_keyword_stamp_timestamp_cache import LastKeywordStampTimestampCache
+from app.modules.shop_runner.bidder.redis_cache.redis_last_total_views import RedisLastTotalViews
 
 
 class BidderContainer(containers.DeclarativeContainer):
@@ -17,3 +18,7 @@ class BidderContainer(containers.DeclarativeContainer):
     redis_last_total_views = providers.Singleton(
         RedisLastTotalViews, redis_client=_redis_client
     )
+
+    last_keyword_stamp_timestamp_cache = providers.Singleton(LastKeywordStampTimestampCache,
+                                                             redis_client=_redis_client
+                                                             )
