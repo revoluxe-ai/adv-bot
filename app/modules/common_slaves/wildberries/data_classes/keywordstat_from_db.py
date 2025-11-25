@@ -196,7 +196,7 @@ class CalculatedKeyword(BaseModel):
     @classmethod
     def from_json(cls, json_str: str) -> "CalculatedKeyword":
         data = json.loads(json_str)
-        raw_position = data.pop("position", None)
+        raw_position: Any = data.pop("position", None)
         raw_position_update = data.pop("position_update", None)
         position_update = (
             validate_datetime(raw_position_update) if raw_position_update else None
@@ -209,10 +209,10 @@ class CalculatedKeyword(BaseModel):
                 if fallback in data:
                     raw_position = data.get(fallback)
                     break
-
+        # TODO: не тестировалось, надо пересмотреть - перепроверить
         position_model: WBItemPosition | None = None
         if isinstance(raw_position, dict):
-            position_model = WBItemPosition.from_dict(raw_position)
+            position_model = WBItemPosition.from_dict(raw_position) # pyright: ignore
         else:
             normalized_position = _parse_position_value(raw_position)
             if normalized_position is not None:
