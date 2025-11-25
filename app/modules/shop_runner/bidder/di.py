@@ -19,6 +19,6 @@ class BidderContainer(containers.DeclarativeContainer):
         RedisLastTotalViews, redis_client=_redis_client
     )
 
-    last_keyword_stamp_timestamp_cache = providers.Singleton(LastKeywordStampTimestampCache,
-                                                             redis_client=_redis_client
-                                                             )
+    last_keyword_stamp_timestamp_cache = providers.Singleton(
+        LastKeywordStampTimestampCache, redis_client=_redis_client
+    )
