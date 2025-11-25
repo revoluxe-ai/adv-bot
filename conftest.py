@@ -641,7 +641,7 @@ async def clickhouse_client(setup_test_database):
     print("[OK] ClickHouse client closed")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def app_container():
     container = AppContainer()
     return container
