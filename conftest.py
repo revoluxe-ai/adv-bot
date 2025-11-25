@@ -190,8 +190,16 @@ def setup_test_database(docker_compose_cmd):
 
     # Создаём необходимые расширения PostgreSQL ПЕРЕД созданием таблиц
     with sync_engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-        conn.commit()
+        try:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+            conn.commit()
+        except Exception as e:
+            # Игнорируем ошибку если расширение уже существует (race condition в PostgreSQL)
+            if "already exists" in str(e):
+                print(f"[INFO] Extension pg_trgm already exists, skipping...")
+                conn.rollback()
+            else:
+                raise
 
     print("[MIGRATION] Creating tables from models metadata...")
     Base.metadata.create_all(sync_engine)
