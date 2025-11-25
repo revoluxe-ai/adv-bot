@@ -179,7 +179,7 @@ async def _get_good_bad_phrases_for_min_ctr(
                 text, adv_setting.nmids[0]
             )
             if position:
-                keyword_new.position = position.position
+                keyword_new.position = position
             keyword_new.query = keywords_query.get_queries_of_keyword(text)
             keyword_stats.append(keyword_new)
 
