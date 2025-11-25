@@ -6,7 +6,6 @@ from app.core.di.app_container import AppContainer
 
 @pytest.mark.asyncio
 async def test_building_app_container(app_container: AppContainer):
-    app_container = AppContainer()
     app_container.check_dependencies()
 
 
