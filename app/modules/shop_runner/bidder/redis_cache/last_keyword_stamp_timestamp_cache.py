@@ -9,7 +9,7 @@ class LastKeywordStampTimestampCache(BaseRedisManager):
     def _get_key(self, keyword: CalculatedKeyword) -> str:
         return self.prefix + ':' + str(keyword.keyword_setting_original_id)
 
-    async def get(self, keyword: CalculatedKeyword):
+    async def get(self, keyword: CalculatedKeyword) -> datetime.datetime | None:
         key = self._get_key(keyword)
         value = await self._client.get(key)
         if value is None:
