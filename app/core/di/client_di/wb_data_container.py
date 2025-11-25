@@ -19,7 +19,7 @@ class WBDataContainer(containers.DeclarativeContainer):
         )
     )
 
-    _analytics_domain_manager: Provider[AnalyticsManager] = (
+    _analytics_domain_manager: Provider[AnalyticsManager] = ( # pyright: ignore
         _analytics_and_data_container.analytics_domain_manager
     )  # pyright: ignore
 

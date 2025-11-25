@@ -38,7 +38,7 @@ class Neo4jLifecycle(resources.AsyncResource[None]):
         # Провайдер передаёт driver как аргумент
         # await driver.verify_connectivity()
 
-    async def shutdown(
+    async def shutdown( # pyright: ignore
         self, driver: AsyncDriver | None = None
     ) -> None:  # pyright: ignore
         """Завершает работу ресурса, закрывая подключение к Neo4j."""
