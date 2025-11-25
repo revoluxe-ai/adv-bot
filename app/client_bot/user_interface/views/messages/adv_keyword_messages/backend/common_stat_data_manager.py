@@ -80,6 +80,7 @@ class CommonStatDataManager:
             if not common_stat:
                 continue
             orders = common_stat.orders
+            add_to_cart = common_stat.add_to_cart
 
             mean_pay_for_order = stat.spend / (orders if orders else 1)
 
@@ -92,7 +93,7 @@ class CommonStatDataManager:
                 mean_orders_for_fraction_day = None
 
             count_orders = orders
-            text_row = f"{date_str}: Заказы: {count_orders}"
+            text_row = f"{date_str}: Корзины: {add_to_cart} Заказы: {count_orders}"
             if mean_orders_for_fraction_day:
                 text_row += f"({mean_orders_for_fraction_day})"
             text_row += "шт."
