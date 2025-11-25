@@ -503,7 +503,7 @@ async def postgres_session(async_engine):
 @pytest.fixture(scope='function')
 async def fake_redis():
     """Создает фейковый Redis для тестов (асинхронная версия)."""
-    redis = await fakeredis.aioredis.FakeRedis()
+    redis = await fakeredis.aioredis.FakeRedis(decode_responses=True)
     yield redis
     await redis.flushall()  # очищаем после теста
     await redis.close()
