@@ -40,9 +40,9 @@ class CalculatedKeyword(BaseModel):
     status: str | None = None
     hard_status: int | None = None
     reason: str | None = None
-    _position: WBItemPosition = None
+    _position: WBItemPosition | None = None
     childs_keywords: list["CalculatedKeyword"] | None = None
-    _query_static: int | None = None
+    _query_static: int | str | None = None
     cluster_name: str | None = None
     preset: int | None = None
     original_predict_ctr: float | None = None
