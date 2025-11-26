@@ -53,6 +53,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             "Запрос(точное соответствие)",
             "Клики",
             "Просмотры",
+            "Показов (история)",
             "Количество запросов",
             "CTR",
             "Прогнозируемый CTR",
@@ -61,6 +62,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             "Позиция",
             "Дополнительные клики",
             "Рейтинг",
+            "Заказов",
         ]
     ]
     # Заголовки столбцов
@@ -114,6 +116,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
                 '"' + keyword.text + '"',
                 str(clicks),
                 str(views),
+                str(keyword.total_views_history if keyword.total_views_history else 0),
                 str(keyword.query),
                 str(ctr).replace(".", ","),
                 str(round(predict_ctr * 100, 2)).replace(".", ","),
@@ -122,6 +125,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
                 str(first_position),
                 str(added_clicks),
                 str(round(keyword.rating_by_predict_ctr * 100, 4)).replace(".", ","),
+                str(keyword.total_orders if keyword.total_orders else 0),
             ]
         )
 

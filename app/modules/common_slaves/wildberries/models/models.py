@@ -702,6 +702,7 @@ class WBItemPosition(BaseModel):
     keyword_text: str | None = None
     adv_type: int | None = None
     total_views: int | None = None
+    total_orders: int | None = None
 
     @property
     def type_native(self) -> str:
@@ -724,6 +725,8 @@ class WBItemPosition(BaseModel):
             "nmid": self.nmid,
             "timestamp": timestamp.isoformat() if timestamp else None,
             "adv_type": self.adv_type,
+            "total_views": self.total_views,
+            "total_orders": self.total_orders,
         }
 
     @staticmethod
@@ -786,5 +789,19 @@ class WBItemPosition(BaseModel):
             position.adv_type = int(raw_adv_type)
         else:
             position.adv_type = None
+
+        # total_views
+        raw_total_views = data.get("total_views")
+        if isinstance(raw_total_views, int):
+            position.total_views = raw_total_views
+        else:
+            position.total_views = None
+
+        # total_orders
+        raw_total_orders = data.get("total_orders")
+        if isinstance(raw_total_orders, int):
+            position.total_orders = raw_total_orders
+        else:
+            position.total_orders = None
 
         return position

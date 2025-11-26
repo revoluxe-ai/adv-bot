@@ -12,7 +12,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
     KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBCabinet
 from app.modules.keywords_query import keywords_query
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker
@@ -26,6 +26,7 @@ from .data_manager import (
     get_best_keyword,
     get_cpm,
 )
+from .total_orders_manager import TotalOrdersManager
 
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,14 @@ async def _get_good_bad_phrases_for_min_ctr(
         )
     except Exception as exc:
         raise exc
+    # Получаем суммарные заказы и показы для всех ключей
+    total_stats_map = await TotalOrdersManager.get_total_stats(
+        nmid=int(adv_setting.nmids[0]),
+    )
+    for keyword_stat in keyword_stats_positioned:
+        total_orders, total_views_history = total_stats_map.get(keyword_stat.text, (0, 0))
+        keyword_stat.total_orders = total_orders
+        keyword_stat.total_views_history = total_views_history
     async with _sm(read_only=False) as session:
         for keyword_stat in keyword_stats_positioned:
             keyword_text = keyword_stat.text
