@@ -85,12 +85,15 @@ def retry_decorator(
                     except ApiForbiddenError as e:
                         state["_attempts"] += 1
                         token_hash = e.not_valid_token_hash
+                        section = e.section
                         if not token_hash:
                             raise e
+                        # TODO: нужно сделать две отдельные ошибки на Api, чтобы пробрасывать без Option Section
+                        assert section is not None
                         if state["_attempts"] >= max_attempts:
                             raise MaxAttemptsError() from e
                         await instance.auth_client_handler.mark_current_token_invalided(
-                            token_hash
+                            token_hash, section=section
                         )
                         state["_current_pause"] = 0
 
