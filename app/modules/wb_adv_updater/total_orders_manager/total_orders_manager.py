@@ -1,3 +1,4 @@
+import datetime
 import logging
 from pathlib import Path
 
@@ -9,8 +10,6 @@ logger = logging.getLogger(__name__)
 class TotalOrdersManager:
     @staticmethod
     async def get_total_orders(
-        shop_id: str,
-        adv_id: int,
         nmid: int,
         keywords_texts: list[str],
     ) -> dict[str, int]:
@@ -31,11 +30,13 @@ class TotalOrdersManager:
 
         query = (Path(__file__).parent / "sql" / "get_total_orders.sql").read_text()
 
+
         async with get_clickhouse_client() as client:
             result = await client.query(
                 query,
                 parameters={
                     "nmid": nmid,
+
                 },
             )
 

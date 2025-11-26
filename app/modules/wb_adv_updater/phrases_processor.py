@@ -12,7 +12,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
     KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.keywords_query import keywords_query
 from app.utils import redis_manager
 from app.utils.db.session_maker import get_async_session_maker
@@ -361,6 +361,6 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
     keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
 
-    keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+    keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True) #pyright: ignore
     keywords = keywords_with_rating + keywords_without_rating
     return keywords
