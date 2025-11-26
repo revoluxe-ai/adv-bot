@@ -70,4 +70,3 @@ async def toggle_hide_zero_views(
         main_photos[0],
         page=1,
     )(state)
-
