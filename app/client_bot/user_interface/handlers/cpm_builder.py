@@ -17,11 +17,11 @@ router = Router()
 
 
 @router.callback_query(
-    callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page")
+    callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page") # noqa
 )
 async def to_page_for_cpm_setting(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
 ):
     adv_original_id = callback_data.adv_original_id
@@ -68,10 +68,10 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        adv = await session.execute(
+        result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
-        adv = adv.scalar()
+        adv = result.scalar_one()
         adv.max_place = data["min_position"]
         adv.max_cpm = max_cpm
         adv.bidder_active = True
@@ -81,7 +81,7 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
     return
 
 
-@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_manual_cpm"))
+@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_manual_cpm")) # noqa
 async def set_manual_cpm(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
@@ -113,19 +113,19 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
     adv_original_id = state_data["last_adv_original_id"]
 
     async with sm(read_only=False) as session:
-        adv = await session.execute(
+        result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
-        adv = adv.scalar()
+        adv = result.scalar_one()
         adv.max_cpm = manual_cpm
         await session.commit()
-    await bot.send_message(message.chat.id, f"CPM успешно установлен ({manual_cpm}) р.")
+    _ = await bot.send_message(message.chat.id, f"CPM успешно установлен ({manual_cpm}) р.")
     await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
     await state.set_state(state=None)
     return
 
 
-@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_max_position"))
+@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_max_position")) # noqa
 async def set_max_position(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
@@ -158,10 +158,10 @@ async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMC
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        adv = await session.execute(
+        result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
-        adv = adv.scalar()
+        adv = result.scalar_one()
         adv.max_place = max_position
         await session.commit()
         await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
