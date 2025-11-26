@@ -54,7 +54,7 @@ async def test_get_total_orders_combines_tables(clickhouse_client: AsyncClient) 
             version      UInt64
         )
         ENGINE = ReplacingMergeTree(version)
-            ORDER BY (nmid, date)
+            ORDER BY (nmid, text, date)
             SETTINGS index_granularity = 8192;
     """
     )
@@ -98,8 +98,6 @@ async def test_get_total_orders_combines_tables(clickhouse_client: AsyncClient) 
     )
 
     orders_map = await TotalOrdersManager.get_total_orders(
-        shop_id="shop",
-        adv_id=100,
         nmid=1,
         keywords_texts=["keyword", "other", "missing"],
     )
@@ -157,7 +155,7 @@ async def test_get_total_stats_combines_orders_and_views(clickhouse_client: Asyn
             version      UInt64
         )
         ENGINE = ReplacingMergeTree(version)
-            ORDER BY (nmid, date)
+            ORDER BY (nmid, text, date)
             SETTINGS index_granularity = 8192;
     """
     )
@@ -205,11 +203,12 @@ async def test_get_total_stats_combines_orders_and_views(clickhouse_client: Asyn
     )
 
     # keyword: orders = 5 (yesterday) + 4 (day_before) + 10 (today) = 19
-    # keyword: views = 110 (yesterday) + 120 (day_before) + 150 (today) = 380
-    assert stats_map["keyword"] == (19, 380)
+    # keyword: views = 150 (ТОЛЬКО за сегодня из keyword_stamp)
+    assert stats_map["keyword"] == (19, 150)
     
-    # other: only historical data
-    assert stats_map["other"] == (2, 80)
+    # other: only historical data, no data for today
+    # orders = 2 (historical), views = 0 (no today data)
+    assert stats_map["other"] == (2, 0)
     
     # missing: not in database, so not in result
     assert "missing" not in stats_map
