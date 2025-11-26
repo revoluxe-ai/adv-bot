@@ -2,8 +2,9 @@
 from typing import cast
 
 import pytest
-from unittest.mock import  patch
+from unittest.mock import patch, AsyncMock
 
+from dependency_injector import providers
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -81,7 +82,8 @@ async def test_process_adv(postgres_session: AsyncSession,
                            fact_data,
                            condition_func,
                            sm_generator,
-                           di_containner_for_adv_auto_updater_v2
+                           app_container,
+                           fake_redis
                            ):
     """Интеграционный тест для AdvControlSystem.process_adv с фейковыми данными."""
 
@@ -116,19 +118,12 @@ async def test_process_adv(postgres_session: AsyncSession,
     ):
         keywords = await complex_adv.get_keywords()
         before_white_list_size = len([kw for kw in keywords if kw.hard_status == 2])
+        complex_adv.get_mean_auto_ctr = AsyncMock(return_value=3.0)
 
-        # container.settings.override(providers.Configuration())
-        # container.module_resources.override(providers.Dependency())
-
-        container = di_containner_for_adv_auto_updater_v2
-
+        app_container.redis_client.override(providers.Object(fake_redis))
 
         await control_system_v2.process_adv(complex_adv, force=3)
-
-        container.settings.reset_override()
-        container.module_resources.reset_override()
-        container.redis_client.reset_override()
-
+        app_container.redis_client.reset_override()
     # 5️⃣ Проверяем KeywordSetting
     updated_settings = await postgres_session.execute(select(KeywordSetting))
     updated_settings = updated_settings.scalars().all()
@@ -136,4 +131,5 @@ async def test_process_adv(postgres_session: AsyncSession,
     updated_adv_setting = cast(AdvSetting, updated_adv_setting)
 
     after_white_list_size = len([kw for kw in updated_settings if kw.hard_status == 2])
+
     assert condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, complex_adv)
