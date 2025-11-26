@@ -1,23 +1,6 @@
 # mypy: ignore-errors
-from clickhouse_connect import get_async_client
-
-from app.core.di.app_container import AppContainer
-from tests.factories import adv_factory
+# IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
-
-import asyncio
-
-from fakeredis import FakeRedis
-
-
-import aiofiles
-from dependency_injector import containers
-
-from typing import AsyncGenerator
-
-import fakeredis
-
-from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
 
 # Устанавливаем переменные окружения для тестовой БД ДО любых импортов
 os.environ["POSTGRES_MASTER_HOST"] = "localhost"
@@ -29,14 +12,16 @@ os.environ["POSTGRES_PASSWORD"] = "test_password"
 os.environ["POSTGRES_SSL_MODE"] = "disable"
 os.environ["POSTGRES_SSL_INSECURE"] = "true"
 
+# FORCE override ClickHouse settings for tests (must connect to test container, not production!)
+os.environ["CLICKHOUSE_PORT"] = "8124"  # HTTP port for test ClickHouse
+os.environ["CLICK_HOUSE_HOST"] = "localhost"
+os.environ["CLICK_HOUSE_USER"] = "CLICK_HOUSE_USER"  # Username from docker-compose.test.yml
+os.environ["CLICK_HOUSE_PASSWORD"] = "password"  # Password from docker-compose.test.yml
+
 # Обязательные переменные для работы settings
 os.environ.setdefault("TELEGRAM_WEB_PORT", "8080")
 os.environ.setdefault("CH_MAX_THREAD", "10")
 os.environ.setdefault("BIDDER_STEP_RUB", "1")
-os.environ.setdefault("CLICKHOUSE_PORT", "9000")
-os.environ.setdefault("CLICK_HOUSE_HOST", "localhost")
-os.environ.setdefault("CLICK_HOUSE_USER", "default")
-os.environ.setdefault("CLICK_HOUSE_PASSWORD", "test")
 os.environ.setdefault("REDIS_MASTER_HOST", "localhost")
 os.environ.setdefault("REDIS_REPLICA_HOST", "localhost")
 os.environ.setdefault("REDIS_PORT", "6379")
@@ -48,11 +33,21 @@ os.environ.setdefault("MIN_SUM", "0")
 TEST_DB_POSTGRES_URL = "postgresql://test_user:test_password@localhost:5433/test_adv_bot_db"
 os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL
 
-
 import dotenv
-
 # Загружаем .env, но НЕ перезаписываем уже установленные переменные окружения для тестов
 dotenv.load_dotenv(override=False)
+
+# Now it's safe to import modules that use settings
+import asyncio
+from clickhouse_connect import get_async_client
+from fakeredis import FakeRedis
+import aiofiles
+from dependency_injector import containers
+import fakeredis
+from tests.factories import adv_factory
+from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
+from app.core.di.app_container import AppContainer
+
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -78,7 +73,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
 
 from app.modules.common_slaves.wildberries.models import WBCabinet
-
+from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
 TEST_DB_URL = "postgresql+asyncpg://test_user:test_password@localhost:5433/test_adv_bot_db"
 COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "tests", "docker-compose.test.yml")
