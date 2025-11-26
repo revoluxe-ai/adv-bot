@@ -1,4 +1,6 @@
+from collections import defaultdict
 from collections.abc import Callable
+from datetime import datetime
 
 import httpx
 
@@ -22,7 +24,7 @@ class AuthClientHandler:
         self.__shop_id: str = shop_id
         self._access: WBCabinetAccess | None = None
         self._httpx_clients: dict[SectionsEnum, httpx.AsyncClient] = {}
-        self._not_working_tokens_hash: set[str] = set()
+        self._not_working_tokens_hash: dict[SectionsEnum, set[str]] = defaultdict(set)
 
     @property
     def shop_id(self) -> str:
@@ -57,11 +59,16 @@ class AuthClientHandler:
         tokens = access.tokens
         filter_func = self.__get_token_filter_func(section)
         filtered_tokens: list[WBToken] = list(filter(filter_func, tokens))
-
         if not filtered_tokens:
             return None
-        else:
-            return filtered_tokens[0].api_key
+        sorted_tokens = sorted(filtered_tokens, key=self.__sort_token_func, reverse=True)
+        return sorted_tokens[0].api_key
+
+    @staticmethod
+    def __sort_token_func(token: WBToken) -> datetime:
+        return token.expires
+
+
 
     def __get_token_filter_func(
         self, section: SectionsEnum
@@ -74,10 +81,13 @@ class AuthClientHandler:
         def func(token: WBToken):
             token_str = token.api_key
             token_hash = self._get_token_hash(token_str)
-            if token_hash in self._not_working_tokens_hash:
+            if token_hash in self._not_working_tokens_hash[section]:
                 return False
             ru_section_name = sections_map[section]
             if token.is_expired:
+                return False
+            # TODO: Токен может быть только для чтения, что достаточно для работы некоторых сервисов, а мы блочим токен, если он не работает, для всех сервисов сразу. Надо сделать новую логику, где будет это учитываться
+            if token.read_only:
                 return False
             if ru_section_name in token.categories:
                 return True
@@ -98,5 +108,5 @@ class AuthClientHandler:
         # TODO: Тут была ошибка получения хеша, чуть не проскочила в прод
         return get_token_hash(token)
 
-    async def mark_current_token_invalided(self, token_hash: str) -> None:
-        self._not_working_tokens_hash.add(token_hash)
+    async def mark_current_token_invalided(self, token_hash: str, section: SectionsEnum) -> None:
+        self._not_working_tokens_hash[section].add(token_hash)

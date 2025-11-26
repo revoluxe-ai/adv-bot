@@ -82,6 +82,8 @@ class KeywordStampManager:
             )
         )
 
+        # TODO: Реализовать отметку в кабинете о ApiForbiddenError
+
         keywords_map = {kw.text: kw for kw in keywords_with_views}
         current_cpm = self._get_current_cpm(complex_adv)
         stamps: list[KeywordStamp] = []
