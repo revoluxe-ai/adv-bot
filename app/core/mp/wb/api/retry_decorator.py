@@ -85,10 +85,10 @@ def retry_decorator(
                     except ApiForbiddenError as e:
                         state["_attempts"] += 1
                         token_hash = e.not_valid_token_hash
-                        section = e.section
                         if not token_hash:
                             raise e
                         # TODO: нужно сделать две отдельные ошибки на Api, чтобы пробрасывать без Option Section
+                        section = e.section
                         assert section is not None
                         if state["_attempts"] >= max_attempts:
                             raise MaxAttemptsError() from e
