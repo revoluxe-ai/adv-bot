@@ -10,13 +10,14 @@ WITH
             lag(avr_position) OVER w AS avr_old,
 
             -- последний ts по ключу
-            max(timestamp) OVER (PARTITION BY nmid, text) AS max_ts,
+            argMax(timestamp, timestamp) OVER (PARTITION BY nmid, text) AS max_ts,
 
             -- ср. позиция из последней строки
             argMax(avr_position, timestamp) OVER (PARTITION BY nmid, text) AS last_avg_pos,
 
             -- показы последней строки (то, что тебе нужно вернуть)
-            argMax(total_views, timestamp) OVER (PARTITION BY nmid, text) AS last_total_views
+            argMax(total_views, timestamp) OVER (PARTITION BY nmid, text) AS last_total_views,
+            sum(orders) OVER (PARTITION BY nmid, text) AS total_orders_for_keyword
         FROM default_db.keyword_stamp
         WHERE nmid = {nmid: UInt32}
         WINDOW w AS (
@@ -49,7 +50,8 @@ SELECT
 
     -- ВОТ ЭТО: показы из последней строки (всегда самые свежие)
     ts,
-    last_total_views AS total_views_last
+    last_total_views AS total_views_last,
+    total_orders_for_keyword
 FROM calc
 QUALIFY row_number() OVER (
     PARTITION BY nmid, text

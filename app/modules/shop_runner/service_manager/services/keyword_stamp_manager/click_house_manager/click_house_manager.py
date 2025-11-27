@@ -126,8 +126,8 @@ class ClickHouseKeywordStampManager:
         adv_type = adv_setting.type
         async with get_clickhouse_client() as client:
             result: QueryResult = await client.query(query, parameters={"nmid": nmid})
-            rows: Sequence[tuple[str, int, datetime, int]] = cast(
-                Sequence[tuple[str, int, datetime, int]], result.result_rows
+            rows: Sequence[tuple[str, int, datetime, int, int]] = cast(
+                Sequence[tuple[str, int, datetime, int, int]], result.result_rows
             )
             positions: list[WBItemPosition] = []
             for row in rows:
@@ -135,6 +135,8 @@ class ClickHouseKeywordStampManager:
                 # TODO: Сюда из рантайма дошла ошибка
                 p = int(row[1] + 0.5)
                 timestamp = row[2]
+                total_views = row[3]
+                total_orders = row[4]
                 position = WBItemPosition(
                     nmid=nmid,
                     keyword_text=text,
@@ -142,7 +144,8 @@ class ClickHouseKeywordStampManager:
                     timestamp=timestamp,
                     adv_id=adv_id,
                     adv_type=adv_type,
-                    total_views=row[3],
+                    total_views=total_views,
+                    total_orders=total_orders,
                 )
                 positions.append(position)
         return positions
