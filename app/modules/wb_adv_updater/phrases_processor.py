@@ -292,7 +292,7 @@ async def _get_good_bad_phrases_for_min_ctr(
             keyword_stat.reason = "baes_ctr_more_than_min_ctr"
         else:
             assert keyword_stat.views is not None
-            if keyword_stat.views < adv_setting.min_views_for_ml_predict:
+            if adv_setting.min_views_for_ml_predict and keyword_stat.views < adv_setting.min_views_for_ml_predict:
                 keyword_stat.status = KeywordStatus.GOOD
                 keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
             else:
@@ -351,7 +351,8 @@ async def _get_good_bad_phrases_for_min_ctr(
 
 async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords: list[CalculatedKeyword] = await _get_good_bad_phrases_for_min_ctr(
-        adv, int(adv.max_cpc) if adv.max_cpc is not None else None
+        adv,
+        int(adv.max_cpc) if adv.max_cpc is not None else None,
     )
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
