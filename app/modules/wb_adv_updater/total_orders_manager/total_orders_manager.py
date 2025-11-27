@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from warnings import deprecated
 
 from app.utils.click_house.client import get_clickhouse_client
 
@@ -7,7 +8,10 @@ logger = logging.getLogger(__name__)
 
 
 class TotalOrdersManager:
+
+
     @staticmethod
+    @deprecated
     async def get_total_orders(
         nmid: int,
         keywords_texts: list[str],
