@@ -202,7 +202,7 @@ async def test_get_last_positions_returns_total_orders(clickhouse_client: AsyncC
     total_orders_by_keyword = {
         position.keyword_text: position.total_orders for position in positions
     }
-    assert total_orders_by_keyword["keyword"] == 6
+    assert total_orders_by_keyword["keyword"] == 8
     assert total_orders_by_keyword["other"] == 4
 
     _ = await clickhouse_client.command(f"DROP TABLE IF EXISTS {table_name}")

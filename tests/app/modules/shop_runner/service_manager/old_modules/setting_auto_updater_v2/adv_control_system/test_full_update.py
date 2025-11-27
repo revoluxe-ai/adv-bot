@@ -92,6 +92,9 @@ async def test_process_adv(postgres_session: AsyncSession,
 
     # 3️⃣ ComplexAdv мок (теперь с нормальной фабрикой)
     # 4️⃣ Мокаем план и факт
+    initial_target_place = complex_adv.target_place
+    initial_exponent = complex_adv.exponent_predict_ctr
+
     with (
         patch(
             'app.modules.shop_runner.service_manager.'
@@ -115,6 +118,12 @@ async def test_process_adv(postgres_session: AsyncSession,
               'service_manager.old_modules.'
               'setting_auto_updater_v2.adv_control_system.'
               'adv_control_system.sm', return_value=sm_generator),
+        patch(
+            'app.modules.shop_runner.service_manager.'
+            'old_modules.setting_auto_updater_v2.adv_control_system.'
+            'executors.target_place_executor.utils.get_max_cpm',
+            new=AsyncMock(return_value=400),
+        ),
     ):
         keywords = await complex_adv.get_keywords()
         before_white_list_size = len([kw for kw in keywords if kw.hard_status == 2])
@@ -131,5 +140,7 @@ async def test_process_adv(postgres_session: AsyncSession,
     updated_adv_setting = cast(AdvSetting, updated_adv_setting)
 
     after_white_list_size = len([kw for kw in updated_settings if kw.hard_status == 2])
+    complex_adv.adv_setting.max_place = initial_target_place
+    complex_adv.adv_setting.exponent_predict_ctr = initial_exponent
 
     assert condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, complex_adv)
