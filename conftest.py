@@ -68,7 +68,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
 
@@ -198,6 +198,13 @@ def setup_test_database(docker_compose_cmd):
 
     print("[MIGRATION] Creating tables from models metadata...")
     Base.metadata.create_all(sync_engine)
+    
+    # Очищаем тестовые таблицы от данных предыдущих запусков
+    with sync_engine.connect() as conn:
+        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+        conn.commit()
+    print("[OK] Test tables truncated.")
+    
     sync_engine.dispose()
     print("[OK] Tables created successfully from models metadata.")
 
@@ -345,8 +352,9 @@ except Exception:
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
+    KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBToken
 
 
 # Добавляем корневую директорию проекта в PYTHONPATH
@@ -520,26 +528,147 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
     """Создает полностью связанную структуру ComplexAdv (реальные ORM-объекты)."""
 
     await postgres_session.begin()
-    adv_setting = AdvSettingFactory.build()
+    adv_setting = AdvSettingFactory.build(
+        auto_update_white_list=True,
+        auto_update_target_place=True,
+        auto_update_exponent=True,
+        auto_add_only_relevant_phrase=False,
+        bidder_for_auto=True,
+        bidder_active=True,
+    )
+    adv_setting.cpm = 100
+    adv_setting.max_cpm = 250
+    adv_setting.max_place = 120
+    adv_setting.exponent_predict_ctr = 8.0
+
     search_adv_setting = AdvSettingFactory.build()
+    search_adv_setting.cpm = 90
     adv_setting._search_adv = search_adv_setting.adv_id
     postgres_session.add(adv_setting)
     await postgres_session.flush()
     await postgres_session.refresh(adv_setting)
     # 2️⃣ KeywordSettings
     adv_factory.fake.unique.clear()
-    keyword_settings = [
-        KeywordSettingFactory.build(adv_setting_id=adv_setting.id,)
-        for _ in range(50)
-    ]
+    keyword_settings = []
+    for idx in range(50):
+        ks = KeywordSettingFactory.build(adv_setting_id=adv_setting.id)
+        if idx < 10:
+            ks.hard_status = 2
+            ks.relevant = True
+        elif idx < 20:
+            ks.hard_status = 1
+            ks.relevant = True
+        else:
+            ks.hard_status = 0
+            ks.relevant = False
+        keyword_settings.append(ks)
     postgres_session.add_all(keyword_settings)
     await postgres_session.flush()
     for ks in keyword_settings:
         await postgres_session.refresh(ks)
 
     # 3️⃣ CalculatedKeywords
-    from tests.factories.keyword_pipeline import generate_calculated_keywords
-    calculated_keywords = generate_calculated_keywords(keyword_settings)
+    def _build_keyword(
+        ks: KeywordSetting,
+        *,
+        status: str,
+        hard_status: int,
+        predict_ctr: float,
+        predict_ctr_exponent: float,
+        views: int,
+        clicks: int,
+        spend: float,
+        relevant: bool,
+        best: bool = False,
+    ) -> CalculatedKeyword:
+        return CalculatedKeyword(
+            keyword_setting_original_id=ks.id,
+            text=ks.text,
+            clicks=clicks,
+            views=views,
+            spend=spend,
+            baes_ctr=round(predict_ctr * 0.8, 3),
+            predict_ctr=predict_ctr,
+            predict_ctr_exponent=predict_ctr_exponent,
+            status=status,
+            hard_status=hard_status,
+            relevant=relevant,
+            best_keyword_status=best,
+        )
+
+    calculated_keywords: list[CalculatedKeyword] = []
+    for idx, ks in enumerate(keyword_settings):
+        if idx == 0:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.GOOD,
+                    hard_status=2,
+                    predict_ctr=1.5,
+                    predict_ctr_exponent=6.0,
+                    views=1500,
+                    clicks=200,
+                    spend=320.0,
+                    relevant=True,
+                    best=True,
+                )
+            )
+        elif idx < 10:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.GOOD,
+                    hard_status=2,
+                    predict_ctr=1.2,
+                    predict_ctr_exponent=5.0,
+                    views=1200,
+                    clicks=150,
+                    spend=210.0,
+                    relevant=True,
+                )
+            )
+        elif idx < 15:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.BAD,
+                    hard_status=1,
+                    predict_ctr=0.35,
+                    predict_ctr_exponent=4.0,
+                    views=800,
+                    clicks=40,
+                    spend=45.0,
+                    relevant=True,
+                )
+            )
+        elif idx < 20:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.GOOD,
+                    hard_status=1,
+                    predict_ctr=1.1,
+                    predict_ctr_exponent=4.5,
+                    views=1000,
+                    clicks=120,
+                    spend=160.0,
+                    relevant=True,
+                )
+            )
+        else:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.BAD,
+                    hard_status=0,
+                    predict_ctr=0.25,
+                    predict_ctr_exponent=3.0,
+                    views=600,
+                    clicks=30,
+                    spend=30.0,
+                    relevant=False,
+                )
+            )
 
     # 4️⃣ Асинхронный источник данных для ComplexAdv
     async def get_keywords_func(_: AdvSetting) -> list[CalculatedKeyword]:
@@ -559,9 +688,19 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
 
 
 @pytest.fixture(scope='function')
-def complex_adv_mock(complex_adv):
-    complex_adv.get_keywords = AsyncMock(return_value=[])
-    return complex_adv
+def complex_adv_mock():
+    mock_adv = MagicMock(spec=ComplexAdv)
+    mock_adv.get_keywords = AsyncMock(return_value=[])
+    mock_adv.adv_setting = MagicMock()
+    mock_adv.adv_setting.adv_id = 99999
+    mock_adv.adv_setting.name = "Тестовая РК"
+    mock_adv.adv_setting.auto_update_white_list = True
+    mock_adv.adv_setting.auto_update_target_place = True
+    mock_adv.adv_setting.auto_update_exponent = True
+    mock_adv.adv_setting._search_adv = None
+    mock_adv.search_adv = None
+    mock_adv.shop_id = "test_shop"
+    return mock_adv
 
 
 
@@ -579,13 +718,20 @@ async def sm_generator(postgres_session):
     return _FakeSessionMaker()
 
 
+SYNC_TEST_DB_URL = TEST_DB_URL.replace("postgresql+asyncpg", "postgresql")
+SYNC_TEST_ENGINE = create_engine(SYNC_TEST_DB_URL, poolclass=NullPool)
+
+
 @pytest.fixture(autouse=True)
-async def clean_db(async_engine):
-    """Очищает таблицы перед каждым тестом."""
-    yield  # Сначала выполняем тест
-    # Очистка после теста
-    async with async_engine.begin() as conn:
-        await conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+def clean_db():
+    """Синхронно очищает ключевые таблицы до и после каждого теста."""
+    with SYNC_TEST_ENGINE.begin() as conn:
+        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+
+    yield
+
+    with SYNC_TEST_ENGINE.begin() as conn:
+        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture(scope='function')
