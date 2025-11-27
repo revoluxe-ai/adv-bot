@@ -42,7 +42,8 @@ from app.utils.db.session_maker import get_async_session_maker
 # Ensure billing models (AdvPayment) are imported and registered before mapper configuration
 try:
     # TODO: Надо разобраться что это за конструкция такая, и постараться ее убрать без рейса исключения
-    from app.modules.billing import models as _billing_models  # noqa: F401
+    # from app.modules.billing import models as _billing_models  # noqa: F401
+    pass
 except Exception:  # noqa
     # In minimal test contexts billing may be absent; relationship will fallback to string resolution
     pass
