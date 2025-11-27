@@ -209,9 +209,10 @@ async def _get_good_bad_phrases_for_min_ctr(
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
         keyword_setting = text_to_keyword_setting[text]
-        added_clicks = keyword_setting.added_clicks
-        if added_clicks is None:  # Added check for None
-            added_clicks = 0
+        if keyword_setting.added_clicks is None:  # Added check for None
+            added_clicks: int = 0
+        else:
+            added_clicks: int = keyword_setting.added_clicks
         keyword_stat.relevant = keyword_setting.relevant
         keyword_stat.added_clicks = added_clicks
         keyword_stat.keyword_setting_original_id = keyword_setting.id
