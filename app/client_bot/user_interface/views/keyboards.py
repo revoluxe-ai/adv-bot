@@ -591,7 +591,7 @@ def get_keywords_setting_keyboard(
         if keyword.relevant:
             text += "🟢"
         total_views_history = keyword.total_views_history if keyword.total_views_history is not None else 0
-        text += f"""{clicks}/{views}({total_views_history})/{round(ctr * 100 if ctr is not None else 0, 2)}%"""
+        text += f"""{clicks}/{views}/{round(ctr * 100 if ctr is not None else 0, 2)}%"""
         total_orders = keyword.total_orders if keyword.total_orders is not None else 0
         text += f"({total_orders})"
         text += "|"
