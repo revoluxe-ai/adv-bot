@@ -238,12 +238,14 @@ async def _get_good_bad_phrases_for_min_ctr(
         enough_views = keyword_stat.enough_views
         assert enough_views is not None
         original_predict_ctr = keyword_stat.original_predict_ctr
+        assert keyword_stat.hard_status is not None
         hard_status = int(keyword_stat.hard_status)
         keyword_setting = text_to_keyword_setting.get(keyword_stat.text)
         """TODO: Выпилить из кода reason max_position, т.е. больше функции отключения позиции, если база больше
          или равна целевой - нет. """
         if max_cpc:
             if cpm_now:
+                assert keyword_stat.predict_ctr is not None
                 cpc = (cpm_now / 1000) / keyword_stat.predict_ctr
             elif clicks > 0:
                 cpc = views / clicks
