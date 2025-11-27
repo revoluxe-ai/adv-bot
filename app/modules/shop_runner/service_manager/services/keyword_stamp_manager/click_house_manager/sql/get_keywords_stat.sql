@@ -91,9 +91,13 @@ WHERE nmid = {nmid: UInt64}
     SELECT
         text,
         date,
-        if(views1 = views2, pos1, (pos1 * views1) - (pos2 * views2 / views1 - views2)) AS pos_real
-    FROM pos_real_calc),
-        last_ts AS (
+        if(
+            views1 = views2,
+            pos1,
+            (pos1 * views1) - (pos2 * views2) /(views1 - views2)) AS pos_real
+            FROM pos_real_calc),
+
+last_ts AS (
     SELECT
         text,
         argMax(timestamp, version) AS last_timestamp
