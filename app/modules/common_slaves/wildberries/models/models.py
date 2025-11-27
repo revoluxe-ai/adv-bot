@@ -421,8 +421,8 @@ class AdvSetting(BaseTable):
         default=settings.DEFAULT_MIN_CTR,
         server_default=text(str(settings.DEFAULT_MIN_CTR)),
     )
-    max_cpc = Column(Float, nullable=True)
-    min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
+    max_cpc: Mapped[float | None] = mapped_column(Float, nullable=True)
+    min_views_for_ml_predict: Mapped[int | None] = mapped_column(Integer, nullable=True, server_default=text("0"))
     payments: Mapped[list["AdvPayment"]] = relationship(
         "AdvPayment", back_populates="adv_setting", uselist=True
     )
@@ -650,7 +650,7 @@ class KeywordSetting(BaseTable):
         uselist=True,
     )
     hard_status: Mapped[int] = mapped_column(Integer, default=1)
-    added_clicks = Column(Integer, default=0)
+    added_clicks: Mapped[int | None] = mapped_column(Integer, default=0)
     added_views = Column(Integer, default=0)
     auto_block = Column(Boolean)
     relevant: Mapped[bool] = mapped_column(
