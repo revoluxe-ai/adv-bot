@@ -119,24 +119,24 @@ class ClickHouseKeywordStampManager:
 
     @staticmethod
     async def get_last_positions(adv_setting: AdvSetting) -> list[WBItemPosition]:
-        sql_path = Path(__file__).parent / "sql/get_last_positions.sql"
+        sql_path = Path(__file__).parent / "sql/get_keywords_stat.sql"
         query = sql_path.read_text()
         nmid = adv_setting.nmids[0]
         adv_id = adv_setting.adv_id
         adv_type = adv_setting.type
         async with get_clickhouse_client() as client:
             result: QueryResult = await client.query(query, parameters={"nmid": nmid})
-            rows: Sequence[tuple[str, int, datetime, int, int]] = cast(
-                Sequence[tuple[str, int, datetime, int, int]], result.result_rows
+            rows: Sequence[tuple[str, float,  int, int, datetime]] = cast(
+                Sequence[tuple[str, float, int, int, datetime]], result.result_rows
             )
             positions: list[WBItemPosition] = []
             for row in rows:
                 text = row[0]
                 # TODO: Сюда из рантайма дошла ошибка
                 p = int(row[1] + 0.5)
-                timestamp = row[2]
-                total_views = row[3]
-                total_orders = row[4]
+                total_views = row[2]
+                total_orders = row[3]
+                timestamp = row[4]
                 position = WBItemPosition(
                     nmid=nmid,
                     keyword_text=text,
