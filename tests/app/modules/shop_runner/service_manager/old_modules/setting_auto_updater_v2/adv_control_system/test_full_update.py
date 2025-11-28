@@ -143,4 +143,18 @@ async def test_process_adv(postgres_session: AsyncSession,
     complex_adv.adv_setting.max_place = initial_target_place
     complex_adv.adv_setting.exponent_predict_ctr = initial_exponent
 
+    """
+    TODO: Улучшение теста test_process_adv
+
+1. Убрать ручное сохранение и восстановление значений initial_target_place / initial_exponent.
+2. Переделать фикстуру complex_adv так, чтобы она создавалась изолированно и @pytest.fixture(scope="function") 
+   всегда возвращала новый объект с чистым состоянием.
+3. Переписать condition_func так, чтобы он не использовал complex_adv, а сравнивал updated_adv_setting 
+   с initial значениями, переданными явно.
+4. Переработать структуру теста в стиле Arrange–Act–Assert для повышения читаемости.
+5. Перестать передавать сам complex_adv внутрь condition_func — заменив на чистые входные данные.
+6. (Опционально) Вынести condition_func в именованные функции для лучшей читаемости.
+    
+    """
+
     assert condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, complex_adv)
