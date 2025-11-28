@@ -238,11 +238,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._adv_setting.orders_source_for_auto_mode
             == OrdersSourceForAutoMode.ADV_SUM
         ):
-            text += "📊 Источник заказов: ТОЛЬКО рекламные заказы\n"
-            text += f"Суммарные заказы из рекламы: {self.full_adv_stat_for_last_days_for_auto_adv.orders + self.full_adv_stat_for_last_days_for_auction.orders}\n"
+            text += "📊 Ист. зак.: ТОЛЬКО рек. заказы\n"
+            text += f"Сумм. заказы из рек.: {self.full_adv_stat_for_last_days_for_auto_adv.orders + self.full_adv_stat_for_last_days_for_auction.orders}\n"
         else:
-            text += "📊 Источник заказов: Общая статистика (включая органику)\n"
-            text += f"""Заказов из Органики: {
+            text += "📊 Ист. зак.: Общая стат. (вкл. органику)\n"
+            text += f"""Зак. из Орг.: {
             self._all_orders_for_last_days
             - self.full_adv_stat_for_last_days_for_auction.orders
             - self.full_adv_stat_for_last_days_for_auto_adv.orders
@@ -273,10 +273,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         fact_method_ru = self._fact_data.method_ru
         text += (
             f"\n Факт-продажи({fact_method_ru}):\n"
-            f"Прогноз заказов в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
-            f"Себестоимость: {round(self._fact_data.pay_for_order, 2)} р."
+            f"Прог. зак. в день: {self._fact_data.predict_orders:.2f} (цель: {plan_for_sales_for_day_str})\n"
+            f"Себес.: {round(self._fact_data.pay_for_order, 2)} р."
             f" (цель: {target_price_for_order_str}, макс: {max_price_for_order_str})\n"
-            f"Средний CTR Рек.системе: {self._mean_auto_ctr*100:.2f} "
+            f"Ср. CTR Рек.сис.: {self._mean_auto_ctr*100:.2f} "
         )
 
         text += self._common_stat_by_days

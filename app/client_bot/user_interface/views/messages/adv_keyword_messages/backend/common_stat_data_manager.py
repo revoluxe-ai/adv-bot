@@ -93,7 +93,7 @@ class CommonStatDataManager:
                 mean_orders_for_fraction_day = None
 
             count_orders = orders
-            text_row = f"{date_str}: Корзины: {add_to_cart} Заказы: {count_orders}"
+            text_row = f"{date_str}: Корз.: {add_to_cart} Зак.: {count_orders}"
             if mean_orders_for_fraction_day:
                 text_row += f"({mean_orders_for_fraction_day})"
             text_row += "шт."
