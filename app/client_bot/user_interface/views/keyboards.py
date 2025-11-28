@@ -590,10 +590,10 @@ def get_keywords_setting_keyboard(
         text = "🌟" if keyword.best_keyword_status else ""
         if keyword.relevant:
             text += "🟢"
-        total_views_history = keyword.total_views_history if keyword.total_views_history is not None else 0
-        text += f"""{clicks}/{views}/{round(ctr * 100 if ctr is not None else 0, 2)}%"""
-        total_orders = keyword.total_orders if keyword.total_orders is not None else 0
-        text += f"({total_orders})"
+        total_views_history = f"({keyword.total_views})" if keyword.total_views else ""
+        text += f"""{clicks}/{views}{total_views_history}/{round(ctr * 100 if ctr is not None else 0, 2)}%"""
+        total_orders = f"({keyword.total_orders})" if keyword.total_orders else ""
+        text += total_orders
         text += "|"
         if keyword.position and keyword.position != -1:
             text += f"{keyword.position}"
