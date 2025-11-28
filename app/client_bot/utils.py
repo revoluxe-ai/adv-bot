@@ -116,7 +116,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
                 '"' + keyword.text + '"',
                 str(clicks),
                 str(views),
-                str(keyword.total_views_history if keyword.total_views_history else 0),
+                str(keyword.total_views if keyword.total_views else 0),
                 str(keyword.query),
                 str(ctr).replace(".", ","),
                 str(round(predict_ctr * 100, 2)).replace(".", ","),
