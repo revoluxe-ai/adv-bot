@@ -134,10 +134,7 @@ class ClickHouseKeywordStampManager:
                 text = row[0]
                 # TODO: Сюда из рантайма дошла ошибка
                 raw_pos = row[1]
-                if raw_pos is not None:
-                    p = int(row[1] + 0.5)
-                else:
-                    p = 0
+                p = int(row[1] + 0.5)
                 total_views = row[2]
                 total_orders = row[3]
                 timestamp = row[4]
