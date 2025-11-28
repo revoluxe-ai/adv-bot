@@ -303,7 +303,7 @@ async def _get_good_bad_phrases_for_min_ctr(
             ]
         except Exception as e:
             raise e
-
+    # TODO: Тут вообще не понятно что это и зачем
     for keyword_stat in keyword_stats:
         for property_ in keyword_stat.__dict__:
             if property_ in [
