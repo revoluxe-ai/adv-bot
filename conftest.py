@@ -180,6 +180,9 @@ def setup_test_database(docker_compose_cmd):
 
     print("[MIGRATION] Creating PostgreSQL extensions...")
 
+    # Добавим небольшую задержку перед созданием расширений PostgreSQL
+    time.sleep(5)
+
     # Создаём синхронный движок для создания расширений и таблиц
     sync_engine = create_engine(TEST_DB_URL.replace("postgresql+asyncpg", "postgresql"))
 
@@ -774,6 +777,42 @@ async def clickhouse_client(setup_test_database):
 
 
     print("[OK] ClickHouse async client created")
+
+    # Добавим небольшую задержку, чтобы ClickHouse полностью инициализировался
+    await asyncio.sleep(5)
+
+    # Создаём таблицы ClickHouse, если их нет
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.full_adv_wb_stat (
+            adv_id Int32,
+            date Date,
+            views Int32,
+            clicks Int32,
+            spend Float64,
+            added_to_cart Int32,
+            orders Int32,
+            sum_price_orders Float64,
+            version Float64
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, date, version)
+    """)
+
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.advkeyword_new (
+            adv_id Int32,
+            text String,
+            date Date,
+            clicks_state AggregateFunction(argMax, Int32, Float64),
+            views_state AggregateFunction(argMax, Int32, Float64),
+            spend_state AggregateFunction(argMax, Float64, Float64),
+            version Float64
+        ) ENGINE = AggregatingMergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, text, date)
+    """)
+
+    print("[OK] ClickHouse tables created/checked")
 
     yield client
 

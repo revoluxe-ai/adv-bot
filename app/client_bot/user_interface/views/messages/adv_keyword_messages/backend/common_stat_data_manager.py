@@ -16,9 +16,30 @@ class CommonStatDataManager:
         concatenate_stat = await self.get_concatinated_stats(adv_setting, last_days)
         nmid = adv_setting.nmids[0]
         common_card_stat = await common_stat_manager.get_stats_by_days(nmid, last_days)
+
+        # Получаем показы авто-РК и показы по ключевым словам по дням
+        auto_adv_id = adv_setting.adv_id
+        end_date = datetime.datetime.now()
+        start_date = end_date - datetime.timedelta(days=last_days)
+
+        auto_adv_stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
+            [auto_adv_id], start_date, end_date
+        )
+        auto_views_by_day: dict[datetime.date, int] = {
+            stat.date: stat.views for stat in auto_adv_stats
+        }
+
+        keywords_views_by_day = await full_wb_adv_stat.get_keywords_views_by_days(
+            [auto_adv_id], start_date, end_date
+        )
+
         text_stat = "\n\nСтатистика по дням:\n"
         text_stat += await self._get_days_static_text(
-            adv_setting, concatenate_stat, common_card_stat
+            adv_setting,
+            concatenate_stat,
+            common_card_stat,
+            auto_views_by_day,
+            keywords_views_by_day,
         )
         return text_stat
 
@@ -57,11 +78,15 @@ class CommonStatDataManager:
         adv: AdvSetting,
         concatenated_adv_stat_result: list[SmallFullAdvStatPerDay],
         common_card_stats: list[CommonCardStat],
+        auto_views_by_day: dict[datetime.date, int],
+        keywords_views_by_day: dict[datetime.date, int],
     ) -> str:
         """
         Получает текст статистики по дням
         Args:
             concatenated_adv_stat_result: Объединенный результат статистики
+            auto_views_by_day: Показы авто-РК по дням
+            keywords_views_by_day: Показы по ключевым словам по дням
 
         Returns:
             str: Текст статистики по дням
@@ -98,6 +123,14 @@ class CommonStatDataManager:
                 text_row += f"({mean_orders_for_fraction_day})"
             text_row += "шт."
             text_row += f"Себеc: {mean_pay_for_order:.2f}р."
+
+            # Дополнительные показы автокампании (за вычетом показов по ключевым запросам)
+            auto_views = auto_views_by_day.get(date, 0)
+            keywords_views = keywords_views_by_day.get(date, 0)
+            extra_views = auto_views - keywords_views
+            if extra_views > 0:
+                text_row += f" Доп.пок.: {extra_views}"
+
             text_row += "\n"
             text += text_row
 
