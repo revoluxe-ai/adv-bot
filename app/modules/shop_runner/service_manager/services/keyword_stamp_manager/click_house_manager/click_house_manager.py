@@ -125,7 +125,8 @@ class ClickHouseKeywordStampManager:
         adv_id = adv_setting.adv_id
         adv_type = adv_setting.type
         async with get_clickhouse_client() as client:
-            result: QueryResult = await client.query(query, parameters={"nmid": nmid})
+            result: QueryResult = await client.query(query, parameters={"nmid": nmid,
+                                                                        "days": 7})
             rows: Sequence[tuple[str, float,  int, int, datetime]] = cast(
                 Sequence[tuple[str, float, int, int, datetime]], result.result_rows
             )

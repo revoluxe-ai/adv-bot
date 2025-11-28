@@ -8,6 +8,7 @@ WITH
                     version
 FROM default_db.keyword_stamp
 WHERE nmid = {nmid: UInt64}
+    AND date >= today() - INTERVAL {days: UInt32} DAYS
     ),
 
     total_sums_today AS (
