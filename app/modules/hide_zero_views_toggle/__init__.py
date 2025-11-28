@@ -6,4 +6,3 @@ __all__ = [
     "HideZeroViewsToggleRouter",
     "ChangeHideZeroViewsStatus",
 ]
-

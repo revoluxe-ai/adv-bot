@@ -26,7 +26,7 @@ def create_redis_client(app_config: AppConfig) -> Redis:  # pyright: ignore
 class RedisLifecycle(resources.AsyncResource[Redis]):  # pyright: ignore
     async def init(self, client: Redis) -> None:  # pyright: ignore
         try:
-            await client.ping()
+            await client.ping() # pyright: ignore
         except Exception as exc:
             await client.aclose()  # type: ignore[attr-defined]
             raise exc

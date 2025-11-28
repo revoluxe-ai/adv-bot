@@ -4,8 +4,8 @@ from sqlalchemy.orm import Mapped
 from app.utils.db.base import BaseTable
 
 
-
 # TODO: Убрать ! в конце ключей
+
 
 class TelegramFile(BaseTable):
     file_telegram_id: Mapped[int] = Column(String, unique=True, nullable=False)

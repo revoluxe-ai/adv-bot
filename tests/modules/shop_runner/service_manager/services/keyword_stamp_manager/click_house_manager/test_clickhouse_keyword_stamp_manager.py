@@ -1,13 +1,14 @@
-from datetime import date
-from unittest.mock import patch, AsyncMock
+from datetime import date, datetime, timedelta
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from clickhouse_connect.driver import AsyncClient
 
 from app.core.mp.wb.dto import KeywordPosition
-from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager import \
-    ClickHouseKeywordStampManager
-from app.utils.click_house.client import get_clickhouse_client
+from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager import (
+    ClickHouseKeywordStampManager,
+)
 from tests.factories import KeywordPositionFactory
 
 
@@ -37,17 +38,14 @@ async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: A
     num_positions = 3
     test_positions: list[KeywordPosition] = KeywordPositionFactory.build_batch(num_positions)
 
-    with patch('app.modules.shop_runner.'
-               'service_manager.services.keyword_stamp_manager.'
-               'click_house_manager.click_house_manager.get_clickhouse_client') as \
-             get_clickhouse_client_mock:
+    with patch(
+        "app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager.click_house_manager.get_clickhouse_client"
+    ) as get_clickhouse_client_mock:
         cm = AsyncMock()
         cm.__aenter__.return_value = clickhouse_client
         cm.__aexit__.return_value = None
 
-
         get_clickhouse_client_mock.return_value = cm
-
 
         await ClickHouseKeywordStampManager.update_positions(test_positions)
 
@@ -74,3 +72,123 @@ async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: A
         )
 
     _ = await clickhouse_client.command(f"DROP TABLE IF EXISTS {table_name}")
+
+
+@pytest.mark.asyncio
+async def test_get_last_positions_returns_total_orders(clickhouse_client: AsyncClient) -> None:
+    _ = await clickhouse_client.command("CREATE DATABASE IF NOT EXISTS default_db")
+
+    stamp_table = "default_db.keyword_stamp"
+    positions_table = "default_db.keyword_position_from_api"
+
+    for table in (stamp_table, positions_table):
+        _ = await clickhouse_client.command(f"DROP TABLE IF EXISTS {table}")
+
+    stamp_table_sql = f"""
+        CREATE TABLE IF NOT EXISTS {stamp_table}
+        (
+            shop_id      LowCardinality(String),
+            adv_id       Int32,
+            nmid         UInt32,
+            text         String,
+            avr_position Float32,
+            orders       UInt32,
+            total_views  UInt32,
+            current_cpm  Int32,
+            date         Date,
+            timestamp    DateTime('Europe/Moscow'),
+            version      UInt64
+        )
+        ENGINE = MergeTree
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (shop_id, adv_id, nmid, text, date, timestamp)
+        SETTINGS index_granularity = 8192;
+    """
+    _ = await clickhouse_client.command(stamp_table_sql)
+
+    positions_table_sql = f"""
+        CREATE TABLE IF NOT EXISTS {positions_table}
+        (
+            nmid         Int32,
+            text         String,
+            avr_position Float32,
+            total_views  Int32,
+            orders       Int32,
+            date         Date,
+            version      UInt64
+        )
+        ENGINE = ReplacingMergeTree(version)
+            ORDER BY (nmid, date)
+            SETTINGS index_granularity = 8192;
+    """
+    _ = await clickhouse_client.command(positions_table_sql)
+
+    today = date.today()
+    today_str = today.strftime("%Y-%m-%d")
+    yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    base_ts = datetime.combine(today, datetime.min.time())
+    ts_10 = (base_ts + timedelta(hours=10)).strftime("%Y-%m-%d %H:%M:%S")
+    ts_11 = (base_ts + timedelta(hours=11)).strftime("%Y-%m-%d %H:%M:%S")
+    ts_12 = (base_ts + timedelta(hours=12)).strftime("%Y-%m-%d %H:%M:%S")
+
+    stamp_insert_sql = f"""
+        INSERT INTO {stamp_table} (
+            shop_id,
+            adv_id,
+            nmid,
+            text,
+            avr_position,
+            orders,
+            total_views,
+            current_cpm,
+            date,
+            timestamp,
+            version
+        ) VALUES
+        ('shop', 100, 1, 'keyword', 10.0, 4, 100, 50, '{today_str}', '{ts_10}', 1),
+        ('shop', 100, 1, 'keyword', 8.0, 5, 130, 55, '{today_str}', '{ts_11}', 2),
+        ('shop', 100, 1, 'other', 12.0, 3, 90, 40, '{today_str}', '{ts_10}', 3),
+        ('shop', 100, 1, 'other', 11.0, 4, 120, 45, '{today_str}', '{ts_12}', 4)
+    """
+    await clickhouse_client.command(stamp_insert_sql)
+
+    positions_insert_sql = f"""
+        INSERT INTO {positions_table} (
+            nmid,
+            text,
+            avr_position,
+            total_views,
+            orders,
+            date,
+            version
+        ) VALUES
+        (1, 'keyword', 7.0, 70, 3, '{yesterday_str}', 1),
+        (1, 'other', 10.0, 60, 2, '{yesterday_str}', 2),
+        (1, 'other', 10.0, 60, 5, '{yesterday_str}', 3)
+    """
+    await clickhouse_client.command(positions_insert_sql)
+
+    adv_setting = SimpleNamespace(nmids=[1], adv_id=100, type=8)
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager.click_house_manager.get_clickhouse_client"
+    ) as get_clickhouse_client_mock:
+        cm = AsyncMock()
+        cm.__aenter__.return_value = clickhouse_client
+        cm.__aexit__.return_value = None
+        get_clickhouse_client_mock.return_value = cm
+
+        positions = await ClickHouseKeywordStampManager.get_last_positions(adv_setting)
+
+    assert len(positions) == 2
+    totals = {pos.keyword_text: pos.total_orders for pos in positions}
+    views = {pos.keyword_text: pos.total_views for pos in positions}
+
+    # Текущая реализация агрегирует только свежие версии из таблицы keyword_stamp.
+    assert totals["keyword"] == 5
+    assert totals["other"] == 9
+    assert views["keyword"] == 130
+    assert views["other"] == 180
+
+    for table in (stamp_table, positions_table):
+        _ = await clickhouse_client.command(f"DROP TABLE IF EXISTS {table}")

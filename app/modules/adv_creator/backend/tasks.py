@@ -13,6 +13,7 @@ from app.modules.adv_creator.backend.exc import (
     NotEnoughBalanceOnShopError,
     AdvExistsForNmidError,
 )
+from app.core.di.app_container import AppContainer
 from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.wb_adv_updater import data_manager
 
@@ -22,7 +23,8 @@ logger = logging.getLogger(__name__)
 async def create_complex_advs(
     ctx: dict[str, Any], nmid: int, shop_id: str, hard_mode: bool, user_telegram_id: int
 ) -> None:
-    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
+    # TODO: Тут ошибка попала в прод: отсутствие импорта
+    async with await DIManager.create(AppContainer):
         try:
             await _create_complex_advs(ctx, nmid, shop_id, hard_mode, user_telegram_id)
         except ApiForbiddenError:

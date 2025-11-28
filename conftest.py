@@ -1,23 +1,6 @@
 # mypy: ignore-errors
-from clickhouse_connect import get_async_client
-
-from app.core.di.app_container import AppContainer
-from tests.factories import adv_factory
+# IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
-
-import asyncio
-
-from fakeredis import FakeRedis
-
-
-import aiofiles
-from dependency_injector import containers
-
-from typing import AsyncGenerator
-
-import fakeredis
-
-from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
 
 # Устанавливаем переменные окружения для тестовой БД ДО любых импортов
 os.environ["POSTGRES_MASTER_HOST"] = "localhost"
@@ -29,14 +12,16 @@ os.environ["POSTGRES_PASSWORD"] = "test_password"
 os.environ["POSTGRES_SSL_MODE"] = "disable"
 os.environ["POSTGRES_SSL_INSECURE"] = "true"
 
+# FORCE override ClickHouse settings for tests (must connect to test container, not production!)
+os.environ["CLICKHOUSE_PORT"] = "8124"  # HTTP port for test ClickHouse
+os.environ["CLICK_HOUSE_HOST"] = "localhost"
+os.environ["CLICK_HOUSE_USER"] = "CLICK_HOUSE_USER"  # Username from docker-compose.test.yml
+os.environ["CLICK_HOUSE_PASSWORD"] = "password"  # Password from docker-compose.test.yml
+
 # Обязательные переменные для работы settings
 os.environ.setdefault("TELEGRAM_WEB_PORT", "8080")
 os.environ.setdefault("CH_MAX_THREAD", "10")
 os.environ.setdefault("BIDDER_STEP_RUB", "1")
-os.environ.setdefault("CLICKHOUSE_PORT", "9000")
-os.environ.setdefault("CLICK_HOUSE_HOST", "localhost")
-os.environ.setdefault("CLICK_HOUSE_USER", "default")
-os.environ.setdefault("CLICK_HOUSE_PASSWORD", "test")
 os.environ.setdefault("REDIS_MASTER_HOST", "localhost")
 os.environ.setdefault("REDIS_REPLICA_HOST", "localhost")
 os.environ.setdefault("REDIS_PORT", "6379")
@@ -48,11 +33,21 @@ os.environ.setdefault("MIN_SUM", "0")
 TEST_DB_POSTGRES_URL = "postgresql://test_user:test_password@localhost:5433/test_adv_bot_db"
 os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL
 
-
 import dotenv
-
 # Загружаем .env, но НЕ перезаписываем уже установленные переменные окружения для тестов
 dotenv.load_dotenv(override=False)
+
+# Now it's safe to import modules that use settings
+import asyncio
+from clickhouse_connect import get_async_client
+from fakeredis import FakeRedis
+import aiofiles
+from dependency_injector import containers
+import fakeredis
+from tests.factories import adv_factory
+from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
+from app.core.di.app_container import AppContainer
+
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -73,12 +68,12 @@ from datetime import datetime, timedelta
 import pytest
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
 
 from app.modules.common_slaves.wildberries.models import WBCabinet
-
+from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
 TEST_DB_URL = "postgresql+asyncpg://test_user:test_password@localhost:5433/test_adv_bot_db"
 COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "tests", "docker-compose.test.yml")
@@ -185,6 +180,9 @@ def setup_test_database(docker_compose_cmd):
 
     print("[MIGRATION] Creating PostgreSQL extensions...")
 
+    # Добавим небольшую задержку перед созданием расширений PostgreSQL
+    time.sleep(5)
+
     # Создаём синхронный движок для создания расширений и таблиц
     sync_engine = create_engine(TEST_DB_URL.replace("postgresql+asyncpg", "postgresql"))
 
@@ -203,6 +201,13 @@ def setup_test_database(docker_compose_cmd):
 
     print("[MIGRATION] Creating tables from models metadata...")
     Base.metadata.create_all(sync_engine)
+    
+    # Очищаем тестовые таблицы от данных предыдущих запусков
+    with sync_engine.connect() as conn:
+        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+        conn.commit()
+    print("[OK] Test tables truncated.")
+    
     sync_engine.dispose()
     print("[OK] Tables created successfully from models metadata.")
 
@@ -350,8 +355,9 @@ except Exception:
 
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
+    KeywordStatus,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBToken
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBToken
 
 
 # Добавляем корневую директорию проекта в PYTHONPATH
@@ -525,26 +531,147 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
     """Создает полностью связанную структуру ComplexAdv (реальные ORM-объекты)."""
 
     await postgres_session.begin()
-    adv_setting = AdvSettingFactory.build()
+    adv_setting = AdvSettingFactory.build(
+        auto_update_white_list=True,
+        auto_update_target_place=True,
+        auto_update_exponent=True,
+        auto_add_only_relevant_phrase=False,
+        bidder_for_auto=True,
+        bidder_active=True,
+    )
+    adv_setting.cpm = 100
+    adv_setting.max_cpm = 250
+    adv_setting.max_place = 120
+    adv_setting.exponent_predict_ctr = 8.0
+
     search_adv_setting = AdvSettingFactory.build()
+    search_adv_setting.cpm = 90
     adv_setting._search_adv = search_adv_setting.adv_id
     postgres_session.add(adv_setting)
     await postgres_session.flush()
     await postgres_session.refresh(adv_setting)
     # 2️⃣ KeywordSettings
     adv_factory.fake.unique.clear()
-    keyword_settings = [
-        KeywordSettingFactory.build(adv_setting_id=adv_setting.id,)
-        for _ in range(50)
-    ]
+    keyword_settings = []
+    for idx in range(50):
+        ks = KeywordSettingFactory.build(adv_setting_id=adv_setting.id)
+        if idx < 10:
+            ks.hard_status = 2
+            ks.relevant = True
+        elif idx < 20:
+            ks.hard_status = 1
+            ks.relevant = True
+        else:
+            ks.hard_status = 0
+            ks.relevant = False
+        keyword_settings.append(ks)
     postgres_session.add_all(keyword_settings)
     await postgres_session.flush()
     for ks in keyword_settings:
         await postgres_session.refresh(ks)
 
     # 3️⃣ CalculatedKeywords
-    from tests.factories.keyword_pipeline import generate_calculated_keywords
-    calculated_keywords = generate_calculated_keywords(keyword_settings)
+    def _build_keyword(
+        ks: KeywordSetting,
+        *,
+        status: str,
+        hard_status: int,
+        predict_ctr: float,
+        predict_ctr_exponent: float,
+        views: int,
+        clicks: int,
+        spend: float,
+        relevant: bool,
+        best: bool = False,
+    ) -> CalculatedKeyword:
+        return CalculatedKeyword(
+            keyword_setting_original_id=ks.id,
+            text=ks.text,
+            clicks=clicks,
+            views=views,
+            spend=spend,
+            baes_ctr=round(predict_ctr * 0.8, 3),
+            predict_ctr=predict_ctr,
+            predict_ctr_exponent=predict_ctr_exponent,
+            status=status,
+            hard_status=hard_status,
+            relevant=relevant,
+            best_keyword_status=best,
+        )
+
+    calculated_keywords: list[CalculatedKeyword] = []
+    for idx, ks in enumerate(keyword_settings):
+        if idx == 0:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.GOOD,
+                    hard_status=2,
+                    predict_ctr=1.5,
+                    predict_ctr_exponent=6.0,
+                    views=1500,
+                    clicks=200,
+                    spend=320.0,
+                    relevant=True,
+                    best=True,
+                )
+            )
+        elif idx < 10:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.GOOD,
+                    hard_status=2,
+                    predict_ctr=1.2,
+                    predict_ctr_exponent=5.0,
+                    views=1200,
+                    clicks=150,
+                    spend=210.0,
+                    relevant=True,
+                )
+            )
+        elif idx < 15:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.BAD,
+                    hard_status=1,
+                    predict_ctr=0.35,
+                    predict_ctr_exponent=4.0,
+                    views=800,
+                    clicks=40,
+                    spend=45.0,
+                    relevant=True,
+                )
+            )
+        elif idx < 20:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.GOOD,
+                    hard_status=1,
+                    predict_ctr=1.1,
+                    predict_ctr_exponent=4.5,
+                    views=1000,
+                    clicks=120,
+                    spend=160.0,
+                    relevant=True,
+                )
+            )
+        else:
+            calculated_keywords.append(
+                _build_keyword(
+                    ks,
+                    status=KeywordStatus.BAD,
+                    hard_status=0,
+                    predict_ctr=0.25,
+                    predict_ctr_exponent=3.0,
+                    views=600,
+                    clicks=30,
+                    spend=30.0,
+                    relevant=False,
+                )
+            )
 
     # 4️⃣ Асинхронный источник данных для ComplexAdv
     async def get_keywords_func(_: AdvSetting) -> list[CalculatedKeyword]:
@@ -564,9 +691,19 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
 
 
 @pytest.fixture(scope='function')
-def complex_adv_mock(complex_adv):
-    complex_adv.get_keywords = AsyncMock(return_value=[])
-    return complex_adv
+def complex_adv_mock():
+    mock_adv = MagicMock(spec=ComplexAdv)
+    mock_adv.get_keywords = AsyncMock(return_value=[])
+    mock_adv.adv_setting = MagicMock()
+    mock_adv.adv_setting.adv_id = 99999
+    mock_adv.adv_setting.name = "Тестовая РК"
+    mock_adv.adv_setting.auto_update_white_list = True
+    mock_adv.adv_setting.auto_update_target_place = True
+    mock_adv.adv_setting.auto_update_exponent = True
+    mock_adv.adv_setting._search_adv = None
+    mock_adv.search_adv = None
+    mock_adv.shop_id = "test_shop"
+    return mock_adv
 
 
 
@@ -584,13 +721,20 @@ async def sm_generator(postgres_session):
     return _FakeSessionMaker()
 
 
+SYNC_TEST_DB_URL = TEST_DB_URL.replace("postgresql+asyncpg", "postgresql")
+SYNC_TEST_ENGINE = create_engine(SYNC_TEST_DB_URL, poolclass=NullPool)
+
+
 @pytest.fixture(autouse=True)
-async def clean_db(async_engine):
-    """Очищает таблицы перед каждым тестом."""
-    yield  # Сначала выполняем тест
-    # Очистка после теста
-    async with async_engine.begin() as conn:
-        await conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+def clean_db():
+    """Синхронно очищает ключевые таблицы до и после каждого теста."""
+    with SYNC_TEST_ENGINE.begin() as conn:
+        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
+
+    yield
+
+    with SYNC_TEST_ENGINE.begin() as conn:
+        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture(scope='function')
@@ -633,6 +777,42 @@ async def clickhouse_client(setup_test_database):
 
 
     print("[OK] ClickHouse async client created")
+
+    # Добавим небольшую задержку, чтобы ClickHouse полностью инициализировался
+    await asyncio.sleep(5)
+
+    # Создаём таблицы ClickHouse, если их нет
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.full_adv_wb_stat (
+            adv_id Int32,
+            date Date,
+            views Int32,
+            clicks Int32,
+            spend Float64,
+            added_to_cart Int32,
+            orders Int32,
+            sum_price_orders Float64,
+            version Float64
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, date, version)
+    """)
+
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.advkeyword_new (
+            adv_id Int32,
+            text String,
+            date Date,
+            clicks_state AggregateFunction(argMax, Int32, Float64),
+            views_state AggregateFunction(argMax, Int32, Float64),
+            spend_state AggregateFunction(argMax, Float64, Float64),
+            version Float64
+        ) ENGINE = AggregatingMergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (adv_id, text, date)
+    """)
+
+    print("[OK] ClickHouse tables created/checked")
 
     yield client
 

@@ -26,6 +26,7 @@ from .data_manager import (
     get_best_keyword,
     get_cpm,
 )
+from .total_orders_manager import TotalOrdersManager
 
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,14 @@ async def _get_good_bad_phrases_for_min_ctr(
         )
     except Exception as exc:
         raise exc
+    # Получаем суммарные заказы и показы для всех ключей
+    total_stats_map = await TotalOrdersManager.get_total_stats(
+        nmid=int(adv_setting.nmids[0]),
+    )
+    for keyword_stat in keyword_stats_positioned:
+        total_orders, total_views_history = total_stats_map.get(keyword_stat.text, (0, 0))
+        keyword_stat.total_orders = total_orders
+        keyword_stat.total_views_history = total_views_history
     async with _sm(read_only=False) as session:
         for keyword_stat in keyword_stats_positioned:
             keyword_text = keyword_stat.text
@@ -200,9 +209,10 @@ async def _get_good_bad_phrases_for_min_ctr(
     for keyword_stat in keyword_stats:
         text = keyword_stat.text
         keyword_setting = text_to_keyword_setting[text]
-        added_clicks = keyword_setting.added_clicks
-        if added_clicks is None:  # Added check for None
-            added_clicks = 0
+        if keyword_setting.added_clicks is None:  # Added check for None
+            added_clicks: int = 0
+        else:
+            added_clicks: int = keyword_setting.added_clicks
         keyword_stat.relevant = keyword_setting.relevant
         keyword_stat.added_clicks = added_clicks
         keyword_stat.keyword_setting_original_id = keyword_setting.id
@@ -228,12 +238,14 @@ async def _get_good_bad_phrases_for_min_ctr(
         enough_views = keyword_stat.enough_views
         assert enough_views is not None
         original_predict_ctr = keyword_stat.original_predict_ctr
+        assert keyword_stat.hard_status is not None
         hard_status = int(keyword_stat.hard_status)
         keyword_setting = text_to_keyword_setting.get(keyword_stat.text)
         """TODO: Выпилить из кода reason max_position, т.е. больше функции отключения позиции, если база больше
          или равна целевой - нет. """
         if max_cpc:
             if cpm_now:
+                assert keyword_stat.predict_ctr is not None
                 cpc = (cpm_now / 1000) / keyword_stat.predict_ctr
             elif clicks > 0:
                 cpc = views / clicks
@@ -280,7 +292,7 @@ async def _get_good_bad_phrases_for_min_ctr(
             keyword_stat.reason = "baes_ctr_more_than_min_ctr"
         else:
             assert keyword_stat.views is not None
-            if keyword_stat.views < adv_setting.min_views_for_ml_predict:
+            if adv_setting.min_views_for_ml_predict and keyword_stat.views < adv_setting.min_views_for_ml_predict:
                 keyword_stat.status = KeywordStatus.GOOD
                 keyword_stat.reason = KeywordStatus.VIEWS_IS_NOT_ENOUGH
             else:
@@ -339,7 +351,8 @@ async def _get_good_bad_phrases_for_min_ctr(
 
 async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords: list[CalculatedKeyword] = await _get_good_bad_phrases_for_min_ctr(
-        adv, int(adv.max_cpc) if adv.max_cpc is not None else None
+        adv,
+        int(adv.max_cpc) if adv.max_cpc is not None else None,
     )
     for kw in keywords:
         kw.predict_ctr_exponent = adv.exponent_predict_ctr
@@ -352,6 +365,6 @@ async def get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
     keywords_with_rating.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
     keywords_without_rating = [kw for kw in keywords if kw.rating_by_predict_ctr == 0]
 
-    keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True)
+    keywords_without_rating.sort(key=lambda x: x.predict_ctr, reverse=True) #pyright: ignore
     keywords = keywords_with_rating + keywords_without_rating
     return keywords
