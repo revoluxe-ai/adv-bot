@@ -77,8 +77,6 @@ class CalculatedKeyword(BaseModel):
     keyword_setting_original_id: int | None = None
     adv_id: int | None = None
     relevant: bool | None = None
-    total_orders: int | None = None
-    total_views_history: int | None = None
 
     @property
     def position_update(self) -> datetime.datetime | None:
@@ -206,9 +204,16 @@ class CalculatedKeyword(BaseModel):
             "calculated_views": self.calculated_views,
             "enough_views": self.enough_views,
             "total_orders": self.total_orders,
-            "total_views_history": self.total_views_history,
+            "total_views": self.total_views,
         }
         return json.dumps(data, ensure_ascii=False)
+
+    @property
+    def total_orders(self) -> int | None:
+        if self._position is None:
+            return None
+        return self._position.total_orders
+
 
     @classmethod
     def from_json(cls, json_str: str) -> "CalculatedKeyword":
