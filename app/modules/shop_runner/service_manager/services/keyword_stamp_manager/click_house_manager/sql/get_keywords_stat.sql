@@ -103,16 +103,24 @@ last_ts AS (
         argMax(timestamp, version) AS last_timestamp
     FROM data
     GROUP BY text
+),
+last_avg_position AS (
+    SELECT
+        text,
+        argMax(avr_position, version) AS last_avg_pos
+    FROM data
+    GROUP BY text
 )
 
 SELECT
     fs.text,
-    pr.pos_real,
+    coalesce(pr.pos_real, lap.last_avg_pos),
     fs.views_sum AS total_views,
     fs.orders_sum AS total_orders,
     lt.last_timestamp
 FROM final_sum fs
 LEFT JOIN final_pos_real pr ON pr.text = fs.text
+LEFT JOIN last_avg_position lap ON lap.text = fs.text
 LEFT JOIN last_ts lt ON lt.text = fs.text
 ORDER BY fs.text
 
