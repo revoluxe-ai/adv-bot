@@ -133,7 +133,6 @@ class ClickHouseKeywordStampManager:
             for row in rows:
                 text = row[0]
                 # TODO: Сюда из рантайма дошла ошибка
-                raw_pos = row[1]
                 p = int(row[1] + 0.5)
                 total_views = row[2]
                 total_orders = row[3]
