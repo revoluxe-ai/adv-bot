@@ -129,7 +129,7 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             ]
         )
 
-    rows.sort(key=lambda loc_row: loc_row[-1], reverse=True)
+    rows.sort(key=lambda loc_row: int(loc_row[-1]), reverse=True)
 
     for row in rows:
         logger.debug(row)
