@@ -29,14 +29,14 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
                         (PlanData(orders=15, target_pay_for_order=120,max_pay_for_order=300,), #  Мало продаж - большой расход
                     FactData(predict_orders=10.0, pay_for_order=500.0, original_orders=10,
                                  fact_method=FactMethods.DIRECT_SALES,),
-                        lambda new_white_list_size, white_list_size, updated_adv_setting, complex_adv: \
+                        lambda new_white_list_size, white_list_size, updated_adv_setting, initial_target_place, initial_exponent: \
                     any([new_white_list_size < white_list_size,
-                     updated_adv_setting.max_place > complex_adv.target_place,
-                     updated_adv_setting.exponent_predict_ctr > complex_adv.exponent_predict_ctr],
+                     updated_adv_setting.max_place > initial_target_place,
+                     updated_adv_setting.exponent_predict_ctr > initial_exponent],
                                  )
                              and not any ([new_white_list_size > white_list_size,
-                                  updated_adv_setting.max_place < complex_adv.target_place,
-                                  updated_adv_setting.exponent_predict_ctr < complex_adv.exponent_predict_ctr]
+                                  updated_adv_setting.max_place < initial_target_place,
+                                  updated_adv_setting.exponent_predict_ctr < initial_exponent]
                       )
 
 
@@ -44,35 +44,35 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
                      (PlanData(orders=15, target_pay_for_order=120, max_pay_for_order=300, ), # Продаж больше чем надо и расход больше максимального
                       FactData(predict_orders=30, pay_for_order=250.0, original_orders=10,
                                fact_method=FactMethods.DIRECT_SALES, ),
-                      lambda new_white_list_size, white_list_size, updated_adv_setting, complex_adv: \
+                      lambda new_white_list_size, white_list_size, updated_adv_setting, initial_target_place, initial_exponent: \
                               any([new_white_list_size < white_list_size,
-                                   updated_adv_setting.max_place > complex_adv.target_place,
-                                   updated_adv_setting.exponent_predict_ctr > complex_adv.exponent_predict_ctr],
+                                   updated_adv_setting.max_place > initial_target_place,
+                                   updated_adv_setting.exponent_predict_ctr > initial_exponent],
                                   )),
                      (PlanData(orders=15, target_pay_for_order=120, max_pay_for_order=300, ), # Продаж больше чем надо и расход больше максимального
                       FactData(predict_orders=30, pay_for_order=250.0, original_orders=10,
                                fact_method=FactMethods.DIRECT_SALES, ),
-                      lambda new_white_list_size, white_list_size, updated_adv_setting, complex_adv: \
+                      lambda new_white_list_size, white_list_size, updated_adv_setting, initial_target_place, initial_exponent: \
                               any([new_white_list_size < white_list_size,
-                                   updated_adv_setting.max_place > complex_adv.target_place,
-                                   updated_adv_setting.exponent_predict_ctr > complex_adv.exponent_predict_ctr],
+                                   updated_adv_setting.max_place > initial_target_place,
+                                   updated_adv_setting.exponent_predict_ctr > initial_exponent],
                                   )
                               and not any ([new_white_list_size > white_list_size,
-                                  updated_adv_setting.max_place < complex_adv.target_place,
-                                  updated_adv_setting.exponent_predict_ctr < complex_adv.exponent_predict_ctr]
+                                  updated_adv_setting.max_place < initial_target_place,
+                                  updated_adv_setting.exponent_predict_ctr < initial_exponent]
                       )),
                      (
 
                     PlanData(orders=15, target_pay_for_order=120, max_pay_for_order=300, ), # Продаж мало, расход меньше максимального
                       FactData(predict_orders=1, pay_for_order=50, original_orders=1,
                                fact_method=FactMethods.DIRECT_SALES, ),
-                      lambda new_white_list_size, white_list_size, updated_adv_setting, complex_adv: \
+                      lambda new_white_list_size, white_list_size, updated_adv_setting, initial_target_place, initial_exponent: \
                               any([new_white_list_size > white_list_size,
-                                   updated_adv_setting.max_place < complex_adv.target_place,
-                                   updated_adv_setting.exponent_predict_ctr < complex_adv.exponent_predict_ctr],
+                                   updated_adv_setting.max_place < initial_target_place,
+                                   updated_adv_setting.exponent_predict_ctr < initial_exponent],
                                   ) and not any ([new_white_list_size < white_list_size,
-                                  updated_adv_setting.max_place > complex_adv.target_place,
-                                  updated_adv_setting.exponent_predict_ctr > complex_adv.exponent_predict_ctr])
+                                  updated_adv_setting.max_place > initial_target_place,
+                                  updated_adv_setting.exponent_predict_ctr > initial_exponent])
 
                       ),])
 @pytest.mark.asyncio(scope='function')
@@ -92,8 +92,9 @@ async def test_process_adv(postgres_session: AsyncSession,
 
     # 3️⃣ ComplexAdv мок (теперь с нормальной фабрикой)
     # 4️⃣ Мокаем план и факт
-    initial_target_place = complex_adv.target_place
-    initial_exponent = complex_adv.exponent_predict_ctr
+
+    initial_target_place = complex_adv.adv_setting.max_place # Сохраняем начальное значение
+    initial_exponent = complex_adv.adv_setting.exponent_predict_ctr # Сохраняем начальное значение
 
     with (
         patch(
@@ -140,8 +141,9 @@ async def test_process_adv(postgres_session: AsyncSession,
     updated_adv_setting = cast(AdvSetting, updated_adv_setting)
 
     after_white_list_size = len([kw for kw in updated_settings if kw.hard_status == 2])
-    complex_adv.adv_setting.max_place = initial_target_place
-    complex_adv.adv_setting.exponent_predict_ctr = initial_exponent
+
+    # complex_adv.adv_setting.max_place = initial_target_place # Убираем ручное восстановление
+    # complex_adv.adv_setting.exponent_predict_ctr = initial_exponent # Убираем ручное восстановление
 
     """
     TODO: Улучшение теста test_process_adv
@@ -157,4 +159,4 @@ async def test_process_adv(postgres_session: AsyncSession,
     
     """
 
-    assert condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, complex_adv)
+    assert condition_func(after_white_list_size, before_white_list_size, updated_adv_setting, initial_target_place, initial_exponent)
