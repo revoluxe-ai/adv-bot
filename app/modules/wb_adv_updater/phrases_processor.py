@@ -26,7 +26,6 @@ from .data_manager import (
     get_best_keyword,
     get_cpm,
 )
-from .total_orders_manager import TotalOrdersManager
 
 
 logger = logging.getLogger(__name__)
@@ -118,14 +117,6 @@ async def _get_good_bad_phrases_for_min_ctr(
         )
     except Exception as exc:
         raise exc
-    # Получаем суммарные заказы и показы для всех ключей
-    total_stats_map = await TotalOrdersManager.get_total_stats(
-        nmid=int(adv_setting.nmids[0]),
-    )
-    for keyword_stat in keyword_stats_positioned:
-        total_orders, total_views_history = total_stats_map.get(keyword_stat.text, (0, 0))
-        keyword_stat.total_orders = total_orders
-        keyword_stat.total_views_history = total_views_history
     async with _sm(read_only=False) as session:
         for keyword_stat in keyword_stats_positioned:
             keyword_text = keyword_stat.text
