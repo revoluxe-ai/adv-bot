@@ -59,6 +59,7 @@ class CalculatedKeyword(BaseModel):
     status: str | None = None
     hard_status: int | None = None
     reason: str | None = None
+    # TODO: position - это данные аналитики по ключам из Джем, переименовать, чтобы не было путаницы
     _position: WBItemPosition | None = None
     childs_keywords: list["CalculatedKeyword"] | None = None
     _query_static: int | str | None = None
