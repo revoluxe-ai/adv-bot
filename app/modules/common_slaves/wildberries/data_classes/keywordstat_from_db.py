@@ -76,6 +76,8 @@ class CalculatedKeyword(BaseModel):
     keyword_setting_original_id: int | None = None
     adv_id: int | None = None
     relevant: bool | None = None
+    total_orders: int | None = None
+    total_views_history: int | None = None
 
     @property
     def position_update(self) -> datetime.datetime | None:
@@ -92,16 +94,16 @@ class CalculatedKeyword(BaseModel):
     @position.setter
     def position(self, value: WBItemPosition) -> None:
         """
-        TODO:
-        Bug: Position data lost during JSON deserialization
+         TODO:
+         Bug: Position data lost during JSON deserialization
 
-       The position and position_update were changed from Pydantic model fields to computed properties backed by the private _position attribute. However, the existing from_json method still tries to set position and position_update through cls(**data). Since these are now properties rather than model fields, Pydantic will silently ignore them during construction, causing all position data to be lost when deserializing CalculatedKeyword objects from Redis cache.
+        The position and position_update were changed from Pydantic model fields to computed properties backed by the private _position attribute. However, the existing from_json method still tries to set position and position_update through cls(**data). Since these are now properties rather than model fields, Pydantic will silently ignore them during construction, causing all position data to be lost when deserializing CalculatedKeyword objects from Redis cache.
 
 
-        Args:
-            value:
+         Args:
+             value:
 
-        Returns:
+         Returns:
 
         """
         assert isinstance(value, WBItemPosition)
@@ -202,6 +204,8 @@ class CalculatedKeyword(BaseModel):
             "calculated_clicks": self.calculated_clicks,
             "calculated_views": self.calculated_views,
             "enough_views": self.enough_views,
+            "total_orders": self.total_orders,
+            "total_views_history": self.total_views_history,
         }
         return json.dumps(data, ensure_ascii=False)
 

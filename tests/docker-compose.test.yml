@@ -23,6 +23,7 @@ services:
       CLICKHOUSE_DB: default_db
       CLICKHOUSE_USER: CLICK_HOUSE_USER
       CLICKHOUSE_PASSWORD: password
+      TZ: Europe/Moscow
     ports:
       - "8124:8123"  # HTTP порт
       - "9001:9000"  # Native протокол

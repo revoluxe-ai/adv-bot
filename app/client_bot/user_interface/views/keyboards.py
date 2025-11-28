@@ -33,6 +33,7 @@ from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingCallback,
 )
+from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 from app.modules.sales_plan_settings.telegram.main_callback import (
     SalesPlanSettingsMenu as SalesPlanSettingsMenuCallback,
 )
@@ -589,7 +590,10 @@ def get_keywords_setting_keyboard(
         text = "🌟" if keyword.best_keyword_status else ""
         if keyword.relevant:
             text += "🟢"
+        total_views_history = keyword.total_views_history if keyword.total_views_history is not None else 0
         text += f"""{clicks}/{views}/{round(ctr * 100 if ctr is not None else 0, 2)}%"""
+        total_orders = keyword.total_orders if keyword.total_orders is not None else 0
+        text += f"({total_orders})"
         text += "|"
         if keyword.position and keyword.position != -1:
             text += f"{keyword.position}"
@@ -810,6 +814,27 @@ def get_keywords_setting_keyboard(
                 adv_setting_original_id=adv_setting.id,
                 wb_user_cabinet_original_id=wb_user_cabinet_original_id,
                 target="active_phrases",
+            ).pack(),
+        )
+    ]
+
+    bottoms.append(button)
+
+    # Кнопка для переключения скрытия ключей без рекламных просмотров
+    if adv_setting.hide_zero_views_keywords:
+        hide_views_text = "Показать ключи без рекламных просмотров"
+        hide_views_new_status = False
+    else:
+        hide_views_text = "Скрыть ключи без рекламных просмотров"
+        hide_views_new_status = True
+
+    button = [
+        InlineKeyboardButton(
+            text=hide_views_text,
+            callback_data=ChangeHideZeroViewsStatus(
+                adv_id=adv_id,
+                wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                new_status=hide_views_new_status,
             ).pack(),
         )
     ]

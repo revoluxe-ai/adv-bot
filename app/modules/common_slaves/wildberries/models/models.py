@@ -42,7 +42,8 @@ from app.utils.db.session_maker import get_async_session_maker
 # Ensure billing models (AdvPayment) are imported and registered before mapper configuration
 try:
     # TODO: Надо разобраться что это за конструкция такая, и постараться ее убрать без рейса исключения
-    from app.modules.billing import models as _billing_models  # noqa: F401
+    # from app.modules.billing import models as _billing_models  # noqa: F401
+    pass
 except Exception:  # noqa
     # In minimal test contexts billing may be absent; relationship will fallback to string resolution
     pass
@@ -420,8 +421,8 @@ class AdvSetting(BaseTable):
         default=settings.DEFAULT_MIN_CTR,
         server_default=text(str(settings.DEFAULT_MIN_CTR)),
     )
-    max_cpc = Column(Float, nullable=True)
-    min_views_for_ml_predict = Column(Integer, nullable=True, server_default=text("0"))
+    max_cpc: Mapped[float | None] = mapped_column(Float, nullable=True)
+    min_views_for_ml_predict: Mapped[int | None] = mapped_column(Integer, nullable=True, server_default=text("0"))
     payments: Mapped[list["AdvPayment"]] = relationship(
         "AdvPayment", back_populates="adv_setting", uselist=True
     )
@@ -488,6 +489,10 @@ class AdvSetting(BaseTable):
     )
 
     rec_system_mode: Mapped[bool] = mapped_column(
+        Boolean, nullable=True, default=False, server_default="false"
+    )
+
+    hide_zero_views_keywords: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
 
@@ -645,7 +650,7 @@ class KeywordSetting(BaseTable):
         uselist=True,
     )
     hard_status: Mapped[int] = mapped_column(Integer, default=1)
-    added_clicks = Column(Integer, default=0)
+    added_clicks: Mapped[int | None] = mapped_column(Integer, default=0)
     added_views = Column(Integer, default=0)
     auto_block = Column(Boolean)
     relevant: Mapped[bool] = mapped_column(
@@ -698,6 +703,7 @@ class WBItemPosition(BaseModel):
     keyword_text: str | None = None
     adv_type: int | None = None
     total_views: int | None = None
+    total_orders: int | None = None
 
     @property
     def type_native(self) -> str:
@@ -720,6 +726,8 @@ class WBItemPosition(BaseModel):
             "nmid": self.nmid,
             "timestamp": timestamp.isoformat() if timestamp else None,
             "adv_type": self.adv_type,
+            "total_views": self.total_views,
+            "total_orders": self.total_orders,
         }
 
     @staticmethod
@@ -782,5 +790,19 @@ class WBItemPosition(BaseModel):
             position.adv_type = int(raw_adv_type)
         else:
             position.adv_type = None
+
+        # total_views
+        raw_total_views = data.get("total_views")
+        if isinstance(raw_total_views, int):
+            position.total_views = raw_total_views
+        else:
+            position.total_views = None
+
+        # total_orders
+        raw_total_orders = data.get("total_orders")
+        if isinstance(raw_total_orders, int):
+            position.total_orders = raw_total_orders
+        else:
+            position.total_orders = None
 
         return position

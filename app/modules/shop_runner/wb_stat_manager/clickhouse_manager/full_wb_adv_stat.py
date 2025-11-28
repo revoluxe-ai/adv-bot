@@ -301,6 +301,70 @@ async def get_keywords_spend(
 # TODO:  Добавить в бот указатель, который показывает, что по настройкам достигнут максимум и дальше поможет только перестроойка плана продаж
 
 
+async def get_keywords_views_by_days(
+    adv_ids: list[int],
+    start_date: datetime,
+    end_date: datetime,
+    table_name: str = "advkeyword_new",
+) -> dict[datetime.date, int]:
+    """
+    Возвращает показы по ключевым словам по дням за период [start_date, end_date]
+    из агрегирующей таблицы (AggregatingMergeTree) default_db.advkeyword_new.
+
+    Returns:
+        dict[date, int]: {дата: суммарные показы по ключевым словам за этот день}
+    """
+    import datetime as dt
+
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    adv_ids_str = ", ".join(map(str, adv_ids))
+
+    query = f"""
+        SELECT
+            date,
+            COALESCE(SUM(total_views), 0) AS total_views
+        FROM (
+            SELECT
+                date,
+                argMaxMerge(views_state) AS total_views
+            FROM default_db.{table_name}
+            WHERE
+                adv_id IN ({adv_ids_str})
+                AND date BETWEEN toDate('{start_date_str}') AND toDate('{end_date_str}')
+            GROUP BY adv_id, text, date
+        ) AS merged
+        GROUP BY date
+        ORDER BY date
+    """
+
+    try:
+        async with get_clickhouse_client() as client:
+            res = await client.query(query)
+            rows = res.result_rows
+
+            # Инициализируем словарь с нулями для всех дат в диапазоне
+            result: dict[dt.date, int] = {}
+            current_date = dt.date.fromisoformat(start_date_str)
+            while current_date <= dt.date.fromisoformat(end_date_str):
+                result[current_date] = 0
+                current_date += dt.timedelta(days=1)
+
+            for row in rows:
+                if row and len(row) >= 2:
+                    date_val = row[0]
+                    views = int(row[1]) if row[1] is not None else 0
+                    result[date_val] = views
+            return result
+
+    except Exception:
+        logger.error(
+            "Ошибка получения показов по ключам по дням из ClickHouse",
+            exc_info=True,
+        )
+        return {}
+
+
 async def get_keywords_clicks_and_views(
     adv_ids: list[int],
     start_date: datetime,
