@@ -22,24 +22,6 @@ def validate_datetime(v: Any) -> datetime.datetime | None:
 DatetimeType = Annotated[datetime.datetime, PlainValidator(validate_datetime)]
 
 
-def _parse_position_value(value: Any) -> int | None:
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        if cleaned.isdigit():
-            return int(cleaned)
-        try:
-            return int(float(cleaned))
-        except ValueError:
-            return None
-    return None
-
-
 class KeywordStatus:
     GOOD = "good"
     BAD = "bad"
@@ -218,42 +200,23 @@ class CalculatedKeyword(BaseModel):
     @classmethod
     def from_json(cls, json_str: str) -> "CalculatedKeyword":
         data = json.loads(json_str)
-        raw_position: Any = data.pop("position", None)
-        raw_position_update = data.pop("position_update", None)
-        position_update = (
-            validate_datetime(raw_position_update) if raw_position_update else None
-        )
 
-        if raw_position is None and "real_position" in data:
-            raw_position = data.get("real_position")
-        elif raw_position is None:
-            for fallback in ("base_position", "promo_position"):
-                if fallback in data:
-                    raw_position = data.get(fallback)
-                    break
-        # TODO: не тестировалось, надо пересмотреть - перепроверить
-        position_model: WBItemPosition | None = None
-        if isinstance(raw_position, dict):
-            position_model = WBItemPosition.from_dict(raw_position)  # pyright: ignore
-        else:
-            normalized_position = _parse_position_value(raw_position)
-            if normalized_position is not None:
-                position_model = WBItemPosition(position=normalized_position)
+        total_orders = data.pop("total_orders", None)
+        total_views = data.pop("total_views", None)
 
-        if position_model and position_update:
-            position_model.timestamp = position_update
-        elif position_model is None and position_update:
-            position_model = WBItemPosition(timestamp=position_update)
+        # Создаем экземпляр CalculatedKeyword без свойств total_orders и total_views
+        # так как они будут установлены далее через _position
+        calculated_keyword = cls(**data)
 
-        if position_model and not position_model.keyword_text:
-            keyword_text = data.get("text")
-            if isinstance(keyword_text, str):
-                position_model.keyword_text = keyword_text
+        # Если _position существует, устанавливаем total_orders и total_views через него
+        # Или создайте новые поля, если это требуется для прямого хранения
+        if calculated_keyword._position and total_orders is not None:
+            calculated_keyword._position.total_orders = total_orders
+        if calculated_keyword._position and total_views is not None:
+            calculated_keyword._position.total_views = total_views
 
-        instance = cls(**data)
-        if position_model:
-            instance.position = position_model
-        return instance
+
+        return calculated_keyword
 
     @property
     def is_in_white_list(self) -> bool:
