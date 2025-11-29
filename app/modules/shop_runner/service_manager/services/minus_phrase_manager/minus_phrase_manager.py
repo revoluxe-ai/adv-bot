@@ -41,7 +41,8 @@ class MinusPhraseManager:
         #                                                                   nmid,
         #                                                                       last_days)
         #     tasks.append(task)
-        if adv_id := complex_adv.search_adv.adv_id:
+        if complex_adv.search_adv:
+            adv_id = complex_adv.search_adv.adv_id
             task: Awaitable[list[NormqueryStatsDTO]] = self._wb_api.wb_data_manager.get_norn_query_stat(adv_id,
                                                                               nmid,
                                                                                  last_days)
