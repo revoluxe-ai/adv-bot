@@ -244,6 +244,8 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
             adv_settings: list[AdvSetting] = result.scalars().all()
             # TODO: Заккомитил фильтр по adv_id и это попало в продакшен. Сделать текст во избежание проблем.
         for adv_setting in adv_settings:
+            if adv_setting.adv_id != 31020277:
+                continue
             if adv_setting.id not in update_tasks:
                 wb_cabinet_id = adv_setting.wb_cabinet_id
                 access: WBCabinetAccess = (

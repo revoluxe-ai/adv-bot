@@ -9,6 +9,7 @@ from typing import (
 )
 
 from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+from app.core.wb_api.http_request import try_except_decorator
 from app.core.wb_api.ping_manager import PingManager
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
@@ -354,7 +355,7 @@ class CoroutinesManager:
         advs = await self._wb_shop_data_manager.get_complex_advs()
         if not advs:
             return None
-        update_tasks = []
+        update_tasks: list[Awaitable[None]] = []
         for adv in advs:
             task = keyword_stamp_manager.update_keyword_history(adv)
             update_tasks.append(task)
@@ -370,6 +371,39 @@ class CoroutinesManager:
                 )
 
         return None
+
+    @try_except_decorator(60 * 15, 60)
+    async def update_minus_phrases_in_advs(self):
+        from .services.minus_phrase_manager import MinusPhraseManagerContainer
+
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        container = MinusPhraseManagerContainer(_wb_api_manager_hub=wb_manager_hub)
+        minus_phrase_manager = container.minus_phrase_manager()
+
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs()
+
+        update_tasks: list[Awaitable[None]] = []
+        for adv in complex_advs:
+            task = minus_phrase_manager.update_minus_phrases(adv)
+            update_tasks.append(task)
+
+        results: list[BaseException | None] = await asyncio.gather(*update_tasks, return_exceptions=True)
+
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(
+                    "Ошибка обновления минус фраз для shop_id: %s, adv_id: %s, ошибка: %s",
+                    complex_advs[i].shop_id,
+                    complex_advs[i].adv_id,
+                    result,
+                    exc_info=True,
+                )
+
+
+
+
+
+
 
 
 # TODO: Частая ошибка - остановка РК в период раскрутки - сделать статью

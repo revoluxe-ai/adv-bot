@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import httpx
 
@@ -12,6 +12,7 @@ from app.core.mp.wb.api.excs import (
     ApiForbiddenError,
     TooManyRequests,
 )
+from app.core.mp.wb.api.generated.analitika_i_dannye_client.models import ErrorObject400
 from app.core.mp.wb.api.utils import parse_too_many_requests_error
 
 
@@ -37,7 +38,8 @@ async def with_raise_errors(
     if 200 <= status < 300:
         return result
     elif status == 400:
-        raise BadRequestError()
+        detail = result.content.decode()
+        raise BadRequestError(detail)
     elif status in [401, 403]:
         raise ApiForbiddenError(
             text="Неверный токен",

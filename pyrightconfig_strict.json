@@ -8,8 +8,9 @@
     "app/modules/shop_runner/bidder",
     "app/core/di",
     "app/modules/common_slaves/wildberries/data_classes/keywordstat_from_db.py",
-    "app/modules/wb_adv_updater/phrases_processor.py"
-
+    "app/modules/wb_adv_updater/phrases_processor.py",
+    "app/core/di/client_di",
+    "app/modules/shop_runner/service_manager/services/minus_phrase_manager",
   ],
 
   "exclude": [
