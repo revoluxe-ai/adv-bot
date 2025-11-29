@@ -36,6 +36,11 @@ class ComplexAdv:
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
 
+
+    @property
+    def auto_adv_id(self) -> int:
+        return self._adv_setting.adv_id
+
     @property
     def rec_system_promotion_mode_active(self) -> bool:
         return self._adv_setting.rec_system_mode

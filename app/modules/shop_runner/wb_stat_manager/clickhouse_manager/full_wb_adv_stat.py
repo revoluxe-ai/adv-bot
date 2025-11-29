@@ -1,7 +1,7 @@
 import logging
 import time
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, date
 from typing import TypedDict
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
@@ -306,7 +306,7 @@ async def get_keywords_views_by_days(
     start_date: datetime,
     end_date: datetime,
     table_name: str = "advkeyword_new",
-) -> dict[datetime.date, int]:
+) -> dict[date, int]:
     """
     Возвращает показы по ключевым словам по дням за период [start_date, end_date]
     из агрегирующей таблицы (AggregatingMergeTree) default_db.advkeyword_new.

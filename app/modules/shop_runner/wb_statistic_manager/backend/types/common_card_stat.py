@@ -1,6 +1,5 @@
 import datetime
 
-
 class CommonCardStat:
     def __init__(
         self,
