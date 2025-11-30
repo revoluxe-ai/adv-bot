@@ -94,8 +94,8 @@ async def set_minus_keywords_for_search_adv(
     if texts:
         texts = [text.replace('"', "") for text in texts]
         texts = set(texts)
+        # TODO: Тут был метод установки фикс-фраз, который не работал и вызывал ошибку всего процесса
         try:
-            await api.advert.set_pluse_status_in_search_adv(search_adv_id, False)
             await api.advert.set_minus_phrase_for_search_adv(search_adv_id, texts)
             await adv_update_state_manager.set_one(search_adv_id)
         except Exception as e:
