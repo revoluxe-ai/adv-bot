@@ -8,13 +8,17 @@ from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.mode
 )
 
 def command_to_body(command: GetNormqueryStatsCommand) -> V0GetNormQueryStatsRequest:
-    items_item = V0GetNormQueryStatsRequestItemsItem(
-        advert_id=command.advert_id,
-        nm_id=command.nmid,
-    )
-    request = V0GetNormQueryStatsRequest(
+    items: list[V0GetNormQueryStatsRequestItemsItem] = []
+
+    for complex_adv in command.complex_advs:
+        item = V0GetNormQueryStatsRequestItemsItem(
+        advert_id=complex_adv.adv_id,
+        nm_id=complex_adv.main_nmid)
+        items.append(item)
+
+    body = V0GetNormQueryStatsRequest(
         from_=command.date_from,
         to=command.date_to,
-        items=[items_item],
+        items=items,
     )
-    return request
+    return body

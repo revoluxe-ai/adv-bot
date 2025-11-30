@@ -43,9 +43,22 @@ def normquery_stats_adapter(
 
 
 @pytest.mark.asyncio
-async def test_get_adv_v0_normquery_stats(normquery_stats_adapter, mock_auth_client_handler):
+async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
+                                          mock_auth_client_handler,
+                                          complex_adv):
     today = datetime.date.today()
-    command = GetNormqueryStatsCommand(advert_id=123, date_from=today, date_to=today, nm_id=456)
+    command = GetNormqueryStatsCommand(complex_advs=[complex_adv], date_from=today,
+                                       date_to=today)
+    #
+    # stat_mock = V0GetNormQueryStatsItemStat(
+    #     norm_query='phrase1',
+    #     clicks=10,
+    #     orders=2,
+    #     atbs=5,
+    #     ctr=0.5,
+    #     cpm=5.0,
+    # )
+    # mock_stats_item = V0GetNormQueryStatsItem(advert_id=123, nm_id=456, stats=[stat_mock])
     mock_client = AsyncMock()
     mock_auth_client_handler.get_proxy_client = AsyncMock(return_value=mock_client)
 
@@ -91,18 +104,16 @@ async def test_get_adv_v0_normquery_stats(normquery_stats_adapter, mock_auth_cli
         )
 
         assert len(result) == 1
-        assert result[0] == NormqueryStatsDTO(
-            advert_id=123,
-            nm_id=456,
-            norm_query="phrase1",
-            views=100,
-            clicks=10,
-            ctr=10.0,
-            cpm=5.0,
-            add_to_cart=5,
-            orders=2,
-            cpc=0.5,
-            avr_pos=3.0,
-            add_keys=[],
-            add_properties={},
-        )
+        assert result[0].adv_id == 123
+        assert result[0].nmid == 456
+        assert len(result[0].stats) == 1
+        assert result[0].stats[0].norm_query == "phrase1"
+        assert result[0].stats[0].views == 100
+        assert result[0].stats[0].clicks == 10
+        assert result[0].stats[0].ctr == 10.0
+        assert result[0].stats[0].cpm == 5.0
+        assert result[0].stats[0].add_to_cart == 5
+        assert result[0].stats[0].orders == 2
+        assert result[0].stats[0].cpc == 0.5
+        assert result[0].stats[0].avr_pos == 3.0
+

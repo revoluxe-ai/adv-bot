@@ -1,9 +1,4 @@
-import asyncio
 import logging
-from collections.abc import Awaitable
-from typing import cast
-
-from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 from app.core.mp.wb.api.wb_manager_hub import WBManagerHub
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     KeywordStatus,
@@ -32,35 +27,6 @@ class MinusPhraseManager:
             )
             raise e
 
-    async def _get_norm_query_from_stat(self, complex_adv: ComplexAdv, last_days: int) -> list[str]:
-        """TODO: Временный метод, заменить на записи из кликхауса"""
-        tasks: list[Awaitable[list[NormqueryStatsDTO]]] = []
-        nmid = complex_adv.main_nmid
-        # if adv_id := complex_adv.auto_adv_id:
-        #     task: Awaitable[list[NormqueryStatsDTO]] = self._wb_api.wb_data_manager.get_norn_query_stat(adv_id,
-        #                                                                   nmid,
-        #                                                                       last_days)
-        #     tasks.append(task)
-        if complex_adv.search_adv:
-            adv_id = complex_adv.search_adv.adv_id
-            task: Awaitable[list[NormqueryStatsDTO]] = self._wb_api.wb_data_manager.get_norn_query_stat(adv_id,
-                                                                              nmid,
-                                                                                 last_days)
-            tasks.append(task)
-
-        results: list[list[NormqueryStatsDTO] | BaseException] = await asyncio.gather(*tasks,
-                                                                                  return_exceptions=True)
-        norm_queries: set[str] = set()
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error('Ошибка получения norm query: %s', result)
-            else:
-                result = cast(list[NormqueryStatsDTO], result)
-                for stat in result:
-                    query: str = stat.norm_query
-                    norm_queries.add(query)
-        return list(norm_queries)
-
 
     async def _update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         keywords = await complex_adv.get_keywords()
@@ -68,11 +34,7 @@ class MinusPhraseManager:
             kw.text for kw in keywords if kw.status == KeywordStatus.BAD
         ]
 
-        norm_queries = await self._get_norm_query_from_stat(complex_adv, last_days=7)
-
-        bad_norm_queries = set(bad_phrases) &  set(norm_queries)
-
-        if not bad_norm_queries:
+        if not bad_phrases:
             logger.debug(
                 "Нет минус фраз для обновления для shop_id: %s, adv_id: %s",
                 complex_adv.shop_id,
@@ -81,7 +43,7 @@ class MinusPhraseManager:
             return
 
         # API лимит - 1000 фраз. Берем только "плохие"
-        minus_phrases_to_send = list(bad_norm_queries)[:1000]
+        minus_phrases_to_send = list(bad_phrases)[:1000]
 
         await self._wb_api.wb_modifier.set_minus_phrases_for_adv(
             complex_adv=complex_adv,

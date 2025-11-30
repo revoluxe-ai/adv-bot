@@ -13,7 +13,9 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
     CalculatedKeyword,
 )
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO
-
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 
 if typing.TYPE_CHECKING:
     from app.core.mp.wb.api.domain_managers import AnalyticsManager, PromotionManager
@@ -46,18 +48,29 @@ class WBDataManager:
 
         return positions
 
-    async def get_norn_query_stat(
+    async def get_norn_query_stat_for_period(
         self,
-        advert_id: int,
-        nmid: int,
+        complex_advs: list["ComplexAdv"],
         last_days: int,
-    ) -> List[NormqueryStatsDTO]:
+    ) -> List[NormqueryStatsDTO] | None:
         today = datetime.date.today()
         date_from  = today - datetime.timedelta(days=last_days)
 
         return await self._promotion_manager.get_normquery_stats(
-            advert_id=advert_id,
+            complex_advs,
             date_from=date_from,
             date_to=today,
-            nm_id=nmid,
+        )
+
+    async def get_norn_query_stat_for_date_range(
+        self,
+        complex_advs: list["ComplexAdv"],
+        date_from: datetime.date,
+        date_to: datetime.date,
+    ) -> List[NormqueryStatsDTO] | None:
+        """Получить статистику normquery за указанный диапазон дат."""
+        return await self._promotion_manager.get_normquery_stats(
+            complex_advs,
+            date_from=date_from,
+            date_to=date_to,
         )

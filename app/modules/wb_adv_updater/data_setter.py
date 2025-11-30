@@ -7,7 +7,7 @@ from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db impo
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.common_slaves.wildberries.wb_api import WBApi
-from app.modules.wb_adv_updater import data_manager, search_advs_manager
+from app.modules.wb_adv_updater import search_advs_manager
 from app.modules.wb_adv_updater.phrases_processor import get_good_bad_phrases
 from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from app.modules.white_list_updater.backend.white_list_updater import WhiteListUpdater

@@ -1,5 +1,7 @@
 from collections.abc import Callable, Awaitable, Sequence
 
+from pydantic import ConfigDict
+
 from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
     CalculatedKeyword,
 )
@@ -67,7 +69,7 @@ class ComplexAdv:
         return self._shop_id
 
     @property
-    def search_adv(self):
+    def search_adv(self) -> AdvSetting:
         return self._search_adv
 
     def nmids(self) -> Sequence[int]:

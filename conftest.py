@@ -532,6 +532,8 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
 
     await postgres_session.begin()
     adv_setting = AdvSettingFactory.build(
+        adv_id=123, # Устанавливаем adv_id для консистентности теста
+        nmids=[456], # Добавляем nmids
         auto_update_white_list=True,
         auto_update_target_place=True,
         auto_update_exponent=True,

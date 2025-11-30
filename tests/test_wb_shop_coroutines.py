@@ -66,10 +66,10 @@ async def test_adv_settings_auto_update(
             "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.ComplexAdv",
             new=MagicMock(return_value=test_complex_adv_instance),
         ),
-        patch(
-            "app.modules.shop_runner.service_manager.manager.data_manager",
-            new=data_manager_mock,
-        ),
+        # patch(
+        #     "app.modules.shop_runner.service_manager.manager.data_manager",
+        #     new=data_manager_mock,
+        # ),
         patch(
             "app.utils.db.session_maker.get_async_session_maker",
             new=get_async_session_mock,
@@ -79,11 +79,11 @@ async def test_adv_settings_auto_update(
             new=AsyncMock(return_value={}), # Возвращаем пустой словарь AdvSetting
         ),
         patch(
-            "app.modules.shop_runner.service_manager.manager.AdvSettingAutoUpdater.get_fact_data",
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.get_fact_data",
             new=AsyncMock(return_value=fact_data),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.manager.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.get_plan_data",
             new=MagicMock(return_value=plan_data),
         ),
         patch(

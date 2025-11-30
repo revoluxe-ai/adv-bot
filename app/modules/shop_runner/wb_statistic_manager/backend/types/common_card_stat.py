@@ -9,6 +9,7 @@ class CommonCardStat:
         orders: int,
         orders_sum: int,
         buy_outs: int,
+        _date: datetime.date | None = None
     ) -> None:
         self.nmid = nmid
         self.open_card = open_card
@@ -16,10 +17,12 @@ class CommonCardStat:
         self.orders = orders
         self.orders_sum = orders_sum
         self.buy_outs = buy_outs
-        self._date = None
+        self._date = _date
 
     @property
-    def date(self) -> datetime.datetime:
+    def date(self) -> datetime.date:
+        if self._date is None:
+            raise AttributeError("date not set")
         return self._date
 
     @date.setter
