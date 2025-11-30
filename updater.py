@@ -41,9 +41,9 @@ async def update_keywords_ctr_by_similary_run() -> NoReturn:
 
 # Явная аннотация типов для списка корутин
 run_own_process_list: list[Callable[..., Never]] = [
-    # update_keywords_ctr_by_similary_run,
+    update_keywords_ctr_by_similary_run,
     run_update_all_keywords_on_wb,
-    # run_main_coroutines,
+    run_main_coroutines,
 ]
 
 
