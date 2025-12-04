@@ -1,8 +1,5 @@
 import datetime
-from typing import Sequence
-from pydantic import BaseModel, field_validator, ConfigDict
-
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
+from pydantic import BaseModel, ConfigDict
 
 
 class GetNormqueryStatsCommandBatchForAdv(BaseModel):
