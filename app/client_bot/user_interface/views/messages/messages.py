@@ -951,42 +951,6 @@ class IncorrectMinViewsForPredictCTR(TextWithKeyboard):
         return keyboards.get_setting_min_views_for_predict_ctr_keyboard(self._adv)
 
 
-class Top10ByViewsKeywordsGraphic(TextWithKeyboardAndImage):
-    def __init__(self, bot: Bot, chat_id: int) -> None:
-        self._image = None
-        super().__init__(bot, chat_id)
-
-
-    async def __call__(self, adv_original_id: int) -> None: #noqa
-        self._adv_original_id = adv_original_id
-        await super().__call__()
-
-    @property
-    def image(self) -> io.BytesIO | str | BufferedInputFile | None:
-        return self._image
-
-    @image.setter
-    def image(self, value: io.BytesIO | str | BufferedInputFile | None) -> None:
-        self._image = value
-
-    @property
-    def text(self) -> str:
-        return "График топ 10 ключевых слов по показам"
-
-    @property
-    def keyboard(self) -> InlineKeyboardMarkup:
-        builder = InlineKeyboardBuilder()
-        builder.row(
-            InlineKeyboardButton(
-                text="Назад",
-                callback_data=callbacks.Adv(
-                    adv_original_id=self._adv_original_id
-                ).pack(),
-            )
-        )
-        return builder.as_markup()
-
-
 class NotKeywordHistoryPositions(Text):
     @property
     def text(self) -> str:
