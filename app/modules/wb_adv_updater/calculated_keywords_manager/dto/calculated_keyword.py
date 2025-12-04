@@ -84,7 +84,9 @@ class CalculatedKeyword(BaseModel):
     # TODO: Обязательно сделать кнопку-отключение добавления только релевантных, и всем ее отключить по умолчанию
     @property
     def relevant(self) -> bool:
-        return self.keyword_setting.relevant if True else False
+        if self.keyword_setting.relevant is None:
+            return False
+        return self.keyword_setting.relevant
 
     @property
     def position(self) -> float:
