@@ -1,6 +1,7 @@
 WITH
     ------------------------------------------------------------------
     -- 1. Базовые данные из clusters_adv_stats по nmid
+    --    Ограничиваем историю по дате, чтобы не взрывать память
     ------------------------------------------------------------------
     data AS (
         SELECT
@@ -192,7 +193,8 @@ WITH
         SELECT
             sum(views)       AS views_total,
             sum(clicks)      AS clicks_total,
-            sum(add_to_cart) AS carts_total
+            sum(add_to_cart) AS carts_total,
+            sum(orders) AS orders_total
         FROM daily_last
         WHERE date >= today() - 7
     ),
@@ -208,26 +210,20 @@ WITH
     priors AS (
         SELECT
             -- сколько показов на 1 клик
-                c7.views_total / (c7.clicks_total + 1) AS prior_views_per_click,
+            c7.views_total / (c7.clicks_total + 1) AS prior_views,
             -- сколько кликов на 1 корзину
             if(
-                c7.carts_total > 0,
-                c7.clicks_total / c7.carts_total,
-                0
-            ) AS prior_clicks_per_cart,
-
-            -- сколько корзин на 1 заказ
-            if(
-                c14.orders_total > 0,
-                c14.carts_total / c14.orders_total,
-                0
-            ) AS prior_carts_per_order
+                c7.clicks_total > 0,
+                c7.clicks_total / c7.carts_total ,
+                0) AS prior_clicks,
+            if(c7.carts_total > 0,
+                c7.carts_total / c7.orders_total, 0) AS prior_carts
         FROM campaign_7d  AS c7
         CROSS JOIN campaign_14d AS c14
     ),
 
     ------------------------------------------------------------------
-    -- 6. Окно для CTR:
+    -- 6. Окно для CTR (отдельный поток на daily_last)
     ------------------------------------------------------------------
     ctr_window AS (
         SELECT
@@ -281,18 +277,14 @@ WITH
     ),
 
     ------------------------------------------------------------------
-    -- 9. Байесовский расчёт
+    -- 9. Байесовский расчёт по воронке
     ------------------------------------------------------------------
-      bayes AS (
+    baes AS (
         SELECT
             t.text AS text,
-            ifNull(c.ctr_clicks, 0) + 1 / (nullIf(c.ctr_views + p.prior_views_per_click, 0)) AS ctr_eff,
-            c7.carts7
-            / (c7.clicks7 + p.prior_clicks_per_cart)
-                AS cart_eff,
-            o14.orders14
-            / (o14.carts14 + p.prior_carts_per_order)
-                AS order_eff
+            (c.ctr_clicks + 1) / (c.ctr_views + p.prior_views) AS ctr_eff,
+            (c7.carts7 + 1) / (c7.clicks7 + p.prior_clicks)  AS cart_eff,
+             (o14.orders14 + 1) / (o14.carts14 + p.prior_carts) AS order_eff
         FROM agg_stats AS t
         LEFT JOIN ctr_cut   AS c
             ON c.text = t.text
@@ -349,17 +341,18 @@ SELECT
     (ifNull(agg.clicks_sum, 0) / nullIf(ifNull(agg.views_sum, 0), 0)) AS ctr,
 
     -- итоговый рейтинг: байесовская цепочка конверсий
-    b.ctr_eff  * if(b.cart_eff = 0, 1, b.cart_eff) * if(b.order_eff = 0, 1, b.order_eff) AS final_rating,
+    b.ctr_eff * if(b.cart_eff = 0, 1, b.cart_eff)
+        * if(b.order_eff = 0, 1, b.order_eff)  AS final_rating,
 
     -- стат. поля
-    ifNull(ata.views_all_time, 0)  AS views_all_time,
-    ifNull(ata.orders_all_time, 0) AS orders_all_time,
-    ifNull(lr.last_ts, toDateTime(0)) AS timestamp,
-    ifNull(lc.cpc_last, 0.0) AS cpc,
-    ifNull(lr.last_cpm, 0.0) AS cpm
+    ifNull(ata.views_all_time, 0)      AS views_all_time,
+    ifNull(ata.orders_all_time, 0)     AS orders_all_time,
+    ifNull(lr.last_ts, toDateTime(0))  AS timestamp,
+    ifNull(lc.cpc_last, 0.0)           AS cpc,
+    ifNull(lr.last_cpm, 0.0)           AS cpm
 
 FROM agg_stats AS agg
-LEFT JOIN bayes             AS b   ON b.text   = agg.text
+LEFT JOIN baes             AS b   ON b.text   = agg.text
 LEFT JOIN last_avg_position AS lap ON lap.text = agg.text
 LEFT JOIN final_pos_real    AS fpr ON fpr.text = agg.text
 LEFT JOIN all_time_agg      AS ata ON ata.text = agg.text
@@ -367,5 +360,4 @@ LEFT JOIN last_records      AS lr  ON lr.text  = agg.text
 LEFT JOIN last_cpc          AS lc  ON lc.text  = agg.text
 LEFT JOIN cart_conv_key_effective AS cke ON cke.text = agg.text
 CROSS JOIN cart_conv_base   AS cb
-
 ORDER BY final_rating DESC
