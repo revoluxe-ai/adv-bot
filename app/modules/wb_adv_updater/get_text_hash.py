@@ -1,6 +1,6 @@
 import hashlib
 
 
-def get_text_hash(text):
+def get_text_hash(text: str) -> str:
     hash_text = hashlib.md5(text.encode()).hexdigest()
     return hash_text

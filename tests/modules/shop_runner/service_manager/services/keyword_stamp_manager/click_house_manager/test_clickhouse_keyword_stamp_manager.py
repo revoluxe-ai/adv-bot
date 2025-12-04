@@ -7,9 +7,9 @@ from clickhouse_connect.driver import AsyncClient
 
 from app.core.mp.wb.dto import KeywordPosition
 from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager import (
-    ClickHouseKeywordStampManager,
+    ClickHouseKeywordJamStatManager,
 )
-from tests.factories import KeywordPositionFactory
+from tests.factories import KeywordStatFromJamFactory
 
 
 @pytest.mark.asyncio
@@ -36,7 +36,7 @@ async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: A
     _ = await clickhouse_client.command(create_table_sql)
 
     num_positions = 3
-    test_positions: list[KeywordPosition] = KeywordPositionFactory.build_batch(num_positions)
+    test_positions: list[KeywordPosition] = KeywordStatFromJamFactory.build_batch(num_positions)
 
     with patch(
         "app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager.click_house_manager.get_clickhouse_client"
@@ -47,7 +47,7 @@ async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: A
 
         get_clickhouse_client_mock.return_value = cm
 
-        await ClickHouseKeywordStampManager.update_positions(test_positions)
+        await ClickHouseKeywordJamStatManager.update_positions(test_positions)
 
     count_result = await clickhouse_client.query(f"SELECT COUNT(*) FROM {table_name}")
     assert count_result.result_rows[0][0] == num_positions
@@ -178,7 +178,7 @@ async def test_get_last_positions_returns_total_orders(clickhouse_client: AsyncC
         cm.__aexit__.return_value = None
         get_clickhouse_client_mock.return_value = cm
 
-        positions = await ClickHouseKeywordStampManager.get_last_positions(adv_setting)
+        positions = await ClickHouseKeywordJamStatManager.get_last_positions(adv_setting)
 
     assert len(positions) == 2
     totals = {pos.keyword_text: pos.total_orders for pos in positions}

@@ -8,12 +8,10 @@ from typing import (
     TypeVar,
 )
 
-from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+
 from app.core.wb_api.http_request import try_except_decorator
 from app.core.wb_api.ping_manager import PingManager
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
@@ -25,17 +23,15 @@ from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_a
 from app.modules.shop_runner.wb_statistic_manager.backend.common_stat_manager import (
     WBCommonStatManager,
 )
-from app.modules.wb_adv_updater import data_manager
 
 from app.settings import settings
-from .old_modules.setting_auto_updater import (
-    AdvSettingAutoUpdater,
-)
+
 from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +106,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(5 * 60, 1)
     async def update_full_adv_stat(self) -> None:
+        from app.modules.wb_adv_updater import data_manager
         wb_api = self._wb_api
         auto_advs: list[AdvSetting] = await self._wb_shop_data_manager.get_active_advs()
 
@@ -139,6 +136,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1 * 60)
     async def update_advs_data_from_wb_to_pg(self) -> None:
+        from app.modules.wb_adv_updater import data_manager
         await data_manager.update_advs_data_from_wb_to_pg(self._wb_api)
 
     @staticmethod
@@ -171,6 +169,9 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self):
+        from .old_modules.setting_auto_updater import (
+            AdvSettingAutoUpdater,
+        )
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs()
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         advs = [adv for adv in advs if adv.search_adv_active_status]
@@ -304,6 +305,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(1, 60)
     async def update_keywords_stamp(self) -> None:
+        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
             KeywordStampManager,
@@ -339,6 +341,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(24 * 60 * 60 * 60, 60)
     async def update_keywords_positions_history(self) -> None:
+        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
         from .services.keyword_stamp_manager import (
             KeywordStampManagerContainer,
             KeywordStampManager,
@@ -375,6 +378,7 @@ class CoroutinesManager:
     @try_except_decorator(60 * 15, 60)
     async def update_minus_phrases_in_advs(self):
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
+        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
 
         wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
         container = MinusPhraseManagerContainer(_wb_api_manager_hub=wb_manager_hub)
@@ -400,8 +404,31 @@ class CoroutinesManager:
                 )
 
 
+    @while_coroutine_decorator(5 * 60, 60)
+    async def update_clusters_adv_stats_today(self) -> None:
+        """Обновление статистики кластеров за сегодня."""
+        from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
+        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+        
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
+        updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs()
 
+        await updater.update_today_stats(complex_advs)
 
+    @while_coroutine_decorator(24 * 60 * 60, 60)
+    async def update_clusters_adv_stats_history(self) -> None:
+        """Обновление статистики кластеров за прошлые дни."""
+        from .services import ClustersAdvStatUpdater, ClustersAdvStatUpdaterContainer
+        from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
+        
+        wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()
+        container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
+        updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()
+        complex_advs = await self._wb_shop_data_manager.get_complex_advs()
+
+        await updater.update_past_days_stats(complex_advs, for_last_days=365)
 
 
 

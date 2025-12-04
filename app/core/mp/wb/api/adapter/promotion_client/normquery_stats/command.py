@@ -1,9 +1,17 @@
-from dataclasses import dataclass
 import datetime
+from typing import Sequence
+from pydantic import BaseModel, field_validator, ConfigDict
 
-@dataclass
-class GetNormqueryStatsCommand:
-    advert_id: int
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
+
+
+class GetNormqueryStatsCommandBatchForAdv(BaseModel):
+    adv_id: int
+    nmid: int
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+class GetNormqueryStatsCommand(BaseModel):
     date_from: datetime.date
     date_to: datetime.date
-    nmid: int
+    batchs: list[GetNormqueryStatsCommandBatchForAdv]

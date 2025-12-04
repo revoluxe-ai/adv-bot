@@ -1,6 +1,10 @@
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from contextlib import asynccontextmanager
+from datetime import date, datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from typing import Awaitable, Callable, List, cast
 
 import pytest
+from clickhouse_connect.driver.asyncclient import AsyncClient
 
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.modules.wb_api import WBApi
@@ -9,8 +13,22 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     PlanData,
     FactData,
 )
-from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
+    ComplexAdv,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
+    CalculatedKeywordsManager,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
+    KeywordStat,
+)
 from conftest import complex_adv_mock
+from tests.factories.clickhouse_factory import (
+    CLUSTERS_ADV_STATS_COLUMNS,
+    ClustersAdvStatsDTO,
+    ClustersAdvStatsFactory,
+    build_clusters_adv_stats_rows,
+)
 
 
 @pytest.fixture
@@ -66,10 +84,10 @@ async def test_adv_settings_auto_update(
             "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.ComplexAdv",
             new=MagicMock(return_value=test_complex_adv_instance),
         ),
-        patch(
-            "app.modules.shop_runner.service_manager.manager.data_manager",
-            new=data_manager_mock,
-        ),
+        # patch(
+        #     "app.modules.shop_runner.service_manager.manager.data_manager",
+        #     new=data_manager_mock,
+        # ),
         patch(
             "app.utils.db.session_maker.get_async_session_maker",
             new=get_async_session_mock,
@@ -79,11 +97,11 @@ async def test_adv_settings_auto_update(
             new=AsyncMock(return_value={}), # Возвращаем пустой словарь AdvSetting
         ),
         patch(
-            "app.modules.shop_runner.service_manager.manager.AdvSettingAutoUpdater.get_fact_data",
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.get_fact_data",
             new=AsyncMock(return_value=fact_data),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.manager.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.get_plan_data",
             new=MagicMock(return_value=plan_data),
         ),
         patch(
@@ -120,3 +138,87 @@ async def test_adv_settings_auto_update(
         # поэтому в тестах мы вызываем оригинальную функцию через __wrapped__,
         # чтобы выполнить её один раз и не зависнуть.
         await manager.adv_settings_auto_update.__wrapped__(manager)
+
+
+@pytest.mark.asyncio
+async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client):
+    await clickhouse_client.command("TRUNCATE TABLE default_db.clusters_adv_stats")
+
+    nmid = 987_654_321
+    base_date = date.today()
+    now_dt = datetime.utcnow()
+
+    records = [
+        ClustersAdvStatsFactory.build(
+            adv_id=25040169,
+            nmid=nmid,
+            norm_query="test_query",
+            wb_category="test_category",
+            views=120,
+            clicks=30,
+            add_to_cart=5,
+            orders=3,
+            cpm=110.0,
+            cpc=7.0,
+            avr_pos=1.5,
+            date=base_date,
+            timestamp=now_dt,
+        ),
+        ClustersAdvStatsFactory.build(
+            adv_id=25040169,
+            nmid=nmid,
+            norm_query="test_query",
+            wb_category="test_category",
+            views=80,
+            clicks=20,
+            add_to_cart=3,
+            orders=2,
+            cpm=90.0,
+            cpc=6.0,
+            avr_pos=2.0,
+            date=base_date - timedelta(days=1),
+            timestamp=now_dt - timedelta(hours=1),
+        ),
+    ]
+
+    rows = build_clusters_adv_stats_rows(records)
+    await clickhouse_client.insert(
+        "default_db.clusters_adv_stats",
+        rows,
+        column_names=CLUSTERS_ADV_STATS_COLUMNS,
+    )
+
+    # Мокируем get_clickhouse_client для использования тестового клиента
+    mock_context = AsyncMock()
+    mock_context.__aenter__.return_value = clickhouse_client
+    mock_context.__aexit__.return_value = None
+
+    with patch(
+        "app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager.get_clickhouse_client",
+        return_value=mock_context,
+    ):
+        manager = CalculatedKeywordsManager()
+        stats = await manager._CalculatedKeywordsManager__get_keywords_stat_from_clickhouse(
+            nmid=nmid,
+            min_days=2,
+            min_views=0,
+        )
+
+    assert len(stats) == 1
+
+    keyword_stat = stats[0]
+    expected_views = sum(record.views for record in records)
+    expected_clicks = sum(record.clicks for record in records)
+    expected_add_to_cart = sum(record.add_to_cart for record in records)
+    expected_orders = sum(record.orders for record in records)
+    expected_spend = sum(
+        (record.cpm * record.views) / 1000 + (record.cpc * record.clicks)
+        for record in records
+    )
+
+    assert keyword_stat.text == "test_query"
+    assert keyword_stat.views == expected_views
+    assert keyword_stat.clicks == expected_clicks
+    assert keyword_stat.add_to_cart == expected_add_to_cart
+    assert keyword_stat.orders == expected_orders
+    assert keyword_stat.spend == pytest.approx(expected_spend, rel=1e-4)

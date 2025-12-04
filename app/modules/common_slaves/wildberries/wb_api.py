@@ -220,31 +220,31 @@ class AdvertApi(ABC_WB_API):
                     advertIds.append(advertId)
 
         return advertIds
+    #
+    # @try_except_decorator(1, 2)
+    # async def _get_advs(self, adv_ids: list) -> list[Adv]:
+    #     advs = []
+    #     url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
+    #     response_text = await requests(
+    #         self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
+    #     )
+    #     answer = json.loads(response_text)
+    #     for advert in answer:
+    #         adv = Adv(advert)
+    #         advs.append(adv)
+    #     return advs
 
-    @try_except_decorator(1, 2)
-    async def _get_advs(self, adv_ids: list) -> list[Adv]:
-        advs = []
-        url = "https://advert-api.wildberries.ru/adv/v1/promotion/adverts"
-        response_text = await requests(
-            self.session, "POST", url, json_data=adv_ids, headers=self.headers.standart
-        )
-        answer = json.loads(response_text)
-        for advert in answer:
-            adv = Adv(advert)
-            advs.append(adv)
-        return advs
-
-    @try_except_decorator(1, 1)
-    async def get_advs(self, adv_ids: list[int] = None) -> list[Adv]:
-        if not adv_ids:
-            adv_ids: list[int] = await self.get_advertIds()
-        all_advs = []
-        part = 50
-        for i in range(0, len(adv_ids), part):
-            part_of_advs = adv_ids[i : i + part]
-            advs = await self._get_advs(part_of_advs)
-            all_advs.extend(advs)
-        return all_advs
+    # @try_except_decorator(1, 1)
+    # async def get_advs(self, adv_ids: list[int] = None) -> list[Adv]:
+    #     if not adv_ids:
+    #         adv_ids: list[int] = await self.get_advertIds()
+    #     all_advs = []
+    #     part = 50
+    #     for i in range(0, len(adv_ids), part):
+    #         part_of_advs = adv_ids[i : i + part]
+    #         advs = await self._get_advs(part_of_advs)
+    #         all_advs.extend(advs)
+    #     return all_advs
 
     @try_except_decorator(1, 6)
     async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
@@ -260,54 +260,54 @@ class AdvertApi(ABC_WB_API):
         )
         logger.debug("Минус-фразы установлены")
 
-    async def create_adv_company(
-        self, nmids: list, budget_type: int, budget: int
-    ) -> Adv | str:
-        """
-        0 - balance
-        1 - net
-        3 - bonus
-
-        """
-        assert budget >= 500
-        if budget_type == "balance":
-            budget_type = 0
-        elif budget_type == "net":
-            budget_type = 1
-        elif budget_type == "bonus":
-            budget_type = 3
-        cards = await self.get_cards()
-        catch_card = None
-        for card in cards:
-            if card.nmid in nmids:
-                catch_card = card
-                break
-        subjectID = catch_card.subjectID
-
-        url = "https://advert-api.wildberries.ru/adv/v1/save-ad"
-        data_json = {
-            "type": 8,
-            "name": ", ".join([str(nmid) for nmid in nmids]),
-            "subjectId": subjectID,
-            "sum": budget,
-            "btype": budget_type,
-            "on_pause": True,
-        }
-
-        async with self.session.post(
-            url, json=data_json, headers=self.headers.standart
-        ) as response:
-            answer = await response.text()
-            if "error" in answer:
-                error = json.loads(answer)["error"]
-                return error
-        adv_id = int(
-            answer
-        )  # Это предполагает, что ответ содержит ID рекламной кампании
-        company = (await self.get_adv_companies([adv_id]))[0]
-        await asyncio.sleep(60)  # Замена sleep на асинхронный asyncio.sleep
-        await self.tune_company(company, nmids)
-        return company
+    # async def create_adv_company(
+    #     self, nmids: list, budget_type: int, budget: int
+    # ) -> Adv | str:
+    #     """
+    #     0 - balance
+    #     1 - net
+    #     3 - bonus
+    #
+    #     """
+    #     assert budget >= 500
+    #     if budget_type == "balance":
+    #         budget_type = 0
+    #     elif budget_type == "net":
+    #         budget_type = 1
+    #     elif budget_type == "bonus":
+    #         budget_type = 3
+    #     cards = await self.get_cards()
+    #     catch_card = None
+    #     for card in cards:
+    #         if card.nmid in nmids:
+    #             catch_card = card
+    #             break
+    #     subjectID = catch_card.subjectID
+    #
+    #     url = "https://advert-api.wildberries.ru/adv/v1/save-ad"
+    #     data_json = {
+    #         "type": 8,
+    #         "name": ", ".join([str(nmid) for nmid in nmids]),
+    #         "subjectId": subjectID,
+    #         "sum": budget,
+    #         "btype": budget_type,
+    #         "on_pause": True,
+    #     }
+    #
+    #     async with self.session.post(
+    #         url, json=data_json, headers=self.headers.standart
+    #     ) as response:
+    #         answer = await response.text()
+    #         if "error" in answer:
+    #             error = json.loads(answer)["error"]
+    #             return error
+    #     adv_id = int(
+    #         answer
+    #     )  # Это предполагает, что ответ содержит ID рекламной кампании
+    #     company = (await self.get_adv_companies([adv_id]))[0]
+    #     await asyncio.sleep(60)  # Замена sleep на асинхронный asyncio.sleep
+    #     await self.tune_company(company, nmids)
+    #     return company
 
     @try_except_decorator(1, 1)
     async def pause_company(self, adv_id: int):

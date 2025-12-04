@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date as date_type, datetime
 
 from pydantic import BaseModel, Field
 
@@ -60,7 +60,7 @@ class BoosterStats(BaseModel):
 
 @dataclass
 class SmallFullAdvStatPerDay:
-    date: date
+    date: date_type
     views: int
     clicks: int
     spend: float

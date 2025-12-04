@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 import httpx
 
@@ -12,7 +12,7 @@ from app.core.mp.wb.api.excs import (
     ApiForbiddenError,
     TooManyRequests,
 )
-from app.core.mp.wb.api.generated.analitika_i_dannye_client.models import ErrorObject400
+
 from app.core.mp.wb.api.utils import parse_too_many_requests_error
 
 

@@ -1,13 +1,13 @@
+from dataclasses import dataclass
 from datetime import datetime
 
-from pydantic import BaseModel, Field
 
-
-class KeywordStat(BaseModel):
-    text: str = Field(..., title="keyword")
-    views: int = Field(..., title="views")
-    clicks: int = Field(..., title="clicks")
-    spend: float = Field(..., title="sum")
-    adv_id: int = Field(..., title="adv_id")
+@dataclass
+class KeywordStat:
+    text: str
+    views: int
+    clicks: int
+    spend: float
+    adv_id: int
     update_timestamp: datetime
     date: datetime

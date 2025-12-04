@@ -1,5 +1,5 @@
-from .click_house_manager import ClickHouseKeywordStampManager
+from .click_house_manager import ClickHouseKeywordJamStatManager
 
 __all__ = [
-    "ClickHouseKeywordStampManager",
+    "ClickHouseKeywordJamStatManager",
 ]

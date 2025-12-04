@@ -8,7 +8,9 @@ from pathlib import Path
 from clickhouse_connect.driver.query import QueryResult
 
 from app.core.mp.wb.dto import KeywordPosition
-from app.modules.common_slaves.wildberries.models import WBItemPosition, AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager.dto.keywords_jam_stat import \
+    KeywordJamStat
 from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.keyword_stamp import (
     KeywordStamp,
 )
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 # TODO: Сделать, чтобы если нет ключей, то максимальную ставку делал минимальной
 
 
-class ClickHouseKeywordStampManager:
+class ClickHouseKeywordJamStatManager:
     @staticmethod
     async def update_stamps(stamps: list[KeywordStamp]) -> None:
         if not stamps:
@@ -118,7 +120,7 @@ class ClickHouseKeywordStampManager:
         return None
 
     @staticmethod
-    async def get_last_positions(adv_setting: AdvSetting) -> list[WBItemPosition]:
+    async def get_last_positions(adv_setting: AdvSetting) -> list[KeywordJamStat]:
         sql_path = Path(__file__).parent / "sql/get_keywords_stat.sql"
         query = sql_path.read_text()
         nmid = adv_setting.nmids[0]
@@ -130,7 +132,7 @@ class ClickHouseKeywordStampManager:
             rows: Sequence[tuple[str, float,  int, int, datetime]] = cast(
                 Sequence[tuple[str, float, int, int, datetime]], result.result_rows
             )
-            positions: list[WBItemPosition] = []
+            positions: list[KeywordJamStat] = []
             for row in rows:
                 text = row[0]
                 # TODO: Сюда из рантайма дошла ошибка
@@ -138,7 +140,7 @@ class ClickHouseKeywordStampManager:
                 total_views = row[2]
                 total_orders = row[3]
                 timestamp = row[4]
-                position = WBItemPosition(
+                position = KeywordJamStat(
                     nmid=nmid,
                     keyword_text=text,
                     position=p,

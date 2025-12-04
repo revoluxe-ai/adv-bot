@@ -16,7 +16,6 @@ from app.modules.token_monitoring.services.token_expiration_service import (
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_func_cache import set_config
 from . import wb_manager
-from .ml_data_manager import update_model
 from ..user_message_sender import message_for_not_pay_user_sender
 
 set_config()
@@ -111,27 +110,26 @@ async def run_update_vectors_in_redis() -> None:
     await wb_manager.update_vectors_in_redis()
 
 
-async def run_vector_update_in_neo4j() -> None:
-    await wb_manager.update_vectors_update_in_graph()
+# async def run_vector_update_in_neo4j() -> None:
+#     await wb_manager.update_vectors_update_in_graph()
+#
 
-
-async def run_update_model():
-    while True:
-        try:
-            await update_model()
-        except Exception as e:
-            logger.error(f"Ошибка обновления модели {e}", exc_info=True)
-            del e
-        await asyncio.sleep(0)
+# async def run_update_model():
+#     while True:
+#         try:
+#             await update_model()
+#         except Exception as e:
+#             logger.error(f"Ошибка обновления модели {e}", exc_info=True)
+#             del e
+#         await asyncio.sleep(0)
 
 
 async def main_loop() -> None:
     await asyncio.gather(
         process_payment_for_advs(),
         # TODO: этот функционал должен быть перенесен в shop_run, проверить не дублирует ли
+        # TODO: Не понятно эта функция вообще работает или нет
         process_token_expiration_check(),
-        run_update_vectors_in_redis(),
-        run_vector_update_in_neo4j(),
     )
 
 

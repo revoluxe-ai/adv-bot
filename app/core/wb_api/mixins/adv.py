@@ -455,8 +455,12 @@ class AdvMixin(WBAPIProtocol):
         if not answer:
             return None
         for data in answer:
-            full_stat = FullAdvStat(**data)
-            full_stats.append(full_stat)
+            try:
+                full_stat = FullAdvStat(**data)
+                full_stats.append(full_stat)
+            except Exception as exc:
+                logger.error('Ошибка распаковки статистики РК: %s', exc, exc_info=True)
+
 
         return full_stats
 

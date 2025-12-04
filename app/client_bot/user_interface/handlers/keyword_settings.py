@@ -19,10 +19,7 @@ from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.start_registration_func import (
     start_registration,
 )
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
+
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,

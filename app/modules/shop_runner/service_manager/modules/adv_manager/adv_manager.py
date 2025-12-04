@@ -1,8 +1,7 @@
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.data_classes import ComplexAdv
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 
 async def get_complex_adv(

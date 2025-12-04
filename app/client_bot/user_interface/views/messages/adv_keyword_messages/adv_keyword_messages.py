@@ -9,7 +9,7 @@ from app.client_bot.message_manager import LastMessage
 from app.client_bot.user_interface.message_templates import (
     TextWithKeyboardAndImage,
 )
-
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 if typing.TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -26,9 +26,6 @@ from app.client_bot.user_interface.views.messages.positions_graphic_messanges.po
     KeywordGraphicPart_1,
 )
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
@@ -129,10 +126,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if filter_by_query:
             clear_keywords = []
             for keyword in self._keywords:
-                if (
-                    not isinstance(keyword.query, str)
-                    and keyword.query >= filter_by_query
-                ):
+                if keyword.total_views > filter_by_query:
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
 
@@ -153,7 +147,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._fact_data: FactData = fact_data
 
         # Устанавливаем полученные данные
-        self.min_ctr = stat_data.min_ctr
+        self.min_rating_by_orders = stat_data.min_rating_by_orders
         self.auto_cpm = stat_data.auto_cpm
         self.auction_cpm = stat_data.auction_cpm
         self.total_spend = stat_data.total_spend
@@ -162,6 +156,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._mean_orders_for_days = stat_data.mean_orders_for_last_days
         self._mean_price_for_order = stat_data.mean_price_for_order
         self._spend_for_inner_adv_for_3_days = stat_data.spend_for_inner_advs
+        self.hard_min_ctr = stat_data.hard_min_ctr
         self.full_adv_stat_for_last_days_for_auto_adv = (
             stat_data.full_adv_stat_for_last_days_for_auto_adv
         )
@@ -220,8 +215,16 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             f"""Бот {"Включен" if self._adv_setting.bot_active else "Выключен"}\n"""
             "ID Авто: " + str(self._adv_setting.adv_id) + "\n"
             f"ID Аукциона: {self._adv_setting.search_adv_id}\n"
-            f"Cтат. за 2 дня:\n"
-            f"Мин. CRT: {self.min_ctr * 100:.2f}%\n"
+            f"Cтат. за 2 дня:\n")
+
+        if self.min_rating_by_orders is not None:
+            t = f"Мин. рейтинг по заказам: {self.min_rating_by_orders * 100:.2f}%\n"
+        elif self.hard_min_ctr is not None:
+            t = f"Мин. CTR: {self.hard_min_ctr * 100:.2f}%\n"
+        else:
+            t = '❗Ограничители не заданы!!!\n'
+        text += t
+        text +=(
             f"Стр.: {self._page}/{total_page + 1}\n"
             f"Экс. прог.CTR: {self._adv_setting.exponent_predict_ctr:.2f}\n"
             f"Общий расход: {self.total_spend:.2f}\n"
@@ -319,7 +322,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         bot = self.bot
         user_telegram_id = self.chat_id
         adv_original_id = self._adv_setting.id
-        result = await get_keyword_history_graphic(adv_original_id, self._keywords)
+        result = await get_keyword_history_graphic(adv_original_id)
         if not result:
             graphic = None
             legend = None
@@ -337,12 +340,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         return keyboards.get_keywords_setting_keyboard(
             self._keywords,
             self._adv_setting,
-            self._adv_choice_last_page,
             self._wb_user_cabinet_original_id,
             self._page,
             self._filter,
             self._on_page,
-            self.min_ctr,
             self.hide_keywords_is_not_relevant,
             sort_mode=self.sort_mode,
             image_mode=self.image_mode,

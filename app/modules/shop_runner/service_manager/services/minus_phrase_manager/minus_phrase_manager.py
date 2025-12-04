@@ -1,23 +1,21 @@
 import asyncio
 import logging
 from collections.abc import Awaitable
-from typing import cast
-
-from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 from app.core.mp.wb.api.wb_manager_hub import WBManagerHub
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    KeywordStatus,
-)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from .click_house_manager import ClickHouseManager
 
 logger = logging.getLogger(__name__)
 
 
 class MinusPhraseManager:
-    def __init__(self, wb_api_manager_hub: WBManagerHub):
+    def __init__(self, wb_api_manager_hub: WBManagerHub,
+                 click_house_manager: ClickHouseManager):
         self._wb_api = wb_api_manager_hub
+        self._click_house = click_house_manager
 
     async def update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         try:
@@ -32,65 +30,58 @@ class MinusPhraseManager:
             )
             raise e
 
-    async def _get_norm_query_from_stat(self, complex_adv: ComplexAdv, last_days: int) -> list[str]:
-        """TODO: Временный метод, заменить на записи из кликхауса"""
-        tasks: list[Awaitable[list[NormqueryStatsDTO]]] = []
-        nmid = complex_adv.main_nmid
-        # if adv_id := complex_adv.auto_adv_id:
-        #     task: Awaitable[list[NormqueryStatsDTO]] = self._wb_api.wb_data_manager.get_norn_query_stat(adv_id,
-        #                                                                   nmid,
-        #                                                                       last_days)
-        #     tasks.append(task)
-        if complex_adv.search_adv:
-            adv_id = complex_adv.search_adv.adv_id
-            task: Awaitable[list[NormqueryStatsDTO]] = self._wb_api.wb_data_manager.get_norn_query_stat(adv_id,
-                                                                              nmid,
-                                                                                 last_days)
-            tasks.append(task)
-
-        results: list[list[NormqueryStatsDTO] | BaseException] = await asyncio.gather(*tasks,
-                                                                                  return_exceptions=True)
-        norm_queries: set[str] = set()
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error('Ошибка получения norm query: %s', result)
-            else:
-                result = cast(list[NormqueryStatsDTO], result)
-                for stat in result:
-                    query: str = stat.norm_query
-                    norm_queries.add(query)
-        return list(norm_queries)
-
-
     async def _update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         keywords = await complex_adv.get_keywords()
-        bad_phrases = [
-            kw.text for kw in keywords if kw.status == KeywordStatus.BAD
-        ]
+        bad_keywords: list[str] = [kw.text for kw in keywords if kw.status==KeywordStatus.BAD]
+        await asyncio.gather(
+            self._update_minuses_in_auto_adv(complex_adv, bad_keywords),
+            self._update_minuses_in_search_adv(complex_adv, bad_keywords)
+        )
+        return None
 
-        norm_queries = await self._get_norm_query_from_stat(complex_adv, last_days=7)
+    async def __update_minus_phrases(self,
+                                     adv_id: int,
+                                     nmids: list[int],
+                                     common_bad_phrases: list[str]) -> None:
+        keywords_from_this_adv: list[str] = await self._get_clusters_for_adv(adv_id)
 
-        bad_norm_queries = set(bad_phrases) &  set(norm_queries)
+        bad_keywords_for_this_adv = set(common_bad_phrases) & set(keywords_from_this_adv)
+        if not bad_keywords_for_this_adv:
+            return None
 
-        if not bad_norm_queries:
-            logger.debug(
-                "Нет минус фраз для обновления для shop_id: %s, adv_id: %s",
-                complex_adv.shop_id,
-                complex_adv.adv_id,
-            )
-            return
+        minus_phrases_to_send = list(bad_keywords_for_this_adv)[:1000]
 
-        # API лимит - 1000 фраз. Берем только "плохие"
-        minus_phrases_to_send = list(bad_norm_queries)[:1000]
-
-        await self._wb_api.wb_modifier.set_minus_phrases_for_adv(
-            complex_adv=complex_adv,
+        tasks: list[Awaitable[None]] = []
+        for nmid in nmids:
+            task = self._wb_api.wb_modifier.set_minus_phrases_for_adv(
+            adv_id=adv_id,
+            nmid=nmid,
             phrases=minus_phrases_to_send,
         )
+            tasks.append(task)
 
-        logger.debug(
-            "Минус-фразы успешно обновлены для shop_id: %s, adv_id: %s, фразы: %s",
-            complex_adv.shop_id,
-            complex_adv.adv_id,
-            minus_phrases_to_send,
-        )
+        results: list[None | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error('Ошибка обновления РК: %s', result, exc_info=True)
+
+
+        return None
+
+    async def _get_clusters_for_adv(self, adv_id: int) -> list[str]:
+        keywords: list[str] = await self._click_house.get_cluster_texts_for_adv(adv_id)
+        return keywords
+
+    async def _update_minuses_in_auto_adv(self, complex_adv: ComplexAdv, bad_keywords: list[str]) -> None:
+        adv_id = complex_adv.auto_adv_id
+        nmids = complex_adv.adv_setting.nmids
+        await self.__update_minus_phrases(adv_id, nmids, bad_keywords)
+        return None
+
+
+    async def _update_minuses_in_search_adv(self, complex_adv: ComplexAdv, bad_keywords: list[str]) -> None:
+        adv_id = complex_adv.search_adv.adv_id
+        nmids = complex_adv.search_adv.nmids
+        await self.__update_minus_phrases(adv_id, nmids, bad_keywords)
+        return None
