@@ -75,8 +75,6 @@ async def get_csv_file(adv_setting: AdvSetting) -> str:
             keyword_reason = None
         if keyword_reason == "max_position":
             hard_status = "ЦП"
-        elif keyword_reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
-            hard_status = "МП"
         elif keyword.hard_status == BLACK_LIST:
             hard_status = "НРФ"
         elif keyword_reason == "max_cpc":
