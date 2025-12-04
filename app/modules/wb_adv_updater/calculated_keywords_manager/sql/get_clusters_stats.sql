@@ -286,9 +286,7 @@ WITH
       bayes AS (
         SELECT
             t.text AS text,
-            c.ctr_clicks
-            / (c.ctr_views + p.prior_views_per_click)
-                AS ctr_eff,
+            ifNull(c.ctr_clicks, 0) + 1 / (nullIf(c.ctr_views + p.prior_views_per_click, 0)) AS ctr_eff,
             c7.carts7
             / (c7.clicks7 + p.prior_clicks_per_cart)
                 AS cart_eff,
@@ -351,7 +349,7 @@ SELECT
     (ifNull(agg.clicks_sum, 0) / nullIf(ifNull(agg.views_sum, 0), 0)) AS ctr,
 
     -- итоговый рейтинг: байесовская цепочка конверсий
-    b.ctr_eff  * ifNull(b.cart_eff, 1) * ifNull(b.order_eff, 1) AS final_rating,
+    b.ctr_eff  * if(b.cart_eff = 0, 1, b.cart_eff) * if(b.order_eff = 0, 1, b.order_eff) AS final_rating,
 
     -- стат. поля
     ifNull(ata.views_all_time, 0)  AS views_all_time,
