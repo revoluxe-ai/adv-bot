@@ -41,6 +41,7 @@ class RedisCalculatedKeywordsCacheManager(RedisManager):
         else:
             result = result_coro
         result_str = result.decode()
+        #TODO: Добавить сюда фоллбек с возвратом на список ключей для перезагрузки списка ключей в кеш
         return CalculatedKeyword.model_validate(json.loads(result_str))
 
     async def get_calculated_keywords(
