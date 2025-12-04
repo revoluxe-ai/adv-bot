@@ -3,7 +3,7 @@
 
 # type: ignore
 import logging
-
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
