@@ -634,7 +634,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         else:
             text += "📈 *Позиция:* Нет на сайте\n"
 
-        text += f"""🕒 *Последнее данных по ключу:* {self.calculated_keyword.timestamp.strftime('%d-%m-%Yy')}\n"""
+        text += f"""🕒 *Последнее данных по ключу:* {self.calculated_keyword.timestamp.strftime('%d-%m-%Y')}\n"""
         return text
 
     @property
