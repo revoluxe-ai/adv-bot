@@ -249,6 +249,14 @@ class ChangeAutoUpdateExponentStatus(
     new_status: bool
 
 
+class ChangeAutoAddOnlyRelevantPhraseStatus(
+    CallbackData, prefix="change_auto_add_relevant"
+):
+    adv_id: int
+    wb_user_cabinet_original_id: int
+    new_status: bool
+
+
 class ChangeRecSystemModeStatus(CallbackData, prefix="change_rec_system_mode"):
     adv_id: int
     wb_user_cabinet_original_id: int

@@ -11,9 +11,25 @@
     "app/modules/wb_adv_updater/phrases_processor.py",
     "app/core/di/client_di",
     "app/modules/shop_runner/service_manager/services/minus_phrase_manager",
+    "app/modules/shop_runner/service_manager/services/clusters_adv_stat_updater",
+    "app/client_bot/user_interface/views/keyboards.py",
+    "app/modules/wb_adv_updater/",
+    "app/modules/shop_runner/bidder/bidder_func.py",
+    "app/modules/wb_adv_updater/position_history_manager",
+    "app/utils/graphic_positions_creator/graphic_positions_creator.py",
+    "app/client_bot/user_interface/views/messages/messages.py"
   ],
 
   "exclude": [
-    "app/core/mp/wb/api/generated"
+    "app/core/mp/wb/api/generated",
+    "app/utils/redis_manager",
+    "app/utils/image_normalizer.py",
+    "adv-bot/app/utils",
+    "app/utils/image_master",
+    "app/utils/faiss_manager",
+    "app/utils/db/session_maker.py",
+    "app/modules/wb_adv_updater/word_to_vec_object.py",
+    "app/modules/wb_adv_updater/wb_manager.py",
+    "app/modules/wb_adv_updater/update_wb_adv_phrases_in_neo.py"
   ]
 }

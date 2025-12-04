@@ -1,18 +1,17 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
-from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.command import GetNormqueryStatsCommand
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO, NormqueryStat
 from app.core.mp.wb.api.domain_managers.promotion.promotion_manager import PromotionManager
+from app.core.mp.wb.api.domain_managers.promotion.methods.get_normquery_stats.convertor import (
+    dto_to_command,
+)
 from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
     V0GetNormQueryStatsItem,
     V0GetNormQueryStatsItemStat,
-    V0GetNormQueryStatsResponse
 )
 import datetime
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
-from app.modules.common_slaves.wildberries.models.models import AdvSetting
-from unittest.mock import MagicMock
 from tests.factories.adv_factory import AdvSettingFactory
 
 
@@ -83,16 +82,17 @@ async def test_get_normquery_stats(promotion_manager, mock_promotion_client):
         nm_id=nm_id,
         stats=[mock_stats_item],
     )
-    mock_response = V0GetNormQueryStatsResponse(
-        stats=[mock_response_item],
-    )
+    # mock_response = V0GetNormQueryStatsResponse(
+    #     stats=[mock_response_item],
+    # )
 
     # Исправляем ошибку TypeError: object AsyncMock can't be used in 'await' expression
     mock_promotion_client.normquery_stats_adapter.get_adv_v0_normquery_stats = AsyncMock(return_value=expected_dto)
 
     result = await promotion_manager.get_normquery_stats(complex_advs, today, today)
 
+    expected_command = dto_to_command(complex_advs, today, today)
     mock_promotion_client.normquery_stats_adapter.get_adv_v0_normquery_stats.assert_awaited_once_with(
-        GetNormqueryStatsCommand(complex_advs=complex_advs, date_from=today, date_to=today)
+        expected_command
     )
     assert result == expected_dto

@@ -2,6 +2,8 @@
 # IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
 
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+
 # Устанавливаем переменные окружения для тестовой БД ДО любых импортов
 os.environ["POSTGRES_MASTER_HOST"] = "localhost"
 os.environ["POSTGRES_REPLICA_HOST"] = "localhost"
@@ -353,9 +355,15 @@ except Exception:
     stub_mod.try_except_decorator = try_except_decorator
     sys.modules[mod_name] = stub_mod
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
+
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
-    KeywordStatus,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_setting_dto import (
+    KeywordSettingDTO,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.keyword_stat import (
+    KeywordStat,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBToken
 
@@ -426,53 +434,32 @@ from pytest import fixture
 
 
 @fixture
-def keywords_mocks() -> list[MagicMock]:
+def keywords_mocks() -> list[CalculatedKeyword]:
+    """Создаёт список тестовых CalculatedKeyword с разными статусами.
+    
+    Включает:
+    - 5 ключевых слов в whitelist (hard_status=2), 1 из них best
+    - 2 ключевых слова в blacklist (hard_status=0)
+    - 2 ключевых слова в тестировании (hard_status=1)
     """
-    Фикстура для генерации моков CalculatedKeyword с заданными параметрами
-    """
-    keyword_params = [
-        {
-            "best_keyword_status": True,
-            "baes_ctr": 0.5,
-            "hard_status": 2,
-            "spend": 100,
-            "relevant": True,
-            "keyword_setting_original_id": 1,
-        },
-        {
-            "best_keyword_status": False,
-            "baes_ctr": 0.2,
-            "hard_status": 2,
-            "spend": 10,
-            "relevant": False,
-            "keyword_setting_original_id": 2,
-        },
-        {
-            "best_keyword_status": False,
-            "baes_ctr": 0.1,
-            "hard_status": 2,
-            "spend": 40,
-            "relevant": True,
-            "keyword_setting_original_id": 3,
-        },
-        {
-            "best_keyword_status": False,
-            "baes_ctr": 0.4,
-            "hard_status": 1,
-            "spend": 0,
-            "relevant": False,
-            "keyword_setting_original_id": 4,
-        },
-    ]
-
-    mocks = []
-    for params in keyword_params:
-        mock = MagicMock(spec=CalculatedKeyword)
-        for key, value in params.items():
-            setattr(mock, key, value)
-        mocks.append(mock)
-
-    return mocks
+    from tests.factories.keyword_pipeline import (
+        GoodKeywordFactory,
+        BadKeywordFactory,
+        TestingKeywordFactory,
+        BestKeywordFactory,
+    )
+    
+    keywords = []
+    # 1 лучшее ключевое слово (whitelist, best_keyword_status=True)
+    keywords.append(BestKeywordFactory())
+    # 4 хороших ключевых слова (whitelist, best_keyword_status=False)
+    keywords.extend(GoodKeywordFactory.create_batch(4, state__best_keyword_status=False))
+    # 2 плохих ключевых слова (blacklist)
+    keywords.extend(BadKeywordFactory.create_batch(2))
+    # 2 в тестировании
+    keywords.extend(TestingKeywordFactory.create_batch(2))
+    
+    return keywords
 
 
 @pytest.fixture(name='front_too_many_requests_str', scope='function')
@@ -516,6 +503,12 @@ async def fake_redis():
 
 
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
+from tests.factories.keyword_pipeline import (
+    make_calculated_keyword,
+    make_keyword_setting_dto,
+    make_keyword_stat,
+    HardStatus,
+)
 
 
 
@@ -573,10 +566,13 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
         await postgres_session.refresh(ks)
 
     # 3️⃣ CalculatedKeywords
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_state import KeywordState
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason
+    
     def _build_keyword(
         ks: KeywordSetting,
         *,
-        status: str,
+        status: KeywordStatus,
         hard_status: int,
         predict_ctr: float,
         predict_ctr_exponent: float,
@@ -586,20 +582,56 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
         relevant: bool,
         best: bool = False,
     ) -> CalculatedKeyword:
-        return CalculatedKeyword(
-            keyword_setting_original_id=ks.id,
+        keyword_setting_dto = KeywordSettingDTO(
             text=ks.text,
-            clicks=clicks,
-            views=views,
-            spend=spend,
-            baes_ctr=round(predict_ctr * 0.8, 3),
-            predict_ctr=predict_ctr,
-            predict_ctr_exponent=predict_ctr_exponent,
-            status=status,
-            hard_status=hard_status,
             relevant=relevant,
+            hard_status=hard_status,
+            id=ks.id,
+            predict_ctr=predict_ctr,
+            added_clicks=0,
+        )
+        cluster_stat = KeywordStat(
+            norm_query=ks.text,
+            position=1.0,
+            timestamp=datetime.now(),
+            views=views,
+            clicks=clicks,
+            add_to_cart=0,
+            orders=0,
+            spend=spend,
+            cpc=0,
+            cpm=0.0,
+            base_cart_to_order_conv=0.0,
+            expected_orders_from_cart=0.0,
+            expected_orders=0.0,
+            final_rating=0.0,
+            views_all_time=views,
+            orders_all_time=0,
+        )
+        
+        # Определяем reason на основе hard_status
+        if hard_status == 2:  # WHITELIST
+            reason = KeywordStatusReason.WHITE_LIST
+        elif hard_status == 0:  # BLACKLIST
+            reason = KeywordStatusReason.BLACK_LIST
+        elif hard_status == 3:  # TURN_OFF
+            reason = KeywordStatusReason.TURN_OFF
+        else:
+            reason = KeywordStatusReason.MORE_THEN_HARD_MIN_CTR
+        
+        state = KeywordState(
+            status=status,
+            reason=reason,
             best_keyword_status=best,
         )
+
+        calculated_keyword = CalculatedKeyword(
+            adv_id=adv_setting.adv_id,
+            keyword_setting=keyword_setting_dto,
+            cluster_stat=cluster_stat,
+            state=state,
+        )
+        return calculated_keyword
 
     calculated_keywords: list[CalculatedKeyword] = []
     for idx, ks in enumerate(keyword_settings):
@@ -814,6 +846,28 @@ async def clickhouse_client(setup_test_database):
         ORDER BY (adv_id, text, date)
     """)
 
+    await client.command("""
+        CREATE TABLE IF NOT EXISTS default_db.clusters_adv_stats (
+            adv_id UInt32,
+            nmid UInt64,
+            wb_category LowCardinality(String),
+            norm_query LowCardinality(String),
+            views UInt32,
+            clicks UInt32,
+            ctr Float64,
+            cpm Float64,
+            add_to_cart UInt32,
+            orders UInt32,
+            cpc Float64,
+            avr_pos Float64,
+            date Date,
+            timestamp DateTime default now()
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(date)
+        ORDER BY (wb_category, nmid, norm_query, date, timestamp)
+        SETTINGS index_granularity = 8192
+    """)
+
     print("[OK] ClickHouse tables created/checked")
 
     yield client
@@ -827,3 +881,9 @@ async def clickhouse_client(setup_test_database):
 def app_container():
     container = AppContainer()
     return container
+
+
+@pytest.fixture(scope='function')
+def bidder_keywords_300() -> list[CalculatedKeyword]:
+    from tests.factories.keyword_pipeline import CalculatedKeywordFactory
+    return CalculatedKeywordFactory.create_batch(300)

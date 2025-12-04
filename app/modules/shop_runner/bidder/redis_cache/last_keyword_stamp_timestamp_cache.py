@@ -1,9 +1,7 @@
 import datetime
 
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 
 class LastKeywordStampTimestampCache(BaseRedisManager):
@@ -21,10 +19,8 @@ class LastKeywordStampTimestampCache(BaseRedisManager):
         return value_dt
 
     async def set(self, keyword: CalculatedKeyword) -> None:
-        key = self._get_key(keyword)
-        value: datetime.datetime | None = keyword.position_update
-        if value is None:
-            return None
+        key: str = self._get_key(keyword)
+        value: datetime.datetime | None = keyword.timestamp
         value_str = value.astimezone(datetime.timezone.utc).isoformat()
         _ = await self._client.set(key, value_str)
         return None

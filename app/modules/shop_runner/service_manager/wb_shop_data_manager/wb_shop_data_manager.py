@@ -1,12 +1,7 @@
-from collections.abc import Sequence, Callable
-from collections.abc import Awaitable
+from collections.abc import Sequence
 from typing import cast
-
 from sqlalchemy import select
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
@@ -15,7 +10,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
 )
-
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 from app.utils.db.session_maker import get_async_session_maker as sm
 

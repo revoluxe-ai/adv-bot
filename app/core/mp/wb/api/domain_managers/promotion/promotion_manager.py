@@ -1,10 +1,6 @@
 from typing import List
 import datetime
 
-
-from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.command import (
-    GetNormqueryStatsCommand,
-)
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import (
     NormqueryStatsDTO,
 )
@@ -12,9 +8,7 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.set_minus_phrases impo
     request,
 )
 from app.core.mp.wb.api.adapter.promotion_client.promotion_client import PromotionClient
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
+from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 
 
 class PromotionManager:
@@ -39,14 +33,14 @@ class PromotionManager:
 
     async def get_normquery_stats(
         self,
-        complex_advs: list["ComplexAdv"],
+        complex_advs: list[ComplexAdv],
         date_from: datetime.date,
         date_to: datetime.date,
     ) -> List[NormqueryStatsDTO] | None:
-        command = GetNormqueryStatsCommand(
-            complex_advs=complex_advs,
-            date_from=date_from,
-            date_to=date_to)
-        return await self._client.normquery_stats_adapter.get_adv_v0_normquery_stats(
-            command
-        )
+        from .methods.get_normquery_stats import method
+
+        result = await method.get_normquery_stats(self._client.normquery_stats_adapter,
+                                                  complex_advs,
+                                                  date_from,
+                                                  date_to)
+        return result

@@ -19,7 +19,7 @@ async def norn_query_dto_to_raw_stat_dto(norm_query_stat_dtos: Sequence["Normque
     async with sm(read_only=True) as session:
         category_rows = await session.execute(stmt)
     nmid_to_category = {row[0]: row[1] for row in category_rows}
-    rows_dto = []
+    rows_dto: list[RowStatDTO] = []
     for stat_dto in norm_query_stat_dtos:
         adv_id = stat_dto.adv_id
         nmid = stat_dto.nmid

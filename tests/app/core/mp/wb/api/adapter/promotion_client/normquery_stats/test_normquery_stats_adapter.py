@@ -1,8 +1,16 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.adapter import NormqueryStatsAdapter
-from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.command import GetNormqueryStatsCommand
 from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO
+from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.get_normquery_stats import (
+    command_to_bodies,
+)
+from app.core.mp.wb.api.domain_managers.promotion.methods.get_normquery_stats.convertor import (
+    dto_to_command,
+)
+from app.core.mp.wb.api.domain_managers.promotion.methods.get_normquery_stats.convertor import (
+    dto_to_command,
+)
 from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import (
     V0GetNormQueryStatsRequest,
     V0GetNormQueryStatsResponse,
@@ -47,8 +55,8 @@ async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
                                           mock_auth_client_handler,
                                           complex_adv):
     today = datetime.date.today()
-    command = GetNormqueryStatsCommand(complex_advs=[complex_adv], date_from=today,
-                                       date_to=today)
+    command = dto_to_command([complex_adv], today, today)
+    expected_body = command_to_bodies(command)[0]
     #
     # stat_mock = V0GetNormQueryStatsItemStat(
     #     norm_query='phrase1',
@@ -96,11 +104,7 @@ async def test_get_adv_v0_normquery_stats(normquery_stats_adapter,
         )
         mock_asyncio_detailed.assert_awaited_once_with(
             client=mock_client,
-            body=V0GetNormQueryStatsRequest(
-                from_=today,
-                to=today,
-                items=[V0GetNormQueryStatsRequestItemsItem(advert_id=123, nm_id=456)]
-            ),
+            body=expected_body,
         )
 
         assert len(result) == 1

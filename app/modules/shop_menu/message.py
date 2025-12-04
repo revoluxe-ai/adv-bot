@@ -288,8 +288,8 @@ class ShopMenu(TextWithKeyboard):
         logger.debug(
             f"Общее время выполнения метода ShopMenu.__call__: {total_time:.2f} сек"
         )
-        result = await super().__call__()
-        return result
+        await super().__call__()
+        return None
 
     @property
     def text(self):

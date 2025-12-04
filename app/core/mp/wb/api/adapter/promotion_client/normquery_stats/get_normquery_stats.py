@@ -7,18 +7,27 @@ from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.mode
     V0GetNormQueryStatsRequestItemsItem,
 )
 
-def command_to_body(command: GetNormqueryStatsCommand) -> V0GetNormQueryStatsRequest:
-    items: list[V0GetNormQueryStatsRequestItemsItem] = []
+def command_to_bodies(command: GetNormqueryStatsCommand) -> list[V0GetNormQueryStatsRequest]:
+    #TODO: тут поймали бесконечный цикл, забыл с
+    len_batch = 100
+    offset = 0
+    adv_batchs = command.batchs
+    bodies: list[V0GetNormQueryStatsRequest] = []
+    while offset < len(adv_batchs):
+        current_batch = adv_batchs[offset:offset + len_batch]
+        items: list[V0GetNormQueryStatsRequestItemsItem] = []
+        for adv_batch in current_batch:
+            item =  V0GetNormQueryStatsRequestItemsItem(
+                advert_id=adv_batch.adv_id,
+                nm_id=adv_batch.nmid,
+            )
+            items.append(item)
+        body = V0GetNormQueryStatsRequest(
+            from_=command.date_from,
+            to=command.date_to,
+            items=items,
+        )
+        bodies.append(body)
+        offset += len_batch
 
-    for complex_adv in command.complex_advs:
-        item = V0GetNormQueryStatsRequestItemsItem(
-        advert_id=complex_adv.adv_id,
-        nm_id=complex_adv.main_nmid)
-        items.append(item)
-
-    body = V0GetNormQueryStatsRequest(
-        from_=command.date_from,
-        to=command.date_to,
-        items=items,
-    )
-    return body
+    return bodies

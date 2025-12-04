@@ -1,7 +1,6 @@
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+
 from app.core.redis_manager_v2.base_redis_manager import BaseRedisManager
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 
 class RedisLastTotalViews(BaseRedisManager):
@@ -22,7 +21,7 @@ class RedisLastTotalViews(BaseRedisManager):
 
     async def set(self, keyword: CalculatedKeyword) -> None:
         key = self._get_key(keyword)
-        views: int | None = keyword.total_views
+        views: int = keyword.total_views
         if views:
-            views_str = str(views)
+            views_str: str = str(views)
             await self._client.set(key, views_str)

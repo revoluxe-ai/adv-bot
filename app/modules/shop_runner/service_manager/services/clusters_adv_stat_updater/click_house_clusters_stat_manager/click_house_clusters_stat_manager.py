@@ -103,6 +103,7 @@ async def _insert_stats_to_clickhouse(stats: Sequence[RowStatDTO]) -> None:
 
 
 async def update_clusters_adv_stats(stats: Sequence["NormqueryStatsDTO"]) -> None:
+    # TODO: Добавить реальные ставка по ключам Авто и Поиск
     row_dtos = await norn_query_dto_to_raw_stat_dto(stats)
     await _insert_stats_to_clickhouse(row_dtos)
 

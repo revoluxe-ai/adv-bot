@@ -57,11 +57,11 @@ from .user_interface.handlers import (
     predict_ctr_mode_toggle,
     sales_predict_method_toggle,
     auto_update_exponent_toggle,
+    auto_add_only_relevant_phrase_toggle,
     reset_place_setting,
     setting_min_ctr,
     shop_settings,
     strategy_setting,
-    update_adv,
     rec_system_mode_toggle,
 )
 from .user_interface.handlers.bidder_mode_toggle import bidder_mode_toggle
@@ -87,6 +87,7 @@ common_router.include_routers(orders_source_toggle.router)
 common_router.include_routers(predict_ctr_mode_toggle.router)
 common_router.include_routers(sales_predict_method_toggle.router)
 common_router.include_routers(auto_update_exponent_toggle.router)
+common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
 common_router.include_routers(auto_max_cpm_toggle.router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
@@ -114,7 +115,6 @@ common_router.include_routers(add_white_phrases.router)
 common_router.include_routers(setting_min_ctr.router)
 common_router.include_routers(change_max_cpc.router)
 common_router.include_routers(min_views_for_ml_predict_ctr.router)
-common_router.include_routers(update_adv.router)
 common_router.include_routers(strategy_setting.router)  # type: ignore[attr-defined]
 common_router.include_routers(shop_settings.router)
 common_router.include_routers(bidder_mode_toggle.router)

@@ -1,13 +1,7 @@
 """Исполнитель для добавления ключевых слов в белый список."""
 
 import logging
-
 from sqlalchemy import update
-
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-    KeywordStatus,
-)
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.data_classes.data_classes import (
     ExecutionResult,
@@ -16,6 +10,8 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
 from .redis_cache import LastAutoAddPhraseToWhiteListV2
 
@@ -53,14 +49,12 @@ class WhiteListAddExecutor(BaseExecutor):
         # Фильтруем кандидатов для белого списка
         def candidate_filter(keyword: CalculatedKeyword) -> bool | None:
             if ctx.complex_adv.auto_add_only_relevant_phrase:
-                # Только релевантные фразы со статусом BAD и hard_status=1
-                assert keyword.predict_ctr is not None
                 return (
                     keyword.relevant
                     and keyword.hard_status == 1
                     and keyword.status == KeywordStatus.BAD
                     and (
-                        keyword.predict_ctr > mean_auto_ctr
+                        keyword.ctr > mean_auto_ctr
                         if mean_auto_ctr is not None
                         else True
                     )
@@ -79,7 +73,7 @@ class WhiteListAddExecutor(BaseExecutor):
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         # Сортируем по рейтингу и берём лучший
-        candidates.sort(key=lambda kw: kw.rating_by_predict_ctr, reverse=True)
+        candidates.sort(key=lambda kw: kw.rating_by_orders, reverse=True)
         best_keyword = candidates[0]
 
         # Добавляем в белый список
@@ -93,7 +87,7 @@ class WhiteListAddExecutor(BaseExecutor):
 
         logger.info(
             f"[adv_id={ctx.complex_adv.adv_id}] WhiteListAdd: добавлен ключ '{best_keyword.text}' "
-            f"(rating={best_keyword.rating_by_predict_ctr:.4f})"
+            f"(rating={best_keyword.rating_by_orders:.4f})"
         )
 
         # Efficiency = 1 ключ добавлен (на первом этапе всегда 1 действие)

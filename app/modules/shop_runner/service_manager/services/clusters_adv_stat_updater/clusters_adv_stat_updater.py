@@ -1,13 +1,22 @@
 import asyncio
 import logging
 from collections import defaultdict
+from collections.abc import AsyncGenerator
 from datetime import date, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence, Awaitable, Any
+
+from sqlalchemy import select
+
+from app.modules.common_slaves.wildberries.models import KeywordSetting
+from app.modules.relevant_phrase_manager import RelevantPhraseManager
+from app.modules.relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
+
 if TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.promotion_client.normquery_stats import NormqueryStatsDTO
 from app.core.mp.wb.api.wb_manager_hub import WBManagerHub
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 from .click_house_clusters_stat_manager import click_house_clusters_stat_manager as ch
+from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +40,8 @@ class ClustersAdvStatUpdater:
         if stats:
             await ch.update_clusters_adv_stats(stats)
             logger.info("Обновлена статистика за сегодня: %d записей", len(stats))
+            await self._create_keyword_setting(complex_advs, stats)
+
 
     async def update_past_days_stats(
         self, complex_advs: list[ComplexAdv], for_last_days: int = 365
@@ -52,17 +63,13 @@ class ClustersAdvStatUpdater:
             return
 
         # Собрать статистику за все недостающие даты
-        all_stats: list["NormqueryStatsDTO"] = []
-        for day, advs_for_day in missing_dates_map.items():
-            day_stats = await self._get_stats_for_day(advs_for_day, day)
-            if self.__check_empty_stats(day_stats):
-                break
-            all_stats.extend(day_stats)
-        
+        all_stats_generator: AsyncGenerator[list[NormqueryStatsDTO], Any] \
+            = self.__get_all_stats_generator(missing_dates_map)
+
         # Записать все данные одним батчем
-        if all_stats:
+        async for all_stats in all_stats_generator:
             await ch.update_clusters_adv_stats(all_stats)
-            logger.info(
+            logger.debug(
                 "Записано %d записей статистики за %d дней",
                 len(all_stats),
                 len(missing_dates_map)
@@ -134,18 +141,19 @@ class ClustersAdvStatUpdater:
         self, complex_advs: list[ComplexAdv], days: list[date]
     ) -> list["NormqueryStatsDTO"]:
         """Получает статистику за несколько дней параллельно."""
-        tasks = []
+        tasks: list[Awaitable[list["NormqueryStatsDTO"]]] = []
         for day in days:
             task = self._get_stats_for_day(complex_advs, day)
             tasks.append(task)
 
-        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+        raw_results: list[list["NormqueryStatsDTO"]  | BaseException] = await asyncio.gather(*tasks,
+                                                                                             return_exceptions=True)
         dtos: list["NormqueryStatsDTO"] = []
         for n, result in enumerate(raw_results):
             day = days[n]
             if isinstance(result, list):
                 dtos.extend(result)
-            elif isinstance(result, BaseException):
+            elif isinstance(result, Exception):
                 logger.error(
                     "Ошибка получения статистики за %s", day, exc_info=True
                 )
@@ -158,3 +166,51 @@ class ClustersAdvStatUpdater:
                return False
         else:
             return True
+
+    async def _create_keyword_setting(self, complex_advs: list[ComplexAdv],
+                                      stats: list["NormqueryStatsDTO"]) -> None:
+
+        # TODO: Сюда прошла ошибка в рантайм
+        adv_id_to_complex_adv = {adv_id: adv for adv in complex_advs for adv_id in adv.all_adv_ids}
+        for stat in stats:
+            adv_id = stat.adv_id
+            complex_adv = adv_id_to_complex_adv[adv_id]
+            original_adv_id = complex_adv.original_adv_setting_id
+            texts: list[str] = [st.norm_query for st in stat.stats]
+            exists_keywords_text: Sequence[str] = await self.__get_exists_keyword_settings_text(original_adv_id, texts)
+            new_texts: set[str] = set(texts) - set(exists_keywords_text)
+            relevant_phrase_manager = RelevantPhraseManager(complex_adv.adv_setting)
+            template_data = await relevant_phrase_manager.get_relevant_template_data()
+            not_rel_templator = NotRelevantTemplate(template_data)
+            async with sm(read_only=False) as session:
+                for text in new_texts:
+                    if not not_rel_templator.is_relevant(text):
+                        hard_status = 0
+                    else:
+                        hard_status = 1
+                    new_keyword_setting = KeywordSetting(
+                        text=text,
+                        hard_status=hard_status,
+                        adv_setting_id=complex_adv.original_adv_setting_id
+                    )
+                    session.add(new_keyword_setting)
+                await session.commit()
+        return None
+
+    @staticmethod
+    async def __get_exists_keyword_settings_text(original_adv_id: int, texts: list[str]) -> Sequence[str]:
+        # TODO: Тут ошибка в рантайм попала
+        stmt = select(KeywordSetting.text).where(KeywordSetting.text.in_(texts),
+                                                 KeywordSetting.adv_setting_id == original_adv_id)
+        async with sm(read_only=True) as session:
+            results = await session.execute(stmt)
+            texts_exists: Sequence[str] = results.scalars().all()
+        return texts_exists
+
+    async def __get_all_stats_generator(self, missing_dates_map: dict[date, list[ComplexAdv]]):
+        for day, advs_for_day in missing_dates_map.items():
+            day_stats = await self._get_stats_for_day(advs_for_day, day)
+            if self.__check_empty_stats(day_stats):
+                break
+            yield day_stats
+

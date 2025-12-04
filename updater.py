@@ -28,15 +28,15 @@ async def update_keywords_ctr_by_similary_run() -> NoReturn:
         hard_ml_data_updater_process as hard_data_manager,
     )
 
-    async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
-        while True:
-            try:
-                await hard_data_manager.update_keywords_ctr_by_similary()
-            except Exception:
-                logger.error(
-                    "Ошибка обновления по похожему CTR процессов", exc_info=True
-                )
-            await asyncio.sleep(60)
+    # async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
+    #     while True:
+    #         try:
+    #             await hard_data_manager.update_keywords_ctr_by_similary()
+    #         except Exception:
+    #             logger.error(
+    #                 "Ошибка обновления по похожему CTR процессов", exc_info=True
+    #             )
+    #         await asyncio.sleep(60)
 
 
 # Явная аннотация типов для списка корутин

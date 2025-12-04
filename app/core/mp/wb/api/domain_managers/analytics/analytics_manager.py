@@ -1,8 +1,6 @@
 import typing
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 if typing.TYPE_CHECKING:
     from app.core.mp.wb.api.adapter.analitika_i_dannye_client import (

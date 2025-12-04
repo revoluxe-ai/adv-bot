@@ -1,11 +1,8 @@
-from collections.abc import Callable, Awaitable, Sequence
+from collections.abc import Callable, Awaitable
 
-from pydantic import ConfigDict
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 
 class _CPMs:
@@ -25,18 +22,31 @@ class _CPMs:
 class ComplexAdv:
     def __init__(
         self,
-        shop_id: str,
         adv_setting: AdvSetting,
-        search_adv: AdvSetting | None,
-        get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]],
+        search_adv: AdvSetting | None = None,
+        shop_id: str | None = None,
+        get_keywords_func: Callable[[...], Awaitable[list[CalculatedKeyword]]] | None = None,
     ):
-
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
         self._adv_setting: AdvSetting = adv_setting
         self._search_adv: AdvSetting | None = search_adv
         self._get_keywords = get_keywords_func
         self._calculated_keywords: list[CalculatedKeyword] | None = None
+
+
+    @property
+    def all_adv_ids(self) -> set[int]:
+        return {self._adv_setting.adv_id,
+                self._search_adv.adv_id}
+
+    @property
+    def hard_min_ctr(self) -> int | None:
+        return self._adv_setting.hard_min_ctr
+
+    @property
+    def original_adv_setting_id(self) -> int:
+        return self._adv_setting.id
 
 
     @property
@@ -72,8 +82,9 @@ class ComplexAdv:
     def search_adv(self) -> AdvSetting:
         return self._search_adv
 
-    def nmids(self) -> Sequence[int]:
-        return self._adv_setting.nmids
+    @property
+    def nmids(self) -> list[int]:
+        return list(self._adv_setting.nmids)
 
     @property
     def main_nmid(self) -> int:
@@ -121,6 +132,8 @@ class ComplexAdv:
 
     async def get_keywords(self) -> list[CalculatedKeyword]:
         if not self._calculated_keywords:
+            if not self._get_keywords:
+                raise RuntimeError("_get_keywords not set")
             self._calculated_keywords = await self._get_keywords(self._adv_setting)
         return self._calculated_keywords
 

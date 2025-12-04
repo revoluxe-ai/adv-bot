@@ -1,15 +1,12 @@
 from dependency_injector.wiring import inject, Provide
 
-
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.shop_runner.modules.max_auto_bid_manager.auto_max_bid_manager import (
     AutoMaxBidManager,
 )
 from app.modules.shop_runner.modules.max_auto_bid_manager.di import AutoMaxCpmContainer
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.wb_adv_updater import data_manager
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 
 def get_current_cpm(complex_adv: ComplexAdv) -> int | None:
@@ -49,7 +46,7 @@ async def get_max_cpm(
     main_adv_setting = complex_adv.adv_setting
     keywords = await complex_adv.get_keywords()
     max_user_cpm = complex_adv.max_user_cpm
-    max_cpm = await auto_max_bid_manager.get_max_cpm(
+    max_cpm: int | None = await auto_max_bid_manager.get_max_cpm(
         main_adv_setting, keywords, max_user_cpm
     )
     return max_cpm
@@ -57,5 +54,5 @@ async def get_max_cpm(
 
 async def get_best_keyword(complex_adv: ComplexAdv) -> CalculatedKeyword | None:
     keywords = await complex_adv.get_keywords()
-    keyword = data_manager.get_best_keyword(keywords)
+    keyword: CalculatedKeyword | None = data_manager.get_best_keyword(keywords)
     return keyword

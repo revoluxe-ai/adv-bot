@@ -1,8 +1,19 @@
 import datetime as dt
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from clickhouse_connect import get_async_client # Import for type hinting
+
+
+def _create_mock_clickhouse_context(clickhouse_client):
+    """Создаёт мок контекстного менеджера для get_clickhouse_client."""
+    mock_context = AsyncMock()
+    mock_context.__aenter__.return_value = clickhouse_client
+    mock_context.__aexit__.return_value = None
+    return mock_context
+
 
 @pytest.mark.integration
 async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
@@ -122,13 +133,20 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
         ]
     )
 
-    # Вызываем тестируемую функцию
-    result_keywords_views = await full_wb_adv_stat.get_keywords_views_by_days(
-        [adv_id], start_date, end_date
-    )
-    result_auto_adv_stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
-        [adv_id], start_date, end_date
-    )
+    # Создаём мок контекстного менеджера для get_clickhouse_client
+    mock_context = _create_mock_clickhouse_context(clickhouse_client)
+
+    # Вызываем тестируемую функцию с мокированным клиентом
+    with patch(
+        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
+        return_value=mock_context,
+    ):
+        result_keywords_views = await full_wb_adv_stat.get_keywords_views_by_days(
+            [adv_id], start_date, end_date
+        )
+        result_auto_adv_stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
+            [adv_id], start_date, end_date
+        )
     
     auto_views_by_day = {stat.date: stat.views for stat in result_auto_adv_stats}
 
@@ -210,7 +228,11 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
 
     # Тестирование с пустыми данными
     await clickhouse_client.command(f"TRUNCATE TABLE default_db.advkeyword_new")
-    empty_result_views = await full_wb_adv_stat.get_keywords_views_by_days(
-        [adv_id], start_date, end_date
-    )
+    with patch(
+        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
+        return_value=mock_context,
+    ):
+        empty_result_views = await full_wb_adv_stat.get_keywords_views_by_days(
+            [adv_id], start_date, end_date
+        )
     assert empty_result_views == {dt.date(2025, 11, 26): 0, dt.date(2025, 11, 27): 0, dt.date(2025, 11, 28): 0}

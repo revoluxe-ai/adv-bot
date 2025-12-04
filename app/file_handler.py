@@ -17,7 +17,7 @@ from app.utils.image_master import image_tools
 logger = logging.getLogger(__name__)
 
 
-async def get_telegram_image(image_path: str, bot: aiogram.Bot) -> InputFile | str:
+async def get_telegram_image(image_path: str | BufferedInputFile, bot: aiogram.Bot) -> InputFile | str:
     result = await _get_telegram_file(image_path, bot)
     return result
 
@@ -48,7 +48,7 @@ async def save_image_to_disc(url: str, image: BytesIO):
         await f.write(image.getvalue())
 
 
-async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFile:
+async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFile | int:
     logger.debug(f"Начало обработки файла: {image_path}")
 
     if isinstance(image_path, BytesIO):

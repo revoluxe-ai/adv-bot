@@ -11,9 +11,7 @@ from typing import (
 
 from app.core.wb_api.http_request import try_except_decorator
 from app.core.wb_api.ping_manager import PingManager
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
 )
@@ -33,6 +31,7 @@ from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
 from ..bidder.bidder_func import run_bidder_process_for_adv
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 logger = logging.getLogger(__name__)
 

@@ -4,9 +4,6 @@ import logging
 
 from sqlalchemy import update
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.data_classes.data_classes import (
     ExecutionResult,
@@ -15,6 +12,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from .redis_cache import LastAutoDeleteFromWhiteListV2
 
 logger = logging.getLogger(__name__)
@@ -65,7 +63,7 @@ class WhiteListRemoveExecutor(BaseExecutor):
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         def sort_func(kw: CalculatedKeyword) -> float:
-            return kw.predict_ctr or 0
+            return kw.rating_by_orders or 0
 
         # Сортируем по базовому CTR и оставляем всех кроме лучшего
         white_keywords.sort(
@@ -97,7 +95,6 @@ class WhiteListRemoveExecutor(BaseExecutor):
             "[adv_id=%s] WhiteListRemove: удалён ключ '%s' (base_ctr=%.4f)",
             ctx.complex_adv.adv_id,
             worst_keyword.text,
-            worst_keyword.baes_ctr,
         )
 
         # Efficiency = 1 ключ удалён (на первом этапе всегда 1 действие)

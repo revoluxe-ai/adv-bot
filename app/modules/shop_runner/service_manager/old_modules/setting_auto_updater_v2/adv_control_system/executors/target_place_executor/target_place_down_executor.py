@@ -5,9 +5,7 @@ from typing_extensions import override
 
 from sqlalchemy import update
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.data_classes.data_classes import (
     ExecutionResult,
@@ -16,6 +14,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.base_executor import (
     BaseExecutor,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from .redis_cache import LastTargetPlaceDownV2
 
 from . import utils
@@ -91,10 +90,6 @@ class TargetPlaceDownExecutor(BaseExecutor):
             return ExecutionResult(success=False, efficiency=0.0, used_power=0)
 
         current_position = best_keyword.position
-        if current_position is None:
-            raise RuntimeError(
-                "current_position не может быть None здесь т.к. такое отфильтровали в utils.get_best_keyword"
-            )
         # TODO: Добавить проверку bid <= MIN_BID достигли физического лимита ставки
         if (
             current_position == 0 or current_position + 1 < new_place
