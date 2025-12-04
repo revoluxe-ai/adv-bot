@@ -308,7 +308,7 @@ async def setting_keywords_white_list(
         adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.hard_status == 2]
-    keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
+    keywords.sort(key=lambda x: x.rating_by_orders, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=page)
