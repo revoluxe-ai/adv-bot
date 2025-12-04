@@ -531,27 +531,27 @@ def get_keywords_setting_keyboard(
     image_mode: str = "graphic",
 ):
     def sorting_keywords(
-        kw: list[CalculatedKeyword], sort_mode_: str
+        kws_: list[CalculatedKeyword], sort_mode_: str
     ) -> list[CalculatedKeyword]:
         if sort_mode_ in ["by_adv", "only_out_index"]:
 
-            kw.sort(
+            kws_.sort(
                 key=lambda x: x.rating_by_orders, reverse=True
             )
 
-            return kw
+            return kws_
 
-        elif sort_mode == "white_list":
+        elif sort_mode_ == "white_list":
 
             def sort_func(kw_: CalculatedKeyword) -> float | None:
                 return kw_.rating_by_orders
 
-            return sorted(keywords, key=sort_func, reverse=True)  # type: ignore[arg-type]
+            return sorted(kws_, key=sort_func, reverse=True)
 
-        elif sort_mode == "sort_by_ctr_desc":
-            return sorted(keywords, key=lambda x: x.ctr or 0, reverse=True)  # type: ignore[arg-type]
+        elif sort_mode_ == "sort_by_ctr_desc":
+            return sorted(kws_, key=lambda x: x.ctr or 0, reverse=True)  # type: ignore[arg-type]
         else:
-            raise ValueError(f"Unknown sort_mode: {sort_mode}")
+            raise ValueError(f"Unknown sort_mode: {sort_mode_}")
 
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
