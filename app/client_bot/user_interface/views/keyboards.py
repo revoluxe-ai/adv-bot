@@ -566,9 +566,6 @@ def get_keywords_setting_keyboard(
         if keyword.reason == KeywordStatusReason.MAX_POSITION:
             message_status = "БС-" if keyword.hard_status == 2 else ""
             message_status += "ЦП"
-        elif keyword.reason == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
-            message_status = "БС-" if keyword.hard_status == 2 else ""
-            message_status += "МП"
         elif keyword.hard_status == BLACK_LIST:
             message_status = "НРФ"
         elif keyword.reason == KeywordStatusReason.MAX_CPC:
