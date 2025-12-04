@@ -628,7 +628,7 @@ class KeywordSettingMessage(TextWithKeyboard):
 
         pos = self.position
         if pos > 0:
-            text += f"📈 *Позиция:* {pos}\n"
+            text += f"📈 *Позиция:* {round(pos, 2)}\n"
         else:
             text += "📈 *Позиция:* Нет на сайте\n"
 
