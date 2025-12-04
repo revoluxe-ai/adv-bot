@@ -543,7 +543,7 @@ def get_keywords_setting_keyboard(
 
         elif sort_mode_ == "white_list":
 
-            def sort_func(kw_: CalculatedKeyword) -> float | None:
+            def sort_func(kw_: CalculatedKeyword) -> float:
                 return kw_.rating_by_orders
 
             return sorted(kws_, key=sort_func, reverse=True)
