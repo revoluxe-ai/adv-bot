@@ -17,7 +17,8 @@
     "app/modules/shop_runner/bidder/bidder_func.py",
     "app/modules/wb_adv_updater/position_history_manager",
     "app/utils/graphic_positions_creator/graphic_positions_creator.py",
-    "app/client_bot/user_interface/views/messages/messages.py"
+    "app/client_bot/user_interface/views/messages/messages.py",
+    "app/client_bot/user_interface/handlers/keyword_settings.py"
   ],
 
   "exclude": [
