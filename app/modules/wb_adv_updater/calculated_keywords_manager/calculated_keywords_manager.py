@@ -62,10 +62,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                                                   ) -> list[KeywordStat]:
         query = self._get_query('get_clusters_stats')
 
-        conv_prior_all = 50.0  # приор для all-time
-        conv_prior_last = 10.0  # приор для последних conv_days
-        short_weight = 0.7  # доля short-term конверсии
-
 
         async with get_clickhouse_client() as client:
             response = await client.query(
@@ -75,9 +71,6 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     "min_views": min_views,
                     "min_days": min_days,
                     "conv_days": cart_to_order_window,
-                    "conv_prior_all": conv_prior_all,
-                    "conv_prior_last": conv_prior_last,
-                    "short_weight": short_weight,
                 },
             )
 
