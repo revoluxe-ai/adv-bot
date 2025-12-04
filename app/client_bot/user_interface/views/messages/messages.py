@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
-import io
 import logging
 import re
 from datetime import datetime
@@ -14,7 +13,6 @@ from aiogram.types import (
     InlineKeyboardButton,
     Message,
     InlineKeyboardMarkup,
-    BufferedInputFile,
 )
 from aiogram.utils import deep_linking
 from aiogram.utils.keyboard import InlineKeyboardBuilder
