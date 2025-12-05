@@ -601,7 +601,7 @@ def get_keywords_setting_keyboard(
         text += f"({cpm})"
         text += f"{turn_on}({message_status}) {keyword.text}"
 
-        text += f"({round(keyword.rating_by_orders * 100, 2)})"
+        text += f"({round(keyword.rating_by_orders * 1000, 2)})"
 
         inline_keyboard = [
             InlineKeyboardButton(
