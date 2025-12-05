@@ -624,7 +624,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         )
 
 
-        text += f"Рейтинг по заказам: {round(self._calculated_keyword.rating_by_orders, 2)}\n"
+        text += f"Рейтинг по заказам: {round(self._calculated_keyword.rating_by_orders, 3)}\n"
 
         pos = self.position
         if pos > 0:
