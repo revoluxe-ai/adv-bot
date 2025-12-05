@@ -353,7 +353,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"📌 Статус Аукциона: {self._status_auction}\n")
             # TODO: Попала ошибка в код, пытался сделать .2f строке
         if self._min_rating_by_orders is not None:
-            text += f"🎯 Мин. Рейтинг по заказам для кампании: {round(self._min_rating_by_orders, 2)}\n"
+            text += f"🎯 Мин. Рейтинг по заказам для кампании: {round(self._min_rating_by_orders * 1000, 2)}\n"
         elif self._hard_min_ctr is not None:
             text += f"🎯 Мин. CTR: {round(self._hard_min_ctr, 2)}\n"
         else:
@@ -624,7 +624,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         )
 
 
-        text += f"Рейтинг по заказам: {round(self._calculated_keyword.rating_by_orders, 3)}\n"
+        text += f"Рейтинг по заказам: {round(self._calculated_keyword.rating_by_orders * 1000, 2)}\n"
 
         pos = self.position
         if pos > 0:
