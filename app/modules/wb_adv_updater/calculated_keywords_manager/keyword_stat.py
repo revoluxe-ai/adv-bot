@@ -28,6 +28,6 @@ class KeywordStat(BaseModel):
     @property
     def ctr(self) -> float:
         if self.views > 0:
-            return self.total_views / self.total_orders
+            return self.clicks / self.views
         else:
             return 0.0
