@@ -247,7 +247,7 @@ async def setting_keywords_white_list(
         and keyword.status == KeywordStatus.BAD
         and keyword.reason != "max_position"
     ]
-    keywords.sort(key=lambda x: x.rating_by_predict_ctr, reverse=True)
+    keywords.sort(key=lambda x: x.rating_by_orders, reverse=True)
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=page)
