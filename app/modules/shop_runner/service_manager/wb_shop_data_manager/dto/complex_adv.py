@@ -75,6 +75,13 @@ class ComplexAdv:
         return False
 
     @property
+    def auto_adv_active_status(self) -> bool:
+        if self._adv_setting.active_status == "started":
+            return True
+        return False
+
+
+    @property
     def shop_id(self) -> str:
         return self._shop_id
 
