@@ -37,7 +37,7 @@ async def with_raise_errors(
 
     if 200 <= status < 300:
         return result
-    elif status == 400:
+    elif status in [400, 404]:
         detail = result.content.decode()
         raise BadRequestError(detail)
     elif status in [401, 403]:
