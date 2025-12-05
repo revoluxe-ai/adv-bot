@@ -282,9 +282,9 @@ WITH
     baes AS (
         SELECT
             t.text AS text,
-            (c.ctr_clicks + 1) / (c.ctr_views + p.prior_views) AS ctr_eff,
-            (c7.carts7 + 1) / (c7.clicks7 + p.prior_clicks)  AS cart_eff,
-             (o14.orders14 + 1) / (o14.carts14 + p.prior_carts) AS order_eff
+            (c.ctr_clicks + 1) / (c.ctr_views - c.ctr_clicks + p.prior_views) AS ctr_eff,
+            (c7.carts7 + 1) / (c7.clicks7 - c7.carts7 + p.prior_clicks)  AS cart_eff,
+             (o14.orders14 + 1) / (o14.carts14 - o14.orders14 + p.prior_carts) AS order_eff
         FROM agg_stats AS t
         LEFT JOIN ctr_cut   AS c
             ON c.text = t.text
