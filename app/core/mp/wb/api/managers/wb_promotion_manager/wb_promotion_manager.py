@@ -17,5 +17,10 @@ class WBModifier:
         self, adv_id: int, nmid: int,  phrases: list[str]
     ) -> None:
         # TODO: WB походу сделал так, что можно ставить отдельно на каждый nmid внутри фразы РК. Надо адаптировать к этому бот
-        await self._promotion_manager.set_minus_phrases(adv_id, nm_id=nmid, phrases=phrases)
+        try:
+            await self._promotion_manager.set_minus_phrases(adv_id, nm_id=nmid, phrases=phrases)
+        except Exception as e:
+            logger.error('Ошибка обновления минус-фраз: %s', exc_info=True)
+            raise e
+
         return None
