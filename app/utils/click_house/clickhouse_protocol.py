@@ -1,12 +1,14 @@
 from typing import Protocol, Any, Mapping, Coroutine
 
+from clickhouse_connect.driver.query import QueryResult
+
 
 class ClickHouseClientProtocol(Protocol):
     async def query(
         self,
         query: str,
         parameters: Mapping[str, Any] | None = None,
-    ) -> Any: ...
+    ) -> QueryResult: ...
 
     async def insert(
         self,

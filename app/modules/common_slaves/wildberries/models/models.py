@@ -318,7 +318,7 @@ class WBCard(BaseTable):
         Boolean, default=False, nullable=True
     )
 
-    @hybrid_property
+    @property
     def card_json(self) -> dict[str, object]:
         raw = self.json
         if not isinstance(raw, str):
@@ -415,14 +415,14 @@ class AdvSetting(BaseTable):
     pass_days = Column(Integer, default=30)
     boost = Column(Float, server_default=text("1"))
     type: Mapped[int] = mapped_column(Integer, nullable=True)
-    hard_min_ctr = Column(
+    hard_min_ctr: Mapped[float | None] = mapped_column(
         Float,
         nullable=True,
         default=settings.DEFAULT_MIN_CTR,
         server_default=text(str(settings.DEFAULT_MIN_CTR)),
     )
     max_cpc: Mapped[float | None] = mapped_column(Float, nullable=True)
-    min_views_for_ml_predict: Mapped[int | None] = mapped_column(Integer, nullable=True, server_default=text("0"))
+    min_views_for_ml_predict: Mapped[int] = mapped_column(Integer, nullable=True, server_default=text("0"))
     payments: Mapped[list["AdvPayment"]] = relationship(
         "AdvPayment", back_populates="adv_setting", uselist=True
     )
@@ -507,7 +507,7 @@ class AdvSetting(BaseTable):
         Boolean, nullable=True, default=None
     )
     auto_add_only_relevant_phrase: Mapped[bool] = mapped_column(
-        Boolean, nullable=True, default=True, server_default=text("true")
+        Boolean, nullable=True, default=False, server_default=text("false")
     )
 
     orders_source_for_auto_mode: Mapped[OrdersSourceForAutoMode] = mapped_column(
@@ -617,7 +617,7 @@ class AdvSetting(BaseTable):
         return False
 
     @property
-    def worst_promo_position(self):
+    def worst_promo_position(self) -> bool | None:
         try:
             return self._worst_promo_position
         except Exception as e:
@@ -637,7 +637,7 @@ class KeywordSetting(BaseTable):
 
     """
 
-    text = Column(String, nullable=False)
+    text: Mapped[str] = mapped_column(String, nullable=False)
     adv_setting_id: Mapped[int] = mapped_column(ForeignKey("advsetting.id"))
     adv_setting: Mapped[AdvSetting] = relationship(
         "AdvSetting", back_populates="keyword_settings", uselist=False
@@ -692,117 +692,117 @@ class KeywordSetting(BaseTable):
             auto_block=data.get("auto_block"),
         )
 
-
-class WBItemPosition(BaseModel):
-    model_config = ConfigDict(validate_assignment=True)
-
-    nmid: int | None = None
-    position: int | None = None
-    timestamp: datetime.datetime | None = None
-    adv_id: int | None = None
-    keyword_text: str | None = None
-    adv_type: int | None = None
-    total_views: int | None = None
-    total_orders: int | None = None
-
-    @property
-    def type_native(self) -> str:
-        if self.adv_type == 9:
-            return "search"
-        elif self.adv_type == 8:
-            return "auto"
-        else:
-            return "unknown"
-
-    def to_dict(self) -> dict[str, object]:
-        timestamp = self.timestamp
-        return {
-            "real_position": self.position,
-            "promo_position": self.position,
-            "base_position": self.position,
-            "position": self.position,
-            "keyword_text": self.keyword_text,
-            "adv_id": self.adv_id,
-            "nmid": self.nmid,
-            "timestamp": timestamp.isoformat() if timestamp else None,
-            "adv_type": self.adv_type,
-            "total_views": self.total_views,
-            "total_orders": self.total_orders,
-        }
-
-    @staticmethod
-    def from_dict(data: dict[str, object]) -> "WBItemPosition":
-        # создаём пустую модель (разрешено, так как все поля optional)
-        position = WBItemPosition()
-
-        # position
-        raw_position = data.get("position")
-        if isinstance(raw_position, int):
-            position.position = raw_position
-        elif isinstance(raw_position, str) and raw_position.isdigit():
-            position.position = int(raw_position)
-        else:
-            base_raw = data.get("base_position")
-            if isinstance(base_raw, int):
-                position.position = base_raw
-            elif isinstance(base_raw, str) and base_raw.isdigit():
-                position.position = int(base_raw)
-            else:
-                position.position = None
-
-        # adv_id
-        raw_adv_id = data.get("adv_id")
-        if isinstance(raw_adv_id, int):
-            position.adv_id = raw_adv_id
-        elif isinstance(raw_adv_id, str) and raw_adv_id.isdigit():
-            position.adv_id = int(raw_adv_id)
-        else:
-            position.adv_id = None
-
-        # nmid
-        raw_nmid = data.get("nmid")
-        if isinstance(raw_nmid, int):
-            position.nmid = raw_nmid
-        elif isinstance(raw_nmid, str) and raw_nmid.isdigit():
-            position.nmid = int(raw_nmid)
-        else:
-            position.nmid = None
-
-        # timestamp
-        raw_ts = data.get("timestamp")
-        if isinstance(raw_ts, str):
-            try:
-                position.timestamp = datetime.datetime.fromisoformat(raw_ts)
-            except Exception:
-                position.timestamp = None
-        else:
-            position.timestamp = None
-
-        # keyword
-        raw_kw = data.get("keyword_text")
-        position.keyword_text = raw_kw if isinstance(raw_kw, str) else None
-
-        # adv_type
-        raw_adv_type = data.get("adv_type")
-        if isinstance(raw_adv_type, int):
-            position.adv_type = raw_adv_type
-        elif isinstance(raw_adv_type, str) and raw_adv_type.isdigit():
-            position.adv_type = int(raw_adv_type)
-        else:
-            position.adv_type = None
-
-        # total_views
-        raw_total_views = data.get("total_views")
-        if isinstance(raw_total_views, int):
-            position.total_views = raw_total_views
-        else:
-            position.total_views = None
-
-        # total_orders
-        raw_total_orders = data.get("total_orders")
-        if isinstance(raw_total_orders, int):
-            position.total_orders = raw_total_orders
-        else:
-            position.total_orders = None
-
-        return position
+#
+# class WBItemPosition(BaseModel):
+#     model_config = ConfigDict(validate_assignment=True)
+#
+#     nmid: int | None = None
+#     position: int | None = None
+#     timestamp: datetime.datetime | None = None
+#     adv_id: int | None = None
+#     keyword_text: str | None = None
+#     adv_type: int | None = None
+#     total_views: int | None = None
+#     total_orders: int | None = None
+#
+#     @property
+#     def type_native(self) -> str:
+#         if self.adv_type == 9:
+#             return "search"
+#         elif self.adv_type == 8:
+#             return "auto"
+#         else:
+#             return "unknown"
+#
+#     def to_dict(self) -> dict[str, object]:
+#         timestamp = self.timestamp
+#         return {
+#             "real_position": self.position,
+#             "promo_position": self.position,
+#             "base_position": self.position,
+#             "position": self.position,
+#             "keyword_text": self.keyword_text,
+#             "adv_id": self.adv_id,
+#             "nmid": self.nmid,
+#             "timestamp": timestamp.isoformat() if timestamp else None,
+#             "adv_type": self.adv_type,
+#             "total_views": self.total_views,
+#             "total_orders": self.total_orders,
+#         }
+#
+#     @staticmethod
+#     def from_dict(data: dict[str, object]) -> "WBItemPosition":
+#         # создаём пустую модель (разрешено, так как все поля optional)
+#         position = WBItemPosition()
+#
+#         # position
+#         raw_position = data.get("position")
+#         if isinstance(raw_position, int):
+#             position.position = raw_position
+#         elif isinstance(raw_position, str) and raw_position.isdigit():
+#             position.position = int(raw_position)
+#         else:
+#             base_raw = data.get("base_position")
+#             if isinstance(base_raw, int):
+#                 position.position = base_raw
+#             elif isinstance(base_raw, str) and base_raw.isdigit():
+#                 position.position = int(base_raw)
+#             else:
+#                 position.position = None
+#
+#         # adv_id
+#         raw_adv_id = data.get("adv_id")
+#         if isinstance(raw_adv_id, int):
+#             position.adv_id = raw_adv_id
+#         elif isinstance(raw_adv_id, str) and raw_adv_id.isdigit():
+#             position.adv_id = int(raw_adv_id)
+#         else:
+#             position.adv_id = None
+#
+#         # nmid
+#         raw_nmid = data.get("nmid")
+#         if isinstance(raw_nmid, int):
+#             position.nmid = raw_nmid
+#         elif isinstance(raw_nmid, str) and raw_nmid.isdigit():
+#             position.nmid = int(raw_nmid)
+#         else:
+#             position.nmid = None
+#
+#         # timestamp
+#         raw_ts = data.get("timestamp")
+#         if isinstance(raw_ts, str):
+#             try:
+#                 position.timestamp = datetime.datetime.fromisoformat(raw_ts)
+#             except Exception:
+#                 position.timestamp = None
+#         else:
+#             position.timestamp = None
+#
+#         # keyword
+#         raw_kw = data.get("keyword_text")
+#         position.keyword_text = raw_kw if isinstance(raw_kw, str) else None
+#
+#         # adv_type
+#         raw_adv_type = data.get("adv_type")
+#         if isinstance(raw_adv_type, int):
+#             position.adv_type = raw_adv_type
+#         elif isinstance(raw_adv_type, str) and raw_adv_type.isdigit():
+#             position.adv_type = int(raw_adv_type)
+#         else:
+#             position.adv_type = None
+#
+#         # total_views
+#         raw_total_views = data.get("total_views")
+#         if isinstance(raw_total_views, int):
+#             position.total_views = raw_total_views
+#         else:
+#             position.total_views = None
+#
+#         # total_orders
+#         raw_total_orders = data.get("total_orders")
+#         if isinstance(raw_total_orders, int):
+#             position.total_orders = raw_total_orders
+#         else:
+#             position.total_orders = None
+#
+#         return position

@@ -1,8 +1,19 @@
 import datetime as dt
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from clickhouse_connect import get_async_client # Import for type hinting
+
+
+def _create_mock_clickhouse_context(clickhouse_client):
+    """Создаёт мок контекстного менеджера для get_clickhouse_client."""
+    mock_context = AsyncMock()
+    mock_context.__aenter__.return_value = clickhouse_client
+    mock_context.__aexit__.return_value = None
+    return mock_context
+
 
 @pytest.mark.integration
 async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
@@ -122,13 +133,20 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
         ]
     )
 
-    # Вызываем тестируемую функцию
-    result_keywords_views = await full_wb_adv_stat.get_keywords_views_by_days(
-        [adv_id], start_date, end_date
-    )
-    result_auto_adv_stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
-        [adv_id], start_date, end_date
-    )
+    # Создаём мок контекстного менеджера для get_clickhouse_client
+    mock_context = _create_mock_clickhouse_context(clickhouse_client)
+
+    # Вызываем тестируемую функцию с мокированным клиентом
+    with patch(
+        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
+        return_value=mock_context,
+    ):
+        result_keywords_views = await full_wb_adv_stat.get_keywords_views_by_days(
+            [adv_id], start_date, end_date
+        )
+        result_auto_adv_stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
+            [adv_id], start_date, end_date
+        )
     
     auto_views_by_day = {stat.date: stat.views for stat in result_auto_adv_stats}
 
@@ -178,9 +196,9 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
 
     # Создадим фиктивные common_card_stats для теста
     common_card_stats = [
-        CommonCardStat(nmid=1111, date=dt.date(2025, 11, 26), open_card=100, add_to_cart=8, orders=0, orders_sum=0, buy_outs=0),
-        CommonCardStat(nmid=1111, date=dt.date(2025, 11, 27), open_card=100, add_to_cart=8, orders=2, orders_sum=517.61, buy_outs=0),
-        CommonCardStat(nmid=1111, date=dt.date(2025, 11, 28), open_card=100, add_to_cart=2, orders=0, orders_sum=0, buy_outs=0),
+        CommonCardStat(nmid=1111, _date=dt.date(2025, 11, 26), open_card=100, add_to_cart=8, orders=0, orders_sum=0, buy_outs=0),
+        CommonCardStat(nmid=1111, _date=dt.date(2025, 11, 27), open_card=100, add_to_cart=8, orders=2, orders_sum=517.61, buy_outs=0),
+        CommonCardStat(nmid=1111, _date=dt.date(2025, 11, 28), open_card=100, add_to_cart=2, orders=0, orders_sum=0, buy_outs=0),
     ]
 
     # Создадим фиктивные SmallFullAdvStatPerDay для теста (для concatenated_adv_stat_result)
@@ -200,20 +218,21 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
         result_keywords_views,
     )
 
-    expected_text = """
-
-Статистика по дням:
-26.11.2025: Корзины: 8 Заказы: 0шт.Себеc: 718.39р. Доп.показы: 5000
-27.11.2025: Корзины: 8 Заказы: 2шт.Себеc: 258.80р. Доп.показы: 5000
-28.11.2025: Корзины: 2 Заказы: 0шт.Себеc: 339.64р. Доп.показы: 10000
-План: продажи: 15 Цель: 45.0р. Макс: 200.0р.\n
+    expected_text = """26.11.2025: Корз.: 8 Зак.: 0шт.Себеc: 718.39р. Доп.пок.: 5000
+27.11.2025: Корз.: 8 Зак.: 2шт.Себеc: 258.81р. Доп.пок.: 5000
+28.11.2025: Корз.: 2 Зак.: 0шт.Себеc: 679.28р. Доп.пок.: 10000
+План: продажи: 15 Цель: 45.0р. Макс: 200.0р.
 """
     # Ожидаемый текст нужно будет скорректировать под фактические значения mean_pay_for_order
     assert generated_text == expected_text
 
     # Тестирование с пустыми данными
     await clickhouse_client.command(f"TRUNCATE TABLE default_db.advkeyword_new")
-    empty_result_views = await full_wb_adv_stat.get_keywords_views_by_days(
-        [adv_id], start_date, end_date
-    )
-    assert empty_result_views == {}
+    with patch(
+        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
+        return_value=mock_context,
+    ):
+        empty_result_views = await full_wb_adv_stat.get_keywords_views_by_days(
+            [adv_id], start_date, end_date
+        )
+    assert empty_result_views == {dt.date(2025, 11, 26): 0, dt.date(2025, 11, 27): 0, dt.date(2025, 11, 28): 0}

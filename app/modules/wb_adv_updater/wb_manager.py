@@ -16,16 +16,13 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
 )
 from app.modules.common_slaves.wildberries.wb_api import WBApi
-from app.modules.wb_adv_updater import data_manager
+
 from app.my_types import KeywordStat
 from app.utils import redis_manager, text_cleaner
 from app.utils.NeoDataScience.driver import DataScience
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.session_maker import get_async_session_maker
-from .ML import Predictor
-from .data_setter import DataSetter
-from .graph_vector_updater import GraphUpdater
-from .phrases_processor import get_good_bad_phrases
+# from .ML import Predictor
 from .wb_adv_api import WBAdvAPI
 from ..billing import AdvPayment
 from ..common_slaves.wildberries import super_cabinet_manager
@@ -73,22 +70,22 @@ async def check_adv_payment(
     return result.scalar()
 
 
-async def graph_vector_update() -> None:
-    graph_updater = GraphUpdater()
-    length = 2**4
-    await graph_updater.update_graph_run(length)
-    await asyncio.sleep(1)
-    return
+# async def graph_vector_update() -> None:
+#     graph_updater = GraphUpdater()
+#     length = 2**4
+#     await graph_updater.update_graph_run(length)
+#     await asyncio.sleep(1)
+#     return
 
 
-async def update_vectors_update_in_graph() -> None:
-    while True:
-        try:
-            await graph_vector_update()
-        except Exception as exc:
-            logger.error(f"Ошибка векторизации {exc}", exc_info=True)
-            del exc
-        await asyncio.sleep(0)
+# async def update_vectors_update_in_graph() -> None:
+#     while True:
+#         try:
+#             await graph_vector_update()
+#         except Exception as exc:
+#             logger.error(f"Ошибка векторизации {exc}", exc_info=True)
+#             del exc
+#         await asyncio.sleep(0)
 
 
 async def update_vectors_in_redis() -> None:
@@ -168,7 +165,7 @@ async def insert_or_update_keywords(keyword_stats, adv_id: int) -> None:
     """
 
     async with get_clickhouse_client() as client:
-        await client.query(query, external_data=ext_data)
+        await client.query(query, external_data=ext_data) # noqa
 
     logger.debug(f"Inserted/updated {len(keyword_stats)} rows into advkeyword_new")
 
@@ -221,15 +218,6 @@ async def update_all_keyword_data(
             exc_info=True,
         )
         raise exc
-    try:
-        keywords = await get_good_bad_phrases(adv_setting)
-        data_setter = DataSetter(wb_api)
-        await data_setter.update_minus_keywords_in_adv(
-            adv_setting, wb_cabinet, keywords
-        )
-    except Exception as exc:
-        logger.error("Ошибка установки активности фраз", exc_info=True)
-        raise exc
     return
 
 
@@ -242,7 +230,7 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
             stmt = select(AdvSetting).where(AdvSetting.bot_active)
             result = await session.execute(stmt)
             adv_settings: list[AdvSetting] = result.scalars().all()
-            # TODO: Заккомитил фильтр по adv_id и это попало в продакшен. Сделать текст во избежание проблем.
+            # TODO: Заккомитил фильтр по adv_id и это попало в продакшен. Сделать текст во избежание проблем. СРОЧНО!!!
         for adv_setting in adv_settings:
             if adv_setting.id not in update_tasks:
                 wb_cabinet_id = adv_setting.wb_cabinet_id
@@ -264,8 +252,6 @@ async def update_all_keywords_on_wb(client_session: ClientSession) -> None:
                 if update_tasks[adv_setting.id].done():
                     if update_tasks[adv_setting.id].exception():
                         logger.error(
-                            "Ошибка обновления ключей для магазина: %s, кампании: %s: %s",
-                            wb_cabinet.shop_id,
                             adv_setting.id,
                             update_tasks[adv_setting.id].exception(),  # noqa
                         )
@@ -294,10 +280,9 @@ async def update_clusters_for_adv(adv: AdvSetting, wb_api: WBApi):
 async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     auto_adv_id = adv_setting.adv_id
     auction_adv_id = adv_setting.search_adv_id
+    keywords_from_auto: list[KeywordStat] = []
     try:
-        keywords_from_auto: list[KeywordStat] = await wb_api.advert.get_keywords_stat(
-            auto_adv_id
-        )
+        keywords_from_auto = await wb_api.advert.get_keywords_stat(auto_adv_id)
         await update_keywords_stat_in_click_house(
             keywords_from_auto,
             auto_adv_id,
@@ -306,17 +291,15 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
     except ApiForbiddenError as exc:
         raise exc
     except Exception as exc:
-        keywords_from_auto = []
         logger.error(
             f"Ошибка получения статистики по ключевым словам для кампании: {adv_setting.name}, "
             f"shop_id: {wb_api.wb_access.wb_cabinet.shop_id}, {exc}",
             exc_info=True,
         )
         del exc
+    keywords_from_search_adv: list[KeywordStat] = []
     try:
-        if not auction_adv_id:
-            keywords_from_search_adv = []
-        else:
+        if auction_adv_id:
             keywords_from_search_adv = await wb_api.advert.get_keywords_stat(
                 auction_adv_id
             )
@@ -337,26 +320,26 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
         logger.debug(f"Пустой список ключевых слов для {adv_setting.adv_id}")
         return
 
-    text_to_keyword_from_auto = {
+    text_to_keyword_from_auto: dict[str, KeywordStat] = {
         kw.text + ":" + str(kw.date): kw for kw in keywords_from_auto
     }
     for kw in keywords_from_search_adv:
-        key = kw.text + ":" + str(kw.date)
+        key: str = kw.text + ":" + str(kw.date)
         if key not in text_to_keyword_from_auto:
             text_to_keyword_from_auto[key] = kw
         else:
-            text_to_keyword_from_auto[key].views += kw.views
-            text_to_keyword_from_auto[key].clicks += kw.clicks
-            text_to_keyword_from_auto[key].spend += kw.spend
-    full_stat = list(text_to_keyword_from_auto.values())
+            text_to_keyword_from_auto[key].views += kw.views # pyright: ignore
+            text_to_keyword_from_auto[key].clicks += kw.clicks # pyright: ignore
+            text_to_keyword_from_auto[key].spend += kw.spend # pyright: ignore
+    full_stat: list[KeywordStat] = list(text_to_keyword_from_auto.values())
 
-    full_stat_keywords = full_stat
+    full_stat_keywords: list[KeywordStat] = full_stat
 
     logger.debug(
         "Получено %s ключевых слов для %s", len(full_stat_keywords), adv_setting.name
     )
-    texts_for_adv_setting = {keyword.text for keyword in full_stat_keywords}
-    clusters = set()
+    texts_for_adv_setting: set[str] = {keyword.text for keyword in full_stat_keywords}
+    clusters: set[str] = set()
     for text_for_adv in texts_for_adv_setting:
         try:
             cluster_name, _ = await redis_manager.get_cluster_and_preset(text_for_adv)
@@ -368,7 +351,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
             clusters.add(cluster_name)
 
     texts_for_adv_setting.update(clusters)
-    existing_keyword_settings = await get_existing_keyword_settings(adv_setting.id)
+    existing_keyword_settings: set[str] = await get_existing_keyword_settings(adv_setting.id)
     new_keywords: set[str] = texts_for_adv_setting - existing_keyword_settings
 
     # Преобразование ключевых слов в объекты KeywordSetting
@@ -428,13 +411,3 @@ async def update_wb_config_data(client_session: ClientSession) -> None:
     min_cpm_data: MinCPMData = await wb_api.get_min_cpm_adv_data()
     await redis_manager.set_min_cpm_data(min_cpm_data)
 
-
-async def update_wb_config_data_run(client_session) -> None:
-    while True:
-        try:
-            await update_wb_config_data(client_session)
-        except Exception as exc:
-            logger.error(f"Ошибка обновления данных {exc}", exc_info=True)
-            raise exc
-        finally:
-            await asyncio.sleep(60 * 60)

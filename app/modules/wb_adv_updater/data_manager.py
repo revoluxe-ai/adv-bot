@@ -1,9 +1,7 @@
 import cProfile
-import io
 import json
 import logging
 import pstats
-from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -20,9 +18,7 @@ from app.exc import (
     CardNotFoundInDB,
 )
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
+from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.common_slaves.wildberries.exceptions import NotItemsInAdvSetting
 from app.modules.common_slaves.wildberries.models import (
     AdvKeyword,
@@ -31,17 +27,16 @@ from app.modules.common_slaves.wildberries.models import (
     WBCabinet,
     WBCard,
     WBCategory,
-    WBItemPosition,
     WBUserCabinet,
 )
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
-from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
 from app.utils import redis_manager
 from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.assoc_tables import favorite_advs_association
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 from app.utils.redis_manager.exc import DataNotFoundError
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from ..common_slaves.wildberries.shops_data_updater import ShopDataUpdater
 
 logger = logging.getLogger(__name__)
@@ -106,124 +101,124 @@ async def get_keyword_statistic_clickhouse(
     return int(total_clicks), int(total_views), float(total_spend)
 
 
-async def get_keywords_statistic_clickhouse(
-    adv_setting: AdvSetting,
-    pass_time: timedelta | None = timedelta(days=7),
-    last_views: int | None = None,
-) -> list[CalculatedKeyword]:
-    async with get_clickhouse_client() as ch_client:
-        advs: set[int] = set()
-        auto_adv_id = int(adv_setting.adv_id)
-        advs.add(auto_adv_id)
-        if search_adv_id := adv_setting.search_adv_id:
-            advs.add(search_adv_id)
-        query = _build_clickhouse_query(advs, pass_time, last_views)
-        result = await ch_client.query(query)
-        rows = result.result_rows
-        keywords = []
-        for row in rows:
-            text = row[0]
-            clicks = row[1]
-            views = row[2]
-            spend = row[3]
-            if clicks > views:
-                views = clicks
-            keyword = CalculatedKeyword(
-                text=text, clicks=clicks, views=views, spend=spend
-            )
-            keywords.append(keyword)
-
-    return keywords
-
-
-async def _get_keyword_settings(
-    adv_setting_id: int, hard_statuses: list[int] | None
-) -> list[KeywordSetting]:
-    async with _sm() as session:
-        stmt = select(KeywordSetting).where(
-            KeywordSetting.adv_setting_id == adv_setting_id
-        )
-        if hard_statuses:
-            stmt = stmt.where(KeywordSetting.hard_status.in_(hard_statuses))
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
+# async def get_keywords_statistic_clickhouse(
+#     adv_setting: AdvSetting,
+#     pass_time: timedelta | None = timedelta(days=7),
+#     last_views: int | None = None,
+# ) -> list[CalculatedKeyword]:
+#     async with get_clickhouse_client() as ch_client:
+#         advs: set[int] = set()
+#         auto_adv_id = int(adv_setting.adv_id)
+#         advs.add(auto_adv_id)
+#         if search_adv_id := adv_setting.search_adv_id:
+#             advs.add(search_adv_id)
+#         query = _build_clickhouse_query(advs, pass_time, last_views)
+#         result = await ch_client.query(query)
+#         rows = result.result_rows
+#         keywords = []
+#         for row in rows:
+#             text = row[0]
+#             clicks = row[1]
+#             views = row[2]
+#             spend = row[3]
+#             if clicks > views:
+#                 views = clicks
+#             keyword = CalculatedKeyword(
+#                 text=text, clicks=clicks, views=views, spend=spend
+#             )
+#             keywords.append(keyword)
+#
+#     return keywords
 
 
-def _build_clickhouse_query(
-    adv_ids: set[int],
-    pass_time: timedelta | None = None,
-    last_views: int | None = None,
-) -> str:
-    """
-    Запрос для ClickHouse AggregatingMergeTree-таблицы default_db.advkeyword_new
-    (fields: adv_id, text, date, clicks_state, views_state, spend_state)
-    Возвращает: text, total_clicks, total_views, total_spend, date
-    """
+# async def _get_keyword_settings(
+#     adv_setting_id: int, hard_statuses: list[int] | None
+# ) -> list[KeywordSetting]:
+#     async with _sm() as session:
+#         stmt = select(KeywordSetting).where(
+#             KeywordSetting.adv_setting_id == adv_setting_id
+#         )
+#         if hard_statuses:
+#             stmt = stmt.where(KeywordSetting.hard_status.in_(hard_statuses))
+#         result = await session.execute(stmt)
+#         return list(result.scalars().all())
 
-    adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
-
-    # --- Внутренний подзапрос: извлекаем агрегаты для каждой кампании ---
-    inner = [
-        "SELECT",
-        "    adv_id,",
-        "    text,",
-        "    argMaxMerge(clicks_state) AS total_clicks,",
-        "    argMaxMerge(views_state)  AS total_views,",
-        "    argMaxMerge(spend_state)  AS total_spend,",
-        "    date",
-        "FROM default_db.advkeyword_new",
-        f"WHERE adv_id IN ({adv_ids_str})",
-    ]
-
-    if pass_time:
-        start_time = datetime.now() - pass_time
-        inner.append(f"  AND date >= '{start_time.strftime('%Y-%m-%d')}'")
-
-    inner.append("GROUP BY adv_id, text, date")
-    inner_query = "\n".join(inner)
-
-    # --- Внешний уровень: суммируем по text/date ---
-    outer = [
-        "SELECT",
-        "    text,",
-        "    SUM(total_clicks) AS total_clicks,",
-        "    SUM(total_views)  AS total_views,",
-        "    SUM(total_spend)  AS total_spend,",
-        "    date",
-        "FROM (",
-        inner_query,
-        ") AS merged",
-        "GROUP BY text, date",
-    ]
-    query = "\n".join(outer)
-
-    # --- Если есть last_views — оборачиваем в CTE ---
-    if last_views:
-        query = f"""
-WITH base AS (
-{query}
-),
-cumulative AS (
-    SELECT
-        text,
-        total_clicks,
-        total_views,
-        total_spend,
-        date,
-        SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
-    FROM base
-)
-SELECT
-    text,
-    SUM(total_clicks) AS total_clicks,
-    SUM(total_views)  AS total_views,
-    SUM(total_spend)  AS total_spend
-FROM cumulative
-WHERE cumulative_total_views <= {last_views}
-GROUP BY text
-""".strip()
-
-    return query
+#
+# def _build_clickhouse_query(
+#     adv_ids: set[int],
+#     pass_time: timedelta | None = None,
+#     last_views: int | None = None,
+# ) -> str:
+#     """
+#     Запрос для ClickHouse AggregatingMergeTree-таблицы default_db.advkeyword_new
+#     (fields: adv_id, text, date, clicks_state, views_state, spend_state)
+#     Возвращает: text, total_clicks, total_views, total_spend, date
+#     """
+#
+#     adv_ids_str = ", ".join(str(aid) for aid in adv_ids)
+#
+#     # --- Внутренний подзапрос: извлекаем агрегаты для каждой кампании ---
+#     inner = [
+#         "SELECT",
+#         "    adv_id,",
+#         "    text,",
+#         "    argMaxMerge(clicks_state) AS total_clicks,",
+#         "    argMaxMerge(views_state)  AS total_views,",
+#         "    argMaxMerge(spend_state)  AS total_spend,",
+#         "    date",
+#         "FROM default_db.advkeyword_new",
+#         f"WHERE adv_id IN ({adv_ids_str})",
+#     ]
+#
+#     if pass_time:
+#         start_time = datetime.now() - pass_time
+#         inner.append(f"  AND date >= '{start_time.strftime('%Y-%m-%d')}'")
+#
+#     inner.append("GROUP BY adv_id, text, date")
+#     inner_query = "\n".join(inner)
+#
+#     # --- Внешний уровень: суммируем по text/date ---
+#     outer = [
+#         "SELECT",
+#         "    text,",
+#         "    SUM(total_clicks) AS total_clicks,",
+#         "    SUM(total_views)  AS total_views,",
+#         "    SUM(total_spend)  AS total_spend,",
+#         "    date",
+#         "FROM (",
+#         inner_query,
+#         ") AS merged",
+#         "GROUP BY text, date",
+#     ]
+#     query = "\n".join(outer)
+#
+#     # --- Если есть last_views — оборачиваем в CTE ---
+#     if last_views:
+#         query = f"""
+# WITH base AS (
+# {query}
+# ),
+# cumulative AS (
+#     SELECT
+#         text,
+#         total_clicks,
+#         total_views,
+#         total_spend,
+#         date,
+#         SUM(total_views) OVER (PARTITION BY text ORDER BY date DESC) AS cumulative_total_views
+#     FROM base
+# )
+# SELECT
+#     text,
+#     SUM(total_clicks) AS total_clicks,
+#     SUM(total_views)  AS total_views,
+#     SUM(total_spend)  AS total_spend
+# FROM cumulative
+# WHERE cumulative_total_views <= {last_views}
+# GROUP BY text
+# """.strip()
+#
+#     return query
 
 
 async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
@@ -241,94 +236,94 @@ async def get_global_super_wb_user_cabinet() -> WBUserCabinet:
     return wb_user_cabinet
 
 
-def __sort_by_update_keyword(keyword: WBItemPosition) -> datetime:
-    if not (update := keyword.timestamp):
-        update = datetime.now() - timedelta(days=1000)
-    return update
+# def __sort_by_update_keyword(keyword: WBItemPosition) -> datetime:
+#     if not (update := keyword.timestamp):
+#         update = datetime.now() - timedelta(days=1000)
+#     return update
 
 
-async def set_positions(
-    keyword_stats: list[CalculatedKeyword], adv_setting: AdvSetting
-) -> list[CalculatedKeyword]:
-    # TODO: Вынести локальный импорт, и вообще разобраться со всеми локальными импортами в проекте
-    from ..shop_runner.service_manager.services.keyword_stamp_manager import (
-        ClickHouseKeywordStampManager,
-    )
-
-    positions: list[WBItemPosition] = (
-        await ClickHouseKeywordStampManager.get_last_positions(adv_setting)
-    )
-    if not positions:
-        return keyword_stats
-    text_to_position = {position.keyword_text: position for position in positions}
-    for keyword_stat in keyword_stats:
-        position = text_to_position.get(keyword_stat.text)
-        if position:
-            keyword_stat.position = position
-
-    return keyword_stats
-
-
-async def set_position(
-    keyword_stat: CalculatedKeyword, adv_setting: AdvSetting
-) -> CalculatedKeyword:
-    text = keyword_stat.text
-    main_nmid = int(adv_setting.nmids[0])
-    position = await redis_manager.get_keyword_position(text, main_nmid)
-    if position:
-        keyword_stat.position = position.position
-
-    else:
-        keywords = keyword_stat.childs_keywords
-        if keywords:
-            texts = [kw.text for kw in keywords]
-            # Type ignore for untyped redis_manager call
-            positions = await redis_manager.get_keywords_positions(adv_setting, texts)  # type: ignore[no-untyped-call]
-            if positions:
-                position = max(positions, key=lambda kw: __sort_by_update_keyword(kw))
-                assert position
-                keyword_stat.position = position.position
-
-    return keyword_stat
+# async def set_positions(
+#     keyword_stats: list[CalculatedKeyword], adv_setting: AdvSetting
+# ) -> list[CalculatedKeyword]:
+#     # TODO: Вынести локальный импорт, и вообще разобраться со всеми локальными импортами в проекте
+#     from ..shop_runner.service_manager.services.keyword_stamp_manager import (
+#         ClickHouseKeywordStampManager,
+#     )
+#
+#     positions: list[WBItemPosition] = (
+#         await ClickHouseKeywordStampManager.get_last_positions(adv_setting)
+#     )
+#     if not positions:
+#         return keyword_stats
+#     text_to_position = {position.keyword_text: position for position in positions}
+#     for keyword_stat in keyword_stats:
+#         position = text_to_position.get(keyword_stat.text)
+#         if position:
+#             keyword_stat.position = position
+#
+#     return keyword_stats
 
 
-async def get_keywords_positions(
-    adv_setting: AdvSetting, texts: list[str]
-) -> list[WBItemPosition]:
-    """Get keywords positions from Redis."""
-    # Type ignore for untyped redis_manager call and return type
-    return await redis_manager.get_keywords_positions(adv_setting, texts)  # type: ignore[no-untyped-call,no-any-return]
+# async def set_position(
+#     keyword_stat: CalculatedKeyword, adv_setting: AdvSetting
+# ) -> CalculatedKeyword:
+#     text = keyword_stat.text
+#     main_nmid = int(adv_setting.nmids[0])
+#     position = await redis_manager.get_keyword_position(text, main_nmid)
+#     if position:
+#         keyword_stat.position = position.position
+#
+#     else:
+#         keywords = keyword_stat.childs_keywords
+#         if keywords:
+#             texts = [kw.text for kw in keywords]
+#             # Type ignore for untyped redis_manager call
+#             positions = await redis_manager.get_keywords_positions(adv_setting, texts)  # type: ignore[no-untyped-call]
+#             if positions:
+#                 position = max(positions, key=lambda kw: __sort_by_update_keyword(kw))
+#                 assert position
+#                 keyword_stat.position = position.position
+#
+#     return keyword_stat
 
+#
+# async def get_keywords_positions(
+#     adv_setting: AdvSetting, texts: list[str]
+# ) -> list[WBItemPosition]:
+#     """Get keywords positions from Redis."""
+#     # Type ignore for untyped redis_manager call and return type
+#     return await redis_manager.get_keywords_positions(adv_setting, texts)  # type: ignore[no-untyped-call,no-any-return]
 
-def __calculate_clusters(
-    preset_to_keywords: dict[Any, list[CalculatedKeyword]],
-    preset_to_cluster_name: dict[Any, str],
-) -> list[CalculatedKeyword]:
-    keyword_stats = []
-    for preset in preset_to_keywords:
-        keywords = preset_to_keywords[preset]
-        keyword_cluster_name = preset_to_cluster_name[preset]
-        views = 0
-        clicks = 0
-        spend = 0
-        query: int = 0
-        for keyword in keywords:
-            views += keyword.views
-            clicks += keyword.clicks
-            spend += int(keyword.spend)
-            if isinstance(keyword.query, int):
-                query += keyword.query
-            elif isinstance(keyword.query, str) and keyword.query.isdigit():
-                query += int(keyword.query)
-
-        cluster_keyword = CalculatedKeyword(
-            text=keyword_cluster_name, views=views, clicks=clicks, spend=spend
-        )
-        cluster_keyword.query = str(query) if query else "<50"
-        cluster_keyword.childs_keywords = keywords
-        keyword_stats.append(cluster_keyword)
-
-    return keyword_stats
+#
+# def __calculate_clusters(
+#     preset_to_keywords: dict[Any, list[CalculatedKeyword]],
+#     preset_to_cluster_name: dict[Any, str],
+# ) -> list[CalculatedKeyword]:
+#     keyword_stats = []
+#     for preset in preset_to_keywords:
+#         keywords = preset_to_keywords[preset]
+#         keyword_cluster_name = preset_to_cluster_name[preset]
+#         views = 0
+#         clicks = 0
+#         spend = 0
+#         query: int = 0
+#         for keyword in keywords:
+#             views += keyword.views
+#             clicks += keyword.clicks
+#             spend += int(keyword.spend)
+#             if isinstance(keyword.query, int):
+#                 query += keyword.query
+#             elif isinstance(keyword.query, str) and keyword.query.isdigit():
+#                 query += int(keyword.query)
+#
+#         cluster_keyword = CalculatedKeyword(
+#             text=keyword_cluster_name, views=views, clicks=clicks, spend=spend
+#         )
+#         cluster_keyword.query = str(query) if query else "<50"
+#         cluster_keyword.childs_keywords = keywords
+#         keyword_stats.append(cluster_keyword)
+#
+#     return keyword_stats
 
 
 def profile_function(inner_func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
@@ -340,35 +335,35 @@ def profile_function(inner_func: Callable[..., Any], *args: Any, **kwargs: Any) 
     stats.print_stats(10)
 
 
-async def convert_keyword_stats_in_clusters(
-    keyword_stats: list[CalculatedKeyword],
-) -> list[CalculatedKeyword]:
-    preset_to_keywords = defaultdict(list)
-    preset_to_cluster_name = {}
-    texts = [keyword.text for keyword in keyword_stats]
-    try:
-        text_to_custer_and_present: dict[str, tuple[str, int]] = (
-            await redis_manager.get_clusters_and_presets(texts)
-        )
-    except Exception as e:
-        logger.error(
-            f"Ошибк {e} получения кластеров и пресетов: {texts}", exc_info=True
-        )
-        return keyword_stats
-    for keyword in keyword_stats:
-        text = keyword.text
-        cluster_name, preset = text_to_custer_and_present.get(text, (None, None))
-        if cluster_name:
-            preset_to_keywords[preset].append(keyword)
-            preset_to_cluster_name[preset] = cluster_name
-        else:
-            preset = hash(text)
-            cluster_name = text
-            preset_to_keywords[preset].append(keyword)
-            preset_to_cluster_name[preset] = cluster_name
-    keyword_stats = __calculate_clusters(preset_to_keywords, preset_to_cluster_name)
-
-    return keyword_stats
+# async def convert_keyword_stats_in_clusters(
+#     keyword_stats: list[CalculatedKeyword],
+# ) -> list[CalculatedKeyword]:
+#     preset_to_keywords = defaultdict(list)
+#     preset_to_cluster_name = {}
+#     texts = [keyword.text for keyword in keyword_stats]
+#     try:
+#         text_to_custer_and_present: dict[str, tuple[str, int]] = (
+#             await redis_manager.get_clusters_and_presets(texts)
+#         )
+#     except Exception as e:
+#         logger.error(
+#             f"Ошибк {e} получения кластеров и пресетов: {texts}", exc_info=True
+#         )
+#         return keyword_stats
+#     for keyword in keyword_stats:
+#         text = keyword.text
+#         cluster_name, preset = text_to_custer_and_present.get(text, (None, None))
+#         if cluster_name:
+#             preset_to_keywords[preset].append(keyword)
+#             preset_to_cluster_name[preset] = cluster_name
+#         else:
+#             preset = hash(text)
+#             cluster_name = text
+#             preset_to_keywords[preset].append(keyword)
+#             preset_to_cluster_name[preset] = cluster_name
+#     keyword_stats = __calculate_clusters(preset_to_keywords, preset_to_cluster_name)
+#
+#     return keyword_stats
 
 
 # Функции get_cpm_by_nmid и __get_cpm_from_positions удалены,
@@ -425,24 +420,24 @@ async def get_main_photos(nmids: list[int]) -> list[str]:
     return main_photos
 
 
-async def __download_and_resize_image(
-    url: str, session: Any, max_size: int = 1280
-) -> bytes | None:
-    while True:
-        async with session.get(url) as response:
-            if response.status != 200:
-                continue
-            image_data = await response.read()
-            # Открываем изображение используя BytesIO
-            with io.BytesIO(image_data) as image_file:
-                with Image.open(image_file) as img:
-                    # Масштабируем изображение, сохраняя пропорции
-                    img.thumbnail((max_size, max_size))
-
-                    # Сохраняем изображение в BytesIO объект
-                    with io.BytesIO() as output:
-                        img.save(output, format="JPEG")
-                        return output.getvalue()
+# async def __download_and_resize_image(
+#     url: str, session: Any, max_size: int = 1280
+# ) -> bytes | None:
+#     while True:
+#         async with session.get(url) as response:
+#             if response.status != 200:
+#                 continue
+#             image_data = await response.read()
+#             # Открываем изображение используя BytesIO
+#             with io.BytesIO(image_data) as image_file:
+#                 with Image.open(image_file) as img:
+#                     # Масштабируем изображение, сохраняя пропорции
+#                     img.thumbnail((max_size, max_size))
+#
+#                     # Сохраняем изображение в BytesIO объект
+#                     with io.BytesIO() as output:
+#                         img.save(output, format="JPEG")
+#                         return output.getvalue()
 
 
 async def get_adv_keyword_text_in_black_list() -> list[tuple[int, str]]:
@@ -475,23 +470,23 @@ async def get_all_shops_for_user(user: User) -> list[WBUserCabinet]:
             return []
 
 
-async def get_adv_id_to_min_ctr(adv_ids: list[int]) -> dict[int, float]:
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(adv_ids))
-        result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = list(result.unique().scalars())
-    adv_id_to_min_ctr = {}
-
-    for adv_setting in adv_settings:
-        logger.debug("Получаю min_ctr")
-        try:
-            min_ctr = await get_min_ctr(adv_setting)
-            logger.debug("min_ctr получен")
-            adv_id_to_min_ctr[adv_setting.adv_id] = min_ctr
-        except Exception as e:
-            logger.error(f"Ошибка при получении min_ctr {e}", exc_info=True)
-            adv_id_to_min_ctr[adv_setting.adv_id] = 0.03
-    return adv_id_to_min_ctr
+# async def get_adv_id_to_min_ctr(adv_ids: list[int]) -> dict[int, float]:
+#     async with _sm() as session:
+#         stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(adv_ids))
+#         result = await session.execute(stmt)
+#         adv_settings: list[AdvSetting] = list(result.unique().scalars())
+#     adv_id_to_min_ctr = {}
+#
+#     for adv_setting in adv_settings:
+#         logger.debug("Получаю min_ctr")
+#         try:
+#             min_ctr = await get_min_ctr(adv_setting)
+#             logger.debug("min_ctr получен")
+#             adv_id_to_min_ctr[adv_setting.adv_id] = min_ctr
+#         except Exception as e:
+#             logger.error(f"Ошибка при получении min_ctr {e}", exc_info=True)
+#             adv_id_to_min_ctr[adv_setting.adv_id] = 0.03
+#     return adv_id_to_min_ctr
 
 
 async def get_adv_id_keyword_text_to_status(
@@ -529,10 +524,11 @@ class ReferralLink:
     link: str
 
 
-async def get_min_ctr(adv: AdvSetting) -> float:
-    ctr_manager = MinCtrManager(adv)
-    min_ctr = await ctr_manager.get_min_ctr()
-    return min_ctr
+# async def get_min_ctr(adv: AdvSetting) -> float:
+#     from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import MinCtrManager
+#     ctr_manager = MinCtrManager(adv)
+#     min_ctr = await ctr_manager.get_min_ctr()
+#     return min_ctr
 
 
 # TODO: Улучшить автоуправление РК
@@ -543,11 +539,11 @@ def get_best_keyword(keywords: list[CalculatedKeyword]) -> CalculatedKeyword | N
     # TODO: Функция упала бы на Smoke-тесте при пустом списке ключевых слов и упала на полной фильтрации
     if not keywords:
         return None
-    keywords = [kw for kw in keywords if kw.position is not None and kw.position >= 0]
+    keywords = [kw for kw in keywords if kw.position >= 0]
     if not keywords:
         return None
     best_keyword = sorted(
-        keywords, key=lambda x: x.rating_by_predict_ctr, reverse=True
+        keywords, key=lambda x: x.rating_by_orders, reverse=True
     )[0]
 
     return best_keyword
@@ -604,14 +600,14 @@ async def get_sum_bot_balance_from_wb_wb_user_cabinet_original_id(
         return result.scalar_one_or_none()
 
 
-async def get_keywords_positions_dict_by_text(
-    adv_setting: AdvSetting, texts: list[str]
-) -> dict[str, WBItemPosition]:
-    # Type ignore for untyped redis_manager call
-    positions = await redis_manager.get_keywords_positions(adv_setting, texts)  # type: ignore[no-untyped-call]
-    positions = [position for position in positions if position]
-    positions = {position.keyword_text: position for position in positions}
-    return positions
+# async def get_keywords_positions_dict_by_text(
+#     adv_setting: AdvSetting, texts: list[str]
+# ) -> dict[str, WBItemPosition]:
+#     # Type ignore for untyped redis_manager call
+#     positions = await redis_manager.get_keywords_positions(adv_setting, texts)  # type: ignore[no-untyped-call]
+#     positions = [position for position in positions if position]
+#     positions = {position.keyword_text: position for position in positions}
+#     return positions
 
 
 async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
@@ -675,21 +671,21 @@ async def update_black_phrases(adv_setting_id: int, keywords: list[str]) -> None
 
         await session.commit()
 
-
-async def check_by_black_list_template(keyword_text: str, adv_setting_id: int) -> bool:
-    black_keywords = await redis_manager.get_black_phrases(adv_setting_id)  # type: ignore[attr-defined]
-    keyword_text_lower = keyword_text.lower().strip()
-
-    for black_phrase in black_keywords:
-        black_phrase_text = black_phrase.lower().strip()
-        if "'" in black_phrase_text or '"' in black_phrase_text:
-            black_phrase_text = black_phrase_text.replace("'", "''").replace('"', '""')
-            if black_phrase_text == keyword_text_lower:
-                return True
-        else:
-            if black_phrase_text in keyword_text_lower:
-                return True
-    return False
+#
+# async def check_by_black_list_template(keyword_text: str, adv_setting_id: int) -> bool:
+#     black_keywords = await redis_manager.get_black_phrases(adv_setting_id)
+#     keyword_text_lower = keyword_text.lower().strip()
+#
+#     for black_phrase in black_keywords:
+#         black_phrase_text = black_phrase.lower().strip()
+#         if "'" in black_phrase_text or '"' in black_phrase_text:
+#             black_phrase_text = black_phrase_text.replace("'", "''").replace('"', '""')
+#             if black_phrase_text == keyword_text_lower:
+#                 return True
+#         else:
+#             if black_phrase_text in keyword_text_lower:
+#                 return True
+#     return False
 
 
 async def reset_black_phrases(adv_setting_id: int) -> None:
@@ -774,14 +770,14 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
         .where(WBCabinet.shop_id == shop_id, AdvSetting.bot_active.is_(True))
         .options(
             load_only(
-                AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id
+                AdvSetting.adv_id, AdvSetting.name, AdvSetting._search_adv_id # pyright: ignore # noqa
             )  # noqa
         )
     )
     async with _sm() as session:
         result = await session.execute(stmt)
         adv_settings: list[AdvSetting] = list(result.scalars().all())
-    adv_ids = []
+    adv_ids: list[int] = []
     for adv in adv_settings:
         adv_ids.append(adv.adv_id)
         if search_adv_id := adv.search_adv_id:
@@ -790,39 +786,39 @@ async def get_active_adv_ids_for_shop(shop_id: str) -> Sequence[int]:
     return adv_ids
 
 
-async def get_keywords_statistic(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
-    keywords = await get_keywords_statistic_clickhouse(adv_setting, last_views=3000)
-    return keywords
+# async def get_keywords_statistic(adv_setting: AdvSetting) -> list[CalculatedKeyword]:
+#     keywords = await get_keywords_statistic_clickhouse(adv_setting, last_views=3000)
+#     return keywords
 
-
-async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
-    setting_max_bid = adv_setting.max_cpm
-    max_pay_for_order = adv_setting.max_pay_for_order
-    if not max_pay_for_order:
-        return setting_max_bid
-    if adv_setting.auto_max_bid:
-        keywords: list[CalculatedKeyword] = await get_keywords_statistic(adv_setting)
-        full_keyword_stat = await get_full_adv_stat_for_adv_id_from_redis(
-            adv_setting.adv_id
-        )
-        if not full_keyword_stat:
-            return setting_max_bid
-        views = float(full_keyword_stat.views + 1)
-        orders = float(full_keyword_stat.orders + 1)
-        best_keyword: CalculatedKeyword | None = get_best_keyword(keywords)
-        if not best_keyword:
-            return setting_max_bid
-        convert_views_to_order = views / orders
-        ctr: float | None = best_keyword.predict_ctr
-        if ctr is None:
-            raise ValueError("predict_ctr cannot be None for max_adv_bid calculation")
-        assert ctr is not None  # Утверждение, что ctr теперь не None
-        max_bid_for_1000_views = (
-            (max_pay_for_order / convert_views_to_order) * ctr * 1000
-        )
-        if setting_max_bid < max_bid_for_1000_views:
-            setting_max_bid = max_bid_for_1000_views
-    return setting_max_bid
+#
+# async def get_max_adv_bid(adv_setting: AdvSetting) -> int | float:
+#     setting_max_bid = adv_setting.max_cpm
+#     max_pay_for_order = adv_setting.max_pay_for_order
+#     if not max_pay_for_order:
+#         return setting_max_bid
+#     if adv_setting.auto_max_bid:
+#         keywords: list[CalculatedKeyword] = await get_keywords_statistic(adv_setting)
+#         full_keyword_stat = await get_full_adv_stat_for_adv_id_from_redis(
+#             adv_setting.adv_id
+#         )
+#         if not full_keyword_stat:
+#             return setting_max_bid
+#         views = float(full_keyword_stat.views + 1)
+#         orders = float(full_keyword_stat.orders + 1)
+#         best_keyword: CalculatedKeyword | None = get_best_keyword(keywords)
+#         if not best_keyword:
+#             return setting_max_bid
+#         convert_views_to_order = views / orders
+#         ctr: float | None = best_keyword.predict_ctr
+#         if ctr is None:
+#             raise ValueError("predict_ctr cannot be None for max_adv_bid calculation")
+#         assert ctr is not None  # Утверждение, что ctr теперь не None
+#         max_bid_for_1000_views = (
+#             (max_pay_for_order / convert_views_to_order) * ctr * 1000
+#         )
+#         if setting_max_bid < max_bid_for_1000_views:
+#             setting_max_bid = max_bid_for_1000_views
+#     return setting_max_bid
 
 
 async def is_adv_in_favorites(
@@ -839,109 +835,109 @@ async def is_adv_in_favorites(
         return result.first() is not None
 
 
-def __calculate_version(position: WBItemPosition) -> int:
-    if position.timestamp is None:
-        return int(datetime.now().timestamp())
-    return int(position.timestamp.timestamp())
+# def __calculate_version(position: WBItemPosition) -> int:
+#     if position.timestamp is None:
+#         return int(datetime.now().timestamp())
+#     return int(position.timestamp.timestamp())
 
+#
+# async def get_avg_base_positions(
+#     nmid: int, start_date: str, end_date: str
+# ) -> list[WBItemPosition]:
+#     query = """
+#     SELECT toDate(timestamp) as date,
+#        text,
+#        AVG(base_position) as avg_base_position
+# FROM default_db.wbitemposition
+# WHERE nmid = %(nmid)s
+#   AND timestamp >= toDateTime(%(start_date)s)
+#   AND timestamp <= toDateTime(%(end_date)s)
+# GROUP BY date, text
+# ORDER BY date, text
+#
+#     """  # Removed the semicolon
+#
+#     parameters = {"nmid": nmid, "start_date": start_date, "end_date": end_date}
+#
+#     async with get_clickhouse_client() as client:
+#         result = await client.query(query, parameters=parameters)
+#         result = result.result_rows
+#         return [
+#             WBItemPosition(nmid=nmid, position=row[1], timestamp=row[0])
+#             for row in result  # type: ignore[attr-defined]
+#         ]
 
-async def get_avg_base_positions(
-    nmid: int, start_date: str, end_date: str
-) -> list[WBItemPosition]:
-    query = """
-    SELECT toDate(timestamp) as date, 
-       text,
-       AVG(base_position) as avg_base_position
-FROM default_db.wbitemposition
-WHERE nmid = %(nmid)s 
-  AND timestamp >= toDateTime(%(start_date)s)
-  AND timestamp <= toDateTime(%(end_date)s)
-GROUP BY date, text
-ORDER BY date, text
+#
+# async def add_positions_to_clickhouse(positions: list[WBItemPosition]) -> None:
+#     async with get_clickhouse_client() as client:
+#         for position in positions:
+#             try:
+#                 # Генерация версии и подготовка timestamp
+#                 version = __calculate_version(position)
+#                 timestamp_str = position.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+#
+#                 # Всегда вставляем новые данные
+#                 query_insert = f"""
+#                 INSERT INTO default_db.wbitemposition (
+#                     nmid,
+#                     text,
+#                     promo_position,
+#                     base_position,
+#                     cpm,
+#                     adv_type,
+#                     timestamp,
+#                     version
+#                 )
+#                 VALUES (
+#                     {position.nmid},
+#                     '{position.keyword_text.replace("'", "''")}',  # Экранирование одинарных кавычек
+#                     {position.position if position.position else 0},
+#                     {position.position if position.position else 0},
+#                     {0},
+#                     {int(position.adv_type) if position.adv_type else 0},
+#                     '{timestamp_str}',
+#                     {version}
+#                 )
+#                 """
+#                 await client.query(query_insert)
+#                 logger.debug(f"Добавлена запись для nmid={position.nmid}")
+#
+#             except Exception as e:
+#                 logger.error(
+#                     f"Ошибка при обработке позиции nmid={position.nmid}: {e}",
+#                     exc_info=True,
+#                 )
 
-    """  # Removed the semicolon
-
-    parameters = {"nmid": nmid, "start_date": start_date, "end_date": end_date}
-
-    async with get_clickhouse_client() as client:
-        result = await client.query(query, parameters=parameters)
-        result = result.result_rows
-        return [
-            WBItemPosition(nmid=nmid, position=row[1], timestamp=row[0])
-            for row in result  # type: ignore[attr-defined]
-        ]
-
-
-async def add_positions_to_clickhouse(positions: list[WBItemPosition]) -> None:
-    async with get_clickhouse_client() as client:
-        for position in positions:
-            try:
-                # Генерация версии и подготовка timestamp
-                version = __calculate_version(position)
-                timestamp_str = position.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-
-                # Всегда вставляем новые данные
-                query_insert = f"""
-                INSERT INTO default_db.wbitemposition (
-                    nmid,
-                    text,
-                    promo_position,
-                    base_position,
-                    cpm,
-                    adv_type,
-                    timestamp,
-                    version
-                )
-                VALUES (
-                    {position.nmid},
-                    '{position.keyword_text.replace("'", "''")}',  # Экранирование одинарных кавычек
-                    {position.position if position.position else 0},
-                    {position.position if position.position else 0},
-                    {0},
-                    {int(position.adv_type) if position.adv_type else 0},
-                    '{timestamp_str}',
-                    {version}
-                )
-                """
-                await client.query(query_insert)
-                logger.debug(f"Добавлена запись для nmid={position.nmid}")
-
-            except Exception as e:
-                logger.error(
-                    f"Ошибка при обработке позиции nmid={position.nmid}: {e}",
-                    exc_info=True,
-                )
-
-
-async def get_keyword_positions_from_click_house(nmid: int) -> list[WBItemPosition]:
-    query = f"""
-    SELECT
-        text,
-        toDate(timestamp) AS day,
-        AVG(promo_position) AS avg_promo_position,
-        AVG(base_position) AS avg_base_position,
-        AVG(cpm) AS avg_cpm
-    FROM default_db.wbitemposition
-    WHERE nmid = {nmid}
-    GROUP BY text, day
-    ORDER BY day
-    """
-
-    async with get_clickhouse_client() as client:
-        result = await client.query(query)
-        positions_rows = result.result_rows
-    positions = []
-    for row in positions_rows:
-        position = WBItemPosition()
-        position.nmid = nmid
-        position.keyword_text = row[0]
-        avg_promo = row[2] if row[2] else 0
-        avg_base = row[3] if row[3] else 0
-        position.position = int(avg_base or avg_promo or 6000)
-        position.timestamp = datetime.combine(row[1], datetime.min.time())
-        positions.append(position)
-
-    return positions
+#
+# async def get_keyword_positions_from_click_house(nmid: int) -> list[WBItemPosition]:
+#     query = f"""
+#     SELECT
+#         text,
+#         toDate(timestamp) AS day,
+#         AVG(promo_position) AS avg_promo_position,
+#         AVG(base_position) AS avg_base_position,
+#         AVG(cpm) AS avg_cpm
+#     FROM default_db.wbitemposition
+#     WHERE nmid = {nmid}
+#     GROUP BY text, day
+#     ORDER BY day
+#     """
+#
+#     async with get_clickhouse_client() as client:
+#         result = await client.query(query)
+#         positions_rows = result.result_rows
+#     positions: list[WBItemPosition] = []
+#     for row in positions_rows:
+#         position = WBItemPosition()
+#         position.nmid = nmid
+#         position.keyword_text = row[0]
+#         avg_promo = row[2] if row[2] else 0
+#         avg_base = row[3] if row[3] else 0
+#         position.position = int(avg_base or avg_promo or 6000)
+#         position.timestamp = datetime.combine(row[1], datetime.min.time())
+#         positions.append(position)
+#
+#     return positions
 
 
 async def set_last_full_stat_update(adv_id: int, timestamp: datetime) -> None:
@@ -991,6 +987,6 @@ async def get_cpm(auto_adv: AdvSetting) -> float | None:
     return max(cpm_values)
 
 
-async def update_advs_data_from_wb_to_pg(wb_api):
+async def update_advs_data_from_wb_to_pg(wb_api: WBApi):
     shop_data_updater = ShopDataUpdater(wb_api)
     await shop_data_updater.update_advs_data()

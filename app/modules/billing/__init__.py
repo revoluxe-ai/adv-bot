@@ -1,3 +1,6 @@
+from collections.abc import Awaitable
+from typing import Any
+
 from .models import AdvPayment
 
 __all__ = ["process_payment_for_advs", "AdvPayment"]
@@ -7,7 +10,7 @@ __all__ = ["process_payment_for_advs", "AdvPayment"]
 # пока это быстрый костыль.
 
 
-def process_payment_for_advs(*args, **kwargs):
+def process_payment_for_advs(*args: Any, **kwargs: Any) -> Awaitable[None]:
     """Ленивая обёртка для избежания циклического импорта.
 
     Импортируем фактическую реализацию только при вызове,

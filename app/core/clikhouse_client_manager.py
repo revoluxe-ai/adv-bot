@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from app.utils.click_house.client import get_clickhouse_client
 
+# TODO: Дублирующий модуль для кликхауса в core
 
 @asynccontextmanager
 async def get_client():

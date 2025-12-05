@@ -19,7 +19,7 @@ async def delete_keywords_from_wl_by_mean_auto_ctr(complex_adv: "ComplexAdv") ->
     keyword_ids_in_wh_least_mean_ctr: Sequence[int] = [
         kw.keyword_setting_original_id
         for kw in keywords
-        if (kw.predict_ctr <= mean_auto_ctr if kw.predict_ctr else False)
+        if (kw.ctr <= mean_auto_ctr)
         and kw.hard_status == 2
     ]
     if not keyword_ids_in_wh_least_mean_ctr:

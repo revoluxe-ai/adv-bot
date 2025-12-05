@@ -77,24 +77,30 @@ async def get_daily_stats_by_last_days(
     start_date_str = start_date.strftime("%Y-%m-%d")
 
     async with get_clickhouse_client() as client:
+        # Используем argMax вместо ROW_NUMBER() OVER - значительно эффективнее по памяти
         query = """
-        WITH max_versions AS (
-            SELECT *, 
-                   ROW_NUMBER() OVER (PARTITION BY adv_id, date ORDER BY version DESC) AS row_num
-            FROM default_db.full_adv_wb_stat
+        SELECT 
+            date,
+            SUM(latest_views) AS views, 
+            SUM(latest_clicks) AS clicks, 
+            SUM(latest_spend) AS spend, 
+            SUM(latest_added_to_cart) AS added_to_cart, 
+            SUM(latest_orders) AS orders, 
+            SUM(latest_sum_price_orders) AS sum_price_orders
+        FROM (
+            SELECT 
+                adv_id,
+                date,
+                views AS latest_views,
+                clicks AS latest_clicks,
+               spend AS latest_spend,
+                added_to_cart AS latest_added_to_cart,
+               orders AS latest_orders,
+               sum_price_orders  AS latest_sum_price_orders
+            FROM default_db.full_adv_wb_stat FINAL 
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
             AND adv_id IN %(adv_ids)s
         )
-        SELECT 
-            date,
-            SUM(views) AS views, 
-            SUM(clicks) AS clicks, 
-            SUM(spend) AS spend, 
-            SUM(added_to_cart) AS added_to_cart, 
-            SUM(orders) AS orders, 
-            SUM(sum_price_orders) AS sum_price_orders
-        FROM max_versions
-        WHERE row_num = 1
         GROUP BY date
         ORDER BY date
         """
@@ -139,25 +145,30 @@ async def get_stats_by_last_days(
     end_date_str = end_date.strftime("%Y-%m-%d")
     start_date_str = start_date.strftime("%Y-%m-%d")
     async with get_clickhouse_client() as client:
+        # Используем argMax вместо ROW_NUMBER() OVER - значительно эффективнее по памяти
         query = """
-        WITH max_versions AS (
-            SELECT *, 
-                   ROW_NUMBER() OVER (PARTITION BY adv_id, date ORDER BY version DESC) AS row_num
-            FROM default_db.full_adv_wb_stat
+        SELECT 
+            SUM(latest_views) AS views, 
+            SUM(latest_clicks) AS clicks, 
+            SUM(latest_spend) AS spend, 
+            SUM(latest_added_to_cart) AS added_to_cart, 
+            SUM(latest_orders) AS orders, 
+            SUM(latest_sum_price_orders) AS sum_price_orders
+        FROM (
+            SELECT 
+                adv_id,
+                date,
+                views AS latest_views,
+                clicks AS latest_clicks,
+                spend AS latest_spend,
+                added_to_cart AS latest_added_to_cart,
+                orders AS latest_orders,
+                sum_price_orders AS latest_sum_price_orders
+            FROM default_db.full_adv_wb_stat FINAL
             WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s) 
             AND adv_id IN %(adv_ids)s
         )
-        SELECT 
-            SUM(views) AS views, 
-            SUM(clicks) AS clicks, 
-            SUM(spend) AS spend, 
-            SUM(added_to_cart) AS added_to_cart, 
-            SUM(orders) AS orders, 
-            SUM(sum_price_orders) AS sum_price_orders
-        FROM max_versions
-        WHERE row_num = 1
-
-"""
+        """
         try:
             # Выполняем запрос
             res = await client.query(

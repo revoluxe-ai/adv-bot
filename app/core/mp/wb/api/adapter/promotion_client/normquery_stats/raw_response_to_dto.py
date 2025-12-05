@@ -1,13 +1,14 @@
 from typing import cast
 
-from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO
-from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import V0GetNormQueryStatsItem
+from app.core.mp.wb.api.adapter.promotion_client.normquery_stats.dto import NormqueryStatsDTO, NormqueryStat
+from app.core.mp.wb.api.generated.promotion.marketing_and_promotions_client.models import V0GetNormQueryStatsItem, \
+    V0GetNormQueryStatsItemStat
 
-def raw_response_to_dto(item: V0GetNormQueryStatsItem, adv_id: int, nmid: int) -> list[NormqueryStatsDTO] | None:
-    if not item.stats:
-        return None
-    stats = item.stats
-    dtos: list[NormqueryStatsDTO] = []
+
+def raw_response_to_dto(raw_stat: V0GetNormQueryStatsItem) -> NormqueryStatsDTO:
+
+    stats: list[V0GetNormQueryStatsItemStat] = raw_stat.stats if raw_stat.stats else []
+    result_stats: list[NormqueryStat] = []
     for stat in stats:
         norm_query = cast(str, stat.norm_query)
         ctr = cast(float, stat.ctr)
@@ -18,23 +19,24 @@ def raw_response_to_dto(item: V0GetNormQueryStatsItem, adv_id: int, nmid: int) -
         views = cast(int, stat.views)
         clicks = cast(int, stat.clicks)
         avr_pos = cast(float, stat.avg_pos)
-        add_keys = stat.additional_keys
-        add_properties = stat.additional_properties
-        dto = NormqueryStatsDTO(
-            adv_id=adv_id,
-            nmid=nmid,
+        result_stat = NormqueryStat(
             norm_query=norm_query,
             ctr=ctr,
             cpm=cpm,
             add_to_cart=add_to_cart,
             orders=orders,
-            add_properties=add_properties,
             cpc=cpc,
             avr_pos=avr_pos,
-            add_keys=add_keys,
             views=views,
             clicks=clicks,
         )
-        dtos.append(dto)
 
-    return dtos
+        result_stats.append(result_stat)
+
+    dto = NormqueryStatsDTO(
+         adv_id=raw_stat.advert_id,
+         nmid=raw_stat.nm_id,
+         stats=result_stats,
+     )
+
+    return dto

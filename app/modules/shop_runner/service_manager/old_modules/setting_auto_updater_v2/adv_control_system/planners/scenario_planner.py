@@ -8,12 +8,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.data_classes.data_classes import (
     PipelineContext,
 )
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.exponent_executor.exponent_down_executor import (
-    ExponentDownExecutor,
-)
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.exponent_executor.exponent_raise_executor import (
-    ExponentRaiseExecutor,
-)
+
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.executors.target_place_executor.target_place_down_executor import (
     TargetPlaceDownExecutor,
 )
@@ -61,18 +56,15 @@ class ScenarioPlanner:
         self.scenarios = {
             SalesStates.OVERSPEND: [
                 WhiteListRemoveExecutor(),
-                ExponentRaiseExecutor(),
                 TargetPlaceDownExecutor(),
             ],
             SalesStates.UNDERPERFORM: [
                 TargetPlaceUpExecutor(),
                 WhiteListAddExecutor(),
-                ExponentDownExecutor(),
             ],
             SalesStates.STABLE: [
                 TargetPlaceDownExecutor(),
                 WhiteListRemoveExecutor(),
-                ExponentRaiseExecutor(),
             ],
             SalesStates.OPTIMAL: [],
         }

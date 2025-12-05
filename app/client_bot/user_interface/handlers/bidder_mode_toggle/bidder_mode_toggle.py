@@ -55,4 +55,4 @@ async def turn_on_bidder_positions(
 
     chat_id = callback_query.message.chat.id  # type: ignore[assignment]
     _ = await bot.send_message(chat_id, "Режим биддера установлен: Позиции")
-    _ = await messages.CPMSetting(bot, chat_id)(adv_original_id)
+    await messages.CPMSetting(bot, chat_id)(adv_original_id)

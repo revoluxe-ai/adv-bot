@@ -26,8 +26,8 @@ async def get_min_position(
     await state.set_state(states.CPMSetting.waiting_for_min_position)
     import app.client_bot.user_interface.views.messages as ui_messages
 
-    await ui_messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(
-        adv_original_id
+    await ui_messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)( # pyright: ignore
+        adv_original_id # pyright: ignore
     )
     return
 
@@ -39,15 +39,15 @@ async def off_auto_cpm(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
-    adv_original_id = callback_data.adv_original_id  # type: ignore[attr-defined]
+    adv_original_id: int = callback_data.adv_original_id # type: ignore
     async with sm(read_only=False) as session:
         adv = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+            select(AdvSetting).where(AdvSetting.id == adv_original_id) # pyright: ignore
         )
         adv = adv.scalar()
         adv.bidder_active = False  # type: ignore[attr-defined]
         await session.commit()
         import app.client_bot.user_interface.views.messages as ui_messages
 
-        await ui_messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
+        await ui_messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id) # pyright: ignore
     return

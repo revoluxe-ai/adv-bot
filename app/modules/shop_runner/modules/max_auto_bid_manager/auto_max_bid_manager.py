@@ -1,9 +1,7 @@
 from typing import TYPE_CHECKING
 
-from app.modules.common_slaves.wildberries.data_classes.keywordstat_from_db import (
-    CalculatedKeyword,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
 if TYPE_CHECKING:
     from .max_cpm_redis_status_manager import MaxCpmRedisStatusManager
@@ -74,8 +72,10 @@ class AutoMaxBidManager:
         max_cpm = max_pay_for_view * 1000
         return max_cpm
 
+
+    @staticmethod
     async def _get_clicks_to_orders_ratio_for_keywords(
-        self, adv: AdvSetting, period_days: int
+       adv: AdvSetting, period_days: int
     ) -> float | None:
         from . import clickhouse_manager
 
@@ -92,8 +92,9 @@ class AutoMaxBidManager:
         )
         return clicks_to_order_ratio
 
+    @staticmethod
     async def _get_target_pay_for_order(
-        self, adv: AdvSetting, keywords: list[CalculatedKeyword]
+      adv: AdvSetting, keywords: list[CalculatedKeyword]
     ) -> float | None:
         from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater import (
             AdvSettingAutoUpdater as PlanFactGetter,
