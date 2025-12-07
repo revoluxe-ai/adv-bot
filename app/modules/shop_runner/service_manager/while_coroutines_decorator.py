@@ -38,7 +38,7 @@ def while_coroutine_decorator(
                     continue
                 except InterfaceError:
                     logger.exception(f"Корутина: {func.__name__}")
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(pause_on_error)
                 except (NotFoundActiveAdvCompany, ApiForbiddenError) as exc:
                     raise StopShopUpdateException from exc
                 except MaxAttemptsError as exc:
