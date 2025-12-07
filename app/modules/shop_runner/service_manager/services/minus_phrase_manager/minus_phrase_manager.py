@@ -6,6 +6,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
     ComplexAdv,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
+from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 from .click_house_manager import ClickHouseManager
 
 logger = logging.getLogger(__name__)
@@ -13,9 +14,11 @@ logger = logging.getLogger(__name__)
 
 class MinusPhraseManager:
     def __init__(self, wb_api_manager_hub: WBManagerHub,
-                 click_house_manager: ClickHouseManager):
+                 click_house_manager: ClickHouseManager,
+                 update_redis_timestamp_manager: AdvActiveKeywordUpdateStateManager):
         self._wb_api = wb_api_manager_hub
         self._click_house = click_house_manager
+        self._update_redis_timestamp_manager = update_redis_timestamp_manager
 
     async def update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         try:
@@ -42,7 +45,8 @@ class MinusPhraseManager:
     async def __update_minus_phrases(self,
                                      adv_id: int,
                                      nmids: list[int],
-                                     common_bad_phrases: list[str]) -> None:
+                                     common_bad_phrases: list[str],
+        ) -> None:
         keywords_from_this_adv: list[str] = await self._get_clusters_for_adv(adv_id)
 
         bad_keywords_for_this_adv = set(common_bad_phrases) & set(keywords_from_this_adv)
@@ -57,6 +61,7 @@ class MinusPhraseManager:
             adv_id=adv_id,
             nmid=nmid,
             phrases=minus_phrases_to_send,
+            update_redis_timestamp_manager=self._update_redis_timestamp_manager
         )
             tasks.append(task)
 
@@ -65,7 +70,6 @@ class MinusPhraseManager:
         for result in results:
             if isinstance(result, Exception):
                 logger.error('Ошибка обновления РК: %s', result, exc_info=True)
-
 
         return None
 
