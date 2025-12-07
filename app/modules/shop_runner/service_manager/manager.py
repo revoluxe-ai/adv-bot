@@ -9,7 +9,7 @@ from typing import (
 )
 
 
-from app.core.wb_api.http_request import try_except_decorator
+
 from app.core.wb_api.ping_manager import PingManager
 
 from app.modules.common_slaves.wildberries.models import (
@@ -375,7 +375,7 @@ class CoroutinesManager:
 
         return None
 
-    @try_except_decorator(60 * 15, 60)
+    @while_coroutine_decorator(60 * 15, 60)
     async def update_minus_phrases_in_advs(self):
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
         from app.core.mp.wb.api.wb_manager_hub_factory import WBManagerHubFactory
@@ -402,6 +402,7 @@ class CoroutinesManager:
                     result,
                     exc_info=True,
                 )
+        return None
 
 
     @while_coroutine_decorator(5 * 60, 60)
