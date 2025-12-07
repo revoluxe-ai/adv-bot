@@ -36,6 +36,8 @@ class MinusPhraseManager:
     async def _update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         keywords = await complex_adv.get_keywords()
         bad_keywords: list[str] = [kw.text for kw in keywords if kw.status==KeywordStatus.BAD]
+        if not bad_keywords:
+            return None
         await asyncio.gather(
             self._update_minuses_in_auto_adv(complex_adv, bad_keywords),
             self._update_minuses_in_search_adv(complex_adv, bad_keywords)
