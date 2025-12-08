@@ -130,8 +130,10 @@ class CommonAdvsStatDataManager:
             predict_orders_for_days, pass_days
         )
 
+        # Исправлено: используем реальные заказы вместо прогнозируемых с дробной частью дня
+        # для корректного расчета средней себестоимости заказа
         mean_price_for_order = (
-            spend_for_inner_advs_for_days / predict_orders_for_fraction_day
+            spend_for_inner_advs_for_days / max(base_common_orders, 1)
         )
 
         # Получаем расходы на ключевые слова
