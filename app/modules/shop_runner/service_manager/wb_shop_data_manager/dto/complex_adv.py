@@ -80,6 +80,11 @@ class ComplexAdv:
     def bid_cpm_step(self) -> int:
         return self._adv_setting.bidder_step
 
+
+    @property
+    def bid_cpm_step(self) -> int:
+        return self._adv_setting.bidder_step
+
     @property
     def all_adv_ids(self) -> set[int]:
         adv_ids: set[int] = set()
