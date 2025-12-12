@@ -933,17 +933,6 @@ def get_keyword_setting_keyboard(
         ]
         buttons.append(button)
 
-    button = [
-        InlineKeyboardButton(
-            text="Проверить позицию",
-            callback_data=callbacks.CheckPosition(
-                keyword_setting_original_id=keyword_setting_original_id,
-                adv_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-    ]
-
-    buttons.append(button)
 
     button: list[InlineKeyboardButton] = [
         InlineKeyboardButton(
