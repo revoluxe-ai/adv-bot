@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.di import DIManager
-from app.core.di.app_container import AppContainer
+
 from app.modules.billing import process_payment_for_advs
 
 logging.disable()
@@ -13,6 +13,7 @@ logging.disable()
 
 @pytest.mark.asyncio
 async def test_billing_module_load(async_session: AsyncSession):
+    from app.core.di.app_container import AppContainer
     mock_process = AsyncMock(name="_process_single_cabinet")
     mock_fetch_active_cabinet_ids = AsyncMock(return_value=[1, 2, 3])
 

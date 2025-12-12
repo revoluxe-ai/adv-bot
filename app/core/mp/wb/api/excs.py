@@ -32,7 +32,9 @@ class UnexpectedRequestError(WBApiError):
 
 
 class BadRequestError(WBApiError):
-    pass
+    def __init__(self, detail: str | None = None, *args: Any, **kwargs: Any) -> None:
+        self.detail = detail
+        super().__init__(args, kwargs)
 
 
 class ApiForbiddenError(WBApiError):

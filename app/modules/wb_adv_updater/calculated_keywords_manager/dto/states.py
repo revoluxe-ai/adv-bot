@@ -2,6 +2,7 @@ from enum import StrEnum, auto
 
 
 class KeywordStatusReason(StrEnum):
+    BIDDER_BAD_STATUS = auto()
     MAX_POSITION = auto()
     BLACK_LIST = "black_list"
     WHITE_LIST = "white_list"
@@ -12,6 +13,7 @@ class KeywordStatusReason(StrEnum):
     MAX_CPC = "max_cpc"
     MORE_THEN_RATING_BY_ORDERS = auto()
     LESS_THEN_RATING_BY_ORDERS = auto()
+    WB_MIN_BID_TOO_HIGH = "wb_min_bid_too_high"
 
 class KeywordStatus(StrEnum):
     GOOD = "good"

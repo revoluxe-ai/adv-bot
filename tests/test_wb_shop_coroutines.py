@@ -49,22 +49,24 @@ def client_session_mock():
 async def test_adv_settings_auto_update(
     access_mock, adv_setting_mock, keywords_mocks, client_session_mock, fact_method, get_async_session_mock
 ):
-    # complex_adv_mock = MagicMock()
-    # complex_adv_mock.search_adv = 556455456
-    # complex_adv_mock.is_part_auto_setting_active = True
-
-    # Чтобы использовать фикстуру complex_adv_mock из conftest, ее нужно передать в тест
-    # Но так как у вас уже есть переменная complex_adv_mock, просто используем ее и мокируем нужное свойство
-    # Давайте переименуем ее, чтобы не было путаницы
-    test_complex_adv_instance = MagicMock()
-    test_complex_adv_instance.search_adv = 556455456
-    # Мокируем свойство, чтобы оно просто возвращало True, не вызывая реальную логику
-    type(test_complex_adv_instance).is_part_auto_setting_active = PropertyMock(return_value=True)
-
-
+    adv_setting_mock.auto_update_white_list = True
+    adv_setting_mock.auto_update_target_place = True
+    adv_setting_mock.auto_update_exponent = False
+    adv_setting_mock.automatic_version = 1
     adv_setting_mock.auto_updater_version = 1
     adv_setting_mock.sales_predict_method = fact_method
+    adv_setting_mock.rec_system_mode = False
     wb_api = WBApi(access_mock, client_session_mock)
+
+    async def _get_keywords(_: ComplexAdv):
+        return keywords_mocks
+
+    test_complex_adv_instance = ComplexAdv(
+        shop_id=wb_api.shop_id,
+        adv_setting=adv_setting_mock,
+        search_adv=None,
+        get_keywords_func=_get_keywords,
+    )
 
     data_manager_mock = MagicMock()
     data_manager_mock.get_good_bad_phrases = AsyncMock(return_value=keywords_mocks)
@@ -80,14 +82,6 @@ async def test_adv_settings_auto_update(
     mock_change_plan_fact.set_new_plan_fact = AsyncMock(return_value=None)
     
     with (
-        patch(
-            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.ComplexAdv",
-            new=MagicMock(return_value=test_complex_adv_instance),
-        ),
-        # patch(
-        #     "app.modules.shop_runner.service_manager.manager.data_manager",
-        #     new=data_manager_mock,
-        # ),
         patch(
             "app.utils.db.session_maker.get_async_session_maker",
             new=get_async_session_mock,
@@ -105,12 +99,8 @@ async def test_adv_settings_auto_update(
             new=MagicMock(return_value=plan_data),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_active_advs",
-            new=AsyncMock(return_value=[test_complex_adv_instance]), # Используем нашу новую замокированную инстанцию
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_calculated_keywords",
-            new=AsyncMock(return_value=keywords_mocks),
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_complex_advs",
+            new=AsyncMock(return_value=[test_complex_adv_instance]),
         ),
         patch(
             "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.update",

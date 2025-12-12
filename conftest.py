@@ -2,8 +2,6 @@
 # IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
 
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
-
 # Устанавливаем переменные окружения для тестовой БД ДО любых импортов
 os.environ["POSTGRES_MASTER_HOST"] = "localhost"
 os.environ["POSTGRES_REPLICA_HOST"] = "localhost"
@@ -46,9 +44,10 @@ from fakeredis import FakeRedis
 import aiofiles
 from dependency_injector import containers
 import fakeredis
-from tests.factories import adv_factory
-from tests.factories.adv_factory import AdvSettingFactory, KeywordSettingFactory
-from app.core.di.app_container import AppContainer
+import typing
+if typing.TYPE_CHECKING:
+    from app.core.di.app_container import AppContainer
+    from app.modules.common_slaves.wildberries.models import WBCabinet
 
 import sys
 from pathlib import Path
@@ -74,7 +73,8 @@ from sqlalchemy import text, create_engine
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
 
-from app.modules.common_slaves.wildberries.models import WBCabinet
+from app.utils.db.base import BaseTable as Base
+
 from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
 TEST_DB_URL = "postgresql+asyncpg://test_user:test_password@localhost:5433/test_adv_bot_db"
@@ -146,6 +146,7 @@ def docker_compose_cmd() -> list[str]:
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_database(docker_compose_cmd):
+    from app.modules.common_slaves.wildberries.models import WBCabinet
     """Синхронная фикстура для настройки тестовой базы данных с помощью Docker Compose и Alembic."""
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
 
@@ -177,52 +178,29 @@ def setup_test_database(docker_compose_cmd):
             _sync_run("docker", "logs", container_id, timeout=10)
         raise RuntimeError("Test database did not become healthy in time.")
 
-    from app.utils.db.base import BaseTable as Base
-    from sqlalchemy import create_engine
+    print("[DB] Resetting PostgreSQL schema for tests...")
 
-    print("[MIGRATION] Creating PostgreSQL extensions...")
-
-    # Добавим небольшую задержку перед созданием расширений PostgreSQL
+    # Добавим небольшую задержку перед манипуляциями со схемой
     time.sleep(5)
 
-    # Создаём синхронный движок для создания расширений и таблиц
-    sync_engine = create_engine(TEST_DB_URL.replace("postgresql+asyncpg", "postgresql"))
+    sync_engine = create_engine(TEST_DB_POSTGRES_URL)
 
-    # Создаём необходимые расширения PostgreSQL ПЕРЕД созданием таблиц
+    # Полностью пересоздаём public-схему, чтобы избавиться от старых enum'ов и таблиц
     with sync_engine.connect() as conn:
-        try:
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-            conn.commit()
-        except Exception as e:
-            # Игнорируем ошибку если расширение уже существует (race condition в PostgreSQL)
-            if "already exists" in str(e):
-                print(f"[INFO] Extension pg_trgm already exists, skipping...")
-                conn.rollback()
-            else:
-                raise
+        conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
 
-    print("[MIGRATION] Creating tables from models metadata...")
+    # Создаём необходимые расширения PostgreSQL в новой схеме
+    with sync_engine.connect() as conn:
+        conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+
+    print("[DB] Creating tables from SQLAlchemy metadata...")
     Base.metadata.create_all(sync_engine)
-    
-    # Очищаем тестовые таблицы от данных предыдущих запусков
-    with sync_engine.connect() as conn:
-        conn.execute(text("TRUNCATE keywordsetting, advsetting RESTART IDENTITY CASCADE"))
-        conn.commit()
-    print("[OK] Test tables truncated.")
-    
-    sync_engine.dispose()
     print("[OK] Tables created successfully from models metadata.")
 
-    # Проставляем миграции Alembic как применённые
-    from alembic.config import Config
-    from alembic import command
-
-    print("[MIGRATION] Stamping Alembic migrations for test database...")
-    alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("script_location", "alembic_")
-    alembic_cfg.set_main_option("sqlalchemy.url", TEST_DB_URL)
-    command.stamp(alembic_cfg, "head")
-    print("[OK] Alembic migrations stamped successfully.")
+    sync_engine.dispose()
 
     # --- Базовые данные (async) ---
     # Создаём минимальный event loop только для этой задачи
@@ -318,7 +296,7 @@ async def _async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture(name="access_mock_simple")
 def _access_mock():
     mock = MagicMock()
-    mock.wb_cabinet = MagicMock(spec=WBCabinet)
+    mock.wb_cabinet = MagicMock(spec="WBCabinet")
     mock.wb_cabinet.id = 1
     mock.wb_cabinet.shop_id = "test_shop_id"
     return mock
@@ -410,6 +388,7 @@ def adv_setting_mock():
     adv_setting_mock = MagicMock(spec=AdvSetting)
     adv_setting_mock.adv_id = 25040169
     adv_setting_mock.nmids = [222811118]
+    adv_setting_mock.search_adv_id = None
     adv_setting_mock.active_status = "started"
     return adv_setting_mock
 
@@ -477,8 +456,8 @@ async def front_too_many_requests_str() -> AsyncGenerator[str, None]:
 
 
 @pytest.fixture(name="di_container", scope="function")
-async def di_container() -> AsyncGenerator[AppContainer, None]:
-
+async def di_container() -> AsyncGenerator["AppContainer", None]:
+    from app.core.di.app_container import  AppContainer
     AppContainer.wiring_config = containers.WiringConfiguration()
     container = AppContainer()
 
@@ -503,12 +482,7 @@ async def fake_redis():
 
 
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import ComplexAdv
-from tests.factories.keyword_pipeline import (
-    make_calculated_keyword,
-    make_keyword_setting_dto,
-    make_keyword_stat,
-    HardStatus,
-)
+from tests.factories.complex_adv import create_complex_adv_seed
 
 
 
@@ -524,199 +498,16 @@ async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexA
     """Создает полностью связанную структуру ComplexAdv (реальные ORM-объекты)."""
 
     await postgres_session.begin()
-    adv_setting = AdvSettingFactory.build(
-        adv_id=123, # Устанавливаем adv_id для консистентности теста
-        nmids=[456], # Добавляем nmids
-        auto_update_white_list=True,
-        auto_update_target_place=True,
-        auto_update_exponent=True,
-        auto_add_only_relevant_phrase=False,
-        bidder_for_auto=True,
-        bidder_active=True,
-    )
-    adv_setting.cpm = 100
-    adv_setting.max_cpm = 250
-    adv_setting.max_place = 120
-    adv_setting.exponent_predict_ctr = 8.0
+    seed = await create_complex_adv_seed(postgres_session)
 
-    search_adv_setting = AdvSettingFactory.build()
-    search_adv_setting.cpm = 90
-    adv_setting._search_adv = search_adv_setting.adv_id
-    postgres_session.add(adv_setting)
-    await postgres_session.flush()
-    await postgres_session.refresh(adv_setting)
-    # 2️⃣ KeywordSettings
-    adv_factory.fake.unique.clear()
-    keyword_settings = []
-    for idx in range(50):
-        ks = KeywordSettingFactory.build(adv_setting_id=adv_setting.id)
-        if idx < 10:
-            ks.hard_status = 2
-            ks.relevant = True
-        elif idx < 20:
-            ks.hard_status = 1
-            ks.relevant = True
-        else:
-            ks.hard_status = 0
-            ks.relevant = False
-        keyword_settings.append(ks)
-    postgres_session.add_all(keyword_settings)
-    await postgres_session.flush()
-    for ks in keyword_settings:
-        await postgres_session.refresh(ks)
-
-    # 3️⃣ CalculatedKeywords
-    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_state import KeywordState
-    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatusReason
-    
-    def _build_keyword(
-        ks: KeywordSetting,
-        *,
-        status: KeywordStatus,
-        hard_status: int,
-        predict_ctr: float,
-        predict_ctr_exponent: float,
-        views: int,
-        clicks: int,
-        spend: float,
-        relevant: bool,
-        best: bool = False,
-    ) -> CalculatedKeyword:
-        keyword_setting_dto = KeywordSettingDTO(
-            text=ks.text,
-            relevant=relevant,
-            hard_status=hard_status,
-            id=ks.id,
-            predict_ctr=predict_ctr,
-            added_clicks=0,
-        )
-        cluster_stat = KeywordStat(
-            norm_query=ks.text,
-            position=1.0,
-            timestamp=datetime.now(),
-            views=views,
-            clicks=clicks,
-            add_to_cart=0,
-            orders=0,
-            spend=spend,
-            cpc=0,
-            cpm=0.0,
-            base_cart_to_order_conv=0.0,
-            expected_orders_from_cart=0.0,
-            expected_orders=0.0,
-            final_rating=0.0,
-            views_all_time=views,
-            orders_all_time=0,
-        )
-        
-        # Определяем reason на основе hard_status
-        if hard_status == 2:  # WHITELIST
-            reason = KeywordStatusReason.WHITE_LIST
-        elif hard_status == 0:  # BLACKLIST
-            reason = KeywordStatusReason.BLACK_LIST
-        elif hard_status == 3:  # TURN_OFF
-            reason = KeywordStatusReason.TURN_OFF
-        else:
-            reason = KeywordStatusReason.MORE_THEN_HARD_MIN_CTR
-        
-        state = KeywordState(
-            status=status,
-            reason=reason,
-            best_keyword_status=best,
-        )
-
-        calculated_keyword = CalculatedKeyword(
-            adv_id=adv_setting.adv_id,
-            keyword_setting=keyword_setting_dto,
-            cluster_stat=cluster_stat,
-            state=state,
-        )
-        return calculated_keyword
-
-    calculated_keywords: list[CalculatedKeyword] = []
-    for idx, ks in enumerate(keyword_settings):
-        if idx == 0:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.GOOD,
-                    hard_status=2,
-                    predict_ctr=1.5,
-                    predict_ctr_exponent=6.0,
-                    views=1500,
-                    clicks=200,
-                    spend=320.0,
-                    relevant=True,
-                    best=True,
-                )
-            )
-        elif idx < 10:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.GOOD,
-                    hard_status=2,
-                    predict_ctr=1.2,
-                    predict_ctr_exponent=5.0,
-                    views=1200,
-                    clicks=150,
-                    spend=210.0,
-                    relevant=True,
-                )
-            )
-        elif idx < 15:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.BAD,
-                    hard_status=1,
-                    predict_ctr=0.35,
-                    predict_ctr_exponent=4.0,
-                    views=800,
-                    clicks=40,
-                    spend=45.0,
-                    relevant=True,
-                )
-            )
-        elif idx < 20:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.GOOD,
-                    hard_status=1,
-                    predict_ctr=1.1,
-                    predict_ctr_exponent=4.5,
-                    views=1000,
-                    clicks=120,
-                    spend=160.0,
-                    relevant=True,
-                )
-            )
-        else:
-            calculated_keywords.append(
-                _build_keyword(
-                    ks,
-                    status=KeywordStatus.BAD,
-                    hard_status=0,
-                    predict_ctr=0.25,
-                    predict_ctr_exponent=3.0,
-                    views=600,
-                    clicks=30,
-                    spend=30.0,
-                    relevant=False,
-                )
-            )
-
-    # 4️⃣ Асинхронный источник данных для ComplexAdv
     async def get_keywords_func(_: AdvSetting) -> list[CalculatedKeyword]:
-        return calculated_keywords
+        return seed.calculated_keywords
 
-    # 5️⃣ Реальный ComplexAdv
     complex_adv = ComplexAdv(
-        shop_id='559785095jljiuilhkh',
-        adv_setting=adv_setting,
+        shop_id="559785095jljiuilhkh",
         get_keywords_func=get_keywords_func,
-        search_adv=search_adv_setting,
+        adv_setting=seed.adv_setting,
+        search_adv=seed.search_adv,
     )
 
     yield complex_adv
@@ -772,8 +563,8 @@ def clean_db():
 
 
 @pytest.fixture(scope='function')
-def main_di_container() -> AppContainer:
-
+def main_di_container() -> "AppContainer":
+    from app.core.di.app_container import AppContainer
     container = AppContainer()
     return container
 
@@ -781,7 +572,7 @@ def main_di_container() -> AppContainer:
 
 
 @pytest.fixture(scope='function')
-def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRedis) -> AppContainer:
+def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRedis) -> "AppContainer":
     main_di_container.wiring_config.modules = ['app.core.redis_cache',  # Отключаем автоматическое встраивание зависимостей
                                        "old_modules.setting_auto_updater_v2.adv_control_system."
                                        "executors.target_place_executor.utils",
@@ -879,6 +670,7 @@ async def clickhouse_client(setup_test_database):
 
 @pytest.fixture(scope='function')
 def app_container():
+    from app.core.di.app_container import AppContainer
     container = AppContainer()
     return container
 

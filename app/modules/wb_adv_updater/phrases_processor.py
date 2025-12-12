@@ -1,19 +1,13 @@
 
-from sqlalchemy import select
-
 
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
     RedisCalculatedKeywordsCacheManager,
 )
-
-
-from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
 from app.utils.db.session_maker import get_async_session_maker
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 
-
-from ..shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import ComplexAdv
 import logging
 
 
@@ -329,31 +323,18 @@ _sm = get_async_session_maker
 #     return keyword_stats
 
 
-async def _get_complex_adv(main_adv: AdvSetting) -> ComplexAdv:
-    if search_adv_id := main_adv.search_adv_id:
-        stmt_for_search_adv = select(AdvSetting).where(AdvSetting.adv_id == search_adv_id)
-        async with _sm(read_only=True) as session:
-            result = await session.execute(stmt_for_search_adv)
-            search_adv_setting = result.scalar_one()
-    else:
-        search_adv_setting = None
-    complex_adv = ComplexAdv(main_adv, search_adv_setting)
-    return complex_adv
 
 
-async def  get_good_bad_phrases(adv: AdvSetting) -> list[CalculatedKeyword]:
+async def  get_good_bad_phrases(complex_adv: ComplexAdv) -> list[CalculatedKeyword]:
 
     from .calculated_keywords_manager import CalculatedKeywordsManager
-
-    complex_adv = await _get_complex_adv(adv)
-
     keyword_manager = CalculatedKeywordsManager()
     # TODO: Вроде как сейчас WB позволяет внутри РК управлять каждым артикулом отдельно
     keywords: list[CalculatedKeyword]  = await keyword_manager.get_calculated_keywords(complex_adv)
     keywords = sorted(keywords, key=lambda kw: kw.rating_by_orders, reverse=True)
     keywords_redis_cache_manager = RedisCalculatedKeywordsCacheManager()
     await keywords_redis_cache_manager.set_calculated_keywords(
-        keywords, int(adv.adv_id)
+        keywords, complex_adv.adv_id
     )
 
     return keywords

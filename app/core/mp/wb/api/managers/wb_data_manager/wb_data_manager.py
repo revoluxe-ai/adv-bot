@@ -1,7 +1,8 @@
 from typing import List, Sequence
 import datetime
 
-from app.core.mp.wb.dto import KeywordPosition
+from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.dto import NormqueryBidDTO
+from app.core.mp.wb.dto import AdvMinNmidsBids, KeywordPosition
 import logging
 import typing
 
@@ -63,3 +64,18 @@ class WBDataManager:
             date_from=date_from,
             date_to=date_to,
         )
+
+    async def get_current_bids_for_advs(
+        self,
+        complex_advs: list["ComplexAdv"],
+    ) -> list[NormqueryBidDTO] | None:
+        """Получить текущие ставки по поисковым кластерам для рекламных кампаний."""
+
+        return await self._promotion_manager.get_normquery_bids(
+            complex_advs,
+        )
+
+    async def get_min_bids(self, advs: list["ComplexAdv"]) -> AdvMinNmidsBids | None:
+        """Получить минимальные ставки CPM (auto + search) для списка РК."""
+
+        return await self._promotion_manager.get_min_bids_for_complex_adv(advs)

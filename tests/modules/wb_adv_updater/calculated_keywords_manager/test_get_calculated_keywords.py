@@ -17,12 +17,11 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
     KeywordStatusReason,
 )
+from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import BidderKeywordStatus
+
 from tests.factories.keyword_pipeline import (
     PreCalculatedKeywordFactory,
-    KeywordSettingDTOFactory,
-    KeywordStatFactory,
     HardStatus,
-    fake,
 )
 
 
@@ -76,6 +75,8 @@ async def test_no_whitelist_all_keywords_pass_ctr(complex_adv_with_hard_min_ctr)
             cluster_stat__clicks=100,  # CTR = 10%
             cluster_stat__final_rating=50.0 + i,
             cluster_stat__norm_query=f"keyword_{i}",
+            bidder_keyword_status=BidderKeywordStatus.GOOD
+
         )
         for i in range(3)
     ]
@@ -114,6 +115,7 @@ async def test_no_whitelist_some_keywords_fail_ctr(complex_adv_with_hard_min_ctr
         cluster_stat__clicks=100,  # CTR = 10%
         cluster_stat__final_rating=60.0,
         cluster_stat__norm_query="good_keyword",
+        bidder_keyword_status=BidderKeywordStatus.GOOD
     )
     
     # Плохое ключевое слово: CTR = 2%

@@ -31,6 +31,9 @@ class AppContainer(containers.DeclarativeContainer):
             "app.modules.wb_adv_updater",  # wb_adv_updater использует min_ctr_manager
             "app.core.redis_cache",
             "app.modules.shop_runner.run_process_func",
+            "app.core.mp.wb.wb_base_manager",
+            "app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager"
+
         ]
     )
 
