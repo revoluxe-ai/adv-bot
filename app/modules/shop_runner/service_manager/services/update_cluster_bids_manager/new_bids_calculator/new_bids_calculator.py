@@ -24,7 +24,7 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     if new_bid >= max_bid:
         new_bid = max_bid
         bidder_keyword_status = BidderKeywordStatus.GOOD
-    elif min_bid is not None and max_bid < new_bid < max_bid:
+    elif min_bid is not None and min_bid < new_bid < max_bid:
         bidder_keyword_status = BidderKeywordStatus.GOOD
     elif min_bid is None:
         logger.error("Нет минимальной ставки: не могу снизить ставку!!!")
