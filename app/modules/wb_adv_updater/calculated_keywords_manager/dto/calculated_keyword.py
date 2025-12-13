@@ -22,6 +22,8 @@ class CalculatedKeyword(BaseModel):
     def auto_max_bid_cpm(self) -> int | None:
         max_pay_for_all_views_for_order = self.target_pay_for_order
         if not max_pay_for_all_views_for_order:
+           return None
+        if self.rating_by_orders == 0:
             return None
         views_for_order = 1000/self.rating_by_orders
         pay_for_one_view = max_pay_for_all_views_for_order / views_for_order
