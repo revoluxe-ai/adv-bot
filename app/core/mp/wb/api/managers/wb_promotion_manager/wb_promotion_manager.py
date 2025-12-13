@@ -32,7 +32,7 @@ class WBModifier:
         try:
             await self._promotion_manager.set_minus_phrases(adv_id, nm_id=nmid, phrases=phrases)
         except Exception as e:
-            logger.error('Ошибка обновления минус-фраз: %s', exc_info=True)
+            logger.error('Ошибка обновления минус-фраз: %s', e, exc_info=True)
             raise e
         await update_redis_timestamp_manager.set_one(adv_id=adv_id)
         return None
