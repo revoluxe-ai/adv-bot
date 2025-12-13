@@ -8,7 +8,7 @@ class RedisClusterBidsTimestampManager(BaseRedisManager):
     prefix = "last_cluster_bids_update_timestamp"
 
     def _get_key(self, adv: AdvProtocol) -> str:
-        return f'self.prefix:{adv.adv_id}'
+        return f'{self.prefix}:{adv.adv_id}'
 
     async def get(self, adv: AdvProtocol) -> datetime.datetime | None:
         key = self._get_key(adv)
