@@ -210,7 +210,7 @@ class UpdateClusterBidsManager:
     async def __get_calculate_data(adv: ComplexAdv) -> set[AdvIdItemCalculateData]:
         from app.modules.shop_runner.service_manager.services.minus_phrase_manager\
             .click_house_manager.click_house_manager import ClickHouseManager
-        search_adv_id = adv.search_adv.adv_id
+        search_adv_id = adv.auction_adv_id
         if search_adv_id is None:
             logger.warning('Нет поисковой компании у комплекса: %s', adv.adv_id)
             return set()
